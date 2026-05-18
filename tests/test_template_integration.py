@@ -80,15 +80,6 @@ class TestTemplateIntegration(unittest.TestCase):
         self.assertIn('type="module"', html)
         self.assertNotIn('mes-toast-container', html)
 
-    def test_tables_page_serves_pure_vite_module(self):
-        response = self.client.get('/tables')
-        self.assertEqual(response.status_code, 200)
-        html = response.data.decode('utf-8')
-
-        self.assertIn('/static/dist/tables.js', html)
-        self.assertIn('type="module"', html)
-        self.assertNotIn('mes-toast-container', html)
-
     def test_resource_page_serves_pure_vite_module(self):
         response = self.client.get('/resource')
         self.assertEqual(response.status_code, 200)
@@ -284,17 +275,6 @@ class TestMesApiUsageInTemplates(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertTrue('MesApi.get' in html or '/static/dist/wip-detail.js' in html)
 
-    def test_tables_page_uses_mesapi_or_vite_module(self):
-        response, final_response, html = _get_response_and_html(self.client, '/tables')
-
-        if response.status_code == 302:
-            self.assertTrue(response.location.endswith('/portal-shell/tables'))
-            self.assertEqual(final_response.status_code, 200)
-            self.assertIn('/static/dist/portal-shell.js', html)
-        else:
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue('MesApi.post' in html or '/static/dist/tables.js' in html)
-
     def test_resource_page_uses_mesapi_or_vite_module(self):
         response, final_response, html = _get_response_and_html(self.client, '/resource')
 
@@ -340,7 +320,6 @@ class TestViteModuleIntegration(unittest.TestCase):
             ('/wip-detail', 'wip-detail.js'),
             ('/hold-overview', 'hold-overview.js'),
             ('/hold-detail?reason=test-reason', 'hold-detail.js'),
-            ('/tables', 'tables.js'),
             ('/resource', 'resource-status.js'),
             ('/resource-history', 'resource-history.js'),
             ('/reject-history', 'reject-history.js'),
@@ -355,7 +334,6 @@ class TestViteModuleIntegration(unittest.TestCase):
             '/resource': '/portal-shell/resource',
             '/resource-history': '/portal-shell/resource-history',
             '/job-query': '/portal-shell/job-query',
-            '/tables': '/portal-shell/tables',
             '/query-tool': '/portal-shell/query-tool',
             '/reject-history': '/portal-shell/reject-history',
         }

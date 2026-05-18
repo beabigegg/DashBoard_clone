@@ -51,7 +51,7 @@ class TestToastStress:
 
     def test_rapid_toast_creation(self, page: Page, app_server: str):
         """Test Toast system under rapid creation - should enforce max limit."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         # Create 50 toasts rapidly
         start_time = time.time()
@@ -70,7 +70,7 @@ class TestToastStress:
 
     def test_toast_type_cycling(self, page: Page, app_server: str):
         """Test rapid cycling through all toast types - system remains stable."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         toast_types = ['info', 'success', 'warning', 'error']
 
@@ -95,7 +95,7 @@ class TestToastStress:
 
     def test_toast_dismiss_stress(self, page: Page, app_server: str):
         """Test rapid toast creation and dismissal."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         start_time = time.time()
 
@@ -116,7 +116,7 @@ class TestToastStress:
 
     def test_loading_toast_stress(self, page: Page, app_server: str):
         """Test loading toasts can be created and properly dismissed."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         toast_ids = []
 
@@ -147,7 +147,7 @@ class TestMesApiStress:
 
     def test_rapid_api_requests(self, page: Page, app_server: str):
         """Test MesApi under rapid sequential requests."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         # Make 20 rapid API requests
         results = page.evaluate("""
@@ -179,7 +179,7 @@ class TestMesApiStress:
 
     def test_concurrent_api_requests(self, page: Page, app_server: str):
         """Test MesApi with concurrent requests using Promise.all."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         # Make 10 concurrent requests
         results = page.evaluate("""
@@ -218,7 +218,7 @@ class TestMesApiStress:
 
     def test_abort_controller_stress(self, page: Page, app_server: str):
         """Test AbortController under rapid request cancellation."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         # Start requests and cancel them rapidly
         results = page.evaluate("""
@@ -444,7 +444,7 @@ class TestMemoryStress:
 
     def test_toast_memory_cleanup(self, page: Page, app_server: str):
         """Check Toast system cleans up properly."""
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         # Create and dismiss many toasts
         for batch in range(5):
@@ -471,7 +471,7 @@ class TestConsoleErrorMonitoring:
 
         page.on("pageerror", lambda error: js_errors.append(str(error)))
 
-        load_page_with_js(page, f"{app_server}/tables")
+        load_page_with_js(page, f"{app_server}/production-history")
 
         # Perform stress operations
         for i in range(30):

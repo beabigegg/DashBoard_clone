@@ -25,7 +25,6 @@ def test_contract_sections_exist_for_primary_pages():
         ('job_query', 'export'),
         ('resource_history', 'detail_table'),
         ('resource_history', 'export'),
-        ('tables', 'result_table'),
         ('resource_status', 'matrix_summary'),
     ]:
         contract = get_page_contract(page, section)
@@ -55,7 +54,6 @@ def test_all_contract_fields_define_semantic_type():
         ('resource_history', 'detail_table'),
         ('resource_history', 'kpi'),
         ('resource_history', 'export'),
-        ('tables', 'result_table'),
         ('resource_status', 'matrix_summary'),
     ]
     for page, section in pages_and_sections:

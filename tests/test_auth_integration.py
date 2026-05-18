@@ -242,28 +242,6 @@ class TestPermissionMiddleware:
         response = client.get("/wip-overview")
         assert response.status_code != 403
 
-    def test_dev_page_returns_403_without_login(self, client, temp_page_status):
-        """Test dev pages return 403 for non-admin."""
-        data = json.loads(temp_page_status.read_text())
-        data["pages"].append({"route": "/tables", "name": "Tables", "status": "dev"})
-        temp_page_status.write_text(json.dumps(data))
-        page_registry._cache = None
-
-        response = client.get("/tables")
-        assert response.status_code == 403
-
-    def test_dev_page_accessible_with_admin_login(self, client, temp_page_status):
-        """Test dev pages are accessible for admin."""
-        data = json.loads(temp_page_status.read_text())
-        data["pages"].append({"route": "/tables", "name": "Tables", "status": "dev"})
-        temp_page_status.write_text(json.dumps(data))
-        page_registry._cache = None
-
-        _set_admin_session(client)
-
-        response = client.get("/tables")
-        assert response.status_code != 403
-
     def test_admin_pages_redirect_without_login(self, client):
         """Test admin pages redirect or return 401/403 without authentication."""
         response = client.get("/admin/pages", follow_redirects=False)

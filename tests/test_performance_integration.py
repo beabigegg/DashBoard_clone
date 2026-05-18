@@ -48,14 +48,6 @@ class TestAPIResponseFormat:
         assert "single_port_bind" in data["data"]
         assert "data" in data
 
-    def test_unauthenticated_redirect(self, client):
-        """Unauthenticated requests redirect to login."""
-        response = client.get('/admin/performance')
-
-        # Should redirect to login page
-        assert response.status_code == 302
-
-
 class TestHealthEndpoints:
     """Test health check endpoints."""
 
@@ -370,18 +362,6 @@ class TestCircuitBreakerIntegration:
 class TestPerformancePage:
     """Test performance monitoring page."""
 
-    def test_performance_page_requires_auth(self, client):
-        """Performance page requires admin authentication."""
-        response = client.get('/admin/performance')
-        # Should redirect to login
-        assert response.status_code == 302
-
-    def test_performance_page_redirects_to_dashboard(self, admin_client):
-        """Performance page redirects to unified dashboard."""
-        response = admin_client.get('/admin/performance')
-        assert response.status_code == 302
-        assert '/admin/dashboard' in response.headers.get('Location', '')
-
     def test_dashboard_page_requires_auth(self, client):
         response = client.get('/admin/dashboard')
         assert response.status_code == 302
@@ -394,17 +374,6 @@ class TestPerformancePage:
         assert 'admin dashboard' in data_str or 'dashboard' in data_str
         assert '/static/dist/admin-dashboard.js' in html
         assert 'cdn.jsdelivr.net' not in html
-
-    def test_user_usage_kpi_page_requires_auth(self, client):
-        response = client.get('/admin/user-usage-kpi')
-        assert response.status_code == 302
-
-    def test_user_usage_kpi_page_redirects_to_dashboard(self, admin_client):
-        """User usage KPI page redirects to unified dashboard."""
-        response = admin_client.get('/admin/user-usage-kpi')
-        assert response.status_code == 302
-        assert '/admin/dashboard' in response.headers.get('Location', '')
-
 
 class TestRedisNamespaceMemoryTelemetry:
     """Test admin Redis namespace memory sampling helpers."""

@@ -216,28 +216,6 @@ test('LotJobsTable uses BlockLoadingState instead of placeholder div', () => {
   );
 });
 
-// ── 8. DataViewer uses shared loading components ──────────────────────────────
-
-test('DataViewer uses BlockLoadingState for column loading', () => {
-  const content = readSrc('tables/components/DataViewer.vue');
-  assert.ok(
-    content.includes('BlockLoadingState'),
-    'DataViewer must use BlockLoadingState for loadingColumns state',
-  );
-  assert.ok(
-    !content.includes('<div v-if="loadingColumns" class="loading">'),
-    'DataViewer must not use text-only loading div for loadingColumns',
-  );
-});
-
-test('DataViewer uses LoadingSpinner for query loading row', () => {
-  const content = readSrc('tables/components/DataViewer.vue');
-  assert.ok(
-    content.includes('LoadingSpinner'),
-    'DataViewer must use LoadingSpinner in the loadingQuery table row',
-  );
-});
-
 // ── 9. wip-detail uses shared spinner ────────────────────────────────────────
 
 test('LotDetailPanel uses LoadingSpinner instead of custom loading-spinner span', () => {

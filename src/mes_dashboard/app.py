@@ -1012,33 +1012,6 @@ def create_app(config_name: str | None = None) -> Flask:
         """Serve favicon without 404 noise."""
         return redirect(url_for('static', filename='favicon.svg'), code=302)
 
-    @app.route('/tables')
-    def tables_page():
-        """Table viewer page served as pure Vite HTML output."""
-        canonical_redirect = maybe_redirect_to_canonical_shell('/tables')
-        if canonical_redirect is not None:
-            return canonical_redirect
-
-        dist_dir = os.path.join(app.static_folder or "", "dist")
-        dist_html = os.path.join(dist_dir, "tables.html")
-        if os.path.exists(dist_html):
-            return send_from_directory(dist_dir, 'tables.html')
-
-        nested_dist_dir = os.path.join(dist_dir, "src", "tables")
-        nested_dist_html = os.path.join(nested_dist_dir, "index.html")
-        if os.path.exists(nested_dist_html):
-            return send_from_directory(nested_dist_dir, "index.html")
-
-        # Test/local fallback when frontend build artifacts are absent.
-        return missing_in_scope_asset_response('/tables', (
-            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-            "<title>MES 數據表查詢工具</title>"
-            "<script type=\"module\" src=\"/static/dist/tables.js\"></script>"
-            "</head><body><div id='app'></div></body></html>",
-            200,
-        ))
-
     @app.route('/wip-overview')
     def wip_overview_page():
         """WIP Overview Dashboard served as pure Vite HTML output."""

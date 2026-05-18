@@ -50,7 +50,6 @@ class AppFactoryTests(unittest.TestCase):
         expected = {
             "/",
             "/portal-shell",
-            "/tables",
             "/resource",
             "/wip-overview",
             "/wip-detail",

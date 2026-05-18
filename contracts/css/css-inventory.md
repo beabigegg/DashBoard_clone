@@ -1,9 +1,10 @@
 ---
 contract: css-inventory
+schema-version: 1.2.1
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-05-05
+last-changed: 2026-05-18
 ---
 
 # CSS Inventory (Governed Source List)
@@ -54,8 +55,6 @@ last-changed: 2026-05-05
 | File | Primary Theme Root | Route / Feature |
 |---|---|---|
 | `frontend/src/admin-dashboard/style.css` | `theme-admin-dashboard` | admin-dashboard |
-| `frontend/src/admin-performance/style.css` | `theme-admin-performance` | admin-performance |
-| `frontend/src/admin-user-usage-kpi/style.css` | `theme-admin-user-usage-kpi` | admin-user-usage-kpi |
 | `frontend/src/anomaly-overview/style.css` | `theme-anomaly-overview` | anomaly-overview |
 | `frontend/src/hold-detail/style.css` | `theme-hold-detail` | hold-detail |
 | `frontend/src/hold-history/style.css` | `theme-hold-history` | hold-history |
@@ -68,7 +67,6 @@ last-changed: 2026-05-05
 | `frontend/src/reject-history/style.css` | `theme-reject-history` | reject-history |
 | `frontend/src/resource-history/style.css` | `theme-resource-history` | resource-history |
 | `frontend/src/resource-status/style.css` | `theme-resource` | resource-status |
-| `frontend/src/tables/style.css` | `theme-tables` | tables |
 | `frontend/src/wip-detail/style.css` | `theme-wip-detail` | wip-detail |
 | `frontend/src/wip-overview/style.css` | `theme-wip-overview` | wip-overview |
 | `frontend/src/yield-alert-center/style.css` | `theme-yield-alert-center` | yield-alert-center |

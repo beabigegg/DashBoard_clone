@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.14
+schema-version: 1.3.15
 last-changed: 2026-05-18
 breaking-change-policy: deprecate-2-minors
 ---
@@ -134,6 +134,14 @@ breaking-change-policy: deprecate-2-minors
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.13 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 - **Source**: change `migrate-material-trace-ts`.
+
+### frontend-build scope change (remove-unused-pages)
+
+- **Removed from Vite build input**: `tables`, `admin-performance`, `admin-user-usage-kpi` — all three app directories deleted; no longer built.
+- **Added to Vite build input**: `production-history` — HTML entry added to `rollupOptions.input`.
+- **Net effect**: `dist/` will no longer contain `tables.*`, `admin-performance.*`, `admin-user-usage-kpi.*` bundles; `production-history.*` bundle now present.
+- **Schema-version bump to 1.3.15 (patch)**: documents build-scope change only — gate tier, command, and status are unchanged.
+- **Source**: change `remove-unused-pages`.
 
 ### frontend-type-check scope expansion (Phase 3 — migrate-mid-section-defect-ts)
 

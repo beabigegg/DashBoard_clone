@@ -21,7 +21,6 @@ def temp_data_file(tmp_path):
         "pages": [
             {"route": "/", "name": "Home", "status": "released"},
             {"route": "/wip-overview", "name": "WIP Overview", "status": "released"},
-            {"route": "/tables", "name": "Tables", "status": "dev"},
             {"route": "/dev-page", "name": "Dev Page", "status": "dev"},
         ],
         "api_public": True,
@@ -61,8 +60,6 @@ class TestSchemaMigration:
 
         assert page_by_route["/wip-overview"]["drawer_id"] == "reports"
         assert page_by_route["/wip-overview"]["order"] == 1
-        assert page_by_route["/tables"]["drawer_id"] == "queries"
-        assert page_by_route["/tables"]["order"] == 1
 
         # Admin tools should be backfilled from legacy hardcoded sidebar mapping.
         assert page_by_route["/admin/pages"]["drawer_id"] == "dev-tools"
@@ -175,7 +172,6 @@ class TestNavigationConfig:
         assert "tool_src" not in reports["pages"][0]
 
         queries = next(drawer for drawer in nav if drawer["id"] == "queries")
-        assert queries["pages"][0]["route"] == "/tables"
         assert queries["pages"][-1]["route"] == "/dev-page"
 
         dev_tools = next(drawer for drawer in nav if drawer["id"] == "dev-tools")

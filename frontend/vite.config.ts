@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
         'resource-status': resolve(__dirname, 'src/resource-status/index.html'),
         'resource-history': resolve(__dirname, 'src/resource-history/index.html'),
         'job-query': resolve(__dirname, 'src/job-query/main.js'),
-        tables: resolve(__dirname, 'src/tables/index.html'),
+        'production-history': resolve(__dirname, 'src/production-history/index.html'),
         'query-tool': resolve(__dirname, 'src/query-tool/main.js'),
         'qc-gate': resolve(__dirname, 'src/qc-gate/index.html'),
         'mid-section-defect': resolve(__dirname, 'src/mid-section-defect/index.html'),

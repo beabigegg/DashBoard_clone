@@ -126,18 +126,6 @@ class TestRoutePagesSmoke:
         assert response is not None and response.ok
         expect(page.locator("body")).to_be_visible()
 
-    def test_tables_page_loads(self, page: Page, app_server: str):
-        response = page.goto(f"{app_server}/tables")
-        assert response is not None
-        assert response.status in {200, 403}
-        expect(page.locator("body")).to_be_visible()
-        if response.status == 200:
-            header = page.locator("h1")
-            expect(header).to_be_visible()
-            text = header.inner_text()
-            assert "MES 數據表查詢工具" in text or "頁面開發中" in text
-
-
 @pytest.mark.e2e
 class TestConsoleAndErrorSignals:
     """Console/pageerror checks for SPA runtime stability."""

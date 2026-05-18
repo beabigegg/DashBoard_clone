@@ -262,14 +262,9 @@
 .shell-content .job-query-page,
 .shell-content .excel-query-page,
 .shell-content .query-tool-page,
-.shell-content .tmtt-page,
-.shell-content .tables-page {
+.shell-content .tmtt-page {
   max-width: none;
   min-height: auto;
-}
-
-.shell-content .tables-page .container {
-  max-width: none;
 }
 
 .shell-content .resource-page,

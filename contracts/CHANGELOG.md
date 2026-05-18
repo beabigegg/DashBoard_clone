@@ -8,6 +8,21 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [css-inventory 1.2.1] — 2026-05-18
+### Changed
+- remove-unused-pages: Added `schema-version: 1.2.0` frontmatter (previously absent), then bumped to 1.2.1. Deleted three removed-app rows: `admin-performance/style.css`, `admin-user-usage-kpi/style.css`, `tables/style.css`.
+- Source: change `remove-unused-pages`.
+
+## [ci 1.3.15] — 2026-05-18
+### Changed
+- remove-unused-pages: frontend-build scope reduced (removed 3 apps: `tables`, `admin-performance`, `admin-user-usage-kpi`; added `production-history`). Additive prose documenting Vite build-input change; gate tier, command, and status unchanged.
+- Source: change `remove-unused-pages`.
+
+## [api-inventory 1.1.6] — 2026-05-18
+### Changed
+- remove-unused-pages: Updated Admin Page Routes row — `/admin/performance` and `/admin/user-usage-kpi` are now documented as redirect-only stubs (HTTP 302 → `/admin/dashboard`), not SPA HTML routes. `/admin/dashboard` is the sole live SPA HTML entry.
+- Source: change `remove-unused-pages`.
+
 ## [ci 1.3.14] — 2026-05-18
 ### Changed
 - migrate-mid-section-defect-ts (Phase 3): `tsconfig.json` `include` expanded with `"src/mid-section-defect/**/*"`, covering `main.ts` and `App.vue` under `strict: true`. Gate tier unchanged (informational). Additive prose only.

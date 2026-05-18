@@ -3,7 +3,7 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.5
+schema-version: 1.1.6
 last-changed: 2026-05-18
 ---
 
@@ -45,7 +45,7 @@ last-changed: 2026-05-18
 
 | File | Routes | Notes |
 |---|---|---|
-| `admin_routes.py` | `/admin/performance`, `/admin/user-usage-kpi`, `/admin/dashboard` | Admin-auth SPA HTML；CSRF token 注入 HTML |
+| `admin_routes.py` | `/admin/performance`, `/admin/user-usage-kpi`, `/admin/dashboard` | `/admin/performance` and `/admin/user-usage-kpi` are redirect-only stubs (HTTP 302 → `/admin/dashboard`), not SPA HTML routes. `/admin/dashboard` is the live Admin-auth SPA HTML entry; CSRF token injected into HTML. |
 
 ## health-exception（保持穩定頂層 payload；不強制 envelope）
 

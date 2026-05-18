@@ -459,7 +459,6 @@ def test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled(m
     _login_as_admin(client)
 
     cases = {
-        "/tables?category=wip": "/portal-shell/tables?category=wip",
         "/query-tool": "/portal-shell/query-tool",
         "/mid-section-defect": "/portal-shell/mid-section-defect",
         "/yield-alert-center?start_date=2026-03-01": "/portal-shell/yield-alert-center?start_date=2026-03-01",

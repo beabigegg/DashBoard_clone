@@ -62,10 +62,6 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../query-tool/App.vue'),
     [() => import('../wip-shared/styles.css'), () => import('../styles/tailwind.css'), () => import('../query-tool/style.css')],
   ),
-  '/tables': createNativeLoader(
-    () => import('../tables/App.vue'),
-    [() => import('../tables/style.css')],
-  ),
   '/mid-section-defect': createNativeLoader(
     () => import('../mid-section-defect/App.vue'),
     [() => import('../mid-section-defect/style.css')],

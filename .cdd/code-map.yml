@@ -1,6 +1,6 @@
-# generated: 2026-05-18T07:21:14Z by cdd-kit 2.0.19
-# files: 783, src-lines: 213876, map-lines: 18330, compression: 11.7x
-# sources-digest: 643c71a76e16bd68c213e988d1b15b9bf8a85ef970cf4e651802664eb1603d12
+# generated: 2026-05-18T09:31:36Z by cdd-kit 2.0.19
+# files: 765, src-lines: 211451, map-lines: 18127, compression: 11.7x
+# sources-digest: bf62b3350a6846b1299b343cf5d484079fee42939366d49a3e921021ed527daf
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -2138,54 +2138,6 @@ frontend/src/admin-dashboard/tabs/WorkerTab.vue:  # 390 lines
     - { name: async doRestart, lines: 149-160 }
     - { name: async refresh, lines: 162-168 }
 
-frontend/src/admin-performance/App.vue:  # 1053 lines
-  imports:
-    - { module: vue, items: [ref, computed, onMounted, onBeforeUnmount], line: 546 }
-    - { module: echarts/core, items: ['*:echarts'], line: 547 }
-    - { module: echarts/charts, items: [BarChart], line: 548 }
-    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 549 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 550 }
-    - { module: '../core/api.js', items: [apiGet, apiPost], line: 552 }
-    - { module: '../shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 553 }
-    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 555 }
-    - { module: './components/GaugeBar.vue', items: ['default:GaugeBar'], line: 556 }
-    - { module: './components/StatCard.vue', items: ['default:StatCard'], line: 557 }
-    - { module: './components/StatusDot.vue', items: ['default:StatusDot'], line: 558 }
-    - { module: './components/TrendChart.vue', items: ['default:TrendChart'], line: 559 }
-  functions:
-    - { name: workerStateColor, lines: 744-748 }
-    - { name: formatUptime, lines: 750-765 }
-    - { name: async loadSystemStatus, lines: 768-775 }
-    - { name: async loadMetrics, lines: 777-785 }
-    - { name: async loadPerformanceDetail, lines: 787-794 }
-    - { name: async loadLogs, lines: 796-806 }
-    - { name: async loadWorkerStatus, lines: 808-815 }
-    - { name: async loadPerformanceHistory, lines: 817-830 }
-    - { name: async loadStorageInfo, lines: 832-839 }
-    - { name: async purgeMetricsHistory, lines: 841-852 }
-    - { name: async cleanupLogFiles, lines: 854-867 }
-    - { name: formatBytes, lines: 869-875 }
-    - { name: async refreshAll, lines: 920-935 }
-    - { name: toggleAutoRefresh, lines: 944-950 }
-    - { name: async doRestart, lines: 953-964 }
-    - { name: async cleanupLogs, lines: 967-977 }
-    - { name: debouncedLoadLogs, lines: 981-987 }
-    - { name: updateLatencyChart, lines: 990-1035 }
-
-frontend/src/admin-performance/components/GaugeBar.vue:  # 3 lines
-
-frontend/src/admin-performance/components/StatCard.vue:  # 3 lines
-
-frontend/src/admin-performance/components/StatusDot.vue:  # 3 lines
-
-frontend/src/admin-performance/components/TrendChart.vue:  # 3 lines
-
-frontend/src/admin-performance/main.js:  # 6 lines
-  imports:
-    - { module: vue, items: [createApp], line: 1 }
-    - { module: './App.vue', items: ['default:App'], line: 3 }
-    - { module: './style.css', items: [], line: 4 }
-
 frontend/src/admin-shared/components/GaugeBar.vue:  # 57 lines
 
 frontend/src/admin-shared/components/StatCard.vue:  # 24 lines
@@ -2219,24 +2171,6 @@ frontend/src/admin-shared/composables/useAdminData.ts:  # 205 lines
     - { name: HealthPayload, lines: 178-182 }  # local
 
 frontend/src/admin-shared/index.ts:  # 14 lines
-
-frontend/src/admin-user-usage-kpi/App.vue:  # 150 lines
-  imports:
-    - { module: vue, items: [onMounted, ref], line: 2 }
-    - { module: '../core/api.js', items: [apiGet], line: 4 }
-    - { module: '../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 5 }
-    - { module: '../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 6 }
-    - { module: './components/DauTrendChart.vue', items: ['default:DauTrendChart'], line: 7 }
-    - { module: './components/DeptBreakdownTable.vue', items: ['default:DeptBreakdownTable'], line: 8 }
-    - { module: './components/DurationDistChart.vue', items: ['default:DurationDistChart'], line: 9 }
-    - { module: './components/HourlyLoginChart.vue', items: ['default:HourlyLoginChart'], line: 10 }
-    - { module: './components/KpiCard.vue', items: ['default:KpiCard'], line: 11 }
-    - { module: './components/RecentSessionsTable.vue', items: ['default:RecentSessionsTable'], line: 12 }
-    - { module: './components/TopUsersTable.vue', items: ['default:TopUsersTable'], line: 13 }
-  functions:
-    - { name: initDates, lines: 24-30 }
-    - { name: async fetchData, lines: 32-48 }
-    - { name: formatDuration, lines: 50-55 }
 
 frontend/src/admin-user-usage-kpi/components/DauTrendChart.vue:  # 65 lines
   imports:
@@ -2279,12 +2213,6 @@ frontend/src/admin-user-usage-kpi/components/RecentSessionsTable.vue:  # 47 line
 frontend/src/admin-user-usage-kpi/components/TopUsersTable.vue:  # 36 lines
   functions:
     - { name: formatDuration, lines: 6-11 }
-
-frontend/src/admin-user-usage-kpi/main.js:  # 6 lines
-  imports:
-    - { module: vue, items: [createApp], line: 1 }
-    - { module: './App.vue', items: ['default:App'], line: 3 }
-    - { module: './style.css', items: [], line: 4 }
 
 frontend/src/anomaly-overview/App.vue:  # 521 lines
   imports:
@@ -2979,12 +2907,12 @@ frontend/src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-frontend/src/portal-shell/nativeModuleRegistry.js:  # 97 lines
+frontend/src/portal-shell/nativeModuleRegistry.js:  # 93 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 95-97 }
+    - { name: getNativeModuleLoader, lines: 91-93 }
 
 frontend/src/portal-shell/navigationState.js:  # 166 lines
   imports:
@@ -2998,26 +2926,26 @@ frontend/src/portal-shell/navigationState.js:  # 166 lines
     - { name: normalizeNavigationDrawers, lines: 31-79 }
     - { name: buildDynamicNavigationState, lines: 81-166 }
 
-frontend/src/portal-shell/routeContracts.js:  # 374 lines
+frontend/src/portal-shell/routeContracts.js:  # 362 lines
   constants:
     - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
-    - { name: IN_SCOPE_ADMIN_ROUTES, line: 22 }
-    - { name: DEFERRED_ROUTES, line: 28 }
-    - { name: ALL_KNOWN_ROUTES, line: 30 }
-    - { name: ROUTE_CONTRACTS, line: 61 }
-    - { name: REQUIRED_FIELDS, line: 295 }
-    - { name: VALID_RENDER_MODES, line: 308 }
-    - { name: VALID_VISIBILITY_POLICIES, line: 309 }
-    - { name: VALID_SCOPES, line: 310 }
+    - { name: IN_SCOPE_ADMIN_ROUTES, line: 21 }
+    - { name: DEFERRED_ROUTES, line: 27 }
+    - { name: ALL_KNOWN_ROUTES, line: 29 }
+    - { name: ROUTE_CONTRACTS, line: 60 }
+    - { name: REQUIRED_FIELDS, line: 283 }
+    - { name: VALID_RENDER_MODES, line: 296 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 297 }
+    - { name: VALID_SCOPES, line: 298 }
   functions:
-    - { name: buildContract, lines: 36-59 }
-    - { name: normalizeRoutePath, lines: 312-318 }
-    - { name: getRouteContract, lines: 320-322 }
-    - { name: getRouteContractMap, lines: 324-326 }
-    - { name: getInScopeRoutes, lines: 328-330 }
-    - { name: getDeferredRoutes, lines: 332-334 }
-    - { name: getKnownRoutes, lines: 336-338 }
-    - { name: validateRouteContractMap, lines: 340-374 }
+    - { name: buildContract, lines: 35-58 }
+    - { name: normalizeRoutePath, lines: 300-306 }
+    - { name: getRouteContract, lines: 308-310 }
+    - { name: getRouteContractMap, lines: 312-314 }
+    - { name: getInScopeRoutes, lines: 316-318 }
+    - { name: getDeferredRoutes, lines: 320-322 }
+    - { name: getKnownRoutes, lines: 324-326 }
+    - { name: validateRouteContractMap, lines: 328-362 }
 
 frontend/src/portal-shell/routeQuery.js:  # 36 lines
   functions:
@@ -3753,55 +3681,6 @@ frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 180 lines
 
 frontend/src/shared-ui/index.ts:  # 22 lines
 
-frontend/src/tables/App.vue:  # 123 lines
-  imports:
-    - { module: vue, items: [computed, onMounted], line: 2 }
-    - { module: '../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 4 }
-    - { module: '../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 5 }
-    - { module: './components/TableCatalog.vue', items: ['default:TableCatalog'], line: 6 }
-    - { module: './components/DataViewer.vue', items: ['default:DataViewer'], line: 7 }
-    - { module: './composables/useTableData.js', items: [useTableData], line: 8 }
-  functions:
-    - { name: handleSelectTable, lines: 48-50 }
-    - { name: handleQuery, lines: 52-54 }
-    - { name: handleRefreshCatalog, lines: 56-58 }
-
-frontend/src/tables/components/DataViewer.vue:  # 182 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: '../../shared-ui/components/Chip.vue', items: ['default:Chip'], line: 4 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 5 }
-    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 6 }
-    - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 7 }
-  functions:
-    - { name: onFilterInput, lines: 78-80 }
-    - { name: onFilterEnter, lines: 82-84 }
-    - { name: isNil, lines: 86-88 }
-
-frontend/src/tables/components/TableCatalog.vue:  # 73 lines
-  functions:
-    - { name: formatRowCount, lines: 19-25 }
-    - { name: resolveDisplayName, lines: 27-29 }
-    - { name: handleSelect, lines: 31-36 }
-
-frontend/src/tables/composables/useTableData.js:  # 200 lines
-  imports:
-    - { module: vue, items: [computed, reactive, ref], line: 1 }
-    - { module: '../../core/api.js', items: [apiGet, apiPost], line: 3 }
-  constants:
-    - { name: QUERY_LIMIT, line: 5 }
-  functions:
-    - { name: normalizeTableConfig, lines: 7-12 }
-    - { name: toDisplayError, lines: 14-16 }
-    - { name: toTableModel, lines: 18-26 }
-    - { name: useTableData, lines: 28-200 }
-
-frontend/src/tables/main.js:  # 6 lines
-  imports:
-    - { module: vue, items: [createApp], line: 1 }
-    - { module: './App.vue', items: ['default:App'], line: 3 }
-    - { module: './style.css', items: [], line: 4 }
-
 frontend/src/wip-detail/App.vue:  # 598 lines
 
 frontend/src/wip-detail/components/FilterPanel.vue:  # 163 lines
@@ -4063,25 +3942,6 @@ frontend/tests/legacy/admin-dashboard.test.js:  # 89 lines
   functions:
     - { name: findTabByKey, lines: 71-73 }
 
-frontend/tests/legacy/admin-performance.test.js:  # 127 lines
-  imports:
-    - { module: 'node:test', items: ['default:test'], line: 7 }
-    - { module: 'node:assert/strict', items: ['default:assert'], line: 8 }
-  functions:
-    - { name: formatLatencyMs, lines: 17-20 }
-    - { name: calcSlowQueryRate, lines: 25-28 }
-    - { name: resolveLatencyHealth, lines: 33-38 }
-    - { name: getLatestBucketLatency, lines: 105-111 }
-
-frontend/tests/legacy/admin-user-usage-kpi.test.js:  # 108 lines
-  imports:
-    - { module: 'node:test', items: ['default:test'], line: 7 }
-    - { module: 'node:assert/strict', items: ['default:assert'], line: 8 }
-  functions:
-    - { name: formatDuration, lines: 13-18 }
-    - { name: initDates, lines: 56-62 }
-    - { name: validateKpiShape, lines: 87-91 }
-
 frontend/tests/legacy/anomaly-overview.test.js:  # 121 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 8 }
@@ -4106,7 +3966,7 @@ frontend/tests/legacy/datetime.test.js:  # 50 lines
     - { module: 'node:assert/strict', items: ['default:assert'], line: 7 }
     - { module: '../../src/core/datetime.js', items: [formatLogTime], line: 10 }
 
-frontend/tests/legacy/loading-standardization.test.js:  # 261 lines
+frontend/tests/legacy/loading-standardization.test.js:  # 239 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 9 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 10 }
@@ -4825,7 +4685,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1430 lines
+src/mes_dashboard/app.py:  # 1403 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -4883,8 +4743,8 @@ src/mes_dashboard/app.py:  # 1430 lines
     - { name: _is_runtime_contract_enforced, lines: 514-519 }
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
-    - { name: create_app, lines: 569-1304 }
-    - { name: _register_error_handlers, lines: 1307-1430 }
+    - { name: create_app, lines: 569-1277 }
+    - { name: _register_error_handlers, lines: 1280-1403 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -7701,7 +7561,7 @@ src/mes_dashboard/services/navigation_contract.py:  # 279 lines
     - { name: validate_route_migration_contract, lines: 124-196 }
     - { name: validate_wave_b_rewrite_entry_criteria, lines: 199-279 }
 
-src/mes_dashboard/services/page_registry.py:  # 505 lines
+src/mes_dashboard/services/page_registry.py:  # 504 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -7717,35 +7577,35 @@ src/mes_dashboard/services/page_registry.py:  # 505 lines
     - { name: LEGACY_NAV_ASSIGNMENTS, line: 30 }
   classes:
     - name: DrawerError
-      lines: 52-53
+      lines: 51-52
     - name: DrawerNotFoundError
-      lines: 56-57
+      lines: 55-56
     - name: DrawerConflictError
-      lines: 60-61
+      lines: 59-60
   functions:
-    - { name: _load, lines: 64-99 }
-    - { name: _save, lines: 102-137 }
-    - { name: _migrate_navigation_schema, lines: 140-170 }
-    - { name: _safe_int, lines: 173-177 }
-    - { name: _as_positive_int, lines: 180-188 }
-    - { name: _drawer_exists, lines: 191-192 }
-    - { name: _apply_page_drawer, lines: 195-203 }
-    - { name: _apply_page_order, lines: 206-210 }
-    - { name: _slugify_drawer_id, lines: 213-215 }
-    - { name: _generate_drawer_id, lines: 218-225 }
-    - { name: _sorted_drawers, lines: 228-235 }
-    - { name: _sorted_pages, lines: 238-245 }
-    - { name: get_page_status, lines: 248-262 }
-    - { name: is_page_registered, lines: 265-274 }
-    - { name: set_page_status, lines: 277-327 }
-    - { name: get_all_pages, lines: 330-337 }
-    - { name: get_all_drawers, lines: 340-345 }
-    - { name: create_drawer, lines: 348-377 }
-    - { name: update_drawer, lines: 380-414 }
-    - { name: delete_drawer, lines: 417-437 }
-    - { name: get_navigation_config, lines: 440-478 }
-    - { name: is_api_public, lines: 481-495 }
-    - { name: reload_cache, lines: 498-505 }
+    - { name: _load, lines: 63-98 }
+    - { name: _save, lines: 101-136 }
+    - { name: _migrate_navigation_schema, lines: 139-169 }
+    - { name: _safe_int, lines: 172-176 }
+    - { name: _as_positive_int, lines: 179-187 }
+    - { name: _drawer_exists, lines: 190-191 }
+    - { name: _apply_page_drawer, lines: 194-202 }
+    - { name: _apply_page_order, lines: 205-209 }
+    - { name: _slugify_drawer_id, lines: 212-214 }
+    - { name: _generate_drawer_id, lines: 217-224 }
+    - { name: _sorted_drawers, lines: 227-234 }
+    - { name: _sorted_pages, lines: 237-244 }
+    - { name: get_page_status, lines: 247-261 }
+    - { name: is_page_registered, lines: 264-273 }
+    - { name: set_page_status, lines: 276-326 }
+    - { name: get_all_pages, lines: 329-336 }
+    - { name: get_all_drawers, lines: 339-344 }
+    - { name: create_drawer, lines: 347-376 }
+    - { name: update_drawer, lines: 379-413 }
+    - { name: delete_drawer, lines: 416-436 }
+    - { name: get_navigation_config, lines: 439-477 }
+    - { name: is_api_public, lines: 480-494 }
+    - { name: reload_cache, lines: 497-504 }
 
 src/mes_dashboard/services/production_history_job_service.py:  # 138 lines
   imports:
@@ -9161,48 +9021,6 @@ tests/e2e/test_admin_dashboard_e2e.py:  # 137 lines
         - { name: test_log_files_cleanup_accessible, lines: 121-128 }
         - { name: test_logs_cleanup_accessible, lines: 130-137 }
 
-tests/e2e/test_admin_performance_e2e.py:  # 94 lines
-  imports:
-    - { module: pytest, items: [], line: 12 }
-    - { module: requests, items: [], line: 13 }
-  classes:
-    - name: TestAdminMetricsEndpoint
-      lines: 17-38
-      methods:
-        - { name: test_metrics_accessible, lines: 20-27 }
-        - { name: test_metrics_has_latency_percentiles, lines: 29-38 }
-    - name: TestAdminPerformanceDetailEndpoint
-      lines: 42-61
-      methods:
-        - { name: test_performance_detail_accessible, lines: 45-52 }
-        - { name: test_performance_detail_returns_list, lines: 54-61 }
-    - name: TestAdminPerformanceHistoryEndpoint
-      lines: 65-81
-      methods:
-        - { name: test_performance_history_accessible, lines: 68-75 }
-        - { name: test_performance_history_default_minutes, lines: 77-81 }
-    - name: TestAdminPerformancePageLoad
-      lines: 85-94
-      methods:
-        - { name: test_admin_performance_page_accessible, lines: 88-94 }
-
-tests/e2e/test_admin_user_usage_kpi_e2e.py:  # 86 lines
-  imports:
-    - { module: pytest, items: [], line: 10 }
-    - { module: requests, items: [], line: 11 }
-  classes:
-    - name: TestAdminUserUsageKpiEndpoint
-      lines: 15-73
-      methods:
-        - { name: test_kpi_without_dates_returns_validation_error_or_success, lines: 18-27 }
-        - { name: test_kpi_with_valid_dates_returns_overview, lines: 29-41 }
-        - { name: test_kpi_with_department_filter, lines: 43-57 }
-        - { name: test_kpi_response_has_expected_fields, lines: 59-73 }
-    - name: TestAdminUserUsageKpiPageLoad
-      lines: 77-86
-      methods:
-        - { name: test_user_usage_kpi_page_accessible, lines: 80-86 }
-
 tests/e2e/test_anomaly_overview_e2e.py:  # 132 lines
   imports:
     - { module: pytest, items: [], line: 14 }
@@ -9280,7 +9098,7 @@ tests/e2e/test_cache_e2e.py:  # 281 lines
         - { name: test_wip_detail_with_workcenter, lines: 245-263 }
         - { name: test_wip_detail_pagination, lines: 265-281 }
 
-tests/e2e/test_global_connection.py:  # 167 lines
+tests/e2e/test_global_connection.py:  # 155 lines
   imports:
     - { module: pytest, items: [], line: 4 }
     - { module: re, items: [], line: 5 }
@@ -9301,17 +9119,16 @@ tests/e2e/test_global_connection.py:  # 167 lines
         - { name: test_wip_detail_can_call_workcenter_api_via_fetch, lines: 86-91 }
         - { name: test_global_mesapi_bridge_is_optional, lines: 93-107 }
     - name: TestRoutePagesSmoke
-      lines: 111-138
+      lines: 111-127
       methods:
         - { name: test_wip_overview_loads, lines: 114-117 }
         - { name: test_wip_detail_loads, lines: 119-122 }
         - { name: test_resource_page_loads, lines: 124-127 }
-        - { name: test_tables_page_loads, lines: 129-138 }
     - name: TestConsoleAndErrorSignals
-      lines: 142-167
+      lines: 130-155
       methods:
-        - { name: test_wip_overview_has_no_uncaught_page_errors, lines: 145-150 }
-        - { name: test_wip_overview_triggers_expected_api_requests, lines: 152-167 }
+        - { name: test_wip_overview_has_no_uncaught_page_errors, lines: 133-138 }
+        - { name: test_wip_overview_triggers_expected_api_requests, lines: 140-155 }
   functions:
     - { name: _sidebar_links, lines: 11-13 }
     - { name: _fetch_json_status, lines: 16-32 }
@@ -9747,17 +9564,6 @@ tests/e2e/test_resource_history_e2e.py:  # 551 lines
     - { name: app, lines: 26-31 }  # @pytest.fixture
     - { name: client, lines: 35-37 }  # @pytest.fixture
     - { name: redis_enabled, lines: 41-71 }  # @pytest.fixture
-
-tests/e2e/test_tables_e2e.py:  # 38 lines
-  imports:
-    - { module: pytest, items: [], line: 4 }
-    - { module: playwright.sync_api, items: [Page, expect], line: 5 }
-    - { module: tests.e2e.browser_helpers, items: [goto_shell_route, wait_for_any_visible], line: 7 }
-  classes:
-    - name: TestTablesBrowserE2E
-      lines: 11-38
-      methods:
-        - { name: test_tables_page_selects_table_and_runs_query, lines: 14-38 }
 
 tests/e2e/test_trace_pipeline_e2e.py:  # 811 lines
   imports:
@@ -11960,7 +11766,7 @@ tests/test_api_integration.py:  # 300 lines
         - { name: test_api_returns_json_content_type, lines: 273-283 }
         - { name: test_table_api_returns_json_content_type, lines: 286-296 }
 
-tests/test_app_factory.py:  # 161 lines
+tests/test_app_factory.py:  # 160 lines
   imports:
     - { module: unittest, items: [], line: 1 }
     - { module: os, items: [], line: 2 }
@@ -11968,17 +11774,17 @@ tests/test_app_factory.py:  # 161 lines
     - { module: mes_dashboard.core.database, items: [], line: 5 }
   classes:
     - name: AppFactoryTests
-      lines: 8-157
+      lines: 8-156
       methods:
         - { name: setUp, lines: 9-10 }
         - { name: test_create_app_default_config, lines: 12-19 }
         - { name: test_create_app_production_config, lines: 21-39 }
         - { name: test_create_app_independent_instances, lines: 41-45 }
-        - { name: test_routes_registered, lines: 47-79 }
-        - { name: test_portal_spa_flag_default_enabled, lines: 81-94 }
-        - { name: test_portal_spa_flag_disabled_via_env, lines: 96-111 }
-        - { name: test_portal_spa_flag_enabled_via_env, lines: 113-129 }
-        - { name: test_default_env_is_production_when_flask_env_missing, lines: 131-157 }
+        - { name: test_routes_registered, lines: 47-78 }
+        - { name: test_portal_spa_flag_default_enabled, lines: 80-93 }
+        - { name: test_portal_spa_flag_disabled_via_env, lines: 95-110 }
+        - { name: test_portal_spa_flag_enabled_via_env, lines: 112-128 }
+        - { name: test_default_env_is_production_when_flask_env_missing, lines: 130-156 }
 
 tests/test_async_job_timeout.py:  # 227 lines
   imports:
@@ -12072,7 +11878,7 @@ tests/test_async_query_job_service.py:  # 661 lines
   functions:
     - { name: _reset_rq_cache, lines: 25-31 }
 
-tests/test_auth_integration.py:  # 429 lines
+tests/test_auth_integration.py:  # 407 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: pytest, items: [], line: 5 }
@@ -12098,32 +11904,30 @@ tests/test_auth_integration.py:  # 429 lines
       methods:
         - { name: test_logout, lines: 224-234 }
     - name: TestPermissionMiddleware
-      lines: 237-277
+      lines: 237-255
       methods:
         - { name: test_released_page_accessible_without_login, lines: 240-243 }
-        - { name: test_dev_page_returns_403_without_login, lines: 245-253 }
-        - { name: test_dev_page_accessible_with_admin_login, lines: 255-265 }
-        - { name: test_admin_pages_redirect_without_login, lines: 267-270 }
-        - { name: test_admin_pages_accessible_with_login, lines: 272-277 }
+        - { name: test_admin_pages_redirect_without_login, lines: 245-248 }
+        - { name: test_admin_pages_accessible_with_login, lines: 250-255 }
     - name: TestAdminAPI
-      lines: 280-401
+      lines: 258-379
       methods:
-        - { name: test_get_pages_without_login, lines: 283-286 }
-        - { name: test_get_pages_with_login, lines: 288-297 }
-        - { name: test_get_drawers_without_login, lines: 299-302 }
-        - { name: test_mutate_drawers_without_login, lines: 304-315 }
-        - { name: test_get_drawers_with_login, lines: 317-326 }
-        - { name: test_create_drawer_duplicate_name_conflict, lines: 328-337 }
-        - { name: test_update_page_status, lines: 339-354 }
-        - { name: test_update_page_invalid_status, lines: 356-366 }
-        - { name: test_update_page_drawer_assignment, lines: 368-383 }
-        - { name: test_update_page_invalid_drawer_assignment, lines: 385-394 }
-        - { name: test_delete_drawer_with_assigned_pages_conflict, lines: 396-401 }
+        - { name: test_get_pages_without_login, lines: 261-264 }
+        - { name: test_get_pages_with_login, lines: 266-275 }
+        - { name: test_get_drawers_without_login, lines: 277-280 }
+        - { name: test_mutate_drawers_without_login, lines: 282-293 }
+        - { name: test_get_drawers_with_login, lines: 295-304 }
+        - { name: test_create_drawer_duplicate_name_conflict, lines: 306-315 }
+        - { name: test_update_page_status, lines: 317-332 }
+        - { name: test_update_page_invalid_status, lines: 334-344 }
+        - { name: test_update_page_drawer_assignment, lines: 346-361 }
+        - { name: test_update_page_invalid_drawer_assignment, lines: 363-372 }
+        - { name: test_delete_drawer_with_assigned_pages_conflict, lines: 374-379 }
     - name: TestContextProcessor
-      lines: 404-425
+      lines: 382-403
       methods:
-        - { name: test_is_admin_in_context_when_logged_in, lines: 407-416 }
-        - { name: test_is_admin_in_context_when_not_logged_in, lines: 418-425 }
+        - { name: test_is_admin_in_context_when_logged_in, lines: 385-394 }
+        - { name: test_is_admin_in_context_when_not_logged_in, lines: 396-403 }
   functions:
     - { name: _ldap_defaults, lines: 18-20 }  # @pytest.fixture(autouse=True)
     - { name: _mock_login_session_store, lines: 24-31 }  # @pytest.fixture(autouse=True)
@@ -13013,7 +12817,7 @@ tests/test_feature_flags.py:  # 25 lines
     - { name: test_resolve_bool_flag_prefers_environment_over_config, lines: 16-19 }
     - { name: test_resolve_bool_flag_uses_config_then_default_when_env_missing, lines: 22-25 }
 
-tests/test_field_contracts.py:  # 127 lines
+tests/test_field_contracts.py:  # 125 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: csv, items: [], line: 6 }
@@ -13024,12 +12828,12 @@ tests/test_field_contracts.py:  # 127 lines
     - { module: mes_dashboard.services.job_query_service, items: [export_jobs_with_history], line: 17 }
     - { module: mes_dashboard.services.resource_history_service, items: [export_resource_history_csv], line: 18 }
   functions:
-    - { name: test_contract_sections_exist_for_primary_pages, lines: 21-32 }
-    - { name: test_export_contracts_have_no_duplicate_api_keys, lines: 35-38 }
-    - { name: test_export_headers_and_keys_have_same_length, lines: 41-47 }
-    - { name: test_all_contract_fields_define_semantic_type, lines: 50-63 }
-    - { name: test_job_query_export_uses_contract_headers, lines: 67-83 }  # @patch('mes_dashboard.services.job_query_service.SQLLoader.load', return_value='S...
-    - { name: test_resource_history_export_uses_contract_headers, lines: 89-127 }  # @patch('mes_dashboard.services.resource_history_service.SQLLoader.load', return_v...
+    - { name: test_contract_sections_exist_for_primary_pages, lines: 21-31 }
+    - { name: test_export_contracts_have_no_duplicate_api_keys, lines: 34-37 }
+    - { name: test_export_headers_and_keys_have_same_length, lines: 40-46 }
+    - { name: test_all_contract_fields_define_semantic_type, lines: 49-61 }
+    - { name: test_job_query_export_uses_contract_headers, lines: 65-81 }  # @patch('mes_dashboard.services.job_query_service.SQLLoader.load', return_value='S...
+    - { name: test_resource_history_export_uses_contract_headers, lines: 87-125 }  # @patch('mes_dashboard.services.resource_history_service.SQLLoader.load', return_v...
 
 tests/test_filter_cache_generic.py:  # 231 lines
   imports:
@@ -14783,7 +14587,7 @@ tests/test_owner_token.py:  # 58 lines
   functions:
     - { name: app, lines: 13-16 }  # @pytest.fixture
 
-tests/test_page_registry.py:  # 264 lines
+tests/test_page_registry.py:  # 260 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -14793,54 +14597,54 @@ tests/test_page_registry.py:  # 264 lines
     - { module: mes_dashboard.services, items: [page_registry], line: 13 }
   classes:
     - name: TestSchemaMigration
-      lines: 51-78
+      lines: 50-75
       methods:
-        - { name: test_migration_adds_drawers_and_assignments, lines: 54-70 }
-        - { name: test_subsequent_load_does_not_reset_drawers, lines: 72-78 }
+        - { name: test_migration_adds_drawers_and_assignments, lines: 53-67 }
+        - { name: test_subsequent_load_does_not_reset_drawers, lines: 69-75 }
     - name: TestGetPageStatus
-      lines: 81-94
+      lines: 78-91
       methods:
-        - { name: test_get_released_page_status, lines: 84-86 }
-        - { name: test_get_dev_page_status, lines: 88-90 }
-        - { name: test_get_unregistered_page_status, lines: 92-94 }
+        - { name: test_get_released_page_status, lines: 81-83 }
+        - { name: test_get_dev_page_status, lines: 85-87 }
+        - { name: test_get_unregistered_page_status, lines: 89-91 }
     - name: TestSetPageStatus
-      lines: 97-125
+      lines: 94-122
       methods:
-        - { name: test_update_existing_page_status, lines: 100-102 }
-        - { name: test_set_page_drawer_and_order, lines: 104-109 }
-        - { name: test_clear_page_drawer_and_order, lines: 111-117 }
-        - { name: test_set_invalid_drawer_raises_error, lines: 119-121 }
-        - { name: test_invalid_status_raises_error, lines: 123-125 }
+        - { name: test_update_existing_page_status, lines: 97-99 }
+        - { name: test_set_page_drawer_and_order, lines: 101-106 }
+        - { name: test_clear_page_drawer_and_order, lines: 108-114 }
+        - { name: test_set_invalid_drawer_raises_error, lines: 116-118 }
+        - { name: test_invalid_status_raises_error, lines: 120-122 }
     - name: TestDrawerCrud
-      lines: 128-160
+      lines: 125-157
       methods:
-        - { name: test_create_drawer, lines: 131-135 }
-        - { name: test_create_duplicate_drawer_name_raises_conflict, lines: 137-139 }
-        - { name: test_update_drawer, lines: 141-150 }
-        - { name: test_delete_drawer_rejects_assigned_pages, lines: 152-154 }
-        - { name: test_delete_empty_drawer, lines: 156-160 }
+        - { name: test_create_drawer, lines: 128-132 }
+        - { name: test_create_duplicate_drawer_name_raises_conflict, lines: 134-136 }
+        - { name: test_update_drawer, lines: 138-147 }
+        - { name: test_delete_drawer_rejects_assigned_pages, lines: 149-151 }
+        - { name: test_delete_empty_drawer, lines: 153-157 }
     - name: TestNavigationConfig
-      lines: 163-183
+      lines: 160-179
       methods:
-        - { name: test_navigation_config_grouped_and_sorted, lines: 166-183 }
+        - { name: test_navigation_config_grouped_and_sorted, lines: 163-179 }
     - name: TestIsApiPublic
-      lines: 186-214
+      lines: 182-210
       methods:
-        - { name: test_api_public_true, lines: 189-190 }
-        - { name: test_api_public_false, lines: 192-198 }
-        - { name: test_api_public_defaults_false_when_key_missing, lines: 200-206 }
-        - { name: test_api_public_invalid_value_defaults_false, lines: 208-214 }
+        - { name: test_api_public_true, lines: 185-186 }
+        - { name: test_api_public_false, lines: 188-194 }
+        - { name: test_api_public_defaults_false_when_key_missing, lines: 196-202 }
+        - { name: test_api_public_invalid_value_defaults_false, lines: 204-210 }
     - name: TestReloadCache
-      lines: 217-231
+      lines: 213-227
       methods:
-        - { name: test_reload_cache, lines: 220-231 }
+        - { name: test_reload_cache, lines: 216-227 }
     - name: TestConcurrency
-      lines: 234-264
+      lines: 230-260
       methods:
-        - { name: test_concurrent_access, lines: 237-264 }
+        - { name: test_concurrent_access, lines: 233-260 }
   functions:
-    - { name: temp_data_file, lines: 17-30 }  # @pytest.fixture
-    - { name: mock_registry, lines: 34-48 }  # @pytest.fixture
+    - { name: temp_data_file, lines: 17-29 }  # @pytest.fixture
+    - { name: mock_registry, lines: 33-47 }  # @pytest.fixture
 
 tests/test_partial_failure_contract.py:  # 69 lines
   imports:
@@ -14851,7 +14655,7 @@ tests/test_partial_failure_contract.py:  # 69 lines
     - { name: test_serialize_partial_failure_meta_roundtrip, lines: 42-56 }
     - { name: test_merge_partial_failure_meta_accumulates_ranges_and_counts, lines: 59-69 }
 
-tests/test_performance_integration.py:  # 426 lines
+tests/test_performance_integration.py:  # 395 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -14862,65 +14666,60 @@ tests/test_performance_integration.py:  # 426 lines
     - { module: mes_dashboard.core.database, items: [], line: 11 }
   classes:
     - name: TestAPIResponseFormat
-      lines: 38-56
+      lines: 38-49
       methods:
         - { name: test_success_response_format, lines: 41-49 }
-        - { name: test_unauthenticated_redirect, lines: 51-56 }
     - name: TestHealthEndpoints
-      lines: 59-86
+      lines: 51-78
       methods:
-        - { name: test_health_basic_endpoint, lines: 62-72 }
-        - { name: test_health_deep_requires_auth, lines: 74-78 }
-        - { name: test_health_deep_returns_metrics, lines: 80-86 }
+        - { name: test_health_basic_endpoint, lines: 54-64 }
+        - { name: test_health_deep_requires_auth, lines: 66-70 }
+        - { name: test_health_deep_returns_metrics, lines: 72-78 }
     - name: TestSystemStatusAPI
-      lines: 89-106
+      lines: 81-98
       methods:
-        - { name: test_system_status_returns_all_components, lines: 92-106 }
+        - { name: test_system_status_returns_all_components, lines: 84-98 }
     - name: TestMetricsAPI
-      lines: 109-133
+      lines: 101-125
       methods:
-        - { name: test_metrics_returns_percentiles, lines: 112-124 }
-        - { name: test_metrics_includes_latencies, lines: 126-133 }
+        - { name: test_metrics_returns_percentiles, lines: 104-116 }
+        - { name: test_metrics_includes_latencies, lines: 118-125 }
     - name: TestLogsAPI
-      lines: 136-195
+      lines: 128-187
       methods:
-        - { name: test_logs_api_returns_logs, lines: 139-147 }
-        - { name: test_logs_api_filter_by_level, lines: 149-155 }
-        - { name: test_logs_api_filter_by_search, lines: 157-163 }
-        - { name: test_logs_api_pagination, lines: 165-175 }
-        - { name: test_logs_api_pagination_offset, lines: 177-195 }
+        - { name: test_logs_api_returns_logs, lines: 131-139 }
+        - { name: test_logs_api_filter_by_level, lines: 141-147 }
+        - { name: test_logs_api_filter_by_search, lines: 149-155 }
+        - { name: test_logs_api_pagination, lines: 157-167 }
+        - { name: test_logs_api_pagination_offset, lines: 169-187 }
     - name: TestLogsCleanupAPI
-      lines: 198-218
+      lines: 190-210
       methods:
-        - { name: test_logs_cleanup_requires_auth, lines: 201-205 }
-        - { name: test_logs_cleanup_success, lines: 207-218 }
+        - { name: test_logs_cleanup_requires_auth, lines: 193-197 }
+        - { name: test_logs_cleanup_success, lines: 199-210 }
     - name: TestWorkerControlAPI
-      lines: 221-347
+      lines: 213-339
       methods:
-        - { name: test_worker_status_returns_info, lines: 224-236 }
-        - { name: test_worker_restart_requires_auth, lines: 238-242 }
-        - { name: test_worker_restart_writes_flag, lines: 244-272 }
-        - { name: test_worker_restart_cooldown, lines: 274-291 }
-        - { name: test_worker_restart_blocked_requires_override, lines: 293-309 }
-        - { name: test_worker_restart_manual_override_allowed_when_blocked, lines: 311-347 }
+        - { name: test_worker_status_returns_info, lines: 216-228 }
+        - { name: test_worker_restart_requires_auth, lines: 230-234 }
+        - { name: test_worker_restart_writes_flag, lines: 236-264 }
+        - { name: test_worker_restart_cooldown, lines: 266-283 }
+        - { name: test_worker_restart_blocked_requires_override, lines: 285-301 }
+        - { name: test_worker_restart_manual_override_allowed_when_blocked, lines: 303-339 }
     - name: TestCircuitBreakerIntegration
-      lines: 350-367
+      lines: 342-359
       methods:
-        - { name: test_circuit_breaker_status_in_system_status, lines: 353-361 }
-        - { name: test_system_status_reports_single_port_bind, lines: 363-367 }
+        - { name: test_circuit_breaker_status_in_system_status, lines: 345-353 }
+        - { name: test_system_status_reports_single_port_bind, lines: 355-359 }
     - name: TestPerformancePage
-      lines: 370-406
+      lines: 362-376
       methods:
-        - { name: test_performance_page_requires_auth, lines: 373-377 }
-        - { name: test_performance_page_redirects_to_dashboard, lines: 379-383 }
-        - { name: test_dashboard_page_requires_auth, lines: 385-387 }
-        - { name: test_dashboard_page_loads, lines: 389-396 }
-        - { name: test_user_usage_kpi_page_requires_auth, lines: 398-400 }
-        - { name: test_user_usage_kpi_page_redirects_to_dashboard, lines: 402-406 }
+        - { name: test_dashboard_page_requires_auth, lines: 365-367 }
+        - { name: test_dashboard_page_loads, lines: 369-376 }
     - name: TestRedisNamespaceMemoryTelemetry
-      lines: 409-426
+      lines: 378-395
       methods:
-        - { name: test_collect_redis_namespace_memory_uses_canonical_wip_parquet_key, lines: 412-426 }
+        - { name: test_collect_redis_namespace_memory_uses_canonical_wip_parquet_key, lines: 381-395 }
   functions:
     - { name: app, lines: 15-21 }  # @pytest.fixture
     - { name: client, lines: 25-27 }  # @pytest.fixture
@@ -14964,7 +14763,7 @@ tests/test_permissions.py:  # 161 lines
   functions:
     - { name: app, lines: 21-26 }  # @pytest.fixture
 
-tests/test_portal_shell_routes.py:  # 473 lines
+tests/test_portal_shell_routes.py:  # 472 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -14991,7 +14790,7 @@ tests/test_portal_shell_routes.py:  # 473 lines
     - { name: test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 375-392 }
     - { name: test_direct_entry_redirect_preserves_non_ascii_query_params, lines: 395-408 }
     - { name: test_legacy_shell_contract_fallback_logs_warning, lines: 411-451 }
-    - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 454-473 }
+    - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 454-472 }
 
 tests/test_portal_shell_wave_b_native_smoke.py:  # 283 lines
   imports:
@@ -17245,7 +17044,7 @@ tests/test_sync_worker_deadlock_retry.py:  # 187 lines
         - { name: test_sync_logs_non_deadlock_error_does_not_retry, lines: 132-156 }
         - { name: test_batch_execute_passes_params_list_not_row_by_row, lines: 158-187 }
 
-tests/test_template_integration.py:  # 433 lines
+tests/test_template_integration.py:  # 411 lines
   imports:
     - { module: unittest, items: [], line: 8 }
     - { module: os, items: [], line: 9 }
@@ -17254,7 +17053,7 @@ tests/test_template_integration.py:  # 433 lines
     - { module: mes_dashboard.core.database, items: [], line: 13 }
   classes:
     - name: TestTemplateIntegration
-      lines: 29-108
+      lines: 29-99
       methods:
         - { name: setUp, lines: 32-39 }
         - { name: tearDown, lines: 41-45 }
@@ -17262,46 +17061,44 @@ tests/test_template_integration.py:  # 433 lines
         - { name: test_wip_overview_serves_pure_vite_module, lines: 56-63 }
         - { name: test_wip_detail_serves_pure_vite_module, lines: 65-72 }
         - { name: test_hold_overview_serves_pure_vite_module, lines: 74-81 }
-        - { name: test_tables_page_serves_pure_vite_module, lines: 83-90 }
-        - { name: test_resource_page_serves_pure_vite_module, lines: 92-99 }
-        - { name: test_query_tool_page_includes_base_scripts, lines: 101-108 }
+        - { name: test_resource_page_serves_pure_vite_module, lines: 83-90 }
+        - { name: test_query_tool_page_includes_base_scripts, lines: 92-99 }
     - name: TestPortalDynamicDrawerRendering
-      lines: 111-212
+      lines: 102-203
       methods:
-        - { name: setUp, lines: 114-121 }
-        - { name: tearDown, lines: 123-127 }
-        - { name: test_portal_uses_navigation_config_for_sidebar_links_without_iframe, lines: 129-170 }
-        - { name: test_portal_hides_admin_only_drawer_for_non_admin, lines: 172-212 }
+        - { name: setUp, lines: 105-112 }
+        - { name: tearDown, lines: 114-118 }
+        - { name: test_portal_uses_navigation_config_for_sidebar_links_without_iframe, lines: 120-161 }
+        - { name: test_portal_hides_admin_only_drawer_for_non_admin, lines: 163-203 }
     - name: TestToastCSSIntegration
-      lines: 215-252
+      lines: 206-243
       methods:
-        - { name: setUp, lines: 218-225 }
-        - { name: tearDown, lines: 227-231 }
-        - { name: test_portal_includes_toast_css, lines: 233-238 }
-        - { name: test_wip_overview_excludes_toast_css, lines: 240-245 }
-        - { name: test_wip_detail_excludes_toast_css, lines: 247-252 }
+        - { name: setUp, lines: 209-216 }
+        - { name: tearDown, lines: 218-222 }
+        - { name: test_portal_includes_toast_css, lines: 224-229 }
+        - { name: test_wip_overview_excludes_toast_css, lines: 231-236 }
+        - { name: test_wip_detail_excludes_toast_css, lines: 238-243 }
     - name: TestMesApiUsageInTemplates
-      lines: 255-323
+      lines: 246-303
       methods:
-        - { name: setUp, lines: 258-263 }
-        - { name: test_wip_overview_uses_mesapi, lines: 265-274 }
-        - { name: test_wip_detail_uses_mesapi, lines: 276-285 }
-        - { name: test_tables_page_uses_mesapi_or_vite_module, lines: 287-296 }
-        - { name: test_resource_page_uses_mesapi_or_vite_module, lines: 298-311 }
-        - { name: test_query_tool_page_uses_vite_module, lines: 313-323 }
+        - { name: setUp, lines: 249-254 }
+        - { name: test_wip_overview_uses_mesapi, lines: 256-265 }
+        - { name: test_wip_detail_uses_mesapi, lines: 267-276 }
+        - { name: test_resource_page_uses_mesapi_or_vite_module, lines: 278-291 }
+        - { name: test_query_tool_page_uses_vite_module, lines: 293-303 }
     - name: TestViteModuleIntegration
-      lines: 327-383
+      lines: 307-361
       methods:
-        - { name: setUp, lines: 330-335 }
-        - { name: test_pages_render_vite_module_reference, lines: 337-383 }
+        - { name: setUp, lines: 310-315 }
+        - { name: test_pages_render_vite_module_reference, lines: 317-361 }
     - name: TestStaticFilesServing
-      lines: 386-429
+      lines: 364-407
       methods:
-        - { name: setUp, lines: 389-394 }
-        - { name: test_toast_js_is_served, lines: 396-405 }
-        - { name: test_mes_api_js_is_served, lines: 407-415 }
-        - { name: test_toast_js_contains_retry_button, lines: 417-422 }
-        - { name: test_mes_api_js_has_exponential_backoff, lines: 424-429 }
+        - { name: setUp, lines: 367-372 }
+        - { name: test_toast_js_is_served, lines: 374-383 }
+        - { name: test_mes_api_js_is_served, lines: 385-393 }
+        - { name: test_toast_js_contains_retry_button, lines: 395-400 }
+        - { name: test_mes_api_js_has_exponential_backoff, lines: 402-407 }
   functions:
     - { name: _login_as_admin, lines: 16-18 }
     - { name: _get_response_and_html, lines: 21-26 }

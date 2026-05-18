@@ -30,7 +30,7 @@ def temp_page_status(tmp_path):
             {"route": "/", "name": "首頁", "status": "released"},
             {"route": "/wip-overview", "name": "WIP 即時概況", "status": "released"},
             {"route": "/wip-detail", "name": "WIP 明細", "status": "released"},
-            {"route": "/tables", "name": "表格總覽", "status": "dev"},
+            {"route": "/production-history", "name": "生產歷程", "status": "dev"},
             {"route": "/resource", "name": "機台狀態", "status": "dev"},
         ],
         "api_public": True
@@ -159,7 +159,7 @@ class TestPageAccessControlFlow:
         assert response.status_code != 403
 
         # 2. Access dev page - should get 403
-        response = client.get("/tables")
+        response = client.get("/production-history")
         assert response.status_code == 403
         content = response.data.decode("utf-8")
         assert "開發中" in content or "403" in content
@@ -182,7 +182,7 @@ class TestPageAccessControlFlow:
         assert response.status_code != 403
 
         # 3. Access dev page - should work for admin
-        response = client.get("/tables")
+        response = client.get("/production-history")
         assert response.status_code != 403
 
 
@@ -234,8 +234,8 @@ class TestPageManagementFlow:
         """Test releasing a dev page makes it publicly accessible."""
         mock_auth.return_value = _mock_admin_user()
 
-        # 1. Verify /tables is currently dev (403 for non-admin)
-        response = client.get("/tables")
+        # 1. Verify /production-history is currently dev (403 for non-admin)
+        response = client.get("/production-history")
         assert response.status_code == 403
 
         # 2. Login as admin
@@ -247,7 +247,7 @@ class TestPageManagementFlow:
 
         # 3. Release the page
         response = client.put(
-            "/admin/api/pages/tables",
+            "/admin/api/pages/production-history",
             data=json.dumps({"status": "released"}),
             content_type="application/json"
         )
@@ -258,7 +258,7 @@ class TestPageManagementFlow:
 
         # 5. Clear cache and verify non-admin can access
         page_registry._cache = None
-        response = client.get("/tables")
+        response = client.get("/production-history")
         assert response.status_code != 403
 
 
@@ -276,7 +276,7 @@ class TestPortalDynamicTabs:
             for page in drawer.get("pages", [])
         }
         assert "/wip-overview" in routes
-        assert "/tables" not in routes
+        assert "/production-history" not in routes
         assert payload.get("is_admin") is False
 
     @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
@@ -301,7 +301,7 @@ class TestPortalDynamicTabs:
             for page in drawer.get("pages", [])
         }
         assert "/wip-overview" in routes
-        assert "/tables" in routes
+        assert "/production-history" in routes
         assert payload.get("is_admin") is True
 
 
