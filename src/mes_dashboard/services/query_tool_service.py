@@ -2284,6 +2284,7 @@ def resolve_lot_equipment(
             'equipment_names': equipment_names,
             'date_range': date_range,
             'trace_map': trace_map,
+            'lot_names': final_names,
         }
 
     except MemoryError:

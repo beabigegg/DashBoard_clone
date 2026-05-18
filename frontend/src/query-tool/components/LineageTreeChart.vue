@@ -696,19 +696,6 @@ function handleNodeClick(params: Record<string, unknown>) {
     return;
   }
 
-  // Skip non-selectable types
-  if (nodeType === 'serial' || nodeType === 'virtual-root') return;
-
-  // Toggle selection for filtering
-  const cid = String(nodeValue.cid || '');
-  if (!cid) return;
-  const current = new Set(selectedSet.value);
-  if (current.has(cid)) {
-    current.delete(cid);
-  } else {
-    current.add(cid);
-  }
-  emit('select-nodes', [...current]);
 }
 
 function buildExportFileName(ext = 'png') {
@@ -923,7 +910,7 @@ function exportRelationCsv() {
           <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
         </p>
         <p class="query-tool-muted lineage-direction-note">
-          滾輪縮放 · 拖曳平移 · 點擊 <code>[−]</code> 收合 / <code>[+N]</code> 展開分支 · 點擊節點篩選下方明細
+          滾輪縮放 · 拖曳平移 · 點擊 <code>[−]</code> 收合 / <code>[+N]</code> 展開分支；節點篩選請回主頁面操作
         </p>
       </div>
 

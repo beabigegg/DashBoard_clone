@@ -1,4 +1,4 @@
-import { computed, reactive, readonly, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
 import { exportCsv } from '../utils/csv';
@@ -45,6 +45,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
   // ── Resolved equipment ──
   const resolvedEquipmentIds = ref<string[]>([]);
   const resolvedEquipmentNames = ref<string[]>([]);
+  const resolvedLotNames = ref<string[]>([]);
   const startDate = ref('');
   const endDate = ref('');
   const lookupMessage = ref('');
@@ -118,26 +119,6 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
     return Object.entries(map).map(([from, to]) => ({ from, to }));
   });
 
-  /** Set of lot names relevant to the query (input lots + traced parent lots).
-   *  For work_order input, the input values are work order names (not lot names),
-   *  so we rely on traceMap keys (resolved lot names) instead. */
-  const relevantLotNames = computed(() => {
-    const names = new Set();
-    // For lot input, include input values directly; for work_order, skip (work order != lot name)
-    if (inputType.value !== 'work_order') {
-      parseInputValues(inputText.value).forEach((v) => names.add(v.toUpperCase()));
-    }
-    const map = traceMap.value;
-    if (map && typeof map === 'object') {
-      // Include both resolved lot names (keys) and their parent lot names (values)
-      Object.entries(map).forEach(([lotName, parentName]) => {
-        if (lotName) names.add(String(lotName).toUpperCase());
-        if (parentName) names.add(String(parentName).toUpperCase());
-      });
-    }
-    return names;
-  });
-
   // ── Bootstrap: load workcenter groups ──
 
   async function bootstrap() {
@@ -180,6 +161,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
   function clearResults() {
     resolvedEquipmentIds.value = [];
     resolvedEquipmentNames.value = [];
+    resolvedLotNames.value = [];
     startDate.value = '';
     endDate.value = '';
     lookupMessage.value = '';
@@ -215,6 +197,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
       const result = (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
       resolvedEquipmentIds.value = Array.isArray(result.equipment_ids) ? result.equipment_ids as string[] : [];
       resolvedEquipmentNames.value = Array.isArray(result.equipment_names) ? result.equipment_names as string[] : [];
+      resolvedLotNames.value = (Array.isArray(result.lot_names) ? result.lot_names as string[] : []).map((n) => String(n).toUpperCase());
       traceMap.value = (result.trace_map && typeof result.trace_map === 'object') ? result.trace_map as Record<string, string> : {};
 
       if (resolvedEquipmentIds.value.length === 0) {
@@ -276,16 +259,11 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
     errors.lots = '';
 
     try {
-      // Fetch all lots for the equipment, then filter to only relevant lots
       const payload = await fetchEquipmentPeriod('lots', { page: 1, perPage: 9999 });
       const allRows = Array.isArray(payload?.data) ? payload.data : [];
-      const relevant = relevantLotNames.value;
-      // When relevant set is empty (e.g., work_order with no trace map), show all lots
+      const relevant = new Set(resolvedLotNames.value);
       _allLotsRows.value = relevant.size > 0
-        ? allRows.filter((row) => {
-            const name = String(row.CONTAINERNAME || '').toUpperCase();
-            return relevant.has(name);
-          })
+        ? allRows.filter((row) => relevant.has(String(row.CONTAINERNAME || '').toUpperCase()))
         : allRows;
       _lotsCurrentPage.value = 1;
       queried.lots = true;
@@ -318,7 +296,14 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
 
     try {
       const payload = await fetchEquipmentPeriod('jobs');
-      jobsRows.value = Array.isArray(payload?.data) ? payload.data : [];
+      const allRows = Array.isArray(payload?.data) ? payload.data : [];
+      const relevant = new Set(resolvedLotNames.value);
+      jobsRows.value = relevant.size > 0
+        ? allRows.filter((row) => {
+            const names = String(row.CONTAINERNAMES || '').toUpperCase();
+            return [...relevant].some((n) => names.includes(n));
+          })
+        : allRows;
       queried.jobs = true;
       return true;
     } catch (error) {

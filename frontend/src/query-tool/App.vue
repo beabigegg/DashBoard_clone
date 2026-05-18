@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
+import { replaceRuntimeHistory } from '../core/shell-navigation';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 
 import PageHeader from '../shared-ui/components/PageHeader.vue';
@@ -274,13 +274,6 @@ function syncUrlState() {
   }
 
   const target = nextQuery ? `/query-tool?${nextQuery}` : '/query-tool';
-  if (
-    typeof window.__MES_PORTAL_SHELL_NAVIGATE__ === 'function'
-    && String(window.location.pathname || '').startsWith('/portal-shell')
-  ) {
-    navigateToRuntimeRoute(target, { replace: true });
-    return;
-  }
   replaceRuntimeHistory(target);
 }
 
