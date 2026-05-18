@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.13
-last-changed: 2026-05-14
+schema-version: 1.3.14
+last-changed: 2026-05-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -134,6 +134,14 @@ breaking-change-policy: deprecate-2-minors
 - **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
 - **Schema-version bump to 1.3.13 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 - **Source**: change `migrate-material-trace-ts`.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-mid-section-defect-ts)
+
+- **Before this change**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`, `reject-history/`, `hold-history/`, `wip-overview/`, `wip-detail/`, `hold-overview/`, `hold-detail/`, `resource-status/`, `qc-gate/`, `resource-history/`, `job-query/`, `production-history/`, `query-tool/`, `material-trace/`.
+- **From this change onward**: `include` gains `"src/mid-section-defect/**/*"`, covering `main.ts` and `App.vue` (with `<script setup lang="ts">`) under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.14 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+- **Source**: change `migrate-mid-section-defect-ts`.
 
 ## Required Check Policy
 

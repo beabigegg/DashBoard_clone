@@ -8,6 +8,11 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.14] — 2026-05-18
+### Changed
+- migrate-mid-section-defect-ts (Phase 3): `tsconfig.json` `include` expanded with `"src/mid-section-defect/**/*"`, covering `main.ts` and `App.vue` under `strict: true`. Gate tier unchanged (informational). Additive prose only.
+- Source: change `migrate-mid-section-defect-ts`.
+
 ## [ci 1.3.13] — 2026-05-18
 ### Changed
 - migrate-material-trace-ts (Phase 3): `tsconfig.json` `include` expanded with `"src/material-trace/**/*"`, covering `main.ts` and `App.vue` under `strict: true`. Gate tier unchanged (informational). Additive prose only.

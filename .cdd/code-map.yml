@@ -1,6 +1,6 @@
-# generated: 2026-05-18T05:37:49Z by cdd-kit 2.0.19
-# files: 783, src-lines: 213743, map-lines: 18378, compression: 11.6x
-# sources-digest: 03b240d65dfc875717c1a60c158aad8449aff2aff3a28ff303dc7e072c265479
+# generated: 2026-05-18T07:21:14Z by cdd-kit 2.0.19
+# files: 783, src-lines: 213876, map-lines: 18330, compression: 11.7x
+# sources-digest: 643c71a76e16bd68c213e988d1b15b9bf8a85ef970cf4e651802664eb1603d12
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -2822,55 +2822,7 @@ frontend/src/material-trace/main.ts:  # 7 lines
     - { module: '../wip-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/mid-section-defect/App.vue:  # 807 lines
-  imports:
-    - { module: vue, items: [computed, reactive, ref], line: 2 }
-    - { module: '../core/api.js', items: [apiGet, ensureMesApiAvailable], line: 4 }
-    - { module: '../core/unwrap-api-result.js', items: [unwrapApiResult], line: 5 }
-    - { module: '../shared-composables/useFilterOrchestrator.js', items: [useFilterOrchestrator], line: 6 }
-    - { module: '../shared-composables/useTraceProgress.js', items: [useTraceProgress], line: 7 }
-    - { module: '../shared-composables/TraceProgressBar.vue', items: ['default:TraceProgressBar'], line: 8 }
-    - { module: '../shared-ui/components/EmptyState.vue', items: ['default:EmptyState'], line: 10 }
-    - { module: '../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 11 }
-    - { module: '../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 12 }
-    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 13 }
-    - { module: './components/AnalysisSummary.vue', items: ['default:AnalysisSummary'], line: 15 }
-    - { module: './components/DetailTable.vue', items: ['default:DetailTable'], line: 16 }
-    - { module: './components/FilterBar.vue', items: ['default:FilterBar'], line: 17 }
-    - { module: './components/KpiCards.vue', items: ['default:KpiCards'], line: 18 }
-    - { module: './components/ParetoChart.vue', items: ['default:ParetoChart'], line: 19 }
-    - { module: './components/SuspectContextPanel.vue', items: ['default:SuspectContextPanel'], line: 20 }
-    - { module: './components/TrendChart.vue', items: ['default:TrendChart'], line: 21 }
-  constants:
-    - { name: API_TIMEOUT, line: 25 }
-    - { name: PAGE_SIZE, line: 26 }
-    - { name: SESSION_CACHE_KEY, line: 27 }
-    - { name: SESSION_CACHE_TTL, line: 28 }
-    - { name: CHART_TOP_N, line: 29 }
-  functions:
-    - { name: buildMaterialChartFromAttribution, lines: 31-58 }
-    - { name: buildMachineChartFromAttribution, lines: 60-95 }
-    - { name: emptyAnalysisData, lines: 337-345 }
-    - { name: setDefaultDates, lines: 347-357 }
-    - { name: toDateString, lines: 359-361 }
-    - { name: buildFilterParams, lines: 365-383 }
-    - { name: buildDetailParams, lines: 385-401 }
-    - { name: parseContainerValues, lines: 403-408 }
-    - { name: snapshotFilters, lines: 410-421 }
-    - { name: firstStageErrorMessage, lines: 423-426 }
-    - { name: async loadLossReasons, lines: 428-436 }
-    - { name: async loadDetail, lines: 438-468 }
-    - { name: async loadAnalysis, lines: 470-530 }
-    - { name: handleUpdateFilters, lines: 532-534 }
-    - { name: handleQuery, lines: 536-539 }
-    - { name: prevPage, lines: 541-544 }
-    - { name: nextPage, lines: 546-549 }
-    - { name: exportCsv, lines: 551-576 }
-    - { name: handleMachineBarClick, lines: 581-591 }
-    - { name: createAbortSignal, lines: 594-600 }
-    - { name: saveSession, lines: 602-618 }
-    - { name: restoreSession, lines: 620-645 }
-    - { name: initPage, lines: 647-652 }
+frontend/src/mid-section-defect/App.vue:  # 940 lines
 
 frontend/src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
   imports:
@@ -2926,7 +2878,7 @@ frontend/src/mid-section-defect/components/ParetoChart.vue:  # 217 lines
 frontend/src/mid-section-defect/components/SuspectContextPanel.vue:  # 215 lines
   imports:
     - { module: vue, items: [ref, watch, onMounted, onBeforeUnmount], line: 2 }
-    - { module: '../../core/api.js', items: [apiGet], line: 4 }
+    - { module: '../../core/api', items: [apiGet], line: 4 }
     - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 5 }
   functions:
     - { name: handleOutsideClick, lines: 37-40 }
@@ -2942,7 +2894,7 @@ frontend/src/mid-section-defect/components/TrendChart.vue:  # 111 lines
     - { module: echarts/charts, items: [BarChart, LineChart], line: 6 }
     - { module: echarts/components, items: [GridComponent, LegendComponent, TooltipComponent], line: 7 }
 
-frontend/src/mid-section-defect/main.js:  # 6 lines
+frontend/src/mid-section-defect/main.ts:  # 6 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
     - { module: './App.vue', items: ['default:App'], line: 3 }

@@ -1,10 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 
-import { apiGet, ensureMesApiAvailable } from '../core/api.js';
-import { unwrapApiResult } from '../core/unwrap-api-result.js';
-import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator.js';
-import { useTraceProgress } from '../shared-composables/useTraceProgress.js';
+import { apiGet, ensureMesApiAvailable } from '../core/api';
+import { unwrapApiResult } from '../core/unwrap-api-result';
+import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useTraceProgress } from '../shared-composables/useTraceProgress';
+// @ts-expect-error TraceProgressBar.vue is not yet migrated to lang="ts" (Phase 3 in-progress)
 import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
@@ -12,15 +13,119 @@ import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 
+// Components below are kept as plain SFCs (no lang="ts") per migration scope — Phase 3 in-progress
+// @ts-expect-error AnalysisSummary.vue not yet migrated to lang="ts"
 import AnalysisSummary from './components/AnalysisSummary.vue';
+// @ts-expect-error DetailTable.vue not yet migrated to lang="ts"
 import DetailTable from './components/DetailTable.vue';
+// @ts-expect-error FilterBar.vue not yet migrated to lang="ts"
 import FilterBar from './components/FilterBar.vue';
+// @ts-expect-error KpiCards.vue not yet migrated to lang="ts"
 import KpiCards from './components/KpiCards.vue';
+// @ts-expect-error ParetoChart.vue not yet migrated to lang="ts"
 import ParetoChart from './components/ParetoChart.vue';
+// @ts-expect-error SuspectContextPanel.vue not yet migrated to lang="ts"
 import SuspectContextPanel from './components/SuspectContextPanel.vue';
+// @ts-expect-error TrendChart.vue not yet migrated to lang="ts"
 import TrendChart from './components/TrendChart.vue';
 
 ensureMesApiAvailable();
+
+// ---------------------------------------------------------------------------
+// Local interfaces for API response shapes used in this app
+// ---------------------------------------------------------------------------
+
+interface StationOption {
+  name: string;
+  label?: string;
+}
+
+interface AttributionRecord {
+  MATERIAL_KEY: string;
+  INPUT_QTY: number;
+  DEFECT_QTY: number;
+  DETECTION_LOT_COUNT: number;
+  EQUIPMENT_NAME?: string;
+  EQUIPMENT_ID?: string;
+  WORKCENTER_GROUP?: string;
+  RESOURCEFAMILYNAME?: string;
+  MATERIAL_PART_NAME?: string;
+}
+
+interface ChartItem {
+  name: string;
+  input_qty: number;
+  defect_qty: number;
+  defect_rate: number;
+  lot_count: number;
+  cumulative_pct?: number;
+}
+
+interface ChartsByKey {
+  by_machine?: ChartItem[];
+  by_material?: ChartItem[];
+  by_wafer_root?: ChartItem[];
+  by_workflow?: ChartItem[];
+  by_loss_reason?: ChartItem[];
+  by_detection_machine?: ChartItem[];
+  by_downstream_station?: ChartItem[];
+  by_downstream_loss_reason?: ChartItem[];
+  by_downstream_machine?: ChartItem[];
+}
+
+interface MsdAnalysisData {
+  kpi: Record<string, unknown>;
+  charts: ChartsByKey;
+  attribution?: AttributionRecord[];
+  materials_attribution?: AttributionRecord[];
+  daily_trend: unknown[];
+  genealogy_status: string;
+  detail_total_count: number;
+  total_ancestor_count?: number;
+}
+
+interface DetailPagination {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
+}
+
+interface CommittedFilters {
+  startDate: string;
+  endDate: string;
+  lossReasons: string[];
+  station: string;
+  direction: string;
+  queryMode?: string;
+  containerInputType?: string;
+  containerValues?: string[];
+}
+
+interface ResolutionInfo {
+  resolved_count: number;
+  not_found: string[];
+}
+
+interface SessionCache {
+  ts: number;
+  committedFilters: CommittedFilters;
+  filters: {
+    startDate: string;
+    endDate: string;
+    lossReasons: string[];
+    station: string;
+    direction: string;
+  };
+  analysisData: MsdAnalysisData;
+  detailData: unknown[];
+  detailPagination: DetailPagination;
+  availableLossReasons: string[];
+  queryMode: string;
+  containerInputType: string;
+  containerInput: string;
+  resolutionInfo: ResolutionInfo | null;
+}
 
 const API_TIMEOUT = 360000;
 const PAGE_SIZE = 20;
@@ -28,10 +133,10 @@ const SESSION_CACHE_KEY = 'msd:cache';
 const SESSION_CACHE_TTL = 5 * 60 * 1000; // 5 min, matches backend Redis TTL
 const CHART_TOP_N = 10;
 
-function buildMaterialChartFromAttribution(records) {
+function buildMaterialChartFromAttribution(records: AttributionRecord[]): ChartItem[] {
   if (!records || records.length === 0) return [];
   const sorted = [...records].sort((a, b) => b.DEFECT_QTY - a.DEFECT_QTY);
-  const items = [];
+  const items: ChartItem[] = [];
   const other = { input_qty: 0, defect_qty: 0, lot_count: 0 };
   for (let i = 0; i < sorted.length; i++) {
     const rec = sorted[i];
@@ -57,9 +162,9 @@ function buildMaterialChartFromAttribution(records) {
   return items;
 }
 
-function buildMachineChartFromAttribution(records) {
+function buildMachineChartFromAttribution(records: AttributionRecord[]): ChartItem[] {
   if (!records || records.length === 0) return [];
-  const agg = {};
+  const agg: Record<string, { input_qty: number; defect_qty: number; lot_count: number }> = {};
   for (const rec of records) {
     const key = rec.EQUIPMENT_NAME || '(未知)';
     if (!agg[key]) agg[key] = { input_qty: 0, defect_qty: 0, lot_count: 0 };
@@ -68,7 +173,7 @@ function buildMachineChartFromAttribution(records) {
     agg[key].lot_count += rec.DETECTION_LOT_COUNT;
   }
   const sorted = Object.entries(agg).sort((a, b) => b[1].defect_qty - a[1].defect_qty);
-  const items = [];
+  const items: ChartItem[] = [];
   const other = { input_qty: 0, defect_qty: 0, lot_count: 0 };
   for (let i = 0; i < sorted.length; i++) {
     const [name, data] = sorted[i];
@@ -94,31 +199,37 @@ function buildMachineChartFromAttribution(records) {
   return items;
 }
 
-const stationOptions = ref([]);
+const stationOptions = ref<StationOption[]>([]);
 (async () => {
   try {
-    const result = await apiGet('/api/mid-section-defect/station-options');
+    const result = await apiGet<StationOption[]>('/api/mid-section-defect/station-options');
     if (result?.success && Array.isArray(result.data)) {
       stationOptions.value = result.data;
     }
   } catch { /* non-blocking */ }
 })();
-const stationLabelMap = computed(() => {
-  const m = {};
+const stationLabelMap = computed((): Record<string, string> => {
+  const m: Record<string, string> = {};
   for (const opt of stationOptions.value) {
     m[opt.name] = opt.label || opt.name;
   }
   return m;
 });
 
-const filters = reactive({
+const filters = reactive<{
+  startDate: string;
+  endDate: string;
+  lossReasons: string[];
+  station: string;
+  direction: string;
+}>({
   startDate: '',
   endDate: '',
   lossReasons: [],
   station: '測試',
   direction: 'backward',
 });
-const committedFilters = ref({
+const committedFilters = ref<CommittedFilters>({
   startDate: '',
   endDate: '',
   lossReasons: [],
@@ -126,19 +237,19 @@ const committedFilters = ref({
   direction: 'backward',
 });
 
-const queryMode = ref('date_range');
-const containerInputType = ref('lot');
-const containerInput = ref('');
-const resolutionInfo = ref(null);
+const queryMode = ref<string>('date_range');
+const containerInputType = ref<string>('lot');
+const containerInput = ref<string>('');
+const resolutionInfo = ref<ResolutionInfo | null>(null);
 
-const availableLossReasons = ref([]);
+const availableLossReasons = ref<string[]>([]);
 const trace = useTraceProgress({ profile: 'mid_section_defect' });
 
 // Canonical trace_query_id from spool-hit or async job result.
 // Passed to detail/export so the backend can serve from spool instead of Oracle.
-const currentTraceQueryId = ref(null);
+const currentTraceQueryId = ref<string | null>(null);
 
-const analysisData = ref({
+const analysisData = ref<MsdAnalysisData>({
   kpi: {},
   charts: {},
   daily_trend: [],
@@ -146,22 +257,22 @@ const analysisData = ref({
   detail_total_count: 0,
 });
 
-const detailData = ref([]);
-const detailPagination = ref({
+const detailData = ref<unknown[]>([]);
+const detailPagination = ref<DetailPagination>({
   page: 1,
   page_size: PAGE_SIZE,
   total_count: 0,
   total_pages: 1,
 });
-const detailLoading = ref(false);
+const detailLoading = ref<boolean>(false);
 
-const loading = reactive({
+const loading = reactive<{ querying: boolean }>({
   querying: false,
 });
 
-const hasQueried = ref(false);
-const queryError = ref('');
-const restoredFromCache = ref(false);
+const hasQueried = ref<boolean>(false);
+const queryError = ref<string>('');
+const restoredFromCache = ref<boolean>(false);
 
 // --- Cascading chart filters: station -> spec prune via useFilterOrchestrator ---
 const {
@@ -177,12 +288,12 @@ const {
   ],
 });
 const upstreamStationFilter = computed({
-  get: () => upstreamChartFilters.station,
-  set: (v) => updateUpstreamField('station', v),
+  get: () => (upstreamChartFilters.station as unknown as string[]),
+  set: (v: string[]) => updateUpstreamField('station', v),
 });
 const upstreamSpecFilter = computed({
-  get: () => upstreamChartFilters.spec,
-  set: (v) => updateUpstreamField('spec', v),
+  get: () => (upstreamChartFilters.spec as unknown as string[]),
+  set: (v: string[]) => updateUpstreamField('spec', v),
 });
 const upstreamStationOptions = computed(() => {
   const attribution = analysisData.value?.attribution;
@@ -203,7 +314,7 @@ const upstreamSpecOptions = computed(() => {
   if (!Array.isArray(attribution) || attribution.length === 0) return [];
   // Apply station filter first so spec options are contextual
   const base = upstreamStationFilter.value.length > 0
-    ? attribution.filter(rec => upstreamStationFilter.value.includes(rec.WORKCENTER_GROUP))
+    ? attribution.filter(rec => upstreamStationFilter.value.includes(rec.WORKCENTER_GROUP ?? ''))
     : attribution;
   const seen = new Set();
   const options = [];
@@ -223,8 +334,8 @@ const filteredByMachineData = computed(() => {
     return analysisData.value?.charts?.by_machine ?? [];
   }
   const filtered = attribution.filter(rec => {
-    if (upstreamStationFilter.value.length > 0 && !upstreamStationFilter.value.includes(rec.WORKCENTER_GROUP)) return false;
-    if (upstreamSpecFilter.value.length > 0 && !upstreamSpecFilter.value.includes(rec.RESOURCEFAMILYNAME)) return false;
+    if (upstreamStationFilter.value.length > 0 && !upstreamStationFilter.value.includes(rec.WORKCENTER_GROUP ?? '')) return false;
+    if (upstreamSpecFilter.value.length > 0 && !upstreamSpecFilter.value.includes(rec.RESOURCEFAMILYNAME ?? '')) return false;
     return true;
   });
   return filtered.length > 0 ? buildMachineChartFromAttribution(filtered) : [];
@@ -240,8 +351,8 @@ const {
   },
 });
 const materialTypeFilter = computed({
-  get: () => materialChartFilters.materialType,
-  set: (v) => updateMaterialField('materialType', v),
+  get: () => (materialChartFilters.materialType as unknown as string[]),
+  set: (v: string[]) => updateMaterialField('materialType', v),
 });
 const materialTypeOptions = computed(() => {
   const materials = analysisData.value?.materials_attribution;
@@ -263,7 +374,7 @@ const filteredByMaterialData = computed(() => {
   if (!hasFilter || !Array.isArray(materials) || materials.length === 0) {
     return analysisData.value?.charts?.by_material ?? [];
   }
-  const filtered = materials.filter(rec => materialTypeFilter.value.includes(rec.MATERIAL_PART_NAME));
+  const filtered = materials.filter(rec => materialTypeFilter.value.includes(rec.MATERIAL_PART_NAME ?? ''));
   return filtered.length > 0 ? buildMaterialChartFromAttribution(filtered) : [];
 });
 
@@ -297,8 +408,20 @@ const showTraceProgress = computed(() => (
   || trace.completed_stages.value.length > 0
   || hasTraceError.value
 ));
-const eventsAggregation = computed(() => trace.stage_results.events?.aggregation || null);
-const eventsQualityMeta = computed(() => trace.stage_results.events?.quality_meta || null);
+interface EventsStageResult {
+  aggregation?: Record<string, unknown>;
+  quality_meta?: { status?: string };
+  trace_query_id?: string;
+}
+interface LineageStageResult {
+  total_ancestor_count?: number;
+}
+interface SeedStageResult {
+  seed_count?: number;
+  not_found?: string[];
+}
+const eventsAggregation = computed(() => (trace.stage_results.events as unknown as EventsStageResult | null)?.aggregation || null);
+const eventsQualityMeta = computed(() => (trace.stage_results.events as unknown as EventsStageResult | null)?.quality_meta || null);
 const hasCompletenessWarning = computed(() => {
   if (!hasQueried.value || loading.querying) return false;
   const status = String(eventsQualityMeta.value?.status || '').toLowerCase();
@@ -316,11 +439,19 @@ const showAnalysisCharts = computed(() => hasQueried.value && (Boolean(eventsAgg
 
 const skeletonChartCount = computed(() => (isForward.value ? 4 : 6));
 
-const totalAncestorCount = computed(() => trace.stage_results.lineage?.total_ancestor_count || analysisData.value?.total_ancestor_count || 0);
+const totalAncestorCount = computed(() => (trace.stage_results.lineage as unknown as LineageStageResult | null)?.total_ancestor_count || analysisData.value?.total_ancestor_count || 0);
 
 const summaryQueryParams = computed(() => {
   const snap = committedFilters.value;
-  const params = {
+  const params: {
+    queryMode: string;
+    startDate: string;
+    endDate: string;
+    lossReasons: string[];
+    containerInputType?: string;
+    resolvedCount?: number;
+    notFoundCount?: number;
+  } = {
     queryMode: snap.queryMode || 'date_range',
     startDate: snap.startDate,
     endDate: snap.endDate,
@@ -356,15 +487,15 @@ function setDefaultDates() {
   filters.endDate = toDateString(endDate);
 }
 
-function toDateString(value) {
+function toDateString(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js
 
-function buildFilterParams() {
+function buildFilterParams(): Record<string, unknown> {
   const snapshot = committedFilters.value;
-  const params = {
+  const params: Record<string, unknown> = {
     station: snapshot.station,
     direction: snapshot.direction,
   };
@@ -382,9 +513,9 @@ function buildFilterParams() {
   return params;
 }
 
-function buildDetailParams() {
+function buildDetailParams(): Record<string, unknown> {
   const snapshot = committedFilters.value;
-  const params = {
+  const params: Record<string, unknown> = {
     start_date: snapshot.startDate,
     end_date: snapshot.endDate,
     station: snapshot.station,
@@ -428,14 +559,14 @@ function firstStageErrorMessage() {
 async function loadLossReasons() {
   try {
     const result = await apiGet('/api/mid-section-defect/loss-reasons');
-    const unwrapped = unwrapApiResult(result, '載入不良原因失敗');
-    availableLossReasons.value = unwrapped.data?.loss_reasons || [];
+    const unwrapped = unwrapApiResult(result, '載入不良原因失敗') as { data?: { loss_reasons?: string[] } } | null;
+    availableLossReasons.value = unwrapped?.data?.loss_reasons || [];
   } catch {
     // Non-blocking, dropdown remains empty.
   }
 }
 
-async function loadDetail(page = 1, signal = null) {
+async function loadDetail(page = 1, signal: AbortSignal | null = null): Promise<void> {
   detailLoading.value = true;
   try {
     const params = {
@@ -446,21 +577,21 @@ async function loadDetail(page = 1, signal = null) {
     const result = await apiGet('/api/mid-section-defect/analysis/detail', {
       params,
       timeout: API_TIMEOUT,
-      signal,
+      signal: signal ?? undefined,
     });
-    const unwrapped = unwrapApiResult(result, '載入明細失敗');
-    detailData.value = unwrapped.data?.detail || [];
-    detailPagination.value = unwrapped.data?.pagination || {
+    const unwrapped = unwrapApiResult(result, '載入明細失敗') as { data?: { detail?: unknown[]; pagination?: DetailPagination } } | null;
+    detailData.value = unwrapped?.data?.detail || [];
+    detailPagination.value = unwrapped?.data?.pagination || {
       page: 1,
       page_size: PAGE_SIZE,
       total_count: 0,
       total_pages: 1,
     };
   } catch (err) {
-    if (err?.name === 'AbortError') {
+    if ((err as { name?: string })?.name === 'AbortError') {
       return;
     }
-    console.error('Detail load failed:', err.message);
+    console.error('Detail load failed:', (err as Error).message);
     detailData.value = [];
   } finally {
     detailLoading.value = false;
@@ -489,22 +620,24 @@ async function loadAnalysis() {
 
     // Extract resolution info for container mode
     if (isContainerMode && trace.stage_results.seed) {
+      const seed = trace.stage_results.seed as unknown as SeedStageResult;
       resolutionInfo.value = {
-        resolved_count: trace.stage_results.seed.seed_count || 0,
-        not_found: trace.stage_results.seed.not_found || [],
+        resolved_count: seed.seed_count || 0,
+        not_found: seed.not_found || [],
       };
     }
 
     if (eventsAggregation.value) {
+      const lineage = trace.stage_results.lineage as unknown as LineageStageResult | null;
       analysisData.value = {
         ...analysisData.value,
         ...eventsAggregation.value,
-        total_ancestor_count: trace.stage_results.lineage?.total_ancestor_count || 0,
+        total_ancestor_count: lineage?.total_ancestor_count || 0,
       };
     }
 
     // Capture canonical trace_query_id for spool-backed detail/export calls.
-    const eventsResult = trace.stage_results.events;
+    const eventsResult = trace.stage_results.events as unknown as EventsStageResult | null;
     if (eventsResult?.trace_query_id) {
       currentTraceQueryId.value = eventsResult.trace_query_id;
     }
@@ -520,16 +653,16 @@ async function loadAnalysis() {
     }
 
   } catch (err) {
-    if (err?.name === 'AbortError') {
+    if ((err as { name?: string })?.name === 'AbortError') {
       return;
     }
-    queryError.value = err.message || '查詢失敗，請稍後再試';
+    queryError.value = (err as Error).message || '查詢失敗，請稍後再試';
   } finally {
     loading.querying = false;
   }
 }
 
-function handleUpdateFilters(updated) {
+function handleUpdateFilters(updated: Partial<typeof filters>): void {
   Object.assign(filters, updated);
 }
 
@@ -576,9 +709,9 @@ function exportCsv() {
 }
 
 // Suspect context panel state
-const suspectPanelMachine = ref(null);
+const suspectPanelMachine = ref<AttributionRecord | null>(null);
 
-function handleMachineBarClick({ name, dataIndex }) {
+function handleMachineBarClick({ name, dataIndex }: { name: string; dataIndex: number }): void {
   if (!name || name === '其他') return;
   const attribution = analysisData.value?.attribution;
   if (!Array.isArray(attribution)) return;
@@ -590,8 +723,8 @@ function handleMachineBarClick({ name, dataIndex }) {
   }
 }
 
-const _abortControllers = new Map();
-function createAbortSignal(key = 'default') {
+const _abortControllers = new Map<string, AbortController>();
+function createAbortSignal(key = 'default'): AbortSignal {
   const prev = _abortControllers.get(key);
   if (prev) prev.abort();
   const ctrl = new AbortController();

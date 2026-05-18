@@ -1,0 +1,44 @@
+agent: frontend-engineer
+change-id: migrate-mid-section-defect-ts
+timestamp: 2026-05-18T15:15:00Z
+status: complete
+
+summary: |
+  Phase 3 TypeScript migration of frontend/src/mid-section-defect/.
+  Renamed main.js → main.ts, migrated App.vue to <script setup lang="ts"> with
+  full type annotations, dropped .js extensions from 5 cross-feature import
+  specifiers (4 in App.vue, 1 in SuspectContextPanel.vue), expanded tsconfig.json
+  include, and bumped ci-gate-contract.md 1.3.13 → 1.3.14 with matching CHANGELOG
+  entry. Type-check exits 0 after adding local interfaces for all API response
+  shapes and casting useFilterOrchestrator committed Record<string,unknown> to
+  typed string[] via as-unknown-as double-cast pattern.
+
+  Key type-annotation decisions:
+  - MsdAnalysisData, AttributionRecord, ChartItem, CommittedFilters, DetailPagination,
+    ResolutionInfo, SessionCache: local interfaces in App.vue
+  - EventsStageResult, LineageStageResult, SeedStageResult: local interfaces for
+    StageResults.events/lineage/seed (StageResults fields are unknown|null)
+  - 7 keep-as-is sub-components and TraceProgressBar.vue lack lang="ts"; suppressed
+    TS7016 via @ts-expect-error comments on each import line per Phase 3 in-progress
+    pattern (CLAUDE.md @ts-expect-error <phase note>)
+  - buildFilterParams/buildDetailParams return Record<string,unknown> to allow
+    dynamic property assignment
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/mid-section-defect/main.ts:1-6" }
+  - { type: files-changed, pointer: "frontend/src/mid-section-defect/App.vue:1-30 (lang=ts + interfaces)" }
+  - { type: files-changed, pointer: "frontend/src/mid-section-defect/components/SuspectContextPanel.vue:4 (import specifier)" }
+  - { type: files-changed, pointer: "frontend/tsconfig.json:19 (mid-section-defect entry)" }
+  - { type: files-changed, pointer: "contracts/ci/ci-gate-contract.md (1.3.13→1.3.14 + subsection)" }
+  - { type: files-changed, pointer: "contracts/CHANGELOG.md (ci 1.3.14 entry prepended)" }
+  - { type: components-affected, pointer: "App.vue (mid-section-defect)" }
+  - { type: accessibility-audit, pointer: "n/a (no UI behavior change; pure type migration)" }
+
+gate-results:
+  type-check: "exit 0 (vue-tsc --noEmit)"
+  tests: "33 files passed, 346 passed | 1 skipped"
+  css-check: "6 pre-existing errors in shared-ui (not introduced by this change); 0 errors in mid-section-defect"
+  cdd-kit-validate: "exit 0"
+  python-js-path-audit: "grep returned empty"
+  index-html-no-change: "git diff shows zero changes"
+  multiselect-no-change: "git diff shows zero changes"

@@ -1,0 +1,14 @@
+change-id: migrate-mid-section-defect-ts
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-18T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3" }
+  - { type: gate-promotions, pointer: "n/a (no gate moved tiers; frontend-type-check remains informational in contract but required for AC-2 merge eligibility)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; all gates covered by existing jobs)" }
+  - { type: required-status-checks, pointer: "frontend-type-check, frontend-unit-tests, frontend-css-check, backend-unit-tests, cdd-validate" }
+next-action: none
+files-read:
+  - specs/changes/migrate-mid-section-defect-ts/change-classification.md
+  - specs/changes/migrate-mid-section-defect-ts/test-plan.md
+  - contracts/ci/ci-gate-contract.md

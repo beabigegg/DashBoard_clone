@@ -1,0 +1,18 @@
+change-id: migrate-mid-section-defect-ts
+agent: test-strategist
+timestamp: "2026-05-18T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/migrate-mid-section-defect-ts/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/mid-section-defect-composables.test.js ↔ frontend/src/mid-section-defect/App.vue" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/msd-completeness-warning.test.js ↔ frontend/src/mid-section-defect/App.vue" }
+  - { type: tdd-pairs, pointer: "tests/e2e/test_mid_section_defect_e2e.py ↔ src/mes_dashboard/routes/mid_section_defect.py" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), lint/type-check (Tier 0), contract (Tier 0), integration (Tier 1), e2e (Tier 3 nightly)" }
+  - { type: mapping-completeness, pointer: "all 8 AC mapped; AC-3 and AC-4 confirmed no-op by source audit; no new test files required" }
+next-action: none
+files-read:
+  - specs/changes/migrate-mid-section-defect-ts/change-classification.md
+  - specs/changes/migrate-mid-section-defect-ts/change-request.md
+  - frontend/tests/legacy/mid-section-defect-composables.test.js
+  - frontend/tests/legacy/msd-completeness-warning.test.js
+  - tests/e2e/test_mid_section_defect_e2e.py
