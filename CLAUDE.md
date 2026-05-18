@@ -96,7 +96,7 @@ This repository follows the Contract-Driven Delivery workflow.
 
 ## TypeScript Migration Rules
 
-- Phase status: Phase 1a (`core/`), 1b (`shared-composables/`), 1c (`shared-ui/`), Phase 2 (`admin-shared/`, `resource-shared/`, `wip-shared/`) — all complete. Phase 3 (per-app) in progress. Remaining JS apps: `admin-dashboard`, `admin-performance`, `admin-user-usage-kpi`, `anomaly-overview`, `mid-section-defect`, `portal`, `portal-shell`, `tables`.
+- Phase status: Phase 1a (`core/`), 1b (`shared-composables/`), 1c (`shared-ui/`), Phase 2 (`admin-shared/`, `resource-shared/`, `wip-shared/`) — all complete. Phase 3 (per-app) in progress. Remaining JS apps: `admin-dashboard`, `admin-performance`, `admin-user-usage-kpi`, `anomaly-overview`, `portal`, `portal-shell`, `tables`.
 - When renaming `.js → .ts`, audit ALL Python test files (`tests/**/*.py`) for hardcoded `.js` paths. Parity tests (`tests/test_frontend_*_parity.py`, call Node subprocesses) and safety tests (`test_*_frontend_safety.py`, use `pathlib.Path.read_text()`) both break silently on the old extension.
 - Python parity tests call `node --experimental-strip-types --input-type=module` to import `.ts` directly — requires Node ≥22.6. `environment.yml` pins `nodejs>=22.6`; do not loosen — conda's node shadows `setup-node@v4`'s node in login-shell pytest (`shell: bash -el {0}`). CI workflows must have `uses: actions/setup-node@v4 / node-version: "22"`.
 - When renaming `.js → .ts`, audit ALL Vitest test files that load it. Tests using `require()` fail (CJS cannot load ESM) — convert to static `import` before or during rename.

@@ -32,3 +32,4 @@
 | query-tool-partial-trackout | 2026 | 2026-05-15 | specs/archive/2026/query-tool-partial-trackout/ |
 | equipment-rejects-by-lots | 2026 | 2026-05-18 | specs/archive/2026/equipment-rejects-by-lots/ |
 | migrate-material-trace-ts | 2026 | 2026-05-18 | specs/archive/2026/migrate-material-trace-ts/ |
+| migrate-mid-section-defect-ts | 2026 | 2026-05-18 | specs/archive/2026/migrate-mid-section-defect-ts/ |
