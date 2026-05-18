@@ -1,5 +1,99 @@
 .theme-admin-pages {
-  padding: 0 0 theme('spacing.token.p32');
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 theme('spacing.token.p16') theme('spacing.token.p32');
+}
+
+.theme-admin-pages .header-gradient {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: theme('spacing.3');
+  padding: theme('spacing.token.p18') theme('spacing.token.p22');
+  margin-top: theme('spacing.token.p16');
+  border-radius: theme('borderRadius.shell');
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+  box-shadow: 0 4px 15px rgba(0, 128, 200, 0.2);
+  margin-bottom: theme('spacing.token.p16');
+}
+
+.theme-admin-pages .header-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-admin-pages .header-gradient h1 {
+  margin: 0;
+  color: theme('colors.white');
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.theme-admin-pages .header-subtitle {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.theme-admin-pages .page-header-meta {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.4');
+  flex-wrap: wrap;
+}
+
+.theme-admin-pages .last-update {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: theme('spacing.2');
+}
+
+.theme-admin-pages .refresh-indicator {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: theme('colors.white');
+  border-radius: 50%;
+  animation: admin-pages-spin 0.8s linear infinite;
+}
+
+.theme-admin-pages .refresh-indicator.active {
+  display: inline-block;
+}
+
+.theme-admin-pages .refresh-success {
+  color: theme('colors.state.success');
+  display: none;
+}
+
+.theme-admin-pages .refresh-success.active {
+  display: inline-block;
+  animation: admin-pages-fade-out 1s ease-out forwards;
+}
+
+.theme-admin-pages .refresh-error-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: theme('colors.state.danger');
+  display: none;
+}
+
+.theme-admin-pages .refresh-error-dot.active {
+  display: inline-block;
+}
+
+@keyframes admin-pages-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes admin-pages-fade-out {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .theme-admin-pages .panel {
