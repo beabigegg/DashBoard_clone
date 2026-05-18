@@ -25,7 +25,6 @@
 | 不良歷史分析 Dashboard | `/reject-history` | ✅ 已完成 |
 | 良率警示中心 | `/yield-alert-center` | ✅ 已完成 |
 | 材料追溯查詢 | `/material-trace` | ✅ 已完成 |
-| 數據表查詢工具 | `/tables` | ✅ 已完成 |
 | 設備維修查詢 | `/job-query` | ✅ 已完成 |
 | 批次追蹤工具 | `/query-tool` | ✅ 已完成 |
 | 生產歷史分析 | `/production-history` | ✅ 已完成 |
@@ -39,7 +38,7 @@
 | 管理員認證系統（LDAP） | ✅ 已完成 |
 | 統一管理儀表板（`/admin-dashboard`） | ✅ 已完成 |
 | 效能監控儀表板（`/admin/performance`） | ✅ 已完成 |
-| 使用者用量 KPI 儀表板（`/admin-user-usage-kpi`） | ✅ 已完成 |
+| 使用者用量 KPI（整合於 `/admin-dashboard` Usage 標籤頁） | ✅ 已完成 |
 | AI 智能查詢助手（Text2SQL / Function / Agent 模式） | ✅ 已完成 |
 | 異常偵測排程器（DuckDB 自動分析） | ✅ 已完成 |
 | Redis 多層快取系統 | ✅ 已完成 |
@@ -83,6 +82,7 @@
 | Vue 3 | 3.5 | UI 框架（所有報表頁面已遷移） |
 | Vue Router | 4.6 | Portal Shell SPA 路由 |
 | Vite | 6.3 | 多頁模組打包（19 個 entry point） |
+| TypeScript | 5.x | 全前端靜態型別（feature apps + shared layers） |
 | ECharts | 6.0 | 圖表庫（npm tree-shaking） |
 | vue-echarts | 8.0 | ECharts Vue 封裝 |
 | DuckDB-WASM | 1.33+ | 瀏覽器端本地運算（view compute offload） |
@@ -177,14 +177,14 @@ DashBoard_vite/
 ├── frontend/                       # Vite 前端專案
 │   ├── src/
 │   │   ├── core/                   # 共用模組
-│   │   │   ├── api.js              # REST API 客戶端
-│   │   │   ├── duckdb-client.js    # DuckDB-WASM 客戶端
-│   │   │   ├── duckdb-activation-policy.js  # 本地運算啟用策略
-│   │   │   ├── autocomplete.js     # WIP autocomplete
-│   │   │   ├── wip-derive.js       # WIP KPI/filter/chart 導出
-│   │   │   ├── field-contracts.js  # 欄位契約
-│   │   │   ├── shell-navigation.js # 導覽結構
-│   │   │   └── ...                 # 其他 helpers
+│   │   │   ├── api.ts              # REST API 客戶端
+│   │   │   ├── duckdb-client.ts    # DuckDB-WASM 客戶端
+│   │   │   ├── duckdb-activation-policy.ts  # 本地運算啟用策略
+│   │   │   ├── autocomplete.ts     # WIP autocomplete
+│   │   │   ├── wip-derive.ts       # WIP KPI/filter/chart 導出
+│   │   │   ├── field-contracts.ts  # 欄位契約
+│   │   │   ├── shell-navigation.ts # 導覽結構
+│   │   │   └── ...                 # 其他 helpers（全部 TypeScript）
 │   │   ├── shared-ui/              # 全站共用 UI 元件（AiChatPanel/DataTable/LoadingOverlay 等）
 │   │   ├── shared-composables/     # 共用 Vue composables
 │   │   ├── styles/                 # 全站 Tailwind CSS
@@ -203,17 +203,15 @@ DashBoard_vite/
 │   │   ├── yield-alert-center/     # 良率警示中心（Vue 3 SFC）
 │   │   ├── mid-section-defect/     # 中段不良追溯（Vue 3 SFC）
 │   │   ├── material-trace/         # 材料追溯（Vue 3 SFC）
-│   │   ├── tables/                 # 數據表查詢（Vue 3 SFC）
 │   │   ├── production-history/      # 生產歷史分析（Vue 3 SFC）
 │   │   ├── admin-dashboard/        # 統一管理儀表板（Vue 3 SFC）
-│   │   ├── admin-performance/      # 效能監控（Vue 3 SFC）
-│   │   ├── admin-user-usage-kpi/   # 使用者用量 KPI（Vue 3 SFC）
+│   │   ├── admin-pages/            # 管理功能 SPA（portal-shell native mounting）
 │   │   ├── job-query/              # 設備維修查詢
 │   │   ├── query-tool/             # 批次追蹤工具
 │   │   ├── workers/                # Web Worker（DuckDB 等）
 │   │   └── portal/                 # Portal 入口
 │   ├── tests/                      # 前端測試（Node test runner）
-│   ├── vite.config.js              # 19 個 entry point 打包設定
+│   ├── vite.config.ts              # 19 個 entry point 打包設定
 │   ├── tailwind.config.js          # 設計 token（色彩/間距/字型）
 │   └── package.json
 ├── shared/
@@ -567,7 +565,7 @@ sudo systemctl start mes-dashboard mes-dashboard-trace-worker mes-dashboard-reje
   - Worker：Worker 狀態控制 + RSS 記憶體監控
   - Performance：查詢效能指標（P50/P95/P99 延遲/慢查詢統計）
   - Usage：使用者登入/用量 KPI
-- 使用者用量 KPI 儀表板（`/admin-user-usage-kpi`）：
+- 使用者用量 KPI（整合於 `/admin-dashboard` Usage 標籤頁）：
   - DAU 趨勢、時段分布、部門統計、Top 使用者排行
 
 ---
