@@ -158,9 +158,9 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
       />
     </div>
 
-    <div v-if="error" class="error-banner" role="alert">{{ error }}</div>
+    <div v-if="error" class="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm mb-2" role="alert">{{ error }}</div>
 
-    <div v-if="truncated" class="row-limit-banner" role="status">
+    <div v-if="truncated" class="bg-yellow-50 border border-yellow-300 text-yellow-800 px-3 py-2 rounded text-sm mb-2" role="status">
       資料已截斷，僅顯示部分結果。請縮小查詢範圍以取得完整資料。
     </div>
 
@@ -253,23 +253,4 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
   white-space: nowrap;
 }
 
-.row-limit-banner {
-  background-color: var(--color-warning-bg, #fff3cd);
-  border: 1px solid var(--color-warning-border, #ffc107);
-  color: var(--color-warning-text, #856404);
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  font-size: 0.875rem;
-}
-
-.error-banner {
-  background-color: var(--color-danger-bg, #f8d7da);
-  border: 1px solid var(--color-danger-border, #f5c6cb);
-  color: var(--color-danger-text, #721c24);
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  font-size: 0.875rem;
-}
 </style>
