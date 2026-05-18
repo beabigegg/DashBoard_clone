@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 295
-visible-files: 1043
+visible-dirs: 296
+visible-files: 1036
 omitted-dirs: 106
 truncated-dirs: 8
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -444,7 +444,7 @@ DashBoard_vite/
 |   |   |-- material-trace/
 |   |   |   |-- App.vue
 |   |   |   |-- index.html
-|   |   |   |-- main.js
+|   |   |   |-- main.ts
 |   |   |   \-- style.css
 |   |   |-- mid-section-defect/
 |   |   |   |-- components/
@@ -709,7 +709,6 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260515_134658.log
 |   |   |-- access_20260515_163007.log
 |   |   |-- access_20260515_163738.log
 |   |   |-- access_20260515_170327.log
@@ -719,7 +718,7 @@ DashBoard_vite/
 |   |   |-- access_20260518_104923.log
 |   |   |-- access_20260518_105558.log
 |   |   |-- access_20260518_111718.log
-|   |   |-- error_20260515_134658.log
+|   |   |-- access_20260518_133418.log
 |   |   |-- error_20260515_163007.log
 |   |   |-- error_20260515_163738.log
 |   |   |-- error_20260515_170327.log
@@ -729,7 +728,7 @@ DashBoard_vite/
 |   |   |-- error_20260518_104923.log
 |   |   |-- error_20260518_105558.log
 |   |   |-- error_20260518_111718.log
-|   |   |-- rq_msd_worker_20260515_134658.log
+|   |   |-- error_20260518_133418.log
 |   |   |-- rq_msd_worker_20260515_163007.log
 |   |   |-- rq_msd_worker_20260515_163738.log
 |   |   |-- rq_msd_worker_20260515_170327.log
@@ -739,7 +738,7 @@ DashBoard_vite/
 |   |   |-- rq_msd_worker_20260518_104923.log
 |   |   |-- rq_msd_worker_20260518_105558.log
 |   |   |-- rq_msd_worker_20260518_111718.log
-|   |   |-- rq_prod_hist_worker_20260515_134658.log
+|   |   |-- rq_msd_worker_20260518_133418.log
 |   |   |-- rq_prod_hist_worker_20260515_163007.log
 |   |   |-- rq_prod_hist_worker_20260515_163738.log
 |   |   |-- rq_prod_hist_worker_20260515_170327.log
@@ -749,7 +748,7 @@ DashBoard_vite/
 |   |   |-- rq_prod_hist_worker_20260518_104923.log
 |   |   |-- rq_prod_hist_worker_20260518_105558.log
 |   |   |-- rq_prod_hist_worker_20260518_111718.log
-|   |   |-- rq_reject_worker_20260515_134658.log
+|   |   |-- rq_prod_hist_worker_20260518_133418.log
 |   |   |-- rq_reject_worker_20260515_163007.log
 |   |   |-- rq_reject_worker_20260515_163738.log
 |   |   |-- rq_reject_worker_20260515_170327.log
@@ -759,6 +758,7 @@ DashBoard_vite/
 |   |   |-- rq_reject_worker_20260518_104923.log
 |   |   |-- rq_reject_worker_20260518_105558.log
 |   |   |-- rq_reject_worker_20260518_111718.log
+|   |   |-- rq_reject_worker_20260518_133418.log
 |   |   \-- ... (30 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
@@ -1394,6 +1394,8 @@ DashBoard_vite/
 |   \-- ... (153 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
+|   |   |-- material_trace/
+|   |   |   \-- mtrace-e2376e60c9af59c5.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1443,17 +1445,9 @@ DashBoard_vite/
 |   |   |-- probe_118725.json
 |   |   |-- probe_118748.json
 |   |   |-- probe_118789.json
-|   |   |-- probe_119871.json
-|   |   \-- ... (385 more entries truncated; cap=50)
-|   |-- gunicorn.pid
+|   |   \-- ... (388 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py
