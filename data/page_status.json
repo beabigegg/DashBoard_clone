@@ -58,13 +58,6 @@
       "order": 6
     },
     {
-      "route": "/tables",
-      "name": "表格總覽",
-      "status": "dev",
-      "drawer_id": "dev-tools",
-      "order": 1
-    },
-    {
       "route": "/resource",
       "name": "設備即時概況",
       "status": "released",
