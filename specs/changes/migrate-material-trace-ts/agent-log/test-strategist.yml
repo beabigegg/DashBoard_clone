@@ -1,0 +1,17 @@
+change-id: migrate-material-trace-ts
+agent: test-strategist
+timestamp: "2026-05-18T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/migrate-material-trace-ts/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/material-trace-composables.test.js — frontend/src/core/reject-history-filters.ts" }
+  - { type: tdd-pairs, pointer: "frontend/tests/validation/useMaterialTrace.validation.test.js — frontend/src/core/endpoint-schemas.js" }
+  - { type: coverage-tiers, pointer: "unit, contract, type, build, lint" }
+  - { type: mapping-completeness, pointer: "all 8 acceptance criteria mapped; no new test files required" }
+next-action: none
+files-read:
+  - specs/changes/migrate-material-trace-ts/context-manifest.md
+  - frontend/tests/legacy/material-trace-composables.test.js
+  - frontend/tests/validation/useMaterialTrace.validation.test.js
+  - frontend/vitest.config.js
+  - frontend/package.json

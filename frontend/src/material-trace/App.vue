@@ -1,13 +1,49 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-import { apiGet, apiPost } from '../core/api.js';
-import { parseMultiLineInput } from '../core/reject-history-filters.js';
+import { apiGet, apiPost } from '../core/api';
+import { parseMultiLineInput } from '../core/reject-history-filters';
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
+
+// ---- Local interfaces ----
+interface Pagination {
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+}
+
+interface QualityMeta {
+  status?: string;
+  max_rows?: number | string | null;
+}
+
+interface MaterialTraceFilterOptions {
+  workcenter_groups?: string[];
+}
+
+interface MaterialTraceQueryPayload {
+  rows?: Record<string, unknown>[];
+  pagination?: Pagination;
+  meta?: {
+    unresolved?: string[];
+    max_rows?: number | string | null;
+    [key: string]: unknown;
+  };
+  quality_meta?: QualityMeta;
+  query_hash?: string | null;
+  async?: boolean;
+  job_id?: string;
+}
+
+interface MaterialTraceJobStatus {
+  status?: string;
+  error?: string;
+}
 
 const API_TIMEOUT = 60000;
 const DEFAULT_PER_PAGE = 20;
@@ -15,32 +51,32 @@ const FORWARD_INPUT_LIMIT = 200;
 const REVERSE_INPUT_LIMIT = 50;
 
 // ---- Query mode state ----
-const queryMode = ref('forward'); // 'forward' | 'reverse'
-const forwardInputType = ref('lot'); // 'lot' | 'workorder'
-const inputText = ref('');
+const queryMode = ref<'forward' | 'reverse'>('forward');
+const forwardInputType = ref<'lot' | 'workorder'>('lot');
+const inputText = ref<string>('');
 
 // ---- Filter state ----
-const workcenterGroupOptions = ref([]);
-const selectedWorkcenterGroups = ref([]);
-const workcenterDropdownOpen = ref(false);
-const workcenterSearch = ref('');
+const workcenterGroupOptions = ref<string[]>([]);
+const selectedWorkcenterGroups = ref<string[]>([]);
+const workcenterDropdownOpen = ref<boolean>(false);
+const workcenterSearch = ref<string>('');
 
 // ---- Result state ----
-const rows = ref([]);
-const pagination = ref({ page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 });
-const loading = ref(false);
-const paginationLoading = ref(false);
-const errorMessage = ref('');
-const warningMessage = ref('');
-const unresolvedWarning = ref('');
+const rows = ref<Record<string, unknown>[]>([]);
+const pagination = ref<Pagination>({ page: 1, per_page: DEFAULT_PER_PAGE, total: 0, total_pages: 0 });
+const loading = ref<boolean>(false);
+const paginationLoading = ref<boolean>(false);
+const errorMessage = ref<string>('');
+const warningMessage = ref<string>('');
+const unresolvedWarning = ref<string>('');
 
 // ---- Async job state (task 8.3) ----
-const currentQueryHash = ref(null);
-const pollingJobId = ref(null);
+const currentQueryHash = ref<string | null>(null);
+const pollingJobId = ref<string | null>(null);
 const _POLL_INTERVAL_MS = 2000;
 const _POLL_MAX_ATTEMPTS = 150; // ~5 minutes
 let _pollingAttempts = 0;
-let _pollingTimer = null;
+let _pollingTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ---- Computed ----
 const parsedValues = computed(() => parseMultiLineInput(inputText.value));
@@ -73,7 +109,7 @@ const workcenterTriggerText = computed(() => {
 });
 
 // ---- Table columns ----
-const TABLE_COLUMNS = [
+const TABLE_COLUMNS: { key: string; label: string }[] = [
   { key: 'CONTAINERNAME', label: 'LOT ID' },
   { key: 'PJ_WORKORDER', label: '工單' },
   { key: 'WORKCENTER_GROUP', label: '站群組' },
@@ -90,13 +126,13 @@ const TABLE_COLUMNS = [
 ];
 
 // ---- Mode switching ----
-function switchQueryMode(mode) {
+function switchQueryMode(mode: 'forward' | 'reverse') {
   if (queryMode.value === mode) return;
   queryMode.value = mode;
   clearAll();
 }
 
-function switchForwardInputType(type) {
+function switchForwardInputType(type: 'lot' | 'workorder') {
   if (forwardInputType.value === type) return;
   forwardInputType.value = type;
   inputText.value = '';
@@ -127,7 +163,7 @@ function _stopPolling() {
   }
 }
 
-function _startPolling(jobId, queryPage) {
+function _startPolling(jobId: string, queryPage: number) {
   _pollingAttempts = 0;
   function poll() {
     if (pollingJobId.value !== jobId) return; // stale poll, discard
@@ -138,10 +174,11 @@ function _startPolling(jobId, queryPage) {
       errorMessage.value = '查詢逾時，請重試';
       return;
     }
-    apiGet(`/api/material-trace/job/${jobId}`, { timeout: 10000 })
+    apiGet<MaterialTraceJobStatus>(`/api/material-trace/job/${jobId}`, { timeout: 10000 })
       .then((res) => {
         if (pollingJobId.value !== jobId) return;
-        const status = String(res?.data?.status || '').toLowerCase();
+        const jobData = res.success ? res.data : undefined;
+        const status = String(jobData?.status || '').toLowerCase();
         if (status === 'completed') {
           pollingJobId.value = null;
           _stopPolling();
@@ -149,7 +186,7 @@ function _startPolling(jobId, queryPage) {
         } else if (status === 'failed') {
           loading.value = false;
           pollingJobId.value = null;
-          errorMessage.value = res?.data?.error || '查詢失敗，請稍後再試';
+          errorMessage.value = jobData?.error || '查詢失敗，請稍後再試';
         } else {
           _pollingTimer = setTimeout(poll, _POLL_INTERVAL_MS);
         }
@@ -164,7 +201,7 @@ function _startPolling(jobId, queryPage) {
 }
 
 // ---- Workcenter multi-select ----
-function toggleWorkcenterGroup(group) {
+function toggleWorkcenterGroup(group: string) {
   const idx = selectedWorkcenterGroups.value.indexOf(group);
   if (idx >= 0) {
     selectedWorkcenterGroups.value.splice(idx, 1);
@@ -184,7 +221,7 @@ function clearWorkcenterGroups() {
 // ---- API calls ----
 async function loadFilterOptions() {
   try {
-    const res = await apiGet('/api/material-trace/filter-options', { timeout: API_TIMEOUT });
+    const res = await apiGet<MaterialTraceFilterOptions>('/api/material-trace/filter-options', { timeout: API_TIMEOUT });
     if (res.success && res.data?.workcenter_groups) {
       workcenterGroupOptions.value = res.data.workcenter_groups;
     }
@@ -193,7 +230,8 @@ async function loadFilterOptions() {
   }
 }
 
-async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll = false } = {}) {
+async function executePrimaryQuery(page: number = 1, opts: { paginationOnly?: boolean; _fromPoll?: boolean } = {}) {
+  const { paginationOnly = false, _fromPoll = false } = opts;
   if (_fromPoll) {
     // loading is already true from the original call — proceed directly
   } else if (paginationOnly) {
@@ -214,7 +252,7 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll
     paginationLoading.value = true;
   }
 
-  const body = {
+  const body: { mode: string; values: string[]; page: number; per_page: number; workcenter_groups?: string[] } = {
     mode: queryModeForApi.value,
     values: parsedValues.value,
     page,
@@ -225,7 +263,7 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll
   }
 
   try {
-    const result = await apiPost('/api/material-trace/query', body, { timeout: API_TIMEOUT });
+    const result = await apiPost<MaterialTraceQueryPayload>('/api/material-trace/query', body, { timeout: API_TIMEOUT });
 
     if (!result.success) {
       errorMessage.value = result.error?.message || '查詢失敗';
@@ -240,9 +278,9 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll
 
     // ── Task 8.3: Handle async 202 response ────────────────────────────────
     if (payload.async) {
-      pollingJobId.value = payload.job_id;
+      pollingJobId.value = payload.job_id ?? null;
       currentQueryHash.value = payload.query_hash || null;
-      _startPolling(payload.job_id, page);
+      _startPolling(payload.job_id as string, page);
       return; // loading stays true during polling
     }
 
@@ -258,12 +296,12 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll
     };
 
     // Handle meta warnings
-    if (payload.meta?.unresolved?.length > 0) {
+    if (payload.meta?.unresolved && payload.meta.unresolved.length > 0) {
       unresolvedWarning.value = `以下 LOT ID 無法解析：${payload.meta.unresolved.join('、')}`;
     }
     warningMessage.value = buildQualityWarning(payload.quality_meta, payload.meta);
   } catch (err) {
-    errorMessage.value = err.message || '查詢失敗，請稍後再試';
+    errorMessage.value = (err instanceof Error ? err.message : null) || '查詢失敗，請稍後再試';
     if (!paginationOnly && !_fromPoll) {
       rows.value = [];
     }
@@ -277,12 +315,12 @@ async function executePrimaryQuery(page = 1, { paginationOnly = false, _fromPoll
   }
 }
 
-function goToPage(page) {
+function goToPage(page: number) {
   if (page < 1 || page > Number(pagination.value?.total_pages || 1)) return;
   void executePrimaryQuery(page, { paginationOnly: true });
 }
 
-function buildQualityWarning(qualityMeta, fallbackMeta = null) {
+function buildQualityWarning(qualityMeta?: QualityMeta | null, fallbackMeta?: QualityMeta | null): string {
   const status = String(qualityMeta?.status || '').toLowerCase();
   const maxRows = qualityMeta?.max_rows || fallbackMeta?.max_rows;
   if (!status || status === 'complete') {
@@ -301,7 +339,7 @@ function buildQualityWarning(qualityMeta, fallbackMeta = null) {
 async function exportCsv() {
   if (!canExport.value) return;
 
-  const body = {
+  const body: { mode: string; values: string[]; workcenter_groups?: string[]; query_hash?: string } = {
     mode: queryModeForApi.value,
     values: parsedValues.value,
   };
@@ -321,8 +359,8 @@ async function exportCsv() {
     });
 
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      errorMessage.value = data.error?.message || '匯出失敗';
+      const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+      errorMessage.value = (data.error as Record<string, unknown> | undefined)?.message as string || '匯出失敗';
       return;
     }
 
@@ -347,7 +385,7 @@ async function exportCsv() {
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
-    errorMessage.value = err.message || '匯出失敗，請稍後再試';
+    errorMessage.value = (err instanceof Error ? err.message : null) || '匯出失敗，請稍後再試';
   }
 }
 
@@ -361,8 +399,8 @@ onUnmounted(() => {
 });
 
 // Close dropdown on click outside
-function onDocumentClick(e) {
-  if (!e.target.closest('.multi-select')) {
+function onDocumentClick(e: MouseEvent) {
+  if (!(e.target as HTMLElement | null)?.closest('.multi-select')) {
     workcenterDropdownOpen.value = false;
   }
 }
@@ -412,7 +450,7 @@ function onDocumentClick(e) {
               <select
                 class="filter-input input-type-select"
                 :value="forwardInputType"
-                @change="switchForwardInputType($event.target.value)"
+                @change="switchForwardInputType(($event.target as HTMLSelectElement).value as 'lot' | 'workorder')"
               >
                 <option value="lot">LOT ID</option>
                 <option value="workorder">工單</option>

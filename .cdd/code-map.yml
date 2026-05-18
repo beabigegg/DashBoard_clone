@@ -1,6 +1,6 @@
-# generated: 2026-05-18T02:46:52Z by cdd-kit 2.0.19
-# files: 783, src-lines: 213682, map-lines: 18409, compression: 11.6x
-# sources-digest: 4c687d0b323a73af0aca701a192d7e79ffc8505cd88fab10deb91cbdab8c8b97
+# generated: 2026-05-18T05:37:49Z by cdd-kit 2.0.19
+# files: 783, src-lines: 213743, map-lines: 18378, compression: 11.6x
+# sources-digest: 03b240d65dfc875717c1a60c158aad8449aff2aff3a28ff303dc7e072c265479
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -2813,40 +2813,9 @@ frontend/src/job-query/main.ts:  # 653 lines
     - { name: Equipment, lines: 22-27 }  # local
     - { name: JobRecord, lines: 28-28 }  # local
 
-frontend/src/material-trace/App.vue:  # 541 lines
-  imports:
-    - { module: vue, items: [computed, onMounted, onUnmounted, ref], line: 2 }
-    - { module: '../core/api.js', items: [apiGet, apiPost], line: 4 }
-    - { module: '../core/reject-history-filters.js', items: [parseMultiLineInput], line: 5 }
-    - { module: '../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 6 }
-    - { module: '../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 7 }
-    - { module: '../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 8 }
-    - { module: '../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 9 }
-    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 10 }
-  constants:
-    - { name: API_TIMEOUT, line: 12 }
-    - { name: DEFAULT_PER_PAGE, line: 13 }
-    - { name: FORWARD_INPUT_LIMIT, line: 14 }
-    - { name: REVERSE_INPUT_LIMIT, line: 15 }
-    - { name: TABLE_COLUMNS, line: 76 }
-  functions:
-    - { name: switchQueryMode, lines: 93-97 }
-    - { name: switchForwardInputType, lines: 99-104 }
-    - { name: clearAll, lines: 106-109 }
-    - { name: clearResults, lines: 111-120 }
-    - { name: _stopPolling, lines: 123-128 }
-    - { name: _startPolling, lines: 130-164 }
-    - { name: toggleWorkcenterGroup, lines: 167-174 }
-    - { name: selectAllWorkcenterGroups, lines: 176-178 }
-    - { name: clearWorkcenterGroups, lines: 180-182 }
-    - { name: async loadFilterOptions, lines: 185-194 }
-    - { name: async executePrimaryQuery, lines: 196-278 }
-    - { name: goToPage, lines: 280-283 }
-    - { name: buildQualityWarning, lines: 285-299 }
-    - { name: async exportCsv, lines: 301-352 }
-    - { name: onDocumentClick, lines: 364-368 }
+frontend/src/material-trace/App.vue:  # 579 lines
 
-frontend/src/material-trace/main.js:  # 7 lines
+frontend/src/material-trace/main.ts:  # 7 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
     - { module: './App.vue', items: ['default:App'], line: 3 }
@@ -3348,7 +3317,7 @@ frontend/src/query-tool/composables/useLotDetail.ts:  # 589 lines
     - { name: QualityMeta, lines: 14-17 }  # local
     - { name: LotDetailInitial, lines: 19-23 }  # local
 
-frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 447 lines
+frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 452 lines
   imports:
     - { module: vue, items: [computed, reactive, ref], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
@@ -3363,7 +3332,7 @@ frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 447 lines
   functions:
     - { name: normalizeSubTab, lines: 24-27 }
     - { name: normalizeInputType, lines: 29-32 }
-    - { name: useLotEquipmentQuery, lines: 34-447 }
+    - { name: useLotEquipmentQuery, lines: 34-452 }
   interfaces:
     - { name: LotEquipmentQueryInitial, lines: 7-12 }  # local
 
@@ -6523,7 +6492,7 @@ src/mes_dashboard/routes/qc_gate_routes.py:  # 20 lines
   functions:
     - { name: api_qc_gate_summary, lines: 15-20 }  # @qc_gate_bp.route('/summary')
 
-src/mes_dashboard/routes/query_tool_routes.py:  # 987 lines
+src/mes_dashboard/routes/query_tool_routes.py:  # 989 lines
   imports:
     - { module: gc, items: [], line: 12 }
     - { module: hashlib, items: [], line: 13 }
@@ -6559,12 +6528,12 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 987 lines
     - { name: query_lot_history, lines: 416-474 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
     - { name: query_adjacent_lots, lines: 484-506 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
     - { name: query_lot_associations, lines: 516-580 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
-    - { name: query_equipment_period, lines: 590-672 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
-    - { name: get_equipment_list, lines: 680-711 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
-    - { name: get_workcenter_groups_list, lines: 719-738 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
-    - { name: lookup_lot_equipment, lines: 748-783 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
-    - { name: get_equipment_recent_jobs_route, lines: 791-804 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
-    - { name: export_csv, lines: 814-987 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+    - { name: query_equipment_period, lines: 590-674 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+    - { name: get_equipment_list, lines: 682-713 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
+    - { name: get_workcenter_groups_list, lines: 721-740 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
+    - { name: lookup_lot_equipment, lines: 750-785 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
+    - { name: get_equipment_recent_jobs_route, lines: 793-806 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
+    - { name: export_csv, lines: 816-989 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
 src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
   imports:
@@ -7931,7 +7900,7 @@ src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
     - { name: _build_lot_payload, lines: 139-171 }
     - { name: get_qc_gate_summary, lines: 174-248 }
 
-src/mes_dashboard/services/query_tool_service.py:  # 2760 lines
+src/mes_dashboard/services/query_tool_service.py:  # 2776 lines
   imports:
     - { module: csv, items: [], line: 18 }
     - { module: hashlib, items: [], line: 19 }
@@ -8019,15 +7988,15 @@ src/mes_dashboard/services/query_tool_service.py:  # 2760 lines
     - { name: _check_names_with_equipment, lines: 1999-2026 }
     - { name: _lookup_equipment_by_names, lines: 2029-2056 }
     - { name: _trace_parents_for_equipment, lines: 2059-2151 }
-    - { name: resolve_lot_equipment, lines: 2154-2295 }
-    - { name: get_equipment_status_hours, lines: 2302-2395 }
-    - { name: get_equipment_lots, lines: 2398-2466 }
-    - { name: get_equipment_materials, lines: 2469-2521 }
-    - { name: get_equipment_rejects, lines: 2524-2580 }
-    - { name: get_equipment_jobs, lines: 2583-2634 }
-    - { name: export_to_csv, lines: 2641-2677 }
-    - { name: generate_csv_stream, lines: 2680-2722 }
-    - { name: get_equipment_recent_jobs, lines: 2729-2760 }
+    - { name: resolve_lot_equipment, lines: 2154-2296 }
+    - { name: get_equipment_status_hours, lines: 2303-2396 }
+    - { name: get_equipment_lots, lines: 2399-2467 }
+    - { name: get_equipment_materials, lines: 2470-2522 }
+    - { name: get_equipment_rejects, lines: 2525-2596 }
+    - { name: get_equipment_jobs, lines: 2599-2650 }
+    - { name: export_to_csv, lines: 2657-2693 }
+    - { name: generate_csv_stream, lines: 2696-2738 }
+    - { name: get_equipment_recent_jobs, lines: 2745-2776 }
 
 src/mes_dashboard/services/query_tool_sql_runtime.py:  # 396 lines
   imports:

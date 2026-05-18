@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.12
+schema-version: 1.3.13
 last-changed: 2026-05-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -126,6 +126,14 @@ breaking-change-policy: deprecate-2-minors
 - **Rollback (cache schema_version)**: This change introduces a new rollback primitive — bumping `container_filter_cache` payload `schema_version` from `2` → `3` in a follow-up deploy invalidates all L2 entries on the next read (PHF-04). This avoids `redis-cli DEL` post-deploy. The runbook step for rollback is: (1) bump `schema_version` in `container_filter_cache.py`, (2) deploy, (3) optionally `rm tmp/container_filter_cache.loading` if stale sentinel is suspected. No parquet cleanup required (cache is Redis-only, not on-disk parquet).
 - **Schema-version bump to 1.3.12 (patch)**: additive prose only — gate tier, command, and status are unchanged.
 - **Source**: change `prod-history-first-tier-cache-filters`.
+
+### frontend-type-check scope expansion (Phase 3 — migrate-material-trace-ts)
+
+- **Before this change**: `tsconfig.json` `include` covered `core/`, `shared-composables/`, `shared-ui/`, `admin-shared/`, `resource-shared/`, `wip-shared/`, `reject-history/`, `hold-history/`, `wip-overview/`, `wip-detail/`, `hold-overview/`, `hold-detail/`, `resource-status/`, `qc-gate/`, `resource-history/`, `job-query/`, `production-history/`, `query-tool/`.
+- **From this change onward**: `include` gains `"src/material-trace/**/*"`, covering `main.ts` and `App.vue` under `strict: true`.
+- **Gate tier unchanged**: informational (continue-on-error: true). Promotion follows the standard Informational Gate Promotion Policy.
+- **Schema-version bump to 1.3.13 (patch)**: additive prose only — gate tier, command, and status are unchanged.
+- **Source**: change `migrate-material-trace-ts`.
 
 ## Required Check Policy
 
