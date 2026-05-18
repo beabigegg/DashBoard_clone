@@ -366,17 +366,36 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
     exportingMap[normalized] = true;
     try {
       let exportType = 'equipment_lots';
-      if (normalized === 'jobs') exportType = 'equipment_jobs';
-      else if (normalized === 'rejects') exportType = 'equipment_rejects';
+      let exportParams: Record<string, unknown>;
 
-      await exportCsv({
-        exportType,
-        params: {
+      if (normalized === 'jobs') {
+        exportType = 'equipment_jobs';
+        exportParams = {
           equipment_ids: resolvedEquipmentIds.value,
           equipment_names: resolvedEquipmentNames.value,
           start_date: startDate.value,
           end_date: endDate.value,
-        },
+        };
+      } else if (normalized === 'rejects') {
+        exportType = 'equipment_rejects';
+        // Rejects route uses equipment_ids only (cross-station join via CONTAINERID; equipment_names not used)
+        exportParams = {
+          equipment_ids: resolvedEquipmentIds.value,
+          start_date: startDate.value,
+          end_date: endDate.value,
+        };
+      } else {
+        exportParams = {
+          equipment_ids: resolvedEquipmentIds.value,
+          equipment_names: resolvedEquipmentNames.value,
+          start_date: startDate.value,
+          end_date: endDate.value,
+        };
+      }
+
+      await exportCsv({
+        exportType,
+        params: exportParams,
       });
       return true;
     } catch (error) {

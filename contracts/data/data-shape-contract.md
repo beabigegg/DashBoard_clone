@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.5.0
-last-changed: 2026-05-15
+schema-version: 1.6.0
+last-changed: 2026-05-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -396,6 +396,42 @@ One row per aggregated partial-trackout group for `GET /api/query-tool/lot-histo
 | partial_count | integer | no | group size; `1` for unaggregated rows (single partial or strict-guard divergence); `≥ 2` for merged partial-trackout groups. Computed by service layer; not stored in Oracle. |
 
 **Prior behavior (before `query-tool-partial-trackout`):** `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY TRACKOUTTIMESTAMP DESC) WHERE rn = 1` was used in all three SQL files. This returned only the last partial row, emitting the wrong TRACKINQTY (remaining qty of the last partial, not original load) and wrong TRACKOUTQTY (only the last partial's output, not cumulative). The `partial_count` column did not exist. Added by change `query-tool-partial-trackout`.
+
+### 3.7 Query-Tool Equipment-Lot-Rejects Row
+
+One row per reject event for `POST /api/query-tool/equipment-period` (`query_type=rejects`) and `POST /api/query-tool/export-csv` (`export_type=equipment_rejects`). Replaces the previous aggregate row shape (EQUIPMENTNAME, LOSSREASONNAME, TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) as of 2026-05-18 (`equipment-rejects-by-lots`).
+
+**Cross-station note**: `EQUIPMENTNAME` reflects the reject event's equipment, which may differ from the queried equipment IDs (a lot processed on Furnace-A may have its reject logged under Furnace-B). This is intentional per QT-07 and not a bug. `LOTREJECTHISTORY` has no `EQUIPMENTID`; `CONTAINERID` is the only correct join key.
+
+| column | type | nullable | notes |
+|---|---|---:|---|
+| CONTAINERID | string | no | internal Oracle container ID |
+| CONTAINERNAME | string | yes | display lot ID |
+| WORKCENTERNAME | string | yes | from LOTREJECTHISTORY row, resolved via DW_MES_SPEC_WORKCENTER_V |
+| WORKCENTER_GROUP | string | yes | from DW_MES_SPEC_WORKCENTER_V |
+| WORKCENTERSEQUENCE_GROUP | integer | yes | from DW_MES_SPEC_WORKCENTER_V; 999 if unknown |
+| PRODUCTLINENAME | string | yes | from DW_MES_CONTAINER |
+| PJ_FUNCTION | string | yes | from DW_MES_CONTAINER |
+| PJ_TYPE | string | yes | from DW_MES_CONTAINER |
+| PRODUCTNAME | string | yes | from DW_MES_CONTAINER |
+| SPECNAME | string | yes | from LOTREJECTHISTORY row |
+| LOSSREASONNAME | string | yes | from LOTREJECTHISTORY row; `(未填寫)` if null |
+| EQUIPMENTNAME | string | yes | reject event's equipment — may differ from queried equipment (cross-station case, see QT-07) |
+| REJECTCOMMENT | string | yes | free-text comment from LOTREJECTHISTORY |
+| REJECT_QTY | integer | yes | `REJECTQTY` from LOTREJECTHISTORY |
+| STANDBY_QTY | integer | yes | `STANDBYQTY` from LOTREJECTHISTORY |
+| QTYTOPROCESS_QTY | integer | yes | `QTYTOPROCESS` from LOTREJECTHISTORY |
+| INPROCESS_QTY | integer | yes | `INPROCESSQTY` from LOTREJECTHISTORY |
+| PROCESSED_QTY | integer | yes | `PROCESSEDQTY` from LOTREJECTHISTORY |
+| REJECT_TOTAL_QTY | integer | yes | sum of the five qty fields above |
+| DEFECT_QTY | integer | yes | `DEFECTQTY` from LOTREJECTHISTORY |
+| TXN_TIME | datetime | yes | `TXNDATE` from LOTREJECTHISTORY |
+| TXNDATE | datetime | yes | same as TXN_TIME |
+| TXN_DAY | date | yes | `TRUNC(TXNDATE)` — date portion only |
+
+**Prior aggregate fields removed**: `TOTAL_REJECT_QTY`, `TOTAL_DEFECT_QTY`, `AFFECTED_LOT_COUNT` — these were present in the old `equipment_rejects.sql` aggregate shape and are no longer returned. See §10 of api-contract.md for the compatibility note.
+
+**CSV export column order** (for `export_type=equipment_rejects`): mirrors the table above — CONTAINERID, CONTAINERNAME, WORKCENTERNAME, WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, PRODUCTLINENAME, PJ_FUNCTION, PJ_TYPE, PRODUCTNAME, SPECNAME, LOSSREASONNAME, EQUIPMENTNAME, REJECTCOMMENT, REJECT_QTY, STANDBY_QTY, QTYTOPROCESS_QTY, INPROCESS_QTY, PROCESSED_QTY, REJECT_TOTAL_QTY, DEFECT_QTY, TXN_TIME, TXNDATE, TXN_DAY.
 
 ---
 

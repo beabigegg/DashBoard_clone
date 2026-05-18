@@ -650,9 +650,13 @@ def query_equipment_period():
             result = get_equipment_materials(equipment_names, start_date, end_date)
 
         elif query_type == 'rejects':
-            if not equipment_names:
+            if not equipment_ids:
                 return validation_error('請選擇至少一台設備')
-            result = get_equipment_rejects(equipment_names, start_date, end_date)
+            result = get_equipment_rejects(
+                equipment_ids=equipment_ids,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
         elif query_type == 'jobs':
             if not equipment_ids:
@@ -936,9 +940,9 @@ def export_csv():
 
         elif export_type == 'equipment_rejects':
             result = get_equipment_rejects(
-                params.get('equipment_names', []),
-                params.get('start_date'),
-                params.get('end_date')
+                equipment_ids=params.get('equipment_ids', []),
+                start_date=params.get('start_date'),
+                end_date=params.get('end_date'),
             )
             filename = 'equipment_rejects.csv'
 

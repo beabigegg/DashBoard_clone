@@ -2284,7 +2284,6 @@ def resolve_lot_equipment(
             'equipment_names': equipment_names,
             'date_range': date_range,
             'trace_map': trace_map,
-            'lot_names': final_names,
         }
 
     except MemoryError:
@@ -2523,35 +2522,39 @@ def get_equipment_materials(
 
 
 def get_equipment_rejects(
-    equipment_names: List[str],
+    equipment_ids: List[str],
     start_date: str,
     end_date: str
 ) -> Dict[str, Any]:
-    """Get reject statistics for equipment in a time period.
+    """Get per-reject-event detail rows for lots that passed through equipment.
 
-    Note: LOTREJECTHISTORY only has EQUIPMENTNAME, not EQUIPMENTID.
+    Resolves equipment IDs via LOTWIPHISTORY (TRACKINTIMESTAMP within window) to
+    a DISTINCT CONTAINERID set, then returns LOTREJECTHISTORY rows for those
+    containers. The reject event EQUIPMENTNAME may differ from the queried
+    equipment (cross-station case — intentional per QT-07).
 
     Args:
-        equipment_names: List of equipment names
-        start_date: Start date (YYYY-MM-DD)
+        equipment_ids: List of equipment IDs (EQUIPMENTID from LOTWIPHISTORY)
+        start_date: Start date (YYYY-MM-DD) — applied on TRACKINTIMESTAMP
         end_date: End date (YYYY-MM-DD)
 
     Returns:
-        Dict with 'data' (reject summary) and 'total'.
+        Dict with 'data' (per-reject-event detail rows) and 'total'.
     """
-    if not equipment_names:
-        raise UserInputError('請選擇至少一台設備')
+    validation_error = validate_equipment_input(equipment_ids)
+    if validation_error:
+        raise UserInputError(validation_error)
 
     validation_error = validate_date_range(start_date, end_date)
     if validation_error:
         raise UserInputError(validation_error)
 
     try:
-        _check_rss_guard("設備不良品查詢")
+        _check_rss_guard("設備批次不良品查詢")
         builder = QueryBuilder()
-        builder.add_in_condition("EQUIPMENTNAME", equipment_names)
+        builder.add_in_condition("h.EQUIPMENTID", equipment_ids)
         sql = SQLLoader.load_with_params(
-            "query_tool/equipment_rejects",
+            "query_tool/equipment_lot_rejects",
             EQUIPMENT_FILTER=builder.get_conditions_sql(),
         )
 
@@ -2560,7 +2563,7 @@ def get_equipment_rejects(
         df = read_sql_df_slow(sql, params)
         data = _df_to_records(df)
 
-        logger.info(f"Equipment rejects: {len(data)} records")
+        logger.info(f"Equipment lot rejects: {len(data)} records")
 
         return {
             'data': data,
@@ -2573,7 +2576,7 @@ def get_equipment_rejects(
     except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
         raise
     except Exception as exc:
-        logger.error(f"Equipment rejects query failed: {exc}")
+        logger.error(f"Equipment lot rejects query failed: {exc}")
         raise InternalQueryError('查詢失敗', cause=exc)
 
 

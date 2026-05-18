@@ -1,6 +1,6 @@
-# generated: 2026-05-15T11:28:57Z by cdd-kit 2.0.19
-# files: 782, src-lines: 212601, map-lines: 18389, compression: 11.6x
-# sources-digest: 298d28c13d9bc9fda3c729a02381d228ea4c599b17aa322d39eecb04ea19bd6e
+# generated: 2026-05-18T02:46:52Z by cdd-kit 2.0.19
+# files: 783, src-lines: 213682, map-lines: 18409, compression: 11.6x
+# sources-digest: 4c687d0b323a73af0aca701a192d7e79ffc8505cd88fab10deb91cbdab8c8b97
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -3265,19 +3265,19 @@ frontend/src/qc-gate/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/query-tool/App.vue:  # 712 lines
+frontend/src/query-tool/App.vue:  # 705 lines
 
 frontend/src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
 
 frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 80 lines
 
-frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 63 lines
+frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 275 lines
 
 frontend/src/query-tool/components/EquipmentView.vue:  # 246 lines
 
 frontend/src/query-tool/components/ExportButton.vue:  # 30 lines
 
-frontend/src/query-tool/components/LineageTreeChart.vue:  # 1166 lines
+frontend/src/query-tool/components/LineageTreeChart.vue:  # 1153 lines
 
 frontend/src/query-tool/components/LotAssociationTable.vue:  # 118 lines
 
@@ -3293,13 +3293,13 @@ frontend/src/query-tool/components/LotRejectTable.vue:  # 218 lines
 
 frontend/src/query-tool/components/LotTimeline.vue:  # 382 lines
 
-frontend/src/query-tool/components/LotTraceView.vue:  # 207 lines
+frontend/src/query-tool/components/LotTraceView.vue:  # 391 lines
 
 frontend/src/query-tool/components/QueryBar.vue:  # 112 lines
 
-frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 212 lines
+frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 396 lines
 
-frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 392 lines
+frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 406 lines
   imports:
     - { module: vue, items: [computed, reactive, ref], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
@@ -3313,7 +3313,7 @@ frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 392 lines
     - { name: normalizeSubTab, lines: 30-33 }
     - { name: defaultDateRange, lines: 35-43 }
     - { name: emptyTabFlags, lines: 45-52 }
-    - { name: useEquipmentQuery, lines: 54-392 }
+    - { name: useEquipmentQuery, lines: 54-406 }
   interfaces:
     - { name: EquipmentItem, lines: 7-10 }  # local
     - { name: Pagination, lines: 12-17 }  # local
@@ -3348,9 +3348,9 @@ frontend/src/query-tool/composables/useLotDetail.ts:  # 589 lines
     - { name: QualityMeta, lines: 14-17 }  # local
     - { name: LotDetailInitial, lines: 19-23 }  # local
 
-frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 443 lines
+frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 447 lines
   imports:
-    - { module: vue, items: [computed, reactive, readonly, ref], line: 1 }
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
     - { module: '../utils/csv', items: [exportCsv], line: 4 }
     - { module: '../utils/values', items: [normalizeText, parseInputValues], line: 5 }
@@ -3363,7 +3363,7 @@ frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 443 lines
   functions:
     - { name: normalizeSubTab, lines: 24-27 }
     - { name: normalizeInputType, lines: 29-32 }
-    - { name: useLotEquipmentQuery, lines: 34-443 }
+    - { name: useLotEquipmentQuery, lines: 34-447 }
   interfaces:
     - { name: LotEquipmentQueryInitial, lines: 7-12 }  # local
 
@@ -4540,7 +4540,7 @@ frontend/tests/playwright/query-tool-url-state.spec.js:  # 92 lines
   functions:
     - { name: async openQueryToolUrlWithRetry, lines: 5-26 }
 
-frontend/tests/playwright/query-tool.spec.js:  # 74 lines
+frontend/tests/playwright/query-tool.spec.js:  # 78 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 8 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
@@ -4619,6 +4619,12 @@ frontend/tests/query-tool/App.url-state.test.js:  # 430 lines
     - { name: makeEquipmentQueryState, lines: 122-153 }
     - { name: makeLotEquipmentQueryState, lines: 155-189 }
     - { name: makeLineageState, lines: 191-211 }
+
+frontend/tests/query-tool/EquipmentRejectsTable.test.js:  # 129 lines
+  imports:
+    - { module: vitest, items: [describe, expect, it, vi], line: 14 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 15 }
+    - { module: '../../src/query-tool/components/EquipmentRejectsTable.vue', items: ['default:EquipmentRejectsTable'], line: 38 }
 
 frontend/tests/query-tool/useLotDetail.pagination.test.js:  # 90 lines
   imports:
@@ -6517,7 +6523,7 @@ src/mes_dashboard/routes/qc_gate_routes.py:  # 20 lines
   functions:
     - { name: api_qc_gate_summary, lines: 15-20 }  # @qc_gate_bp.route('/summary')
 
-src/mes_dashboard/routes/query_tool_routes.py:  # 983 lines
+src/mes_dashboard/routes/query_tool_routes.py:  # 987 lines
   imports:
     - { module: gc, items: [], line: 12 }
     - { module: hashlib, items: [], line: 13 }
@@ -6553,12 +6559,12 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 983 lines
     - { name: query_lot_history, lines: 416-474 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
     - { name: query_adjacent_lots, lines: 484-506 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
     - { name: query_lot_associations, lines: 516-580 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
-    - { name: query_equipment_period, lines: 590-668 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
-    - { name: get_equipment_list, lines: 676-707 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
-    - { name: get_workcenter_groups_list, lines: 715-734 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
-    - { name: lookup_lot_equipment, lines: 744-779 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
-    - { name: get_equipment_recent_jobs_route, lines: 787-800 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
-    - { name: export_csv, lines: 810-983 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+    - { name: query_equipment_period, lines: 590-672 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+    - { name: get_equipment_list, lines: 680-711 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
+    - { name: get_workcenter_groups_list, lines: 719-738 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
+    - { name: lookup_lot_equipment, lines: 748-783 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
+    - { name: get_equipment_recent_jobs_route, lines: 791-804 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
+    - { name: export_csv, lines: 814-987 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
 src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
   imports:
@@ -7925,7 +7931,7 @@ src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
     - { name: _build_lot_payload, lines: 139-171 }
     - { name: get_qc_gate_summary, lines: 174-248 }
 
-src/mes_dashboard/services/query_tool_service.py:  # 2756 lines
+src/mes_dashboard/services/query_tool_service.py:  # 2760 lines
   imports:
     - { module: csv, items: [], line: 18 }
     - { module: hashlib, items: [], line: 19 }
@@ -8017,11 +8023,11 @@ src/mes_dashboard/services/query_tool_service.py:  # 2756 lines
     - { name: get_equipment_status_hours, lines: 2302-2395 }
     - { name: get_equipment_lots, lines: 2398-2466 }
     - { name: get_equipment_materials, lines: 2469-2521 }
-    - { name: get_equipment_rejects, lines: 2524-2576 }
-    - { name: get_equipment_jobs, lines: 2579-2630 }
-    - { name: export_to_csv, lines: 2637-2673 }
-    - { name: generate_csv_stream, lines: 2676-2718 }
-    - { name: get_equipment_recent_jobs, lines: 2725-2756 }
+    - { name: get_equipment_rejects, lines: 2524-2580 }
+    - { name: get_equipment_jobs, lines: 2583-2634 }
+    - { name: export_to_csv, lines: 2641-2677 }
+    - { name: generate_csv_stream, lines: 2680-2722 }
+    - { name: get_equipment_recent_jobs, lines: 2729-2760 }
 
 src/mes_dashboard/services/query_tool_sql_runtime.py:  # 396 lines
   imports:
@@ -15525,7 +15531,7 @@ tests/test_query_tool_error_contract.py:  # 272 lines
     - { name: _reset_rl, lines: 49-52 }  # @pytest.fixture(autouse=True)
     - { name: _assert_error, lines: 55-59 }
 
-tests/test_query_tool_heavy_join.py:  # 258 lines
+tests/test_query_tool_heavy_join.py:  # 338 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: datetime, items: [date, timedelta], line: 12 }
@@ -15533,7 +15539,7 @@ tests/test_query_tool_heavy_join.py:  # 258 lines
     - { module: pytest, items: [], line: 15 }
   classes:
     - name: TestQueryToolHeavyJoin
-      lines: 62-258
+      lines: 62-338
       methods:
         - { name: test_multi_filter_lineage_returns_partial_result_envelope_on_timeout, lines: 69-110 }
         - { name: test_heavy_join_within_timeout_returns_data, lines: 116-141 }
@@ -15541,17 +15547,19 @@ tests/test_query_tool_heavy_join.py:  # 258 lines
         - { name: test_injection_blocklist_rejects_drop_statement, lines: 181-218 }
         - { name: test_missing_date_fields_returns_400, lines: 224-238 }
         - { name: test_invalid_query_type_returns_400, lines: 244-258 }
+        - { name: test_equipment_rejects_row_limit_at_scale, lines: 264-338 }
   functions:
     - { name: app_client, lines: 24-27 }  # @pytest.fixture()
     - { name: _equipment_payload, lines: 35-44 }
     - { name: _resolve_payload, lines: 47-53 }
 
-tests/test_query_tool_no_error_dicts.py:  # 40 lines
+tests/test_query_tool_no_error_dicts.py:  # 69 lines
   imports:
     - { module: pathlib, items: [], line: 14 }
     - { module: re, items: [], line: 15 }
   functions:
     - { name: test_no_error_dict_returns, lines: 27-40 }
+    - { name: test_QT_07_cross_station_rule_present, lines: 49-69 }
 
 tests/test_query_tool_pagination_contract.py:  # 324 lines
   imports:
@@ -15660,7 +15668,7 @@ tests/test_query_tool_partial_trackout.py:  # 495 lines
     - { name: _lot_row, lines: 36-70 }
     - { name: _adj_row, lines: 73-107 }
 
-tests/test_query_tool_routes.py:  # 1443 lines
+tests/test_query_tool_routes.py:  # 1530 lines
   imports:
     - { module: pytest, items: [], line: 10 }
     - { module: json, items: [], line: 11 }
@@ -15787,74 +15795,86 @@ tests/test_query_tool_routes.py:  # 1443 lines
         - { name: test_accepts_workcenter_groups_param, lines: 1390-1406 }
         - { name: test_empty_workcenter_groups_ignored, lines: 1409-1425 }
         - { name: test_returns_filtered_by_groups_in_response, lines: 1428-1443 }
+    - name: TestEquipmentPeriodRejectsDetailSchema
+      lines: 1446-1530
+      methods:
+        - { name: test_equipment_period_rejects_detail_schema, lines: 1455-1509 }
+        - { name: test_equipment_period_rejects_empty_equipment_ids_returns_error, lines: 1511-1530 }
   functions:
     - { name: app, lines: 21-26 }  # @pytest.fixture
     - { name: client, lines: 30-32 }  # @pytest.fixture
     - { name: _reset_rate_limits, lines: 36-39 }  # @pytest.fixture(autouse=True)
 
-tests/test_query_tool_service.py:  # 523 lines
+tests/test_query_tool_service.py:  # 689 lines
   imports:
-    - { module: mes_dashboard.services.query_tool_service, items: [validate_date_range, validate_lot_input, validate_equipment_input, _resolve_by_lot_id, _resolve_by_wafer_lot, _resolve_by_serial_number, _resolve_by_work_order, get_lot_split_merge_history, BATCH_SIZE, MAX_DATE_RANGE_DAYS], line: 10 }
+    - { module: pytest, items: [], line: 10 }
+    - { module: mes_dashboard.services.query_tool_service, items: [validate_date_range, validate_lot_input, validate_equipment_input, _resolve_by_lot_id, _resolve_by_wafer_lot, _resolve_by_serial_number, _resolve_by_work_order, get_lot_split_merge_history, get_equipment_rejects, BATCH_SIZE, MAX_DATE_RANGE_DAYS], line: 12 }
   classes:
     - name: TestValidateDateRange
-      lines: 24-85
+      lines: 27-88
       methods:
-        - { name: test_valid_range, lines: 27-30 }
-        - { name: test_same_day, lines: 32-35 }
-        - { name: test_end_before_start, lines: 37-41 }
-        - { name: test_exceeds_max_range, lines: 43-48 }
-        - { name: test_exactly_max_range, lines: 50-54 }
-        - { name: test_one_day_over_max_range, lines: 56-61 }
-        - { name: test_invalid_date_format, lines: 63-67 }
-        - { name: test_invalid_start_date, lines: 69-73 }
-        - { name: test_invalid_end_date, lines: 75-79 }
-        - { name: test_non_date_string, lines: 81-85 }
+        - { name: test_valid_range, lines: 30-33 }
+        - { name: test_same_day, lines: 35-38 }
+        - { name: test_end_before_start, lines: 40-44 }
+        - { name: test_exceeds_max_range, lines: 46-51 }
+        - { name: test_exactly_max_range, lines: 53-57 }
+        - { name: test_one_day_over_max_range, lines: 59-64 }
+        - { name: test_invalid_date_format, lines: 66-70 }
+        - { name: test_invalid_start_date, lines: 72-76 }
+        - { name: test_invalid_end_date, lines: 78-82 }
+        - { name: test_non_date_string, lines: 84-88 }
     - name: TestValidateLotInput
-      lines: 88-132
+      lines: 91-135
       methods:
-        - { name: test_valid_lot_ids, lines: 91-95 }
-        - { name: test_valid_serial_numbers, lines: 97-101 }
-        - { name: test_valid_work_orders, lines: 103-107 }
-        - { name: test_empty_values, lines: 109-113 }
-        - { name: test_large_input_list_allowed_when_no_count_cap, lines: 115-120 }
-        - { name: test_rejects_too_broad_wildcard_pattern, lines: 122-127 }
-        - { name: test_accepts_wildcard_with_prefix, lines: 129-132 }
+        - { name: test_valid_lot_ids, lines: 94-98 }
+        - { name: test_valid_serial_numbers, lines: 100-104 }
+        - { name: test_valid_work_orders, lines: 106-110 }
+        - { name: test_empty_values, lines: 112-116 }
+        - { name: test_large_input_list_allowed_when_no_count_cap, lines: 118-123 }
+        - { name: test_rejects_too_broad_wildcard_pattern, lines: 125-130 }
+        - { name: test_accepts_wildcard_with_prefix, lines: 132-135 }
     - name: TestValidateEquipmentInput
-      lines: 135-148
+      lines: 138-151
       methods:
-        - { name: test_valid_equipment_ids, lines: 138-142 }
-        - { name: test_empty_equipment_ids, lines: 144-148 }
+        - { name: test_valid_equipment_ids, lines: 141-145 }
+        - { name: test_empty_equipment_ids, lines: 147-151 }
     - name: TestResolveQueriesUseBindParams
-      lines: 152-364
+      lines: 155-367
       methods:
-        - { name: test_resolve_by_lot_id_uses_query_builder_params, lines: 155-179 }
-        - { name: test_resolve_by_lot_id_supports_wildcard_pattern, lines: 181-211 }
-        - { name: test_resolve_by_wafer_lot_supports_wildcard_pattern, lines: 213-243 }
-        - { name: test_resolve_by_serial_number_uses_query_builder_params, lines: 245-307 }
-        - { name: test_resolve_by_work_order_uses_query_builder_params, lines: 309-331 }
-        - { name: test_resolve_by_work_order_supports_wildcard_pattern, lines: 333-364 }
+        - { name: test_resolve_by_lot_id_uses_query_builder_params, lines: 158-182 }
+        - { name: test_resolve_by_lot_id_supports_wildcard_pattern, lines: 184-214 }
+        - { name: test_resolve_by_wafer_lot_supports_wildcard_pattern, lines: 216-246 }
+        - { name: test_resolve_by_serial_number_uses_query_builder_params, lines: 248-310 }
+        - { name: test_resolve_by_work_order_uses_query_builder_params, lines: 312-334 }
+        - { name: test_resolve_by_work_order_supports_wildcard_pattern, lines: 336-367 }
     - name: TestSplitMergeHistoryMode
-      lines: 367-404
+      lines: 370-407
       methods:
-        - { name: test_fast_mode_uses_time_window_and_row_limit, lines: 370-385 }
-        - { name: test_full_mode_uses_slow_query_without_limits, lines: 387-404 }
+        - { name: test_fast_mode_uses_time_window_and_row_limit, lines: 373-388 }
+        - { name: test_full_mode_uses_slow_query_without_limits, lines: 390-407 }
     - name: TestServiceConstants
-      lines: 407-416
+      lines: 410-419
       methods:
-        - { name: test_batch_size_is_reasonable, lines: 410-412 }
-        - { name: test_max_date_range_is_two_years, lines: 414-416 }
+        - { name: test_batch_size_is_reasonable, lines: 413-415 }
+        - { name: test_max_date_range_is_two_years, lines: 417-419 }
     - name: TestGetWorkcenterForGroups
-      lines: 420-446
+      lines: 423-449
       methods:
-        - { name: test_calls_filter_cache, lines: 423-434 }
-        - { name: test_returns_empty_list_for_unknown_group, lines: 436-446 }
+        - { name: test_calls_filter_cache, lines: 426-437 }
+        - { name: test_returns_empty_list_for_unknown_group, lines: 439-449 }
     - name: TestGetLotHistoryWithWorkcenterFilter
-      lines: 449-523
+      lines: 452-526
       methods:
-        - { name: test_no_filter_returns_all, lines: 452-469 }
-        - { name: test_with_filter_adds_condition, lines: 471-491 }
-        - { name: test_empty_groups_list_no_filter, lines: 493-506 }
-        - { name: test_filter_with_empty_workcenters_result, lines: 508-523 }
+        - { name: test_no_filter_returns_all, lines: 455-472 }
+        - { name: test_with_filter_adds_condition, lines: 474-494 }
+        - { name: test_empty_groups_list_no_filter, lines: 496-509 }
+        - { name: test_filter_with_empty_workcenters_result, lines: 511-526 }
+    - name: TestGetEquipmentRejects
+      lines: 529-689
+      methods:
+        - { name: test_get_equipment_rejects_cross_station_lot, lines: 539-598 }
+        - { name: test_get_equipment_rejects_no_aggregate_columns, lines: 600-662 }
+        - { name: test_get_equipment_rejects_empty_short_circuit, lines: 664-689 }
 
 tests/test_query_tool_sql_runtime.py:  # 207 lines
   imports:

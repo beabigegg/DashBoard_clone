@@ -1,0 +1,15 @@
+agent: contract-reviewer
+change-id: equipment-rejects-by-lots
+timestamp: 2026-05-18
+status: changes-required
+summary: >
+  4 contracts reviewed. Breaking change confirmed: aggregate fields (TOTAL_REJECT_QTY,
+  TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) removed from query_type=rejects response.
+  No existing section covers equipment_rejects payload shape at all (neither old nor new).
+  Hard cutover acceptable because all consumers are in the same monorepo and will be
+  updated atomically in the same PR.
+artifacts:
+  - { type: version-bumps, pointer: "api-contract: 1.6.0→2.0.0 (major); data-shape-contract: 1.5.0→2.0.0 (major); business-rules: 1.7.0→1.8.0 (minor); api-inventory: 1.1.4→1.1.5 (patch)" }
+  - { type: breaking-change-note, pointer: "Removal of aggregate fields is breaking; hard cutover acceptable (monorepo, all consumers updated atomically)" }
+  - { type: new-rule, pointer: "QT-07: equipment-rejects = rejects of lots processed on equipment (via LOTWIPHISTORY→LOTREJECTHISTORY), cross-station rejects intentionally included" }
+  - { type: missing-sections, pointer: "data-shape-contract §3.7 (new equipment-rejects row shape) and §5.x (CSV columns) must be written; api-contract §10 compatibility note must be appended" }

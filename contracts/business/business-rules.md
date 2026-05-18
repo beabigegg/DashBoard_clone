@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.7.0
-last-changed: 2026-05-15
+schema-version: 1.8.0
+last-changed: 2026-05-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -157,6 +157,7 @@ breaking-change-policy: deprecate-2-minors
 | QT-04 | Equipment lookup | `POST /api/query-tool/lot-equipment-lookup` 接受多 lot；`GET /equipment-recent-jobs/<equipment_id>` 查單設備近期 jobs | route tests |
 | QT-05 | Partial-trackout aggregation (query-tool) | `lot_history.sql` and `equipment_lots.sql` aggregate partial track-outs by the 4-tuple `(CONTAINERID, EQUIPMENTID, SPECNAME, TRACKINTIMESTAMP)`. `adjacent_lots.sql` uses a 3-tuple `(CONTAINERID, EQUIPMENTID, TRACKINTIMESTAMP)` (SPECNAME not in adjacent-lots scope). All three: `TRACKINQTY = MAX(TRACKINQTY)` (original load qty — MES stores REMAINING qty which decreases across partials), `TRACKOUTQTY = SUM(TRACKOUTQTY)`, `TRACKOUTTIMESTAMP = MAX(TRACKOUTTIMESTAMP)`, `partial_count = COUNT(*)`. Prior `ROW_NUMBER() OVER (...ORDER BY TRACKOUTTIMESTAMP DESC) WHERE rn=1` returned only the last partial's TRACKINQTY (lowest remaining qty) and TRACKOUTQTY (one partial only) — a silent data-accuracy bug. `partial_count` is an additive output column; existing consumers that ignore unknown columns are unaffected. | unit + contract tests |
 | QT-06 | Partial-trackout strict guard (query-tool) | Mirrors PH-07 for query-tool SQL paths. A group collapses only when all non-key columns are identical across its partials. For `lot_history.sql` / `equipment_lots.sql` the non-key columns are: `WORKCENTERNAME, EQUIPMENTNAME, FINISHEDRUNCARD, PJ_WORKORDER, CONTAINERNAME, PJ_TYPE, PJ_BOP, WAFER_LOT_ID`. For `adjacent_lots.sql`: `EQUIPMENTNAME, SPECNAME, FINISHEDRUNCARD, PJ_WORKORDER, CONTAINERNAME, PJ_TYPE, PJ_BOP, WAFER_LOT_ID`. If any non-key column diverges, the group falls back to raw rows with `partial_count = 1` each. Divergence logged at INFO level per request (`query-tool partial-trackout strict-guard: <N> divergent groups fell back to raw rows ...`). No error returned to client. | unit tests |
+| QT-07 | Equipment-rejects cross-station semantic | `get_equipment_rejects()` resolves the queried EQUIPMENTIDs against `LOTWIPHISTORY` (`TRACKINTIMESTAMP` within window) to a DISTINCT CONTAINERID set, then returns `LOTREJECTHISTORY` rows for those CONTAINERIDs. The reject event's EQUIPMENTNAME may differ from the queried equipment (cross-station case: a lot processed on Furnace-A may have its reject event logged under Furnace-B — intentional, not a bug). `LOTREJECTHISTORY` has no EQUIPMENTID; CONTAINERID is the only correct join key. Empty equipment_ids → `UserInputError` (AC-4 short-circuit; LOTREJECTHISTORY query never executed). Implemented in `equipment_lot_rejects.sql` + `get_equipment_rejects()`. | `TestGetEquipmentRejects` |
 
 ## Job Query Rules
 

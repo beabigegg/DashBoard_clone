@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.4
-last-changed: 2026-05-14
+schema-version: 1.1.5
+last-changed: 2026-05-18
 ---
 
 # API Inventory
@@ -97,6 +97,7 @@ last-changed: 2026-05-14
 - **2026-05-14（prod-history-query-mode-tabs）：** `production_history_routes.py` 主查詢端點 `POST /api/production-history/query` 的 `start_date` / `end_date` 由無條件必填放寬為條件必填（classification mode 必填、identifier mode 可選）；無端點新增/刪除/重新命名；backward-compatible。Per-mode 驗證規則見 business-rules.md PHF-07 / PHF-08。
 - **2026-05-14（prod-history-first-tier-cache-filters）：** `production_history_routes.py` 新增 `GET /api/production-history/filter-options` 端點（cross-filter cached options，4-tuple in-memory filter）；主查詢端點新增六個 additive 可選 body 欄位（`pj_packages[]`、`pj_bops[]`、`pj_functions[]`、`mfg_orders[]`、`lot_ids[]`、`wafer_lots[]`）；萬用字元語法與安全性規則見 business-rules.md PHF-01..PHF-06；全部 backward-compatible。
 - **2026-05-13（resource-history-perf）：** `resource_history_routes.py` 新增 `GET /api/resource/history/query/progress` 端點；progress state 以 Redis side-channel 儲存；auth required；400/404 error contract；additive，不影響既有端點及 Type A re-query 流程。
+- **2026-05-18（equipment-rejects-by-lots）：** `query_tool_routes.py` `POST /api/query-tool/equipment-period` (`query_type='rejects'`) and `POST /api/query-tool/export-csv` (`export_type='equipment_rejects'`) response shape changed to per-reject-event detail rows (see api-contract.md §10). Breaking cutover — both consumer views shipped atomically.
 - **2026-05-13（wip-hold-drilldown-filters）：** `wip_routes.py` 四個端點新增三個可選過濾參數（`workflow`、`bop`、`pj_function`）；`/detail/<workcenter>` lot 列新增 `pjType`；`/meta/filter-options` response 新增 `workflows`、`bops`、`pjFunctions`；全部 backward-compatible。
 - **2026-04-15：** 所有 `standard-json` 端點注入 `meta.app_version`（additive，backward-compatible）。
 - **2026-03-11：** `/health` / `/health/deep` 加入 `system_memory` + `async_workers`（backward-compatible）。

@@ -1,0 +1,59 @@
+agent: backend-engineer
+change-id: equipment-rejects-by-lots
+date: 2026-05-18
+status: complete
+
+summary: >
+  Rewrote the equipment-rejects service/SQL from aggregate-by-EQUIPMENTNAME
+  to per-reject-event detail via LOTWIPHISTORY→CONTAINERID→LOTREJECTHISTORY join.
+  Followed TDD: tests written first (all failed), then IP-1..IP-3 implementation,
+  then contracts updated, cdd-kit validate green, full suite 3979 passed.
+
+tdd-evidence:
+  pre-implementation-failure: >
+    TestGetEquipmentRejects::test_get_equipment_rejects_cross_station_lot
+    failed with TypeError (equipment_ids unexpected keyword argument) — as expected.
+    TestEquipmentPeriodRejectsDetailSchema::test_equipment_period_rejects_detail_schema
+    failed with 400 (route checked equipment_names which was empty) — as expected.
+
+design-decision:
+  ac4-short-circuit: >
+    Chose single-SQL design (equipment_lot_rejects.sql) relying on the inner CTE
+    wip_lots → JOIN chain to return zero rows when no CONTAINERID is matched.
+    The AC-4 guard is at validate_equipment_input level (empty equipment_ids →
+    UserInputError before SQLLoader is called) — so mock_read.assert_not_called()
+    passes cleanly.
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/query_tool/equipment_lot_rejects.sql:1-90 (new file)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/query_tool/equipment_rejects.sql (deleted)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/query_tool_service.py:2524-2576 (get_equipment_rejects rewrite)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/query_tool_routes.py:652-656, 937-943 (rejects branch update)"
+  - type: files-changed
+    pointer: "contracts/CHANGELOG.md:11-32 (api 1.7.0, data 1.6.0, business 1.8.0 entries)"
+  - type: files-changed
+    pointer: "contracts/api/api-contract.md (schema-version 1.7.0, §10 compatibility note)"
+  - type: files-changed
+    pointer: "contracts/data/data-shape-contract.md (schema-version 1.6.0, §3.7 new section)"
+  - type: files-changed
+    pointer: "contracts/business/business-rules.md (schema-version 1.8.0, QT-07 rule)"
+  - type: files-changed
+    pointer: "contracts/api/api-inventory.md (schema-version 1.1.5, patch note)"
+  - type: tests-added
+    pointer: "tests/test_query_tool_service.py::TestGetEquipmentRejects (3 tests: cross_station, no_aggregate, empty_short_circuit)"
+  - type: tests-added
+    pointer: "tests/test_query_tool_routes.py::TestEquipmentPeriodRejectsDetailSchema (2 tests: detail_schema, empty_ids)"
+  - type: tests-added
+    pointer: "tests/test_query_tool_no_error_dicts.py::test_QT_07_cross_station_rule_present"
+  - type: tests-added
+    pointer: "tests/test_query_tool_heavy_join.py::TestQueryToolHeavyJoin::test_equipment_rejects_row_limit_at_scale"
+  - type: test-output
+    pointer: "3979 passed, 267 skipped in 128.09s (full suite excl. e2e + integration_real)"
+  - type: contracts-touched
+    pointer: "contracts/api/api-contract.md, contracts/data/data-shape-contract.md, contracts/business/business-rules.md, contracts/api/api-inventory.md, contracts/CHANGELOG.md"
+
+next-reviewer: frontend-engineer (IP-9 EquipmentRejectsTable.vue rewrite, IP-10 export payload, IP-11 Vitest test)

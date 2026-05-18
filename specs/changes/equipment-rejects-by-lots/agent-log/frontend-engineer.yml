@@ -1,0 +1,43 @@
+agent: frontend-engineer
+change-id: equipment-rejects-by-lots
+date: 2026-05-18
+status: complete
+
+tasks-completed:
+  - IP-9 (EquipmentRejectsTable.vue rewrite)
+  - IP-10 (export payload fix in useEquipmentQuery.ts and useLotEquipmentQuery.ts)
+  - IP-11 (Vitest component test - 6 tests, all passing)
+  - IP-12 (E2E TODO scaffold in query-tool.spec.js)
+
+commands-run:
+  - "cd frontend && npm run type-check  # 0 errors"
+  - "cd frontend && npm run test -- --run tests/query-tool/EquipmentRejectsTable.test.js  # 6 passed"
+  - "cd frontend && npm run test -- --run  # 33 files, 346 passed, 1 skipped"
+  - "cd frontend && npm run build  # success, 0 warnings"
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/query-tool/components/EquipmentRejectsTable.vue:1-end"
+  - type: files-changed
+    pointer: "frontend/src/query-tool/composables/useEquipmentQuery.ts:324-362"
+  - type: files-changed
+    pointer: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts:360-396"
+  - type: files-changed
+    pointer: "frontend/tests/query-tool/EquipmentRejectsTable.test.js:1-end (new)"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/query-tool.spec.js:73-76 (TODO scaffold)"
+  - type: components-affected
+    pointer: "EquipmentRejectsTable, useEquipmentQuery (exportSubTab), useLotEquipmentQuery (exportSubTab)"
+  - type: accessibility-audit
+    pointer: "n/a (no new interactive elements beyond existing table pattern; aria-sort added to all sortable th, aria-label added to expand-toggle button)"
+
+notes:
+  - EquipmentRejectsTable rewritten to follow LotRejectTable.vue pattern (useSortableTable, BlockLoadingState, native table)
+  - EQUIPMENTNAME column header labeled as "報廢登錄設備" with "(可能不同於查詢設備)" tooltip/parenthetical per cross-station requirement
+  - Default sort: TXN_TIME desc → WORKCENTERNAME asc → REJECT_TOTAL_QTY desc (matches §3.7)
+  - Old aggregate columns (TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) removed
+  - Added SPECNAME column per §3.7; CONTAINERNAME, WORKCENTERNAME, LOSSREASONNAME, REJECT_TOTAL_QTY, DEFECT_QTY, REJECTCOMMENT, TXN_TIME all present
+  - Breakdown toggle for REJECT/STANDBY/QTYTOPROCESS/INPROCESS/PROCESSED sub-columns (mirrors LotRejectTable pattern)
+  - truncated prop added for AC-8 row-limit banner
+  - IP-10: rejects export branch now sends only equipment_ids (no equipment_names) in both useEquipmentQuery and useLotEquipmentQuery
+  - vitest.config.js include already covers tests/**/*.test.js; no config change needed

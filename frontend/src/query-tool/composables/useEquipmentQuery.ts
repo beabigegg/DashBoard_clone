@@ -323,17 +323,31 @@ export function useEquipmentQuery(initial: EquipmentQueryInitial = {}) {
 
     try {
       let exportType = 'equipment_lots';
-      const params: Record<string, unknown> = {
-        equipment_ids: selectedEquipmentIds.value,
-        equipment_names: selectedEquipmentNames.value,
-        start_date: startDate.value,
-        end_date: endDate.value,
-      };
+      let params: Record<string, unknown>;
 
       if (normalized === 'jobs') {
         exportType = 'equipment_jobs';
+        params = {
+          equipment_ids: selectedEquipmentIds.value,
+          equipment_names: selectedEquipmentNames.value,
+          start_date: startDate.value,
+          end_date: endDate.value,
+        };
       } else if (normalized === 'rejects') {
         exportType = 'equipment_rejects';
+        // Rejects route uses equipment_ids only (cross-station join; equipment_names not used)
+        params = {
+          equipment_ids: selectedEquipmentIds.value,
+          start_date: startDate.value,
+          end_date: endDate.value,
+        };
+      } else {
+        params = {
+          equipment_ids: selectedEquipmentIds.value,
+          equipment_names: selectedEquipmentNames.value,
+          start_date: startDate.value,
+          end_date: endDate.value,
+        };
       }
 
       await exportCsv({

@@ -1441,3 +1441,90 @@ class TestLotHistoryWithWorkcenterFilter:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['data'].get('filtered_by_groups') == ['DB']
+
+
+class TestEquipmentPeriodRejectsDetailSchema:
+    """Route-level tests for query_type='rejects' under the new detail-row design.
+
+    AC-2 (detail schema), AC-3 (route uses equipment_ids not equipment_names).
+    These tests are authored BEFORE IP-1..IP-3 land and must fail until
+    get_equipment_rejects accepts equipment_ids kwarg.
+    """
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_equipment_rejects')
+    def test_equipment_period_rejects_detail_schema(self, mock_rejects, client):
+        """AC-2 contract: response data rows contain detail columns, not aggregate fields.
+
+        WHY: The route must forward the new service's per-event detail rows.
+        Verifies that CONTAINERNAME, LOSSREASONNAME, REJECT_QTY, TXN_TIME appear
+        and that TOTAL_REJECT_QTY / TOTAL_DEFECT_QTY / AFFECTED_LOT_COUNT are absent.
+        """
+        mock_rejects.return_value = {
+            'data': [{
+                'CONTAINERID': 'CID-1',
+                'CONTAINERNAME': 'LOT-1',
+                'WORKCENTERNAME': 'DB',
+                'LOSSREASONNAME': 'SCRATCH',
+                'EQUIPMENTNAME': 'Furnace-A',
+                'REJECT_QTY': 2,
+                'REJECT_TOTAL_QTY': 2,
+                'DEFECT_QTY': 2,
+                'TXN_TIME': '2024-01-10 08:00:00',
+                'TXNDATE': '2024-01-10',
+                'TXN_DAY': '2024-01-10',
+            }],
+            'total': 1,
+            'date_range': {'start': '2024-01-01', 'end': '2024-01-31'},
+        }
+
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            json={
+                'equipment_ids': ['EQP-A'],
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-31',
+                'query_type': 'rejects',
+            }
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['success'] is True
+        rows = payload['data']['data']
+        assert len(rows) == 1
+        row = rows[0]
+        # Detail fields must be present
+        assert 'CONTAINERNAME' in row
+        assert 'LOSSREASONNAME' in row
+        assert 'REJECT_QTY' in row or 'REJECT_TOTAL_QTY' in row
+        assert 'TXN_TIME' in row
+        # Aggregate fields must be absent
+        assert 'TOTAL_REJECT_QTY' not in row
+        assert 'TOTAL_DEFECT_QTY' not in row
+        assert 'AFFECTED_LOT_COUNT' not in row
+        # Verify service was called with equipment_ids keyword
+        mock_rejects.assert_called_once()
+        call_kwargs = mock_rejects.call_args
+        assert call_kwargs.kwargs.get('equipment_ids') == ['EQP-A'] or \
+               (call_kwargs.args and call_kwargs.args[0] == ['EQP-A'])
+
+    def test_equipment_period_rejects_empty_equipment_ids_returns_error(self, client):
+        """AC-3: empty equipment_ids for query_type='rejects' must return 400.
+
+        WHY: The new route branch validates equipment_ids (not equipment_names).
+        An empty list must be rejected before the service is called to prevent
+        a full-scan query on LOTREJECTHISTORY.
+        """
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            json={
+                'equipment_ids': [],
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-31',
+                'query_type': 'rejects',
+            }
+        )
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['success'] is False
+        assert 'error' in payload

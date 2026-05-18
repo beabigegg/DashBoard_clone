@@ -1,0 +1,11 @@
+agent: test-strategist
+change-id: equipment-rejects-by-lots
+timestamp: 2026-05-18
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/equipment-rejects-by-lots/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_service.py — src/mes_dashboard/services/query_tool_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_routes.py — src/mes_dashboard/routes/query_tool_routes.py" }
+  - { type: tdd-pairs, pointer: "frontend/tests/query-tool/EquipmentRejectsTable.test.js — frontend/src/query-tool/components/EquipmentRejectsTable.vue" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, data-boundary, e2e" }
+  - { type: mapping-completeness, pointer: "all 8 ACs covered; AC-7 covered by contract lint on business-rules.md" }

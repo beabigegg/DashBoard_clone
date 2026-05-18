@@ -7,6 +7,8 @@ Tests the core service functions without database dependencies:
 - Constants validation
 """
 
+import pytest
+
 from mes_dashboard.services.query_tool_service import (
     validate_date_range,
     validate_lot_input,
@@ -16,6 +18,7 @@ from mes_dashboard.services.query_tool_service import (
     _resolve_by_serial_number,
     _resolve_by_work_order,
     get_lot_split_merge_history,
+    get_equipment_rejects,
     BATCH_SIZE,
     MAX_DATE_RANGE_DAYS,
 )
@@ -521,3 +524,166 @@ class TestGetLotHistoryWithWorkcenterFilter:
 
                 assert 'error' not in result
                 assert result['total'] == 1
+
+
+class TestGetEquipmentRejects:
+    """TDD tests for get_equipment_rejects() — must fail before IP-1/IP-2 land.
+
+    These tests guard the core AC requirements of the equipment-rejects-by-lots
+    change:
+      - AC-1: cross-station reject join (CONTAINERID-based, not EQUIPMENTNAME-based)
+      - AC-2: detail row shape — no aggregate fields
+      - AC-4: empty-WIP short-circuit (LOTREJECTHISTORY not queried when WIP empty)
+    """
+
+    def test_get_equipment_rejects_cross_station_lot(self):
+        """AC-1: A lot processed on EQP-A but with reject logged under EQP-B must appear.
+
+        WHY: The old equipment_rejects.sql filtered LOTREJECTHISTORY by EQUIPMENTNAME,
+        which meant that if a lot was processed on Furnace-A but the reject event
+        was recorded under Furnace-B's name, the row was silently missing.
+        The new design resolves via LOTWIPHISTORY(EQUIPMENTID) → CONTAINERID, then
+        JOINs LOTREJECTHISTORY on CONTAINERID — so the cross-station row IS returned
+        regardless of which EQUIPMENTNAME appears in the reject event.
+        """
+        from unittest.mock import patch
+        import pandas as pd
+
+        # Fixture: lot LOT-CROSS was processed on EQP-A (EQUIPMENTID='EQP-A'),
+        # but the reject event was logged with EQUIPMENTNAME='Furnace-B' (cross-station).
+        reject_rows = pd.DataFrame([{
+            'CONTAINERID': 'CID-CROSS',
+            'CONTAINERNAME': 'LOT-CROSS',
+            'WORKCENTERNAME': 'DB',
+            'WORKCENTER_GROUP': 'DB',
+            'WORKCENTERSEQUENCE_GROUP': 1,
+            'PRODUCTLINENAME': 'PROD-LINE',
+            'PJ_FUNCTION': 'FUNC-A',
+            'PJ_TYPE': 'TYPE-A',
+            'PRODUCTNAME': 'PROD-A',
+            'SPECNAME': 'SPEC-A',
+            'LOSSREASONNAME': 'CRACK',
+            'EQUIPMENTNAME': 'Furnace-B',  # differs from queried EQP-A — cross-station
+            'REJECTCOMMENT': '',
+            'REJECT_QTY': 5,
+            'STANDBY_QTY': 0,
+            'QTYTOPROCESS_QTY': 0,
+            'INPROCESS_QTY': 0,
+            'PROCESSED_QTY': 0,
+            'REJECT_TOTAL_QTY': 5,
+            'DEFECT_QTY': 5,
+            'TXN_TIME': '2024-01-15 10:00:00',
+            'TXNDATE': '2024-01-15',
+            'TXN_DAY': '2024-01-15',
+        }])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = reject_rows
+
+                result = get_equipment_rejects(
+                    equipment_ids=['EQP-A'],
+                    start_date='2024-01-01',
+                    end_date='2024-01-31',
+                )
+
+        assert result['total'] == 1
+        row = result['data'][0]
+        # Cross-station: EQUIPMENTNAME in result row is 'Furnace-B', not 'EQP-A'
+        assert row['EQUIPMENTNAME'] == 'Furnace-B', (
+            "Cross-station reject must appear with the reject event's EQUIPMENTNAME, "
+            "not the queried EQUIPMENTID"
+        )
+        assert row['CONTAINERNAME'] == 'LOT-CROSS'
+
+    def test_get_equipment_rejects_no_aggregate_columns(self):
+        """AC-2: Response rows must NOT contain TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY,
+        or AFFECTED_LOT_COUNT — these are aggregate fields from the old SQL.
+
+        WHY: The new design returns one row per reject event (detail view), not
+        aggregate rows grouped by EQUIPMENTNAME+LOSSREASONNAME. Any row that still
+        carries the aggregate-shape fields indicates the wrong SQL was loaded.
+        """
+        from unittest.mock import patch
+        import pandas as pd
+
+        detail_rows = pd.DataFrame([{
+            'CONTAINERID': 'CID-1',
+            'CONTAINERNAME': 'LOT-1',
+            'WORKCENTERNAME': 'WB',
+            'WORKCENTER_GROUP': 'WB',
+            'WORKCENTERSEQUENCE_GROUP': 2,
+            'PRODUCTLINENAME': 'PL-1',
+            'PJ_FUNCTION': 'F1',
+            'PJ_TYPE': 'T1',
+            'PRODUCTNAME': 'PROD-1',
+            'SPECNAME': 'SPEC-1',
+            'LOSSREASONNAME': 'PARTICLE',
+            'EQUIPMENTNAME': 'Furnace-A',
+            'REJECTCOMMENT': None,
+            'REJECT_QTY': 3,
+            'STANDBY_QTY': 0,
+            'QTYTOPROCESS_QTY': 0,
+            'INPROCESS_QTY': 0,
+            'PROCESSED_QTY': 0,
+            'REJECT_TOTAL_QTY': 3,
+            'DEFECT_QTY': 3,
+            'TXN_TIME': '2024-01-10 08:00:00',
+            'TXNDATE': '2024-01-10',
+            'TXN_DAY': '2024-01-10',
+        }])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.return_value = detail_rows
+
+                result = get_equipment_rejects(
+                    equipment_ids=['EQP-A'],
+                    start_date='2024-01-01',
+                    end_date='2024-01-31',
+                )
+
+        assert result['total'] == 1
+        for row in result['data']:
+            assert 'TOTAL_REJECT_QTY' not in row, (
+                "Aggregate field TOTAL_REJECT_QTY must not appear in detail rows"
+            )
+            assert 'TOTAL_DEFECT_QTY' not in row, (
+                "Aggregate field TOTAL_DEFECT_QTY must not appear in detail rows"
+            )
+            assert 'AFFECTED_LOT_COUNT' not in row, (
+                "Aggregate field AFFECTED_LOT_COUNT must not appear in detail rows"
+            )
+        # Detail fields must be present
+        assert 'REJECT_TOTAL_QTY' in result['data'][0]
+        assert 'DEFECT_QTY' in result['data'][0]
+        assert 'CONTAINERNAME' in result['data'][0]
+
+    def test_get_equipment_rejects_empty_short_circuit(self):
+        """AC-4: When no equipment_ids are provided, raise UserInputError immediately.
+        The LOTREJECTHISTORY query (read_sql_df_slow) must NOT be invoked at all.
+
+        WHY: The new service validates equipment_ids first. An empty list means
+        no WIP can be resolved, so there is nothing to join against LOTREJECTHISTORY.
+        The short-circuit prevents a full-scan query on LOTREJECTHISTORY.
+        """
+        from unittest.mock import patch
+        import pandas as pd
+        from mes_dashboard.core.exceptions import UserInputError
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_read.return_value = pd.DataFrame([])
+
+                with pytest.raises(UserInputError):
+                    get_equipment_rejects(
+                        equipment_ids=[],
+                        start_date='2024-01-01',
+                        end_date='2024-01-31',
+                    )
+
+                # LOTREJECTHISTORY query must NOT have been invoked
+                mock_read.assert_not_called()
+                mock_load.assert_not_called()

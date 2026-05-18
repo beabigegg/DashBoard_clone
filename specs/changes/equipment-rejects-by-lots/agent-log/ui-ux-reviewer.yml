@@ -1,0 +1,13 @@
+agent: ui-ux-reviewer
+change-id: equipment-rejects-by-lots
+timestamp: 2026-05-18
+status: blocking-fixed
+summary: >
+  2 blocking accessibility issues found and fixed inline:
+  B-1 (sortable-th missing tabindex+keydown), B-2 (expand-toggle span→button with keydown).
+  5 advisory items recorded (cross-station column position, empty-state distinction,
+  language consistency, truncation banner export caveat, default sort tie-breaker).
+  Advisory items are non-blocking for this PR.
+artifacts:
+  - { type: blocking-fixed, pointer: "B-1: tabindex+keydown added to all sortable-th; B-2: expand-toggle span replaced with <button>" }
+  - { type: advisory, pointer: "A-1: EQUIPMENTNAME column at position 9/9 (may be off-screen); A-2: empty state cannot distinguish no-lots vs no-rejects; A-3: mixed language in headers vs LotRejectTable; A-4: truncation banner does not mention export is also truncated; A-5: default sort missing WORKCENTERSEQUENCE_GROUP tie-breaker" }

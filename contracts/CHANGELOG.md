@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.7.0] — 2026-05-18
+### Breaking
+- equipment-rejects-by-lots: `POST /api/query-tool/equipment-period` (`query_type='rejects'`) and `POST /api/query-tool/export-csv` (`export_type='equipment_rejects'`) response shape changed from aggregate (EQUIPMENTNAME, LOSSREASONNAME, TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) to per-reject-event detail rows (see data-shape-contract.md §3.7). Data source changed from LOTREJECTHISTORY filtered by EQUIPMENTNAME to LOTWIPHISTORY→LOTREJECTHISTORY via CONTAINERID (fixes cross-station reject omission). Service parameter renamed `equipment_names → equipment_ids`. Hard cutover — both EquipmentView and LotEquipmentView consumers ship in the same PR. Deprecate-2-minors policy bypassed because all consumers are in the same monorepo and shipped atomically.
+- Source: change `equipment-rejects-by-lots`.
+
+## [data 1.6.0] — 2026-05-18
+### Breaking
+- equipment-rejects-by-lots: Added §3.7 Query-Tool Equipment-Lot-Rejects Row documenting the new per-reject-event detail row shape (23 columns: CONTAINERID, CONTAINERNAME, WORKCENTERNAME, WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, PRODUCTLINENAME, PJ_FUNCTION, PJ_TYPE, PRODUCTNAME, SPECNAME, LOSSREASONNAME, EQUIPMENTNAME, REJECTCOMMENT, REJECT_QTY, STANDBY_QTY, QTYTOPROCESS_QTY, INPROCESS_QTY, PROCESSED_QTY, REJECT_TOTAL_QTY, DEFECT_QTY, TXN_TIME, TXNDATE, TXN_DAY). Old aggregate fields (TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) removed. Cross-station semantic documented: EQUIPMENTNAME reflects reject event's equipment (may differ from queried equipment). CSV export column order mirrors §3.7.
+- Source: change `equipment-rejects-by-lots`.
+
+## [business 1.8.0] — 2026-05-18
+### Added (additive)
+- Query Tool Rules: QT-07 (equipment-rejects cross-station semantic — `get_equipment_rejects()` resolves EQUIPMENTIDs via LOTWIPHISTORY to DISTINCT CONTAINERID set, then returns LOTREJECTHISTORY rows for those containers; EQUIPMENTNAME may differ from queried equipment; CONTAINERID is the only correct join key; empty equipment_ids → UserInputError; LOTREJECTHISTORY query short-circuited on empty input).
+- Source: change `equipment-rejects-by-lots`.
+
+## [api-inventory 1.1.5] — 2026-05-18
+### Changed (breaking)
+- equipment-rejects-by-lots: `query_tool_routes.py` `POST /api/query-tool/equipment-period` (`query_type='rejects'`) and `POST /api/query-tool/export-csv` (`export_type='equipment_rejects'`) response shape changed to per-reject-event detail rows (see api-contract.md §10). Breaking cutover — both consumer views (EquipmentView, LotEquipmentView) shipped atomically in same PR. Deprecate-2-minors policy bypassed (monorepo atomic cutover).
+- Source: change `equipment-rejects-by-lots`.
+
 ## [api 1.6.0] — 2026-05-15
 ### Added (additive)
 - Section 10 Compatibility Note: query-tool `lot_history`, `equipment_lots`, and `adjacent_lots` responses gain `partial_count: integer (≥ 1)`. `TRACKINQTY` now = `MAX(TRACKINQTY)` (original load qty); `TRACKOUTQTY` now = `SUM(TRACKOUTQTY)` (cumulative). Prior `ROW_NUMBER()` deduplication was a silent data-accuracy bug returning only the last partial's values. Additive; no endpoint removed; no error-code change. Strict-guard divergence is transparent to consumers. Export CSV (`lot_history` / `equipment_lots`) gains `partial_count` as a pass-through column.

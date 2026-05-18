@@ -71,4 +71,8 @@ test.describe('Query Tool page', () => {
     const dateInput = page.locator('input[type="date"]').first();
     await expect(dateInput).toBeVisible({ timeout: 10_000 });
   });
+
+  // TODO (equipment-rejects-by-lots AC-6): verify rejects sub-tab shows
+  //   CONTAINERNAME, LOSSREASONNAME, EQUIPMENTNAME ("報廢登錄設備") columns
+  // TODO (equipment-rejects-by-lots AC-8): verify row-limit banner shown when truncated
 });

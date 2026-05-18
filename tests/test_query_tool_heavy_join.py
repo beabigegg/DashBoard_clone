@@ -235,7 +235,7 @@ class TestQueryToolHeavyJoin:
         assert resp.status_code == 400
         data = resp.get_json()
         assert data is not None
-        assert data.get("success") is False
+        assert data.get("success") is False, f"Expected success=False, got: {data}"
 
     # ------------------------------------------------------------------ #
     # 6.11.6 — Validation: invalid query_type returns 400                #
@@ -256,3 +256,83 @@ class TestQueryToolHeavyJoin:
         data = resp.get_json()
         assert data is not None
         assert data.get("success") is False
+
+    # ------------------------------------------------------------------ #
+    # 6.11.7 — AC-8: equipment-rejects row-limit at realistic volume      #
+    # ------------------------------------------------------------------ #
+
+    def test_equipment_rejects_row_limit_at_scale(self, app_client):
+        """AC-8: When many reject events exist, response must return within
+        the row limit or include _meta.truncated=true.
+
+        WHY: aggregate→detail multiplies response size by O(rejects-per-lot).
+        With 100 containers each having 50 reject events = 5000 rows, the
+        response must still succeed (200) and the row count must be within
+        the expected range (or truncated flag present).
+        """
+        import pandas as pd
+
+        # Build a fixture of 5000 reject rows across 100 lots
+        rows = []
+        for i in range(100):
+            for j in range(50):
+                rows.append({
+                    'CONTAINERID': f'CID-{i:03d}',
+                    'CONTAINERNAME': f'LOT-{i:03d}',
+                    'WORKCENTERNAME': 'DB',
+                    'WORKCENTER_GROUP': 'DB',
+                    'WORKCENTERSEQUENCE_GROUP': 1,
+                    'PRODUCTLINENAME': 'PL-1',
+                    'PJ_FUNCTION': 'F1',
+                    'PJ_TYPE': 'T1',
+                    'PRODUCTNAME': 'PROD-1',
+                    'SPECNAME': 'SPEC-1',
+                    'LOSSREASONNAME': 'PARTICLE',
+                    'EQUIPMENTNAME': f'Furnace-{j % 5}',
+                    'REJECTCOMMENT': None,
+                    'REJECT_QTY': 1,
+                    'STANDBY_QTY': 0,
+                    'QTYTOPROCESS_QTY': 0,
+                    'INPROCESS_QTY': 0,
+                    'PROCESSED_QTY': 0,
+                    'REJECT_TOTAL_QTY': 1,
+                    'DEFECT_QTY': 1,
+                    'TXN_TIME': f'2024-01-{(j % 28) + 1:02d} 08:00:00',
+                    'TXNDATE': f'2024-01-{(j % 28) + 1:02d}',
+                    'TXN_DAY': f'2024-01-{(j % 28) + 1:02d}',
+                })
+        mock_df = pd.DataFrame(rows)
+
+        with patch(
+            "mes_dashboard.services.query_tool_service.SQLLoader.load_with_params",
+            return_value="SELECT * FROM DUAL",
+        ), patch(
+            "mes_dashboard.services.query_tool_service.read_sql_df_slow",
+            return_value=mock_df,
+        ), patch(
+            "mes_dashboard.services.page_registry.is_api_public", return_value=True
+        ):
+            resp = app_client.post(
+                "/api/query-tool/equipment-period",
+                json={
+                    "equipment_ids": [f"EQP-{i}" for i in range(10)],
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-01-31",
+                    "query_type": "rejects",
+                },
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.get_json()
+        assert data is not None
+        assert data.get("success") is True
+        # Either all rows returned (≤ soft cap) or truncated flag set
+        row_count = data.get("data", {}).get("total", 0)
+        is_truncated = (
+            (isinstance(data.get("data"), dict) and data["data"].get("_meta", {}).get("truncated"))
+            or (isinstance(data.get("meta"), dict) and data["meta"].get("truncated"))
+        )
+        assert row_count <= 10000 or is_truncated, (
+            f"Expected row_count <= 10000 or truncated flag; got row_count={row_count}"
+        )

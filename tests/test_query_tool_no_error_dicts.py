@@ -38,3 +38,32 @@ def test_no_error_dict_returns():
         "Offending lines:\n"
         + "\n".join(f"  L{lineno}: {text}" for lineno, text in matches)
     )
+
+
+_BUSINESS_RULES_PATH = (
+    pathlib.Path(__file__).parent.parent
+    / "contracts" / "business" / "business-rules.md"
+)
+
+
+def test_QT_07_cross_station_rule_present():
+    """AC-7: business-rules.md must document QT-07 cross-station semantic.
+
+    WHY: The equipment-rejects-by-lots change introduces a semantic where the
+    reject event EQUIPMENTNAME may differ from the queried equipment IDs
+    (cross-station case). This rule must be documented so future maintainers
+    do not treat it as a bug and revert to EQUIPMENTNAME-based filtering.
+    """
+    src = _BUSINESS_RULES_PATH.read_text(encoding="utf-8")
+    assert "QT-07" in src, (
+        "business-rules.md must contain rule QT-07 for equipment-rejects "
+        "cross-station semantic (equipment-rejects-by-lots)"
+    )
+    assert "cross-station" in src.lower() or "cross_station" in src.lower(), (
+        "QT-07 must reference the cross-station semantic "
+        "(EQUIPMENTNAME may differ from queried equipment)"
+    )
+    assert "CONTAINERID" in src, (
+        "QT-07 must mention CONTAINERID as the correct join key "
+        "(LOTREJECTHISTORY has no EQUIPMENTID)"
+    )
