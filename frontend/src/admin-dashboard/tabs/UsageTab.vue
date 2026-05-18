@@ -1,13 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 
-import DauTrendChart from '../../admin-user-usage-kpi/components/DauTrendChart.vue';
-import DeptBreakdownTable from '../../admin-user-usage-kpi/components/DeptBreakdownTable.vue';
-import DurationDistChart from '../../admin-user-usage-kpi/components/DurationDistChart.vue';
-import HourlyLoginChart from '../../admin-user-usage-kpi/components/HourlyLoginChart.vue';
-import KpiCard from '../../admin-user-usage-kpi/components/KpiCard.vue';
-import RecentSessionsTable from '../../admin-user-usage-kpi/components/RecentSessionsTable.vue';
-import TopUsersTable from '../../admin-user-usage-kpi/components/TopUsersTable.vue';
+import DauTrendChart from '../components/DauTrendChart.vue';
+import DeptBreakdownTable from '../components/DeptBreakdownTable.vue';
+import DurationDistChart from '../components/DurationDistChart.vue';
+import HourlyLoginChart from '../components/HourlyLoginChart.vue';
+import KpiCard from '../components/KpiCard.vue';
+import RecentSessionsTable from '../components/RecentSessionsTable.vue';
+import TopUsersTable from '../components/TopUsersTable.vue';
 import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
