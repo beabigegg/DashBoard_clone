@@ -3,7 +3,7 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 306
+visible-dirs: 295
 visible-files: 1043
 omitted-dirs: 106
 truncated-dirs: 8
@@ -679,6 +679,7 @@ DashBoard_vite/
 |   |   |   \-- wip-matrix-drilldown.spec.js
 |   |   |-- query-tool/
 |   |   |   |-- App.url-state.test.js
+|   |   |   |-- EquipmentRejectsTable.test.js
 |   |   |   \-- useLotDetail.pagination.test.js
 |   |   |-- shared-composables/
 |   |   |   |-- useAsyncJobPolling.test.js
@@ -708,57 +709,57 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260515_113239.log
-|   |   |-- access_20260515_130312.log
 |   |   |-- access_20260515_134658.log
 |   |   |-- access_20260515_163007.log
 |   |   |-- access_20260515_163738.log
 |   |   |-- access_20260515_170327.log
 |   |   |-- access_20260515_191511.log
-|   |   |-- error_20260515_113239.log
-|   |   |-- error_20260515_113624.log
-|   |   |-- error_20260515_113842.log
-|   |   |-- error_20260515_130312.log
+|   |   |-- access_20260518_085458.log
+|   |   |-- access_20260518_092351.log
+|   |   |-- access_20260518_104923.log
+|   |   |-- access_20260518_105558.log
+|   |   |-- access_20260518_111718.log
 |   |   |-- error_20260515_134658.log
 |   |   |-- error_20260515_163007.log
 |   |   |-- error_20260515_163738.log
 |   |   |-- error_20260515_170327.log
 |   |   |-- error_20260515_191511.log
-|   |   |-- rq_msd_worker_20260515_113239.log
-|   |   |-- rq_msd_worker_20260515_113624.log
-|   |   |-- rq_msd_worker_20260515_113842.log
-|   |   |-- rq_msd_worker_20260515_130312.log
+|   |   |-- error_20260518_085458.log
+|   |   |-- error_20260518_092351.log
+|   |   |-- error_20260518_104923.log
+|   |   |-- error_20260518_105558.log
+|   |   |-- error_20260518_111718.log
 |   |   |-- rq_msd_worker_20260515_134658.log
 |   |   |-- rq_msd_worker_20260515_163007.log
 |   |   |-- rq_msd_worker_20260515_163738.log
 |   |   |-- rq_msd_worker_20260515_170327.log
 |   |   |-- rq_msd_worker_20260515_191511.log
-|   |   |-- rq_prod_hist_worker_20260515_113239.log
-|   |   |-- rq_prod_hist_worker_20260515_113624.log
-|   |   |-- rq_prod_hist_worker_20260515_113842.log
-|   |   |-- rq_prod_hist_worker_20260515_130312.log
+|   |   |-- rq_msd_worker_20260518_085458.log
+|   |   |-- rq_msd_worker_20260518_092351.log
+|   |   |-- rq_msd_worker_20260518_104923.log
+|   |   |-- rq_msd_worker_20260518_105558.log
+|   |   |-- rq_msd_worker_20260518_111718.log
 |   |   |-- rq_prod_hist_worker_20260515_134658.log
 |   |   |-- rq_prod_hist_worker_20260515_163007.log
 |   |   |-- rq_prod_hist_worker_20260515_163738.log
 |   |   |-- rq_prod_hist_worker_20260515_170327.log
 |   |   |-- rq_prod_hist_worker_20260515_191511.log
-|   |   |-- rq_reject_worker_20260515_113239.log
-|   |   |-- rq_reject_worker_20260515_113624.log
-|   |   |-- rq_reject_worker_20260515_113842.log
-|   |   |-- rq_reject_worker_20260515_130312.log
+|   |   |-- rq_prod_hist_worker_20260518_085458.log
+|   |   |-- rq_prod_hist_worker_20260518_092351.log
+|   |   |-- rq_prod_hist_worker_20260518_104923.log
+|   |   |-- rq_prod_hist_worker_20260518_105558.log
+|   |   |-- rq_prod_hist_worker_20260518_111718.log
 |   |   |-- rq_reject_worker_20260515_134658.log
 |   |   |-- rq_reject_worker_20260515_163007.log
 |   |   |-- rq_reject_worker_20260515_163738.log
 |   |   |-- rq_reject_worker_20260515_170327.log
 |   |   |-- rq_reject_worker_20260515_191511.log
-|   |   |-- rq_worker_20260515_113239.log
-|   |   |-- rq_worker_20260515_113624.log
-|   |   |-- rq_worker_20260515_113842.log
-|   |   |-- rq_worker_20260515_130312.log
-|   |   |-- rq_worker_20260515_134658.log
-|   |   |-- rq_worker_20260515_163007.log
-|   |   |-- rq_worker_20260515_163738.log
-|   |   \-- ... (20 more entries truncated; cap=50)
+|   |   |-- rq_reject_worker_20260518_085458.log
+|   |   |-- rq_reject_worker_20260518_092351.log
+|   |   |-- rq_reject_worker_20260518_104923.log
+|   |   |-- rq_reject_worker_20260518_105558.log
+|   |   |-- rq_reject_worker_20260518_111718.log
+|   |   \-- ... (30 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1393,36 +1394,6 @@ DashBoard_vite/
 |   \-- ... (153 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
-|   |   |-- anomaly_hold_dataset/
-|   |   |   \-- 7c193f4e1ec6e300.parquet
-|   |   |-- anomaly_reject_dataset/
-|   |   |   \-- 858f092b53042f96.parquet
-|   |   |-- anomaly_resource_dataset/
-|   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- anomaly_yield_dataset/
-|   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- hold_dataset/
-|   |   |   |-- 4bd16ea73a4bbf32.parquet
-|   |   |   \-- 95e42fcaaa327839.parquet
-|   |   |-- production_history/
-|   |   |   |-- ph-043e0eabf07ba3c3.parquet
-|   |   |   |-- ph-594670cd0801903b.parquet
-|   |   |   |-- ph-dc1eb0568290c52f.parquet
-|   |   |   \-- ph-e0f0c7afebd990ee.parquet
-|   |   |-- reject_dataset/
-|   |   |   \-- 3511280f81a0f4eb.parquet
-|   |   |-- resource_dataset/
-|   |   |   |-- 44404b8c8320a4dc.parquet
-|   |   |   \-- c5c811f2b223e0cf.parquet
-|   |   |-- resource_oee/
-|   |   |   |-- 44404b8c8320a4dc.parquet
-|   |   |   \-- c5c811f2b223e0cf.parquet
-|   |   |-- trace_lineage/
-|   |   |   \-- trace-lineage-query-tool-ce8fc4723ffc9baba1ad31fc.parquet
-|   |   |-- yield_alert_dataset/
-|   |   |   |-- 5fdd52d6df79c582.parquet
-|   |   |   |-- b14cb138e6173d12.parquet
-|   |   |   \-- f90475d8fa771e62.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1462,9 +1433,27 @@ DashBoard_vite/
 |   |   |-- probe_112651.json
 |   |   |-- probe_113602.json
 |   |   |-- probe_113603.json
+|   |   |-- probe_113666.json
+|   |   |-- probe_113869.json
+|   |   |-- probe_116133.json
+|   |   |-- probe_116787.json
+|   |   |-- probe_116823.json
+|   |   |-- probe_117915.json
+|   |   |-- probe_117920.json
+|   |   |-- probe_118725.json
+|   |   |-- probe_118748.json
+|   |   |-- probe_118789.json
+|   |   |-- probe_119871.json
 |   |   \-- ... (385 more entries truncated; cap=50)
+|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   \-- resource_history.duckdb
+|   |-- resource_history.duckdb
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py
