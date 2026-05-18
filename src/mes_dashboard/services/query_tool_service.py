@@ -2284,6 +2284,7 @@ def resolve_lot_equipment(
             'equipment_names': equipment_names,
             'date_range': date_range,
             'trace_map': trace_map,
+            'lot_names': final_names,
         }
 
     except MemoryError:
@@ -2524,7 +2525,8 @@ def get_equipment_materials(
 def get_equipment_rejects(
     equipment_ids: List[str],
     start_date: str,
-    end_date: str
+    end_date: str,
+    workcenter_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Get per-reject-event detail rows for lots that passed through equipment.
 
@@ -2537,6 +2539,8 @@ def get_equipment_rejects(
         equipment_ids: List of equipment IDs (EQUIPMENTID from LOTWIPHISTORY)
         start_date: Start date (YYYY-MM-DD) — applied on TRACKINTIMESTAMP
         end_date: End date (YYYY-MM-DD)
+        workcenter_groups: Optional list of WORK_CENTER_GROUP names to filter
+            reject events by station group. When None, all rejects are returned.
 
     Returns:
         Dict with 'data' (per-reject-event detail rows) and 'total'.
@@ -2553,9 +2557,21 @@ def get_equipment_rejects(
         _check_rss_guard("設備批次不良品查詢")
         builder = QueryBuilder()
         builder.add_in_condition("h.EQUIPMENTID", equipment_ids)
+
+        if workcenter_groups:
+            wg_builder = QueryBuilder()
+            wg_builder._param_counter = builder._param_counter
+            wg_builder.add_in_condition("WORKCENTER_GROUP", workcenter_groups)
+            builder._param_counter = wg_builder._param_counter
+            builder.params.update(wg_builder.params)
+            workcenter_filter = wg_builder.get_conditions_sql()
+        else:
+            workcenter_filter = '1=1'
+
         sql = SQLLoader.load_with_params(
             "query_tool/equipment_lot_rejects",
             EQUIPMENT_FILTER=builder.get_conditions_sql(),
+            WORKCENTER_FILTER=workcenter_filter,
         )
 
         params = {'start_date': start_date, 'end_date': end_date}

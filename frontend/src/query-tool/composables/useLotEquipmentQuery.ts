@@ -230,6 +230,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
     return {
       equipment_ids: resolvedEquipmentIds.value,
       equipment_names: resolvedEquipmentNames.value,
+      workcenter_groups: selectedWorkcenterGroups.value,
       start_date: startDate.value,
       end_date: endDate.value,
       query_type: queryType,
@@ -322,7 +323,11 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
 
     try {
       const payload = await fetchEquipmentPeriod('rejects');
-      rejectsRows.value = Array.isArray(payload?.data) ? payload.data : [];
+      const allRows = Array.isArray(payload?.data) ? payload.data : [];
+      const relevant = new Set(resolvedLotNames.value);
+      rejectsRows.value = relevant.size > 0
+        ? allRows.filter((row) => relevant.has(String(row.CONTAINERNAME || '').toUpperCase()))
+        : allRows;
       queried.rejects = true;
       return true;
     } catch (error) {

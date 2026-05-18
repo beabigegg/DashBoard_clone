@@ -607,6 +607,7 @@ def query_equipment_period():
 
     equipment_ids = data.get('equipment_ids', [])
     equipment_names = data.get('equipment_names', [])
+    workcenter_groups = data.get('workcenter_groups') or []
     start_date = data.get('start_date')
     end_date = data.get('end_date')
     query_type = data.get('query_type')
@@ -656,6 +657,7 @@ def query_equipment_period():
                 equipment_ids=equipment_ids,
                 start_date=start_date,
                 end_date=end_date,
+                workcenter_groups=workcenter_groups or None,
             )
 
         elif query_type == 'jobs':
