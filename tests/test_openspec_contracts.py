@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-"""OpenSpec contract compliance tests.
+"""Static source-code contract tests.
 
-Parses five spec directories and asserts that the runtime codebase satisfies
-key requirements from each spec.  These are static-analysis tests — they read
-source files and verify structure, not live behaviour.
+Asserts that the runtime codebase satisfies key implementation contracts —
+no external spec files required.  These read source files and verify structure,
+not live behaviour.
 
-Specs covered:
-  1. api-response-contract-unification
-  2. anomaly-summary-api
-  3. cache-plane-architecture
-  4. async-query-job-service
-  5. api-safety-hygiene
+Areas covered:
+  1. api-response-contract-unification (source checks)
+  2. anomaly-summary-api (source checks)
+  3. cache-plane-architecture (source checks)
+  4. async-query-job-service (source checks)
+  5. api-safety-hygiene (source checks)
 """
 
 from __future__ import annotations
@@ -24,16 +24,9 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).parent.parent
-SPECS_DIR = PROJECT_ROOT / "openspec" / "specs"
 ROUTES_DIR = PROJECT_ROOT / "src" / "mes_dashboard" / "routes"
 SERVICES_DIR = PROJECT_ROOT / "src" / "mes_dashboard" / "services"
 CORE_DIR = PROJECT_ROOT / "src" / "mes_dashboard" / "core"
-
-
-def _spec_text(spec_name: str) -> str:
-    spec_path = SPECS_DIR / spec_name / "spec.md"
-    assert spec_path.exists(), f"spec not found: {spec_path}"
-    return spec_path.read_text(encoding="utf-8")
 
 
 def _src_text(relative_path: str) -> str:
@@ -51,18 +44,7 @@ def _grep(pattern: str, text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 class TestApiResponseContractUnification:
-    """Spec: api-response-contract-unification"""
-
-    def test_spec_file_exists(self):
-        _spec_text("api-response-contract-unification")
-
-    def test_spec_requires_success_response_helper(self):
-        spec = _spec_text("api-response-contract-unification")
-        assert "success_response" in spec, "Spec must reference success_response helper"
-
-    def test_spec_requires_error_response_helper(self):
-        spec = _spec_text("api-response-contract-unification")
-        assert "error_response" in spec or "validation_error" in spec
+    """Contract: api-response-contract-unification (source checks)"""
 
     def test_response_py_exports_success_response(self):
         src = _src_text("src/mes_dashboard/core/response.py")
@@ -137,19 +119,7 @@ class TestApiResponseContractUnification:
 # ---------------------------------------------------------------------------
 
 class TestAnomalySummaryApi:
-    """Spec: anomaly-summary-api"""
-
-    def test_spec_file_exists(self):
-        _spec_text("anomaly-summary-api")
-
-    def test_spec_requires_anomaly_summary_endpoint(self):
-        spec = _spec_text("anomaly-summary-api")
-        assert "/api/analytics/anomaly-summary" in spec
-
-    def test_spec_requires_four_detector_breakdown(self):
-        spec = _spec_text("anomaly-summary-api")
-        for key in ("yield", "reject", "hold", "equipment"):
-            assert key in spec, f"Spec must reference {key!r} detector"
+    """Contract: anomaly-summary-api (source checks)"""
 
     def test_analytics_routes_has_anomaly_summary_endpoint(self):
         src = _src_text("src/mes_dashboard/routes/analytics_routes.py")
@@ -167,10 +137,6 @@ class TestAnomalySummaryApi:
         src = _src_text("src/mes_dashboard/services/anomaly_detection_sql_runtime.py")
         assert "get_anomaly_summary" in src or "anomaly_summary" in src
 
-    def test_spec_documents_meta_cache_state(self):
-        spec = _spec_text("anomaly-summary-api")
-        assert "cache_state" in spec or "cache" in spec
-
     def test_analytics_routes_injects_cache_state_meta(self):
         src = _src_text("src/mes_dashboard/routes/analytics_routes.py")
         assert "cache_state" in src
@@ -181,19 +147,7 @@ class TestAnomalySummaryApi:
 # ---------------------------------------------------------------------------
 
 class TestCachePlaneArchitecture:
-    """Spec: cache-plane-architecture"""
-
-    def test_spec_file_exists(self):
-        _spec_text("cache-plane-architecture")
-
-    def test_spec_defines_four_planes(self):
-        spec = _spec_text("cache-plane-architecture")
-        for plane in ("snapshot", "heavy-query", "derived-result", "control"):
-            assert plane in spec, f"Spec must define {plane!r} plane"
-
-    def test_spec_requires_redis_isolation(self):
-        spec = _spec_text("cache-plane-architecture")
-        assert "control" in spec and "evict" in spec.lower()
+    """Contract: cache-plane-architecture (source checks)"""
 
     def test_redis_client_has_control_plane_function(self):
         """get_control_redis_client must exist as a distinct function."""
@@ -210,10 +164,6 @@ class TestCachePlaneArchitecture:
         src = _src_text("src/mes_dashboard/routes/spool_routes.py")
         assert ".parquet" in src
 
-    def test_spec_requires_duckdb_for_heavy_query_runtime(self):
-        spec = _spec_text("cache-plane-architecture")
-        assert "DuckDB" in spec or "duckdb" in spec.lower()
-
     def test_heavy_query_services_use_duckdb_runtime(self):
         """At least one service must import duckdb for heavy-query plane."""
         found_duckdb = any(
@@ -228,30 +178,7 @@ class TestCachePlaneArchitecture:
 # ---------------------------------------------------------------------------
 
 class TestAsyncQueryJobService:
-    """Spec: async-query-job-service"""
-
-    def test_spec_file_exists(self):
-        _spec_text("async-query-job-service")
-
-    def test_spec_requires_enqueue_job(self):
-        spec = _spec_text("async-query-job-service")
-        assert "enqueue_job" in spec
-
-    def test_spec_requires_get_job_status(self):
-        spec = _spec_text("async-query-job-service")
-        assert "get_job_status" in spec
-
-    def test_spec_requires_update_job_progress(self):
-        spec = _spec_text("async-query-job-service")
-        assert "update_job_progress" in spec
-
-    def test_spec_requires_complete_job(self):
-        spec = _spec_text("async-query-job-service")
-        assert "complete_job" in spec
-
-    def test_spec_requires_is_async_available(self):
-        spec = _spec_text("async-query-job-service")
-        assert "is_async_available" in spec
+    """Contract: async-query-job-service (source checks)"""
 
     def test_service_exports_enqueue_job(self):
         src = _src_text("src/mes_dashboard/services/async_query_job_service.py")
@@ -288,18 +215,7 @@ class TestAsyncQueryJobService:
 # ---------------------------------------------------------------------------
 
 class TestApiSafetyHygiene:
-    """Spec: api-safety-hygiene"""
-
-    def test_spec_file_exists(self):
-        _spec_text("api-safety-hygiene")
-
-    def test_spec_requires_rate_limiting_on_high_cost_apis(self):
-        spec = _spec_text("api-safety-hygiene")
-        assert "TOO_MANY_REQUESTS" in spec or "rate" in spec.lower()
-
-    def test_spec_requires_429_with_retry_after(self):
-        spec = _spec_text("api-safety-hygiene")
-        assert "429" in spec or "TOO_MANY_REQUESTS" in spec
+    """Contract: api-safety-hygiene (source checks)"""
 
     def test_response_py_exports_too_many_requests_error(self):
         src = _src_text("src/mes_dashboard/core/response.py")
@@ -334,10 +250,6 @@ class TestApiSafetyHygiene:
             if "rate_limit" not in src.lower() and "configured_rate_limit" not in src:
                 missing.append(filename)
         assert not missing, f"These high-cost route files lack rate limiting: {missing}"
-
-    def test_spec_requires_depth_safe_nan_cleaning(self):
-        spec = _spec_text("api-safety-hygiene")
-        assert "depth" in spec.lower() or "recursive" in spec.lower()
 
     def test_job_abandon_route_is_rate_limited(self):
         """The new POST /api/job/<id>/abandon endpoint must apply rate limiting."""
