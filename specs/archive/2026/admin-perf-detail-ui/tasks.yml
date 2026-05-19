@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "frontend-tests.yml (vitest + css:check) + contract-driven-gates.yml cover all Tier 1 gates" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "type-check informational (continue-on-error: true); 0 errors after @ts-expect-error fix" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gates for this change" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: skipped, note: "no durable lessons warranted; vi.mock depth and @ts-expect-error are already documented; backend fixes in ADMIN-06/07 via fix-admin-dashboard close" }

@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 147
-visible-files: 728
-omitted-dirs: 50
+visible-dirs: 148
+visible-files: 744
+omitted-dirs: 51
 truncated-dirs: 3
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -140,6 +140,8 @@ DashBoard_vite/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- utils/
 |   |   |   |   \-- ... (max depth)
 |   |   |   \-- index.ts
 |   |   |-- anomaly-overview/
@@ -456,20 +458,36 @@ DashBoard_vite/
 |   |-- archive/
 |   |   |-- access_20260519_105711.log
 |   |   |-- access_20260519_123328.log
+|   |   |-- access_20260519_140146.log
+|   |   |-- access_20260519_144025.log
 |   |   |-- error_20260519_105711.log
 |   |   |-- error_20260519_123328.log
+|   |   |-- error_20260519_140146.log
+|   |   |-- error_20260519_144025.log
 |   |   |-- rq_msd_worker_20260519_105711.log
 |   |   |-- rq_msd_worker_20260519_123328.log
+|   |   |-- rq_msd_worker_20260519_140146.log
+|   |   |-- rq_msd_worker_20260519_144025.log
 |   |   |-- rq_prod_hist_worker_20260519_105711.log
 |   |   |-- rq_prod_hist_worker_20260519_123328.log
+|   |   |-- rq_prod_hist_worker_20260519_140146.log
+|   |   |-- rq_prod_hist_worker_20260519_144025.log
 |   |   |-- rq_reject_worker_20260519_105711.log
 |   |   |-- rq_reject_worker_20260519_123328.log
+|   |   |-- rq_reject_worker_20260519_140146.log
+|   |   |-- rq_reject_worker_20260519_144025.log
 |   |   |-- rq_worker_20260519_105711.log
 |   |   |-- rq_worker_20260519_123328.log
+|   |   |-- rq_worker_20260519_140146.log
+|   |   |-- rq_worker_20260519_144025.log
 |   |   |-- rq_yield_alert_worker_20260519_105711.log
 |   |   |-- rq_yield_alert_worker_20260519_123328.log
+|   |   |-- rq_yield_alert_worker_20260519_140146.log
+|   |   |-- rq_yield_alert_worker_20260519_144025.log
 |   |   |-- watchdog_20260519_105711.log
-|   |   \-- watchdog_20260519_123328.log
+|   |   |-- watchdog_20260519_123328.log
+|   |   |-- watchdog_20260519_140146.log
+|   |   \-- watchdog_20260519_144025.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -921,7 +939,7 @@ DashBoard_vite/
 |   |   |-- probe_118748.json
 |   |   |-- probe_118789.json
 |   |   |-- probe_119871.json
-|   |   \-- ... (414 more entries truncated; cap=50)
+|   |   \-- ... (418 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb

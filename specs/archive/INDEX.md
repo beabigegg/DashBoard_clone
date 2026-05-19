@@ -35,3 +35,5 @@
 | migrate-mid-section-defect-ts | 2026 | 2026-05-18 | specs/archive/2026/migrate-mid-section-defect-ts/ |
 | remove-unused-pages | 2026 | 2026-05-18 | specs/archive/2026/remove-unused-pages/ |
 | fix-admin-dashboard | 2026 | 2026-05-19 | specs/archive/2026/fix-admin-dashboard/ |
+| admin-dashboard-ux | 2026 | 2026-05-19 | specs/archive/2026/admin-dashboard-ux/ |
+| admin-perf-detail-ui | 2026 | 2026-05-19 | specs/archive/2026/admin-perf-detail-ui/ |
