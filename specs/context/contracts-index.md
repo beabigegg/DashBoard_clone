@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 3981a9aa67122921ca6f8a7d49bd38c839056a427c5e18e5a11465856d45a844
+inputs-digest: a7eb77a2b3087f99262be9e5337b634d08f968213ef7138ad35f224c57cc4c4b
 ---
 
 # Contracts Index
@@ -85,7 +85,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.15
+- schema-version: 1.3.16
 - last-changed: 2026-05-18
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.
