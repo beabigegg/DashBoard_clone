@@ -555,11 +555,23 @@ def api_performance_detail():
                 # --- Additive: slowlog top-5 ---
                 try:
                     raw_slowlog = client.slowlog_get(5)
+                    def _decode_cmd(raw_cmd):
+                        if isinstance(raw_cmd, (bytes, bytearray)):
+                            return raw_cmd.decode("utf-8", errors="replace")[:120]
+                        if isinstance(raw_cmd, (list, tuple)):
+                            parts = []
+                            for a in raw_cmd[:3]:
+                                if isinstance(a, (bytes, bytearray)):
+                                    parts.append(a.decode("utf-8", errors="replace"))
+                                else:
+                                    parts.append(str(a))
+                            return " ".join(parts)
+                        return str(raw_cmd)[:120]
                     redis_detail["slowlog"] = [
                         {
                             "id": e["id"],
                             "duration_us": e["duration"],
-                            "command": " ".join(str(a) for a in e["command"][:3]),
+                            "command": _decode_cmd(e.get("command") or []),
                         }
                         for e in raw_slowlog
                     ]

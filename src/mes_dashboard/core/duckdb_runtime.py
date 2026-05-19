@@ -156,12 +156,7 @@ def get_duckdb_telemetry() -> dict:
 
     return {
         "temp_dir_bytes": temp_dir_bytes,
-        "memory_limit_state": {
-            "memory_limit": DUCKDB_MEMORY_LIMIT,
-            "threads": DUCKDB_THREADS,
-            "temp_dir": DUCKDB_TEMP_DIR or None,
-            "connection_ok": connection_ok,
-        },
+        "memory_limit_state": DUCKDB_MEMORY_LIMIT or None,
     }
 
 
