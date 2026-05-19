@@ -237,6 +237,25 @@ def _add_exact_filter_conditions(builder: QueryBuilder, column: str, raw_values:
     return builder
 
 
+def _apply_non_indexed_filters(
+    df: pd.DataFrame,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
+) -> pd.DataFrame:
+    """Filter a snapshot DataFrame by the fields not covered by snapshot indexes."""
+    workflow_vals = _split_csv_values(workflow)
+    bop_vals = _split_csv_values(bop)
+    pj_function_vals = _split_csv_values(pj_function)
+    if workflow_vals and "WORKFLOWNAME" in df.columns:
+        df = df[df["WORKFLOWNAME"].isin(workflow_vals)]
+    if bop_vals and "BOP" in df.columns:
+        df = df[df["BOP"].isin(bop_vals)]
+    if pj_function_vals and "PJ_FUNCTION" in df.columns:
+        df = df[df["PJ_FUNCTION"].isin(pj_function_vals)]
+    return df
+
+
 def _lookup_positions(index_map: Dict[str, np.ndarray], raw_values: Optional[str]) -> Optional[np.ndarray]:
     values = _split_csv_values(raw_values)
     if not values:
@@ -953,6 +972,8 @@ def get_wip_summary(
                     pj_function,
                 )
 
+            df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
+
             if df.empty:
                 return {
                     'totalLots': 0,
@@ -1042,12 +1063,9 @@ def _get_wip_summary_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
-        if workflow:
-            builder.add_param_condition("WORKFLOWNAME", workflow)
-        if bop:
-            builder.add_param_condition("BOP", bop)
-        if pj_function:
-            builder.add_param_condition("PJ_FUNCTION", pj_function)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
 
         # Load SQL template and build query
         base_sql = SQLLoader.load("wip/summary")
@@ -1175,6 +1193,8 @@ def get_wip_matrix(
                     pj_function,
                 )
 
+            df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
+
             if reason_filter:
                 if isinstance(reason_filter, (list, tuple)):
                     df = df[df['HOLDREASONNAME'].isin(reason_filter)]
@@ -1297,12 +1317,9 @@ def _get_wip_matrix_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
-        if workflow:
-            builder.add_param_condition("WORKFLOWNAME", workflow)
-        if bop:
-            builder.add_param_condition("BOP", bop)
-        if pj_function:
-            builder.add_param_condition("PJ_FUNCTION", pj_function)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
 
         # WIP status filter
         if status:
@@ -1355,6 +1372,9 @@ def get_wip_hold_summary(
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
     workcenter: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get hold summary grouped by hold reason.
 
@@ -1399,7 +1419,12 @@ def get_wip_hold_summary(
                     firstname,
                     waferdesc,
                     workcenter,
+                    workflow=workflow,
+                    bop=bop,
+                    pj_function=pj_function,
                 )
+
+            df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
 
             # Filter for HOLD status with reason
             df = df[df['HOLDREASONNAME'].notna()]
@@ -1441,6 +1466,9 @@ def get_wip_hold_summary(
         firstname,
         waferdesc,
         workcenter,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
 
 
@@ -1453,6 +1481,9 @@ def _get_wip_hold_summary_from_oracle(
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
     workcenter: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get WIP hold summary directly from Oracle (fallback)."""
     try:
@@ -1465,6 +1496,9 @@ def _get_wip_hold_summary_from_oracle(
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
         _add_exact_filter_conditions(builder, "WORKCENTER_GROUP", workcenter)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
 
         where_clause, params = builder.build_where_only()
 
@@ -1583,6 +1617,8 @@ def get_wip_detail(
                     pj_function,
                 )
 
+            summary_df = _apply_non_indexed_filters(summary_df, workflow=workflow, bop=bop, pj_function=pj_function)
+
             if summary_df.empty:
                 summary = {
                     'totalLots': 0,
@@ -1647,6 +1683,7 @@ def get_wip_detail(
                         bop,
                         pj_function,
                     )
+                filtered_df = _apply_non_indexed_filters(filtered_df, workflow=workflow, bop=bop, pj_function=pj_function)
                 df = filtered_df
 
             # Get specs (sorted by SPECSEQUENCE if available)
@@ -1742,12 +1779,9 @@ def _get_wip_detail_from_oracle(
         _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
-        if workflow:
-            builder.add_param_condition("WORKFLOWNAME", workflow)
-        if bop:
-            builder.add_param_condition("BOP", bop)
-        if pj_function:
-            builder.add_param_condition("PJ_FUNCTION", pj_function)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
 
         # WIP status filter (RUN/QUEUE/HOLD based on EQUIPMENTCOUNT and CURRENTHOLDCOUNT)
         if status:
@@ -1771,12 +1805,9 @@ def _get_wip_detail_from_oracle(
         _add_exact_filter_conditions(summary_builder, "PJ_TYPE", pj_type)
         _add_exact_filter_conditions(summary_builder, "FIRSTNAME", firstname)
         _add_exact_filter_conditions(summary_builder, "WAFERDESC", waferdesc)
-        if workflow:
-            summary_builder.add_param_condition("WORKFLOWNAME", workflow)
-        if bop:
-            summary_builder.add_param_condition("BOP", bop)
-        if pj_function:
-            summary_builder.add_param_condition("PJ_FUNCTION", pj_function)
+        _add_exact_filter_conditions(summary_builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(summary_builder, "BOP", bop)
+        _add_exact_filter_conditions(summary_builder, "PJ_FUNCTION", pj_function)
 
         summary_where, summary_params = summary_builder.build_where_only()
         non_quality_list = CommonFilters.get_non_quality_reasons_sql()
@@ -2127,12 +2158,12 @@ def _query_distinct_values_from_oracle(
             _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
         if exclude_field != "waferdesc":
             _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
-        if exclude_field != "workflow" and workflow:
-            builder.add_param_condition("WORKFLOWNAME", workflow)
-        if exclude_field != "bop" and bop:
-            builder.add_param_condition("BOP", bop)
-        if exclude_field != "pj_function" and pj_function:
-            builder.add_param_condition("PJ_FUNCTION", pj_function)
+        if exclude_field != "workflow":
+            _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        if exclude_field != "bop":
+            _add_exact_filter_conditions(builder, "BOP", bop)
+        if exclude_field != "pj_function":
+            _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
         where_clause, params = builder.build_where_only()
         sql = f"""
             SELECT DISTINCT {column}
@@ -2238,6 +2269,28 @@ def _get_filter_options_cache_payload(
         "waferdesc": ("waferdescs", "waferdesc"),
     }
 
+    # Parse non-indexed filter values first so they are available for both the
+    # indexed-field loop and the non-indexed field section below.
+    workflow_vals = _split_csv_values(workflow)
+    bop_vals = _split_csv_values(bop)
+    pj_function_vals = _split_csv_values(pj_function)
+
+    # Build row-position array for rows that satisfy every non-indexed filter
+    # (BOP / WORKFLOWNAME / PJ_FUNCTION).  These positions are intersected with
+    # each indexed field's computed positions so that, e.g., BOP=EAC17 also
+    # narrows the Type / Package / WorkOrder option lists.
+    ni_positions: Optional[np.ndarray] = None
+    if workflow_vals or bop_vals or pj_function_vals:
+        frame = snapshot["frame"]
+        mask = np.ones(len(frame), dtype=bool)
+        if workflow_vals and "WORKFLOWNAME" in frame.columns:
+            mask &= frame["WORKFLOWNAME"].isin(workflow_vals).values
+        if bop_vals and "BOP" in frame.columns:
+            mask &= frame["BOP"].isin(bop_vals).values
+        if pj_function_vals and "PJ_FUNCTION" in frame.columns:
+            mask &= frame["PJ_FUNCTION"].isin(pj_function_vals).values
+        ni_positions = np.where(mask)[0].astype(np.int64)
+
     payload: Dict[str, List[str]] = {}
     for field, (result_key, index_key) in by_field.items():
         positions = _compute_snapshot_positions(
@@ -2251,6 +2304,8 @@ def _get_filter_options_cache_payload(
             status=status,
             hold_type=hold_type,
         )
+        if ni_positions is not None:
+            positions = _intersect_positions(positions, ni_positions)
         payload[result_key] = _distinct_values_from_index(
             indexes[index_key], positions, row_count
         )
@@ -2270,17 +2325,21 @@ def _get_filter_options_cache_payload(
     if filtered_df is None:
         filtered_df = snapshot["frame"]
 
-    # Apply new filters on top of the materialised frame
-    if workflow and "WORKFLOWNAME" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["WORKFLOWNAME"] == workflow]
-    if bop and "BOP" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["BOP"] == bop]
-    if pj_function and "PJ_FUNCTION" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["PJ_FUNCTION"] == pj_function]
+    # Cross-filter semantics for workflow/bop/pjFunction:
+    # Each field's options are derived from a frame filtered by the OTHER two fields only
+    # (excluding self), and using isin() on split CSV values so multi-select works correctly.
+    def _apply_isin(df: Any, col: str, vals: list) -> Any:  # type: ignore[type-arg]
+        if vals and col in df.columns:
+            return df[df[col].isin(vals)]
+        return df
 
-    payload["workflows"] = _distinct_non_empty_values(filtered_df, "WORKFLOWNAME")
-    payload["bops"] = _distinct_non_empty_values(filtered_df, "BOP")
-    payload["pjFunctions"] = _distinct_non_empty_values(filtered_df, "PJ_FUNCTION")
+    workflows_df = _apply_isin(_apply_isin(filtered_df, "BOP", bop_vals), "PJ_FUNCTION", pj_function_vals)
+    bops_df = _apply_isin(_apply_isin(filtered_df, "WORKFLOWNAME", workflow_vals), "PJ_FUNCTION", pj_function_vals)
+    pj_functions_df = _apply_isin(_apply_isin(filtered_df, "WORKFLOWNAME", workflow_vals), "BOP", bop_vals)
+
+    payload["workflows"] = _distinct_non_empty_values(workflows_df, "WORKFLOWNAME")
+    payload["bops"] = _distinct_non_empty_values(bops_df, "BOP")
+    payload["pjFunctions"] = _distinct_non_empty_values(pj_functions_df, "PJ_FUNCTION")
 
     return payload
 
@@ -2819,6 +2878,9 @@ def get_hold_detail_summary(
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
     include_dummy: bool = False,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get summary statistics for hold lots.
 
@@ -2861,7 +2923,12 @@ def get_hold_detail_summary(
                     firstname=firstname,
                     waferdesc=waferdesc,
                     include_dummy=include_dummy,
+                    workflow=workflow,
+                    bop=bop,
+                    pj_function=pj_function,
                 )
+
+            df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
 
             # Extract all distinct reasons before applying reason filter
             top_reasons = sorted(
@@ -2914,6 +2981,9 @@ def get_hold_detail_summary(
         firstname=firstname,
         waferdesc=waferdesc,
         include_dummy=include_dummy,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
 
 
@@ -2926,6 +2996,9 @@ def _get_hold_detail_summary_from_oracle(
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
     include_dummy: bool = False,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail summary directly from Oracle (fallback)."""
     try:
@@ -2946,6 +3019,9 @@ def _get_hold_detail_summary_from_oracle(
             builder.add_param_condition("FIRSTNAME", firstname)
         if waferdesc:
             builder.add_param_condition("WAFERDESC", waferdesc)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
         where_clause, params = builder.build_where_only()
 
         sql = f"""
@@ -3279,7 +3355,10 @@ def get_hold_detail_lots(
     age_range: Optional[str] = None,
     include_dummy: bool = False,
     page: int = 1,
-    page_size: int = 50
+    page_size: int = 50,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get paginated lot details for hold lots.
 
@@ -3339,7 +3418,12 @@ def get_hold_detail_lots(
                     include_dummy=include_dummy,
                     page=page,
                     page_size=page_size,
+                    workflow=workflow,
+                    bop=bop,
+                    pj_function=pj_function,
                 )
+
+            df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
 
             if reason:
                 if isinstance(reason, (list, tuple)):
@@ -3431,6 +3515,9 @@ def get_hold_detail_lots(
         include_dummy=include_dummy,
         page=page,
         page_size=page_size,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
 
 
@@ -3448,7 +3535,10 @@ def _get_hold_detail_lots_from_oracle(
     age_range: Optional[str] = None,
     include_dummy: bool = False,
     page: int = 1,
-    page_size: int = 50
+    page_size: int = 50,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail lots directly from Oracle (fallback)."""
     try:
@@ -3477,6 +3567,9 @@ def _get_hold_detail_lots_from_oracle(
             builder.add_param_condition("FIRSTNAME", firstname)
         if waferdesc:
             builder.add_param_condition("WAFERDESC", waferdesc)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
         if age_range:
             if age_range == '0-1':
                 builder.add_condition("AGEBYDAYS >= 0 AND AGEBYDAYS < 1")

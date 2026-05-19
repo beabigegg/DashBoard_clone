@@ -211,6 +211,9 @@ def api_overview_hold():
     firstname = args.get('firstname', '').strip() or None
     waferdesc = args.get('waferdesc', '').strip() or None
     workcenter = args.get('workcenter', '').strip() or None
+    workflow = args.get('workflow', '').strip() or ''
+    bop = args.get('bop', '').strip() or ''
+    pj_function = args.get('pj_function', '').strip() or ''
     include_dummy = parse_bool_query(args.get('include_dummy'))
 
     result = get_wip_hold_summary(
@@ -222,6 +225,9 @@ def api_overview_hold():
         firstname=firstname,
         waferdesc=waferdesc,
         workcenter=workcenter,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)

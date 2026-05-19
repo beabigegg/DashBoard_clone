@@ -135,6 +135,9 @@ def api_hold_overview_summary():
     pj_type = args.get('type', '').strip() or None
     firstname = args.get('firstname', '').strip() or None
     waferdesc = args.get('waferdesc', '').strip() or None
+    workflow = args.get('workflow', '').strip() or ''
+    bop = args.get('bop', '').strip() or ''
+    pj_function = args.get('pj_function', '').strip() or ''
     include_dummy = parse_bool_query(args.get('include_dummy'))
 
     result = get_hold_detail_summary(
@@ -146,6 +149,9 @@ def api_hold_overview_summary():
         firstname=firstname,
         waferdesc=waferdesc,
         include_dummy=include_dummy,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)
@@ -167,6 +173,9 @@ def api_hold_overview_matrix():
     pj_type = args.get('type', '').strip() or None
     firstname = args.get('firstname', '').strip() or None
     waferdesc = args.get('waferdesc', '').strip() or None
+    workflow = args.get('workflow', '').strip() or ''
+    bop = args.get('bop', '').strip() or ''
+    pj_function = args.get('pj_function', '').strip() or ''
     include_dummy = parse_bool_query(args.get('include_dummy'))
 
     result = get_wip_matrix(
@@ -179,6 +188,9 @@ def api_hold_overview_matrix():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)
@@ -228,6 +240,9 @@ def api_hold_overview_lots():
     pj_type = args.get('type', '').strip() or None
     firstname = args.get('firstname', '').strip() or None
     waferdesc = args.get('waferdesc', '').strip() or None
+    workflow = args.get('workflow', '').strip() or ''
+    bop = args.get('bop', '').strip() or ''
+    pj_function = args.get('pj_function', '').strip() or ''
     age_range = args.get('age_range', '').strip() or None
     include_dummy = parse_bool_query(args.get('include_dummy'))
     page = _coerce_int(args.get('page', 1), default=1)
@@ -255,6 +270,9 @@ def api_hold_overview_lots():
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
         age_range=age_range,
         include_dummy=include_dummy,
         page=page,
