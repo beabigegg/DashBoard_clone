@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.8.0
-last-changed: 2026-05-18
+schema-version: 1.9.0
+last-changed: 2026-05-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -195,6 +195,8 @@ breaking-change-policy: deprecate-2-minors
 | ADMIN-03 | Worker management | `POST /admin/api/worker/restart` 重啟 RQ worker；`GET /worker/status` 查 worker 狀態；需 admin | route tests |
 | ADMIN-04 | Drawer CRUD | `/admin/api/drawers` 管理導覽欄 drawer 設定；支援 CRUD（GET/POST/PUT/DELETE）| route tests |
 | ADMIN-05 | Log management | `/admin/api/logs`、`/logs/cleanup`、`/log-files/cleanup` 管理系統 log；cleanup 用 DELETE method | route tests |
+| ADMIN-06 | Log query path divergence | `query_logs_all()` and `count_logs()` in `log_store.py` MUST NOT filter by `synced`; they return all records (synced and unsynced) for the admin view. `query_logs()` (legacy consumer path) intentionally retains `WHERE synced = 0`. Adding a `synced` filter to the "all" variants silently hides records from `/admin/api/logs`. Retention window: synced records are purged after 24 h (`older_than_hours=24`) by `SyncWorker._cleanup_synced()`. | `tests/test_log_store.py::TestLogStoreAllRows` |
+| ADMIN-07 | Log pagination authoritative total | For `/admin/api/logs`, `total` in the pagination meta MUST be computed from independent `COUNT` queries (`log_store.count_logs()` + `_count_mysql_logs()`) executed without the page window — NOT from `len(merged_rows)` after a windowed fetch. The windowed fetch uses `limit = offset + page_size` per source to cover the merge sort window; post-merge slice is `rows[offset : offset + page_size]`. Deriving `total` from a windowed fetch silently under-counts when `offset > 0`. | `tests/test_admin_routes_logs.py::TestMergePagination` |
 
 ## Decision Tables
 

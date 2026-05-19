@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "backend-tests.yml + contract-driven-gates.yml cover all Tier 1 gates" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "coverage-report is informational only" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gates for this change" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "ADMIN-06, ADMIN-07 → business-rules.md 1.9.0; L-1 rq_monitor test isolation + L-4 TRUNCATE guard → CLAUDE.md" }
