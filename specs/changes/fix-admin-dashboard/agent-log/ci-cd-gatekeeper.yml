@@ -1,0 +1,15 @@
+change-id: fix-admin-dashboard
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-19T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (PR required), 2 (informational)" }
+  - { type: gate-promotions, pointer: "n/a (no gate tier changes; existing workflow coverage is sufficient)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow file edits required; existing path filters in .github/workflows/backend-tests.yml cover all changed paths)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, contract-and-fast-tests" }
+next-action: none
+files-read:
+  - specs/changes/fix-admin-dashboard/change-classification.md
+  - specs/changes/fix-admin-dashboard/test-plan.md
+  - .github/workflows/backend-tests.yml
+  - .github/workflows/contract-driven-gates.yml

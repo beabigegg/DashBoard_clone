@@ -1,6 +1,6 @@
-# generated: 2026-05-18T11:06:59Z by cdd-kit 2.0.19
-# files: 765, src-lines: 211432, map-lines: 18127, compression: 11.7x
-# sources-digest: 0369f1070f3f84bfff8224694a8c636eff5346a88c4a9f620d832938bf96ddea
+# generated: 2026-05-19T00:24:18Z by cdd-kit 2.0.19
+# files: 771, src-lines: 212822, map-lines: 18230, compression: 11.7x
+# sources-digest: 9527c312caf2ee4fad29ee9533b7815a48fa62d7a21d523522962d202b3abe73
 frontend/playwright-report/trace/assets/codeMirrorModule-a5XoALAZ.js:  # 32 lines
   imports:
     - { module: './defaultSettingsView-CJSZINFr.js', items: [v], line: 1 }
@@ -2054,12 +2054,12 @@ frontend/src/admin-dashboard/components/TopUsersTable.vue:  # 36 lines
   functions:
     - { name: formatDuration, lines: 6-11 }
 
-frontend/src/admin-dashboard/main.js:  # 7 lines
+frontend/src/admin-dashboard/main.ts:  # 8 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
-    - { module: './App.vue', items: ['default:App'], line: 3 }
-    - { module: '../styles/tailwind.css', items: [], line: 4 }
-    - { module: './style.css', items: [], line: 5 }
+    - { module: './App.vue', items: ['default:App'], line: 4 }
+    - { module: '../styles/tailwind.css', items: [], line: 5 }
+    - { module: './style.css', items: [], line: 6 }
 
 frontend/src/admin-dashboard/tabs/CacheTab.vue:  # 165 lines
   imports:
@@ -2179,6 +2179,19 @@ frontend/src/admin-dashboard/tabs/WorkerTab.vue:  # 390 lines
     - { name: async loadWorkerStatus, lines: 139-147 }
     - { name: async doRestart, lines: 149-160 }
     - { name: async refresh, lines: 162-168 }
+
+frontend/src/admin-pages/App.vue:  # 182 lines
+
+frontend/src/admin-pages/components/DrawerManagementPanel.vue:  # 149 lines
+
+frontend/src/admin-pages/components/PagesManagementPanel.vue:  # 94 lines
+
+frontend/src/admin-pages/main.ts:  # 7 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../styles/tailwind.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
 
 frontend/src/admin-shared/components/GaugeBar.vue:  # 57 lines
 
@@ -2907,12 +2920,12 @@ frontend/src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-frontend/src/portal-shell/nativeModuleRegistry.js:  # 93 lines
+frontend/src/portal-shell/nativeModuleRegistry.js:  # 97 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 91-93 }
+    - { name: getNativeModuleLoader, lines: 95-97 }
 
 frontend/src/portal-shell/navigationState.js:  # 166 lines
   imports:
@@ -4499,7 +4512,7 @@ frontend/tests/yield-alert/App.cross-filter.test.js:  # 353 lines
     - { name: MultiSelectStub, lines: 42-50 }
     - { name: buildViewPayload, lines: 52-86 }
 
-frontend/vite.config.ts:  # 67 lines
+frontend/vite.config.ts:  # 68 lines
   imports:
     - { module: vite, items: [defineConfig], line: 1 }
     - { module: 'node:path', items: [resolve], line: 2 }
@@ -5134,7 +5147,7 @@ src/mes_dashboard/core/database.py:  # 1186 lines
     - { name: get_table_data, lines: 984-1068 }
     - { name: get_table_column_metadata, lines: 1071-1186 }
 
-src/mes_dashboard/core/duckdb_runtime.py:  # 146 lines
+src/mes_dashboard/core/duckdb_runtime.py:  # 187 lines
   imports:
     - { module: __future__, items: [annotations], line: 29 }
     - { module: logging, items: [], line: 31 }
@@ -5153,7 +5166,8 @@ src/mes_dashboard/core/duckdb_runtime.py:  # 146 lines
     - { name: _str_env, lines: 45-46 }
     - { name: _int_env, lines: 49-56 }
     - { name: create_heavy_query_connection, lines: 87-124 }
-    - { name: assert_spool_path, lines: 127-146 }
+    - { name: get_duckdb_telemetry, lines: 127-165 }
+    - { name: assert_spool_path, lines: 168-187 }
 
 src/mes_dashboard/core/exceptions.py:  # 97 lines
   imports:
@@ -5821,7 +5835,7 @@ src/mes_dashboard/core/spool_warmup_scheduler.py:  # 260 lines
     - { name: init_warmup_scheduler, lines: 221-251 }
     - { name: stop_warmup_scheduler, lines: 254-260 }
 
-src/mes_dashboard/core/sync_worker.py:  # 564 lines
+src/mes_dashboard/core/sync_worker.py:  # 588 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -5836,26 +5850,26 @@ src/mes_dashboard/core/sync_worker.py:  # 564 lines
     - { name: MYSQL_SYNC_ENABLED, line: 27 }
   classes:
     - name: SyncWorker
-      lines: 39-500
+      lines: 39-524
       methods:
         - { name: __init__, lines: 42-58 }
         - { name: start, lines: 60-71 }
         - { name: stop, lines: 73-77 }
         - { name: _run, lines: 79-102 }
         - { name: _ensure_mysql_tables, lines: 108-225 }
-        - { name: _run_login_session_migration, lines: 234-271 }
-        - { name: _sync_logs, lines: 277-322 }
-        - { name: _sync_metrics, lines: 328-421 }
-        - { name: _sync_login_sessions, lines: 427-481 }
-        - { name: _cleanup_orphan_sessions, lines: 487-491 }
-        - { name: _cleanup_synced, lines: 497-500 }
+        - { name: _run_login_session_migration, lines: 234-295 }
+        - { name: _sync_logs, lines: 301-346 }
+        - { name: _sync_metrics, lines: 352-445 }
+        - { name: _sync_login_sessions, lines: 451-505 }
+        - { name: _cleanup_orphan_sessions, lines: 511-515 }
+        - { name: _cleanup_synced, lines: 521-524 }
   functions:
-    - { name: _is_deadlock, lines: 507-511 }
-    - { name: _parse_ts, lines: 514-521 }
-    - { name: start_sync_worker, lines: 533-537 }
-    - { name: stop_sync_worker, lines: 540-544 }
-    - { name: record_sync_completed, lines: 547-550 }
-    - { name: get_sync_worker_status, lines: 553-564 }
+    - { name: _is_deadlock, lines: 531-535 }
+    - { name: _parse_ts, lines: 538-545 }
+    - { name: start_sync_worker, lines: 557-561 }
+    - { name: stop_sync_worker, lines: 564-568 }
+    - { name: record_sync_completed, lines: 571-574 }
+    - { name: get_sync_worker_status, lines: 577-588 }
 
 src/mes_dashboard/core/utils.py:  # 274 lines
   imports:
@@ -5972,7 +5986,7 @@ src/mes_dashboard/routes/__init__.py:  # 76 lines
   functions:
     - { name: register_routes, lines: 30-51 }
 
-src/mes_dashboard/routes/admin_routes.py:  # 1379 lines
+src/mes_dashboard/routes/admin_routes.py:  # 1483 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -5982,7 +5996,7 @@ src/mes_dashboard/routes/admin_routes.py:  # 1379 lines
     - { module: datetime, items: [datetime, timezone], line: 10 }
     - { module: pathlib, items: [Path], line: 11 }
     - { module: typing, items: [Any], line: 12 }
-    - { module: flask, items: [Blueprint, current_app, g, make_response, redirect, render_template, request, url_for], line: 14 }
+    - { module: flask, items: [Blueprint, current_app, g, make_response, redirect, request, url_for], line: 14 }
     - { module: mes_dashboard.core.csrf, items: [get_csrf_token], line: 16 }
     - { module: mes_dashboard.core.permissions, items: [admin_required], line: 17 }
     - { module: mes_dashboard.core.response, items: [error_response, internal_error, not_found_error, success_response, validation_error, TOO_MANY_REQUESTS], line: 18 }
@@ -6002,37 +6016,38 @@ src/mes_dashboard/routes/admin_routes.py:  # 1379 lines
     - { name: dashboard, lines: 86-110 }  # @admin_bp.route('/dashboard')
     - { name: api_system_status, lines: 115-222 }  # @admin_bp.route('/api/system-status', methods=['GET'])
     - { name: api_metrics, lines: 227-245 }  # @admin_bp.route('/api/metrics', methods=['GET'])
-    - { name: api_logs, lines: 250-301 }  # @admin_bp.route('/api/logs', methods=['GET'])
-    - { name: _query_mysql_logs, lines: 304-346 }
-    - { name: _collect_spool_disk_usage, lines: 349-381 }
-    - { name: _collect_redis_namespace_memory, lines: 384-428 }
-    - { name: api_performance_detail, lines: 433-583 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
-    - { name: api_performance_history, lines: 588-618 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
-    - { name: _query_mysql_metrics, lines: 621-682 }
-    - { name: api_performance_history_purge, lines: 687-693 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
-    - { name: api_storage_info, lines: 698-768 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
-    - { name: api_log_files_cleanup, lines: 773-821 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
-    - { name: api_logs_cleanup, lines: 826-877 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
-    - { name: _get_restart_state, lines: 884-886 }
-    - { name: _iso_from_epoch, lines: 889-892 }
-    - { name: _check_restart_cooldown, lines: 895-904 }
-    - { name: _get_restart_history, lines: 907-910 }
-    - { name: _get_restart_churn_summary, lines: 913-916 }
-    - { name: _get_restart_policy_state, lines: 919-939 }
-    - { name: _build_restart_alerts, lines: 942-960 }
-    - { name: _log_restart_audit, lines: 963-970 }
-    - { name: api_worker_restart, lines: 975-1100 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
-    - { name: api_worker_status, lines: 1105-1197 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
-    - { name: user_usage_kpi, lines: 1206-1208 }  # @admin_bp.route('/user-usage-kpi')
-    - { name: api_user_usage_kpi, lines: 1213-1232 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
-    - { name: pages, lines: 1241-1243 }  # @admin_bp.route('/pages')
-    - { name: api_get_pages, lines: 1248-1250 }  # @admin_bp.route('/api/pages', methods=['GET'])
-    - { name: api_get_drawers, lines: 1255-1257 }  # @admin_bp.route('/api/drawers', methods=['GET'])
-    - { name: api_create_drawer, lines: 1262-1279 }  # @admin_bp.route('/api/drawers', methods=['POST'])
-    - { name: api_update_drawer, lines: 1284-1311 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['PUT'])
-    - { name: api_delete_drawer, lines: 1316-1328 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['DELETE'])
-    - { name: api_update_page, lines: 1333-1366 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
-    - { name: recalculate_anomaly_detection, lines: 1371-1379 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
+    - { name: api_logs, lines: 250-307 }  # @admin_bp.route('/api/logs', methods=['GET'])
+    - { name: _query_mysql_logs, lines: 310-352 }
+    - { name: _count_mysql_logs, lines: 355-383 }
+    - { name: _collect_spool_disk_usage, lines: 386-418 }
+    - { name: _collect_redis_namespace_memory, lines: 421-465 }
+    - { name: api_performance_detail, lines: 470-665 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
+    - { name: api_performance_history, lines: 670-700 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
+    - { name: _query_mysql_metrics, lines: 703-764 }
+    - { name: api_performance_history_purge, lines: 769-775 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
+    - { name: api_storage_info, lines: 780-850 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
+    - { name: api_log_files_cleanup, lines: 855-903 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
+    - { name: api_logs_cleanup, lines: 908-959 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
+    - { name: _get_restart_state, lines: 966-968 }
+    - { name: _iso_from_epoch, lines: 971-974 }
+    - { name: _check_restart_cooldown, lines: 977-986 }
+    - { name: _get_restart_history, lines: 989-992 }
+    - { name: _get_restart_churn_summary, lines: 995-998 }
+    - { name: _get_restart_policy_state, lines: 1001-1021 }
+    - { name: _build_restart_alerts, lines: 1024-1042 }
+    - { name: _log_restart_audit, lines: 1045-1052 }
+    - { name: api_worker_restart, lines: 1057-1182 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
+    - { name: api_worker_status, lines: 1187-1279 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
+    - { name: user_usage_kpi, lines: 1288-1290 }  # @admin_bp.route('/user-usage-kpi')
+    - { name: api_user_usage_kpi, lines: 1295-1314 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
+    - { name: pages, lines: 1323-1347 }  # @admin_bp.route('/pages')
+    - { name: api_get_pages, lines: 1352-1354 }  # @admin_bp.route('/api/pages', methods=['GET'])
+    - { name: api_get_drawers, lines: 1359-1361 }  # @admin_bp.route('/api/drawers', methods=['GET'])
+    - { name: api_create_drawer, lines: 1366-1383 }  # @admin_bp.route('/api/drawers', methods=['POST'])
+    - { name: api_update_drawer, lines: 1388-1415 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['PUT'])
+    - { name: api_delete_drawer, lines: 1420-1432 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['DELETE'])
+    - { name: api_update_page, lines: 1437-1470 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
+    - { name: recalculate_anomaly_detection, lines: 1475-1483 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
 
 src/mes_dashboard/routes/ai_routes.py:  # 75 lines
   imports:
@@ -11123,7 +11138,7 @@ tests/stress/test_yield_alert_stress.py:  # 116 lines
         - { name: _run_alerts, lines: 74-94 }
         - { name: test_concurrent_alerts_pagination, lines: 96-116 }
 
-tests/test_admin_routes.py:  # 176 lines
+tests/test_admin_routes.py:  # 197 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: unittest.mock, items: [patch], line: 15 }
@@ -11143,23 +11158,79 @@ tests/test_admin_routes.py:  # 176 lines
     - { name: test_metrics_returns_success_or_graceful_empty, lines: 137-142 }
     - { name: test_user_usage_kpi_with_dates_returns_success, lines: 147-159 }
     - { name: test_update_page_status, lines: 164-176 }
+    - { name: test_user_usage_kpi_no_500_mysql_unavailable, lines: 181-197 }
 
-tests/test_admin_routes_logs.py:  # 147 lines
+tests/test_admin_routes_logs.py:  # 352 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: unittest.mock, items: [patch, MagicMock], line: 11 }
     - { module: pytest, items: [], line: 13 }
     - { module: mes_dashboard.app, items: [create_app], line: 15 }
   classes:
-    - name: TestApiLogsMergedSort
-      lines: 39-147
+    - name: TestApiLogsSqliteIncludesSynced
+      lines: 56-95
       methods:
-        - { name: test_same_minute_rows_interleave_by_datetime, lines: 42-93 }
-        - { name: test_unparseable_timestamp_falls_to_bottom, lines: 95-147 }
+        - { name: test_api_logs_sqlite_only_includes_synced, lines: 59-95 }
+    - name: TestMergePagination
+      lines: 98-207
+      methods:
+        - { name: _run_paginated, lines: 101-127 }
+        - { name: _make_rows, lines: 129-135 }
+        - { name: test_merge_pagination_offset_zero, lines: 137-146 }
+        - { name: test_merge_pagination_across_source_boundary, lines: 148-157 }
+        - { name: test_merge_pagination_offset_exceeds_total, lines: 159-168 }
+        - { name: test_merge_pagination_total_is_combined, lines: 170-178 }
+        - { name: test_merge_pagination_mysql_empty, lines: 180-188 }
+        - { name: test_merge_pagination_sqlite_empty, lines: 190-198 }
+        - { name: test_merge_pagination_both_empty, lines: 200-207 }
+    - name: TestApiLogsNoMysql
+      lines: 210-233
+      methods:
+        - { name: test_api_logs_no_500_mysql_not_configured, lines: 213-233 }
+    - name: TestApiLogsMergedSort
+      lines: 236-352
+      methods:
+        - { name: test_same_minute_rows_interleave_by_datetime, lines: 239-294 }
+        - { name: test_unparseable_timestamp_falls_to_bottom, lines: 296-352 }
   functions:
     - { name: app, lines: 19-22 }  # @pytest.fixture
     - { name: client, lines: 26-27 }  # @pytest.fixture
     - { name: auth_patches, lines: 31-36 }  # @pytest.fixture
+    - { name: _make_log_row, lines: 39-53 }
+
+tests/test_admin_routes_perf.py:  # 312 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 4 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 6 }
+    - { module: pytest, items: [], line: 8 }
+    - { module: mes_dashboard.app, items: [create_app], line: 10 }
+  classes:
+    - name: TestPerfDetailRedisAdditiveKeys
+      lines: 128-213
+      methods:
+        - { name: _redis_ctx, lines: 131-134 }
+        - { name: test_perf_detail_redis_evicted_keys_present, lines: 136-151 }
+        - { name: test_perf_detail_redis_expired_keys_present, lines: 153-164 }
+        - { name: test_perf_detail_redis_fragmentation_present, lines: 166-178 }
+        - { name: test_perf_detail_redis_slowlog_top5, lines: 180-201 }
+        - { name: test_perf_detail_redis_null_when_unavailable, lines: 203-213 }
+    - name: TestPerfDetailDuckdb
+      lines: 218-287
+      methods:
+        - { name: test_perf_detail_duckdb_temp_dir_bytes, lines: 220-244 }
+        - { name: test_perf_detail_duckdb_memory_limit_state, lines: 246-271 }
+        - { name: test_perf_detail_duckdb_null_when_unavailable, lines: 273-287 }
+    - name: TestPerfDetailNoExternals
+      lines: 292-312
+      methods:
+        - { name: test_perf_detail_no_500_all_externals_off, lines: 294-312 }
+  functions:
+    - { name: app, lines: 14-17 }  # @pytest.fixture
+    - { name: client, lines: 21-22 }  # @pytest.fixture
+    - { name: auth_patches, lines: 26-31 }  # @pytest.fixture
+    - { name: _mock_redis_client, lines: 34-71 }
+    - { name: _get_perf_data, lines: 74-82 }
+    - { name: _redis_patches, lines: 100-117 }
 
 tests/test_ai_agent_loop.py:  # 233 lines
   imports:
@@ -13783,7 +13854,7 @@ tests/test_lock_open_justification.py:  # 72 lines
     - { name: _collect_unjustified_open_sites, lines: 46-62 }
     - { name: test_open_fail_mode_sites_have_justification_comment, lines: 65-72 }
 
-tests/test_log_store.py:  # 445 lines
+tests/test_log_store.py:  # 526 lines
   imports:
     - { module: os, items: [], line: 4 }
     - { module: pytest, items: [], line: 5 }
@@ -13830,16 +13901,40 @@ tests/test_log_store.py:  # 445 lines
         - { name: test_query_logs_excludes_synced, lines: 332-344 }
         - { name: test_cleanup_synced_removes_old_synced, lines: 346-367 }
         - { name: test_get_unsynced_respects_batch_size, lines: 369-375 }
-    - name: TestLogStoreTimestampNormalization
-      lines: 378-445
+    - name: TestLogStoreAllRows
+      lines: 378-456
       methods:
         - { name: temp_db_path, lines: 382-389 }
         - { name: log_store, lines: 392-395 }
-        - { name: test_normalize_naive_string, lines: 397-404 }
-        - { name: test_normalize_aware_string, lines: 406-412 }
-        - { name: test_normalize_datetime_object, lines: 414-422 }
-        - { name: test_normalize_unparseable_string, lines: 424-428 }
-        - { name: test_query_logs_normalizes_naive_timestamp, lines: 430-445 }
+        - { name: test_query_logs_all_returns_synced_and_unsynced, lines: 397-410 }
+        - { name: test_count_logs_includes_synced_rows, lines: 412-422 }
+        - { name: test_log_store_cleanup_synced_default_is_24h, lines: 424-456 }
+    - name: TestLogStoreTimestampNormalization
+      lines: 459-526
+      methods:
+        - { name: temp_db_path, lines: 463-470 }
+        - { name: log_store, lines: 473-476 }
+        - { name: test_normalize_naive_string, lines: 478-485 }
+        - { name: test_normalize_aware_string, lines: 487-493 }
+        - { name: test_normalize_datetime_object, lines: 495-503 }
+        - { name: test_normalize_unparseable_string, lines: 505-509 }
+        - { name: test_query_logs_normalizes_naive_timestamp, lines: 511-526 }
+
+tests/test_login_session_store.py:  # 75 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 4 }
+    - { module: os, items: [], line: 6 }
+    - { module: sqlite3, items: [], line: 7 }
+    - { module: tempfile, items: [], line: 8 }
+    - { module: datetime, items: [datetime, timedelta], line: 9 }
+    - { module: pytest, items: [], line: 11 }
+    - { module: mes_dashboard.core.login_session_store, items: [LoginSessionStore], line: 13 }
+  functions:
+    - { name: temp_db_path, lines: 17-24 }  # @pytest.fixture
+    - { name: store, lines: 28-31 }  # @pytest.fixture
+    - { name: _insert_synced_session, lines: 34-47 }
+    - { name: test_cleanup_synced_retains_within_24h, lines: 50-61 }
+    - { name: test_cleanup_synced_deletes_beyond_24h, lines: 64-75 }
 
 tests/test_map_service_errors_decorator.py:  # 104 lines
   imports:
@@ -16982,7 +17077,7 @@ tests/test_sql_loader.py:  # 108 lines
         - { name: test_clear_cache, lines: 78-91 }
         - { name: test_cache_info, lines: 93-108 }
 
-tests/test_sync_worker.py:  # 248 lines
+tests/test_sync_worker.py:  # 337 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: os, items: [], line: 6 }
@@ -17011,11 +17106,19 @@ tests/test_sync_worker.py:  # 248 lines
       lines: 175-213
       methods:
         - { name: test_insert_ignore_idempotent, lines: 178-213 }
-    - name: TestCleanupSynced
-      lines: 220-248
+    - name: TestLoginSessionMigrationGuard
+      lines: 220-300
       methods:
-        - { name: test_cleanup_removes_old_synced_logs, lines: 223-241 }
-        - { name: test_cleanup_leaves_unsynced_alone, lines: 243-248 }
+        - { name: _make_mock_conn, lines: 223-260 }
+        - { name: test_truncate_guard_skips_when_rows_exist, lines: 262-273 }
+        - { name: test_truncate_guard_executes_when_table_empty, lines: 275-284 }
+        - { name: test_migration_skipped_when_version_current, lines: 286-300 }
+    - name: TestCleanupSynced
+      lines: 303-337
+      methods:
+        - { name: test_cleanup_removes_old_synced_logs, lines: 306-324 }
+        - { name: test_cleanup_leaves_unsynced_alone, lines: 326-331 }
+        - { name: test_cleanup_synced_calls_log_store_with_24h, lines: 333-337 }
   functions:
     - { name: temp_log_store, lines: 24-33 }  # @pytest.fixture
     - { name: temp_metrics_store, lines: 37-46 }  # @pytest.fixture

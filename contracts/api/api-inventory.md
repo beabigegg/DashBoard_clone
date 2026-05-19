@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.6
-last-changed: 2026-05-18
+schema-version: 1.1.7
+last-changed: 2026-05-19
 ---
 
 # API Inventory
@@ -94,6 +94,7 @@ last-changed: 2026-05-18
 
 ## Compatibility Notes
 
+- **2026-05-19（fix-admin-dashboard）：** `admin_routes.py` `/admin/api/performance-detail` `data.redis` 新增 `evicted_keys`、`expired_keys`、`mem_fragmentation_ratio`、`slowlog` 四 key；新增 `data.duckdb` 子物件（`temp_dir_bytes`、`memory_limit_state`）；`/admin/api/logs` 查詢範圍擴大至含已同步記錄，pagination 修正；全部 backward-compatible，無端點新增/移除。
 - **2026-05-14（prod-history-query-mode-tabs）：** `production_history_routes.py` 主查詢端點 `POST /api/production-history/query` 的 `start_date` / `end_date` 由無條件必填放寬為條件必填（classification mode 必填、identifier mode 可選）；無端點新增/刪除/重新命名；backward-compatible。Per-mode 驗證規則見 business-rules.md PHF-07 / PHF-08。
 - **2026-05-14（prod-history-first-tier-cache-filters）：** `production_history_routes.py` 新增 `GET /api/production-history/filter-options` 端點（cross-filter cached options，4-tuple in-memory filter）；主查詢端點新增六個 additive 可選 body 欄位（`pj_packages[]`、`pj_bops[]`、`pj_functions[]`、`mfg_orders[]`、`lot_ids[]`、`wafer_lots[]`）；萬用字元語法與安全性規則見 business-rules.md PHF-01..PHF-06；全部 backward-compatible。
 - **2026-05-13（resource-history-perf）：** `resource_history_routes.py` 新增 `GET /api/resource/history/query/progress` 端點；progress state 以 Redis side-channel 儲存；auth required；400/404 error contract；additive，不影響既有端點及 Type A re-query 流程。

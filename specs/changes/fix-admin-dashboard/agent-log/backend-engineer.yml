@@ -1,0 +1,40 @@
+agent: backend-engineer
+status: done
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/core/log_store.py: query_logs_all and count_logs WHERE removed synced=0 filter; cleanup_synced default raised to 24h"
+  - type: files-changed
+    pointer: "src/mes_dashboard/core/sync_worker.py: _cleanup_synced passes older_than_hours=24; _run_login_session_migration has row-count guard before TRUNCATE"
+  - type: files-changed
+    pointer: "src/mes_dashboard/core/duckdb_runtime.py: added get_duckdb_telemetry() returning temp_dir_bytes + memory_limit_state"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/admin_routes.py: pagination fix (authoritative combined total + post-merge slice); Redis additive keys (evicted_keys, expired_keys, mem_fragmentation_ratio, slowlog); duckdb telemetry field; removed unused render_template import"
+  - type: tests-added
+    pointer: "tests/test_log_store.py::TestLogStoreAllRows (3 tests)"
+  - type: tests-added
+    pointer: "tests/test_login_session_store.py (new file, 2 tests)"
+  - type: tests-added
+    pointer: "tests/test_sync_worker.py::TestLoginSessionMigrationGuard (3 tests); TestCleanupSynced::test_cleanup_synced_calls_log_store_with_24h"
+  - type: tests-added
+    pointer: "tests/test_admin_routes_logs.py: TestApiLogsSqliteIncludesSynced, TestMergePagination (7 tests), TestApiLogsNoMysql"
+  - type: tests-added
+    pointer: "tests/test_admin_routes_perf.py (new file): TestPerfDetailRedisAdditiveKeys (5 tests), TestPerfDetailDuckdb (3 tests), TestPerfDetailNoExternals (1 test)"
+  - type: tests-added
+    pointer: "tests/test_admin_routes.py::test_user_usage_kpi_no_500_mysql_unavailable"
+  - type: test-output
+    pointer: "72 passed in 2.77s (tests/test_log_store.py + test_login_session_store.py + test_sync_worker.py + test_admin_routes_logs.py + test_admin_routes_perf.py + test_admin_routes.py)"
+  - type: contracts-touched
+    pointer: "none"
+notes: |
+  Test isolation pitfall: all performance-detail tests that run after REDIS_ENABLED=True Redis
+  tests must stub rq_monitor_service.get_rq_monitor_summary (patch at
+  mes_dashboard.services.rq_monitor_service.get_rq_monitor_summary) — rq_monitor_service
+  imports get_redis_client at module level (from x import y), so the function-level patch on
+  mes_dashboard.core.redis_client.get_redis_client does not intercept rq calls. Real rq.Worker
+  objects from a live Redis can contain non-serializable values in test context.
+
+  pre-existing test updated: test_sync_worker.py::TestCleanupSynced::test_cleanup_removes_old_synced_logs
+  backdate changed from 2h to 25h to match the new 24h retention threshold (IP-3/IP-4).
+
+  pre-existing lint: removed unused render_template import from admin_routes.py (was already
+  flagged by ruff before this change).

@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.6.0
-last-changed: 2026-05-18
+schema-version: 1.7.0
+last-changed: 2026-05-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -432,6 +432,60 @@ One row per reject event for `POST /api/query-tool/equipment-period` (`query_typ
 **Prior aggregate fields removed**: `TOTAL_REJECT_QTY`, `TOTAL_DEFECT_QTY`, `AFFECTED_LOT_COUNT` — these were present in the old `equipment_rejects.sql` aggregate shape and are no longer returned. See §10 of api-contract.md for the compatibility note.
 
 **CSV export column order** (for `export_type=equipment_rejects`): mirrors the table above — CONTAINERID, CONTAINERNAME, WORKCENTERNAME, WORKCENTER_GROUP, WORKCENTERSEQUENCE_GROUP, PRODUCTLINENAME, PJ_FUNCTION, PJ_TYPE, PRODUCTNAME, SPECNAME, LOSSREASONNAME, EQUIPMENTNAME, REJECTCOMMENT, REJECT_QTY, STANDBY_QTY, QTYTOPROCESS_QTY, INPROCESS_QTY, PROCESSED_QTY, REJECT_TOTAL_QTY, DEFECT_QTY, TXN_TIME, TXNDATE, TXN_DAY.
+
+---
+
+### 3.8 Admin Performance-Detail Payload（`GET /admin/api/performance-detail`）
+
+首次記錄於 `fix-admin-dashboard`（2026-05-19）。以下 baseline keys 於首次文件化前已在 production 運行。
+
+#### 頂層 `data` keys
+
+| key | type | nullable | description |
+|---|---|---|---|
+| `redis` | object \| null | yes | Redis 監控子物件；Redis 不可達時為 `null` 或 `{"error":"..."}` |
+| `duckdb` | object \| null | yes | DuckDB 監控子物件；**新增於 fix-admin-dashboard**；telemetry 不可用時為 `null` |
+| `process_caches` | object | no | Process-level L1/L2 route cache 統計 |
+| `route_cache` | object | no | Route cache hit/miss rates |
+| `db_pool` | object | no | DB connection pool 狀態 |
+| `direct_connections` | object | no | 直連（non-pool）連線數 |
+| `worker_memory_guard` | object | no | Worker memory guard 狀態 |
+| `heavy_query_telemetry` | object | no | Heavy query slot 使用狀態 |
+| `async_workers` | object | no | RQ async worker 摘要 |
+| `spool_disk_usage` | object | no | Spool temp dir 磁碟用量 |
+| `redis_namespace_memory` | object \| null | yes | Redis namespace key count 分析 |
+
+#### `data.redis` 子物件 keys
+
+| key | type | nullable | description |
+|---|---|---|---|
+| `used_memory_human` | string | no | Redis 已用記憶體（human readable） |
+| `used_memory` | integer | no | Redis 已用記憶體（bytes） |
+| `peak_memory_human` | string | no | Redis 峰值記憶體（human readable） |
+| `peak_memory` | integer | no | Redis 峰值記憶體（bytes） |
+| `maxmemory_human` | string | no | Redis 上限（human readable） |
+| `maxmemory` | integer | no | Redis 上限（bytes） |
+| `connected_clients` | integer | no | 已連線 client 數 |
+| `hit_rate` | float | no | Keyspace hit rate（0.0–1.0） |
+| `keyspace_hits` | integer | no | Cache hit 累計數 |
+| `keyspace_misses` | integer | no | Cache miss 累計數 |
+| `namespaces` | object | no | Per-namespace key count |
+| `evicted_keys` | integer | no | 記憶體壓力下被驅逐的 key 數；**新增於 fix-admin-dashboard** |
+| `expired_keys` | integer | no | TTL 到期被清除的 key 數；**新增於 fix-admin-dashboard** |
+| `mem_fragmentation_ratio` | float | no | 記憶體碎片率（> 1.5 表示碎片嚴重）；**新增於 fix-admin-dashboard** |
+| `slowlog` | array | no | 最慢 top-5 指令列表；每筆 `{id: int, duration_us: int, command: string}`；**新增於 fix-admin-dashboard** |
+
+#### `data.duckdb` 子物件 keys（新增於 fix-admin-dashboard）
+
+| key | type | nullable | description |
+|---|---|---|---|
+| `temp_dir_bytes` | integer \| null | yes | DuckDB temp dir 目前磁碟用量（bytes）；目錄不存在時為 `null` |
+| `memory_limit_state` | string \| null | yes | 設定的 memory limit（如 `"512MB"`）；不可用時為 `null` |
+
+#### Nullability rules
+- 當 `REDIS_ENABLED=false` 或 Redis client 不可達，`data.redis` 整個為 `null`（不是空物件）。
+- 當 DuckDB temp dir 不可讀或 runtime 未初始化，`data.duckdb` 整個為 `null`。
+- 前端對 `data.redis` 與 `data.duckdb` 的所有 key 應以 defensive optional chaining 讀取。
 
 ---
 

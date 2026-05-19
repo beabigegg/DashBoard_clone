@@ -217,6 +217,89 @@ class TestCrashRecovery:
 # Test: cleanup_synced
 # ============================================================
 
+class TestLoginSessionMigrationGuard:
+    """TRUNCATE guard for _run_login_session_migration (AC-3, IP-6)."""
+
+    def _make_mock_conn(self, version: int, row_count: int):
+        """Return a MagicMock connection whose execute() returns controlled values.
+
+        Sequence of queries issued by _run_login_session_migration:
+          1. SELECT `value` FROM dashboard_migration_meta  → version row
+          2. (if version < target) SELECT COUNT(*) FROM dashboard_login_sessions
+          3. TRUNCATE or REPLACE (conditional)
+        """
+        from sqlalchemy import text  # noqa: F401 — not used, but confirms import works
+
+        conn = MagicMock()
+
+        # We need fetchone() to return different values for different calls.
+        # Keep a call counter keyed by query text fragments.
+        call_results = iter([
+            MagicMock(return_value=(str(version),)),   # migration version fetch
+            MagicMock(return_value=(row_count,)),      # COUNT(*) on login_sessions
+            MagicMock(return_value=None),              # TRUNCATE / REPLACE
+            MagicMock(return_value=None),              # extra REPLACE (skip path)
+        ])
+
+        executed: list = []
+
+        def side_effect_execute(sql, *a, **kw):
+            sql_str = str(sql)
+            result_mock = MagicMock()
+            if "migration_meta" in sql_str and "SELECT" in sql_str:
+                result_mock.fetchone.return_value = (str(version),)
+            elif "COUNT(*)" in sql_str:
+                result_mock.fetchone.return_value = (row_count,)
+            else:
+                result_mock.fetchone.return_value = None
+            executed.append(sql_str)
+            return result_mock
+
+        conn.execute.side_effect = side_effect_execute
+        conn._executed = executed
+        return conn
+
+    def test_truncate_guard_skips_when_rows_exist(self, worker):
+        """TRUNCATE is NOT called when dashboard_login_sessions has rows (AC-3)."""
+        conn = self._make_mock_conn(version=0, row_count=5)
+
+        worker._run_login_session_migration(conn)
+
+        executed_sql = " ".join(conn._executed)
+        assert "TRUNCATE" not in executed_sql.upper(), (
+            "TRUNCATE must be skipped when the table contains rows"
+        )
+        # Version meta REPLACE must still have been called
+        assert "REPLACE" in executed_sql.upper() or "replace" in executed_sql.lower()
+
+    def test_truncate_guard_executes_when_table_empty(self, worker):
+        """TRUNCATE IS called when dashboard_login_sessions has 0 rows (AC-3)."""
+        conn = self._make_mock_conn(version=0, row_count=0)
+
+        worker._run_login_session_migration(conn)
+
+        executed_sql = " ".join(conn._executed)
+        assert "TRUNCATE" in executed_sql.upper(), (
+            "TRUNCATE must be called when the table is empty"
+        )
+
+    def test_migration_skipped_when_version_current(self, worker):
+        """When migration version is already current, neither COUNT nor TRUNCATE run (AC-3)."""
+        conn = self._make_mock_conn(
+            version=worker._MIGRATION_VERSION_TARGET, row_count=0
+        )
+
+        worker._run_login_session_migration(conn)
+
+        executed_sql = " ".join(conn._executed)
+        assert "COUNT" not in executed_sql.upper(), (
+            "COUNT query must not run when migration is already at target version"
+        )
+        assert "TRUNCATE" not in executed_sql.upper(), (
+            "TRUNCATE must not run when migration is already at target version"
+        )
+
+
 class TestCleanupSynced:
     """cleanup_synced removes old synced rows from both stores."""
 
@@ -225,9 +308,9 @@ class TestCleanupSynced:
         unsynced = temp_log_store.get_unsynced()
         temp_log_store.mark_synced([unsynced[0]["id"]])
 
-        # Backdate
+        # Backdate beyond the 24-hour retention window
         db_path = temp_log_store.db_path
-        old_ts = (datetime.now() - timedelta(hours=2)).isoformat()
+        old_ts = (datetime.now() - timedelta(hours=25)).isoformat()
         conn = sqlite3.connect(db_path)
         conn.execute("UPDATE logs SET timestamp = ? WHERE synced = 1", (old_ts,))
         conn.commit()
@@ -246,3 +329,9 @@ class TestCleanupSynced:
         worker._cleanup_synced()  # synced=0, so nothing deleted
 
         assert len(temp_log_store.get_unsynced()) == 1
+
+    def test_cleanup_synced_calls_log_store_with_24h(self, worker):
+        """_cleanup_synced must pass older_than_hours=24 to _log_store.cleanup_synced (IP-4)."""
+        with patch.object(worker._log_store, "cleanup_synced") as mock_cleanup:
+            worker._cleanup_synced()
+        mock_cleanup.assert_called_once_with(older_than_hours=24)

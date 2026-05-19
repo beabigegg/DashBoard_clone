@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.7.0
-last-changed: 2026-05-18
+schema-version: 1.8.0
+last-changed: 2026-05-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -287,6 +287,11 @@ breaking-change-policy: deprecate-2-minors
   - `pagination.total_rows`（`POST /api/production-history/page`）語意更新：反映聚合後的列數，而非 raw spool 列數。當查詢無 partial trackout 時兩者相同；當有合併群組時 `total_rows` 小於原 LOTWIPHISTORY 列數。
   - 三條後端路徑（DuckDB SQL 主路徑、pandas fallback、CSV 匯出）一致套用相同聚合邏輯。
   - 嚴格守門：群組內非鍵欄位若有差異則該群組退回 raw rows（不合併），對 API consumer 透明 — 無新錯誤碼。詳見 business-rules.md PH-06 / PH-07。
+- **Admin dashboard fixes（2026-05-19，fix-admin-dashboard）**：以下為 additive，backward-compatible：
+  - `GET /admin/api/performance-detail` `data.redis` 子物件新增四個 key：`evicted_keys`（integer），`expired_keys`（integer），`mem_fragmentation_ratio`（float），`slowlog`（array of top-5 entries：`{id, duration_us, command}`）。Redis 不可達時整個 `data.redis` 維持 `null` 或 `{"error": "..."}` 行為不變。
+  - `GET /admin/api/performance-detail` 新增頂層 `data.duckdb` 子物件：`{temp_dir_bytes: integer|null, memory_limit_state: string|null}`。DuckDB telemetry 不可用時 `data.duckdb` 為 `null`。
+  - `GET /admin/api/logs` 查詢範圍從「僅未同步記錄（synced=0）」擴大為「全部記錄（含已同步）」；pagination 修正為在 merge sort 後正確套用 offset/limit；response schema 不變。
+  - 無端點新增/刪除/重新命名；無現有 key 移除或更名；所有改動為 additive。
 - **Query-Tool partial-trackout aggregation (2026-05-15, query-tool-partial-trackout)**：以下為 additive，backward-compatible：
   - `GET /api/query-tool/lot-history` 與 `POST /api/query-tool/equipment-period`（`query_type=lots`）response rows 新增 `partial_count: integer (≥ 1)`。`TRACKINQTY` 改為 `MAX(TRACKINQTY)`（原始上機量，因 MES `TRACKINQTY` 隨 partial 遞減）；`TRACKOUTQTY` 改為 `SUM(TRACKOUTQTY)`（累計下機量）；`TRACKOUTTIMESTAMP` 改為 `MAX(TRACKOUTTIMESTAMP)`。舊行為為 `ROW_NUMBER() ... WHERE rn=1` 取最後一筆 partial —— 為靜默的數據準確性 bug。
   - `GET /api/query-tool/adjacent-lots` response rows 同樣新增 `partial_count: integer (≥ 1)`，使用 3-tuple `(CONTAINERID, EQUIPMENTID, TRACKINTIMESTAMP)` 聚合語意。

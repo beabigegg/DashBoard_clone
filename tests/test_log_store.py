@@ -375,6 +375,87 @@ class TestLogStoreSyncFields:
         assert len(batch) == 3
 
 
+class TestLogStoreAllRows:
+    """Tests for query_logs_all (includes synced rows) and count_logs fixes."""
+
+    @pytest.fixture
+    def temp_db_path(self):
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        yield path
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    @pytest.fixture
+    def log_store(self, temp_db_path):
+        store = LogStore(db_path=temp_db_path)
+        store.initialize()
+        return store
+
+    def test_query_logs_all_returns_synced_and_unsynced(self, log_store):
+        """query_logs_all returns both synced=1 and synced=0 rows (IP-1)."""
+        log_store.write_log(level="INFO", logger_name="test", message="unsynced_msg")
+        log_store.write_log(level="INFO", logger_name="test", message="synced_msg")
+
+        # Mark the second log synced
+        unsynced = log_store.get_unsynced()
+        to_sync = [r["id"] for r in unsynced if r["message"] == "synced_msg"]
+        log_store.mark_synced(to_sync)
+
+        rows = log_store.query_logs_all(limit=100)
+        messages = [r["message"] for r in rows]
+        assert "unsynced_msg" in messages
+        assert "synced_msg" in messages
+
+    def test_count_logs_includes_synced_rows(self, log_store):
+        """count_logs counts both synced=1 and synced=0 rows (IP-2)."""
+        log_store.write_log(level="INFO", logger_name="test", message="row1")
+        log_store.write_log(level="INFO", logger_name="test", message="row2")
+
+        # Mark one synced
+        unsynced = log_store.get_unsynced()
+        log_store.mark_synced([unsynced[0]["id"]])
+
+        count = log_store.count_logs()
+        assert count == 2
+
+    def test_log_store_cleanup_synced_default_is_24h(self, log_store, temp_db_path):
+        """cleanup_synced default older_than_hours is 24 (IP-3).
+
+        Write a synced row backdated to 23 hours ago; with default=24h it must
+        be retained.
+        """
+        from datetime import datetime, timedelta
+
+        # Verify the default via __defaults__
+        defaults = log_store.cleanup_synced.__defaults__
+        assert defaults is not None and defaults[0] == 24, (
+            f"cleanup_synced default must be 24h, got {defaults}"
+        )
+
+        log_store.write_log(level="INFO", logger_name="test", message="recent_synced")
+        unsynced = log_store.get_unsynced()
+        log_store.mark_synced([unsynced[0]["id"]])
+
+        # Backdate to exactly 23 hours ago (within the 24h window).
+        # Use naive datetime to match the cutoff produced by cleanup_synced
+        # (which calls datetime.now() without timezone).
+        conn = sqlite3.connect(temp_db_path)
+        ts_23h = (datetime.now() - timedelta(hours=23)).isoformat()
+        conn.execute("UPDATE logs SET timestamp = ? WHERE synced = 1", (ts_23h,))
+        conn.commit()
+        conn.close()
+
+        # cleanup_synced() with default (24h) must retain the 23h-old row
+        deleted = log_store.cleanup_synced()
+        assert deleted == 0, "Row within 24h window must not be deleted"
+
+        remaining = log_store.count_logs()
+        assert remaining == 1
+
+
 class TestLogStoreTimestampNormalization:
     """Test _normalize_iso_to_utc helper and read-side normalization."""
 

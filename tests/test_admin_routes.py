@@ -174,3 +174,24 @@ def test_update_page_status(client, auth_patches):
             json={"enabled": True},
         )
     assert resp.status_code in (200, 400, 404)
+
+
+# ── AC-7: user-usage-kpi no-500 when MySQL unavailable ───────────────────────
+
+def test_user_usage_kpi_no_500_mysql_unavailable(client, auth_patches):
+    """GET /admin/api/user-usage-kpi returns 200 envelope even when MySQL raises (AC-7)."""
+    with patch(
+        "mes_dashboard.core.mysql_client.MYSQL_OPS_ENABLED", False
+    ):
+        resp = client.get(
+            "/admin/api/user-usage-kpi?start_date=2026-03-01&end_date=2026-03-31"
+        )
+    # Accept 200 (success) or 400 (invalid date params); must NOT be 500
+    assert resp.status_code in (200, 400), (
+        f"Expected 200 or 400 but got {resp.status_code}"
+    )
+    payload = resp.get_json()
+    assert payload is not None
+    # If 200, envelope must be well-formed
+    if resp.status_code == 200:
+        assert payload.get("success") is True

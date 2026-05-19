@@ -124,6 +124,47 @@ def create_heavy_query_connection() -> "duckdb.DuckDBPyConnection":
     return conn
 
 
+def get_duckdb_telemetry() -> dict:
+    """Return DuckDB runtime telemetry for admin performance-detail endpoint.
+
+    Includes temp-dir disk usage and memory-limit configuration state.
+    Never raises — returns null fields on any failure.
+
+    Returns:
+        Dict with keys:
+          - ``temp_dir_bytes``: total bytes of files in DUCKDB_TEMP_DIR, or None.
+          - ``memory_limit_state``: dict of configured limits and connection probe result.
+    """
+    temp_dir_bytes = None
+    if DUCKDB_TEMP_DIR and os.path.isdir(DUCKDB_TEMP_DIR):
+        try:
+            temp_dir_bytes = sum(
+                e.stat().st_size
+                for e in os.scandir(DUCKDB_TEMP_DIR)
+                if e.is_file()
+            )
+        except OSError:
+            pass
+
+    connection_ok = False
+    try:
+        conn = create_heavy_query_connection()
+        conn.close()
+        connection_ok = True
+    except Exception:
+        pass
+
+    return {
+        "temp_dir_bytes": temp_dir_bytes,
+        "memory_limit_state": {
+            "memory_limit": DUCKDB_MEMORY_LIMIT,
+            "threads": DUCKDB_THREADS,
+            "temp_dir": DUCKDB_TEMP_DIR or None,
+            "connection_ok": connection_ok,
+        },
+    }
+
+
 def assert_spool_path(spool_path: str | None, query_id: str = "") -> str:
     """Assert that *spool_path* is non-empty and return it.
 

@@ -260,6 +260,30 @@ class SyncWorker:
             return
 
         try:
+            # Guard: skip TRUNCATE if the target table already contains rows.
+            # Two gunicorn workers may both pass this check before either inserts the
+            # version-meta row; that race is acceptable because the REPLACE below
+            # serializes subsequent runs — any worker that lost the race will read the
+            # updated version on the next startup and skip the migration entirely.
+            count_result = conn.execute(
+                text("SELECT COUNT(*) FROM dashboard_login_sessions LIMIT 1")
+            ).fetchone()
+            row_count = int(count_result[0]) if count_result else 0
+
+            if row_count > 0:
+                # Table has live data — skip TRUNCATE but still mark migration as done
+                # so this guard is not re-evaluated on every restart.
+                conn.execute(text(
+                    "REPLACE INTO dashboard_migration_meta (`key`, `value`) VALUES "
+                    f"('{self._MIGRATION_VERSION_KEY}', '{self._MIGRATION_VERSION_TARGET}')"
+                ))
+                logger.info(
+                    "SyncWorker: migration v%d skipped — dashboard_login_sessions has %d rows "
+                    "(table not truncated; version meta updated)",
+                    self._MIGRATION_VERSION_TARGET, row_count,
+                )
+                return
+
             conn.execute(text("TRUNCATE TABLE dashboard_login_sessions"))
             conn.execute(text(
                 "REPLACE INTO dashboard_migration_meta (`key`, `value`) VALUES "
@@ -495,7 +519,7 @@ class SyncWorker:
     # ----------------------------------------------------------
 
     def _cleanup_synced(self) -> None:
-        self._log_store.cleanup_synced(older_than_hours=1)
+        self._log_store.cleanup_synced(older_than_hours=24)
         self._metrics_store.cleanup_synced(older_than_hours=1)
         self._login_store.cleanup_synced(older_than_hours=24)
 

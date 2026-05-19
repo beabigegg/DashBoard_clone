@@ -8,6 +8,21 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.7.0] — 2026-05-19
+### Added
+- fix-admin-dashboard: New Section 3.8 documenting the full `GET /admin/api/performance-detail` payload shape (baseline keys previously undocumented + new keys). `data.redis` gains `evicted_keys`, `expired_keys`, `mem_fragmentation_ratio`, `slowlog`. New `data.duckdb` sub-object added with `temp_dir_bytes`, `memory_limit_state`. All additions additive.
+- Source: change `fix-admin-dashboard`.
+
+## [api 1.8.0] — 2026-05-19
+### Added
+- fix-admin-dashboard: `/admin/api/performance-detail` `data.redis` gains `evicted_keys` (int), `expired_keys` (int), `mem_fragmentation_ratio` (float), `slowlog` (array of top-5 `{id, duration_us, command}`). New top-level `data.duckdb` sub-object `{temp_dir_bytes, memory_limit_state}`. `/admin/api/logs` query scope widened from `synced=0` rows only to all rows; pagination fixed for merge mode. All changes additive, backward-compatible.
+- Source: change `fix-admin-dashboard`.
+
+## [api-inventory 1.1.7] — 2026-05-19
+### Changed
+- fix-admin-dashboard: `admin_routes.py` compatibility note added for performance-detail new keys and logs filter-scope widening.
+- Source: change `fix-admin-dashboard`.
+
 ## [ci 1.3.16] — 2026-05-18
 ### Changed
 - admin-pages-vue-spa-and-admin-dashboard-ts-entry: `tsconfig.json` `include` expanded with `"src/admin-dashboard/**/*"` and `"src/admin-pages/**/*"`. Vite `rollupOptions.input` gains `admin-pages` entry. `/admin/pages` `renderMode` flipped `external → native` in `routeContracts.js`. Flask `/admin/pages` switched to Vue SPA HTML serving. `asset_readiness_manifest.json` gains `/admin/pages: ["admin-pages.js"]`. Gate tier unchanged (informational); additive prose only.

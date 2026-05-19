@@ -1,0 +1,21 @@
+change-id: fix-admin-dashboard
+agent: test-strategist
+timestamp: "2026-05-19T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/fix-admin-dashboard/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_log_store.py ↔ src/mes_dashboard/core/log_store.py" }
+  - { type: tdd-pairs, pointer: "tests/test_login_session_store.py ↔ src/mes_dashboard/core/login_session_store.py" }
+  - { type: tdd-pairs, pointer: "tests/test_sync_worker.py ↔ src/mes_dashboard/core/sync_worker.py" }
+  - { type: tdd-pairs, pointer: "tests/test_admin_routes_logs.py ↔ src/mes_dashboard/routes/admin_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/test_admin_routes_perf.py ↔ src/mes_dashboard/routes/admin_routes.py" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, data-boundary, resilience" }
+  - { type: mapping-completeness, pointer: "all 7 ACs covered; 28 named test cases across 6 test files" }
+next-action: none
+notes: >
+  Key bug found: query_logs_all (line 539) and count_logs (line 359) in log_store.py
+  both still contain "WHERE synced = 0" despite being the "all" variants — those
+  are the exact lines the implementation must change, and the unit tests must fail
+  before the fix is applied (TDD). SyncWorker TRUNCATE guard (line 259-271 of
+  sync_worker.py) fires on version check only; AC-3 test must assert that a
+  non-empty table causes the guard to skip TRUNCATE.

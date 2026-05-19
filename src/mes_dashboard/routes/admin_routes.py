@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, current_app, g, make_response, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, g, make_response, redirect, request, url_for
 
 from mes_dashboard.core.csrf import get_csrf_token
 from mes_dashboard.core.permissions import admin_required
@@ -264,11 +264,18 @@ def api_logs():
     log_store = get_log_store()
 
     if MYSQL_OPS_ENABLED:
-        # --- dual-layer: SQLite unsynced + MySQL historical ---
+        # --- dual-layer: SQLite (all rows) + MySQL historical ---
+        # Compute authoritative combined total independently of the windowed fetch.
+        sqlite_total = log_store.count_logs(level=level, q=q, since=since)
+        mysql_total = _count_mysql_logs(level=level, q=q, since=since)
+        total = sqlite_total + mysql_total
+
+        # Fetch enough rows from each source to cover the requested window.
+        fetch_limit = offset + limit
         sqlite_rows = log_store.query_logs_all(
-            level=level, q=q, limit=limit, since=since
+            level=level, q=q, limit=fetch_limit, since=since
         )
-        mysql_rows = _query_mysql_logs(level=level, q=q, since=since, limit=limit)
+        mysql_rows = _query_mysql_logs(level=level, q=q, since=since, limit=fetch_limit)
 
         # Merge sort by timestamp DESC — parse to datetime for correct cross-source ordering
         def _sort_key(r):
@@ -285,10 +292,9 @@ def api_logs():
             reverse=True,
         )
         merged = all_rows[offset: offset + limit]
-        total = len(all_rows)
     else:
         total = log_store.count_logs(level=level, q=q, since=since)
-        merged = log_store.query_logs(
+        merged = log_store.query_logs_all(
             level=level, q=q, limit=limit, offset=offset, since=since
         )
 
@@ -344,6 +350,37 @@ def _query_mysql_logs(
             exc_info=True,
         )
         return []
+
+
+def _count_mysql_logs(
+    level=None, q=None, since=None
+) -> int:
+    """Count rows in dashboard_logs matching filters. Returns 0 on any error."""
+    try:
+        from mes_dashboard.core.mysql_client import get_mysql_connection
+        from sqlalchemy import text
+
+        where = "1=1"
+        params: dict = {}
+        if level:
+            where += " AND level = :level"
+            params["level"] = level.upper()
+        if q:
+            where += " AND message LIKE :q"
+            params["q"] = f"%{q}%"
+        if since:
+            where += " AND timestamp >= :since"
+            params["since"] = since
+
+        sql = text(f"SELECT COUNT(*) FROM dashboard_logs WHERE {where}")
+
+        with get_mysql_connection() as conn:
+            result = conn.execute(sql, params)
+            row = result.fetchone()
+            return int(row[0]) if row else 0
+    except Exception as exc:
+        logger.debug("MySQL log count failed, returning 0: %s", exc)
+        return 0
 
 
 def _collect_spool_disk_usage() -> list:
@@ -494,6 +531,41 @@ def api_performance_detail():
                     "keyspace_misses": misses,
                     "namespaces": namespaces,
                 }
+
+                # --- Additive: evicted_keys, expired_keys (from stats section) ---
+                try:
+                    redis_detail["evicted_keys"] = int(stats_info.get("evicted_keys", 0))
+                except Exception:
+                    redis_detail["evicted_keys"] = None
+
+                try:
+                    redis_detail["expired_keys"] = int(stats_info.get("expired_keys", 0))
+                except Exception:
+                    redis_detail["expired_keys"] = None
+
+                # --- Additive: mem_fragmentation_ratio (from memory section) ---
+                try:
+                    mem_info = client.info(section="memory")
+                    redis_detail["mem_fragmentation_ratio"] = mem_info.get(
+                        "mem_fragmentation_ratio"
+                    )
+                except Exception:
+                    redis_detail["mem_fragmentation_ratio"] = None
+
+                # --- Additive: slowlog top-5 ---
+                try:
+                    raw_slowlog = client.slowlog_get(5)
+                    redis_detail["slowlog"] = [
+                        {
+                            "id": e["id"],
+                            "duration_us": e["duration"],
+                            "command": " ".join(str(a) for a in e["command"][:3]),
+                        }
+                        for e in raw_slowlog
+                    ]
+                except Exception:
+                    redis_detail["slowlog"] = None
+
             except Exception as exc:
                 logger.warning("Failed to collect Redis detail: %s", exc)
                 redis_detail = {"error": str(exc)}
@@ -569,6 +641,15 @@ def api_performance_detail():
                 logger.warning("Failed to collect Redis namespace memory: %s", exc)
                 redis_namespace_memory = [{"error": str(exc)}]
 
+    # ---- DuckDB telemetry ----
+    duckdb_telemetry = None
+    try:
+        from mes_dashboard.core.duckdb_runtime import get_duckdb_telemetry
+        duckdb_telemetry = get_duckdb_telemetry()
+    except Exception as exc:
+        logger.warning("Failed to collect DuckDB telemetry: %s", exc)
+        duckdb_telemetry = {"error": str(exc)}
+
     return success_response({
         "redis": redis_detail,
         "process_caches": process_caches,
@@ -580,6 +661,7 @@ def api_performance_detail():
         "async_workers": async_workers,
         "spool_disk_usage": spool_disk_usage,
         "redis_namespace_memory": redis_namespace_memory,
+        "duckdb": duckdb_telemetry,
     })
 
 

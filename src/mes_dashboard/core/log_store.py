@@ -356,7 +356,7 @@ class LogStore:
         if not self._initialized:
             self.initialize()
 
-        query = "SELECT COUNT(*) FROM logs WHERE synced = 0"
+        query = "SELECT COUNT(*) FROM logs WHERE 1=1"
         params: List[Any] = []
 
         if level:
@@ -536,7 +536,7 @@ class LogStore:
         if not self._initialized:
             self.initialize()
 
-        query = "SELECT * FROM logs WHERE synced = 0"
+        query = "SELECT * FROM logs WHERE 1=1"
         params: List[Any] = []
 
         if level:
@@ -601,7 +601,7 @@ class LogStore:
         except Exception as e:
             logger.error(f"Failed to mark_synced logs: {e}")
 
-    def cleanup_synced(self, older_than_hours: int = 1) -> int:
+    def cleanup_synced(self, older_than_hours: int = 24) -> int:
         """Delete synced=1 records older than older_than_hours. Returns deleted count."""
         if not self._initialized:
             return 0
