@@ -1,0 +1,16 @@
+agent: contract-reviewer
+change-id: admin-perf-detail-ui
+status: done
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/api/api-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/data/data-shape-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/css/css-inventory.md" }
+  - { type: version-bumps, pointer: "contracts/css/css-inventory.md: 1.2.1 → 1.2.2 (admin-pages/style.css entry added)" }
+  - { type: breaking-changes, pointer: "none" }
+notes: |
+  API contract fully documented (v1.8.0, lines 291-292). All 6 fields already contracted.
+  css-inventory gap fixed: admin-pages/style.css was missing from Route-Local table (pre-existing
+  since commit a0aa6a3); added in this change.
+  Type conflict corrected: change-classification.md AC-5 originally described memory_limit_state
+  as object{memory_limit, threads, temp_dir, connection_ok} — contracts/api and contracts/data
+  both specify it as string|null. AC-5 corrected before implementation.

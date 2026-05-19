@@ -1,0 +1,14 @@
+agent: ci-cd-gatekeeper
+change-id: admin-perf-detail-ui
+status: done
+artifacts:
+  - { type: tiers-modified, pointer: "1 (css:check added), 2 (vue-tsc informational confirmed)" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml:43-46 (css:check step added)" }
+  - { type: required-status-checks, pointer: "frontend-unit-tests, contract-and-fast-tests" }
+notes: |
+  No new workflow files created. One step added to frontend-tests.yml to close the
+  css:check gap confirmed by contract-reviewer (css-inventory v1.2.2 adds admin-pages/style.css).
+  vue-tsc type-check remains Tier 2 informational (continue-on-error: true) per existing project policy.
+  ruff gate not required — no Python files in changeset.
+  No nightly, weekly, or manual gates are needed for this Tier 3 frontend-only change.

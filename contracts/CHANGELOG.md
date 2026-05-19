@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [css-inventory 1.2.2] — 2026-05-19
+### Added
+- admin-perf-detail-ui: Added `frontend/src/admin-pages/style.css` (`theme-admin-pages`) to Route-Local Feature Layers table. File pre-existed since `a0aa6a3` but was missing from inventory.
+
+## [business 1.9.0] — 2026-05-19
+### Added
+- fix-admin-dashboard: `ADMIN-06` — log query path divergence rule: `query_logs_all()`/`count_logs()` must not filter by `synced`; `query_logs()` retains the filter intentionally. `ADMIN-07` — log pagination authoritative total rule: `total` must come from independent `COUNT` queries, not windowed fetch length.
+
 ## [data 1.7.0] — 2026-05-19
 ### Added
 - fix-admin-dashboard: New Section 3.8 documenting the full `GET /admin/api/performance-detail` payload shape (baseline keys previously undocumented + new keys). `data.redis` gains `evicted_keys`, `expired_keys`, `mem_fragmentation_ratio`, `slowlog`. New `data.duckdb` sub-object added with `temp_dir_bytes`, `memory_limit_state`. All additions additive.

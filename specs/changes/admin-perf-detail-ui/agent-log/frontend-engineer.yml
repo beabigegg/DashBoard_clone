@@ -1,0 +1,57 @@
+agent: frontend-engineer
+change-id: admin-perf-detail-ui
+date: 2026-05-19
+status: done
+
+summary: >
+  Implemented admin-perf-detail-ui following strict TDD order.
+  Created 10 failing Vitest tests first (IP-1), added TypeScript interfaces
+  additive to useAdminData.ts (IP-2), added Redis evicted_keys/expired_keys/
+  mem_fragmentation_ratio SummaryCards and slowlog <ul> list to CacheTab.vue
+  (IP-3), added DuckDB SectionCard with formatBytes helper to PerformanceTab.vue
+  (IP-4), then ran all gate commands to confirm pass (IP-5).
+
+steps-completed:
+  - IP-1: Created PerfDetail.test.ts with all 10 cases; confirmed failing before
+      implementation (10 failed, 346 passed).
+  - IP-2: Added PerfDetailSlowlogEntry, PerfDetailRedis, PerfDetailDuckDB,
+      PerfDetailData interfaces; changed usePerfDetail return type to
+      DataFetcher<PerfDetailData>. All existing fields preserved as optional
+      supersets. type-check informational (2 pre-existing TS7016 for JS SFCs).
+  - IP-3: Appended 3 SummaryCards (evicted_keys, expired_keys,
+      mem_fragmentation_ratio with toFixed(2)) to CacheTab Redis SummaryCardGroup;
+      added slowlog <ul>/<li> list with N/A placeholder when null or empty.
+  - IP-4: Added formatBytes inline helper to PerformanceTab script setup; added
+      new DuckDB SectionCard (v-if="perfDetail?.duckdb") with temp_dir_bytes and
+      memory_limit_state SummaryCards.
+  - IP-5: All gates passed.
+
+gate-results:
+  vitest: "34 test files passed; 356 passed, 1 skipped"
+  css-check: "PASS — 0 errors, 47 pre-existing warnings"
+  type-check: "2 pre-existing TS7016 errors (JS SFC imports); continue-on-error in CI"
+  cdd-kit-validate: "All validations passed"
+
+mock-strategy-note: >
+  vi.mock paths in the test file are relative to the TEST file location
+  (src/admin-dashboard/tabs/__tests__/), requiring ../../../ (3 levels up) to
+  reach src/admin-shared/ and src/shared-ui/. Initially used ../../  (2 levels),
+  which silently fell back to the real module. Fixed using vi.hoisted to create
+  mockStore before mock factory, and async import('vue') inside the factory to
+  avoid require() TS error (TS2591).
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts:1-260"
+  - type: files-changed
+    pointer: "frontend/src/admin-shared/composables/useAdminData.ts:88-166"
+  - type: files-changed
+    pointer: "frontend/src/admin-dashboard/tabs/CacheTab.vue:103-134"
+  - type: files-changed
+    pointer: "frontend/src/admin-dashboard/tabs/PerformanceTab.vue:128-210"
+  - type: components-affected
+    pointer: "CacheTab, PerformanceTab, useAdminData (usePerfDetail)"
+  - type: screenshot-paths
+    pointer: "n/a (unit tests only; no Playwright/visual regression in scope)"
+  - type: accessibility-audit
+    pointer: "New <ul>/<li> slowlog list uses semantic HTML. SummaryCard labels are visible text. No interactive elements added — no focus management needed."

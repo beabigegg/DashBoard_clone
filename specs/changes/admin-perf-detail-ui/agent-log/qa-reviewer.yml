@@ -1,0 +1,12 @@
+agent: qa-reviewer
+change-id: admin-perf-detail-ui
+verdict: release-ready
+artifacts:
+  - { type: gate-results, pointer: "vitest: 356 passed (incl. 10 PerfDetail.test.ts), css:check: 0 errors, type-check: clean after @ts-expect-error, cdd-kit-gate: PASSED" }
+  - { type: ac-coverage, pointer: "AC-1..AC-7: met (10 Vitest cases); AC-8: met (only css-inventory.md modified in this change)" }
+  - { type: decision, pointer: "release-ready" }
+notes: |
+  QA first run found 2 issues: (1) TS7016 errors from JS SFC imports in test file — fixed with
+  @ts-expect-error; (2) business-rules.md / CHANGELOG [business 1.9.0] appeared in diff —
+  these belong to fix-admin-dashboard close, not this PR (will be committed separately).
+  After both fixes, cdd-kit gate PASSED and all local gates green.

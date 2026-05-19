@@ -1,0 +1,18 @@
+agent: ui-ux-reviewer
+change-id: admin-perf-detail-ui
+verdict: approved-with-fixes-applied
+artifacts:
+  - type: journeys-reviewed
+    pointer: "CacheTab.vue (Redis diagnostic cards + slowlog list), PerformanceTab.vue (DuckDB SectionCard)"
+  - type: state-coverage
+    pointer: "all 6 fields: null + value paths verified; slowlog: null/empty-array/non-empty verified"
+  - type: copy-issues-resolved
+    pointer: "Labels: Evicted Keys→逐出鍵數, Expired Keys→過期鍵數, Fragmentation Ratio→碎片率, Temp Dir→Temp 目錄大小, Memory Limit→記憶體上限"
+notes: |
+  Found 2 must-fix: slowlog list had no heading and browser-default bullets; DuckDB section silently
+  hidden when unavailable (inconsistent with Redis pattern). Both fixed before qa-reviewer.
+  Found 4 should-fix: English labels, no fragmentation tooltip, asymmetric grid (7 cards in :columns=2),
+  muted placeholder. All applied: slowlog <h3> added + Tailwind list-none, DuckDB v-else-if fallback,
+  Chinese labels, tooltip on 碎片率 card, split into 4-card + 3-card groups.
+  Tests updated to expect '無慢查詢記錄' (not 'N/A') for slowlog null/empty,
+  and to expect DuckDB '未啟用' fallback when duckdb is null.

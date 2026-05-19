@@ -131,6 +131,18 @@ onBeforeUnmount(() => {
     chartInstance = null;
   }
 });
+
+function formatBytes(bytes) {
+  if (bytes == null) return 'N/A';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
 </script>
 
 <template>
@@ -180,6 +192,18 @@ onBeforeUnmount(() => {
         <SummaryCard label="逾時 (s)" :value="perfDetail.db_pool.config?.pool_timeout" accent="neutral" />
         <SummaryCard label="直連次數" :value="perfDetail.direct_connections?.total_since_start" accent="info" />
       </SummaryCardGroup>
+    </SectionCard>
+
+    <SectionCard v-if="perfDetail?.duckdb">
+      <template #header><h2 class="panel-title">DuckDB</h2></template>
+      <SummaryCardGroup :columns="2">
+        <SummaryCard label="Temp 目錄大小" :value="formatBytes(perfDetail.duckdb.temp_dir_bytes)" accent="info" />
+        <SummaryCard label="記憶體上限" :value="perfDetail.duckdb.memory_limit_state != null ? perfDetail.duckdb.memory_limit_state : 'N/A'" accent="neutral" />
+      </SummaryCardGroup>
+    </SectionCard>
+    <SectionCard v-else-if="perfDetail && !perfDetail.duckdb">
+      <template #header><h2 class="panel-title">DuckDB</h2></template>
+      <p class="muted">DuckDB 未啟用</p>
     </SectionCard>
 
     <TrendChart

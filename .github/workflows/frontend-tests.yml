@@ -41,6 +41,10 @@ jobs:
         working-directory: frontend
         run: npm test
 
+      - name: CSS governance check
+        working-directory: frontend
+        run: npm run css:check
+
       - name: Run legacy node --test suite
         working-directory: frontend
         run: npm run test:legacy

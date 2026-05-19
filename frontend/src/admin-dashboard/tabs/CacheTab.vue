@@ -106,12 +106,27 @@ onMounted(() => {
             <SummaryCard label="連線數" :value="perfDetail.redis.connected_clients" accent="brand" />
             <SummaryCard label="命中率" :value="hitRateDisplay" accent="success" />
           </SummaryCardGroup>
+          <h3 class="sub-title">診斷指標</h3>
+          <SummaryCardGroup :columns="3">
+            <SummaryCard label="逐出鍵數" :value="perfDetail.redis.evicted_keys != null ? perfDetail.redis.evicted_keys : 'N/A'" accent="danger" />
+            <SummaryCard label="過期鍵數" :value="perfDetail.redis.expired_keys != null ? perfDetail.redis.expired_keys : 'N/A'" accent="neutral" />
+            <SummaryCard label="碎片率" :value="perfDetail.redis.mem_fragmentation_ratio != null ? Number(perfDetail.redis.mem_fragmentation_ratio).toFixed(2) : 'N/A'" accent="info" tooltip="建議值：1.0–1.5；>1.5 表示記憶體碎片化嚴重" />
+          </SummaryCardGroup>
         </div>
         <div class="redis-namespaces">
           <DataTable :data="perfDetail.redis.namespaces || []">
             <DataTableColumn columnKey="name" label="Namespace" />
             <DataTableColumn columnKey="key_count" label="Key 數量" align="right" />
           </DataTable>
+          <div class="redis-slowlog">
+            <h3 class="sub-title">慢查詢紀錄</h3>
+            <ul v-if="perfDetail.redis.slowlog && perfDetail.redis.slowlog.length > 0" class="list-none p-0 m-0 font-mono text-xs space-y-1">
+              <li v-for="entry in perfDetail.redis.slowlog" :key="entry.id">
+                {{ entry.command }} — {{ entry.duration_us }}μs
+              </li>
+            </ul>
+            <p v-else class="muted">無慢查詢記錄</p>
+          </div>
         </div>
       </div>
     </SectionCard>

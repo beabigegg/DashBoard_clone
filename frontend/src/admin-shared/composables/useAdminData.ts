@@ -85,10 +85,85 @@ export function useMetrics(): DataFetcher<unknown> {
   });
 }
 
-export function usePerfDetail(): DataFetcher<unknown> {
+export interface PerfDetailSlowlogEntry {
+  id: number;
+  duration_us: number;
+  command: string;
+}
+
+export interface PerfDetailRedis {
+  used_memory?: number | null;
+  used_memory_human?: string | null;
+  peak_memory?: number | null;
+  peak_memory_human?: string | null;
+  maxmemory?: number | null;
+  maxmemory_human?: string | null;
+  connected_clients?: number | null;
+  hit_rate?: number | null;
+  namespaces?: Array<{ name: string; key_count: number }> | null;
+  // New fields (admin-perf-detail-ui)
+  evicted_keys?: number | null;
+  expired_keys?: number | null;
+  mem_fragmentation_ratio?: number | null;
+  slowlog?: PerfDetailSlowlogEntry[] | null;
+  [key: string]: unknown;
+}
+
+export interface PerfDetailDuckDB {
+  temp_dir_bytes: number | null;
+  memory_limit_state: string | null;
+}
+
+export interface PerfDetailData {
+  db_pool?: {
+    status?: {
+      checked_out?: number;
+      checked_in?: number;
+      saturation?: number;
+      overflow?: number;
+      max_capacity?: number;
+      slow_query_active?: number;
+      slow_query_waiting?: number;
+      [key: string]: unknown;
+    } | null;
+    config?: {
+      pool_size?: number;
+      pool_recycle?: number;
+      pool_timeout?: number;
+      [key: string]: unknown;
+    } | null;
+    [key: string]: unknown;
+  } | null;
+  direct_connections?: {
+    total_since_start?: number;
+    [key: string]: unknown;
+  } | null;
+  redis?: PerfDetailRedis | null;
+  route_cache?: {
+    mode?: string;
+    l1_size?: number;
+    l1_hit_rate?: number;
+    l2_hit_rate?: number;
+    miss_rate?: number;
+    reads_total?: number;
+    [key: string]: unknown;
+  } | null;
+  process_caches?: Record<string, {
+    description?: string;
+    entries?: number;
+    max_size?: number;
+    ttl_seconds?: number;
+    [key: string]: unknown;
+  }> | null;
+  // New field (admin-perf-detail-ui)
+  duckdb?: PerfDetailDuckDB | null;
+  [key: string]: unknown;
+}
+
+export function usePerfDetail(): DataFetcher<PerfDetailData> {
   return createDataFetcher(async () => {
     const response = await apiGet('/admin/api/performance-detail');
-    return unwrapEnvelope(response);
+    return unwrapEnvelope(response) as PerfDetailData;
   });
 }
 
