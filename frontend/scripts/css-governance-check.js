@@ -41,6 +41,7 @@ let warnings = 0;
 let hexErrors = 0;
 let hexExceptionWarnings = 0;
 let spacingWarnings = 0;
+let scopeErrors = 0;
 
 // Valid CSS hex only (3/4/6/8 digits). Excludes HTML entities like &#10003; via negative lookbehind.
 const HEX_COLOR_RE = /(?<!&)#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/;
@@ -79,12 +80,143 @@ function classifyHexUsage(fileType, line, hasChartImport) {
 
 // ── CSS checks ──────────────────────────────────────────────────────────────
 
+// Rule 6: Top-level rules in feature CSS must be scoped under .theme-<X>.
+// Reason: portal-shell permanently caches every feature's CSS in <head>, so
+// unscoped rules bleed across pages. See CLAUDE.md "Portal-Shell CSS
+// Architecture Notes" and contract/css_development_contract.md.
+//
+// Returns array of {lineNo, selector} for unscoped top-level rules.
+function findUnscopedTopLevelRules(content) {
+  const offences = [];
+  let i = 0;
+  const n = content.length;
+  let depth = 0;
+  // Stack of open at-rules at each depth (so we can ignore @keyframes inner rules)
+  const atStack = []; // values: 'scope' | 'keyframes' | 'other'
+
+  while (i < n) {
+    const ch = content[i];
+    // Skip comments
+    if (ch === '/' && content[i + 1] === '*') {
+      const k = content.indexOf('*/', i + 2);
+      i = k === -1 ? n : k + 2;
+      continue;
+    }
+    if (ch === '{') { depth++; i++; continue; }
+    if (ch === '}') {
+      depth--;
+      if (atStack.length && depth === atStack.length - 1) atStack.pop();
+      i++;
+      continue;
+    }
+
+    // We only inspect selectors at depth 0 OR inside @media/@supports (depth 1 of a scoping at-rule).
+    const isScopable = depth === 0 || (
+      atStack.length && atStack[atStack.length - 1] === 'scope' && depth === atStack.length
+    );
+    if (!isScopable) { i++; continue; }
+
+    // Skip whitespace + leading comments
+    while (i < n) {
+      if (/\s/.test(content[i])) { i++; continue; }
+      if (content[i] === '/' && content[i + 1] === '*') {
+        const k = content.indexOf('*/', i + 2);
+        i = k === -1 ? n : k + 2;
+        continue;
+      }
+      break;
+    }
+    if (i >= n) break;
+
+    // At-rule
+    if (content[i] === '@') {
+      const m = content.slice(i).match(/^@([\w-]+)/);
+      const name = (m ? m[1] : '').toLowerCase();
+      let j = i;
+      while (j < n && content[j] !== ';' && content[j] !== '{') j++;
+      if (j >= n) break;
+      if (content[j] === ';') { i = j + 1; continue; }
+      // block at-rule
+      i = j + 1;
+      depth++;
+      if (name === 'media' || name === 'supports' || name === 'container') {
+        atStack.push('scope');
+      } else if (name === 'keyframes' || name.endsWith('keyframes')) {
+        atStack.push('keyframes');
+      } else {
+        atStack.push('other');
+      }
+      continue;
+    }
+
+    // Read selector group until '{'
+    const selectorStart = i;
+    let j = i;
+    while (j < n && content[j] !== '{' && content[j] !== '}' && content[j] !== ';') {
+      if (content[j] === '/' && content[j + 1] === '*') {
+        const k = content.indexOf('*/', j + 2);
+        j = k === -1 ? n : k + 2;
+        continue;
+      }
+      j++;
+    }
+    if (j >= n || content[j] !== '{') { i = j; continue; }
+    const selectorBlock = content.slice(selectorStart, j).trim();
+    // Inside @keyframes, "selectors" are 0%/from/to — skip.
+    const insideKeyframes = atStack.length && atStack[atStack.length - 1] === 'keyframes' && depth === atStack.length;
+    if (!insideKeyframes && selectorBlock) {
+      // Split on commas respecting parens
+      const parts = [];
+      let buf = '';
+      let paren = 0;
+      for (const c of selectorBlock) {
+        if (c === '(') paren++;
+        else if (c === ')') paren--;
+        if (c === ',' && paren === 0) { parts.push(buf.trim()); buf = ''; }
+        else buf += c;
+      }
+      parts.push(buf.trim());
+      for (const p of parts) {
+        if (!p) continue;
+        // Allowed prefixes: .theme-*, :root, ::backdrop, or :is(.theme-...)
+        if (p.startsWith('.theme-')) continue;
+        if (p.startsWith(':root')) continue;
+        if (p.startsWith('::backdrop')) continue;
+        if (/^:is\s*\(\s*\.theme-/.test(p)) continue;
+        const lineNo = content.slice(0, selectorStart).split('\n').length;
+        offences.push({ lineNo, selector: p });
+      }
+    }
+    i = j;
+  }
+  return offences;
+}
+
+// A feature CSS is `src/<feature>/style.css` where <feature> is a top-level
+// directory under src/ (not src/, not nested deeper). Shared files like
+// wip-shared/styles.css are *.css too but allowed to share themes via :is().
+function isFeatureCss(full) {
+  const rel = relPath(full);
+  // Match exactly "<feature>/style.css" — single segment, then style.css
+  return /^[^/]+\/style\.css$/.test(rel);
+}
+
 function checkCssFile(full) {
   if (isExemptCss(full)) return;
 
   const rel = relPath(full);
   const content = readFileSync(full, 'utf8');
   const lines = content.split('\n');
+
+  // Rule 6: feature CSS scope leakage check
+  if (isFeatureCss(full)) {
+    const offences = findUnscopedTopLevelRules(content);
+    for (const off of offences) {
+      console.error(`[FAIL] ${rel}:${off.lineNo} — Unscoped top-level rule "${off.selector}" in feature CSS. Prefix with .theme-<feature> (portal-shell caches CSS permanently; unscoped rules bleed across pages).`);
+      errors++;
+      scopeErrors++;
+    }
+  }
 
   lines.forEach((line, i) => {
     const lineNo = i + 1;
@@ -218,6 +350,7 @@ console.log(`\nCSS Governance Check: ${errors} error(s), ${warnings} warning(s)`
 console.log(`- HEX violations: ${hexErrors}`);
 console.log(`- HEX chart-exception candidates: ${hexExceptionWarnings}`);
 console.log(`- Spacing px warnings: ${spacingWarnings}`);
+console.log(`- Unscoped feature-CSS rules: ${scopeErrors}`);
 
 if (errors > 0) {
   console.error('\nFAIL: Fix errors above before merging.');

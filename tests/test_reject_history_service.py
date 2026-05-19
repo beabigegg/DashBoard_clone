@@ -146,6 +146,43 @@ def test_get_filter_options_reads_from_caches(monkeypatch):
     assert "meta" in result
 
 
+def test_get_filter_options_does_not_narrow_packages_by_selection(monkeypatch):
+    """Regression: reject-history filter-options is intentionally NON-cross-filter.
+
+    Unlike WIP overview and production-history, reject-history serves the full
+    cached lists for each field even when other fields are selected. The
+    L1-cache architecture (filter_cache / container_filter_cache /
+    reason_filter_cache) is per-field and has no co-occurrence index. This
+    test pins that contract so a future "cross-filter the reject dropdowns"
+    change must update the test deliberately rather than silently regressing.
+    """
+    monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())
+
+    mock_packages = ["PKG-A", "PKG-B", "PKG-C"]
+    mock_reasons = ["001_CRACK", "002_BREAK", "003_SCRATCH"]
+
+    import mes_dashboard.services.filter_cache as fc
+    import mes_dashboard.services.container_filter_cache as cfc
+    import mes_dashboard.services.reason_filter_cache as rfc
+
+    monkeypatch.setattr(fc, "get_workcenter_groups", lambda force_refresh=False: [{"name": "WB", "sequence": 1}])
+    monkeypatch.setattr(cfc, "_CACHE", {"packages": mock_packages, "pj_types": [], "loaded": True, "updated_at": None})
+    monkeypatch.setattr(rfc, "_CACHE", {"reject_reasons": mock_reasons, "loaded": True, "updated_at": None})
+
+    # Even when caller supplies workcenter_groups + reasons selections, the
+    # packages list is NOT narrowed — full cache returned.
+    result = svc.get_filter_options(
+        workcenter_groups=["WB"],
+        reasons=["001_CRACK"],
+        packages=["PKG-A"],  # Even with explicit packages selection...
+    )
+
+    # ... the returned packages still contains all three (no co-occurrence narrowing).
+    assert result["packages"] == mock_packages
+    # And reasons is also the full cache.
+    assert result["reasons"] == mock_reasons
+
+
 def test_get_filter_options_date_params_backward_compat(monkeypatch):
     """get_filter_options accepts date params without error (backward compat)."""
     monkeypatch.setattr(svc, "get_excluded_reasons", lambda force_refresh=False: set())

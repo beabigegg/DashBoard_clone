@@ -268,6 +268,9 @@ class TestOverviewHoldRoute(TestWipRoutesBase):
             firstname='WF001',
             waferdesc='SiC',
             workcenter=None,
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
 

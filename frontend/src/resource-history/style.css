@@ -1,4 +1,4 @@
-.history-header {
+.theme-resource-history .history-header {
   background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
 }
 
@@ -9,19 +9,19 @@
   align-items: center;
 }
 
-.filter-field {
+.theme-resource-history .filter-field {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.filter-field label {
+.theme-resource-history .filter-field label {
   font-size: 13px;
   color: theme('colors.token.h475569');
   white-space: nowrap;
 }
 
-.filter-field input[type='date'] {
+.theme-resource-history .filter-field input[type='date'] {
   border: 1px solid var(--resource-border);
   border-radius: 6px;
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
@@ -30,7 +30,7 @@
   color: theme('colors.token.h1f2937');
 }
 
-.granularity-btns {
+.theme-resource-history .granularity-btns {
   display: inline-flex;
   gap: 4px;
   padding: theme('spacing.token.p3');
@@ -39,7 +39,7 @@
   background: theme('colors.token.hf8fafc');
 }
 
-.granularity-btn {
+.theme-resource-history .granularity-btn {
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -49,20 +49,20 @@
   cursor: pointer;
 }
 
-.granularity-btn.active {
+.theme-resource-history .granularity-btn.active {
   background: theme('colors.token.hdbeafe');
   color: theme('colors.token.h1d4ed8');
   font-weight: 700;
 }
 
-.checkbox-row {
+.theme-resource-history .checkbox-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.checkbox-pill {
+.theme-resource-history .checkbox-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -74,14 +74,14 @@
   background: theme('colors.token.hf8fafc');
 }
 
-.checkbox-pill input[type='checkbox'] {
+.theme-resource-history .checkbox-pill input[type='checkbox'] {
   margin: 0;
   width: 14px;
   height: 14px;
   accent-color: theme('colors.brand.600');
 }
 
-.chart-grid {
+.theme-resource-history .chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(320px, 1fr));
   gap: 12px;
@@ -115,29 +115,29 @@
   color: theme('colors.token.h64748b');
 }
 
-.detail-toolbar {
+.theme-resource-history .detail-toolbar {
   display: flex;
   gap: 8px;
   margin-left: auto;
 }
 
-.detail-name-cell {
+.theme-resource-history .detail-name-cell {
   font-weight: 600;
 }
 
-.detail-cell {
+.theme-resource-history .detail-cell {
   white-space: nowrap;
   font-size: 12px;
 }
 
 @media (max-width: 1180px) {
-  .chart-grid {
+  .theme-resource-history .chart-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 860px) {
-  .multi-select {
+  .theme-resource-history .multi-select {
     min-width: 160px;
   }
 

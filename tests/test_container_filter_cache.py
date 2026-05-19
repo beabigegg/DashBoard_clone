@@ -211,6 +211,95 @@ class TestSchemaV2Payload:
         assert sorted(opts["pj_types"]) == ["TYPE_X", "TYPE_Y"]
         assert sorted(opts["pj_functions"]) == ["FN_1"]
 
+    def test_cross_filter_pairwise_narrowing_package_and_type(self):
+        """Pairwise selection (packages + pj_types) intersects: both must match.
+
+        Coverage gap previously: only single-field narrowing was tested. This
+        test exercises the AND semantics across multiple selected fields, which
+        is the common multi-select dropdown scenario.
+        """
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        with patch.object(cache_mod, "_read_from_redis", return_value=None):
+            with patch(
+                "mes_dashboard.services.container_filter_cache.read_sql_df",
+                return_value=_sample_tuple_df(),
+            ):
+                with patch.object(cache_mod, "_write_to_redis"):
+                    cache_mod.init()
+
+        # PKG_A ∩ TYPE_X: only the (TYPE_X, PKG_A, BOP_1, FN_1) tuple matches.
+        opts = cache_mod.get_filter_options(
+            {"packages": ["PKG_A"], "pj_types": ["TYPE_X"]}
+        )
+        assert sorted(opts["bops"]) == ["BOP_1"]
+        assert sorted(opts["pj_types"]) == ["TYPE_X"]
+        assert sorted(opts["pj_functions"]) == ["FN_1"]
+
+    def test_cross_filter_three_way_narrowing(self):
+        """Three-field selection further narrows to single tuple intersections."""
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        with patch.object(cache_mod, "_read_from_redis", return_value=None):
+            with patch(
+                "mes_dashboard.services.container_filter_cache.read_sql_df",
+                return_value=_sample_tuple_df(),
+            ):
+                with patch.object(cache_mod, "_write_to_redis"):
+                    cache_mod.init()
+
+        # TYPE_Y ∩ PKG_B ∩ BOP_3 → exactly one tuple (TYPE_Y, PKG_B, BOP_3, FN_2)
+        opts = cache_mod.get_filter_options({
+            "pj_types": ["TYPE_Y"],
+            "packages": ["PKG_B"],
+            "bops": ["BOP_3"],
+        })
+        assert opts["pj_types"] == ["TYPE_Y"]
+        assert opts["packages"] == ["PKG_B"]
+        assert opts["bops"] == ["BOP_3"]
+        assert opts["pj_functions"] == ["FN_2"]
+
+    def test_cross_filter_empty_when_contradictory_selections(self):
+        """Mutually exclusive selections → all fields empty (no co-occurrence)."""
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        with patch.object(cache_mod, "_read_from_redis", return_value=None):
+            with patch(
+                "mes_dashboard.services.container_filter_cache.read_sql_df",
+                return_value=_sample_tuple_df(),
+            ):
+                with patch.object(cache_mod, "_write_to_redis"):
+                    cache_mod.init()
+
+        # PKG_A only appears with BOP_1; selecting PKG_A + BOP_2 → no rows.
+        opts = cache_mod.get_filter_options({
+            "packages": ["PKG_A"],
+            "bops": ["BOP_2"],
+        })
+        assert opts["pj_types"] == []
+        assert opts["packages"] == []
+        assert opts["bops"] == []
+        assert opts["pj_functions"] == []
+
+    def test_cross_filter_csv_multi_value_per_field(self):
+        """Multi-value within a single field is a union (OR semantics)."""
+        import mes_dashboard.services.container_filter_cache as cache_mod
+
+        with patch.object(cache_mod, "_read_from_redis", return_value=None):
+            with patch(
+                "mes_dashboard.services.container_filter_cache.read_sql_df",
+                return_value=_sample_tuple_df(),
+            ):
+                with patch.object(cache_mod, "_write_to_redis"):
+                    cache_mod.init()
+
+        # bops ∈ {BOP_1, BOP_3}: tuples (TYPE_X, PKG_A, BOP_1, FN_1),
+        # (TYPE_Y, PKG_A, BOP_1, null), (TYPE_Y, PKG_B, BOP_3, FN_2)
+        opts = cache_mod.get_filter_options({"bops": ["BOP_1", "BOP_3"]})
+        assert sorted(opts["packages"]) == ["PKG_A", "PKG_B"]
+        assert sorted(opts["pj_types"]) == ["TYPE_X", "TYPE_Y"]
+        assert sorted(opts["pj_functions"]) == ["FN_1", "FN_2"]
+
 
 class TestSchemaVersionMismatch:
     """AC-8 — stale/legacy payload triggers rebuild."""

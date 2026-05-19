@@ -681,7 +681,7 @@
 }
 
 /* ---- 血緣樹 Modal ---- */
-.lineage-modal-backdrop {
+.theme-query-tool .lineage-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 9000;
@@ -692,7 +692,7 @@
   padding: theme('spacing.token.p24');
 }
 
-.lineage-modal-container {
+.theme-query-tool .lineage-modal-container {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -704,7 +704,7 @@
   overflow: hidden;
 }
 
-.lineage-modal-header {
+.theme-query-tool .lineage-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -714,13 +714,13 @@
   flex-shrink: 0;
 }
 
-.lineage-modal-title {
+.theme-query-tool .lineage-modal-title {
   font-size: 16px;
   font-weight: 700;
   color: theme('colors.token.h0f172a');
 }
 
-.lineage-modal-close {
+.theme-query-tool .lineage-modal-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -736,12 +736,12 @@
   flex-shrink: 0;
 }
 
-.lineage-modal-close:hover {
+.theme-query-tool .lineage-modal-close:hover {
   background: theme('colors.token.hf1f5f9');
   color: theme('colors.token.h0f172a');
 }
 
-.lineage-modal-body {
+.theme-query-tool .lineage-modal-body {
   flex: 1;
   overflow-y: auto;
   padding: 0;

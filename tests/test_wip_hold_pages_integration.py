@@ -346,6 +346,9 @@ def test_wip_hold_post_avoids_url_length_limit(client):
             firstname=None,
             waferdesc=None,
             workcenter="DA",
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
 

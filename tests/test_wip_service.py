@@ -933,6 +933,255 @@ class TestHoldOverviewServiceCachePath(unittest.TestCase):
         self.assertEqual(expected[('WC-C', '設備異常')]['lots'], 1)
 
 
+class TestFilterOptionsCrossFilterNarrowing(unittest.TestCase):
+    """Regression: non-indexed filters (BOP/WORKFLOWNAME/PJ_FUNCTION) must
+    narrow indexed-field option lists (Types/Packages/WorkOrders) in the
+    snapshot+index code path of _get_filter_options_cache_payload.
+
+    Bug history: the snapshot+index path (the common production path because
+    Redis cache hits dominate) computed indexed-field positions WITHOUT
+    intersecting with positions matching non-indexed filters. So selecting
+    BOP=EAC17 returned ALL Types regardless of which Types actually had
+    BOP=EAC17 rows — the dropdown looked broken from the user's perspective.
+    Fix: compute ni_positions and intersect inside the by_field loop.
+    """
+
+    def setUp(self):
+        import mes_dashboard.services.wip_service as wip_service
+        with wip_service._wip_search_index_lock:
+            wip_service._wip_search_index_cache.clear()
+        with wip_service._wip_snapshot_lock:
+            wip_service._wip_snapshot_cache.clear()
+
+    @staticmethod
+    def _build_df() -> pd.DataFrame:
+        """Fixture rows designed so each non-indexed filter narrows indexed options:
+          BOP=EAC17 → rows {0,1,3} → Types {T1,T2}      (excludes T3,T4)
+          BOP=EAC18 → rows {2,4}   → Types {T3}          (excludes T1,T2,T4)
+          WF=WF-A   → rows {0,2}   → Types {T1,T3}       (excludes T2,T4)
+        """
+        return pd.DataFrame({
+            'LOTID': ['L1', 'L2', 'L3', 'L4', 'L5'],
+            'WORKORDER': ['WO1', 'WO2', 'WO3', 'WO4', 'WO5'],
+            'QTY': [10, 20, 30, 40, 50],
+            'PACKAGE_LEF': ['PKG-A', 'PKG-A', 'PKG-B', 'PKG-A', 'PKG-C'],
+            'WORKCENTER_GROUP': ['WC-A', 'WC-A', 'WC-B', 'WC-A', 'WC-C'],
+            'WORKCENTERSEQUENCE_GROUP': [1, 1, 2, 1, 3],
+            'HOLDREASONNAME': [None, None, None, None, None],
+            'AGEBYDAYS': [1.0, 2.0, 3.0, 4.0, 5.0],
+            'EQUIPMENTCOUNT': [1, 1, 1, 1, 1],
+            'CURRENTHOLDCOUNT': [0, 0, 0, 0, 0],
+            'SPECNAME': ['S1', 'S2', 'S3', 'S4', 'S5'],
+            'PJ_TYPE': ['T1', 'T2', 'T3', 'T1', 'T4'],
+            'FIRSTNAME': ['F1', 'F2', 'F1', 'F2', 'F3'],
+            'WAFERDESC': ['SiC', 'Si', 'SiC', 'Si', 'GaN'],
+            'BOP': ['EAC17', 'EAC17', 'EAC18', 'EAC17', 'EAC18'],
+            'WORKFLOWNAME': ['WF-A', 'WF-B', 'WF-A', 'WF-B', 'WF-C'],
+            'PJ_FUNCTION': ['FN-X', 'FN-Y', 'FN-X', 'FN-Z', 'FN-Y'],
+        })
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_bop_filter_narrows_type_options(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._build_df()
+
+        # No filter: all 4 types present
+        all_options = get_wip_filter_options()
+        self.assertEqual(sorted(all_options['types']), ['T1', 'T2', 'T3', 'T4'])
+
+        # BOP=EAC17: rows {0,1,3} → types should narrow to {T1, T2}
+        narrowed = get_wip_filter_options(bop='EAC17')
+        self.assertEqual(sorted(narrowed['types']), ['T1', 'T2'])
+        self.assertNotIn('T3', narrowed['types'])
+        self.assertNotIn('T4', narrowed['types'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_workflow_filter_narrows_package_options(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._build_df()
+
+        # WORKFLOWNAME=WF-A: rows {0,2} → packages should narrow to {PKG-A, PKG-B}
+        narrowed = get_wip_filter_options(workflow='WF-A')
+        self.assertEqual(sorted(narrowed['packages']), ['PKG-A', 'PKG-B'])
+        self.assertNotIn('PKG-C', narrowed['packages'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_pj_function_filter_narrows_workorder_options(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._build_df()
+
+        # PJ_FUNCTION=FN-X: rows {0,2} → workorders should narrow to {WO1, WO3}
+        narrowed = get_wip_filter_options(pj_function='FN-X')
+        self.assertEqual(sorted(narrowed['workorders']), ['WO1', 'WO3'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_bop_csv_multi_value_narrows_type_options(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._build_df()
+
+        # BOP=EAC17,EAC18: rows {0,1,2,3,4} = all → all types
+        narrowed = get_wip_filter_options(bop='EAC17,EAC18')
+        self.assertEqual(sorted(narrowed['types']), ['T1', 'T2', 'T3', 'T4'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_combined_bop_and_workflow_intersects(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._build_df()
+
+        # BOP=EAC17 ∩ WORKFLOWNAME=WF-A: rows {0} only → types={T1}
+        narrowed = get_wip_filter_options(bop='EAC17', workflow='WF-A')
+        self.assertEqual(narrowed['types'], ['T1'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_bop_filter_self_excluded_for_bops_field(self, mock_cached_wip):
+        """Cross-filter exclude-self semantics: selecting BOP=EAC17 must still
+        show ALL available BOP values in the bops dropdown (not just EAC17)
+        so the user can switch selection."""
+        mock_cached_wip.return_value = self._build_df()
+
+        narrowed = get_wip_filter_options(bop='EAC17')
+        self.assertEqual(sorted(narrowed['bops']), ['EAC17', 'EAC18'])
+
+
+class TestNonIndexedFilterSnapshotPath(unittest.TestCase):
+    """Regression: workflow/bop/pj_function must narrow snapshot-path results.
+
+    Bug history: snapshot path (the common production code path) silently
+    bypassed workflow/bop/pj_function before _apply_non_indexed_filters was
+    wired in. Existing tests used a fixture without these columns so the bug
+    could not surface. These tests use a fixture WITH the three columns and
+    assert that each filter (single + CSV multi-value) narrows results.
+    """
+
+    def setUp(self):
+        import mes_dashboard.services.wip_service as wip_service
+        with wip_service._wip_search_index_lock:
+            wip_service._wip_search_index_cache.clear()
+        with wip_service._wip_snapshot_lock:
+            wip_service._wip_snapshot_cache.clear()
+
+    @staticmethod
+    def _sample_df_with_non_indexed() -> pd.DataFrame:
+        """6-row fixture covering distinct BOP/WORKFLOWNAME/PJ_FUNCTION values."""
+        return pd.DataFrame({
+            'LOTID': ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'],
+            'WORKORDER': ['WO1', 'WO2', 'WO3', 'WO4', 'WO5', 'WO6'],
+            'QTY': [100, 50, 80, 60, 20, 70],
+            'PACKAGE_LEF': ['PKG-A', 'PKG-B', 'PKG-A', 'PKG-C', 'PKG-A', 'PKG-B'],
+            'WORKCENTER_GROUP': ['WC-A', 'WC-A', 'WC-A', 'WC-B', 'WC-A', 'WC-B'],
+            'WORKCENTERSEQUENCE_GROUP': [1, 1, 1, 2, 1, 2],
+            'HOLDREASONNAME': ['品質確認', '品質確認', '設備異常', '品質確認', '品質確認', None],
+            'AGEBYDAYS': [2.0, 3.0, 5.0, 4.0, 1.0, 0.5],
+            'EQUIPMENTCOUNT': [0, 0, 0, 0, 0, 1],
+            'CURRENTHOLDCOUNT': [1, 1, 1, 1, 1, 0],
+            'SPECNAME': ['S1', 'S2', 'S1', 'S2', 'S1', 'S2'],
+            'HOLDEMP': ['E1', 'E2', 'E3', 'E4', 'E5', 'E6'],
+            'DEPTNAME': ['QC', 'QC', 'QC', 'QC', 'QC', 'PD'],
+            'COMMENT_HOLD': ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'],
+            'COMMENT_FUTURE': [None, None, None, None, None, None],
+            'PRODUCT': ['P1', 'P2', 'P1', 'P3', 'P1', 'P2'],
+            'PJ_TYPE': ['T1', 'T1', 'T2', 'T1', 'T3', 'T1'],
+            # The three non-indexed filter columns under test:
+            'BOP': ['EAC17', 'EAC17', 'EAC18', 'EAC17', 'EAC19', 'EAC17'],
+            'WORKFLOWNAME': ['WF-A', 'WF-A', 'WF-B', 'WF-C', 'WF-A', 'WF-A'],
+            'PJ_FUNCTION': ['FN-X', 'FN-Y', 'FN-X', 'FN-X', 'FN-Z', 'FN-Y'],
+        })
+
+    @patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value='2026-05-19 10:00:00')
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_hold_detail_summary_snapshot_narrows_by_bop(
+        self, mock_cached_wip, _mock_sys_date,
+    ):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        all_summary = get_hold_detail_summary()
+        # 5 hold lots (L1..L5, L6 has CURRENTHOLDCOUNT=0)
+        self.assertEqual(all_summary['totalLots'], 5)
+
+        bop17 = get_hold_detail_summary(bop='EAC17')
+        # Only L1, L2, L4 have BOP=EAC17 AND CURRENTHOLDCOUNT>0 (L6 excluded)
+        self.assertEqual(bop17['totalLots'], 3)
+        self.assertEqual(bop17['totalQty'], 100 + 50 + 60)
+
+        bop18 = get_hold_detail_summary(bop='EAC18')
+        self.assertEqual(bop18['totalLots'], 1)
+
+        # CSV multi-value: BOP=EAC17,EAC18
+        multi = get_hold_detail_summary(bop='EAC17,EAC18')
+        self.assertEqual(multi['totalLots'], 4)
+
+    @patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value='2026-05-19 10:00:00')
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_hold_detail_summary_snapshot_narrows_by_workflow(
+        self, mock_cached_wip, _mock_sys_date,
+    ):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        # WORKFLOWNAME=WF-A on holds: L1, L2, L5 (3 lots)
+        wf_a = get_hold_detail_summary(workflow='WF-A')
+        self.assertEqual(wf_a['totalLots'], 3)
+        self.assertEqual(wf_a['totalQty'], 100 + 50 + 20)
+
+    @patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value='2026-05-19 10:00:00')
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_hold_detail_summary_snapshot_narrows_by_pj_function(
+        self, mock_cached_wip, _mock_sys_date,
+    ):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        # PJ_FUNCTION=FN-X on holds: L1, L3, L4 (3 lots)
+        fn_x = get_hold_detail_summary(pj_function='FN-X')
+        self.assertEqual(fn_x['totalLots'], 3)
+
+    @patch('mes_dashboard.services.wip_service.get_cached_sys_date', return_value='2026-05-19 10:00:00')
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_hold_detail_summary_snapshot_combines_bop_and_workflow(
+        self, mock_cached_wip, _mock_sys_date,
+    ):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        # BOP=EAC17 AND WORKFLOWNAME=WF-A: L1, L2 (L4 has WF-C, L6 has CURRENTHOLDCOUNT=0)
+        combined = get_hold_detail_summary(bop='EAC17', workflow='WF-A')
+        self.assertEqual(combined['totalLots'], 2)
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_hold_detail_lots_snapshot_narrows_by_bop(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        result = get_hold_detail_lots(bop='EAC17', page=1, page_size=10)
+        lot_ids = sorted(lot['lotId'] for lot in result['lots'])
+        self.assertEqual(lot_ids, ['L1', 'L2', 'L4'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_hold_detail_lots_snapshot_narrows_by_pj_function_csv(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        result = get_hold_detail_lots(pj_function='FN-Y,FN-Z', page=1, page_size=10)
+        # FN-Y: L2; FN-Z: L5 (L6 excluded as CURRENTHOLDCOUNT=0)
+        lot_ids = sorted(lot['lotId'] for lot in result['lots'])
+        self.assertEqual(lot_ids, ['L2', 'L5'])
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_wip_hold_summary_snapshot_narrows_by_bop(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        # No filter: 4 lots with HOLDREASONNAME notna AND CURRENTHOLDCOUNT>0:
+        # L1(品質確認), L2(品質確認), L3(設備異常), L4(品質確認), L5(品質確認)
+        # → groups: 品質確認=4, 設備異常=1
+        all_summary = get_wip_hold_summary()
+        reasons = {item['reason']: item['lots'] for item in all_summary['items']}
+        self.assertEqual(reasons.get('品質確認'), 4)
+        self.assertEqual(reasons.get('設備異常'), 1)
+
+        # BOP=EAC17: L1, L2, L4 → 品質確認=3 only
+        bop17 = get_wip_hold_summary(bop='EAC17')
+        reasons17 = {item['reason']: item['lots'] for item in bop17['items']}
+        self.assertEqual(reasons17.get('品質確認'), 3)
+        self.assertNotIn('設備異常', reasons17)
+
+    @patch('mes_dashboard.services.wip_service.get_cached_wip_data')
+    def test_wip_hold_summary_snapshot_empty_when_filter_excludes_all(self, mock_cached_wip):
+        mock_cached_wip.return_value = self._sample_df_with_non_indexed()
+
+        result = get_wip_hold_summary(bop='NONEXISTENT')
+        self.assertEqual(result['items'], [])
+
+
 class TestHoldOverviewServiceOracleFallback(unittest.TestCase):
     """Test reason filtering behavior on Oracle fallback path."""
 

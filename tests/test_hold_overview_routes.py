@@ -63,6 +63,9 @@ class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
             firstname=None,
             waferdesc=None,
             include_dummy=False,
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
     @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary')
@@ -87,6 +90,9 @@ class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
             firstname=None,
             waferdesc=None,
             include_dummy=False,
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
     def test_summary_invalid_hold_type(self):
@@ -130,6 +136,9 @@ class TestHoldOverviewMatrixRoute(TestHoldOverviewRoutesBase):
             pj_type=None,
             firstname=None,
             waferdesc=None,
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
     def test_matrix_invalid_hold_type(self):
@@ -207,6 +216,9 @@ class TestHoldOverviewLotsRoute(TestHoldOverviewRoutesBase):
             include_dummy=False,
             page=2,
             page_size=200,
+            workflow='',
+            bop='',
+            pj_function='',
         )
 
     @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
@@ -322,6 +334,74 @@ class TestHoldOverviewTreemapEdgeCases(TestHoldOverviewRoutesBase):
         self.assertEqual(response.status_code, 200)
         payload = json.loads(response.data)
         self.assertTrue(payload['success'])
+
+
+class TestHoldOverviewNonIndexedFilterForwarding(TestHoldOverviewRoutesBase):
+    """Regression: workflow/bop/pj_function must be forwarded to the service.
+
+    Bug history: routes silently dropped these params at the request layer; tests
+    used assert_called_once_with whitelists that omitted them, so the drop never
+    failed CI. These tests verify each non-indexed filter reaches the service
+    layer with the exact value supplied in the request.
+    """
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary')
+    def test_summary_forwards_workflow_bop_pj_function(self, mock_service):
+        mock_service.return_value = {
+            'totalLots': 0, 'totalQty': 0, 'avgAge': 0, 'maxAge': 0,
+            'workcenterCount': 0, 'dataUpdateDate': None,
+        }
+        self.client.get(
+            '/api/hold-overview/summary'
+            '?workflow=FLOW_A&bop=EAC17&pj_function=FUNC_Y'
+        )
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['workflow'], 'FLOW_A')
+        self.assertEqual(kw['bop'], 'EAC17')
+        self.assertEqual(kw['pj_function'], 'FUNC_Y')
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_wip_matrix')
+    def test_matrix_forwards_workflow_bop_pj_function(self, mock_service):
+        mock_service.return_value = {
+            'workcenters': [], 'packages': [], 'matrix': {},
+            'workcenter_totals': {}, 'package_totals': {}, 'grand_total': 0,
+        }
+        self.client.get(
+            '/api/hold-overview/matrix'
+            '?workflow=FLOW_A&bop=EAC17&pj_function=FUNC_Y'
+        )
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['workflow'], 'FLOW_A')
+        self.assertEqual(kw['bop'], 'EAC17')
+        self.assertEqual(kw['pj_function'], 'FUNC_Y')
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_forwards_workflow_bop_pj_function(self, mock_service):
+        mock_service.return_value = {
+            'lots': [],
+            'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 1},
+            'filters': {},
+        }
+        self.client.get(
+            '/api/hold-overview/lots'
+            '?workflow=FLOW_A&bop=EAC17&pj_function=FUNC_Y'
+        )
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['workflow'], 'FLOW_A')
+        self.assertEqual(kw['bop'], 'EAC17')
+        self.assertEqual(kw['pj_function'], 'FUNC_Y')
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary')
+    def test_summary_forwards_multi_value_csv(self, mock_service):
+        """Multi-select CSV values (comma-separated) must reach the service intact."""
+        mock_service.return_value = {
+            'totalLots': 0, 'totalQty': 0, 'avgAge': 0, 'maxAge': 0,
+            'workcenterCount': 0, 'dataUpdateDate': None,
+        }
+        self.client.get('/api/hold-overview/summary?bop=EAC17,EAC18&workflow=A,B')
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['bop'], 'EAC17,EAC18')
+        self.assertEqual(kw['workflow'], 'A,B')
 
 
 class TestHoldOverviewSummaryPostCompat(TestHoldOverviewRoutesBase):
