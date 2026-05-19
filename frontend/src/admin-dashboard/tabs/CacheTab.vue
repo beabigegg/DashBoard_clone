@@ -14,9 +14,12 @@ import {
   usePerfDetail,
   usePerfHistory,
 } from '../../admin-shared/composables/useAdminData';
+import { useLastUpdated } from '../../admin-shared/composables/useLastUpdated';
+import { formatDuration } from '../../admin-shared/utils/formatDuration';
 
 const perfDetailHook = usePerfDetail();
 const historyHook = usePerfHistory(30, 30);
+const { lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 const perfDetail = computed(() => perfDetailHook.data.value || null);
 const historyData = computed(() => historyHook.data.value || []);
@@ -77,6 +80,7 @@ async function refresh() {
     perfDetailHook.refresh(),
     historyHook.refresh(),
   ]);
+  markUpdated();
 }
 
 defineExpose({ refresh });
@@ -88,6 +92,7 @@ onMounted(() => {
 
 <template>
   <div class="cache-tab">
+    <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
     <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <SectionCard v-if="perfDetail?.redis">
@@ -108,9 +113,9 @@ onMounted(() => {
           </SummaryCardGroup>
           <h3 class="sub-title">診斷指標</h3>
           <SummaryCardGroup :columns="3">
-            <SummaryCard label="逐出鍵數" :value="perfDetail.redis.evicted_keys != null ? perfDetail.redis.evicted_keys : 'N/A'" accent="danger" />
+            <SummaryCard label="逐出鍵數" :value="perfDetail.redis.evicted_keys != null ? perfDetail.redis.evicted_keys : 'N/A'" accent="danger" :warningThreshold="1" /><!-- threshold=1: integer counter; >=1 == >0 -->
             <SummaryCard label="過期鍵數" :value="perfDetail.redis.expired_keys != null ? perfDetail.redis.expired_keys : 'N/A'" accent="neutral" />
-            <SummaryCard label="碎片率" :value="perfDetail.redis.mem_fragmentation_ratio != null ? Number(perfDetail.redis.mem_fragmentation_ratio).toFixed(2) : 'N/A'" accent="info" tooltip="建議值：1.0–1.5；>1.5 表示記憶體碎片化嚴重" />
+            <SummaryCard label="碎片率" :value="perfDetail.redis.mem_fragmentation_ratio != null ? Number(perfDetail.redis.mem_fragmentation_ratio).toFixed(2) : 'N/A'" accent="info" tooltip="建議值：1.0–1.5；>1.5 表示記憶體碎片化嚴重" :warningThreshold="1.5" :dangerThreshold="2.0" />
           </SummaryCardGroup>
         </div>
         <div class="redis-namespaces">
@@ -122,7 +127,7 @@ onMounted(() => {
             <h3 class="sub-title">慢查詢紀錄</h3>
             <ul v-if="perfDetail.redis.slowlog && perfDetail.redis.slowlog.length > 0" class="list-none p-0 m-0 font-mono text-xs space-y-1">
               <li v-for="entry in perfDetail.redis.slowlog" :key="entry.id">
-                {{ entry.command }} — {{ entry.duration_us }}μs
+                {{ entry.command }} — {{ formatDuration(entry.duration_us) }}
               </li>
             </ul>
             <p v-else class="muted">無慢查詢記錄</p>
@@ -136,7 +141,6 @@ onMounted(() => {
     </SectionCard>
 
     <TrendChart
-      v-if="historyData.length > 1"
       title="Redis 記憶體趨勢"
       :snapshots="historyData"
       :series="redisTrendSeries"
@@ -170,7 +174,6 @@ onMounted(() => {
     </SectionCard>
 
     <TrendChart
-      v-if="historyData.length > 1"
       title="快取命中率趨勢"
       :snapshots="historyData"
       :series="hitRateTrendSeries"

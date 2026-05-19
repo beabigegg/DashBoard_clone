@@ -193,9 +193,11 @@ describe('PerfDetail — admin-perf-detail-ui', () => {
     await wrapper.vm.$nextTick();
     const html = wrapper.html();
     expect(html).toContain('HGETALL cache:wip');
-    expect(html).toContain('50000');
+    // duration_us: 50000 → formatDuration renders as "50.0ms"
+    expect(html).toContain('50.0ms');
     expect(html).toContain('GET session:abc');
-    expect(html).toContain('30000');
+    // duration_us: 30000 → formatDuration renders as "30.0ms"
+    expect(html).toContain('30.0ms');
     // Must have list items
     expect(wrapper.findAll('li').length).toBeGreaterThanOrEqual(2);
   });

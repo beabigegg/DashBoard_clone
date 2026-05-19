@@ -1,0 +1,19 @@
+change-id: admin-dashboard-ux
+agent: test-strategist
+timestamp: "2026-05-19T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/admin-dashboard-ux/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-shared/components/__tests__/SummaryCard.test.ts — frontend/src/admin-shared/components/SummaryCard.vue" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-shared/components/__tests__/TrendChart.test.ts — frontend/src/admin-shared/components/TrendChart.vue" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-dashboard/tabs/__tests__/OverviewTab.test.ts — frontend/src/admin-dashboard/tabs/OverviewTab.vue" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts — frontend/src/admin-dashboard/tabs/WorkerTab.vue" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-dashboard/tabs/__tests__/CacheTab.test.ts — frontend/src/admin-dashboard/tabs/CacheTab.vue" }
+  - { type: coverage-tiers, pointer: "unit, integration" }
+  - { type: mapping-completeness, pointer: "all 8 AC mapped; existing PerfDetail.test.ts covers AC-8 regression with no modification needed" }
+next-action: none
+notes: >
+  SummaryCard.vue does not yet exist at admin-shared (it lives at shared-ui); tests are written TDD-first
+  so they must fail before implementation. TrendChart empty state second line is missing in current code.
+  OverviewTab currently places Active Alerts last; WorkerTab currently places 2 TrendCharts before SectionCards.
+  Duration formatter in CacheTab renders raw μs with no tier switching. All four are confirmed red paths.

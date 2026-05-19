@@ -17,9 +17,11 @@ import {
   usePerfDetail,
   usePerfHistory,
 } from '../../admin-shared/composables/useAdminData';
+import { useLastUpdated } from '../../admin-shared/composables/useLastUpdated';
 
 const perfDetailHook = usePerfDetail();
 const historyHook = usePerfHistory(30, 30);
+const { lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 const workerData = ref(null);
 const workerStatusError = ref('');
@@ -165,6 +167,7 @@ async function refresh() {
     historyHook.refresh(),
     loadWorkerStatus(),
   ]);
+  markUpdated();
 }
 
 defineExpose({ refresh });
@@ -176,24 +179,8 @@ onMounted(() => {
 
 <template>
   <div class="worker-tab">
+    <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
     <ErrorBanner :message="errorMessage" :dismissible="false" />
-
-    <TrendChart
-      v-if="historyData.length > 1"
-      title="Process / Server RSS 趨勢"
-      :snapshots="historyData"
-      :series="memoryTrendSeries"
-      yAxisLabel="MB"
-    />
-
-    <TrendChart
-      v-if="historyData.length > 1"
-      title="System 全機記憶體趨勢"
-      :snapshots="historyData"
-      :series="systemMemoryTrendSeries"
-      yAxisLabel="%"
-      :yMax="100"
-    />
 
     <SectionCard v-if="perfDetail?.worker_memory_guard?.enabled">
       <template #header><h2 class="panel-title">記憶體守衛</h2></template>
@@ -344,20 +331,6 @@ onMounted(() => {
       <p class="muted">RQ Worker 監控不可用</p>
     </SectionCard>
 
-    <TrendChart
-      v-if="historyData.length > 1"
-      title="非同步 Worker 趨勢"
-      :snapshots="historyData"
-      :series="asyncWorkerTrendSeries"
-    />
-
-    <TrendChart
-      v-if="historyData.length > 1"
-      title="佇列深度 & 槽位趨勢"
-      :snapshots="historyData"
-      :series="asyncQueueTrendSeries"
-    />
-
     <SectionCard>
       <template #header><h2 class="panel-title">Worker 控制</h2></template>
       <SummaryCardGroup :columns="3">
@@ -386,5 +359,32 @@ onMounted(() => {
         </div>
       </div>
     </SectionCard>
+
+    <TrendChart
+      title="Process / Server RSS 趨勢"
+      :snapshots="historyData"
+      :series="memoryTrendSeries"
+      yAxisLabel="MB"
+    />
+
+    <TrendChart
+      title="System 全機記憶體趨勢"
+      :snapshots="historyData"
+      :series="systemMemoryTrendSeries"
+      yAxisLabel="%"
+      :yMax="100"
+    />
+
+    <TrendChart
+      title="非同步 Worker 趨勢"
+      :snapshots="historyData"
+      :series="asyncWorkerTrendSeries"
+    />
+
+    <TrendChart
+      title="佇列深度 & 槽位趨勢"
+      :snapshots="historyData"
+      :series="asyncQueueTrendSeries"
+    />
   </div>
 </template>

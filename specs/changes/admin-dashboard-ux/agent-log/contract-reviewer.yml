@@ -1,0 +1,17 @@
+agent: contract-reviewer
+change-id: admin-dashboard-ux
+status: approved
+notes: >
+  All five UX changes are within existing registered contract surfaces.
+  No API, CSS inventory, env, data, business, or CI/CD contract documents
+  require version bumps or edits. Three implementation compliance obligations
+  flagged: (1) SummaryCard accent via props only — no external CSS override of
+  shared component internals; (2) all new CSS rules scoped under
+  .theme-admin-dashboard; (3) no new unregistered hex values outside ECharts
+  option objects.
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/css/css-inventory.md" }
+  - { type: contracts-reviewed, pointer: "contracts/css/css-contract.md" }
+  - { type: version-bumps, pointer: "none" }
+  - { type: breaking-changes, pointer: "none" }
+  - { type: consumers-impacted, pointer: "none" }

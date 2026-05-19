@@ -9,6 +9,9 @@ interface Props {
   tooltip?: string | null;
   clickable?: boolean;
   active?: boolean;
+  warningThreshold?: number;
+  dangerThreshold?: number;
+  thresholdValue?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -24,7 +27,14 @@ const emit = defineEmits<{
   (e: 'click'): void;
 }>();
 
-const accentColor = computed(() => props.accent ?? 'brand')
+const accentColor = computed(() => {
+  const cmp = props.thresholdValue ?? props.value
+  const n = Number(cmp)
+  if (!Number.isFinite(n)) return props.accent ?? 'brand'
+  if (props.dangerThreshold != null && n >= props.dangerThreshold) return 'danger'
+  if (props.warningThreshold != null && n >= props.warningThreshold) return 'warning'
+  return props.accent ?? 'brand'
+})
 
 const formattedValue = computed(() => {
   const v = props.value

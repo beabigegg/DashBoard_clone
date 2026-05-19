@@ -1,0 +1,9 @@
+change-id: admin-dashboard-ux
+agent: ci-gatekeeper
+timestamp: "2026-05-19T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (required), 2 (informational)" }
+  - { type: gate-promotions, pointer: "n/a (no tier changes; existing gates already cover all requirements)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; .github/workflows/frontend-tests.yml already covers all gates)" }
+  - { type: required-status-checks, pointer: "frontend-unit-tests (job in frontend-tests.yml)" }

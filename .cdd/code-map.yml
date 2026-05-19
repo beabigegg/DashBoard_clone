@@ -1,6 +1,6 @@
-# generated: 2026-05-19T03:14:32Z by cdd-kit 2.0.19
-# files: 767, src-lines: 212903, map-lines: 16289, compression: 13.1x
-# sources-digest: aaf6ed885dda053351bc85e7f5792892061f9d60b9f967b1bb350440314b906f
+# generated: 2026-05-19T06:04:38Z by cdd-kit 2.0.19
+# files: 776, src-lines: 213614, map-lines: 16365, compression: 13.1x
+# sources-digest: 433ea5e9395cd16a09d9e538c157d228992c8045e619ab35b9755345f9f327e4
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -97,7 +97,7 @@ frontend/src/admin-dashboard/main.ts:  # 8 lines
     - { module: '../styles/tailwind.css', items: [], line: 5 }
     - { module: './style.css', items: [], line: 6 }
 
-frontend/src/admin-dashboard/tabs/CacheTab.vue:  # 180 lines
+frontend/src/admin-dashboard/tabs/CacheTab.vue:  # 183 lines
   imports:
     - { module: vue, items: [computed, onMounted], line: 2 }
     - { module: '../../admin-shared/components/GaugeBar.vue', items: ['default:GaugeBar'], line: 4 }
@@ -110,33 +110,36 @@ frontend/src/admin-dashboard/tabs/CacheTab.vue:  # 180 lines
     - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 11 }
     - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 12 }
     - { module: '../../admin-shared/composables/useAdminData', items: [usePerfDetail, usePerfHistory], line: 13 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 17 }
+    - { module: '../../admin-shared/utils/formatDuration', items: [formatDuration], line: 18 }
   functions:
-    - { name: async refresh, lines: 75-80 }
+    - { name: async refresh, lines: 78-84 }
 
-frontend/src/admin-dashboard/tabs/LogsTab.vue:  # 266 lines
+frontend/src/admin-dashboard/tabs/LogsTab.vue:  # 270 lines
   imports:
     - { module: vue, items: [computed, onBeforeUnmount, onMounted, ref], line: 2 }
     - { module: '../../core/api.js', items: [apiPost], line: 4 }
     - { module: '../../core/datetime.js', items: [formatLogTime], line: 5 }
     - { module: '../../admin-shared/composables/useAdminData', items: [useLogs, useStorageInfo], line: 6 }
-    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 7 }
-    - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 8 }
-    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 9 }
-    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 10 }
-    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 11 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 7 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 8 }
+    - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 9 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 10 }
+    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 11 }
+    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 12 }
   functions:
-    - { name: async loadLogs, lines: 30-32 }
-    - { name: onLevelChange, lines: 34-37 }
-    - { name: onSearchInput, lines: 39-47 }
-    - { name: async cleanupLogs, lines: 49-64 }
-    - { name: async purgeMetricsHistory, lines: 66-79 }
-    - { name: async cleanupLogFiles, lines: 81-93 }
-    - { name: formatBytes, lines: 95-101 }
-    - { name: previousPage, lines: 103-107 }
-    - { name: nextPage, lines: 109-113 }
-    - { name: async refresh, lines: 121-123 }
+    - { name: async loadLogs, lines: 32-34 }
+    - { name: onLevelChange, lines: 36-39 }
+    - { name: onSearchInput, lines: 41-49 }
+    - { name: async cleanupLogs, lines: 51-66 }
+    - { name: async purgeMetricsHistory, lines: 68-81 }
+    - { name: async cleanupLogFiles, lines: 83-95 }
+    - { name: formatBytes, lines: 97-103 }
+    - { name: previousPage, lines: 105-109 }
+    - { name: nextPage, lines: 111-115 }
+    - { name: async refresh, lines: 123-126 }
 
-frontend/src/admin-dashboard/tabs/OverviewTab.vue:  # 260 lines
+frontend/src/admin-dashboard/tabs/OverviewTab.vue:  # 264 lines
   imports:
     - { module: vue, items: [computed, onMounted], line: 2 }
     - { module: '../../admin-shared/components/StatusDot.vue', items: ['default:StatusDot'], line: 4 }
@@ -147,11 +150,12 @@ frontend/src/admin-dashboard/tabs/OverviewTab.vue:  # 260 lines
     - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 9 }
     - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 10 }
     - { module: '../../admin-shared/composables/useAdminData', items: [useHealthSummary, usePerfHistory], line: 11 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 12 }
   functions:
-    - { name: mapServiceStatus, lines: 33-38 }
-    - { name: async refresh, lines: 155-157 }
+    - { name: mapServiceStatus, lines: 35-40 }
+    - { name: async refresh, lines: 157-160 }
 
-frontend/src/admin-dashboard/tabs/PerformanceTab.vue:  # 216 lines
+frontend/src/admin-dashboard/tabs/PerformanceTab.vue:  # 220 lines
   imports:
     - { module: vue, items: [computed, onBeforeUnmount, onMounted, ref], line: 2 }
     - { module: echarts/core, items: ['*:echarts'], line: 3 }
@@ -166,12 +170,13 @@ frontend/src/admin-dashboard/tabs/PerformanceTab.vue:  # 216 lines
     - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 13 }
     - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 14 }
     - { module: '../../admin-shared/composables/useAdminData', items: [useMetrics, usePerfDetail, usePerfHistory], line: 15 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 20 }
   functions:
-    - { name: updateLatencyChart, lines: 67-111 }
-    - { name: async refresh, lines: 113-120 }
-    - { name: formatBytes, lines: 135-145 }
+    - { name: updateLatencyChart, lines: 69-113 }
+    - { name: async refresh, lines: 115-123 }
+    - { name: formatBytes, lines: 138-148 }
 
-frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 155 lines
+frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 159 lines
   imports:
     - { module: vue, items: [computed, onMounted, ref], line: 2 }
     - { module: '../components/DauTrendChart.vue', items: ['default:DauTrendChart'], line: 4 }
@@ -189,10 +194,11 @@ frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 155 lines
     - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 16 }
     - { module: '../../admin-shared/components/TrendChart.vue', items: ['default:TrendChart'], line: 17 }
     - { module: '../../admin-shared/composables/useAdminData', items: [usePerfHistory, useUsageKpi], line: 18 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 19 }
   functions:
-    - { name: initDates, lines: 36-42 }
-    - { name: formatDuration, lines: 44-49 }
-    - { name: async refresh, lines: 51-53 }
+    - { name: initDates, lines: 38-44 }
+    - { name: formatSessionDuration, lines: 46-51 }
+    - { name: async refresh, lines: 53-56 }
 
 frontend/src/admin-dashboard/tabs/WorkerTab.vue:  # 390 lines
   imports:
@@ -210,14 +216,40 @@ frontend/src/admin-dashboard/tabs/WorkerTab.vue:  # 390 lines
     - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 14 }
     - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 15 }
     - { module: '../../admin-shared/composables/useAdminData', items: [usePerfDetail, usePerfHistory], line: 16 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 20 }
   functions:
-    - { name: workerStateColor, lines: 116-120 }
-    - { name: formatUptime, lines: 122-137 }
-    - { name: async loadWorkerStatus, lines: 139-147 }
-    - { name: async doRestart, lines: 149-160 }
-    - { name: async refresh, lines: 162-168 }
+    - { name: workerStateColor, lines: 118-122 }
+    - { name: formatUptime, lines: 124-139 }
+    - { name: async loadWorkerStatus, lines: 141-149 }
+    - { name: async doRestart, lines: 151-162 }
+    - { name: async refresh, lines: 164-171 }
 
-frontend/src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts:  # 277 lines
+frontend/src/admin-dashboard/tabs/__tests__/CacheTab.test.ts:  # 266 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../CacheTab.vue', items: ['default:CacheTab'], line: 57 }
+    - { module: '../PerformanceTab.vue', items: ['default:PerformanceTab'], line: 59 }
+  constants:
+    - { name: REDIS_BASE, line: 61 }
+  functions:
+    - { name: makePayload, lines: 73-85 }
+    - { name: mountCache, lines: 87-90 }
+    - { name: mountPerf, lines: 92-95 }
+
+frontend/src/admin-dashboard/tabs/__tests__/OverviewTab.test.ts:  # 120 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../OverviewTab.vue', items: ['default:OverviewTab'], line: 45 }
+  constants:
+    - { name: HEALTH_PAYLOAD, line: 47 }
+  functions:
+    - { name: mountOverview, lines: 58-62 }
+
+frontend/src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts:  # 279 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 18 }
     - { module: '@vue/test-utils', items: [mount], line: 19 }
@@ -234,6 +266,17 @@ frontend/src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts:  # 277 lines
     - { name: makeFullPayload, lines: 130-152 }
     - { name: mountCache, lines: 155-158 }
     - { name: mountPerf, lines: 161-164 }
+
+frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../WorkerTab.vue', items: ['default:WorkerTab'], line: 61 }
+  constants:
+    - { name: WORKER_PAYLOAD, line: 63 }
+  functions:
+    - { name: mountWorker, lines: 86-90 }
 
 frontend/src/admin-pages/App.vue:  # 182 lines
 
@@ -254,7 +297,25 @@ frontend/src/admin-shared/components/StatCard.vue:  # 24 lines
 
 frontend/src/admin-shared/components/StatusDot.vue:  # 13 lines
 
-frontend/src/admin-shared/components/TrendChart.vue:  # 110 lines
+frontend/src/admin-shared/components/TrendChart.vue:  # 113 lines
+
+frontend/src/admin-shared/components/__tests__/SummaryCard.test.ts:  # 43 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: '../../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 4 }
+
+frontend/src/admin-shared/components/__tests__/TrendChart.test.ts:  # 37 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../TrendChart.vue', items: ['default:TrendChart'], line: 10 }
+
+frontend/src/admin-shared/composables/__tests__/useLastUpdated.test.ts:  # 30 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 2 }
+    - { module: '../useLastUpdated', items: [useLastUpdated], line: 3 }
 
 frontend/src/admin-shared/composables/useAdminData.ts:  # 280 lines
   imports:
@@ -284,7 +345,22 @@ frontend/src/admin-shared/composables/useAdminData.ts:  # 280 lines
     - { name: PerfSnapshot, lines: 170-179 }  # local
     - { name: HealthPayload, lines: 253-257 }  # local
 
+frontend/src/admin-shared/composables/useLastUpdated.ts:  # 15 lines
+  imports:
+    - { module: vue, items: [ref, Ref], line: 1 }
+  functions:
+    - { name: useLastUpdated, lines: 3-15 }
+
 frontend/src/admin-shared/index.ts:  # 14 lines
+
+frontend/src/admin-shared/utils/__tests__/formatDuration.test.ts:  # 13 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '../formatDuration', items: [formatDuration], line: 3 }
+
+frontend/src/admin-shared/utils/formatDuration.ts:  # 6 lines
+  functions:
+    - { name: formatDuration, lines: 1-6 }
 
 frontend/src/anomaly-overview/App.vue:  # 521 lines
   imports:
@@ -1734,7 +1810,7 @@ frontend/src/shared-ui/components/SkeletonLoader.vue:  # 153 lines
 
 frontend/src/shared-ui/components/StatusBadge.vue:  # 57 lines
 
-frontend/src/shared-ui/components/SummaryCard.vue:  # 218 lines
+frontend/src/shared-ui/components/SummaryCard.vue:  # 228 lines
 
 frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
@@ -3206,7 +3282,7 @@ src/mes_dashboard/core/database.py:  # 1186 lines
     - { name: get_table_data, lines: 984-1068 }
     - { name: get_table_column_metadata, lines: 1071-1186 }
 
-src/mes_dashboard/core/duckdb_runtime.py:  # 187 lines
+src/mes_dashboard/core/duckdb_runtime.py:  # 182 lines
   imports:
     - { module: __future__, items: [annotations], line: 29 }
     - { module: logging, items: [], line: 31 }
@@ -3225,8 +3301,8 @@ src/mes_dashboard/core/duckdb_runtime.py:  # 187 lines
     - { name: _str_env, lines: 45-46 }
     - { name: _int_env, lines: 49-56 }
     - { name: create_heavy_query_connection, lines: 87-124 }
-    - { name: get_duckdb_telemetry, lines: 127-165 }
-    - { name: assert_spool_path, lines: 168-187 }
+    - { name: get_duckdb_telemetry, lines: 127-160 }
+    - { name: assert_spool_path, lines: 163-182 }
 
 src/mes_dashboard/core/exceptions.py:  # 97 lines
   imports:
@@ -4045,7 +4121,7 @@ src/mes_dashboard/routes/__init__.py:  # 76 lines
   functions:
     - { name: register_routes, lines: 30-51 }
 
-src/mes_dashboard/routes/admin_routes.py:  # 1483 lines
+src/mes_dashboard/routes/admin_routes.py:  # 1495 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -4080,33 +4156,33 @@ src/mes_dashboard/routes/admin_routes.py:  # 1483 lines
     - { name: _count_mysql_logs, lines: 355-383 }
     - { name: _collect_spool_disk_usage, lines: 386-418 }
     - { name: _collect_redis_namespace_memory, lines: 421-465 }
-    - { name: api_performance_detail, lines: 470-665 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
-    - { name: api_performance_history, lines: 670-700 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
-    - { name: _query_mysql_metrics, lines: 703-764 }
-    - { name: api_performance_history_purge, lines: 769-775 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
-    - { name: api_storage_info, lines: 780-850 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
-    - { name: api_log_files_cleanup, lines: 855-903 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
-    - { name: api_logs_cleanup, lines: 908-959 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
-    - { name: _get_restart_state, lines: 966-968 }
-    - { name: _iso_from_epoch, lines: 971-974 }
-    - { name: _check_restart_cooldown, lines: 977-986 }
-    - { name: _get_restart_history, lines: 989-992 }
-    - { name: _get_restart_churn_summary, lines: 995-998 }
-    - { name: _get_restart_policy_state, lines: 1001-1021 }
-    - { name: _build_restart_alerts, lines: 1024-1042 }
-    - { name: _log_restart_audit, lines: 1045-1052 }
-    - { name: api_worker_restart, lines: 1057-1182 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
-    - { name: api_worker_status, lines: 1187-1279 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
-    - { name: user_usage_kpi, lines: 1288-1290 }  # @admin_bp.route('/user-usage-kpi')
-    - { name: api_user_usage_kpi, lines: 1295-1314 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
-    - { name: pages, lines: 1323-1347 }  # @admin_bp.route('/pages')
-    - { name: api_get_pages, lines: 1352-1354 }  # @admin_bp.route('/api/pages', methods=['GET'])
-    - { name: api_get_drawers, lines: 1359-1361 }  # @admin_bp.route('/api/drawers', methods=['GET'])
-    - { name: api_create_drawer, lines: 1366-1383 }  # @admin_bp.route('/api/drawers', methods=['POST'])
-    - { name: api_update_drawer, lines: 1388-1415 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['PUT'])
-    - { name: api_delete_drawer, lines: 1420-1432 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['DELETE'])
-    - { name: api_update_page, lines: 1437-1470 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
-    - { name: recalculate_anomaly_detection, lines: 1475-1483 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
+    - { name: api_performance_detail, lines: 470-677 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
+    - { name: api_performance_history, lines: 682-712 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
+    - { name: _query_mysql_metrics, lines: 715-776 }
+    - { name: api_performance_history_purge, lines: 781-787 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
+    - { name: api_storage_info, lines: 792-862 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
+    - { name: api_log_files_cleanup, lines: 867-915 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
+    - { name: api_logs_cleanup, lines: 920-971 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
+    - { name: _get_restart_state, lines: 978-980 }
+    - { name: _iso_from_epoch, lines: 983-986 }
+    - { name: _check_restart_cooldown, lines: 989-998 }
+    - { name: _get_restart_history, lines: 1001-1004 }
+    - { name: _get_restart_churn_summary, lines: 1007-1010 }
+    - { name: _get_restart_policy_state, lines: 1013-1033 }
+    - { name: _build_restart_alerts, lines: 1036-1054 }
+    - { name: _log_restart_audit, lines: 1057-1064 }
+    - { name: api_worker_restart, lines: 1069-1194 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
+    - { name: api_worker_status, lines: 1199-1291 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
+    - { name: user_usage_kpi, lines: 1300-1302 }  # @admin_bp.route('/user-usage-kpi')
+    - { name: api_user_usage_kpi, lines: 1307-1326 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
+    - { name: pages, lines: 1335-1359 }  # @admin_bp.route('/pages')
+    - { name: api_get_pages, lines: 1364-1366 }  # @admin_bp.route('/api/pages', methods=['GET'])
+    - { name: api_get_drawers, lines: 1371-1373 }  # @admin_bp.route('/api/drawers', methods=['GET'])
+    - { name: api_create_drawer, lines: 1378-1395 }  # @admin_bp.route('/api/drawers', methods=['POST'])
+    - { name: api_update_drawer, lines: 1400-1427 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['PUT'])
+    - { name: api_delete_drawer, lines: 1432-1444 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['DELETE'])
+    - { name: api_update_page, lines: 1449-1482 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
+    - { name: recalculate_anomaly_detection, lines: 1487-1495 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
 
 src/mes_dashboard/routes/ai_routes.py:  # 75 lines
   imports:

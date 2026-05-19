@@ -17,12 +17,14 @@ import {
   usePerfDetail,
   usePerfHistory,
 } from '../../admin-shared/composables/useAdminData';
+import { useLastUpdated } from '../../admin-shared/composables/useLastUpdated';
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
 const metricsHook = useMetrics();
 const perfDetailHook = usePerfDetail();
 const historyHook = usePerfHistory(30, 30);
+const { lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 const latencyChartRef = ref(null);
 let chartInstance = null;
@@ -117,6 +119,7 @@ async function refresh() {
     historyHook.refresh(),
   ]);
   updateLatencyChart();
+  markUpdated();
 }
 
 defineExpose({ refresh });
@@ -147,6 +150,7 @@ function formatBytes(bytes) {
 
 <template>
   <div class="performance-tab">
+    <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
     <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <SectionCard>
@@ -197,7 +201,7 @@ function formatBytes(bytes) {
     <SectionCard v-if="perfDetail?.duckdb">
       <template #header><h2 class="panel-title">DuckDB</h2></template>
       <SummaryCardGroup :columns="2">
-        <SummaryCard label="Temp 目錄大小" :value="formatBytes(perfDetail.duckdb.temp_dir_bytes)" accent="info" />
+        <SummaryCard label="Temp 目錄大小" :value="formatBytes(perfDetail.duckdb.temp_dir_bytes)" accent="info" :thresholdValue="perfDetail.duckdb.temp_dir_bytes" :warningThreshold="524288000" />
         <SummaryCard label="記憶體上限" :value="perfDetail.duckdb.memory_limit_state != null ? perfDetail.duckdb.memory_limit_state : 'N/A'" accent="neutral" />
       </SummaryCardGroup>
     </SectionCard>

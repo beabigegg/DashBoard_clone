@@ -1,0 +1,16 @@
+agent: ui-ux-reviewer
+change-id: admin-dashboard-ux
+verdict: approved-after-fixes
+notes: >
+  One blocking finding resolved: CacheTab v-if guards bypassed TrendChart empty state
+  (AC-7 was not met for CacheTab). Fixed by removing v-if="historyData.length > 1" guards.
+  Additional fixes applied: "Active Alerts" renamed to "系統警示" for language consistency;
+  TrendChart aria-label now uses title prop; last-updated div has role=status aria-live=polite;
+  UsageTab local formatDuration renamed to formatSessionDuration to avoid naming collision.
+  Non-blocking backlog items recorded: deadWorkerAlert banner CSS consistency, WorkerTab
+  window.alert on restart error, LogsTab window.confirm/alert pattern, sticky last-updated
+  header for long-scrolling tabs.
+artifacts:
+  - { type: journeys-reviewed, pointer: "all 6 tabs: alerts hierarchy, worker trend demotion, slowlog formatting, threshold colors, last-updated label, TrendChart empty state" }
+  - { type: blocking-findings, pointer: "CacheTab v-if bypassed AC-7 — fixed inline" }
+  - { type: a11y-fixes, pointer: "TrendChart dynamic aria-label, last-updated role=status aria-live=polite" }

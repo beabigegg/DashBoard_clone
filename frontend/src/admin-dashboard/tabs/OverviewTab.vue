@@ -9,9 +9,11 @@ import SectionCard from '../../shared-ui/components/SectionCard.vue';
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 import { useHealthSummary, usePerfHistory } from '../../admin-shared/composables/useAdminData';
+import { useLastUpdated } from '../../admin-shared/composables/useLastUpdated';
 
 const healthHook = useHealthSummary();
 const historyHook = usePerfHistory(30, 30);
+const { lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 const healthData = computed(() => healthHook.data.value || {});
 const historyData = computed(() => historyHook.data.value || []);
@@ -154,6 +156,7 @@ const errorMessage = computed(() => healthHook.error.value || historyHook.error.
 
 async function refresh() {
   await Promise.all([healthHook.refresh(), historyHook.refresh()]);
+  markUpdated();
 }
 
 defineExpose({ refresh });
@@ -165,11 +168,22 @@ onMounted(() => {
 
 <template>
   <div class="overview-tab">
+    <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
     <section v-if="isInitialLoading" class="panel">
       <BlockLoadingState text="載入總覽資料中..." />
     </section>
 
     <ErrorBanner :message="errorMessage" :dismissible="false" />
+
+    <SectionCard>
+      <template #header><h2 class="panel-title">系統警示</h2></template>
+      <ul v-if="warnings.length" class="overview-alert-list">
+        <li v-for="(entry, index) in warnings" :key="`${entry}-${index}`">
+          {{ entry }}
+        </li>
+      </ul>
+      <p v-else class="muted">目前無警示訊息</p>
+    </SectionCard>
 
     <SectionCard>
       <template #header><h2 class="panel-title">系統健康總覽</h2></template>
@@ -245,16 +259,6 @@ onMounted(() => {
           height="180px"
         />
       </div>
-    </SectionCard>
-
-    <SectionCard>
-      <template #header><h2 class="panel-title">Active Alerts</h2></template>
-      <ul v-if="warnings.length" class="overview-alert-list">
-        <li v-for="(entry, index) in warnings" :key="`${entry}-${index}`">
-          {{ entry }}
-        </li>
-      </ul>
-      <p v-else class="muted">目前無警示訊息</p>
     </SectionCard>
   </div>
 </template>

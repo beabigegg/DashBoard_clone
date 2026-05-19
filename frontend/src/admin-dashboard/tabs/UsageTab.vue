@@ -16,6 +16,7 @@ import SummaryCard from '../../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue';
 import TrendChart from '../../admin-shared/components/TrendChart.vue';
 import { usePerfHistory, useUsageKpi } from '../../admin-shared/composables/useAdminData';
+import { useLastUpdated } from '../../admin-shared/composables/useLastUpdated';
 
 const startDate = ref('');
 const endDate = ref('');
@@ -23,6 +24,7 @@ const department = ref('');
 
 const usageHook = useUsageKpi(startDate, endDate, department);
 const historyHook = usePerfHistory(60, 30);
+const { lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 const kpiData = computed(() => usageHook.data.value || null);
 const loading = computed(() => usageHook.loading.value);
@@ -41,7 +43,7 @@ function initDates() {
   startDate.value = start.toISOString().slice(0, 10);
 }
 
-function formatDuration(seconds) {
+function formatSessionDuration(seconds) {
   if (seconds == null || seconds === 0) return '-';
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
@@ -50,6 +52,7 @@ function formatDuration(seconds) {
 
 async function refresh() {
   await Promise.all([usageHook.refresh(), historyHook.refresh()]);
+  markUpdated();
 }
 
 defineExpose({ refresh });
@@ -62,6 +65,7 @@ onMounted(() => {
 
 <template>
   <div class="usage-tab">
+    <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
     <section class="panel">
       <h2 class="panel-title">用戶 KPI</h2>
       <div class="usage-filter-bar">
@@ -103,7 +107,7 @@ onMounted(() => {
         <SummaryCardGroup :columns="4">
           <SummaryCard label="不重複使用者" :value="kpiData.overview?.unique_users" accent="brand" />
           <SummaryCard label="總登入次數" :value="kpiData.overview?.total_sessions" accent="info" />
-          <SummaryCard label="平均使用時長" :value="formatDuration(kpiData.overview?.avg_duration_sec)" accent="success" />
+          <SummaryCard label="平均使用時長" :value="formatSessionDuration(kpiData.overview?.avg_duration_sec)" accent="success" />
           <SummaryCard label="目前在線" :value="kpiData.overview?.active_sessions" accent="warning" />
         </SummaryCardGroup>
       </SectionCard>

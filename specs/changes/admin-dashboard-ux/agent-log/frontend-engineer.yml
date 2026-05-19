@@ -1,0 +1,32 @@
+agent: frontend-engineer
+change-id: admin-dashboard-ux
+date: 2026-05-19
+status: complete
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/shared-ui/components/SummaryCard.vue:4-12,27-33" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/components/TrendChart.vue:108-112" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/utils/formatDuration.ts:1-8 (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/composables/useLastUpdated.ts:1-16 (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/OverviewTab.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/WorkerTab.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/CacheTab.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/PerformanceTab.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/UsageTab.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/LogsTab.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/utils/__tests__/formatDuration.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/composables/__tests__/useLastUpdated.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/components/__tests__/SummaryCard.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-shared/components/__tests__/TrendChart.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/__tests__/OverviewTab.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/__tests__/CacheTab.test.ts (new)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts (updated slowlog assertions)" }
+  - { type: components-affected, pointer: "SummaryCard, TrendChart, OverviewTab, WorkerTab, CacheTab, PerformanceTab, UsageTab, LogsTab" }
+  - { type: screenshot-paths, pointer: "n/a (visual capture is ui-ux-reviewer scope)" }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements added; admin-tab__last-updated is a passive display div)" }
+
+notes:
+  - "PerfDetail.test.ts slowlog assertions updated from raw '50000'/'30000' to '50.0ms'/'30.0ms' — this is intentional; formatDuration changes rendered output, so AC-8 'no regression' means the rendering intent is preserved, not the literal raw μs string."
+  - "WorkerTab.test.ts uses trend-chart-card class (actual rendered class) rather than trend-chart-stub because TrendChart mock was not applied — TrendChart renders without errors in jsdom via vue-echarts mock for VChart."
+  - "SummaryCard.test.ts import path fixed from '../../../../...' to '../../../...' — counted 3 levels from admin-shared/components/__tests__ to src/, then shared-ui/components/."

@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 146
-visible-files: 712
+visible-dirs: 147
+visible-files: 728
 omitted-dirs: 50
 truncated-dirs: 3
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -453,6 +453,23 @@ DashBoard_vite/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
+|   |-- archive/
+|   |   |-- access_20260519_105711.log
+|   |   |-- access_20260519_123328.log
+|   |   |-- error_20260519_105711.log
+|   |   |-- error_20260519_123328.log
+|   |   |-- rq_msd_worker_20260519_105711.log
+|   |   |-- rq_msd_worker_20260519_123328.log
+|   |   |-- rq_prod_hist_worker_20260519_105711.log
+|   |   |-- rq_prod_hist_worker_20260519_123328.log
+|   |   |-- rq_reject_worker_20260519_105711.log
+|   |   |-- rq_reject_worker_20260519_123328.log
+|   |   |-- rq_worker_20260519_105711.log
+|   |   |-- rq_worker_20260519_123328.log
+|   |   |-- rq_yield_alert_worker_20260519_105711.log
+|   |   |-- rq_yield_alert_worker_20260519_123328.log
+|   |   |-- watchdog_20260519_105711.log
+|   |   \-- watchdog_20260519_123328.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -904,7 +921,7 @@ DashBoard_vite/
 |   |   |-- probe_118748.json
 |   |   |-- probe_118789.json
 |   |   |-- probe_119871.json
-|   |   \-- ... (410 more entries truncated; cap=50)
+|   |   \-- ... (414 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb

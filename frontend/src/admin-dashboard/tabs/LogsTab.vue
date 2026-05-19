@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { apiPost } from '../../core/api.js';
 import { formatLogTime } from '../../core/datetime.js';
 import { useLogs, useStorageInfo } from '../../admin-shared/composables/useAdminData';
+import { useLastUpdated } from '../../admin-shared/composables/useLastUpdated';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 import SectionCard from '../../shared-ui/components/SectionCard.vue';
@@ -19,6 +20,7 @@ const storagePurging = ref(false);
 
 const logsHook = useLogs(logLevel, logSearch, logLimit, logOffset);
 const storageHook = useStorageInfo();
+const { lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 const logsData = computed(() => logsHook.data.value || null);
 const logsLoading = computed(() => logsHook.loading.value);
@@ -120,6 +122,7 @@ const totalPages = computed(() => {
 
 async function refresh() {
   await Promise.all([logsHook.refresh(), storageHook.refresh()]);
+  markUpdated();
 }
 
 defineExpose({ refresh });
@@ -137,6 +140,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="logs-tab">
+    <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
     <ErrorBanner :message="errorMessage" :dismissible="false" />
 
     <SectionCard>

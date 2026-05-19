@@ -1,0 +1,13 @@
+agent: qa-reviewer
+change-id: admin-dashboard-ux
+verdict: release-ready
+artifacts:
+  - { type: gate-results, pointer: "vitest: 402 passed / 1 skipped / 0 failed; css:check: 0 errors 47 pre-existing warnings; type-check: clean" }
+  - { type: ac-coverage, pointer: "AC-1..AC-8: met by 9 test files + existing PerfDetail.test.ts" }
+  - { type: decision, pointer: "release-ready" }
+notes: >
+  CacheTab v-if bypass (AC-7) fixed inline by ui-ux-reviewer finding.
+  Active Alerts renamed to 系統警示 for language consistency.
+  A11y: TrendChart aria-label now dynamic; last-updated div has role=status aria-live=polite.
+  Non-blocking backlog: deadWorkerAlert banner CSS, WorkerTab window.alert, LogsTab
+  window.confirm/alert, sticky last-updated header.

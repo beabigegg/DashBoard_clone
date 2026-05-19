@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 609553a7b1c823d2de6953e79829ed0fd19344cc41ee89bb780378f0694d0c74
+inputs-digest: 59de2d16d456d4c154073cd46287735cb6feb010b812df950b579cc96ab4e199
 ---
 
 # Contracts Index
@@ -109,10 +109,10 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - type: css-inventory
 - directory: contracts/css
 - title: CSS Inventory (Governed Source List)
-- schema-version: 1.2.1
+- schema-version: 1.2.2
 - owner: application-team
 - surface: ui
-- last-changed: 2026-05-18
+- last-changed: 2026-05-19
 - summary: Governed inventory of authored CSS source files under frontend/src/.
 
 
