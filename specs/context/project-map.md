@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 148
-visible-files: 744
-omitted-dirs: 51
-truncated-dirs: 3
+visible-dirs: 161
+visible-files: 760
+omitted-dirs: 55
+truncated-dirs: 4
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -47,6 +47,64 @@ DashBoard_vite/
 |       |-- released-pages-hardening-gates.yml
 |       |-- soak-tests.yml
 |       \-- stress-tests.yml
+|-- .hypothesis/
+|   |-- constants/
+|   |   |-- 00731426b90af740
+|   |   |-- 00e4935d1440a2ca
+|   |   |-- 0199bae5456ba1ac
+|   |   |-- 01cb19e636d04082
+|   |   |-- 02bca2c9d2f8566d
+|   |   |-- 03d72be617fe07b9
+|   |   |-- 0478f49b48ee4a27
+|   |   |-- 04f75a340f5aee98
+|   |   |-- 06e37be44b7c2558
+|   |   |-- 09af02b32eace3be
+|   |   |-- 0ac8c61031ebb16b
+|   |   |-- 0bb0d7320a5cea09
+|   |   |-- 0c14e8a6e0dfaa9a
+|   |   |-- 0e749cfd569a40b7
+|   |   |-- 0f2d4ac438e36262
+|   |   |-- 0fb4599ed66628f4
+|   |   |-- 15a2721810beed32
+|   |   |-- 17a6952f61650689
+|   |   |-- 1fcb892092629696
+|   |   |-- 2079893a07ce42c4
+|   |   |-- 20a29d650996dc03
+|   |   |-- 22775c7be38c0fc8
+|   |   |-- 2487e0dd67ee4005
+|   |   |-- 2513622121cc3cd3
+|   |   |-- 253e6c94fab987bc
+|   |   |-- 25db02c884e47e34
+|   |   |-- 263226a93d9fd720
+|   |   |-- 267688019eacc507
+|   |   |-- 296b4f265252c452
+|   |   |-- 2b2923cb2e7b99f7
+|   |   |-- 2bfc933af50d6a1b
+|   |   |-- 2f2ae64af48e93fe
+|   |   |-- 2f46fe56abf81670
+|   |   |-- 314c411df6192c80
+|   |   |-- 327c52ae13744797
+|   |   |-- 3399b41644e40c25
+|   |   |-- 3453e8fac951ce5c
+|   |   |-- 37d084e6562ef65a
+|   |   |-- 392d6328bece7db8
+|   |   |-- 397bc9bcb3adb4ac
+|   |   |-- 3d3226e8accbac08
+|   |   |-- 3dc02da381254368
+|   |   |-- 4093a4056e3ed640
+|   |   |-- 40bd549cffe1dc41
+|   |   |-- 41d662f99bd58f37
+|   |   |-- 436a639fd17d1c38
+|   |   |-- 46b03a60678f44dd
+|   |   |-- 471dc2d32d0357fb
+|   |   |-- 47b65f8dbbcf8e4a
+|   |   |-- 4a9dd532b412d992
+|   |   \-- ... (90 more entries truncated; cap=50)
+|   |-- unicode_data/
+|   |   \-- 14.0.0/
+|   |       |-- charmap.json.gz
+|   |       \-- codec-utf-8.json.gz
+|   \-- .gitignore
 |-- ci/
 |   |-- gate-policy.md
 |   |-- playwright-nightly.md
@@ -87,12 +145,15 @@ DashBoard_vite/
 |   |-- page_status.json
 |   \-- table_schema_info.json
 |-- deploy/
+|   |-- mes-dashboard-material-consumption-worker.service
 |   |-- mes-dashboard-msd-worker.service
 |   |-- mes-dashboard-reject-worker.service
 |   |-- mes-dashboard-trace-worker.service
 |   |-- mes-dashboard-watchdog.service
 |   \-- mes-dashboard.service
 |-- docs/
+|   |-- adr/
+|   |   \-- 0001-material-consumption-summary-spool-granularity-key.md
 |   |-- migration/
 |   |   |-- full-modernization-architecture-blueprint/
 |   |   |   |-- asset_readiness_manifest.json
@@ -114,6 +175,8 @@ DashBoard_vite/
 |   |-- hold_history.md
 |   \-- real_infra_stability_report.md
 |-- frontend/
+|   |-- .cdd/
+|   |   \-- code-map.yml
 |   |-- logs/
 |   |   \-- admin_logs.sqlite
 |   |-- scripts/
@@ -203,6 +266,17 @@ DashBoard_vite/
 |   |   |   |-- composables/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
+|   |   |   |-- main.ts
+|   |   |   \-- style.css
+|   |   |-- material-consumption/
+|   |   |   |-- __tests__/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- components/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- App.vue
+|   |   |   |-- index.html
 |   |   |   |-- main.ts
 |   |   |   \-- style.css
 |   |   |-- material-trace/
@@ -413,6 +487,9 @@ DashBoard_vite/
 |   |   |   |-- hold-history-flat-table.spec.js
 |   |   |   |-- hold-overview.spec.js
 |   |   |   |-- job-abandon-on-unload.spec.js
+|   |   |   |-- material-consumption-data-boundary.spec.ts
+|   |   |   |-- material-consumption-resilience.spec.ts
+|   |   |   |-- material-consumption.spec.ts
 |   |   |   |-- production-history-cross-filter.spec.ts
 |   |   |   |-- production-history-filter-options-error.spec.ts
 |   |   |   |-- production-history-multi-line-input.spec.ts
@@ -455,57 +532,6 @@ DashBoard_vite/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
-|   |-- archive/
-|   |   |-- access_20260519_105711.log
-|   |   |-- access_20260519_123328.log
-|   |   |-- access_20260519_140146.log
-|   |   |-- access_20260519_144025.log
-|   |   |-- error_20260519_105711.log
-|   |   |-- error_20260519_123328.log
-|   |   |-- error_20260519_140146.log
-|   |   |-- error_20260519_144025.log
-|   |   |-- rq_msd_worker_20260519_105711.log
-|   |   |-- rq_msd_worker_20260519_123328.log
-|   |   |-- rq_msd_worker_20260519_140146.log
-|   |   |-- rq_msd_worker_20260519_144025.log
-|   |   |-- rq_prod_hist_worker_20260519_105711.log
-|   |   |-- rq_prod_hist_worker_20260519_123328.log
-|   |   |-- rq_prod_hist_worker_20260519_140146.log
-|   |   |-- rq_prod_hist_worker_20260519_144025.log
-|   |   |-- rq_reject_worker_20260519_105711.log
-|   |   |-- rq_reject_worker_20260519_123328.log
-|   |   |-- rq_reject_worker_20260519_140146.log
-|   |   |-- rq_reject_worker_20260519_144025.log
-|   |   |-- rq_worker_20260519_105711.log
-|   |   |-- rq_worker_20260519_123328.log
-|   |   |-- rq_worker_20260519_140146.log
-|   |   |-- rq_worker_20260519_144025.log
-|   |   |-- rq_yield_alert_worker_20260519_105711.log
-|   |   |-- rq_yield_alert_worker_20260519_123328.log
-|   |   |-- rq_yield_alert_worker_20260519_140146.log
-|   |   |-- rq_yield_alert_worker_20260519_144025.log
-|   |   |-- watchdog_20260519_105711.log
-|   |   |-- watchdog_20260519_123328.log
-|   |   |-- watchdog_20260519_140146.log
-|   |   \-- watchdog_20260519_144025.log
-|   |-- access.log
-|   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
-|   |-- error.log
-|   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
-|   |-- metrics_history.sqlite
-|   |-- metrics_history.sqlite-shm
-|   |-- metrics_history.sqlite-wal
-|   |-- rq_msd_worker.log
-|   |-- rq_prod_hist_worker.log
-|   |-- rq_reject_worker.log
-|   |-- rq_worker.log
-|   |-- rq_yield_alert_worker.log
-|   |-- startup.log
-|   \-- watchdog.log
 |-- scripts/
 |   |-- capture_spool_snapshot.py
 |   |-- deploy.sh
@@ -606,6 +632,7 @@ DashBoard_vite/
 |       |   |-- internal_routes.py
 |       |   |-- job_query_routes.py
 |       |   |-- job_routes.py
+|       |   |-- material_consumption_routes.py
 |       |   |-- material_trace_routes.py
 |       |   |-- mid_section_defect_routes.py
 |       |   |-- production_history_routes.py
@@ -647,6 +674,8 @@ DashBoard_vite/
 |       |   |-- internal_metrics_service.py
 |       |   |-- job_query_service.py
 |       |   |-- lineage_engine.py
+|       |   |-- material_consumption_duckdb_runtime.py
+|       |   |-- material_consumption_service.py
 |       |   |-- material_trace_duckdb_runtime.py
 |       |   |-- material_trace_service.py
 |       |   |-- mid_section_defect_service.py
@@ -668,9 +697,7 @@ DashBoard_vite/
 |       |   |-- reject_pareto_materialized.py
 |       |   |-- reject_query_job_service.py
 |       |   |-- resource_cache.py
-|       |   |-- resource_dataset_cache.py
-|       |   |-- resource_history_duckdb_cache.py
-|       |   \-- ... (15 more entries truncated; cap=50)
+|       |   \-- ... (17 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -681,6 +708,8 @@ DashBoard_vite/
 |       |   |-- job_query/
 |       |   |   \-- ... (max depth)
 |       |   |-- lineage/
+|       |   |   \-- ... (max depth)
+|       |   |-- material_consumption/
 |       |   |   \-- ... (max depth)
 |       |   |-- material_trace/
 |       |   |   \-- ... (max depth)
@@ -819,6 +848,7 @@ DashBoard_vite/
 |   |   |-- test_frontend_stress.py
 |   |   |-- test_hold_today_snapshot_stress.py
 |   |   |-- test_load_collector_unit.py
+|   |   |-- test_material_consumption_stress.py
 |   |   |-- test_material_trace_stress.py
 |   |   |-- test_mid_section_defect_stress.py
 |   |   |-- test_production_history_stress.py
@@ -886,9 +916,23 @@ DashBoard_vite/
 |   |-- test_dashboard_routes.py
 |   |-- test_dashboard_service.py
 |   |-- test_database_redaction.py
-|   \-- ... (155 more entries truncated; cap=50)
+|   \-- ... (157 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
+|   |   |-- anomaly_resource_dataset/
+|   |   |   \-- daa76e309ed12ee6.parquet
+|   |   |-- material_consumption_detail/
+|   |   |   |-- 101cccc0d82186b0.parquet
+|   |   |   |-- 73dbeab3e07d3143.parquet
+|   |   |   |-- d36b0ab051fce642.parquet
+|   |   |   \-- f1fcac9b7cc12559.parquet
+|   |   |-- material_consumption_summary/
+|   |   |   |-- 134ce682a624c91e.parquet
+|   |   |   |-- 24fba4ef206b81b2.parquet
+|   |   |   |-- 48def8a793c594af.parquet
+|   |   |   |-- e25f0fc14bf7a5c0.parquet
+|   |   |   |-- e3fdd668c64fe659.parquet
+|   |   |   \-- ee8bf6cd7f7ce1d8.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -915,6 +959,8 @@ DashBoard_vite/
 |   |   |-- probe_108246.json
 |   |   |-- probe_108255.json
 |   |   |-- probe_108256.json
+|   |   |-- probe_109089.json
+|   |   |-- probe_109090.json
 |   |   |-- probe_109468.json
 |   |   |-- probe_109469.json
 |   |   |-- probe_109596.json
@@ -922,6 +968,8 @@ DashBoard_vite/
 |   |   |-- probe_10985.json
 |   |   |-- probe_10990.json
 |   |   |-- probe_110595.json
+|   |   |-- probe_110745.json
+|   |   |-- probe_110747.json
 |   |   |-- probe_112201.json
 |   |   |-- probe_112498.json
 |   |   |-- probe_112650.json
@@ -932,23 +980,9 @@ DashBoard_vite/
 |   |   |-- probe_113869.json
 |   |   |-- probe_116133.json
 |   |   |-- probe_116787.json
-|   |   |-- probe_116823.json
-|   |   |-- probe_117915.json
-|   |   |-- probe_117920.json
-|   |   |-- probe_118725.json
-|   |   |-- probe_118748.json
-|   |   |-- probe_118789.json
-|   |   |-- probe_119871.json
-|   |   \-- ... (418 more entries truncated; cap=50)
-|   |-- gunicorn.pid
+|   |   \-- ... (504 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

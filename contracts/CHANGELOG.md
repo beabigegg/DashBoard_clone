@@ -12,6 +12,10 @@ a corresponding entry below.
 ### Added
 - material-part-consumption: Added 7 endpoints under `/api/material-consumption` (filter-options, query, view, detail, detail/page, detail/job, export). Summary query always synchronous; detail sync ≤ SYNC_ROW_LIMIT, async Type B (RQ queue `material-consumption`) for larger sets. `/view` regroups from DuckDB spool without Oracle re-query. Additive; no existing endpoints changed.
 
+## [css 1.3.0] — 2026-05-20
+### Added
+- material-part-consumption (close): Added "Known Global Rule Interactions" section documenting that `.ui-card { overflow: hidden }` (global rule in `tailwind.css`) clips `position: absolute` dropdowns nested inside it. Establishes the scoped modifier class + `overflow: visible` override as the authoritative pattern; added corresponding Forbidden Practice entry prohibiting direct modification of the global rule. Evidence: filter panel MultiSelect was silently clipped until `.filter-query-card` override was introduced.
+
 ## [css 1.2.1] — 2026-05-20
 ### Added
 - material-part-consumption: Added `.theme-material-consumption` scoping rule for `frontend/src/material-consumption/style.css`. Enforced by `npm run css:check` Rule 6; zero unscoped top-level rules permitted. CI fails on any violation.

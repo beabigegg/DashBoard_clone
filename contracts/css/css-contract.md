@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.2.1
+schema-version: 1.3.0
 last-changed: 2026-05-20
 breaking-change-policy: deprecate-2-minors
 ---
@@ -108,6 +108,10 @@ breaking-change-policy: deprecate-2-minors
 
 **material-consumption（2026-05-20）**: `frontend/src/material-consumption/style.css` 的全部 CSS 規則必須以 `.theme-material-consumption` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行；CI fails on any violation。
 
+## Known Global Rule Interactions
+
+- **`.ui-card { overflow: hidden }` (defined in `frontend/src/styles/tailwind.css`) clips any `position: absolute` dropdown (MultiSelect, custom select) nested inside it.** When a card must contain such a dropdown, add a scoped modifier class to the card (e.g., `filter-query-card`, `type-filter-card`) and override `overflow: visible` in the feature's scoped `style.css` — never change the global rule. The pattern has been applied in 7+ feature CSS files and is established as the correct override contract. Evidence: `material-part-consumption` — filter panel MultiSelect clipped by `.ui-card { overflow: hidden }` until scoped override was added.
+
 ## Forbidden Practices
 
 - 表中表（detail table 嵌套在額外卡片 wrapper 內）
@@ -116,12 +120,16 @@ breaking-change-policy: deprecate-2-minors
 - 從外部 CSS 覆寫共用元件內部樣式（DataTable、SummaryCard、Chip、SectionCard、ErrorBanner）
 - 未審查的 z-index 添加
 - 多種 loading 表現並存於同一區塊
+- **直接修改全域 `.ui-card` 的 overflow 屬性**：若需卡片內的彈出下拉，使用 scoped 修飾類別加上 `overflow: visible` override（見 Known Global Rule Interactions）
 
 ## Visual Review Policy
 
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.3.0]
+- material-part-consumption (2026-05-20): Added "Known Global Rule Interactions" section documenting `.ui-card { overflow: hidden }` clipping behaviour and the scoped modifier class override pattern. Added corresponding Forbidden Practice entry prohibiting direct modification of the global `overflow` property. Evidence: filter panel MultiSelect dropdown was clipped until `.filter-query-card` scoped override was introduced.
 
 ## [css 1.2.1]
 - material-part-consumption (2026-05-20): Added `.theme-material-consumption` scoping rule for `frontend/src/material-consumption/style.css`. Enforced by `npm run css:check` Rule 6; zero unscoped top-level rules permitted.

@@ -37,3 +37,4 @@
 | fix-admin-dashboard | 2026 | 2026-05-19 | specs/archive/2026/fix-admin-dashboard/ |
 | admin-dashboard-ux | 2026 | 2026-05-19 | specs/archive/2026/admin-dashboard-ux/ |
 | admin-perf-detail-ui | 2026 | 2026-05-19 | specs/archive/2026/admin-perf-detail-ui/ |
+| material-part-consumption | 2026 | 2026-05-20 | specs/archive/2026/material-part-consumption/ |
