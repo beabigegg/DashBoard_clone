@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.2.0
-last-changed: 2026-05-15
+schema-version: 1.2.1
+last-changed: 2026-05-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -106,6 +106,8 @@ breaking-change-policy: deprecate-2-minors
 - 表格的 column resize handle（`.col-resize-handle`）、tooltip teleport 等輔助元素不屬於「額外卡片包裝」，允許保留。
 - 違反此規則的佈局稱為「表中表（table-within-table）」，屬 Forbidden Practice。
 
+**material-consumption（2026-05-20）**: `frontend/src/material-consumption/style.css` 的全部 CSS 規則必須以 `.theme-material-consumption` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行；CI fails on any violation。
+
 ## Forbidden Practices
 
 - 表中表（detail table 嵌套在額外卡片 wrapper 內）
@@ -118,3 +120,8 @@ breaking-change-policy: deprecate-2-minors
 ## Visual Review Policy
 
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
+
+## CHANGELOG
+
+## [css 1.2.1]
+- material-part-consumption (2026-05-20): Added `.theme-material-consumption` scoping rule for `frontend/src/material-consumption/style.css`. Enforced by `npm run css:check` Rule 6; zero unscoped top-level rules permitted.

@@ -1,0 +1,2754 @@
+# generated: 2026-05-20T06:26:50Z by cdd-kit 2.0.20
+# files: 351, src-lines: 64708, map-lines: 2754, compression: 23.5x
+# sources-digest: f0015804670202473cbae922ec4a3f6244bc0f790961ca1ab756aa7c4b982e99
+playwright.config.js:  # 28 lines
+  imports:
+    - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
+
+postcss.config.js:  # 6 lines
+
+scripts/css-governance-check.js:  # 362 lines
+  imports:
+    - { module: fs, items: [readFileSync, readdirSync, statSync], line: 15 }
+    - { module: path, items: [join, relative], line: 16 }
+    - { module: url, items: [fileURLToPath], line: 17 }
+    - { module: path, items: [dirname], line: 18 }
+  constants:
+    - { name: SRC_DIR, line: 21 }
+    - { name: EXEMPT_CSS, line: 24 }
+    - { name: CHART_HEX_ALLOWED, line: 33 }
+    - { name: HEX_COLOR_RE, line: 47 }
+    - { name: SPACING_PX_RE, line: 48 }
+    - { name: CHART_IMPORT_RE, line: 49 }
+  functions:
+    - { name: walk, lines: 51-61 }
+    - { name: relPath, lines: 63-65 }
+    - { name: isExemptCss, lines: 67-70 }
+    - { name: classifyHexUsage, lines: 72-79 }
+    - { name: findUnscopedTopLevelRules, lines: 89-193 }
+    - { name: isFeatureCss, lines: 198-202 }
+    - { name: checkCssFile, lines: 204-261 }
+    - { name: checkVueFile, lines: 265-308 }
+    - { name: checkJsFile, lines: 310-335 }
+
+scripts/ts-resolver-loader.mjs:  # 50 lines
+  imports:
+    - { module: 'node:fs', items: [existsSync], line: 12 }
+    - { module: 'node:url', items: [fileURLToPath, pathToFileURL], line: 13 }
+    - { module: 'node:path', items: [resolve, dirname], line: 14 }
+  functions:
+    - { name: async resolve, lines: 16-50 }
+
+src/admin-dashboard/App.vue:  # 149 lines
+  imports:
+    - { module: vue, items: [computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch], line: 2 }
+    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 12 }
+    - { module: '../shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 13 }
+  functions:
+    - { name: async refreshActiveTab, lines: 59-61 }
+    - { name: async refreshNow, lines: 63-71 }
+    - { name: setActiveTab, lines: 79-83 }
+    - { name: toggleAutoRefresh, lines: 85-91 }
+
+src/admin-dashboard/components/DauTrendChart.vue:  # 65 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: echarts/charts, items: [LineChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, LegendComponent, TooltipComponent], line: 5 }
+    - { module: echarts/core, items: [use], line: 6 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+
+src/admin-dashboard/components/DeptBreakdownTable.vue:  # 36 lines
+  functions:
+    - { name: formatDuration, lines: 6-11 }
+
+src/admin-dashboard/components/DurationDistChart.vue:  # 53 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: echarts/charts, items: [BarChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
+    - { module: echarts/core, items: [use], line: 6 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+
+src/admin-dashboard/components/HourlyLoginChart.vue:  # 53 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: echarts/charts, items: [BarChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
+    - { module: echarts/core, items: [use], line: 6 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 7 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 8 }
+
+src/admin-dashboard/components/KpiCard.vue:  # 14 lines
+
+src/admin-dashboard/components/RecentSessionsTable.vue:  # 47 lines
+  functions:
+    - { name: formatTime, lines: 6-9 }
+    - { name: formatDuration, lines: 11-16 }
+
+src/admin-dashboard/components/TopUsersTable.vue:  # 36 lines
+  functions:
+    - { name: formatDuration, lines: 6-11 }
+
+src/admin-dashboard/main.ts:  # 8 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 4 }
+    - { module: '../styles/tailwind.css', items: [], line: 5 }
+    - { module: './style.css', items: [], line: 6 }
+
+src/admin-dashboard/tabs/CacheTab.vue:  # 183 lines
+  imports:
+    - { module: vue, items: [computed, onMounted], line: 2 }
+    - { module: '../../admin-shared/components/GaugeBar.vue', items: ['default:GaugeBar'], line: 4 }
+    - { module: '../../admin-shared/components/StatCard.vue', items: ['default:StatCard'], line: 5 }
+    - { module: '../../admin-shared/components/TrendChart.vue', items: ['default:TrendChart'], line: 6 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 7 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 8 }
+    - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 9 }
+    - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 10 }
+    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 11 }
+    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 12 }
+    - { module: '../../admin-shared/composables/useAdminData', items: [usePerfDetail, usePerfHistory], line: 13 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 17 }
+    - { module: '../../admin-shared/utils/formatDuration', items: [formatDuration], line: 18 }
+  functions:
+    - { name: async refresh, lines: 78-84 }
+
+src/admin-dashboard/tabs/LogsTab.vue:  # 270 lines
+  imports:
+    - { module: vue, items: [computed, onBeforeUnmount, onMounted, ref], line: 2 }
+    - { module: '../../core/api.js', items: [apiPost], line: 4 }
+    - { module: '../../core/datetime.js', items: [formatLogTime], line: 5 }
+    - { module: '../../admin-shared/composables/useAdminData', items: [useLogs, useStorageInfo], line: 6 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 7 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 8 }
+    - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 9 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 10 }
+    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 11 }
+    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 12 }
+  functions:
+    - { name: async loadLogs, lines: 32-34 }
+    - { name: onLevelChange, lines: 36-39 }
+    - { name: onSearchInput, lines: 41-49 }
+    - { name: async cleanupLogs, lines: 51-66 }
+    - { name: async purgeMetricsHistory, lines: 68-81 }
+    - { name: async cleanupLogFiles, lines: 83-95 }
+    - { name: formatBytes, lines: 97-103 }
+    - { name: previousPage, lines: 105-109 }
+    - { name: nextPage, lines: 111-115 }
+    - { name: async refresh, lines: 123-126 }
+
+src/admin-dashboard/tabs/OverviewTab.vue:  # 264 lines
+  imports:
+    - { module: vue, items: [computed, onMounted], line: 2 }
+    - { module: '../../admin-shared/components/StatusDot.vue', items: ['default:StatusDot'], line: 4 }
+    - { module: '../../admin-shared/components/TrendChart.vue', items: ['default:TrendChart'], line: 5 }
+    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 6 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 7 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 8 }
+    - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 9 }
+    - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 10 }
+    - { module: '../../admin-shared/composables/useAdminData', items: [useHealthSummary, usePerfHistory], line: 11 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 12 }
+  functions:
+    - { name: mapServiceStatus, lines: 35-40 }
+    - { name: async refresh, lines: 157-160 }
+
+src/admin-dashboard/tabs/PerformanceTab.vue:  # 220 lines
+  imports:
+    - { module: vue, items: [computed, onBeforeUnmount, onMounted, ref], line: 2 }
+    - { module: echarts/core, items: ['*:echarts'], line: 3 }
+    - { module: echarts/charts, items: [BarChart], line: 4 }
+    - { module: echarts/components, items: [GridComponent, TooltipComponent], line: 5 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 6 }
+    - { module: '../../admin-shared/components/GaugeBar.vue', items: ['default:GaugeBar'], line: 8 }
+    - { module: '../../admin-shared/components/StatCard.vue', items: ['default:StatCard'], line: 9 }
+    - { module: '../../admin-shared/components/TrendChart.vue', items: ['default:TrendChart'], line: 10 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 11 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 12 }
+    - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 13 }
+    - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 14 }
+    - { module: '../../admin-shared/composables/useAdminData', items: [useMetrics, usePerfDetail, usePerfHistory], line: 15 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 20 }
+  functions:
+    - { name: updateLatencyChart, lines: 69-113 }
+    - { name: async refresh, lines: 115-123 }
+    - { name: formatBytes, lines: 138-148 }
+
+src/admin-dashboard/tabs/UsageTab.vue:  # 159 lines
+  imports:
+    - { module: vue, items: [computed, onMounted, ref], line: 2 }
+    - { module: '../components/DauTrendChart.vue', items: ['default:DauTrendChart'], line: 4 }
+    - { module: '../components/DeptBreakdownTable.vue', items: ['default:DeptBreakdownTable'], line: 5 }
+    - { module: '../components/DurationDistChart.vue', items: ['default:DurationDistChart'], line: 6 }
+    - { module: '../components/HourlyLoginChart.vue', items: ['default:HourlyLoginChart'], line: 7 }
+    - { module: '../components/KpiCard.vue', items: ['default:KpiCard'], line: 8 }
+    - { module: '../components/RecentSessionsTable.vue', items: ['default:RecentSessionsTable'], line: 9 }
+    - { module: '../components/TopUsersTable.vue', items: ['default:TopUsersTable'], line: 10 }
+    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 11 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 12 }
+    - { module: '../../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 13 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 14 }
+    - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 15 }
+    - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 16 }
+    - { module: '../../admin-shared/components/TrendChart.vue', items: ['default:TrendChart'], line: 17 }
+    - { module: '../../admin-shared/composables/useAdminData', items: [usePerfHistory, useUsageKpi], line: 18 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 19 }
+  functions:
+    - { name: initDates, lines: 38-44 }
+    - { name: formatSessionDuration, lines: 46-51 }
+    - { name: async refresh, lines: 53-56 }
+
+src/admin-dashboard/tabs/WorkerTab.vue:  # 390 lines
+  imports:
+    - { module: vue, items: [computed, onMounted, ref], line: 2 }
+    - { module: '../../core/api.js', items: [apiGet, apiPost], line: 4 }
+    - { module: '../../core/datetime.js', items: [formatLogTime], line: 5 }
+    - { module: '../../admin-shared/components/GaugeBar.vue', items: ['default:GaugeBar'], line: 6 }
+    - { module: '../../admin-shared/components/StatCard.vue', items: ['default:StatCard'], line: 7 }
+    - { module: '../../admin-shared/components/StatusDot.vue', items: ['default:StatusDot'], line: 8 }
+    - { module: '../../admin-shared/components/TrendChart.vue', items: ['default:TrendChart'], line: 9 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 10 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 11 }
+    - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 12 }
+    - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 13 }
+    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 14 }
+    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 15 }
+    - { module: '../../admin-shared/composables/useAdminData', items: [usePerfDetail, usePerfHistory], line: 16 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 20 }
+  functions:
+    - { name: workerStateColor, lines: 118-122 }
+    - { name: formatUptime, lines: 124-139 }
+    - { name: async loadWorkerStatus, lines: 141-149 }
+    - { name: async doRestart, lines: 151-162 }
+    - { name: async refresh, lines: 164-171 }
+
+src/admin-dashboard/tabs/__tests__/CacheTab.test.ts:  # 266 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../CacheTab.vue', items: ['default:CacheTab'], line: 57 }
+    - { module: '../PerformanceTab.vue', items: ['default:PerformanceTab'], line: 59 }
+  constants:
+    - { name: REDIS_BASE, line: 61 }
+  functions:
+    - { name: makePayload, lines: 73-85 }
+    - { name: mountCache, lines: 87-90 }
+    - { name: mountPerf, lines: 92-95 }
+
+src/admin-dashboard/tabs/__tests__/OverviewTab.test.ts:  # 120 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../OverviewTab.vue', items: ['default:OverviewTab'], line: 45 }
+  constants:
+    - { name: HEALTH_PAYLOAD, line: 47 }
+  functions:
+    - { name: mountOverview, lines: 58-62 }
+
+src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts:  # 279 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 18 }
+    - { module: '@vue/test-utils', items: [mount], line: 19 }
+    - { module: vue, items: [ref, defineComponent], line: 20 }
+    - { module: '../CacheTab.vue', items: ['default:CacheTab'], line: 83 }
+    - { module: '../PerformanceTab.vue', items: ['default:PerformanceTab'], line: 85 }
+  constants:
+    - { name: REDIS_BASE, line: 90 }
+    - { name: DB_POOL_BASE, line: 102 }
+    - { name: DIRECT_CONNECTIONS_BASE, line: 115 }
+    - { name: ROUTE_CACHE_BASE, line: 117 }
+    - { name: PROCESS_CACHES_BASE, line: 126 }
+  functions:
+    - { name: makeFullPayload, lines: 130-152 }
+    - { name: mountCache, lines: 155-158 }
+    - { name: mountPerf, lines: 161-164 }
+
+src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../WorkerTab.vue', items: ['default:WorkerTab'], line: 61 }
+  constants:
+    - { name: WORKER_PAYLOAD, line: 63 }
+  functions:
+    - { name: mountWorker, lines: 86-90 }
+
+src/admin-pages/App.vue:  # 182 lines
+
+src/admin-pages/components/DrawerManagementPanel.vue:  # 149 lines
+
+src/admin-pages/components/PagesManagementPanel.vue:  # 94 lines
+
+src/admin-pages/main.ts:  # 7 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../styles/tailwind.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+
+src/admin-shared/components/GaugeBar.vue:  # 57 lines
+
+src/admin-shared/components/StatCard.vue:  # 24 lines
+
+src/admin-shared/components/StatusDot.vue:  # 13 lines
+
+src/admin-shared/components/TrendChart.vue:  # 113 lines
+
+src/admin-shared/components/__tests__/SummaryCard.test.ts:  # 43 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: '../../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 4 }
+
+src/admin-shared/components/__tests__/TrendChart.test.ts:  # 37 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../TrendChart.vue', items: ['default:TrendChart'], line: 10 }
+
+src/admin-shared/composables/__tests__/useLastUpdated.test.ts:  # 30 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 2 }
+    - { module: '../useLastUpdated', items: [useLastUpdated], line: 3 }
+
+src/admin-shared/composables/useAdminData.ts:  # 280 lines
+  imports:
+    - { module: vue, items: [ref, unref, Ref, MaybeRef], line: 1 }
+    - { module: '../../core/api', items: [apiGet], line: 3 }
+    - { module: '../../core/types', items: [ApiResponse], line: 4 }
+  functions:
+    - { name: resolveValue, lines: 19-25 }
+    - { name: resolveErrorMessage, lines: 27-36 }
+    - { name: createDataFetcher, lines: 38-66 }
+    - { name: unwrapEnvelope, lines: 68-72 }
+    - { name: useSystemStatus, lines: 74-79 }
+    - { name: useMetrics, lines: 81-86 }
+    - { name: usePerfDetail, lines: 163-168 }
+    - { name: usePerfHistory, lines: 181-208 }
+    - { name: useStorageInfo, lines: 210-215 }
+    - { name: useUsageKpi, lines: 217-232 }
+    - { name: useLogs, lines: 234-251 }
+    - { name: useHealthSummary, lines: 259-280 }
+  interfaces:
+    - { name: DataFetcher, lines: 6-11 }  # local
+    - { name: DataFetcherOptions, lines: 13-15 }  # local
+    - { name: PerfDetailSlowlogEntry, lines: 88-92 }
+    - { name: PerfDetailRedis, lines: 94-110 }
+    - { name: PerfDetailDuckDB, lines: 112-115 }
+    - { name: PerfDetailData, lines: 117-161 }
+    - { name: PerfSnapshot, lines: 170-179 }  # local
+    - { name: HealthPayload, lines: 253-257 }  # local
+
+src/admin-shared/composables/useLastUpdated.ts:  # 15 lines
+  imports:
+    - { module: vue, items: [ref, Ref], line: 1 }
+  functions:
+    - { name: useLastUpdated, lines: 3-15 }
+
+src/admin-shared/index.ts:  # 14 lines
+
+src/admin-shared/utils/__tests__/formatDuration.test.ts:  # 13 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '../formatDuration', items: [formatDuration], line: 3 }
+
+src/admin-shared/utils/formatDuration.ts:  # 6 lines
+  functions:
+    - { name: formatDuration, lines: 1-6 }
+
+src/anomaly-overview/App.vue:  # 521 lines
+  imports:
+    - { module: vue, items: [onMounted, ref, reactive, computed], line: 2 }
+    - { module: vue-router, items: [useRouter], line: 3 }
+    - { module: '../portal-shell/routeQuery.js', items: [buildLaunchHref], line: 4 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 5 }
+    - { module: '../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 6 }
+    - { module: '../shared-ui/components/LoadingOverlay.vue', items: ['default:LoadingOverlay'], line: 7 }
+    - { module: '../shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 8 }
+    - { module: '../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 9 }
+    - { module: '../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 10 }
+    - { module: '../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 11 }
+    - { module: '../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 12 }
+    - { module: '../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 13 }
+    - { module: echarts/core, items: [use], line: 14 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 15 }
+    - { module: echarts/charts, items: [LineChart, BarChart], line: 16 }
+    - { module: echarts/components, items: [GridComponent, TooltipComponent, MarkLineComponent], line: 17 }
+  functions:
+    - { name: formatDate, lines: 129-135 }
+    - { name: daysAgo, lines: 137-141 }
+    - { name: severityClass, lines: 143-147 }
+    - { name: scrollToSection, lines: 149-152 }
+    - { name: toggleSection, lines: 154-156 }
+    - { name: buildDrilldownUrl, lines: 160-174 }
+    - { name: buildNavigateQuery, lines: 176-208 }
+    - { name: drilldownLabel, lines: 210-223 }
+    - { name: async toggleDrilldown, lines: 294-336 }
+    - { name: navigateWithParams, lines: 338-342 }
+    - { name: async loadSummary, lines: 346-366 }
+    - { name: async loadSectionDetail, lines: 368-389 }
+    - { name: applyDefaultExpand, lines: 391-395 }
+
+src/anomaly-overview/main.js:  # 6 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+
+src/core/api.ts:  # 396 lines
+  imports:
+    - { module: './types.js', items: [ApiResponse], line: 3 }
+  constants:
+    - { name: DEFAULT_TIMEOUT, line: 5 }
+    - { name: IS_DEV, line: 6 }
+  functions:
+    - { name: getCsrfToken, lines: 55-57 }
+    - { name: withCsrfHeaders, lines: 59-72 }
+    - { name: buildApiError, lines: 81-102 }
+    - { name: buildUrlWithParams, lines: 104-133 }
+    - { name: isExternalMesApiBridge, lines: 135-138 }
+    - { name: createAbortSignal, lines: 145-179 }
+    - { name: _buildDedupKey, lines: 187-196 }
+    - { name: async parseResponsePayload, lines: 198-211 }
+    - { name: async _fetchJsonRaw, lines: 213-251 }
+    - { name: async fetchJson, lines: 253-279 }
+    - { name: async apiGet, lines: 281-289 }
+    - { name: async apiPost, lines: 291-319 }
+    - { name: async apiUpload, lines: 321-343 }
+    - { name: _inFlightSize, lines: 348-350 }
+    - { name: _clearInFlight, lines: 355-357 }
+    - { name: ensureMesApiAvailable, lines: 359-396 }
+  interfaces:
+    - { name: FetchOptions, lines: 32-39 }
+    - { name: MesApiBridge, lines: 42-46 }  # local
+    - { name: ApiError, lines: 74-79 }  # local
+    - { name: AbortController_, lines: 140-143 }  # local
+
+src/core/app-version-check.ts:  # 91 lines
+  functions:
+    - { name: onVersionMismatch, lines: 25-27 }
+    - { name: appVersionCheck, lines: 37-67 }
+    - { name: getLastSeenServerVersion, lines: 73-75 }
+    - { name: getBundleVersion, lines: 80-82 }
+    - { name: _resetVersionCheck, lines: 87-91 }
+  interfaces:
+    - { name: AppVersionMeta, lines: 29-32 }
+  types:
+    - { name: VersionMismatchCallback, lines: 16-16 }  # local
+
+src/core/autocomplete.ts:  # 100 lines
+  constants:
+    - { name: DEFAULT_LIMIT, line: 1 }
+    - { name: FIELD_MAP, line: 3 }
+  functions:
+    - { name: debounce, lines: 12-23 }
+    - { name: buildWipAutocompleteParams, lines: 40-66 }
+    - { name: async fetchWipAutocompleteItems, lines: 76-98 }
+  interfaces:
+    - { name: WipAutocompleteFilters, lines: 25-31 }
+    - { name: WipAutocompleteParams, lines: 33-38 }
+    - { name: FetchWipAutocompleteOptions, lines: 68-74 }
+  types:
+    - { name: TimerHandle, lines: 10-10 }
+
+src/core/compute.ts:  # 124 lines
+  functions:
+    - { name: calcOuPct, lines: 1-11 }
+    - { name: calcAvailabilityPct, lines: 13-25 }
+    - { name: calcStatusPct, lines: 27-30 }
+    - { name: calcYieldPct, lines: 32-38 }
+    - { name: calcOeePct, lines: 40-42 }
+    - { name: buildResourceKpiFromHours, lines: 70-99 }
+    - { name: round1, lines: 105-124 }
+  interfaces:
+    - { name: ResourceHours, lines: 44-53 }
+    - { name: ResourceKpi, lines: 55-68 }
+
+src/core/datetime.ts:  # 34 lines
+  functions:
+    - { name: formatLogTime, lines: 25-34 }
+
+src/core/dev-warnings.ts:  # 204 lines
+  imports:
+    - { module: './schema-guard.js', items: [assertShape], line: 12 }
+    - { module: './endpoint-schemas.js', items: [ENDPOINT_SCHEMAS], line: 13 }
+  functions:
+    - { name: _warn, lines: 17-24 }
+    - { name: detectNaNPagination, lines: 34-50 }
+    - { name: detectUnknownEnvelope, lines: 58-82 }
+    - { name: guardResponse, lines: 93-110 }
+    - { name: detectArrayShape, lines: 119-137 }
+    - { name: detectSpoolContentType, lines: 145-168 }
+    - { name: detectMissingSignal, lines: 176-197 }
+    - { name: _resetWarned, lines: 202-204 }
+
+src/core/duckdb-activation-policy.ts:  # 44 lines
+  imports:
+    - { module: './duckdb-client.js', items: [isDuckDBSupported], line: 8 }
+  functions:
+    - { name: checkLocalComputeEligibility, lines: 25-44 }
+  interfaces:
+    - { name: LocalComputeEligibilityOptions, lines: 10-15 }
+    - { name: LocalComputeEligibilityResult, lines: 17-20 }
+
+src/core/duckdb-client.ts:  # 168 lines
+  imports:
+    - { module: '../workers/duckdb-worker.js?worker', items: ['default:DuckDBWorker'], line: 15 }
+  classes:
+    - name: DuckDBClient
+      lines: 37-120
+      methods:
+        - { name: async init, lines: 44-58 }
+        - { name: async registerParquet, lines: 65-68 }
+        - { name: async sendQuery, lines: 75-78 }
+        - { name: destroy, lines: 81-93 }
+        - { name: _send, lines: 97-108 }
+        - { name: _handleMessage, lines: 110-119 }
+  functions:
+    - { name: getDuckDBClient, lines: 126-131 }
+    - { name: isDuckDBSupported, lines: 134-144 }
+    - { name: async fetchParquetBuffer, lines: 152-168 }
+  interfaces:
+    - { name: PendingCall, lines: 17-20 }  # local
+    - { name: WorkerMessage, lines: 22-26 }  # local
+    - { name: WorkerResponse, lines: 28-33 }  # local
+
+src/core/endpoint-schemas.ts:  # 193 lines
+  constants:
+    - { name: HOLD_OVERVIEW_SUMMARY_SCHEMA, line: 84 }
+    - { name: HOLD_OVERVIEW_TREEMAP_SCHEMA, line: 96 }
+    - { name: REJECT_HISTORY_SUMMARY_SCHEMA, line: 103 }
+    - { name: REJECT_HISTORY_OPTIONS_SCHEMA, line: 111 }
+    - { name: PRODUCTION_HISTORY_QUERY_SCHEMA, line: 118 }
+    - { name: PRODUCTION_HISTORY_TYPE_OPTIONS_SCHEMA, line: 125 }
+    - { name: PRODUCTION_HISTORY_COUNT_SCHEMA, line: 132 }
+    - { name: PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA, line: 140 }
+    - { name: MATERIAL_TRACE_SPOOL_SCHEMA, line: 150 }
+    - { name: MATERIAL_TRACE_QUERY_SCHEMA, line: 157 }
+    - { name: ANALYTICS_ANOMALY_SUMMARY_SCHEMA, line: 165 }
+    - { name: ENVELOPE_META_SCHEMA, line: 173 }
+    - { name: ENDPOINT_SCHEMAS, line: 181 }
+  interfaces:
+    - { name: IHoldOverviewSummary, lines: 18-25 }
+    - { name: IHoldOverviewTreemap, lines: 27-29 }
+    - { name: IRejectHistorySummary, lines: 31-34 }
+    - { name: IRejectHistoryOptions, lines: 36-38 }
+    - { name: IProductionHistoryQuery, lines: 40-42 }
+    - { name: IProductionHistoryTypeOptions, lines: 44-46 }
+    - { name: IProductionHistoryCount, lines: 48-50 }
+    - { name: IMaterialTraceSpool, lines: 52-54 }
+    - { name: IMaterialTraceQuery, lines: 56-59 }
+    - { name: IAnalyticsAnomalySummary, lines: 61-64 }
+    - { name: IEnvelopeMeta, lines: 66-69 }
+  types:
+    - { name: FieldSpec, lines: 77-77 }
+    - { name: SchemaObject, lines: 79-79 }
+
+src/core/field-contracts.ts:  # 40 lines
+  imports:
+    - { module: '../../../shared/field_contracts.json', items: ['default:rawContracts'], line: 1 }
+  functions:
+    - { name: getPageContract, lines: 14-18 }
+    - { name: getFieldContractByApiKey, lines: 20-26 }
+    - { name: getUiHeaders, lines: 28-30 }
+    - { name: getExportHeaders, lines: 32-36 }
+    - { name: getContractRegistry, lines: 38-40 }
+  interfaces:
+    - { name: FieldContract, lines: 7-12 }
+
+src/core/index.ts:  # 207 lines
+
+src/core/pending-jobs-registry.ts:  # 105 lines
+  imports:
+    - { module: './types.js', items: [PendingJobEntry], line: 8 }
+  constants:
+    - { name: STORAGE_KEY, line: 12 }
+    - { name: MAX_AGE_MS, line: 13 }
+  functions:
+    - { name: _readAll, lines: 19-28 }
+    - { name: _writeAll, lines: 30-36 }
+    - { name: _isExpired, lines: 38-40 }
+    - { name: registerJob, lines: 53-65 }
+    - { name: deregisterJob, lines: 70-74 }
+    - { name: getPendingJobs, lines: 79-87 }
+    - { name: clearAllJobs, lines: 92-98 }
+    - { name: isJobPending, lines: 103-105 }
+
+src/core/post-export.ts:  # 45 lines
+  functions:
+    - { name: async postExport, lines: 15-45 }
+
+src/core/reject-history-filters.ts:  # 358 lines
+  constants:
+    - { name: PRIMARY_QUERY_MAX_DAYS, line: 32 }
+  functions:
+    - { name: normalizeText, lines: 1-6 }
+    - { name: normalizeArray, lines: 8-23 }
+    - { name: normalizeBoolean, lines: 25-30 }
+    - { name: toRejectFilterSnapshot, lines: 59-71 }
+    - { name: extractWorkcenterGroupValues, lines: 80-101 }
+    - { name: pruneRejectFilterSelections, lines: 119-175 }
+    - { name: buildRejectOptionsRequestParams, lines: 188-203 }
+    - { name: buildRejectCommonQueryParams, lines: 213-232 }
+    - { name: parseMultiLineInput, lines: 234-250 }
+    - { name: validateDateRange, lines: 252-273 }
+    - { name: buildViewParams, lines: 301-358 }
+  interfaces:
+    - { name: RejectFilterInput, lines: 34-45 }
+    - { name: RejectFilterSnapshot, lines: 47-57 }
+    - { name: WorkcenterGroupOption, lines: 73-78 }
+    - { name: RejectFilterOptions, lines: 103-107 }
+    - { name: PruneRejectFilterResult, lines: 109-117 }
+    - { name: RejectOptionsRequestParams, lines: 177-186 }
+    - { name: RejectCommonQueryParams, lines: 205-207 }
+    - { name: BuildRejectCommonQueryOptions, lines: 209-211 }
+    - { name: ViewParamsOptions, lines: 275-299 }
+
+src/core/resource-history-filters.ts:  # 240 lines
+  functions:
+    - { name: normalizeText, lines: 1-6 }
+    - { name: normalizeBoolean, lines: 8-13 }
+    - { name: normalizeArray, lines: 15-30 }
+    - { name: applyUpstreamResourceFilters, lines: 43-64 }
+    - { name: toResourceFilterSnapshot, lines: 91-103 }
+    - { name: deriveResourceFamilyOptions, lines: 105-119 }
+    - { name: deriveResourceMachineOptions, lines: 126-144 }
+    - { name: pruneResourceFilterSelections, lines: 160-204 }
+    - { name: buildResourceHistoryQueryParams, lines: 218-240 }
+  interfaces:
+    - { name: ResourceItem, lines: 32-41 }
+    - { name: ResourceFilterInput, lines: 66-77 }
+    - { name: ResourceFilterSnapshot, lines: 79-89 }
+    - { name: MachineOption, lines: 121-124 }
+    - { name: PruneResourceFilterOptions, lines: 146-149 }
+    - { name: PruneResourceFilterResult, lines: 151-158 }
+    - { name: ResourceHistoryQueryParams, lines: 206-216 }
+
+src/core/risk-score.ts:  # 55 lines
+  functions:
+    - { name: calcRiskScore, lines: 23-34 }
+    - { name: calcRiskLevel, lines: 44-55 }
+  types:
+    - { name: RiskLevel, lines: 13-13 }
+
+src/core/schema-guard.ts:  # 180 lines
+  imports:
+    - { module: './endpoint-schemas.js', items: [FieldSpec], line: 24 }
+  functions:
+    - { name: _isVerbose, lines: 27-28 }
+    - { name: _warn, lines: 30-35 }
+    - { name: assertShape, lines: 45-59 }
+    - { name: _checkPrimitive, lines: 61-116 }
+    - { name: _checkObject, lines: 118-143 }
+    - { name: _checkArrayItems, lines: 145-158 }
+    - { name: _typeof, lines: 160-164 }
+    - { name: _preview, lines: 166-173 }
+    - { name: _resetWarned, lines: 178-180 }
+
+src/core/shell-navigation.ts:  # 117 lines
+  constants:
+    - { name: URL_SAFE_LENGTH, line: 70 }
+    - { name: URL_STATE_KEY_PREFIX, line: 71 }
+  functions:
+    - { name: normalizeTargetPath, lines: 1-7 }
+    - { name: toShellRouterPath, lines: 9-20 }
+    - { name: getShellRouterBridge, lines: 22-25 }
+    - { name: isPortalShellRuntime, lines: 27-30 }
+    - { name: toRuntimeRoute, lines: 36-48 }
+    - { name: navigateToRuntimeRoute, lines: 54-68 }
+    - { name: replaceRuntimeHistory, lines: 73-94 }
+    - { name: restoreUrlState, lines: 100-117 }
+  interfaces:
+    - { name: ToRuntimeRouteOptions, lines: 32-34 }
+    - { name: NavigateOptions, lines: 50-52 }
+
+src/core/table-tree.ts:  # 58 lines
+  functions:
+    - { name: groupBy, lines: 1-13 }
+    - { name: sortBy, lines: 15-27 }
+    - { name: toggleTreeState, lines: 29-35 }
+    - { name: setTreeStateBulk, lines: 37-45 }
+    - { name: escapeHtml, lines: 47-54 }
+    - { name: safeText, lines: 56-58 }
+
+src/core/types.ts:  # 58 lines
+  interfaces:
+    - { name: ApiResponseMeta, lines: 13-18 }
+    - { name: ApiErrorPayload, lines: 32-36 }
+    - { name: PaginationMeta, lines: 42-47 }
+    - { name: PendingJobEntry, lines: 53-58 }
+  types:
+    - { name: ApiResponse, lines: 20-30 }
+
+src/core/unwrap-api-result.ts:  # 72 lines
+  imports:
+    - { module: './types.js', items: [ApiResponse], line: 15 }
+  functions:
+    - { name: unwrapApiResult, lines: 27-50 }
+    - { name: unwrapApiData, lines: 62-72 }
+
+src/core/wip-derive.ts:  # 145 lines
+  functions:
+    - { name: toTrimmedString, lines: 1-6 }
+    - { name: normalizeFilterValue, lines: 8-16 }
+    - { name: normalizeStatusFilter, lines: 23-34 }
+    - { name: buildWipOverviewQueryParams, lines: 51-77 }
+    - { name: buildWipDetailQueryParams, lines: 86-95 }
+    - { name: splitHoldByType, lines: 110-115 }
+    - { name: prepareParetoData, lines: 126-145 }
+  interfaces:
+    - { name: WipStatusFilterResult, lines: 18-21 }
+    - { name: WipFilters, lines: 36-47 }
+    - { name: WipDetailQueryOptions, lines: 79-84 }
+    - { name: WipItem, lines: 97-103 }
+    - { name: HoldSplit, lines: 105-108 }
+    - { name: ParetoData, lines: 117-124 }
+  types:
+    - { name: WipOverviewQueryParams, lines: 49-49 }
+
+src/core/wip-navigation-state.ts:  # 99 lines
+  constants:
+    - { name: STORAGE_KEY, line: 5 }
+  functions:
+    - { name: storeWipNavigationState, lines: 41-64 }
+    - { name: loadWipNavigationState, lines: 71-88 }
+    - { name: clearWipNavigationState, lines: 93-99 }
+  interfaces:
+    - { name: WipNavigationFilters, lines: 7-19 }
+    - { name: WipNavigationState, lines: 21-34 }
+
+src/hold-detail/App.vue:  # 493 lines
+
+src/hold-detail/components/AgeDistribution.vue:  # 63 lines
+
+src/hold-detail/components/DistributionTable.vue:  # 61 lines
+
+src/hold-detail/components/SummaryCards.vue:  # 25 lines
+
+src/hold-detail/main.ts:  # 8 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
+
+src/hold-history/App.vue:  # 1109 lines
+
+src/hold-history/components/DailyTrend.vue:  # 145 lines
+
+src/hold-history/components/DetailTable.vue:  # 331 lines
+
+src/hold-history/components/DurationChart.vue:  # 130 lines
+
+src/hold-history/components/FilterBar.vue:  # 148 lines
+
+src/hold-history/components/FilterIndicator.vue:  # 34 lines
+
+src/hold-history/components/ReasonPareto.vue:  # 155 lines
+
+src/hold-history/components/RecordTypeFilter.vue:  # 87 lines
+
+src/hold-history/components/SummaryCards.vue:  # 248 lines
+
+src/hold-history/main.ts:  # 9 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../wip-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
+
+src/hold-history/useAutoRefresh.ts:  # 107 lines
+  imports:
+    - { module: vue, items: [onUnmounted, ref], line: 1 }
+    - { module: vue, items: [Ref], line: 2 }
+  functions:
+    - { name: useAutoRefresh, lines: 30-107 }
+  interfaces:
+    - { name: UseAutoRefreshOptions, lines: 17-20 }
+    - { name: UseAutoRefreshReturn, lines: 22-28 }
+
+src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
+  imports:
+    - { module: vue, items: [ref, readonly], line: 14 }
+    - { module: '../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer, DuckDBClient], line: 15 }
+  constants:
+    - { name: TABLE_NAME, line: 127 }
+  functions:
+    - { name: qs, lines: 131-133 }
+    - { name: qid, lines: 135-137 }
+    - { name: sf, lines: 139-142 }
+    - { name: toRows, lines: 145-147 }
+    - { name: buildRecordTypeConditions, lines: 151-174 }
+    - { name: buildHoldTypeCondition, lines: 176-180 }
+    - { name: buildDurationCondition, lines: 182-189 }
+    - { name: buildBaseConditions, lines: 198-205 }
+    - { name: buildWhere, lines: 207-209 }
+    - { name: async queryTrend, lines: 213-267 }
+    - { name: async queryReasonPareto, lines: 271-303 }
+    - { name: async queryDuration, lines: 307-377 }
+    - { name: async queryList, lines: 389-462 }
+    - { name: useHoldHistoryDuckDB, lines: 466-559 }
+  interfaces:
+    - { name: TrendDayMetrics, lines: 20-26 }
+    - { name: TrendDay, lines: 29-34 }
+    - { name: TrendResult, lines: 37-39 }
+    - { name: ReasonParetoItem, lines: 42-48 }
+    - { name: ReasonParetoResult, lines: 51-53 }
+    - { name: DurationItem, lines: 56-61 }
+    - { name: DurationResult, lines: 64-70 }
+    - { name: ListPagination, lines: 73-78 }
+    - { name: HoldListItem, lines: 81-97 }
+    - { name: ListResult, lines: 100-103 }
+    - { name: ComputeViewResult, lines: 106-111 }
+    - { name: ComputeViewParams, lines: 114-123 }
+    - { name: BaseConditionParams, lines: 191-196 }  # local
+    - { name: QueryListParams, lines: 381-387 }  # local
+
+src/hold-overview/App.vue:  # 958 lines
+
+src/hold-overview/components/FilterBar.vue:  # 103 lines
+
+src/hold-overview/components/FilterIndicator.vue:  # 77 lines
+
+src/hold-overview/components/HoldMatrix.vue:  # 151 lines
+
+src/hold-overview/components/HoldTreeMap.vue:  # 237 lines
+
+src/hold-overview/main.ts:  # 10 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../resource-shared/styles.css', items: [], line: 4 }
+    - { module: '../wip-shared/styles.css', items: [], line: 5 }
+    - { module: './style.css', items: [], line: 6 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
+
+src/job-query/App.vue:  # 221 lines
+
+src/job-query/composables/useJobQueryData.ts:  # 371 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: vue, items: [ComputedRef, Ref], line: 2 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 4 }
+    - { module: '../../core/shell-navigation', items: [replaceRuntimeHistory], line: 5 }
+  constants:
+    - { name: JOBS_DISPLAY_COLUMNS, line: 96 }
+    - { name: TXN_DISPLAY_COLUMNS, line: 101 }
+  functions:
+    - { name: toDateString, lines: 49-51 }
+    - { name: parseArrayQuery, lines: 53-62 }
+    - { name: buildQueryString, lines: 64-77 }
+    - { name: buildStatusTone, lines: 79-94 }
+    - { name: useJobQueryData, lines: 106-371 }
+  interfaces:
+    - { name: FiltersState, lines: 9-14 }
+    - { name: Resource, lines: 16-21 }
+    - { name: UseJobQueryDataReturn, lines: 23-47 }
+
+src/job-query/main.ts:  # 653 lines
+  imports:
+    - { module: '../core/api', items: [ensureMesApiAvailable], line: 1 }
+    - { module: '../core/field-contracts', items: [getPageContract], line: 2 }
+    - { module: '../core/table-tree', items: [escapeHtml, groupBy, sortBy, safeText], line: 3 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 4 }
+  constants:
+    - { name: BATCH_CONCURRENCY, line: 552 }
+  functions:
+    - { name: toDataToken, lines: 40-42 }
+    - { name: fromDataToken, lines: 44-53 }
+    - { name: renderJobCell, lines: 55-66 }
+    - { name: renderTxnCell, lines: 68-82 }
+    - { name: async loadEquipments, lines: 117-132 }
+    - { name: renderEquipmentList, lines: 135-181 }
+    - { name: handleEquipmentListClick, lines: 183-205 }
+    - { name: toggleEquipmentDropdown, lines: 208-211 }
+    - { name: filterEquipments, lines: 214-222 }
+    - { name: toggleEquipment, lines: 225-239 }
+    - { name: toggleWorkcenterGroup, lines: 242-263 }
+    - { name: updateSelectedDisplay, lines: 266-286 }
+    - { name: setLast90Days, lines: 289-298 }
+    - { name: validateInputs, lines: 301-332 }
+    - { name: async queryJobs, lines: 335-378 }
+    - { name: renderJobsTable, lines: 381-454 }
+    - { name: handleResultSectionClick, lines: 456-479 }
+    - { name: async toggleJobHistory, lines: 482-499 }
+    - { name: async loadJobHistory, lines: 502-549 }
+    - { name: async loadHistoriesBatched, lines: 553-558 }
+    - { name: expandAll, lines: 561-569 }
+    - { name: collapseAll, lines: 572-575 }
+    - { name: async exportCsv, lines: 578-626 }
+    - { name: formatDate, lines: 629-632 }
+  types:
+    - { name: Equipment, lines: 22-27 }  # local
+    - { name: JobRecord, lines: 28-28 }  # local
+
+src/material-consumption/App.vue:  # 323 lines
+
+src/material-consumption/__tests__/FilterPanel.test.ts:  # 101 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 10 }
+    - { module: '@vue/test-utils', items: [mount], line: 11 }
+    - { module: vue, items: [defineComponent, nextTick], line: 12 }
+    - { module: '../components/FilterPanel.vue', items: ['default:FilterPanel'], line: 13 }
+  functions:
+    - { name: mountPanel, lines: 29-38 }
+
+src/material-consumption/__tests__/TrendChart.test.ts:  # 109 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 10 }
+    - { module: '@vue/test-utils', items: [mount], line: 11 }
+    - { module: vue, items: [defineComponent, nextTick], line: 12 }
+    - { module: '../components/ConsumptionTrendChart.vue', items: ['default:ConsumptionTrendChart'], line: 13 }
+  functions:
+    - { name: makeTrendData, lines: 34-39 }
+    - { name: mountChart, lines: 41-49 }
+
+src/material-consumption/__tests__/useConsumptionQuery.test.ts:  # 183 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 10 }
+    - { module: vue, items: [nextTick], line: 11 }
+    - { module: '../../core/api', items: [apiPost, apiGet], line: 19 }
+    - { module: '../composables/useConsumptionQuery', items: [useConsumptionQuery], line: 20 }
+
+src/material-consumption/components/ConsumptionTrendChart.vue:  # 164 lines
+
+src/material-consumption/components/DetailTable.vue:  # 151 lines
+
+src/material-consumption/components/FilterPanel.vue:  # 218 lines
+
+src/material-consumption/components/TypeBreakdownChart.vue:  # 128 lines
+
+src/material-consumption/composables/useConsumptionQuery.ts:  # 394 lines
+  imports:
+    - { module: vue, items: [ref], line: 13 }
+    - { module: '../../core/api', items: [apiGet, apiPost], line: 14 }
+  constants:
+    - { name: POLL_INTERVAL_MS, line: 66 }
+    - { name: POLL_MAX_ATTEMPTS, line: 67 }
+  functions:
+    - { name: useConsumptionQuery, lines: 69-394 }
+  interfaces:
+    - { name: ConsumptionKpi, lines: 17-23 }
+    - { name: TrendItem, lines: 25-29 }
+    - { name: TypeBreakdownItem, lines: 31-35 }
+    - { name: DetailRow, lines: 37-48 }
+    - { name: DetailPagination, lines: 50-55 }
+    - { name: QueryParams, lines: 59-64 }
+  types:
+    - { name: Granularity, lines: 57-57 }
+
+src/material-consumption/main.ts:  # 5 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 2 }
+    - { module: './style.css', items: [], line: 3 }
+
+src/material-trace/App.vue:  # 579 lines
+
+src/material-trace/main.ts:  # 7 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../wip-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+
+src/mid-section-defect/App.vue:  # 940 lines
+
+src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
+  imports:
+    - { module: vue, items: [ref, watch], line: 2 }
+  constants:
+    - { name: STORAGE_KEY, line: 4 }
+    - { name: INPUT_TYPE_LABELS, line: 26 }
+  functions:
+    - { name: toggle, lines: 48-50 }
+    - { name: formatNumber, lines: 52-55 }
+    - { name: formatInputType, lines: 57-59 }
+
+src/mid-section-defect/components/DetailTable.vue:  # 177 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 4 }
+    - { module: '../../shared-ui/components/DataTableColumn.vue', items: ['default:DataTableColumn'], line: 5 }
+  constants:
+    - { name: COLUMNS_BACKWARD, line: 32 }
+    - { name: COLUMNS_FORWARD, line: 47 }
+  functions:
+    - { name: handlePageChange, lines: 79-86 }
+    - { name: formatCell, lines: 88-93 }
+    - { name: getSuspectHits, lines: 95-114 }
+
+src/mid-section-defect/components/FilterBar.vue:  # 216 lines
+  imports:
+    - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 2 }
+  functions:
+    - { name: updateFilters, lines: 47-52 }
+
+src/mid-section-defect/components/KpiCards.vue:  # 133 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 4 }
+    - { module: '../../shared-ui/components/SummaryCardGroup.vue', items: ['default:SummaryCardGroup'], line: 5 }
+  functions:
+    - { name: formatNumber, lines: 108-111 }
+    - { name: formatRate, lines: 113-116 }
+
+src/mid-section-defect/components/ParetoChart.vue:  # 217 lines
+  imports:
+    - { module: vue, items: [computed, ref], line: 2 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 3 }
+    - { module: echarts/core, items: [use], line: 4 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 5 }
+    - { module: echarts/charts, items: [BarChart, LineChart], line: 6 }
+    - { module: echarts/components, items: [GridComponent, LegendComponent, MarkLineComponent, TooltipComponent], line: 7 }
+  functions:
+    - { name: toggleSort, lines: 36-38 }
+    - { name: handleChartClick, lines: 169-174 }
+
+src/mid-section-defect/components/SuspectContextPanel.vue:  # 215 lines
+  imports:
+    - { module: vue, items: [ref, watch, onMounted, onBeforeUnmount], line: 2 }
+    - { module: '../../core/api', items: [apiGet], line: 4 }
+    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 5 }
+  functions:
+    - { name: handleOutsideClick, lines: 37-40 }
+    - { name: formatDate, lines: 49-52 }
+    - { name: formatNumber, lines: 54-57 }
+
+src/mid-section-defect/components/TrendChart.vue:  # 111 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+    - { module: vue-echarts, items: ['default:VChart'], line: 3 }
+    - { module: echarts/core, items: [use], line: 4 }
+    - { module: echarts/renderers, items: [CanvasRenderer], line: 5 }
+    - { module: echarts/charts, items: [BarChart, LineChart], line: 6 }
+    - { module: echarts/components, items: [GridComponent, LegendComponent, TooltipComponent], line: 7 }
+
+src/mid-section-defect/main.ts:  # 6 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+
+src/portal-shell/App.vue:  # 346 lines
+  imports:
+    - { module: './ai-chat.css', items: [], line: 2 }
+    - { module: lucide-vue-next, items: [ChevronRight], line: 4 }
+    - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 5 }
+    - { module: vue-router, items: [useRoute, useRouter], line: 6 }
+    - { module: '../shared-composables/useAiChat.js', items: [useAiChat], line: 8 }
+    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 9 }
+    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 10 }
+    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 11 }
+    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 12 }
+    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 13 }
+    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 14 }
+    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 15 }
+    - { module: './sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, isMobileViewport, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 16 }
+  functions:
+    - { name: toShellPath, lines: 42-44 }
+    - { name: isPortalShellRootPath, lines: 46-49 }
+    - { name: async handleLogout, lines: 67-70 }
+    - { name: restoreSidebarPreference, lines: 87-94 }
+    - { name: persistSidebarPreference, lines: 96-105 }
+    - { name: checkViewport, lines: 107-112 }
+    - { name: closeMobileSidebar, lines: 114-116 }
+    - { name: toggleSidebar, lines: 118-125 }
+    - { name: handleViewportResize, lines: 127-129 }
+    - { name: handleGlobalKeydown, lines: 131-138 }
+    - { name: async loadNavigation, lines: 140-200 }
+
+src/portal-shell/components/AnomalyIndicator.vue:  # 58 lines
+  imports:
+    - { module: vue, items: [onMounted, onUnmounted, ref], line: 2 }
+    - { module: vue-router, items: [useRouter], line: 3 }
+  functions:
+    - { name: async fetchSummary, lines: 13-32 }
+    - { name: handleClick, lines: 34-36 }
+
+src/portal-shell/components/HealthStatus.vue:  # 303 lines
+  imports:
+    - { module: vue, items: [computed, onMounted, onUnmounted, ref], line: 2 }
+    - { module: '../healthSummary.js', items: [buildHealthFallbackDetail, labelFromHealthStatus, normalizeFrontendShellHealth], line: 3 }
+  functions:
+    - { name: toStatusText, lines: 25-29 }
+    - { name: formatDateTime, lines: 31-45 }
+    - { name: normalizeHitRate, lines: 47-52 }
+    - { name: toCircuitText, lines: 54-60 }
+    - { name: toPoolText, lines: 62-65 }
+    - { name: togglePopup, lines: 138-140 }
+    - { name: closePopup, lines: 142-144 }
+    - { name: onDocumentClick, lines: 146-151 }
+    - { name: onDocumentKeydown, lines: 153-155 }
+    - { name: async checkHealth, lines: 157-184 }
+
+src/portal-shell/composables/useAuth.js:  # 101 lines
+  imports:
+    - { module: vue, items: [computed, ref], line: 1 }
+  functions:
+    - { name: useAuth, lines: 10-101 }
+
+src/portal-shell/healthSummary.js:  # 36 lines
+  functions:
+    - { name: labelFromHealthStatus, lines: 1-6 }
+    - { name: normalizeFrontendShellHealth, lines: 8-17 }
+    - { name: buildHealthFallbackDetail, lines: 19-36 }
+
+src/portal-shell/main.js:  # 82 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './router.js', items: [router], line: 4 }
+    - { module: '../styles/tailwind.css', items: [], line: 5 }
+    - { module: './style.css', items: [], line: 6 }
+    - { module: '../core/pending-jobs-registry.js', items: [getPendingJobs, deregisterJob], line: 7 }
+    - { module: '../core/shell-navigation.js', items: [restoreUrlState], line: 8 }
+  constants:
+    - { name: PRELOAD_RECOVERY_KEY, line: 10 }
+    - { name: PRELOAD_RECOVERY_TTL_MS, line: 11 }
+  functions:
+    - { name: shouldRecoverByReload, lines: 13-36 }
+
+src/portal-shell/nativeModuleRegistry.js:  # 101 lines
+  constants:
+    - { name: NATIVE_MODULE_LOADERS, line: 20 }
+  functions:
+    - { name: createNativeLoader, lines: 1-18 }
+    - { name: getNativeModuleLoader, lines: 99-101 }
+
+src/portal-shell/navigationState.js:  # 166 lines
+  imports:
+    - { module: './routeContracts.js', items: [getRouteContract, normalizeRoutePath], line: 1 }
+  constants:
+    - { name: STANDALONE_DRILLDOWN_ROUTES, line: 3 }
+  functions:
+    - { name: safeInt, lines: 9-12 }
+    - { name: canViewPage, lines: 14-19 }
+    - { name: sortByOrderThenName, lines: 21-29 }
+    - { name: normalizeNavigationDrawers, lines: 31-79 }
+    - { name: buildDynamicNavigationState, lines: 81-166 }
+
+src/portal-shell/routeContracts.js:  # 374 lines
+  constants:
+    - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
+    - { name: IN_SCOPE_ADMIN_ROUTES, line: 22 }
+    - { name: DEFERRED_ROUTES, line: 28 }
+    - { name: ALL_KNOWN_ROUTES, line: 30 }
+    - { name: ROUTE_CONTRACTS, line: 61 }
+    - { name: REQUIRED_FIELDS, line: 295 }
+    - { name: VALID_RENDER_MODES, line: 308 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 309 }
+    - { name: VALID_SCOPES, line: 310 }
+  functions:
+    - { name: buildContract, lines: 36-59 }
+    - { name: normalizeRoutePath, lines: 312-318 }
+    - { name: getRouteContract, lines: 320-322 }
+    - { name: getRouteContractMap, lines: 324-326 }
+    - { name: getInScopeRoutes, lines: 328-330 }
+    - { name: getDeferredRoutes, lines: 332-334 }
+    - { name: getKnownRoutes, lines: 336-338 }
+    - { name: validateRouteContractMap, lines: 340-374 }
+
+src/portal-shell/routeQuery.js:  # 36 lines
+  functions:
+    - { name: normalizeTargetRoute, lines: 1-7 }
+    - { name: appendQueryValue, lines: 9-18 }
+    - { name: buildLaunchHref, lines: 20-36 }
+
+src/portal-shell/router.js:  # 151 lines
+  imports:
+    - { module: vue-router, items: [createRouter, createWebHistory], line: 1 }
+    - { module: './views/LoginPage.vue', items: ['default:LoginPage'], line: 3 }
+    - { module: './views/NativeRouteView.vue', items: ['default:NativeRouteView'], line: 4 }
+    - { module: './views/ShellHomeView.vue', items: ['default:ShellHomeView'], line: 5 }
+    - { module: './navigationState.js', items: [buildDynamicNavigationState], line: 6 }
+    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 7 }
+    - { module: '../core/shell-navigation.js', items: [restoreUrlState], line: 8 }
+  functions:
+    - { name: toShellPath, lines: 25-27 }
+    - { name: syncNavigationRoutes, lines: 56-98 }
+    - { name: consumeNavigationNotice, lines: 100-104 }
+    - { name: setAuthState, lines: 110-113 }
+
+src/portal-shell/sidebarState.js:  # 34 lines
+  constants:
+    - { name: SIDEBAR_STORAGE_KEY, line: 1 }
+    - { name: MOBILE_BREAKPOINT, line: 2 }
+  functions:
+    - { name: isMobileViewport, lines: 4-6 }
+    - { name: parseSidebarCollapsedPreference, lines: 8-10 }
+    - { name: serializeSidebarCollapsedPreference, lines: 12-14 }
+    - { name: buildSidebarUiState, lines: 16-34 }
+
+src/portal-shell/views/LoginPage.vue:  # 288 lines
+  imports:
+    - { module: vue, items: [ref], line: 2 }
+    - { module: vue-router, items: [useRouter, useRoute], line: 3 }
+    - { module: '../composables/useAuth.js', items: [useAuth], line: 4 }
+    - { module: '../router.js', items: [setAuthState], line: 5 }
+  functions:
+    - { name: async handleSubmit, lines: 18-44 }
+
+src/portal-shell/views/NativeRouteView.vue:  # 211 lines
+  imports:
+    - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 2 }
+    - { module: vue-router, items: [useRoute], line: 3 }
+    - { module: '../nativeModuleRegistry.js', items: [getNativeModuleLoader], line: 4 }
+    - { module: '../routeQuery.js', items: [buildLaunchHref], line: 5 }
+  constants:
+    - { name: MODULE_RECOVERY_KEY, line: 35 }
+    - { name: MODULE_RECOVERY_TTL_MS, line: 36 }
+    - { name: MODULE_LOAD_TIMEOUT_MS, line: 37 }
+  functions:
+    - { name: startLoadingTimer, lines: 41-47 }
+    - { name: stopLoadingTimer, lines: 49-52 }
+    - { name: shouldRecoverWithReload, lines: 54-63 }
+    - { name: recoverByReloadOnce, lines: 65-90 }
+    - { name: openLegacyPage, lines: 92-94 }
+    - { name: async loadNativeModule, lines: 96-138 }
+
+src/portal-shell/views/ShellHomeView.vue:  # 6 lines
+
+src/portal/main.js:  # 160 lines
+  imports:
+    - { module: './portal.css', items: [], line: 1 }
+
+src/production-history/App.vue:  # 563 lines
+
+src/production-history/components/ProductionDetailTable.vue:  # 102 lines
+
+src/production-history/components/ProductionMatrix.vue:  # 245 lines
+
+src/production-history/composables/useFirstTierFilters.ts:  # 365 lines
+  imports:
+    - { module: vue, items: [reactive, ref, watch], line: 22 }
+    - { module: '../../core/api', items: [apiGet], line: 23 }
+  constants:
+    - { name: DEFAULT_DEBOUNCE_MS, line: 91 }
+  functions:
+    - { name: parseWildcardInput, lines: 72-87 }
+    - { name: useFirstTierFilters, lines: 102-348 }
+    - { name: _buildUrl, lines: 352-365 }
+  interfaces:
+    - { name: CachedFilterSelection, lines: 28-33 }
+    - { name: FilterOptionsResponse, lines: 42-51 }
+    - { name: ApiErrorLike, lines: 53-56 }  # local
+    - { name: UseFirstTierFiltersOptions, lines: 93-100 }
+  types:
+    - { name: CachedFilterField, lines: 35-35 }
+    - { name: WildcardField, lines: 39-39 }
+
+src/production-history/composables/useProductionHistory.ts:  # 637 lines
+  imports:
+    - { module: vue, items: [ref, reactive], line: 1 }
+    - { module: '../../core/api', items: [apiPost], line: 2 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 3 }
+    - { module: '../../core/post-export', items: [postExport], line: 4 }
+  constants:
+    - { name: API_TIMEOUT, line: 6 }
+  functions:
+    - { name: validateQueryMode, lines: 167-185 }
+    - { name: buildModePayload, lines: 196-217 }
+    - { name: useProductionHistory, lines: 245-637 }
+  interfaces:
+    - { name: MatrixFilter, lines: 11-16 }
+    - { name: SupplementaryFilter, lines: 25-28 }
+    - { name: SupplementaryOptions, lines: 34-37 }
+    - { name: Pagination, lines: 40-45 }
+    - { name: DetailRow, lines: 55-77 }
+    - { name: MatrixEquipmentNode, lines: 80-85 }
+    - { name: MatrixSpecNode, lines: 88-93 }
+    - { name: MatrixWorkcenterNode, lines: 96-101 }
+    - { name: OverloadError, lines: 107-110 }
+    - { name: JobProgressState, lines: 113-119 }
+    - { name: QueryParams, lines: 125-140 }
+    - { name: ModeValidationInput, lines: 150-159 }
+    - { name: QueryResponseEnvelope, lines: 221-225 }  # local
+    - { name: QueryResponseData, lines: 227-234 }  # local
+    - { name: ApiErrorLike, lines: 236-243 }  # local
+  types:
+    - { name: SupplementaryFilterField, lines: 31-31 }
+    - { name: MatrixTree, lines: 104-104 }
+    - { name: DatasetMeta, lines: 122-122 }
+    - { name: QueryMode, lines: 144-144 }
+    - { name: QueryFragment, lines: 147-147 }
+
+src/production-history/main.ts:  # 7 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../resource-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+
+src/qc-gate/App.vue:  # 160 lines
+
+src/qc-gate/components/LotTable.vue:  # 119 lines
+
+src/qc-gate/components/QcGateChart.vue:  # 166 lines
+
+src/qc-gate/composables/useQcGateData.ts:  # 224 lines
+  imports:
+    - { module: vue, items: [computed, onBeforeUnmount, onMounted, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet], line: 3 }
+  constants:
+    - { name: REFRESH_INTERVAL_MS, line: 5 }
+    - { name: JITTER_FACTOR, line: 6 }
+    - { name: API_TIMEOUT_MS, line: 12 }
+    - { name: BUCKET_KEYS, line: 13 }
+  functions:
+    - { name: jitteredInterval, lines: 8-11 }
+    - { name: normalizeBuckets, lines: 51-58 }
+    - { name: normalizeStation, lines: 60-69 }
+    - { name: normalizePayload, lines: 71-82 }
+    - { name: toComparableWaitHours, lines: 84-87 }
+    - { name: useQcGateData, lines: 89-224 }
+  interfaces:
+    - { name: BucketCounts, lines: 17-22 }
+    - { name: LotItem, lines: 24-36 }
+    - { name: StationData, lines: 38-44 }
+    - { name: ApiPayload, lines: 46-49 }
+  types:
+    - { name: BucketKey, lines: 15-15 }
+
+src/qc-gate/main.ts:  # 6 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+
+src/query-tool/App.vue:  # 705 lines
+
+src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
+
+src/query-tool/components/EquipmentLotsTable.vue:  # 80 lines
+
+src/query-tool/components/EquipmentRejectsTable.vue:  # 256 lines
+
+src/query-tool/components/EquipmentView.vue:  # 246 lines
+
+src/query-tool/components/ExportButton.vue:  # 30 lines
+
+src/query-tool/components/LineageTreeChart.vue:  # 1153 lines
+
+src/query-tool/components/LotAssociationTable.vue:  # 118 lines
+
+src/query-tool/components/LotDetail.vue:  # 350 lines
+
+src/query-tool/components/LotEquipmentView.vue:  # 392 lines
+
+src/query-tool/components/LotHistoryTable.vue:  # 128 lines
+
+src/query-tool/components/LotJobsTable.vue:  # 265 lines
+
+src/query-tool/components/LotRejectTable.vue:  # 218 lines
+
+src/query-tool/components/LotTimeline.vue:  # 382 lines
+
+src/query-tool/components/LotTraceView.vue:  # 391 lines
+
+src/query-tool/components/QueryBar.vue:  # 112 lines
+
+src/query-tool/components/SerialReverseTraceView.vue:  # 396 lines
+
+src/query-tool/composables/useEquipmentQuery.ts:  # 406 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/csv', items: [exportCsv], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, toDateInputValue, uniqueValues], line: 5 }
+  constants:
+    - { name: EQUIPMENT_SUB_TABS, line: 26 }
+    - { name: DEFAULT_LOTS_PER_PAGE, line: 27 }
+    - { name: PAGE_SIZE_OPTIONS, line: 28 }
+  functions:
+    - { name: normalizeSubTab, lines: 30-33 }
+    - { name: defaultDateRange, lines: 35-43 }
+    - { name: emptyTabFlags, lines: 45-52 }
+    - { name: useEquipmentQuery, lines: 54-406 }
+  interfaces:
+    - { name: EquipmentItem, lines: 7-10 }  # local
+    - { name: Pagination, lines: 12-17 }  # local
+    - { name: EquipmentQueryInitial, lines: 19-24 }  # local
+
+src/query-tool/composables/useLotDetail.ts:  # 589 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/csv', items: [exportCsv], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, parseDateTime, uniqueValues, formatDateTime], line: 5 }
+  constants:
+    - { name: LOT_SUB_TABS, line: 25 }
+    - { name: PAGED_SUB_TABS, line: 32 }
+    - { name: DEFAULT_PER_PAGE, line: 33 }
+    - { name: PAGE_SIZE_OPTIONS, line: 34 }
+    - { name: ASSOCIATION_TABS, line: 36 }
+    - { name: EXPORT_TYPE_MAP, line: 38 }
+  functions:
+    - { name: emptyTabFlags, lines: 46-54 }
+    - { name: emptyTabErrors, lines: 56-65 }
+    - { name: emptyAssociations, lines: 67-74 }
+    - { name: emptyPagination, lines: 76-83 }
+    - { name: emptyPaginationMap, lines: 85-93 }
+    - { name: emptyQualityMetaMap, lines: 95-103 }
+    - { name: normalizeSubTab, lines: 105-108 }
+    - { name: resolveTimeRangeFromHistory, lines: 110-143 }
+    - { name: resolveEquipmentIdFromHistory, lines: 145-158 }
+    - { name: useLotDetail, lines: 160-589 }
+  interfaces:
+    - { name: Pagination, lines: 7-12 }  # local
+    - { name: QualityMeta, lines: 14-17 }  # local
+    - { name: LotDetailInitial, lines: 19-23 }  # local
+
+src/query-tool/composables/useLotEquipmentQuery.ts:  # 452 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/csv', items: [exportCsv], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, parseInputValues], line: 5 }
+  constants:
+    - { name: EQUIPMENT_SUB_TABS, line: 14 }
+    - { name: DEFAULT_LOTS_PER_PAGE, line: 15 }
+    - { name: PAGE_SIZE_OPTIONS, line: 16 }
+    - { name: MAX_INPUT, line: 17 }
+    - { name: INPUT_TYPE_OPTIONS, line: 19 }
+  functions:
+    - { name: normalizeSubTab, lines: 24-27 }
+    - { name: normalizeInputType, lines: 29-32 }
+    - { name: useLotEquipmentQuery, lines: 34-452 }
+  interfaces:
+    - { name: LotEquipmentQueryInitial, lines: 7-12 }  # local
+
+src/query-tool/composables/useLotLineage.ts:  # 582 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, uniqueValues], line: 5 }
+  constants:
+    - { name: MAX_CONCURRENCY, line: 25 }
+    - { name: MAX_429_RETRY, line: 26 }
+  functions:
+    - { name: emptyLineageEntry, lines: 28-36 }
+    - { name: extractContainerId, lines: 38-44 }
+    - { name: createSemaphore, lines: 46-82 }
+    - { name: sleep, lines: 84-86 }
+    - { name: edgeKey, lines: 88-95 }
+    - { name: useLotLineage, lines: 97-582 }
+  interfaces:
+    - { name: LineageEntry, lines: 7-13 }  # local
+    - { name: LineageInitial, lines: 15-17 }  # local
+    - { name: SemaphoreItem, lines: 19-23 }  # local
+
+src/query-tool/composables/useLotResolve.ts:  # 188 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../utils/values', items: [parseInputValues], line: 4 }
+  constants:
+    - { name: INPUT_TYPE_OPTIONS, line: 12 }
+    - { name: INPUT_LIMITS, line: 21 }
+  functions:
+    - { name: normalizeInputType, lines: 30-36 }
+    - { name: normalizeAllowedTypes, lines: 38-47 }
+    - { name: useLotResolve, lines: 49-188 }
+  interfaces:
+    - { name: LotResolveInitial, lines: 6-10 }  # local
+
+src/query-tool/composables/useReverseLineage.ts:  # 580 lines
+  imports:
+    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 4 }
+    - { module: '../utils/values', items: [normalizeText, uniqueValues], line: 5 }
+  constants:
+    - { name: MAX_CONCURRENCY, line: 25 }
+    - { name: MAX_429_RETRY, line: 26 }
+  functions:
+    - { name: emptyLineageEntry, lines: 28-36 }
+    - { name: extractContainerId, lines: 38-44 }
+    - { name: createSemaphore, lines: 46-82 }
+    - { name: sleep, lines: 84-86 }
+    - { name: edgeKey, lines: 88-95 }
+    - { name: collectAncestors, lines: 97-123 }
+    - { name: useReverseLineage, lines: 125-580 }
+  interfaces:
+    - { name: LineageEntry, lines: 7-13 }  # local
+    - { name: LineageInitial, lines: 15-17 }  # local
+    - { name: SemaphoreItem, lines: 19-23 }  # local
+
+src/query-tool/main.ts:  # 10 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: '../wip-shared/styles.css', items: [], line: 3 }
+    - { module: '../styles/tailwind.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+    - { module: './App.vue', items: ['default:App'], line: 6 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
+
+src/query-tool/utils/csv.ts:  # 87 lines
+  functions:
+    - { name: getCsrfToken, lines: 12-14 }
+    - { name: resolveErrorMessage, lines: 16-27 }
+    - { name: resolveDownloadFilename, lines: 29-36 }
+    - { name: async exportCsv, lines: 38-87 }
+  interfaces:
+    - { name: ErrorPayload, lines: 1-4 }  # local
+    - { name: ExportCsvOptions, lines: 6-10 }  # local
+
+src/query-tool/utils/values.ts:  # 93 lines
+  functions:
+    - { name: normalizeText, lines: 1-3 }
+    - { name: uniqueValues, lines: 5-17 }
+    - { name: parseInputValues, lines: 19-21 }
+    - { name: parseArrayParam, lines: 23-33 }
+    - { name: toDateInputValue, lines: 35-44 }
+    - { name: parseDateTime, lines: 46-58 }
+    - { name: formatDateTime, lines: 60-72 }
+    - { name: formatCellValue, lines: 74-82 }
+    - { name: hashColor, lines: 84-93 }
+
+src/reject-history/App.vue:  # 1522 lines
+
+src/reject-history/components/DetailTable.vue:  # 163 lines
+
+src/reject-history/components/FilterPanel.vue:  # 295 lines
+
+src/reject-history/components/ParetoGrid.vue:  # 51 lines
+
+src/reject-history/components/ParetoSection.vue:  # 204 lines
+
+src/reject-history/components/SummaryCards.vue:  # 35 lines
+
+src/reject-history/components/TrendChart.vue:  # 120 lines
+
+src/reject-history/main.ts:  # 9 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../wip-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
+
+src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
+  imports:
+    - { module: vue, items: [ref, readonly], line: 14 }
+    - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported], line: 15 }
+  constants:
+    - { name: TABLE_NAME, line: 170 }
+    - { name: DIM_TO_COLUMN, line: 173 }
+  functions:
+    - { name: getCsrfToken, lines: 181-185 }
+    - { name: async fetchParquetBuffer, lines: 187-201 }
+    - { name: qs, lines: 205-207 }
+    - { name: qid, lines: 209-211 }
+    - { name: normValueExpr, lines: 213-216 }
+    - { name: buildPolicyConditions, lines: 225-262 }
+    - { name: buildUserConditions, lines: 272-308 }
+    - { name: buildWhereClause, lines: 310-312 }
+    - { name: async queryAnalyticsRaw, lines: 316-336 }
+    - { name: buildSummaryFromAnalytics, lines: 338-358 }
+    - { name: async queryDetail, lines: 367-460 }
+    - { name: async queryBatchPareto, lines: 468-558 }
+    - { name: async queryAvailableFilters, lines: 560-589 }
+    - { name: async querySummaryDirect, lines: 591-641 }
+    - { name: useRejectHistoryDuckDB, lines: 645-764 }
+  interfaces:
+    - { name: AnalyticsRawRow, lines: 20-28 }
+    - { name: SummaryData, lines: 31-40 }
+    - { name: DetailRow, lines: 43-71 }
+    - { name: DetailPagination, lines: 74-79 }
+    - { name: DetailResult, lines: 82-85 }
+    - { name: ParetoItem, lines: 88-97 }
+    - { name: ParetoDimension, lines: 100-104 }
+    - { name: BatchParetoResult, lines: 107-112 }
+    - { name: AvailableFilters, lines: 115-119 }
+    - { name: ComputeViewResult, lines: 122-128 }
+    - { name: PolicyFilters, lines: 131-136 }
+    - { name: ComputeViewParams, lines: 142-155 }
+    - { name: DuckDBClient, lines: 161-166 }  # local
+    - { name: PolicyConditionParams, lines: 218-223 }  # local
+    - { name: UserConditionParams, lines: 264-270 }  # local
+    - { name: QueryDetailParams, lines: 360-365 }  # local
+    - { name: QueryBatchParetoParams, lines: 462-466 }  # local
+  types:
+    - { name: ParetoSelections, lines: 139-139 }
+
+src/resource-history/App.vue:  # 776 lines
+
+src/resource-history/components/ComparisonChart.vue:  # 97 lines
+
+src/resource-history/components/DetailSection.vue:  # 300 lines
+
+src/resource-history/components/FilterBar.vue:  # 163 lines
+
+src/resource-history/components/HeatmapChart.vue:  # 161 lines
+
+src/resource-history/components/KpiCards.vue:  # 96 lines
+
+src/resource-history/components/StackedChart.vue:  # 104 lines
+
+src/resource-history/components/TrendChart.vue:  # 97 lines
+
+src/resource-history/main.ts:  # 9 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../resource-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
+
+src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
+  imports:
+    - { module: vue, items: [ref, readonly], line: 14 }
+    - { module: '../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 15 }
+    - { module: '../core/duckdb-client', items: [DuckDBClient], line: 16 }
+  constants:
+    - { name: TABLE_NAME, line: 18 }
+  functions:
+    - { name: qid, lines: 136-138 }
+    - { name: granularityExpr, lines: 140-152 }
+    - { name: sf, lines: 158-161 }
+    - { name: calcOuPct, lines: 163-166 }
+    - { name: calcAvailPct, lines: 168-172 }
+    - { name: statusPct, lines: 174-176 }
+    - { name: buildKpiFromRow, lines: 178-207 }
+    - { name: emptyKpi, lines: 209-222 }
+    - { name: async queryKpi, lines: 226-241 }
+    - { name: async queryTrend, lines: 243-281 }
+    - { name: async queryByHistoryId, lines: 283-299 }
+    - { name: async queryByHistoryIdAndDate, lines: 301-318 }
+    - { name: deriveHeatmap, lines: 322-358 }
+    - { name: deriveComparison, lines: 360-383 }
+    - { name: deriveDetail, lines: 385-430 }
+    - { name: useResourceHistoryDuckDB, lines: 434-515 }
+  interfaces:
+    - { name: ResourceMeta, lines: 22-27 }  # local
+    - { name: LocalKpi, lines: 33-53 }  # local
+    - { name: TrendItem, lines: 55-67 }  # local
+    - { name: HeatmapItem, lines: 69-76 }  # local
+    - { name: ComparisonItem, lines: 78-83 }  # local
+    - { name: DetailItem, lines: 85-109 }  # local
+    - { name: SummaryResult, lines: 111-116 }  # local
+    - { name: DetailResult, lines: 118-123 }  # local
+    - { name: ComputeViewResult, lines: 125-128 }  # local
+    - { name: ComputeViewOptions, lines: 130-132 }  # local
+  types:
+    - { name: ResourceMetadataMap, lines: 29-29 }  # local
+
+src/resource-shared/components/HierarchyTable.vue:  # 362 lines
+
+src/resource-shared/components/MultiSelect.vue:  # 193 lines
+
+src/resource-shared/constants.ts:  # 79 lines
+  constants:
+    - { name: STATUS_DISPLAY_MAP, line: 1 }
+    - { name: STATUS_AGGREGATION, line: 15 }
+    - { name: STATUS_COLORS, line: 22 }
+    - { name: OU_BADGE_THRESHOLDS, line: 32 }
+    - { name: MATRIX_STATUS_COLUMNS, line: 39 }
+  functions:
+    - { name: normalizeStatus, lines: 49-60 }
+    - { name: resolveOuBadgeClass, lines: 62-71 }
+    - { name: getStatusDisplay, lines: 73-79 }
+
+src/resource-shared/index.ts:  # 13 lines
+
+src/resource-status/App.vue:  # 680 lines
+
+src/resource-status/components/EquipmentCard.vue:  # 120 lines
+
+src/resource-status/components/EquipmentGrid.vue:  # 83 lines
+
+src/resource-status/components/FilterBar.vue:  # 119 lines
+
+src/resource-status/components/FloatingTooltip.vue:  # 358 lines
+
+src/resource-status/components/MatrixSection.vue:  # 457 lines
+
+src/resource-status/components/StatusHeader.vue:  # 45 lines
+
+src/resource-status/main.ts:  # 7 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../resource-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+
+src/shared-composables/TraceProgressBar.vue:  # 166 lines
+  imports:
+    - { module: vue, items: [computed], line: 2 }
+  constants:
+    - { name: STAGES, line: 19 }
+  functions:
+    - { name: hasStageError, lines: 27-30 }
+    - { name: stageState, lines: 32-43 }
+
+src/shared-composables/index.ts:  # 8 lines
+
+src/shared-composables/useAiChat.ts:  # 202 lines
+  imports:
+    - { module: vue, items: [computed, ref], line: 1 }
+    - { module: vue, items: [Ref, ComputedRef], line: 2 }
+  functions:
+    - { name: useAiChat, lines: 36-198 }
+    - { name: createConversationId, lines: 200-202 }
+  interfaces:
+    - { name: AiMessage, lines: 6-17 }
+    - { name: AiChatComposable, lines: 19-30 }
+  types:
+    - { name: MessageRole, lines: 4-4 }
+
+src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
+  imports:
+    - { module: '../core/api.js', items: [apiGet], line: 1 }
+  constants:
+    - { name: JOB_POLL_INTERVAL_MS, line: 3 }
+    - { name: JOB_POLL_MAX_MS, line: 4 }
+  functions:
+    - { name: sleep, lines: 6-8 }
+    - { name: async pollJobUntilComplete, lines: 50-94 }
+    - { name: useAsyncJobPolling, lines: 100-104 }
+  interfaces:
+    - { name: JobStatusResponse, lines: 10-16 }
+    - { name: PollOptions, lines: 18-23 }
+    - { name: AsyncJobPollingComposable, lines: 25-27 }
+    - { name: JobError, lines: 29-31 }  # local
+
+src/shared-composables/useAutoRefresh.ts:  # 23 lines
+  imports:
+    - { module: '../wip-shared/composables/useAutoRefresh', items: [useAutoRefresh], line: 1 }
+  functions:
+    - { name: useAutoRefresh, lines: 21-23 }
+  interfaces:
+    - { name: AutoRefreshOptions, lines: 3-9 }
+    - { name: AutoRefreshComposable, lines: 11-19 }
+
+src/shared-composables/useAutocomplete.ts:  # 33 lines
+  imports:
+    - { module: '../wip-shared/composables/useAutocomplete', items: [useAutocomplete], line: 1 }
+  functions:
+    - { name: useAutocomplete, lines: 31-33 }
+  interfaces:
+    - { name: AutocompleteFieldState, lines: 3-8 }
+    - { name: AutocompleteOptions, lines: 10-16 }
+    - { name: AutocompleteComposable, lines: 18-29 }
+
+src/shared-composables/useFilterOrchestrator.ts:  # 229 lines
+  imports:
+    - { module: vue, items: [reactive, ref, watch, toRaw], line: 1 }
+    - { module: './useRequestGuard.js', items: [useRequestGuard], line: 2 }
+    - { module: './useUrlSync.js', items: [useUrlSync], line: 3 }
+  functions:
+    - { name: useFilterOrchestrator, lines: 55-229 }
+  interfaces:
+    - { name: FieldDefinition, lines: 8-12 }
+    - { name: FieldDependency, lines: 14-20 }
+    - { name: PaginationConfig, lines: 22-24 }
+    - { name: UrlSyncConfig, lines: 26-28 }
+    - { name: FilterOrchestratorConfig, lines: 30-39 }
+    - { name: FilterOrchestratorComposable, lines: 41-50 }
+  types:
+    - { name: FieldTrigger, lines: 5-5 }
+    - { name: DependencyAction, lines: 6-6 }
+
+src/shared-composables/usePaginationState.ts:  # 66 lines
+  imports:
+    - { module: vue, items: [computed, ref], line: 1 }
+    - { module: vue, items: [Ref, ComputedRef], line: 2 }
+  functions:
+    - { name: usePaginationState, lines: 34-66 }
+  interfaces:
+    - { name: PaginationInitial, lines: 4-10 }
+    - { name: PaginationPayload, lines: 12-21 }
+    - { name: PaginationState, lines: 23-32 }
+
+src/shared-composables/useQueryState.ts:  # 25 lines
+  functions:
+    - { name: readQueryState, lines: 3-10 }
+    - { name: writeQueryState, lines: 12-25 }
+  types:
+    - { name: QueryStateRecord, lines: 1-1 }
+
+src/shared-composables/useRequestGuard.ts:  # 22 lines
+  imports:
+    - { module: vue, items: [ref], line: 1 }
+    - { module: vue, items: [Ref], line: 2 }
+  functions:
+    - { name: useRequestGuard, lines: 9-22 }
+  interfaces:
+    - { name: RequestGuard, lines: 4-7 }
+
+src/shared-composables/useSortableTable.ts:  # 115 lines
+  imports:
+    - { module: vue, items: [computed, ref], line: 1 }
+    - { module: vue, items: [Ref, ComputedRef], line: 2 }
+  functions:
+    - { name: useSortableTable, lines: 23-115 }
+  interfaces:
+    - { name: SortableTableComposable, lines: 9-15 }
+  types:
+    - { name: SortDirection, lines: 4-4 }
+    - { name: SortType, lines: 5-5 }
+    - { name: DataRow, lines: 7-7 }
+
+src/shared-composables/useTraceProgress.ts:  # 531 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 1 }
+    - { module: vue, items: [Ref], line: 2 }
+    - { module: '../core/api.js', items: [apiGet, apiPost, ensureMesApiAvailable], line: 4 }
+    - { module: './useAsyncJobPolling.js', items: [pollJobUntilComplete], line: 5 }
+  constants:
+    - { name: DEFAULT_STAGE_TIMEOUT_MS, line: 9 }
+    - { name: PROFILE_DOMAINS, line: 13 }
+  functions:
+    - { name: unwrapEnvelope, lines: 63-68 }
+    - { name: stageKey, lines: 70-74 }
+    - { name: normalizeSeedContainerIds, lines: 76-105 }
+    - { name: collectAllContainerIds, lines: 107-152 }
+    - { name: async consumeNDJSONStream, lines: 159-211 }
+    - { name: useTraceProgress, lines: 213-531 }
+  interfaces:
+    - { name: TraceProgressOptions, lines: 22-24 }
+    - { name: StageError, lines: 26-29 }
+    - { name: StageErrors, lines: 31-35 }
+    - { name: StageResults, lines: 37-41 }
+    - { name: JobProgress, lines: 43-49 }
+    - { name: TraceProgressComposable, lines: 51-61 }
+  types:
+    - { name: ProfileKey, lines: 11-11 }  # local
+    - { name: TraceProfile, lines: 19-19 }
+    - { name: TraceDirection, lines: 20-20 }
+
+src/shared-composables/useUrlSync.ts:  # 42 lines
+  functions:
+    - { name: useUrlSync, lines: 10-42 }
+  interfaces:
+    - { name: UrlSyncState, lines: 1-3 }
+    - { name: UrlSync, lines: 5-8 }
+
+src/shared-ui/components/AiChartRenderer.vue:  # 423 lines
+
+src/shared-ui/components/AiChatMessage.vue:  # 264 lines
+
+src/shared-ui/components/AiChatPanel.vue:  # 410 lines
+
+src/shared-ui/components/AiChatTrigger.vue:  # 72 lines
+
+src/shared-ui/components/BlockLoadingState.vue:  # 36 lines
+
+src/shared-ui/components/Chip.vue:  # 162 lines
+
+src/shared-ui/components/DataTable.vue:  # 369 lines
+
+src/shared-ui/components/DataTableColumn.vue:  # 46 lines
+
+src/shared-ui/components/EmptyState.vue:  # 54 lines
+
+src/shared-ui/components/ErrorBanner.vue:  # 78 lines
+
+src/shared-ui/components/FilterToolbar.vue:  # 135 lines
+
+src/shared-ui/components/LoadingOverlay.vue:  # 39 lines
+
+src/shared-ui/components/LoadingSpinner.vue:  # 51 lines
+
+src/shared-ui/components/MultiSelect.vue:  # 256 lines
+
+src/shared-ui/components/PageHeader.vue:  # 88 lines
+
+src/shared-ui/components/PaginationControl.vue:  # 229 lines
+
+src/shared-ui/components/SectionCard.vue:  # 121 lines
+
+src/shared-ui/components/SkeletonLoader.vue:  # 153 lines
+
+src/shared-ui/components/StatusBadge.vue:  # 57 lines
+
+src/shared-ui/components/SummaryCard.vue:  # 228 lines
+
+src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
+
+src/shared-ui/components/TimelineChart.vue:  # 566 lines
+
+src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 180 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 11 }
+    - { module: '@vue/test-utils', items: [mount], line: 12 }
+    - { module: vue, items: [nextTick, defineComponent], line: 13 }
+    - { module: '../MultiSelect.vue', items: ['default:MultiSelect'], line: 14 }
+  constants:
+    - { name: DEFAULT_OPTIONS, line: 25 }
+  functions:
+    - { name: mountSelect, lines: 27-37 }
+
+src/shared-ui/index.ts:  # 22 lines
+
+src/wip-detail/App.vue:  # 598 lines
+
+src/wip-detail/components/FilterPanel.vue:  # 163 lines
+
+src/wip-detail/components/LotDetailPanel.vue:  # 198 lines
+
+src/wip-detail/components/LotTable.vue:  # 169 lines
+
+src/wip-detail/components/SummaryCards.vue:  # 46 lines
+
+src/wip-detail/main.ts:  # 8 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
+
+src/wip-overview/App.vue:  # 563 lines
+
+src/wip-overview/components/FilterPanel.vue:  # 164 lines
+
+src/wip-overview/components/MatrixTable.vue:  # 134 lines
+
+src/wip-overview/components/StatusCards.vue:  # 59 lines
+
+src/wip-overview/main.ts:  # 8 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
+
+src/wip-shared/components/HoldLotTable.vue:  # 140 lines
+
+src/wip-shared/components/Pagination.vue:  # 23 lines
+
+src/wip-shared/components/ParetoSection.vue:  # 180 lines
+
+src/wip-shared/composables/useAutoRefresh.ts:  # 123 lines
+  imports:
+    - { module: vue, items: [onBeforeUnmount, onMounted], line: 1 }
+    - { module: '../../shared-composables/useAutoRefresh', items: [AutoRefreshOptions], line: 3 }
+  constants:
+    - { name: DEFAULT_REFRESH_INTERVAL_MS, line: 5 }
+    - { name: JITTER_FACTOR, line: 6 }
+  functions:
+    - { name: jitteredInterval, lines: 8-11 }
+    - { name: useAutoRefresh, lines: 13-123 }
+
+src/wip-shared/composables/useAutocomplete.ts:  # 150 lines
+  imports:
+    - { module: vue, items: [reactive], line: 1 }
+    - { module: '../../core/autocomplete', items: [debounce, fetchWipAutocompleteItems], line: 3 }
+    - { module: '../../core/autocomplete', items: [WipAutocompleteFilters, WipAutocompleteParams], line: 4 }
+    - { module: '../../core/api', items: [apiGet], line: 5 }
+    - { module: '../../core/api', items: [FetchOptions], line: 6 }
+  functions:
+    - { name: createFieldState, lines: 22-29 }
+    - { name: defaultRequest, lines: 31-31 }
+    - { name: useAutocomplete, lines: 33-150 }
+  interfaces:
+    - { name: UseAutocompleteOptions, lines: 8-13 }  # local
+    - { name: FieldState, lines: 15-20 }  # local
+
+src/wip-shared/constants.ts:  # 15 lines
+  constants:
+    - { name: NON_QUALITY_HOLD_REASONS, line: 1 }
+    - { name: NON_QUALITY_HOLD_REASON_SET, line: 15 }
+
+src/wip-shared/index.ts:  # 8 lines
+
+src/workers/duckdb-worker.js:  # 147 lines
+  imports:
+    - { module: '@duckdb/duckdb-wasm', items: ['*:duckdb'], line: 15 }
+    - { module: '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url', items: ['default:duckdb_wasm_eh'], line: 16 }
+    - { module: '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url', items: ['default:duckdb_worker_eh'], line: 17 }
+    - { module: '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url', items: ['default:duckdb_wasm_mvp'], line: 18 }
+    - { module: '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url', items: ['default:duckdb_worker_mvp'], line: 19 }
+  functions:
+    - { name: async initDuckDB, lines: 25-59 }
+    - { name: async registerParquet, lines: 66-74 }
+    - { name: async execQuery, lines: 81-98 }
+    - { name: async destroyDuckDB, lines: 100-105 }
+
+src/yield-alert-center/App.vue:  # 985 lines
+
+src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
+
+src/yield-alert-center/YieldPackageChart.vue:  # 128 lines
+
+src/yield-alert-center/YieldStationChart.vue:  # 94 lines
+
+src/yield-alert-center/YieldTrendChart.vue:  # 104 lines
+
+src/yield-alert-center/main.ts:  # 10 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../wip-shared/styles.css', items: [], line: 4 }
+    - { module: '../resource-shared/styles.css', items: [], line: 5 }
+    - { module: './style.css', items: [], line: 6 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
+
+src/yield-alert-center/useYieldAlertDuckDB.ts:  # 678 lines
+  imports:
+    - { module: vue, items: [ref, readonly, Ref], line: 15 }
+    - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported, DuckDBClient], line: 16 }
+    - { module: '../core/risk-score', items: [calcRiskScore, calcRiskLevel, RiskLevel], line: 17 }
+  constants:
+    - { name: TABLE_NAME, line: 41 }
+    - { name: TX_DEDUP_COLS, line: 43 }
+    - { name: DEPT_SEQ_MAP, line: 49 }
+  functions:
+    - { name: getCsrfToken, lines: 19-21 }
+    - { name: async fetchParquetBuffer, lines: 23-37 }
+    - { name: qs, lines: 161-164 }
+    - { name: qid, lines: 166-168 }
+    - { name: granularityExpr, lines: 170-178 }
+    - { name: buildDimensionWhere, lines: 180-196 }
+    - { name: buildReasonExclusionWhere, lines: 198-209 }
+    - { name: sf, lines: 211-214 }
+    - { name: async querySummary, lines: 218-248 }
+    - { name: async queryTrend, lines: 250-292 }
+    - { name: async queryHeatmap, lines: 294-344 }
+    - { name: async queryStationSummary, lines: 346-387 }
+    - { name: async queryPackageSummary, lines: 389-427 }
+    - { name: async queryAlerts, lines: 429-564 }
+    - { name: async queryFilterOptions, lines: 566-589 }
+    - { name: useYieldAlertDuckDB, lines: 593-678 }
+  interfaces:
+    - { name: SummaryResult, lines: 56-60 }  # local
+    - { name: TrendItem, lines: 62-67 }  # local
+    - { name: HeatmapItem, lines: 69-76 }  # local
+    - { name: StationItem, lines: 78-84 }  # local
+    - { name: PackageItem, lines: 86-91 }  # local
+    - { name: AlertItem, lines: 93-114 }  # local
+    - { name: AlertsResult, lines: 116-121 }  # local
+    - { name: FilterOptions, lines: 123-125 }  # local
+    - { name: ComputeViewParams, lines: 127-137 }  # local
+    - { name: WhereParams, lines: 139-142 }  # local
+    - { name: TrendWhereParams, lines: 144-146 }  # local
+    - { name: AlertQueryParams, lines: 148-157 }  # local
+
+src/yield-alert-center/utils.ts:  # 52 lines
+  functions:
+    - { name: parseTokenList, lines: 1-19 }
+    - { name: toQueryParams, lines: 21-38 }
+    - { name: buildDrilldownNotice, lines: 40-52 }
+
+tailwind.config.js:  # 257 lines
+
+tests/abort/production-history-abort.test.js:  # 209 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 13 }
+    - { module: '../../src/core/api.js', items: [apiPost], line: 30 }
+    - { module: '../../src/shared-composables/useAsyncJobPolling.ts', items: [pollJobUntilComplete], line: 31 }
+
+tests/abort/query-tool-abort.test.js:  # 151 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 15 }
+    - { module: '../../src/core/api.js', items: [apiPost], line: 25 }
+    - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 26 }
+
+tests/abort/reject-history-abort.test.js:  # 174 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 14 }
+    - { module: '../../src/core/api.js', items: [apiGet], line: 36 }
+
+tests/abort/yield-alert-abort.test.js:  # 179 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 15 }
+
+tests/components/ActionButton.test.js:  # 98 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 18 }
+    - { module: '@vue/test-utils', items: [mount], line: 19 }
+    - { module: '../../src/query-tool/components/ExportButton.vue', items: ['default:ExportButton'], line: 20 }
+
+tests/components/DataTable.test.js:  # 76 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 10 }
+    - { module: '@vue/test-utils', items: [mount], line: 11 }
+    - { module: '../../src/shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 12 }
+
+tests/components/DateRangePicker.test.js:  # 68 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 16 }
+  functions:
+    - { name: isRangeExceeded, lines: 29-36 }
+
+tests/components/FilterPanel.test.js:  # 198 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 16 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 17 }
+    - { module: '../../src/wip-overview/components/FilterPanel.vue', items: ['default:FilterPanel'], line: 18 }
+
+tests/components/HoldMatrix.test.js:  # 125 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 15 }
+    - { module: '@vue/test-utils', items: [mount], line: 16 }
+    - { module: '../../src/hold-overview/components/HoldMatrix.vue', items: ['default:HoldMatrix'], line: 17 }
+
+tests/components/LoadingOverlay.test.js:  # 54 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 12 }
+    - { module: '@vue/test-utils', items: [mount], line: 13 }
+    - { module: '../../src/shared-ui/components/LoadingOverlay.vue', items: ['default:LoadingOverlay'], line: 14 }
+
+tests/components/LoadingSpinner.test.js:  # 65 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 12 }
+    - { module: '@vue/test-utils', items: [mount], line: 13 }
+    - { module: '../../src/shared-ui/components/LoadingSpinner.vue', items: ['default:LoadingSpinner'], line: 14 }
+  constants:
+    - { name: SIZE_MAP, line: 16 }
+
+tests/components/LotDetailTable.test.js:  # 141 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 11 }
+    - { module: '@vue/test-utils', items: [mount], line: 12 }
+    - { module: '../../src/wip-detail/components/LotTable.vue', items: ['default:LotTable'], line: 13 }
+  functions:
+    - { name: makeLot, lines: 15-25 }
+
+tests/components/MatrixTable.test.js:  # 174 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 14 }
+    - { module: '@vue/test-utils', items: [mount], line: 15 }
+    - { module: '../../src/wip-overview/components/MatrixTable.vue', items: ['default:MatrixTable'], line: 16 }
+
+tests/components/ParetoGrid.test.js:  # 104 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 20 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 21 }
+    - { module: '../../src/reject-history/components/ParetoGrid.vue', items: ['default:ParetoGrid'], line: 22 }
+
+tests/components/ProductionDetailTable.test.js:  # 70 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 11 }
+    - { module: '@vue/test-utils', items: [mount], line: 12 }
+    - { module: vue, items: [nextTick], line: 13 }
+    - { module: '../../src/production-history/components/ProductionDetailTable.vue', items: ['default:ProductionDetailTable'], line: 14 }
+  functions:
+    - { name: makeRow, lines: 17-36 }
+
+tests/core/api-dedup.test.js:  # 172 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 12 }
+  functions:
+    - { name: makeOkResponse, lines: 25-33 }
+
+tests/legacy/admin-dashboard.test.js:  # 89 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 7 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 8 }
+  constants:
+    - { name: ADMIN_DASHBOARD_TABS, line: 13 }
+    - { name: AUTO_REFRESH_INTERVAL_MS, line: 57 }
+  functions:
+    - { name: findTabByKey, lines: 71-73 }
+
+tests/legacy/anomaly-overview.test.js:  # 121 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 8 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 9 }
+  constants:
+    - { name: ANOMALY_SECTIONS, line: 14 }
+    - { name: RISK_LEVEL_LABELS, line: 78 }
+  functions:
+    - { name: initDrilldownState, lines: 45-53 }
+    - { name: getRiskLabel, lines: 90-92 }
+    - { name: totalAnomalyCount, lines: 105-107 }
+
+tests/legacy/autocomplete.test.js:  # 57 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/core/autocomplete.js', items: [buildWipAutocompleteParams, fetchWipAutocompleteItems], line: 4 }
+
+tests/legacy/datetime.test.js:  # 50 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 6 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 7 }
+    - { module: '../../src/core/datetime.js', items: [formatLogTime], line: 10 }
+
+tests/legacy/loading-standardization.test.js:  # 239 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 9 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 10 }
+    - { module: 'node:fs', items: [readFileSync], line: 11 }
+    - { module: 'node:path', items: [resolve], line: 12 }
+  functions:
+    - { name: readSrc, lines: 16-18 }
+
+tests/legacy/local-compute-activation-policy.test.js:  # 172 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 13 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 14 }
+    - { module: 'node:fs/promises', items: [readFile], line: 15 }
+    - { module: 'node:module', items: [stripTypeScriptTypes], line: 16 }
+  functions:
+    - { name: withDuckdbSupport, lines: 31-39 }
+
+tests/legacy/material-trace-composables.test.js:  # 110 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 8 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 9 }
+    - { module: '../../src/core/reject-history-filters.js', items: [parseMultiLineInput], line: 11 }
+  constants:
+    - { name: FORWARD_INPUT_LIMIT, line: 62 }
+    - { name: REVERSE_INPUT_LIMIT, line: 63 }
+  functions:
+    - { name: isOverLimit, lines: 65-68 }
+    - { name: queryModeForApi, lines: 95-98 }
+
+tests/legacy/mid-section-defect-composables.test.js:  # 128 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 7 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 8 }
+  constants:
+    - { name: CHART_TOP_N, line: 11 }
+  functions:
+    - { name: buildMachineChartFromAttribution, lines: 17-52 }
+
+tests/legacy/msd-completeness-warning.test.js:  # 108 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+  functions:
+    - { name: evalHasCompletenessWarning, lines: 16-20 }
+    - { name: evalCompletenessWarningText, lines: 22-28 }
+
+tests/legacy/portal-shell-app-contract.test.js:  # 32 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: 'node:fs', items: [existsSync, readFileSync], line: 3 }
+    - { module: 'node:path', items: [resolve], line: 4 }
+  functions:
+    - { name: readSource, lines: 6-12 }
+
+tests/legacy/portal-shell-health-summary.test.js:  # 70 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: 'node:fs', items: [existsSync, readFileSync], line: 3 }
+    - { module: 'node:path', items: [resolve], line: 4 }
+    - { module: '../../src/portal-shell/healthSummary.js', items: [buildHealthFallbackDetail, labelFromHealthStatus, normalizeFrontendShellHealth], line: 6 }
+  functions:
+    - { name: readSource, lines: 12-18 }
+
+tests/legacy/portal-shell-navigation.test.js:  # 130 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/portal-shell/navigationState.js', items: [buildDynamicNavigationState, normalizeNavigationDrawers], line: 4 }
+
+tests/legacy/portal-shell-no-iframe.test.js:  # 34 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: 'node:fs', items: [existsSync, readFileSync], line: 3 }
+    - { module: 'node:path', items: [resolve], line: 4 }
+  functions:
+    - { name: readSource, lines: 6-12 }
+
+tests/legacy/portal-shell-parity-table-chart-matrix.test.js:  # 64 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: 'node:fs', items: [existsSync, readFileSync], line: 3 }
+    - { module: 'node:path', items: [resolve], line: 4 }
+  functions:
+    - { name: readSource, lines: 6-12 }
+
+tests/legacy/portal-shell-route-query-compat.test.js:  # 63 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 4 }
+    - { module: '../../src/core/shell-navigation.js', items: [toRuntimeRoute], line: 5 }
+
+tests/legacy/portal-shell-route-query.test.js:  # 29 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 4 }
+
+tests/legacy/portal-shell-sidebar.test.js:  # 96 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: 'node:fs', items: [existsSync, readFileSync], line: 3 }
+    - { module: 'node:path', items: [resolve], line: 4 }
+    - { module: '../../src/portal-shell/sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 6 }
+  functions:
+    - { name: readSource, lines: 13-19 }
+
+tests/legacy/portal-shell-wave-a-chart-lifecycle.test.js:  # 52 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: 'node:fs', items: [existsSync, readFileSync], line: 3 }
+    - { module: 'node:path', items: [resolve], line: 4 }
+  functions:
+    - { name: readSource, lines: 6-12 }
+
+tests/legacy/portal-shell-wave-a-smoke.test.js:  # 85 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/core/shell-navigation.js', items: [toRuntimeRoute], line: 4 }
+    - { module: '../../src/portal-shell/nativeModuleRegistry.js', items: [getNativeModuleLoader], line: 5 }
+    - { module: '../../src/portal-shell/navigationState.js', items: [buildDynamicNavigationState], line: 6 }
+    - { module: '../../src/portal-shell/routeContracts.js', items: [getRouteContract], line: 7 }
+  constants:
+    - { name: WAVE_A_ROUTES, line: 9 }
+    - { name: WAVE_B_NATIVE_ROUTES, line: 20 }
+
+tests/legacy/portal-shell-wave-b-native-smoke.test.js:  # 71 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/portal-shell/navigationState.js', items: [buildDynamicNavigationState], line: 4 }
+    - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 5 }
+    - { module: '../../src/portal-shell/routeContracts.js', items: [getRouteContract], line: 6 }
+  constants:
+    - { name: WAVE_B_NATIVE_CASES, line: 8 }
+
+tests/legacy/production-history.test.js:  # 440 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 9 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 10 }
+    - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, useFirstTierFilters, _buildUrl], line: 134 }
+  functions:
+    - { name: computeDefaultDateRange, lines: 19-27 }
+    - { name: buildPageQueryParams, lines: 29-31 }
+    - { name: shouldRenderBadge, lines: 407-409 }
+    - { name: badgeText, lines: 412-414 }
+
+tests/legacy/query-tool-composables.test.js:  # 471 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/query-tool/composables/useEquipmentQuery.js', items: [useEquipmentQuery], line: 4 }
+    - { module: '../../src/query-tool/composables/useLotDetail.js', items: [useLotDetail], line: 5 }
+    - { module: '../../src/query-tool/composables/useLotLineage.js', items: [useLotLineage], line: 6 }
+    - { module: '../../src/query-tool/composables/useLotResolve.js', items: [useLotResolve], line: 7 }
+  functions:
+    - { name: setupWindowMesApi, lines: 10-29 }
+
+tests/legacy/reject-history-date-range-limit.test.js:  # 17 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/core/reject-history-filters.js', items: [PRIMARY_QUERY_MAX_DAYS, validateDateRange], line: 4 }
+
+tests/legacy/report-filter-strategy.test.js:  # 184 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/core/reject-history-filters.js', items: [buildRejectOptionsRequestParams, buildViewParams, pruneRejectFilterSelections], line: 4 }
+    - { module: '../../src/core/resource-history-filters.js', items: [buildResourceHistoryQueryParams, deriveResourceFamilyOptions, deriveResourceMachineOptions, pruneResourceFilterSelections], line: 9 }
+
+tests/legacy/resource-history.test.js:  # 132 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 12 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 13 }
+  functions:
+    - { name: sf, lines: 18-21 }
+    - { name: calcOuPct, lines: 23-26 }
+    - { name: calcAvailPct, lines: 28-32 }
+    - { name: statusPct, lines: 34-36 }
+
+tests/legacy/resource-status.test.js:  # 114 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/resource-shared/constants.js', items: [normalizeStatus, resolveOuBadgeClass, getStatusDisplay, STATUS_DISPLAY_MAP, STATUS_AGGREGATION, MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS], line: 4 }
+
+tests/legacy/shell-navigation.test.js:  # 89 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/core/shell-navigation.js', items: [isPortalShellRuntime, navigateToRuntimeRoute, toRuntimeRoute], line: 4 }
+
+tests/legacy/wip-derive.test.js:  # 84 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/core/wip-derive.js', items: [buildWipOverviewQueryParams, buildWipDetailQueryParams, splitHoldByType, prepareParetoData], line: 4 }
+
+tests/legacy/yield-alert-center-shell-contract.test.js:  # 26 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/portal-shell/nativeModuleRegistry.js', items: [getNativeModuleLoader], line: 4 }
+    - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 5 }
+    - { module: '../../src/portal-shell/routeContracts.js', items: [getRouteContract], line: 6 }
+
+tests/legacy/yield-alert-center-utils.test.js:  # 33 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 1 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
+    - { module: '../../src/yield-alert-center/utils', items: [buildDrilldownNotice, parseTokenList, toQueryParams], line: 4 }
+
+tests/pending-jobs-registry.test.js:  # 177 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach], line: 7 }
+    - { module: '../src/core/pending-jobs-registry.js', items: [registerJob, deregisterJob, getPendingJobs, clearAllJobs, isJobPending], line: 8 }
+  functions:
+    - { name: makeLocalStorageStub, lines: 20-29 }
+
+tests/playwright/_auth.js:  # 177 lines
+  constants:
+    - { name: BASE_URL, line: 12 }
+    - { name: USERNAME, line: 13 }
+    - { name: PASSWORD, line: 17 }
+  functions:
+    - { name: async loginViaUI, lines: 28-45 }
+    - { name: async loginViaApi, lines: 54-72 }
+    - { name: async mockApiError, lines: 89-122 }
+    - { name: async waitForIdleUi, lines: 132-146 }
+    - { name: async navigateViaSidebar, lines: 161-177 }
+
+tests/playwright/data-boundary/empty-result.spec.js:  # 174 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 14 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 15 }
+  constants:
+    - { name: EMPTY_SUCCESS, line: 17 }
+    - { name: EMPTY_SUCCESS_WITH_QUERY_ID, line: 24 }
+    - { name: EMPTY_SELECTORS, line: 32 }
+  functions:
+    - { name: async waitForEmptyState, lines: 43-60 }
+    - { name: async assertExportDisabledOrLabelChanged, lines: 62-83 }
+
+tests/playwright/data-boundary/hold-history-today-snapshot.spec.js:  # 125 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 11 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 12 }
+  constants:
+    - { name: BASE_ENVELOPE, line: 14 }
+  functions:
+    - { name: makeTodayPayload, lines: 19-40 }
+    - { name: async switchToTodayMode, lines: 42-49 }
+
+tests/playwright/data-boundary/malformed-input.spec.js:  # 190 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 16 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 17 }
+  constants:
+    - { name: MALICIOUS_INPUTS, line: 20 }
+
+tests/playwright/data-boundary/resource-history-progress-malformed.spec.js:  # 116 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 16 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 17 }
+  constants:
+    - { name: QUERY_ID, line: 19 }
+    - { name: MALFORMED_PROGRESS, line: 22 }
+  functions:
+    - { name: async setupResourceHistoryWithMalformedProgress, lines: 32-72 }
+
+tests/playwright/hold-history-flat-table.spec.js:  # 81 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 10 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+
+tests/playwright/hold-overview.spec.js:  # 66 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 7 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 8 }
+
+tests/playwright/job-abandon-on-unload.spec.js:  # 133 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 13 }
+    - { module: './_auth.js', items: [loginViaApi, BASE_URL], line: 14 }
+
+tests/playwright/material-consumption-data-boundary.spec.ts:  # 180 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 13 }
+  constants:
+    - { name: BASE_URL, line: 15 }
+    - { name: PAGE_URL, line: 16 }
+    - { name: MOCK_FILTER_OPTIONS, line: 18 }
+  functions:
+    - { name: async setupBasicMocks, lines: 28-32 }
+
+tests/playwright/material-consumption-resilience.spec.ts:  # 155 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 12 }
+  constants:
+    - { name: BASE_URL, line: 14 }
+    - { name: PAGE_URL, line: 15 }
+    - { name: MOCK_FILTER_OPTIONS, line: 17 }
+    - { name: MOCK_QUERY_RESULT, line: 27 }
+
+tests/playwright/material-consumption.spec.ts:  # 299 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 15 }
+  constants:
+    - { name: BASE_URL, line: 17 }
+    - { name: PAGE_URL, line: 18 }
+    - { name: MOCK_FILTER_OPTIONS, line: 20 }
+    - { name: MOCK_QUERY_RESULT, line: 30 }
+    - { name: MOCK_VIEW_MONTH, line: 55 }
+  functions:
+    - { name: async setupMockRoutes, lines: 76-88 }
+
+tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 14 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 15 }
+  constants:
+    - { name: FULL, line: 32 }
+  functions:
+    - { name: narrow, lines: 39-75 }
+    - { name: async installFilterOptionsMock, lines: 77-108 }
+    - { name: async selectOption, lines: 113-127 }
+    - { name: async readOptions, lines: 130-140 }
+
+tests/playwright/production-history-filter-options-error.spec.ts:  # 59 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 12 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, mockApiError], line: 13 }
+
+tests/playwright/production-history-multi-line-input.spec.ts:  # 155 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 23 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 24 }
+  constants:
+    - { name: FILTER_OPTIONS_PAYLOAD, line: 26 }
+  functions:
+    - { name: async installMocks, lines: 42-84 }
+    - { name: async switchToIdentifierTab, lines: 89-94 }
+
+tests/playwright/production-history-pruning-feedback.spec.ts:  # 99 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 10 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+  functions:
+    - { name: async installPruningMock, lines: 13-46 }
+    - { name: async pickByTestidLabel, lines: 48-58 }
+
+tests/playwright/production-history-query-mode-tabs.spec.ts:  # 180 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 15 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 16 }
+  constants:
+    - { name: FILTER_OPTIONS_PAYLOAD, line: 18 }
+  functions:
+    - { name: async installMocks, lines: 34-87 }
+
+tests/playwright/production-history-wildcard-paste.spec.ts:  # 203 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 15 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 16 }
+  constants:
+    - { name: FILTER_OPTIONS_PAYLOAD, line: 18 }
+  functions:
+    - { name: async installMocks, lines: 34-97 }
+    - { name: async switchToIdentifierTab, lines: 103-108 }
+
+tests/playwright/query-tool-url-state.spec.js:  # 92 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 1 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 3 }
+  functions:
+    - { name: async openQueryToolUrlWithRetry, lines: 5-26 }
+
+tests/playwright/query-tool.spec.js:  # 78 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 8 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
+  constants:
+    - { name: DUMMY_LOT_ID, line: 11 }
+
+tests/playwright/reject-history.spec.js:  # 134 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 8 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
+  functions:
+    - { name: defaultDateRange, lines: 11-18 }
+
+tests/playwright/reject-material-flat-table.spec.js:  # 126 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 10 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+
+tests/playwright/resilience/api-failure.spec.js:  # 204 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 15 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, mockApiError, waitForIdleUi], line: 16 }
+  constants:
+    - { name: ERROR_SELECTORS, line: 18 }
+  functions:
+    - { name: async waitForErrorFeedback, lines: 27-36 }
+
+tests/playwright/resilience/browser-history.spec.js:  # 233 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 13 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar], line: 14 }
+  functions:
+    - { name: mockQueryToolApis, lines: 16-40 }
+    - { name: mockRejectHistoryApis, lines: 42-52 }
+
+tests/playwright/resilience/rapid-interaction.spec.js:  # 182 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 15 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 16 }
+  constants:
+    - { name: SLOW_MS, line: 18 }
+  functions:
+    - { name: async setupRejectHistoryWithSlowQuery, lines: 20-48 }
+
+tests/playwright/resilience/resource-history-progress-503.spec.js:  # 115 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 16 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 17 }
+  constants:
+    - { name: QUERY_ID, line: 19 }
+  functions:
+    - { name: async setupResourceHistoryWithBatchQuery, lines: 21-65 }
+
+tests/playwright/resilience/slow-network.spec.js:  # 141 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 11 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 12 }
+  constants:
+    - { name: DELAY_MS, line: 14 }
+  functions:
+    - { name: async setupRejectHistoryWithSlowQuery, lines: 16-43 }
+
+tests/playwright/wip-matrix-drilldown.spec.js:  # 111 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 10 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+
+tests/query-tool/App.url-state.test.js:  # 430 lines
+  imports:
+    - { module: vitest, items: [beforeEach, describe, expect, it, vi], line: 2 }
+    - { module: vue, items: [nextTick, ref], line: 3 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 4 }
+  functions:
+    - { name: makeLotResolveState, lines: 21-40 }
+    - { name: makeDetailState, lines: 42-120 }
+    - { name: makeEquipmentQueryState, lines: 122-153 }
+    - { name: makeLotEquipmentQueryState, lines: 155-189 }
+    - { name: makeLineageState, lines: 191-211 }
+
+tests/query-tool/EquipmentRejectsTable.test.js:  # 129 lines
+  imports:
+    - { module: vitest, items: [describe, expect, it, vi], line: 14 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 15 }
+    - { module: '../../src/query-tool/components/EquipmentRejectsTable.vue', items: ['default:EquipmentRejectsTable'], line: 38 }
+
+tests/query-tool/useLotDetail.pagination.test.js:  # 90 lines
+  imports:
+    - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
+    - { module: '../../src/query-tool/composables/useLotDetail.js', items: [useLotDetail], line: 3 }
+  functions:
+    - { name: setupWindowMesApi, lines: 5-16 }
+
+tests/schema-guard.test.js:  # 157 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 13 }
+    - { module: '../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 14 }
+
+tests/shared-composables/useAsyncJobPolling.test.js:  # 237 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 12 }
+    - { module: '../../src/shared-composables/useAsyncJobPolling.ts', items: [pollJobUntilComplete, useAsyncJobPolling], line: 13 }
+    - { module: '../../src/core/api.js', items: [apiGet], line: 21 }
+
+tests/shared-composables/useAutoRefresh.test.js:  # 242 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 15 }
+    - { module: vue, items: [defineComponent, h], line: 16 }
+    - { module: '@vue/test-utils', items: [mount], line: 17 }
+    - { module: '../../src/shared-composables/useAutoRefresh.ts', items: [useAutoRefresh], line: 18 }
+  functions:
+    - { name: mountWithAutoRefresh, lines: 22-41 }
+
+tests/shared-composables/useRequestGuard.test.js:  # 155 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
+    - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
+
+tests/unwrap-api-result.test.js:  # 88 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 12 }
+    - { module: '../src/core/unwrap-api-result.js', items: [unwrapApiResult, unwrapApiData], line: 13 }
+
+tests/validation/useHoldOverview.validation.test.js:  # 287 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
+    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
+    - { module: '../../src/core/endpoint-schemas.js', items: [HOLD_OVERVIEW_SUMMARY_SCHEMA, HOLD_OVERVIEW_TREEMAP_SCHEMA], line: 16 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 20 }
+
+tests/validation/useMaterialTrace.validation.test.js:  # 220 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 17 }
+    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 18 }
+    - { module: '../../src/core/endpoint-schemas.js', items: [MATERIAL_TRACE_SPOOL_SCHEMA, MATERIAL_TRACE_QUERY_SCHEMA], line: 19 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
+
+tests/validation/useProductionHistory.validation.test.js:  # 537 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
+    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 16 }
+    - { module: '../../src/core/endpoint-schemas.js', items: [PRODUCTION_HISTORY_QUERY_SCHEMA, PRODUCTION_HISTORY_TYPE_OPTIONS_SCHEMA, PRODUCTION_HISTORY_COUNT_SCHEMA, PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA], line: 17 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
+    - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, _buildUrl, useFirstTierFilters], line: 24 }
+    - { module: '../../src/production-history/composables/useProductionHistory.ts', items: [validateQueryMode, buildModePayload, useProductionHistory], line: 29 }
+
+tests/validation/useRejectHistory.validation.test.js:  # 205 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
+    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
+    - { module: '../../src/core/endpoint-schemas.js', items: [REJECT_HISTORY_SUMMARY_SCHEMA, REJECT_HISTORY_OPTIONS_SCHEMA], line: 16 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 20 }
+
+tests/validation/useYieldAlert.validation.test.js:  # 216 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
+    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, detectUnknownEnvelope, _resetWarned], line: 16 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 17 }
+    - { module: '../../src/core/dev-warnings.js', items: [detectSpoolContentType], line: 189 }
+  constants:
+    - { name: SUMMARY_SHAPE, line: 75 }
+    - { name: TREND_ITEM_SHAPE, line: 81 }
+    - { name: ALERT_ITEM_SHAPE, line: 88 }
+
+tests/validation/wip-url-params.test.js:  # 86 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 10 }
+    - { module: '../../src/core/wip-derive', items: [buildWipOverviewQueryParams], line: 11 }
+
+tests/yield-alert/App.cross-filter.test.js:  # 353 lines
+  imports:
+    - { module: vitest, items: [beforeEach, describe, expect, it, vi], line: 2 }
+    - { module: vue, items: [defineComponent, nextTick, ref], line: 3 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 4 }
+  functions:
+    - { name: MultiSelectStub, lines: 42-50 }
+    - { name: buildViewPayload, lines: 52-86 }
+
+vite.config.ts:  # 69 lines
+  imports:
+    - { module: vite, items: [defineConfig], line: 1 }
+    - { module: 'node:path', items: [resolve], line: 2 }
+    - { module: '@vitejs/plugin-vue', items: ['default:vue'], line: 3 }
+
+vitest.config.js:  # 24 lines
+  imports:
+    - { module: vitest/config, items: [defineConfig], line: 1 }
+    - { module: 'node:path', items: [resolve], line: 2 }
+    - { module: '@vitejs/plugin-vue', items: ['default:vue'], line: 3 }

@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.7.0
-last-changed: 2026-05-19
+schema-version: 1.8.0
+last-changed: 2026-05-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -513,6 +513,54 @@ One row per reject event for `POST /api/query-tool/equipment-period` (`query_typ
 
 ---
 
+### 3.9 Material-Consumption Spool Schemas
+
+#### 3.9.1 Summary Spool (`tmp/query_spool/material_consumption/summary-*.parquet`)
+
+One row per `(txn_date, material_part, pj_type, primary_category)` grouping. Stored at day-level granularity; the `POST /query` response and `GET /view?granularity=` response are computed by re-grouping this spool in DuckDB. The summary spool cache key **excludes** granularity — one spool file serves all three granularity views (week/month/quarter). See ADR `docs/adr/0001-material-consumption-summary-spool-granularity-key.md`.
+
+| column | type | nullable | notes |
+|---|---|---|---|
+| txn_date | DATE | no | `TRUNC(DWH.DW_MES_LOTMATERIALSHISTORY.TXNDATE)` — date portion only, not datetime |
+| material_part | VARCHAR | no | MATERIALPARTNAME |
+| pj_type | VARCHAR | yes | `DWH.DW_MES_CONTAINER.PJ_TYPE`; null when LEFT JOIN returns no match |
+| primary_category | VARCHAR | yes | PRIMARY_CATEGORY from LOTMATERIALSHISTORY; null when not applicable |
+| total_consumed | FLOAT | no | `SUM(QTYCONSUMED)` for this (txn_date, material_part, pj_type, primary_category) cell |
+| total_required | FLOAT | no | `SUM(QTYREQUIRED)` for this cell |
+| lot_count | INT | no | `COUNT(DISTINCT CONTAINERID)` for this cell |
+| workorder_count | INT | no | `COUNT(DISTINCT PJ_WORKORDER)` for this cell |
+
+**Breaking-change surface**: any column rename, addition, or removal orphans existing files → `rm -f tmp/query_spool/material_consumption/*.parquet` required on both deploy and rollback (see ci-gate-contract.md §material-part-consumption worker gate).
+
+#### 3.9.2 Detail Spool (`tmp/query_spool/material_consumption/detail-*.parquet`)
+
+One row per raw lot-material event from `DWH.DW_MES_LOTMATERIALSHISTORY`, with `PJ_TYPE` joined from `DWH.DW_MES_CONTAINER`. Produced by `POST /api/material-consumption/detail`; paginated and exported via DuckDB.
+
+| column | type | nullable | notes |
+|---|---|---|---|
+| CONTAINERID | CHAR | no | Batch container ID |
+| CONTAINERNAME | VARCHAR | yes | LOT ID resolved via DWH.DW_MES_CONTAINER JOIN |
+| PJ_WORKORDER | VARCHAR | yes | Production work order number |
+| WORKCENTERNAME | VARCHAR | yes | Consumption work center |
+| MATERIALPARTNAME | VARCHAR | no | Material part number |
+| MATERIALLOTNAME | VARCHAR | yes | Material batch number |
+| VENDORLOTNUMBER | VARCHAR | yes | Vendor/supplier batch number |
+| QTYREQUIRED | FLOAT | yes | Required quantity |
+| QTYCONSUMED | FLOAT | yes | Actual consumption quantity |
+| EQUIPMENTNAME | VARCHAR | yes | Consumption equipment |
+| TXNDATE | DATE | yes | Consumption transaction date |
+| PRIMARY_CATEGORY | VARCHAR | yes | Material primary category |
+| SECONDARY_CATEGORY | VARCHAR | yes | Material secondary category |
+| pj_type | VARCHAR | yes | `DWH.DW_MES_CONTAINER.PJ_TYPE`; null when JOIN returns no match |
+
+Same breaking-change surface rule as summary spool.
+
+**Multi-worker detail spool write**: uses idempotency-check-before-write pattern from `material_trace_service.execute_to_spool()` — check `get_spool_file_path()` exists before executing Oracle query. Last-write-wins is NOT acceptable for detail (potentially slow Oracle query).
+
+**Async threshold**: `POST /api/material-consumption/detail` is synchronous when rows ≤ `SYNC_ROW_LIMIT` (env, default 30000); async Type B (RQ queue `material-consumption`) for larger sets (business-rules.md MC-04).
+
+---
+
 ## 6. Row Limit / Truncation Policy
 
 | scope | limit | behavior |
@@ -531,3 +579,8 @@ Removing a required column, changing a column type, or removing a key from the e
 1. Marking the field as `deprecated` for at least one minor version.
 2. Adding a compatibility note to `contracts/api/api-contract.md`.
 3. Updating related tests before removing the field.
+
+## CHANGELOG
+
+## [data 1.8.0]
+- material-part-consumption (2026-05-20): Added §3.9 with summary spool schema (8 columns: txn_date, material_part, pj_type, primary_category, total_consumed, total_required, lot_count, workorder_count) and detail spool schema (mirrors forward_by_lot.sql columns + pj_type). New spool namespaces only; no existing schemas changed.

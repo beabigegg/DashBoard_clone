@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.9.0] — 2026-05-20
+### Added
+- material-part-consumption: Added 7 endpoints under `/api/material-consumption` (filter-options, query, view, detail, detail/page, detail/job, export). Summary query always synchronous; detail sync ≤ SYNC_ROW_LIMIT, async Type B (RQ queue `material-consumption`) for larger sets. `/view` regroups from DuckDB spool without Oracle re-query. Additive; no existing endpoints changed.
+
+## [css 1.2.1] — 2026-05-20
+### Added
+- material-part-consumption: Added `.theme-material-consumption` scoping rule for `frontend/src/material-consumption/style.css`. Enforced by `npm run css:check` Rule 6; zero unscoped top-level rules permitted. CI fails on any violation.
+
+## [data 1.8.0] — 2026-05-20
+### Added
+- material-part-consumption: Added §3.9 with summary spool schema (8 columns: txn_date, material_part, pj_type, primary_category, total_consumed, total_required, lot_count, workorder_count) and detail spool schema (mirrors forward_by_lot.sql columns + pj_type). New spool namespaces only; no existing schemas changed.
+
+## [business 1.10.0] — 2026-05-20
+### Added
+- material-part-consumption: Added MC-01..MC-05 rules (data source/aggregation grouping, 20-part cap/wildcard/meta-char validation, granularity excluded from summary cache key, async threshold default 30000 rows, no DuckDB prewarm). Additive; no existing rules changed.
+
+## [ci 1.3.17] — 2026-05-20
+### Changed
+- material-part-consumption: Added worker queue deploy/rollback checklist for the new `material-consumption` RQ queue (systemd unit verification, zero-worker alert, parquet cleanup on schema-breaking rollback). No existing gates changed.
+
 ## [css-inventory 1.2.2] — 2026-05-19
 ### Added
 - admin-perf-detail-ui: Added `frontend/src/admin-pages/style.css` (`theme-admin-pages`) to Route-Local Feature Layers table. File pre-existed since `a0aa6a3` but was missing from inventory.

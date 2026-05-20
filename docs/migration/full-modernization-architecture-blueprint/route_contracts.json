@@ -251,6 +251,18 @@
       "canonical_shell_path": "/portal-shell/admin/performance",
       "rollback_strategy": "fallback_to_legacy_route",
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
+      "route": "/material-consumption",
+      "route_id": "material-consumption",
+      "title": "料號用量報表",
+      "scope": "in-scope",
+      "render_mode": "native",
+      "owner": "frontend-mes-reporting",
+      "visibility_policy": "released_or_admin",
+      "canonical_shell_path": "/portal-shell/material-consumption",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled"
     }
   ]
 }

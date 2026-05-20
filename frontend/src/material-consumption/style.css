@@ -1,0 +1,590 @@
+/*
+ * style.css — material-consumption feature styles
+ * Change: material-part-consumption
+ *
+ * CSS Rule 6: ALL top-level rules MUST be scoped under .theme-material-consumption
+ * Verified by: npm run css:check
+ */
+
+.theme-material-consumption {
+  /* Layout */
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p16');
+  padding: theme('spacing.token.p16');
+  min-height: 100vh;
+  background: theme('colors.surface.app');
+}
+
+/* --- PageHeader (header-gradient) layout + text ---
+   theme-material-consumption is not in resource-shared/styles.css :is() list,
+   so we replicate the minimal required rules here (same pattern as admin-pages). */
+.theme-material-consumption .header-gradient {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: theme('spacing.token.p16') theme('spacing.token.p20');
+  border-radius: 12px;
+  margin-bottom: theme('spacing.token.p16');
+}
+
+.theme-material-consumption .header-gradient h1 {
+  margin: 0;
+  color: theme('colors.token.hffffff');
+  font-size: 24px;
+  letter-spacing: 0.2px;
+}
+
+.theme-material-consumption .page-header {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p12');
+  margin-bottom: theme('spacing.token.p4');
+}
+
+.theme-material-consumption .page-title {
+  font-size: theme('fontSize.xl.0');
+  font-weight: 700;
+  color: theme('colors.text.primary');
+  margin: 0;
+}
+
+/* --- Cards --- */
+.theme-material-consumption .card {
+  background: theme('colors.surface.card');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.card');
+  overflow: hidden;
+}
+
+.theme-material-consumption .card-header {
+  padding: theme('spacing.token.p12') theme('spacing.token.p16');
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  background: theme('colors.surface.muted');
+}
+
+.theme-material-consumption .card-title {
+  font-size: theme('fontSize.sm.0');
+  font-weight: 600;
+  color: theme('colors.text.primary');
+}
+
+.theme-material-consumption .card-body {
+  padding: theme('spacing.token.p16');
+}
+
+/* --- Filter query card: override ui-card overflow:hidden so the MultiSelect dropdown escapes --- */
+.theme-material-consumption .filter-query-card,
+.theme-material-consumption .filter-query-card .ui-card-body {
+  overflow: visible;
+}
+
+/* --- Filter panel --- */
+.theme-material-consumption .filter-panel-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p12');
+}
+
+.theme-material-consumption .filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: theme('spacing.token.p12');
+}
+
+.theme-material-consumption .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p4');
+}
+
+.theme-material-consumption .filter-group--full {
+  grid-column: 1 / -1;
+}
+
+.theme-material-consumption .filter-group--granularity {
+  grid-column: 1 / -1;
+}
+
+.theme-material-consumption .filter-label {
+  font-size: theme('fontSize.xs.0');
+  font-weight: 500;
+  color: theme('colors.text.secondary');
+}
+
+.theme-material-consumption .filter-input {
+  border: 1px solid theme('colors.stroke.input');
+  border-radius: theme('borderRadius.button');
+  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  font-size: theme('fontSize.sm.0');
+  color: theme('colors.text.primary');
+  background: theme('colors.surface.card');
+  height: 36px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.theme-material-consumption .filter-input:focus {
+  outline: 2px solid theme('colors.brand.500');
+  outline-offset: 1px;
+}
+
+.theme-material-consumption .filter-textarea {
+  border: 1px solid theme('colors.stroke.input');
+  border-radius: theme('borderRadius.button');
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  font-size: theme('fontSize.sm.0');
+  color: theme('colors.text.primary');
+  background: theme('colors.surface.card');
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: ui-monospace, monospace;
+}
+
+.theme-material-consumption .filter-textarea--error {
+  border-color: theme('colors.state.danger');
+}
+
+.theme-material-consumption .filter-textarea:focus {
+  outline: 2px solid theme('colors.brand.500');
+  outline-offset: 1px;
+}
+
+.theme-material-consumption .input-count {
+  font-size: theme('fontSize.2xs.0');
+  color: theme('colors.text.secondary');
+}
+
+.theme-material-consumption .input-count--error {
+  color: theme('colors.state.danger');
+  font-weight: 600;
+}
+
+/* --- Validation error --- */
+.theme-material-consumption .validation-error {
+  background: theme('colors.token.hfef2f2');
+  border: 1px solid theme('colors.token.hfecaca');
+  color: theme('colors.token.hdc2626');
+  border-radius: theme('borderRadius.button');
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+  font-size: theme('fontSize.sm.0');
+}
+
+/* --- Granularity buttons --- */
+.theme-material-consumption .granularity-buttons {
+  display: flex;
+  gap: theme('spacing.token.p4');
+}
+
+.theme-material-consumption .granularity-btn {
+  padding: theme('spacing.token.p4') theme('spacing.token.p12');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.button');
+  background: theme('colors.surface.card');
+  font-size: theme('fontSize.xs.0');
+  cursor: pointer;
+  color: theme('colors.text.primary');
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.theme-material-consumption .granularity-btn:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-material-consumption .granularity-btn--active {
+  background: theme('colors.brand.500');
+  color: theme('colors.surface.card');
+  border-color: theme('colors.brand.500');
+}
+
+.theme-material-consumption .granularity-btn--active:hover {
+  background: theme('colors.brand.600');
+  color: theme('colors.surface.card');
+  border-color: theme('colors.brand.600');
+}
+
+/* --- Filter actions --- */
+.theme-material-consumption .filter-actions {
+  display: flex;
+  gap: theme('spacing.token.p8');
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* --- KPI cards --- */
+.theme-material-consumption .kpi-cards .ui-card-body {
+  padding: theme('spacing.token.p12');
+}
+
+/* --- Type filter (post-query bar) --- */
+.theme-material-consumption .type-filter-card {
+  overflow: visible;
+}
+
+.theme-material-consumption .type-filter-card .ui-card-body {
+  padding: theme('spacing.token.p10') theme('spacing.token.p16');
+  overflow: visible;
+}
+
+.theme-material-consumption .type-filter-row {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p12');
+  flex-wrap: wrap;
+}
+
+.theme-material-consumption .type-filter-label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.theme-material-consumption .type-filter-select {
+  position: relative;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+/* --- Tab bar --- */
+.theme-material-consumption .tab-bar {
+  display: flex;
+  gap: theme('spacing.token.p4');
+  border-bottom: 2px solid theme('colors.stroke.soft');
+  margin-bottom: 0;
+}
+
+.theme-material-consumption .tab-btn {
+  padding: theme('spacing.token.p8') theme('spacing.token.p20');
+  border: none;
+  background: transparent;
+  font-size: theme('fontSize.sm.0');
+  font-weight: 500;
+  color: theme('colors.text.secondary');
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.theme-material-consumption .tab-btn:hover {
+  color: theme('colors.text.primary');
+}
+
+.theme-material-consumption .tab-btn--active {
+  color: theme('colors.brand.500');
+  border-bottom-color: theme('colors.brand.500');
+}
+
+/* --- Chart containers --- */
+.theme-material-consumption .trend-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-material-consumption .type-breakdown-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-material-consumption .chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-material-consumption .chart-title {
+  font-size: theme('fontSize.sm.0');
+  font-weight: 600;
+  color: theme('colors.text.primary');
+}
+
+.theme-material-consumption .chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  color: theme('colors.text.secondary');
+  font-size: theme('fontSize.sm.0');
+}
+
+.theme-material-consumption .chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  color: theme('colors.text.secondary');
+  font-size: theme('fontSize.sm.0');
+  border: 1px dashed theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.button');
+}
+
+/* --- VChart sizing --- */
+.theme-material-consumption .vchart-trend {
+  height: 320px;
+  width: 100%;
+}
+
+.theme-material-consumption .vchart-breakdown {
+  height: 320px;
+  width: 100%;
+}
+
+/* --- Detail table section --- */
+.theme-material-consumption .detail-table-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p12');
+  position: relative;
+  min-height: theme('spacing.token.p80');
+}
+
+.theme-material-consumption .detail-toolbar {
+  display: flex;
+  gap: theme('spacing.token.p8');
+  flex-wrap: wrap;
+}
+
+.theme-material-consumption .detail-actions {
+  display: flex;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-material-consumption .detail-pending-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: theme('spacing.token.p12');
+  min-height: 120px;
+  position: relative;
+}
+
+.theme-material-consumption .detail-pending-text {
+  color: theme('colors.text.secondary');
+  font-size: theme('fontSize.sm.0');
+  margin: 0;
+}
+
+.theme-material-consumption .detail-loading-wrap {
+  position: relative;
+  min-height: 120px;
+}
+
+.theme-material-consumption .data-table-container {
+  overflow-x: auto;
+}
+
+/* --- Empty state --- */
+.theme-material-consumption .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: theme('spacing.token.p48') theme('spacing.token.p24');
+  text-align: center;
+  color: theme('colors.text.secondary');
+  font-size: theme('fontSize.base.0');
+  border: 1px dashed theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.card');
+  background: theme('colors.surface.card');
+}
+
+/* --- Buttons (ui-btn base) --- */
+.theme-material-consumption .ui-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: theme('spacing.token.p6');
+  padding: theme('spacing.token.p6') theme('spacing.token.p16');
+  border-radius: theme('borderRadius.button');
+  font-size: theme('fontSize.sm.0');
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  white-space: nowrap;
+}
+
+.theme-material-consumption .ui-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-material-consumption .ui-btn--primary {
+  background: theme('colors.brand.500');
+  color: theme('colors.surface.card');
+  border-color: theme('colors.brand.500');
+}
+
+.theme-material-consumption .ui-btn--primary:hover:not(:disabled) {
+  background: theme('colors.brand.600');
+  border-color: theme('colors.brand.600');
+}
+
+.theme-material-consumption .ui-btn--secondary {
+  background: theme('colors.surface.card');
+  color: theme('colors.text.primary');
+  border-color: theme('colors.stroke.soft');
+}
+
+.theme-material-consumption .ui-btn--secondary:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+}
+
+/* --- MultiSelect visual styles --- */
+.theme-material-consumption .multi-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid theme('colors.stroke.input');
+  border-radius: 8px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  font-size: 13px;
+  color: theme('colors.text.primary');
+  background: theme('colors.surface.card');
+  cursor: pointer;
+}
+
+.theme-material-consumption .multi-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.theme-material-consumption .multi-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.theme-material-consumption .multi-select-arrow {
+  color: theme('colors.text.subtle');
+  font-size: 11px;
+}
+
+.theme-material-consumption .multi-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 8px;
+  background: theme('colors.surface.card');
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.theme-material-consumption .multi-select-search {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+  font-size: 13px;
+  color: theme('colors.text.primary');
+  outline: none;
+  background: theme('colors.surface.muted');
+}
+
+.theme-material-consumption .multi-select-search::placeholder {
+  color: theme('colors.text.subtle');
+}
+
+.theme-material-consumption .multi-select-options {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: theme('spacing.token.p8') 0;
+}
+
+.theme-material-consumption .multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: theme('colors.text.primary');
+  cursor: pointer;
+  text-align: left;
+}
+
+.theme-material-consumption .multi-select-option:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-material-consumption .multi-select-option input[type='checkbox'] {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: theme('colors.brand.600');
+}
+
+.theme-material-consumption .multi-select-empty {
+  padding: theme('spacing.token.p12');
+  text-align: center;
+  color: theme('colors.text.subtle');
+  font-size: 13px;
+}
+
+.theme-material-consumption .multi-select-actions {
+  display: flex;
+  gap: 8px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  border-top: 1px solid theme('colors.stroke.soft');
+  background: theme('colors.surface.muted');
+}
+
+/* --- Pagination (BasePagination has no scoped styles; style from theme scope) --- */
+.theme-material-consumption .pagination {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-material-consumption .pagination button {
+  display: inline-flex;
+  align-items: center;
+  padding: theme('spacing.token.p4') theme('spacing.token.p12');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: theme('borderRadius.button');
+  background: theme('colors.surface.card');
+  font-size: theme('fontSize.xs.0');
+  color: theme('colors.text.primary');
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  white-space: nowrap;
+}
+
+.theme-material-consumption .pagination button:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+}
+
+.theme-material-consumption .pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.theme-material-consumption .page-info {
+  font-size: theme('fontSize.xs.0');
+  color: theme('colors.text.secondary');
+  white-space: nowrap;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .theme-material-consumption .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-material-consumption .granularity-buttons {
+    flex-wrap: wrap;
+  }
+}

@@ -1,13 +1,13 @@
-# generated: 2026-05-19T06:04:38Z by cdd-kit 2.0.19
-# files: 776, src-lines: 213614, map-lines: 16365, compression: 13.1x
-# sources-digest: 433ea5e9395cd16a09d9e538c157d228992c8045e619ab35b9755345f9f327e4
+# generated: 2026-05-20T10:39:15Z by cdd-kit 2.0.20
+# files: 795, src-lines: 219571, map-lines: 16734, compression: 13.1x
+# sources-digest: 72837e97c63fabc1f3bdd96db431ca8365c58e2f253ef368a00c7c9ec6fe2370
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
 
 frontend/postcss.config.js:  # 6 lines
 
-frontend/scripts/css-governance-check.js:  # 229 lines
+frontend/scripts/css-governance-check.js:  # 362 lines
   imports:
     - { module: fs, items: [readFileSync, readdirSync, statSync], line: 15 }
     - { module: path, items: [join, relative], line: 16 }
@@ -17,17 +17,19 @@ frontend/scripts/css-governance-check.js:  # 229 lines
     - { name: SRC_DIR, line: 21 }
     - { name: EXEMPT_CSS, line: 24 }
     - { name: CHART_HEX_ALLOWED, line: 33 }
-    - { name: HEX_COLOR_RE, line: 46 }
-    - { name: SPACING_PX_RE, line: 47 }
-    - { name: CHART_IMPORT_RE, line: 48 }
+    - { name: HEX_COLOR_RE, line: 47 }
+    - { name: SPACING_PX_RE, line: 48 }
+    - { name: CHART_IMPORT_RE, line: 49 }
   functions:
-    - { name: walk, lines: 50-60 }
-    - { name: relPath, lines: 62-64 }
-    - { name: isExemptCss, lines: 66-69 }
-    - { name: classifyHexUsage, lines: 71-78 }
-    - { name: checkCssFile, lines: 82-129 }
-    - { name: checkVueFile, lines: 133-176 }
-    - { name: checkJsFile, lines: 178-203 }
+    - { name: walk, lines: 51-61 }
+    - { name: relPath, lines: 63-65 }
+    - { name: isExemptCss, lines: 67-70 }
+    - { name: classifyHexUsage, lines: 72-79 }
+    - { name: findUnscopedTopLevelRules, lines: 89-193 }
+    - { name: isFeatureCss, lines: 198-202 }
+    - { name: checkCssFile, lines: 204-261 }
+    - { name: checkVueFile, lines: 265-308 }
+    - { name: checkJsFile, lines: 310-335 }
 
 frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   imports:
@@ -889,6 +891,69 @@ frontend/src/job-query/main.ts:  # 653 lines
     - { name: Equipment, lines: 22-27 }  # local
     - { name: JobRecord, lines: 28-28 }  # local
 
+frontend/src/material-consumption/App.vue:  # 341 lines
+
+frontend/src/material-consumption/__tests__/FilterPanel.test.ts:  # 133 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 10 }
+    - { module: '@vue/test-utils', items: [mount], line: 11 }
+    - { module: vue, items: [defineComponent, nextTick], line: 12 }
+    - { module: '../components/FilterPanel.vue', items: ['default:FilterPanel'], line: 13 }
+  constants:
+    - { name: DEFAULT_PART_OPTIONS, line: 33 }
+  functions:
+    - { name: mountPanel, lines: 39-47 }
+
+frontend/src/material-consumption/__tests__/TrendChart.test.ts:  # 96 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 10 }
+    - { module: '@vue/test-utils', items: [mount], line: 11 }
+    - { module: vue, items: [defineComponent, nextTick], line: 12 }
+    - { module: '../components/ConsumptionTrendChart.vue', items: ['default:ConsumptionTrendChart'], line: 13 }
+  functions:
+    - { name: makeTrendData, lines: 34-39 }
+    - { name: mountChart, lines: 41-48 }
+
+frontend/src/material-consumption/__tests__/useConsumptionQuery.test.ts:  # 183 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 10 }
+    - { module: vue, items: [nextTick], line: 11 }
+    - { module: '../../core/api', items: [apiPost, apiGet], line: 19 }
+    - { module: '../composables/useConsumptionQuery', items: [useConsumptionQuery], line: 20 }
+
+frontend/src/material-consumption/components/ConsumptionTrendChart.vue:  # 130 lines
+
+frontend/src/material-consumption/components/DetailTable.vue:  # 180 lines
+
+frontend/src/material-consumption/components/FilterPanel.vue:  # 212 lines
+
+frontend/src/material-consumption/components/TypeBreakdownChart.vue:  # 125 lines
+
+frontend/src/material-consumption/composables/useConsumptionQuery.ts:  # 393 lines
+  imports:
+    - { module: vue, items: [ref], line: 13 }
+    - { module: '../../core/api', items: [apiGet, apiPost], line: 14 }
+  constants:
+    - { name: POLL_INTERVAL_MS, line: 66 }
+    - { name: POLL_MAX_ATTEMPTS, line: 67 }
+  functions:
+    - { name: useConsumptionQuery, lines: 69-393 }
+  interfaces:
+    - { name: ConsumptionKpi, lines: 17-23 }
+    - { name: TrendItem, lines: 25-29 }
+    - { name: TypeBreakdownItem, lines: 31-35 }
+    - { name: DetailRow, lines: 37-48 }
+    - { name: DetailPagination, lines: 50-55 }
+    - { name: QueryParams, lines: 59-64 }
+  types:
+    - { name: Granularity, lines: 57-57 }
+
+frontend/src/material-consumption/main.ts:  # 5 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 2 }
+    - { module: './style.css', items: [], line: 3 }
+
 frontend/src/material-trace/App.vue:  # 579 lines
 
 frontend/src/material-trace/main.ts:  # 7 lines
@@ -1055,12 +1120,12 @@ frontend/src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-frontend/src/portal-shell/nativeModuleRegistry.js:  # 97 lines
+frontend/src/portal-shell/nativeModuleRegistry.js:  # 101 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 95-97 }
+    - { name: getNativeModuleLoader, lines: 99-101 }
 
 frontend/src/portal-shell/navigationState.js:  # 166 lines
   imports:
@@ -1074,26 +1139,26 @@ frontend/src/portal-shell/navigationState.js:  # 166 lines
     - { name: normalizeNavigationDrawers, lines: 31-79 }
     - { name: buildDynamicNavigationState, lines: 81-166 }
 
-frontend/src/portal-shell/routeContracts.js:  # 362 lines
+frontend/src/portal-shell/routeContracts.js:  # 374 lines
   constants:
     - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
-    - { name: IN_SCOPE_ADMIN_ROUTES, line: 21 }
-    - { name: DEFERRED_ROUTES, line: 27 }
-    - { name: ALL_KNOWN_ROUTES, line: 29 }
-    - { name: ROUTE_CONTRACTS, line: 60 }
-    - { name: REQUIRED_FIELDS, line: 283 }
-    - { name: VALID_RENDER_MODES, line: 296 }
-    - { name: VALID_VISIBILITY_POLICIES, line: 297 }
-    - { name: VALID_SCOPES, line: 298 }
+    - { name: IN_SCOPE_ADMIN_ROUTES, line: 22 }
+    - { name: DEFERRED_ROUTES, line: 28 }
+    - { name: ALL_KNOWN_ROUTES, line: 30 }
+    - { name: ROUTE_CONTRACTS, line: 61 }
+    - { name: REQUIRED_FIELDS, line: 295 }
+    - { name: VALID_RENDER_MODES, line: 308 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 309 }
+    - { name: VALID_SCOPES, line: 310 }
   functions:
-    - { name: buildContract, lines: 35-58 }
-    - { name: normalizeRoutePath, lines: 300-306 }
-    - { name: getRouteContract, lines: 308-310 }
-    - { name: getRouteContractMap, lines: 312-314 }
-    - { name: getInScopeRoutes, lines: 316-318 }
-    - { name: getDeferredRoutes, lines: 320-322 }
-    - { name: getKnownRoutes, lines: 324-326 }
-    - { name: validateRouteContractMap, lines: 328-362 }
+    - { name: buildContract, lines: 36-59 }
+    - { name: normalizeRoutePath, lines: 312-318 }
+    - { name: getRouteContract, lines: 320-322 }
+    - { name: getRouteContractMap, lines: 324-326 }
+    - { name: getInScopeRoutes, lines: 328-330 }
+    - { name: getDeferredRoutes, lines: 332-334 }
+    - { name: getKnownRoutes, lines: 336-338 }
+    - { name: validateRouteContractMap, lines: 340-374 }
 
 frontend/src/portal-shell/routeQuery.js:  # 36 lines
   functions:
@@ -2408,6 +2473,37 @@ frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 133 lines
     - { module: '@playwright/test', items: [test, expect], line: 13 }
     - { module: './_auth.js', items: [loginViaApi, BASE_URL], line: 14 }
 
+frontend/tests/playwright/material-consumption-data-boundary.spec.ts:  # 180 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 13 }
+  constants:
+    - { name: BASE_URL, line: 15 }
+    - { name: PAGE_URL, line: 16 }
+    - { name: MOCK_FILTER_OPTIONS, line: 18 }
+  functions:
+    - { name: async setupBasicMocks, lines: 28-32 }
+
+frontend/tests/playwright/material-consumption-resilience.spec.ts:  # 155 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 12 }
+  constants:
+    - { name: BASE_URL, line: 14 }
+    - { name: PAGE_URL, line: 15 }
+    - { name: MOCK_FILTER_OPTIONS, line: 17 }
+    - { name: MOCK_QUERY_RESULT, line: 27 }
+
+frontend/tests/playwright/material-consumption.spec.ts:  # 299 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 15 }
+  constants:
+    - { name: BASE_URL, line: 17 }
+    - { name: PAGE_URL, line: 18 }
+    - { name: MOCK_FILTER_OPTIONS, line: 20 }
+    - { name: MOCK_QUERY_RESULT, line: 30 }
+    - { name: MOCK_VIEW_MONTH, line: 55 }
+  functions:
+    - { name: async setupMockRoutes, lines: 76-88 }
+
 frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 14 }
@@ -2647,7 +2743,7 @@ frontend/tests/yield-alert/App.cross-filter.test.js:  # 353 lines
     - { name: MultiSelectStub, lines: 42-50 }
     - { name: buildViewPayload, lines: 52-86 }
 
-frontend/vite.config.ts:  # 68 lines
+frontend/vite.config.ts:  # 69 lines
   imports:
     - { module: vite, items: [defineConfig], line: 1 }
     - { module: 'node:path', items: [resolve], line: 2 }
@@ -2833,7 +2929,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1403 lines
+src/mes_dashboard/app.py:  # 1405 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -2891,8 +2987,8 @@ src/mes_dashboard/app.py:  # 1403 lines
     - { name: _is_runtime_contract_enforced, lines: 514-519 }
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
-    - { name: create_app, lines: 569-1277 }
-    - { name: _register_error_handlers, lines: 1280-1403 }
+    - { name: create_app, lines: 569-1279 }
+    - { name: _register_error_handlers, lines: 1282-1405 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4095,7 +4191,7 @@ src/mes_dashboard/core/worker_recovery_policy.py:  # 220 lines
     - { name: evaluate_worker_recovery_state, lines: 95-156 }
     - { name: decide_restart_request, lines: 159-219 }
 
-src/mes_dashboard/routes/__init__.py:  # 76 lines
+src/mes_dashboard/routes/__init__.py:  # 79 lines
   imports:
     - { module: '.wip_routes', items: [wip_bp], line: 7 }
     - { module: '.resource_routes', items: [resource_bp], line: 8 }
@@ -4118,8 +4214,9 @@ src/mes_dashboard/routes/__init__.py:  # 76 lines
     - { module: '.ai_routes', items: [ai_bp], line: 25 }
     - { module: '.production_history_routes', items: [production_history_bp], line: 26 }
     - { module: '.job_routes', items: [job_bp], line: 27 }
+    - { module: '.material_consumption_routes', items: [material_consumption_bp], line: 28 }
   functions:
-    - { name: register_routes, lines: 30-51 }
+    - { name: register_routes, lines: 31-53 }
 
 src/mes_dashboard/routes/admin_routes.py:  # 1495 lines
   imports:
@@ -4299,7 +4396,7 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 350 lines
     - { name: api_hold_history_config, lines: 272-277 }  # @hold_history_bp.route('/api/hold-history/config')
     - { name: api_hold_history_today_snapshot, lines: 287-350 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
-src/mes_dashboard/routes/hold_overview_routes.py:  # 265 lines
+src/mes_dashboard/routes/hold_overview_routes.py:  # 283 lines
   imports:
     - { module: os, items: [], line: 4 }
     - { module: typing, items: [Optional], line: 5 }
@@ -4316,10 +4413,10 @@ src/mes_dashboard/routes/hold_overview_routes.py:  # 265 lines
     - { name: _parse_reason_list, lines: 67-80 }
     - { name: _parse_hold_type, lines: 83-95 }
     - { name: hold_overview_page, lines: 99-117 }  # @hold_overview_bp.route('/hold-overview')
-    - { name: api_hold_overview_summary, lines: 121-152 }  # @hold_overview_bp.route('/api/hold-overview/summary', methods=['GET', 'POST'])
-    - { name: api_hold_overview_matrix, lines: 157-185 }  # @hold_overview_bp.route('/api/hold-overview/matrix', methods=['GET', 'POST'])
-    - { name: api_hold_overview_treemap, lines: 189-210 }  # @hold_overview_bp.route('/api/hold-overview/treemap', methods=['GET', 'POST'])
-    - { name: api_hold_overview_lots, lines: 215-265 }  # @hold_overview_bp.route('/api/hold-overview/lots', methods=['GET', 'POST'])
+    - { name: api_hold_overview_summary, lines: 121-158 }  # @hold_overview_bp.route('/api/hold-overview/summary', methods=['GET', 'POST'])
+    - { name: api_hold_overview_matrix, lines: 163-197 }  # @hold_overview_bp.route('/api/hold-overview/matrix', methods=['GET', 'POST'])
+    - { name: api_hold_overview_treemap, lines: 201-222 }  # @hold_overview_bp.route('/api/hold-overview/treemap', methods=['GET', 'POST'])
+    - { name: api_hold_overview_lots, lines: 227-283 }  # @hold_overview_bp.route('/api/hold-overview/lots', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/hold_routes.py:  # 186 lines
   imports:
@@ -4378,6 +4475,24 @@ src/mes_dashboard/routes/job_routes.py:  # 158 lines
   functions:
     - { name: get_job, lines: 60-76 }  # @job_bp.route('/api/job/<job_id>', methods=['GET'])
     - { name: abandon_job, lines: 81-158 }  # @job_bp.route('/api/job/<job_id>/abandon', methods=['POST'])
+
+src/mes_dashboard/routes/material_consumption_routes.py:  # 267 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 23 }
+    - { module: logging, items: [], line: 25 }
+    - { module: flask, items: [Blueprint, Response, stream_with_context], line: 27 }
+    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 29 }
+    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 30 }
+    - { module: mes_dashboard.core.response, items: [cache_expired_error, internal_error, success_response, validation_error], line: 31 }
+  functions:
+    - { name: _svc, lines: 71-73 }
+    - { name: get_filter_options, lines: 82-89 }  # @material_consumption_bp.route('/filter-options', methods=['GET'])
+    - { name: query_summary, lines: 94-131 }  # @material_consumption_bp.route('/query', methods=['POST'])
+    - { name: view_summary, lines: 135-161 }  # @material_consumption_bp.route('/view', methods=['GET'])
+    - { name: query_detail, lines: 166-202 }  # @material_consumption_bp.route('/detail', methods=['POST'])
+    - { name: get_detail_page, lines: 206-227 }  # @material_consumption_bp.route('/detail/page', methods=['GET'])
+    - { name: get_job_status, lines: 231-239 }  # @material_consumption_bp.route('/detail/job/<job_id>', methods=['GET'])
+    - { name: export_csv, lines: 244-267 }  # @material_consumption_bp.route('/export', methods=['POST'])
 
 src/mes_dashboard/routes/material_trace_routes.py:  # 273 lines
   imports:
@@ -4694,7 +4809,7 @@ src/mes_dashboard/routes/user_auth_routes.py:  # 231 lines
     - { name: me, lines: 199-212 }  # @user_auth_bp.route('/api/auth/me', methods=['GET'])
     - { name: heartbeat, lines: 217-231 }  # @user_auth_bp.route('/api/auth/heartbeat', methods=['PATCH'])
 
-src/mes_dashboard/routes/wip_routes.py:  # 489 lines
+src/mes_dashboard/routes/wip_routes.py:  # 495 lines
   imports:
     - { module: flask, items: [Blueprint, request], line: 8 }
     - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 10 }
@@ -4706,13 +4821,13 @@ src/mes_dashboard/routes/wip_routes.py:  # 489 lines
     - { name: _get_wip_args, lines: 21-29 }
     - { name: api_overview_summary, lines: 70-118 }  # @wip_bp.route('/overview/summary', methods=['GET', 'POST'])
     - { name: api_overview_matrix, lines: 123-183 }  # @wip_bp.route('/overview/matrix', methods=['GET', 'POST'])
-    - { name: api_overview_hold, lines: 187-228 }  # @wip_bp.route('/overview/hold', methods=['GET', 'POST'])
-    - { name: api_detail, lines: 237-324 }  # @wip_bp.route('/detail/<workcenter>', methods=['GET', 'POST'])
-    - { name: api_lot_detail, lines: 328-341 }  # @wip_bp.route('/lot/<lotid>')
-    - { name: api_meta_workcenters, lines: 349-363 }  # @wip_bp.route('/meta/workcenters')
-    - { name: api_meta_packages, lines: 367-381 }  # @wip_bp.route('/meta/packages')
-    - { name: api_meta_filter_options, lines: 385-421 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
-    - { name: api_meta_search, lines: 425-489 }  # @wip_bp.route('/meta/search')
+    - { name: api_overview_hold, lines: 187-234 }  # @wip_bp.route('/overview/hold', methods=['GET', 'POST'])
+    - { name: api_detail, lines: 243-330 }  # @wip_bp.route('/detail/<workcenter>', methods=['GET', 'POST'])
+    - { name: api_lot_detail, lines: 334-347 }  # @wip_bp.route('/lot/<lotid>')
+    - { name: api_meta_workcenters, lines: 355-369 }  # @wip_bp.route('/meta/workcenters')
+    - { name: api_meta_packages, lines: 373-387 }  # @wip_bp.route('/meta/packages')
+    - { name: api_meta_filter_options, lines: 391-427 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
+    - { name: api_meta_search, lines: 431-495 }  # @wip_bp.route('/meta/search')
 
 src/mes_dashboard/routes/yield_alert_routes.py:  # 654 lines
   imports:
@@ -5460,6 +5575,80 @@ src/mes_dashboard/services/lineage_engine.py:  # 853 lines
     - { name: _append_unique, lines: 63-65 }
     - { name: _to_edge_payload, lines: 68-86 }
     - { name: _build_parent_map, lines: 89-127 }
+
+src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 422 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: csv, items: [], line: 17 }
+    - { module: io, items: [], line: 18 }
+    - { module: logging, items: [], line: 19 }
+    - { module: pathlib, items: [Path], line: 20 }
+    - { module: typing, items: [Any, Dict, Generator, List, Optional], line: 21 }
+    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 23 }
+  classes:
+    - name: MaterialConsumptionDetailRuntime
+      lines: 293-422
+      methods:
+        - { name: __init__, lines: 296-299 }
+        - { name: _resolve_path, lines: 301-305 }
+        - { name: is_available, lines: 307-309 }
+        - { name: get_page, lines: 311-373 }
+        - { name: export_csv, lines: 375-422 }
+  functions:
+    - { name: _normalize_detail_df, lines: 63-66 }
+    - { name: _granularity_bucket_expr, lines: 74-96 }
+    - { name: _sql_str_literal, lines: 99-100 }
+    - { name: _type_where, lines: 103-111 }
+    - { name: _fetch_dict_rows, lines: 114-119 }
+    - { name: regroup_summary, lines: 127-161 }
+    - { name: _query_kpi, lines: 164-189 }
+    - { name: _empty_kpi, lines: 192-199 }
+    - { name: _query_trend, lines: 202-243 }
+    - { name: _query_type_breakdown, lines: 246-285 }
+
+src/mes_dashboard/services/material_consumption_service.py:  # 677 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: logging, items: [], line: 17 }
+    - { module: os, items: [], line: 18 }
+    - { module: re, items: [], line: 19 }
+    - { module: typing, items: [Any, Dict, Generator, List, Optional], line: 20 }
+    - { module: pandas, items: [], line: 22 }
+    - { module: mes_dashboard.core.database, items: [read_sql_df], line: 24 }
+    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 25 }
+    - { module: mes_dashboard.core.redis_client, items: [REDIS_ENABLED, get_redis_client], line: 29 }
+    - { module: mes_dashboard.services.batch_query_engine, items: [compute_query_hash], line: 30 }
+    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 31 }
+  constants:
+    - { name: MATERIAL_CONSUMPTION_QUEUE, line: 39 }
+  classes:
+    - name: ValidationError
+      lines: 123-128
+      methods:
+        - { name: __init__, lines: 126-128 }
+    - name: CacheExpiredError
+      lines: 131-136
+      methods:
+        - { name: __init__, lines: 134-136 }
+  functions:
+    - { name: _get_parts_list, lines: 60-115 }
+    - { name: validate_material_parts, lines: 144-196 }
+    - { name: _add_parts_condition, lines: 199-223 }
+    - { name: _compute_summary_cache_key, lines: 231-248 }
+    - { name: _compute_detail_cache_key, lines: 251-262 }
+    - { name: _build_summary_sql, lines: 270-294 }
+    - { name: _build_detail_sql, lines: 297-318 }
+    - { name: _compute_summary_from_spool, lines: 326-337 }
+    - { name: get_filter_options, lines: 345-358 }
+    - { name: get_summary, lines: 361-429 }
+    - { name: apply_view, lines: 432-449 }
+    - { name: get_detail_summary, lines: 452-536 }
+    - { name: get_detail_page, lines: 539-555 }
+    - { name: get_job_status, lines: 561-564 }
+    - { name: export_csv_stream, lines: 567-574 }
+    - { name: rq_material_consumption_job, lines: 582-633 }
+    - { name: enqueue_job, lines: 641-643 }
+    - { name: start_parts_cache_warmup, lines: 646-677 }
 
 src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 175 lines
   imports:
@@ -6540,7 +6729,7 @@ src/mes_dashboard/services/resource_service.py:  # 658 lines
     - { name: get_resource_status_summary, lines: 492-586 }
     - { name: get_workcenter_status_matrix, lines: 589-658 }
 
-src/mes_dashboard/services/rq_monitor_service.py:  # 246 lines
+src/mes_dashboard/services/rq_monitor_service.py:  # 247 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -6549,11 +6738,11 @@ src/mes_dashboard/services/rq_monitor_service.py:  # 246 lines
     - { module: typing, items: [Any, Dict, List], line: 14 }
     - { module: mes_dashboard.core.redis_client, items: [get_redis_client], line: 16 }
   functions:
-    - { name: _check_rq_installed, lines: 32-37 }
-    - { name: get_rq_worker_details, lines: 44-123 }
-    - { name: get_rq_queue_details, lines: 130-184 }
-    - { name: get_heavy_query_slot_status, lines: 191-204 }
-    - { name: get_rq_monitor_summary, lines: 211-246 }
+    - { name: _check_rq_installed, lines: 33-38 }
+    - { name: get_rq_worker_details, lines: 45-124 }
+    - { name: get_rq_queue_details, lines: 131-185 }
+    - { name: get_heavy_query_slot_status, lines: 192-205 }
+    - { name: get_rq_monitor_summary, lines: 212-247 }
 
 src/mes_dashboard/services/scrap_reason_exclusion_cache.py:  # 236 lines
   imports:
@@ -6689,7 +6878,7 @@ src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
     - { name: _safe_int, lines: 412-419 }
     - { name: _compute_duration_buckets, lines: 422-434 }
 
-src/mes_dashboard/services/wip_service.py:  # 4014 lines
+src/mes_dashboard/services/wip_service.py:  # 4107 lines
   imports:
     - { module: logging, items: [], line: 10 }
     - { module: threading, items: [], line: 11 }
@@ -6704,7 +6893,7 @@ src/mes_dashboard/services/wip_service.py:  # 4014 lines
     - { module: mes_dashboard.sql.filters, items: [CommonFilters, NON_QUALITY_HOLD_REASONS], line: 30 }
   constants:
     - { name: WIP_VIEW, line: 146 }
-    - { name: LOT_DETAIL_FIELD_LABELS, line: 3727 }
+    - { name: LOT_DETAIL_FIELD_LABELS, line: 3820 }
   functions:
     - { name: _safe_value, lines: 52-59 }
     - { name: _build_base_conditions_builder, lines: 62-99 }
@@ -6719,63 +6908,64 @@ src/mes_dashboard/services/wip_service.py:  # 4014 lines
     - { name: _split_csv_values, lines: 203-214 }
     - { name: _contains_any_mask, lines: 217-226 }
     - { name: _add_exact_filter_conditions, lines: 229-237 }
-    - { name: _lookup_positions, lines: 240-251 }
-    - { name: _build_filter_mask, lines: 254-275 }
-    - { name: _build_value_index, lines: 278-282 }
-    - { name: _intersect_positions, lines: 285-292 }
-    - { name: _compute_snapshot_positions, lines: 295-352 }
-    - { name: _distinct_values_from_index, lines: 355-382 }
-    - { name: _select_with_snapshot_indexes, lines: 385-420 }
-    - { name: _build_search_signatures, lines: 423-463 }
-    - { name: _decode_signature_fields, lines: 466-470 }
-    - { name: _build_field_counters, lines: 473-499 }
-    - { name: _materialize_search_payload, lines: 502-551 }
-    - { name: _try_incremental_search_sync, lines: 555-646 }
-    - { name: _build_wip_snapshot, lines: 649-686 }
-    - { name: _get_wip_snapshot, lines: 689-712 }
-    - { name: _get_wip_search_index, lines: 715-759 }
-    - { name: _search_values_from_index, lines: 762-765 }
-    - { name: get_wip_search_index_status, lines: 768-815 }
-    - { name: _add_wip_status_columns, lines: 818-856 }
-    - { name: _filter_base_conditions, lines: 859-887 }
-    - { name: get_wip_summary, lines: 894-1021 }
-    - { name: _get_wip_summary_from_oracle, lines: 1024-1098 }
-    - { name: get_wip_matrix, lines: 1101-1218 }
-    - { name: _build_matrix_result, lines: 1221-1271 }
-    - { name: _get_wip_matrix_from_oracle, lines: 1274-1346 }
-    - { name: get_wip_hold_summary, lines: 1349-1444 }
-    - { name: _get_wip_hold_summary_from_oracle, lines: 1447-1501 }
-    - { name: get_wip_detail, lines: 1508-1715 }
-    - { name: _get_wip_detail_from_oracle, lines: 1718-1908 }
-    - { name: get_workcenters, lines: 1915-1956 }
-    - { name: _get_workcenters_from_oracle, lines: 1959-1993 }
-    - { name: get_packages, lines: 1996-2037 }
-    - { name: _get_packages_from_oracle, lines: 2040-2073 }
-    - { name: _distinct_non_empty_values, lines: 2076-2084 }
-    - { name: _build_filter_options_payload, lines: 2087-2098 }
-    - { name: _query_distinct_values_from_oracle, lines: 2101-2152 }
-    - { name: _get_wip_filter_options_from_oracle, lines: 2155-2197 }
-    - { name: _get_filter_options_cache_payload, lines: 2200-2285 }
-    - { name: get_wip_filter_options, lines: 2288-2360 }
-    - { name: search_workorders, lines: 2367-2430 }
-    - { name: _search_workorders_from_oracle, lines: 2433-2473 }
-    - { name: search_lot_ids, lines: 2476-2538 }
-    - { name: _search_lot_ids_from_oracle, lines: 2541-2580 }
-    - { name: search_packages, lines: 2583-2652 }
-    - { name: _search_packages_from_oracle, lines: 2655-2693 }
-    - { name: search_types, lines: 2696-2765 }
-    - { name: _search_types_from_oracle, lines: 2768-2806 }
-    - { name: get_hold_detail_summary, lines: 2813-2917 }
-    - { name: _get_hold_detail_summary_from_oracle, lines: 2920-2982 }
-    - { name: get_hold_detail_distribution, lines: 2985-3122 }
-    - { name: _get_hold_detail_distribution_from_oracle, lines: 3125-3265 }
-    - { name: get_hold_detail_lots, lines: 3268-3434 }
-    - { name: _get_hold_detail_lots_from_oracle, lines: 3437-3576 }
-    - { name: get_hold_overview_treemap, lines: 3583-3658 }
-    - { name: _get_hold_overview_treemap_from_oracle, lines: 3661-3719 }
-    - { name: get_lot_detail, lines: 3785-3819 }
-    - { name: _get_lot_detail_from_oracle, lines: 3822-3902 }
-    - { name: _build_lot_detail_response, lines: 3905-4014 }
+    - { name: _apply_non_indexed_filters, lines: 240-256 }
+    - { name: _lookup_positions, lines: 259-270 }
+    - { name: _build_filter_mask, lines: 273-294 }
+    - { name: _build_value_index, lines: 297-301 }
+    - { name: _intersect_positions, lines: 304-311 }
+    - { name: _compute_snapshot_positions, lines: 314-371 }
+    - { name: _distinct_values_from_index, lines: 374-401 }
+    - { name: _select_with_snapshot_indexes, lines: 404-439 }
+    - { name: _build_search_signatures, lines: 442-482 }
+    - { name: _decode_signature_fields, lines: 485-489 }
+    - { name: _build_field_counters, lines: 492-518 }
+    - { name: _materialize_search_payload, lines: 521-570 }
+    - { name: _try_incremental_search_sync, lines: 574-665 }
+    - { name: _build_wip_snapshot, lines: 668-705 }
+    - { name: _get_wip_snapshot, lines: 708-731 }
+    - { name: _get_wip_search_index, lines: 734-778 }
+    - { name: _search_values_from_index, lines: 781-784 }
+    - { name: get_wip_search_index_status, lines: 787-834 }
+    - { name: _add_wip_status_columns, lines: 837-875 }
+    - { name: _filter_base_conditions, lines: 878-906 }
+    - { name: get_wip_summary, lines: 913-1042 }
+    - { name: _get_wip_summary_from_oracle, lines: 1045-1116 }
+    - { name: get_wip_matrix, lines: 1119-1238 }
+    - { name: _build_matrix_result, lines: 1241-1291 }
+    - { name: _get_wip_matrix_from_oracle, lines: 1294-1363 }
+    - { name: get_wip_hold_summary, lines: 1366-1472 }
+    - { name: _get_wip_hold_summary_from_oracle, lines: 1475-1535 }
+    - { name: get_wip_detail, lines: 1542-1752 }
+    - { name: _get_wip_detail_from_oracle, lines: 1755-1939 }
+    - { name: get_workcenters, lines: 1946-1987 }
+    - { name: _get_workcenters_from_oracle, lines: 1990-2024 }
+    - { name: get_packages, lines: 2027-2068 }
+    - { name: _get_packages_from_oracle, lines: 2071-2104 }
+    - { name: _distinct_non_empty_values, lines: 2107-2115 }
+    - { name: _build_filter_options_payload, lines: 2118-2129 }
+    - { name: _query_distinct_values_from_oracle, lines: 2132-2183 }
+    - { name: _get_wip_filter_options_from_oracle, lines: 2186-2228 }
+    - { name: _get_filter_options_cache_payload, lines: 2231-2344 }
+    - { name: get_wip_filter_options, lines: 2347-2419 }
+    - { name: search_workorders, lines: 2426-2489 }
+    - { name: _search_workorders_from_oracle, lines: 2492-2532 }
+    - { name: search_lot_ids, lines: 2535-2597 }
+    - { name: _search_lot_ids_from_oracle, lines: 2600-2639 }
+    - { name: search_packages, lines: 2642-2711 }
+    - { name: _search_packages_from_oracle, lines: 2714-2752 }
+    - { name: search_types, lines: 2755-2824 }
+    - { name: _search_types_from_oracle, lines: 2827-2865 }
+    - { name: get_hold_detail_summary, lines: 2872-2987 }
+    - { name: _get_hold_detail_summary_from_oracle, lines: 2990-3058 }
+    - { name: get_hold_detail_distribution, lines: 3061-3198 }
+    - { name: _get_hold_detail_distribution_from_oracle, lines: 3201-3341 }
+    - { name: get_hold_detail_lots, lines: 3344-3521 }
+    - { name: _get_hold_detail_lots_from_oracle, lines: 3524-3669 }
+    - { name: get_hold_overview_treemap, lines: 3676-3751 }
+    - { name: _get_hold_overview_treemap_from_oracle, lines: 3754-3812 }
+    - { name: get_lot_detail, lines: 3878-3912 }
+    - { name: _get_lot_detail_from_oracle, lines: 3915-3995 }
+    - { name: _build_lot_detail_response, lines: 3998-4107 }
 
 src/mes_dashboard/services/yield_alert_contracts.py:  # 84 lines
   imports:
@@ -8597,7 +8787,7 @@ tests/routes/_fuzz_payloads.py:  # 83 lines
     - { name: WILDCARD_CONTROL_CHARS, line: 70 }
     - { name: WILDCARD_GRAMMAR_INVALID, line: 73 }
 
-tests/routes/test_fuzz_routes.py:  # 577 lines
+tests/routes/test_fuzz_routes.py:  # 702 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: json, items: [], line: 19 }
@@ -8641,6 +8831,12 @@ tests/routes/test_fuzz_routes.py:  # 577 lines
     - { name: test_wildcard_unicode_handling, lines: 527-544 }  # @pytest.mark.parametrize('field', WILDCARD_FIELDS)
     - { name: test_high_cardinality_lot_in_list_at_cap_accepted, lines: 548-557 }  # @pytest.mark.parametrize('field', WILDCARD_FIELDS)
     - { name: test_wildcard_textarea_paste_with_carriage_returns, lines: 561-577 }  # @pytest.mark.parametrize('field', WILDCARD_FIELDS)
+    - { name: _base_mc_query_body, lines: 588-594 }
+    - { name: test_mc_query_rejects_malicious_material_parts, lines: 598-628 }  # @pytest.mark.parametrize('payload', MALICIOUS_INPUTS)
+    - { name: test_mc_query_sql_meta_char_rejected, lines: 632-638 }  # @pytest.mark.parametrize('meta_char', ["'", ';', '--', '/*', '*/'])
+    - { name: test_mc_query_wildcard_star_accepted_and_forwarded, lines: 641-657 }
+    - { name: test_mc_query_over_20_parts_rejected, lines: 660-666 }
+    - { name: test_mc_detail_rejects_malicious_material_parts, lines: 670-702 }  # @pytest.mark.parametrize('payload', MALICIOUS_INPUTS)
 
 tests/routes/test_internal_routes.py:  # 259 lines
   imports:
@@ -9123,6 +9319,19 @@ tests/stress/test_load_collector_unit.py:  # 585 lines
     - { name: _mock_health_response, lines: 107-119 }
     - { name: _mock_admin_response, lines: 122-142 }
     - { name: _url_dispatch, lines: 145-151 }
+
+tests/stress/test_material_consumption_stress.py:  # 92 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 10 }
+    - { module: datetime, items: [], line: 12 }
+    - { module: time, items: [], line: 13 }
+    - { module: unittest.mock, items: [patch], line: 14 }
+    - { module: pandas, items: [], line: 16 }
+    - { module: pytest, items: [], line: 17 }
+  functions:
+    - { name: _large_summary_df, lines: 20-39 }
+    - { name: test_summary_aggregate_large_table_under_5s, lines: 43-60 }  # @pytest.mark.stress
+    - { name: test_concurrent_granularity_switches_cache_only, lines: 64-92 }  # @pytest.mark.stress
 
 tests/stress/test_material_trace_stress.py:  # 118 lines
   imports:
@@ -10640,7 +10849,7 @@ tests/test_common_filters.py:  # 287 lines
         - { name: test_parse_wildcard_tokens_idempotent, lines: 262-281 }
         - { name: test_parse_wildcard_tokens_empty_input_returns_empty_list, lines: 283-287 }
 
-tests/test_container_filter_cache.py:  # 270 lines
+tests/test_container_filter_cache.py:  # 359 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: pytest, items: [], line: 6 }
@@ -10667,19 +10876,23 @@ tests/test_container_filter_cache.py:  # 270 lines
         - { name: test_refresh_fail_open_preserves_old_values, lines: 127-141 }
         - { name: test_redis_l2_hit_skips_oracle, lines: 143-165 }
     - name: TestSchemaV2Payload
-      lines: 173-212
+      lines: 173-301
       methods:
         - { name: test_4tuple_payload_v2_round_trip, lines: 176-194 }
         - { name: test_cross_filter_narrows_by_selected_package, lines: 196-212 }
+        - { name: test_cross_filter_pairwise_narrowing_package_and_type, lines: 214-237 }
+        - { name: test_cross_filter_three_way_narrowing, lines: 239-260 }
+        - { name: test_cross_filter_empty_when_contradictory_selections, lines: 262-282 }
+        - { name: test_cross_filter_csv_multi_value_per_field, lines: 284-301 }
     - name: TestSchemaVersionMismatch
-      lines: 215-240
+      lines: 304-329
       methods:
-        - { name: test_schema_version_mismatch_triggers_rebuild, lines: 218-240 }
+        - { name: test_schema_version_mismatch_triggers_rebuild, lines: 307-329 }
     - name: TestMultiWorkerLock
-      lines: 243-270
+      lines: 332-359
       methods:
-        - { name: test_lock_acquired_when_no_file_exists, lines: 246-255 }
-        - { name: test_lock_denied_when_file_exists, lines: 257-270 }
+        - { name: test_lock_acquired_when_no_file_exists, lines: 335-344 }
+        - { name: test_lock_denied_when_file_exists, lines: 346-359 }
   functions:
     - { name: reset_cache, lines: 12-36 }  # @pytest.fixture(autouse=True)
     - { name: _sample_tuple_df, lines: 39-45 }
@@ -11535,7 +11748,7 @@ tests/test_hold_history_sql_runtime.py:  # 226 lines
         - { name: test_day_map_initialized_with_repeat_quality, lines: 208-215 }
         - { name: test_repeat_quality_accumulates_from_batch, lines: 217-226 }
 
-tests/test_hold_overview_routes.py:  # 349 lines
+tests/test_hold_overview_routes.py:  # 429 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: unittest, items: [], line: 5 }
@@ -11553,42 +11766,49 @@ tests/test_hold_overview_routes.py:  # 349 lines
         - { name: test_hold_overview_page_includes_vite_entry, lines: 26-29 }
         - { name: test_hold_overview_page_redirects_without_admin, lines: 32-35 }
     - name: TestHoldOverviewSummaryRoute
-      lines: 38-104
+      lines: 38-110
       methods:
-        - { name: test_summary_defaults_to_quality, lines: 42-66 }
-        - { name: test_summary_hold_type_all_maps_to_none, lines: 69-90 }
-        - { name: test_summary_invalid_hold_type, lines: 92-96 }
-        - { name: test_summary_failure_returns_500, lines: 99-104 }
+        - { name: test_summary_defaults_to_quality, lines: 42-69 }
+        - { name: test_summary_hold_type_all_maps_to_none, lines: 72-96 }
+        - { name: test_summary_invalid_hold_type, lines: 98-102 }
+        - { name: test_summary_failure_returns_500, lines: 105-110 }
     - name: TestHoldOverviewMatrixRoute
-      lines: 107-147
+      lines: 113-156
       methods:
-        - { name: test_matrix_passes_hold_filters, lines: 111-133 }
-        - { name: test_matrix_invalid_hold_type, lines: 135-137 }
-        - { name: test_matrix_rate_limited_returns_429, lines: 141-147 }
+        - { name: test_matrix_passes_hold_filters, lines: 117-142 }
+        - { name: test_matrix_invalid_hold_type, lines: 144-146 }
+        - { name: test_matrix_rate_limited_returns_429, lines: 150-156 }
     - name: TestHoldOverviewTreemapRoute
-      lines: 150-175
+      lines: 159-184
       methods:
-        - { name: test_treemap_passes_filters, lines: 154-167 }
-        - { name: test_treemap_failure_returns_500, lines: 170-175 }
+        - { name: test_treemap_passes_filters, lines: 163-176 }
+        - { name: test_treemap_failure_returns_500, lines: 179-184 }
     - name: TestHoldOverviewLotsRoute
-      lines: 178-245
+      lines: 187-257
       methods:
-        - { name: test_lots_passes_all_filters_and_caps_per_page, lines: 182-210 }
-        - { name: test_lots_handles_page_less_than_one, lines: 213-223 }
-        - { name: test_lots_invalid_age_range, lines: 225-229 }
-        - { name: test_lots_invalid_hold_type, lines: 231-235 }
-        - { name: test_lots_rate_limited_returns_429, lines: 239-245 }
+        - { name: test_lots_passes_all_filters_and_caps_per_page, lines: 191-222 }
+        - { name: test_lots_handles_page_less_than_one, lines: 225-235 }
+        - { name: test_lots_invalid_age_range, lines: 237-241 }
+        - { name: test_lots_invalid_hold_type, lines: 243-247 }
+        - { name: test_lots_rate_limited_returns_429, lines: 251-257 }
     - name: TestHoldOverviewTreemapEdgeCases
-      lines: 248-324
+      lines: 260-336
       methods:
-        - { name: test_treemap_3_level_nesting, lines: 252-281 }
-        - { name: test_treemap_leaf_without_children, lines: 284-299 }
-        - { name: test_treemap_post_json_reasons, lines: 302-314 }
-        - { name: test_treemap_get_legacy_compat, lines: 317-324 }
+        - { name: test_treemap_3_level_nesting, lines: 264-293 }
+        - { name: test_treemap_leaf_without_children, lines: 296-311 }
+        - { name: test_treemap_post_json_reasons, lines: 314-326 }
+        - { name: test_treemap_get_legacy_compat, lines: 329-336 }
+    - name: TestHoldOverviewNonIndexedFilterForwarding
+      lines: 339-404
+      methods:
+        - { name: test_summary_forwards_workflow_bop_pj_function, lines: 349-361 }
+        - { name: test_matrix_forwards_workflow_bop_pj_function, lines: 364-376 }
+        - { name: test_lots_forwards_workflow_bop_pj_function, lines: 379-392 }
+        - { name: test_summary_forwards_multi_value_csv, lines: 395-404 }
     - name: TestHoldOverviewSummaryPostCompat
-      lines: 327-349
+      lines: 407-429
       methods:
-        - { name: test_summary_post_json_body, lines: 331-349 }
+        - { name: test_summary_post_json_body, lines: 411-429 }
 
 tests/test_hold_routes.py:  # 411 lines
   imports:
@@ -12093,6 +12313,145 @@ tests/test_map_service_errors_decorator.py:  # 104 lines
   functions:
     - { name: _make_handler, lines: 21-26 }
 
+tests/test_material_consumption_routes.py:  # 449 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 11 }
+    - { module: json, items: [], line: 13 }
+    - { module: unittest, items: [mock], line: 14 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  classes:
+    - name: TestFilterOptions
+      lines: 54-72
+      methods:
+        - { name: test_returns_parts_and_pj_types, lines: 55-72 }
+    - name: TestQuerySubmit
+      lines: 80-216
+      methods:
+        - { name: _post_query, lines: 81-86 }
+        - { name: test_forwards_material_parts_kwarg_non_default, lines: 88-107 }
+        - { name: test_forwards_date_range_kwargs_non_default, lines: 109-129 }
+        - { name: test_over_20_parts_returns_400, lines: 131-141 }
+        - { name: test_sql_meta_char_in_part_returns_400, lines: 143-153 }
+        - { name: test_wildcard_star_accepted, lines: 155-172 }
+        - { name: test_day_granularity_accepted, lines: 174-193 }
+        - { name: test_workcenter_groups_not_forwarded_to_service, lines: 195-216 }
+    - name: TestViewEndpoint
+      lines: 224-282
+      methods:
+        - { name: test_forwards_granularity_kwarg_non_default, lines: 225-234 }
+        - { name: test_forwards_query_id_kwarg, lines: 236-245 }
+        - { name: test_day_granularity_accepted, lines: 247-256 }
+        - { name: test_forwards_types_kwarg_non_default, lines: 258-271 }
+        - { name: test_no_types_param_passes_none_to_service, lines: 273-282 }
+    - name: TestDetailSubmit
+      lines: 290-392
+      methods:
+        - { name: _post_detail, lines: 291-296 }
+        - { name: _base_body, lines: 298-303 }
+        - { name: test_sync_path_when_rows_under_threshold, lines: 305-317 }
+        - { name: test_async_202_when_rows_over_threshold, lines: 319-330 }
+        - { name: test_pj_types_not_forwarded_to_detail_summary, lines: 332-352 }
+        - { name: test_workcenter_groups_not_forwarded_to_detail_summary, lines: 354-370 }
+        - { name: test_async_202_includes_status_url, lines: 372-392 }
+    - name: TestDetailJob
+      lines: 400-410
+      methods:
+        - { name: test_poll_returns_job_status, lines: 401-410 }
+    - name: TestExport
+      lines: 418-435
+      methods:
+        - { name: test_export_returns_streaming_response, lines: 419-435 }
+    - name: TestRqMonitor
+      lines: 443-449
+      methods:
+        - { name: test_material_consumption_queue_in_rq_monitor_queue_names, lines: 444-449 }
+  functions:
+    - { name: client, lines: 26-35 }  # @pytest.fixture
+    - { name: _reset_rate_limiter, lines: 39-46 }  # @pytest.fixture(autouse=True)
+
+tests/test_material_consumption_service.py:  # 795 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: datetime, items: [], line: 15 }
+    - { module: unittest, items: [mock], line: 16 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 17 }
+    - { module: pandas, items: [], line: 19 }
+    - { module: pytest, items: [], line: 20 }
+    - { module: mes_dashboard.services.material_consumption_service, items: [], line: 22 }
+  classes:
+    - name: TestSummaryOraclePath
+      lines: 90-207
+      methods:
+        - { name: test_aggregates_consumed_required_by_txn_date, lines: 97-120 }
+        - { name: test_pj_type_join_present_in_sql, lines: 126-151 }
+        - { name: test_workcenter_groups_not_in_sql, lines: 157-180 }
+        - { name: test_material_parts_kwarg_forwarded_to_sql, lines: 186-207 }
+    - name: TestSummarySpoolPath
+      lines: 215-263
+      methods:
+        - { name: _mock_spool_path, lines: 218-223 }
+        - { name: test_granularity_week_regroups_without_oracle, lines: 226-235 }
+        - { name: test_granularity_month_regroups_without_oracle, lines: 238-246 }
+        - { name: test_granularity_quarter_regroups_without_oracle, lines: 249-257 }
+        - { name: test_spool_miss_raises_cache_expired, lines: 259-263 }
+    - name: TestDetailOraclePath
+      lines: 271-314
+      methods:
+        - { name: test_sync_rows_under_limit_returns_inline, lines: 277-292 }
+        - { name: test_rows_over_limit_enqueues_rq_job, lines: 298-314 }
+    - name: TestDetailSpoolPath
+      lines: 322-358
+      methods:
+        - { name: test_pagination_returns_correct_page, lines: 325-341 }
+        - { name: test_pj_types_filter_applied_on_both_paths, lines: 343-358 }
+    - name: TestCsvExport
+      lines: 366-387
+      methods:
+        - { name: test_streams_chunks_without_full_memory_load, lines: 369-387 }
+    - name: TestInputValidation
+      lines: 395-420
+      methods:
+        - { name: test_parts_cap_20_enforced, lines: 398-401 }
+        - { name: test_wildcard_translated_to_like_escaped, lines: 403-409 }
+        - { name: test_exact_token_uses_in_list, lines: 411-415 }
+        - { name: test_meta_char_rejected_before_oracle, lines: 417-420 }
+    - name: TestDetailJob
+      lines: 428-507
+      methods:
+        - { name: test_get_job_status_correct_function_called, lines: 431-451 }
+        - { name: test_rq_job_calls_complete_job_on_success, lines: 456-480 }
+        - { name: test_rq_job_calls_complete_job_on_failure, lines: 484-507 }
+    - name: TestIdempotentSpoolWrite
+      lines: 515-540
+      methods:
+        - { name: test_spool_exists_skips_oracle_query, lines: 520-540 }
+    - name: TestGetPartsList
+      lines: 548-664
+      methods:
+        - { name: test_redis_hit_returns_cached_list, lines: 551-576 }
+        - { name: test_redis_miss_queries_oracle_and_caches, lines: 578-610 }
+        - { name: test_oracle_fallback_returns_empty_on_failure, lines: 612-623 }
+        - { name: test_redis_disabled_queries_oracle_without_caching, lines: 625-642 }
+        - { name: test_description_none_when_db_value_is_null, lines: 644-664 }
+    - name: TestApplyViewTypes
+      lines: 672-746
+      methods:
+        - { name: _write_spool, lines: 675-684 }
+        - { name: test_types_filter_narrows_type_breakdown, lines: 687-706 }
+        - { name: test_no_types_returns_all_pj_types, lines: 709-726 }
+        - { name: test_day_granularity_regroups_without_oracle, lines: 729-746 }
+    - name: TestCacheKeySimplified
+      lines: 754-795
+      methods:
+        - { name: test_summary_cache_key_excludes_removed_filters, lines: 757-765 }
+        - { name: test_detail_cache_key_excludes_removed_filters, lines: 767-775 }
+        - { name: test_summary_key_differs_on_material_parts, lines: 777-785 }
+        - { name: test_detail_key_differs_on_date_range, lines: 787-795 }
+  functions:
+    - { name: _sample_summary_df, lines: 30-56 }
+    - { name: _sample_detail_df, lines: 59-82 }
+
 tests/test_material_trace_duckdb_runtime.py:  # 104 lines
   imports:
     - { module: sys, items: [], line: 4 }
@@ -12499,11 +12858,19 @@ tests/test_mid_section_defect_service.py:  # 877 lines
     - { name: test_build_detail_table_deduplicates_machines, lines: 676-696 }
     - { name: test_export_csv_flattens_structured_fields, lines: 700-735 }  # @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
 
-tests/test_modernization_policy_hardening.py:  # 45 lines
+tests/test_modernization_policy_hardening.py:  # 97 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
     - { module: mes_dashboard.core, items: [policy], line: 8 }
+  classes:
+    - name: TestMaterialConsumptionRegistration
+      lines: 53-97
+      methods:
+        - { name: _load_asset_manifest, lines: 56-66 }
+        - { name: _load_page_status, lines: 68-76 }
+        - { name: test_asset_readiness_manifest_contains_material_consumption_key, lines: 78-84 }
+        - { name: test_page_status_contains_material_consumption_in_drawer2, lines: 86-97 }
   functions:
     - { name: test_scope_matrix_loader_returns_defensive_copy, lines: 11-25 }
     - { name: test_scope_matrix_cache_refresh_requires_explicit_clear, lines: 28-45 }
@@ -12674,89 +13041,66 @@ tests/test_oee_precision.py:  # 150 lines
         - { name: test_round4_precision_boundaries, lines: 139-145 }
         - { name: test_large_quantities_round_stably, lines: 147-150 }
 
-tests/test_openspec_contracts.py:  # 345 lines
+tests/test_openspec_contracts.py:  # 257 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: re, items: [], line: 18 }
     - { module: pathlib, items: [Path], line: 19 }
   constants:
     - { name: PROJECT_ROOT, line: 26 }
-    - { name: SPECS_DIR, line: 27 }
-    - { name: ROUTES_DIR, line: 28 }
-    - { name: SERVICES_DIR, line: 29 }
-    - { name: CORE_DIR, line: 30 }
+    - { name: ROUTES_DIR, line: 27 }
+    - { name: SERVICES_DIR, line: 28 }
+    - { name: CORE_DIR, line: 29 }
   classes:
     - name: TestApiResponseContractUnification
-      lines: 53-132
+      lines: 46-114
       methods:
-        - { name: test_spec_file_exists, lines: 56-57 }
-        - { name: test_spec_requires_success_response_helper, lines: 59-61 }
-        - { name: test_spec_requires_error_response_helper, lines: 63-65 }
-        - { name: test_response_py_exports_success_response, lines: 67-69 }
-        - { name: test_response_py_exports_error_response, lines: 71-73 }
-        - { name: test_response_py_exports_validation_error, lines: 75-77 }
-        - { name: test_response_py_exports_not_found_error, lines: 79-81 }
-        - { name: test_response_py_injects_meta_timestamp, lines: 83-86 }
-        - { name: test_response_py_injects_app_version, lines: 88-91 }
-        - { name: test_routes_do_not_use_raw_jsonify, lines: 93-122 }
-        - { name: test_api_inventory_documents_job_routes, lines: 124-128 }
-        - { name: test_api_inventory_documents_app_version, lines: 130-132 }
+        - { name: test_response_py_exports_success_response, lines: 49-51 }
+        - { name: test_response_py_exports_error_response, lines: 53-55 }
+        - { name: test_response_py_exports_validation_error, lines: 57-59 }
+        - { name: test_response_py_exports_not_found_error, lines: 61-63 }
+        - { name: test_response_py_injects_meta_timestamp, lines: 65-68 }
+        - { name: test_response_py_injects_app_version, lines: 70-73 }
+        - { name: test_routes_do_not_use_raw_jsonify, lines: 75-104 }
+        - { name: test_api_inventory_documents_job_routes, lines: 106-110 }
+        - { name: test_api_inventory_documents_app_version, lines: 112-114 }
     - name: TestAnomalySummaryApi
-      lines: 139-176
+      lines: 121-142
       methods:
-        - { name: test_spec_file_exists, lines: 142-143 }
-        - { name: test_spec_requires_anomaly_summary_endpoint, lines: 145-147 }
-        - { name: test_spec_requires_four_detector_breakdown, lines: 149-152 }
-        - { name: test_analytics_routes_has_anomaly_summary_endpoint, lines: 154-156 }
-        - { name: test_analytics_routes_uses_success_response, lines: 158-160 }
-        - { name: test_analytics_routes_applies_rate_limit, lines: 162-164 }
-        - { name: test_anomaly_summary_service_function_exists, lines: 166-168 }
-        - { name: test_spec_documents_meta_cache_state, lines: 170-172 }
-        - { name: test_analytics_routes_injects_cache_state_meta, lines: 174-176 }
+        - { name: test_analytics_routes_has_anomaly_summary_endpoint, lines: 124-126 }
+        - { name: test_analytics_routes_uses_success_response, lines: 128-130 }
+        - { name: test_analytics_routes_applies_rate_limit, lines: 132-134 }
+        - { name: test_anomaly_summary_service_function_exists, lines: 136-138 }
+        - { name: test_analytics_routes_injects_cache_state_meta, lines: 140-142 }
     - name: TestCachePlaneArchitecture
-      lines: 183-223
+      lines: 149-173
       methods:
-        - { name: test_spec_file_exists, lines: 186-187 }
-        - { name: test_spec_defines_four_planes, lines: 189-192 }
-        - { name: test_spec_requires_redis_isolation, lines: 194-196 }
-        - { name: test_redis_client_has_control_plane_function, lines: 198-201 }
-        - { name: test_async_job_service_uses_control_redis, lines: 203-206 }
-        - { name: test_spool_files_used_for_heavy_query_plane, lines: 208-211 }
-        - { name: test_spec_requires_duckdb_for_heavy_query_runtime, lines: 213-215 }
-        - { name: test_heavy_query_services_use_duckdb_runtime, lines: 217-223 }
+        - { name: test_redis_client_has_control_plane_function, lines: 152-155 }
+        - { name: test_async_job_service_uses_control_redis, lines: 157-160 }
+        - { name: test_spool_files_used_for_heavy_query_plane, lines: 162-165 }
+        - { name: test_heavy_query_services_use_duckdb_runtime, lines: 167-173 }
     - name: TestAsyncQueryJobService
-      lines: 230-283
+      lines: 180-210
       methods:
-        - { name: test_spec_file_exists, lines: 233-234 }
-        - { name: test_spec_requires_enqueue_job, lines: 236-238 }
-        - { name: test_spec_requires_get_job_status, lines: 240-242 }
-        - { name: test_spec_requires_update_job_progress, lines: 244-246 }
-        - { name: test_spec_requires_complete_job, lines: 248-250 }
-        - { name: test_spec_requires_is_async_available, lines: 252-254 }
-        - { name: test_service_exports_enqueue_job, lines: 256-258 }
-        - { name: test_service_exports_get_job_status, lines: 260-262 }
-        - { name: test_service_exports_update_job_progress, lines: 264-266 }
-        - { name: test_service_exports_complete_job, lines: 268-270 }
-        - { name: test_service_exports_is_async_available, lines: 272-274 }
-        - { name: test_job_metadata_key_schema, lines: 276-279 }
-        - { name: test_rq_health_ttl_is_60_seconds, lines: 281-283 }
+        - { name: test_service_exports_enqueue_job, lines: 183-185 }
+        - { name: test_service_exports_get_job_status, lines: 187-189 }
+        - { name: test_service_exports_update_job_progress, lines: 191-193 }
+        - { name: test_service_exports_complete_job, lines: 195-197 }
+        - { name: test_service_exports_is_async_available, lines: 199-201 }
+        - { name: test_job_metadata_key_schema, lines: 203-206 }
+        - { name: test_rq_health_ttl_is_60_seconds, lines: 208-210 }
     - name: TestApiSafetyHygiene
-      lines: 290-345
+      lines: 217-257
       methods:
-        - { name: test_spec_file_exists, lines: 293-294 }
-        - { name: test_spec_requires_rate_limiting_on_high_cost_apis, lines: 296-298 }
-        - { name: test_spec_requires_429_with_retry_after, lines: 300-302 }
-        - { name: test_response_py_exports_too_many_requests_error, lines: 304-306 }
-        - { name: test_response_py_exports_too_many_requests_code, lines: 308-310 }
-        - { name: test_rate_limit_module_exists, lines: 312-314 }
-        - { name: test_rate_limit_module_has_configured_rate_limit, lines: 316-318 }
-        - { name: test_high_cost_routes_apply_rate_limit, lines: 320-336 }
-        - { name: test_spec_requires_depth_safe_nan_cleaning, lines: 338-340 }
-        - { name: test_job_abandon_route_is_rate_limited, lines: 342-345 }
+        - { name: test_response_py_exports_too_many_requests_error, lines: 220-222 }
+        - { name: test_response_py_exports_too_many_requests_code, lines: 224-226 }
+        - { name: test_rate_limit_module_exists, lines: 228-230 }
+        - { name: test_rate_limit_module_has_configured_rate_limit, lines: 232-234 }
+        - { name: test_high_cost_routes_apply_rate_limit, lines: 236-252 }
+        - { name: test_job_abandon_route_is_rate_limited, lines: 254-257 }
   functions:
-    - { name: _spec_text, lines: 33-36 }
-    - { name: _src_text, lines: 39-42 }
-    - { name: _grep, lines: 45-46 }
+    - { name: _src_text, lines: 32-35 }
+    - { name: _grep, lines: 38-39 }
 
 tests/test_oracle_connection_leak.py:  # 201 lines
   imports:
@@ -14320,7 +14664,7 @@ tests/test_reject_history_routes.py:  # 975 lines
   functions:
     - { name: _login_as_admin, lines: 13-15 }
 
-tests/test_reject_history_service.py:  # 366 lines
+tests/test_reject_history_service.py:  # 403 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: pandas, items: [], line: 6 }
@@ -14332,15 +14676,16 @@ tests/test_reject_history_service.py:  # 366 lines
     - { name: test_build_where_clause_applies_reason_prefix_policy_by_default, lines: 91-98 }
     - { name: test_build_where_clause_include_override_skips_reason_prefix_policy, lines: 101-113 }
     - { name: test_get_filter_options_reads_from_caches, lines: 116-146 }
-    - { name: test_get_filter_options_date_params_backward_compat, lines: 149-165 }
-    - { name: test_build_where_clause_with_material_reason_adds_objecttype_condition, lines: 168-173 }
-    - { name: test_build_where_clause_exclude_material_scrap_adds_not_material_condition, lines: 176-182 }
-    - { name: test_sql_template_replacement_does_not_introduce_fake_bind_placeholders, lines: 185-196 }
-    - { name: test_base_with_cte_sql_flattens_nested_with, lines: 199-216 }
-    - { name: test_query_trend_invalid_granularity_raises, lines: 219-221 }
-    - { name: test_query_reason_pareto_top80_scope, lines: 224-256 }
-    - { name: test_query_list_pagination_and_caps, lines: 259-316 }
-    - { name: test_export_csv_contains_semantic_headers, lines: 319-366 }
+    - { name: test_get_filter_options_does_not_narrow_packages_by_selection, lines: 149-183 }
+    - { name: test_get_filter_options_date_params_backward_compat, lines: 186-202 }
+    - { name: test_build_where_clause_with_material_reason_adds_objecttype_condition, lines: 205-210 }
+    - { name: test_build_where_clause_exclude_material_scrap_adds_not_material_condition, lines: 213-219 }
+    - { name: test_sql_template_replacement_does_not_introduce_fake_bind_placeholders, lines: 222-233 }
+    - { name: test_base_with_cte_sql_flattens_nested_with, lines: 236-253 }
+    - { name: test_query_trend_invalid_granularity_raises, lines: 256-258 }
+    - { name: test_query_reason_pareto_top80_scope, lines: 261-293 }
+    - { name: test_query_list_pagination_and_caps, lines: 296-353 }
+    - { name: test_export_csv_contains_semantic_headers, lines: 356-403 }
 
 tests/test_reject_history_shell_coverage.py:  # 38 lines
   imports:
@@ -15675,7 +16020,7 @@ tests/test_watchdog_logging.py:  # 69 lines
     - { name: test_attach_sqlite_log_handler_disabled_skips_factory, lines: 40-53 }
     - { name: test_attach_sqlite_log_handler_handles_handler_errors, lines: 56-69 }
 
-tests/test_wip_hold_pages_integration.py:  # 438 lines
+tests/test_wip_hold_pages_integration.py:  # 441 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -15691,13 +16036,13 @@ tests/test_wip_hold_pages_integration.py:  # 438 lines
     - { name: test_wip_detail_post_avoids_url_length_limit, lines: 198-239 }
     - { name: test_wip_overview_get_still_works_after_post_support, lines: 242-267 }
     - { name: test_hold_detail_api_contract_flow, lines: 270-320 }
-    - { name: test_wip_hold_post_avoids_url_length_limit, lines: 328-349 }
-    - { name: test_hold_overview_endpoints_accept_post, lines: 352-391 }
-    - { name: test_hold_overview_reason_list_coercion, lines: 394-407 }
-    - { name: test_hold_overview_lots_post_pagination, lines: 410-425 }
-    - { name: test_max_content_length_rejects_oversized_body, lines: 428-438 }
+    - { name: test_wip_hold_post_avoids_url_length_limit, lines: 328-352 }
+    - { name: test_hold_overview_endpoints_accept_post, lines: 355-394 }
+    - { name: test_hold_overview_reason_list_coercion, lines: 397-410 }
+    - { name: test_hold_overview_lots_post_pagination, lines: 413-428 }
+    - { name: test_max_content_length_rejects_oversized_body, lines: 431-441 }
 
-tests/test_wip_routes.py:  # 785 lines
+tests/test_wip_routes.py:  # 788 lines
   imports:
     - { module: unittest, items: [], line: 7 }
     - { module: unittest.mock, items: [patch], line: 8 }
@@ -15726,58 +16071,58 @@ tests/test_wip_routes.py:  # 785 lines
         - { name: test_passes_filters_to_service, lines: 170-199 }
         - { name: test_matrix_forwards_workflow_bop_pj_function, lines: 202-218 }
     - name: TestOverviewHoldRoute
-      lines: 221-271
+      lines: 221-274
       methods:
         - { name: test_returns_success_with_hold_items, lines: 225-239 }
         - { name: test_returns_error_on_failure, lines: 242-250 }
-        - { name: test_passes_filters_and_include_dummy, lines: 253-271 }
+        - { name: test_passes_filters_and_include_dummy, lines: 253-274 }
     - name: TestDetailRoute
-      lines: 274-505
+      lines: 277-508
       methods:
-        - { name: test_returns_success_with_detail, lines: 278-309 }
-        - { name: test_passes_query_parameters, lines: 312-346 }
-        - { name: test_limits_page_size_to_500, lines: 349-366 }
-        - { name: test_handles_page_less_than_one, lines: 369-385 }
-        - { name: test_handles_page_size_less_than_one, lines: 388-404 }
-        - { name: test_returns_error_on_failure, lines: 407-415 }
-        - { name: test_rejects_invalid_status, lines: 417-426 }
-        - { name: test_rejects_invalid_hold_type, lines: 428-437 }
-        - { name: test_detail_rate_limited_returns_429, lines: 441-449 }
-        - { name: test_pj_type_appears_in_lot_rows, lines: 452-483 }
-        - { name: test_detail_forwards_workflow_bop_pj_function, lines: 486-505 }
+        - { name: test_returns_success_with_detail, lines: 281-312 }
+        - { name: test_passes_query_parameters, lines: 315-349 }
+        - { name: test_limits_page_size_to_500, lines: 352-369 }
+        - { name: test_handles_page_less_than_one, lines: 372-388 }
+        - { name: test_handles_page_size_less_than_one, lines: 391-407 }
+        - { name: test_returns_error_on_failure, lines: 410-418 }
+        - { name: test_rejects_invalid_status, lines: 420-429 }
+        - { name: test_rejects_invalid_hold_type, lines: 431-440 }
+        - { name: test_detail_rate_limited_returns_429, lines: 444-452 }
+        - { name: test_pj_type_appears_in_lot_rows, lines: 455-486 }
+        - { name: test_detail_forwards_workflow_bop_pj_function, lines: 489-508 }
     - name: TestMetaWorkcentersRoute
-      lines: 508-536
+      lines: 511-539
       methods:
-        - { name: test_returns_success_with_workcenters, lines: 512-525 }
-        - { name: test_returns_error_on_failure, lines: 528-536 }
+        - { name: test_returns_success_with_workcenters, lines: 515-528 }
+        - { name: test_returns_error_on_failure, lines: 531-539 }
     - name: TestMetaPackagesRoute
-      lines: 539-567
+      lines: 542-570
       methods:
-        - { name: test_returns_success_with_packages, lines: 543-556 }
-        - { name: test_returns_error_on_failure, lines: 559-567 }
+        - { name: test_returns_success_with_packages, lines: 546-559 }
+        - { name: test_returns_error_on_failure, lines: 562-570 }
     - name: TestMetaFilterOptionsRoute
-      lines: 570-728
+      lines: 573-731
       methods:
-        - { name: test_returns_success_with_options, lines: 574-596 }
-        - { name: test_filter_options_includes_new_keys, lines: 599-620 }
-        - { name: test_passes_include_dummy_flag, lines: 623-650 }
-        - { name: test_passes_cross_filter_parameters, lines: 653-684 }
-        - { name: test_passes_new_filter_params, lines: 687-718 }
-        - { name: test_returns_error_on_failure, lines: 721-728 }
+        - { name: test_returns_success_with_options, lines: 577-599 }
+        - { name: test_filter_options_includes_new_keys, lines: 602-623 }
+        - { name: test_passes_include_dummy_flag, lines: 626-653 }
+        - { name: test_passes_cross_filter_parameters, lines: 656-687 }
+        - { name: test_passes_new_filter_params, lines: 690-721 }
+        - { name: test_returns_error_on_failure, lines: 724-731 }
     - name: TestMetaSearchRoute
-      lines: 731-754
+      lines: 734-757
       methods:
-        - { name: test_invalid_limit_type_falls_back_to_default, lines: 735-743 }
-        - { name: test_limit_is_bounded_with_upper_cap, lines: 746-754 }
+        - { name: test_invalid_limit_type_falls_back_to_default, lines: 738-746 }
+        - { name: test_limit_is_bounded_with_upper_cap, lines: 749-757 }
     - name: TestPageRoutes
-      lines: 757-781
+      lines: 760-784
       methods:
-        - { name: test_wip_overview_page_exists, lines: 760-764 }
-        - { name: test_wip_detail_page_exists, lines: 766-770 }
-        - { name: test_wip_detail_page_with_workcenter, lines: 772-776 }
-        - { name: test_old_wip_route_removed, lines: 778-781 }
+        - { name: test_wip_overview_page_exists, lines: 763-767 }
+        - { name: test_wip_detail_page_exists, lines: 769-773 }
+        - { name: test_wip_detail_page_with_workcenter, lines: 775-779 }
+        - { name: test_old_wip_route_removed, lines: 781-784 }
 
-tests/test_wip_service.py:  # 1184 lines
+tests/test_wip_service.py:  # 1433 lines
   imports:
     - { module: unittest, items: [], line: 7 }
     - { module: unittest.mock, items: [patch], line: 8 }
@@ -15787,7 +16132,7 @@ tests/test_wip_service.py:  # 1184 lines
     - { module: time, items: [], line: 12 }
     - { module: concurrent.futures, items: [ThreadPoolExecutor], line: 13 }
     - { module: mes_dashboard.services.wip_service, items: [WIP_VIEW, get_wip_summary, get_wip_matrix, get_wip_hold_summary, get_wip_detail, get_hold_detail_summary, get_hold_detail_lots, get_hold_overview_treemap, get_workcenters, get_packages, get_wip_filter_options, search_workorders, search_lot_ids], line: 15 }
-    - { module: pytest, items: [], line: 964 }
+    - { module: pytest, items: [], line: 1213 }
   classes:
     - name: TestWipServiceConfig
       lines: 48-53
@@ -15888,33 +16233,57 @@ tests/test_wip_service.py:  # 1184 lines
         - { name: test_get_hold_detail_lots_includes_product_and_future_hold_comment, lines: 894-904 }
         - { name: test_get_wip_matrix_reason_filter_keeps_backward_compatibility, lines: 907-919 }
         - { name: test_get_hold_overview_treemap_groups_by_workcenter_and_reason, lines: 922-933 }
+    - name: TestFilterOptionsCrossFilterNarrowing
+      lines: 936-1038
+      methods:
+        - { name: setUp, lines: 949-954 }
+        - { name: _build_df, lines: 957-981 }
+        - { name: test_bop_filter_narrows_type_options, lines: 984-995 }
+        - { name: test_workflow_filter_narrows_package_options, lines: 998-1004 }
+        - { name: test_pj_function_filter_narrows_workorder_options, lines: 1007-1012 }
+        - { name: test_bop_csv_multi_value_narrows_type_options, lines: 1015-1020 }
+        - { name: test_combined_bop_and_workflow_intersects, lines: 1023-1028 }
+        - { name: test_bop_filter_self_excluded_for_bops_field, lines: 1031-1038 }
+    - name: TestNonIndexedFilterSnapshotPath
+      lines: 1041-1182
+      methods:
+        - { name: setUp, lines: 1051-1056 }
+        - { name: _sample_df_with_non_indexed, lines: 1059-1083 }
+        - { name: test_hold_detail_summary_snapshot_narrows_by_bop, lines: 1087-1106 }
+        - { name: test_hold_detail_summary_snapshot_narrows_by_workflow, lines: 1110-1118 }
+        - { name: test_hold_detail_summary_snapshot_narrows_by_pj_function, lines: 1122-1129 }
+        - { name: test_hold_detail_summary_snapshot_combines_bop_and_workflow, lines: 1133-1140 }
+        - { name: test_hold_detail_lots_snapshot_narrows_by_bop, lines: 1143-1148 }
+        - { name: test_hold_detail_lots_snapshot_narrows_by_pj_function_csv, lines: 1151-1157 }
+        - { name: test_wip_hold_summary_snapshot_narrows_by_bop, lines: 1160-1175 }
+        - { name: test_wip_hold_summary_snapshot_empty_when_filter_excludes_all, lines: 1178-1182 }
     - name: TestHoldOverviewServiceOracleFallback
-      lines: 936-961
+      lines: 1185-1210
       methods:
-        - { name: test_get_wip_matrix_oracle_applies_reason_for_hold_status, lines: 941-950 }
-        - { name: test_get_wip_matrix_oracle_ignores_reason_for_non_hold_status, lines: 954-961 }
+        - { name: test_get_wip_matrix_oracle_applies_reason_for_hold_status, lines: 1190-1199 }
+        - { name: test_get_wip_matrix_oracle_ignores_reason_for_non_hold_status, lines: 1203-1210 }
     - name: TestWipServiceIntegration
-      lines: 967-1084
+      lines: 1216-1333
       methods:
-        - { name: _reset_db_state, lines: 975-980 }
-        - { name: test_get_wip_summary_integration, lines: 983-988 }
-        - { name: test_get_wip_matrix_integration, lines: 991-996 }
-        - { name: test_get_wip_hold_summary_integration, lines: 999-1003 }
-        - { name: test_get_wip_detail_integration, lines: 1006-1019 }
-        - { name: test_get_workcenters_integration, lines: 1022-1028 }
-        - { name: test_get_packages_integration, lines: 1031-1037 }
-        - { name: test_search_workorders_integration, lines: 1040-1046 }
-        - { name: test_search_lot_ids_integration, lines: 1049-1054 }
-        - { name: test_dummy_exclusion_integration, lines: 1057-1068 }
-        - { name: test_workorder_filter_integration, lines: 1071-1084 }
+        - { name: _reset_db_state, lines: 1224-1229 }
+        - { name: test_get_wip_summary_integration, lines: 1232-1237 }
+        - { name: test_get_wip_matrix_integration, lines: 1240-1245 }
+        - { name: test_get_wip_hold_summary_integration, lines: 1248-1252 }
+        - { name: test_get_wip_detail_integration, lines: 1255-1268 }
+        - { name: test_get_workcenters_integration, lines: 1271-1277 }
+        - { name: test_get_packages_integration, lines: 1280-1286 }
+        - { name: test_search_workorders_integration, lines: 1289-1295 }
+        - { name: test_search_lot_ids_integration, lines: 1298-1303 }
+        - { name: test_dummy_exclusion_integration, lines: 1306-1317 }
+        - { name: test_workorder_filter_integration, lines: 1320-1333 }
     - name: TestExactFilterLotidWorkorder
-      lines: 1087-1180
+      lines: 1336-1429
       methods:
-        - { name: _make_snapshot, lines: 1095-1121 }
-        - { name: _sample_df, lines: 1123-1137 }
-        - { name: test_lotid_exact_match_excludes_superstring, lines: 1139-1152 }
-        - { name: test_workorder_exact_match_excludes_superstring, lines: 1154-1167 }
-        - { name: test_snapshot_indexes_include_lotid_and_workorder, lines: 1169-1180 }
+        - { name: _make_snapshot, lines: 1344-1370 }
+        - { name: _sample_df, lines: 1372-1386 }
+        - { name: test_lotid_exact_match_excludes_superstring, lines: 1388-1401 }
+        - { name: test_workorder_exact_match_excludes_superstring, lines: 1403-1416 }
+        - { name: test_snapshot_indexes_include_lotid_and_workorder, lines: 1418-1429 }
   functions:
     - { name: disable_cache, lines: 32-45 }
 

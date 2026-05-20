@@ -82,6 +82,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../production-history/App.vue'),
     [() => import('../resource-shared/styles.css'), () => import('../styles/tailwind.css'), () => import('../wip-shared/styles.css'), () => import('../production-history/style.css')],
   ),
+  '/material-consumption': createNativeLoader(
+    () => import('../material-consumption/App.vue'),
+    [() => import('../material-consumption/style.css')],
+  ),
   '/admin/dashboard': createNativeLoader(
     () => import('../admin-dashboard/App.vue'),
     [() => import('../styles/tailwind.css'), () => import('../admin-dashboard/style.css')],

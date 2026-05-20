@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.2
+schema-version: 1.2.3
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-05-19
+last-changed: 2026-05-20
 ---
 
 # CSS Inventory (Governed Source List)
@@ -61,6 +61,7 @@ last-changed: 2026-05-19
 | `frontend/src/hold-history/style.css` | `theme-hold-history` | hold-history |
 | `frontend/src/hold-overview/style.css` | `theme-hold-overview` | hold-overview |
 | `frontend/src/job-query/style.css` | `theme-job-query` | job-query |
+| `frontend/src/material-consumption/style.css` | `theme-material-consumption` | material-consumption |
 | `frontend/src/material-trace/style.css` | `theme-material-trace` | material-trace |
 | `frontend/src/mid-section-defect/style.css` | `theme-mid-section-defect` | mid-section-defect |
 | `frontend/src/qc-gate/style.css` | `theme-qc-gate` | qc-gate |

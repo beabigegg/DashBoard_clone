@@ -15,6 +15,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/yield-alert-center',
   '/anomaly-overview',
   '/production-history',
+  '/material-consumption',
   '/login',
 ]);
 
@@ -251,6 +252,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '生產歷程查詢',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/material-consumption': buildContract({
+    route: '/material-consumption',
+    routeId: 'material-consumption',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '料號用量報表',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

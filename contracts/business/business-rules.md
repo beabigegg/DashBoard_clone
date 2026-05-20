@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.9.0
-last-changed: 2026-05-19
+schema-version: 1.10.0
+last-changed: 2026-05-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -214,6 +214,16 @@ breaking-change-policy: deprecate-2-minors
 | Partial trackout group — 4-tuple match, non-key columns consistent | Single aggregated row; `trackin_qty = MAX(...)` (original load), `trackout_qty = SUM(...)`, `trackout_time = MAX(...)`, `partial_count ≥ 2` | PH-06 | unit tests |
 | Partial trackout group — 4-tuple match, any non-key column diverges | Multiple raw rows emitted, `partial_count = 1` each; per-request INFO log with divergent-group count | PH-07 | unit tests |
 
+## Material Consumption Rules
+
+| rule id | name | behavior | tests |
+|---|---|---|---|
+| MC-01 | Consumption data source and grouping | Reads `QTYCONSUMED` (actual) and `QTYREQUIRED` (required) from `DWH.DW_MES_LOTMATERIALSHISTORY`. Grouped by `TRUNC(TXNDATE)` (date-only; not datetime). Product type dimension joins `DWH.DW_MES_CONTAINER.PJ_TYPE`. Granularity GROUP BY (DuckDB): `week = date_trunc('week', txn_date)`, `month = strftime(txn_date, '%Y-%m')`, `quarter = CAST(YEAR(txn_date) AS VARCHAR) \|\| '-Q' \|\| CAST(QUARTER(txn_date) AS VARCHAR)`. Granularity switch re-groups summary spool in DuckDB without Oracle re-query (ADR-0001). | unit + contract |
+| MC-02 | MATERIALPARTNAME input cap and wildcard | `material_parts` cap: 20 values per request; > 20 → 400 `VALIDATION_ERROR`. `*` wildcard → `LIKE %` (escaped: `_` → `\_`, `%` → `\%` before `*` → `%` translation). SQL meta-chars (`'`, `;`, `--`, `/*`, `*/`, control chars `\x00-\x1f`) in any token → 400 `VALIDATION_ERROR`; token never reaches Oracle. Exact tokens (no `*`) → `IN (...)`. Wildcard tokens → `MATERIALPARTNAME LIKE :bind ESCAPE '\'`. | unit + fuzz |
+| MC-03 | Summary spool granularity key | Summary spool cache key EXCLUDES granularity. One spool file serves all three granularity views. `GET /api/material-consumption/view?query_id=X&granularity=Y` reads spool and re-groups in DuckDB; no Oracle query. Spool expiry → 410 `CACHE_EXPIRED`; client re-submits `POST /query`. | unit + resilience |
+| MC-04 | Detail async threshold | `POST /api/material-consumption/detail` sync when rows ≤ `SYNC_ROW_LIMIT` (env, default 30000); async Type B (RQ queue `material-consumption`) for larger sets. Worker absent → detail jobs pending; Admin Dashboard `rq_monitor` surfaces zero workers for queue. | unit + resilience + integration |
+| MC-05 | No DuckDB prewarm | No startup pre-warm performed. Cold queries hit Oracle once, populate Redis + spool cache. Subsequent requests and all granularity switches served from spool. | — (by design) |
+
 ## Change Policy
 
 任何業務邏輯變更必須：
@@ -221,3 +231,8 @@ breaking-change-policy: deprecate-2-minors
 2. 更新受影響的 decision table 行。
 3. 新增或更新對應的回歸測試。
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
+
+## CHANGELOG
+
+## [business 1.10.0]
+- material-part-consumption (2026-05-20): Added MC-01..MC-05 rules for the new material-consumption report (aggregation grouping, input cap/wildcard/meta-char, granularity cache key exclusion, async threshold, no prewarm). Additive; no existing rules changed.

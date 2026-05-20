@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.16
-last-changed: 2026-05-18
+schema-version: 1.3.17
+last-changed: 2026-05-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -239,6 +239,29 @@ Promote from informational to required after ALL of:
 | Screenshot diffs | 30 days |
 | Soak/stress reports | 90 days |
 
+## material-part-consumption Worker Queue & Deploy Gates
+
+**New RQ worker queue `material-consumption`**: dedicated queue for detail async jobs (business-rules.md MC-04). Isolated from other report queues. `rq_monitor_service._QUEUE_NAMES` must include `os.getenv("MATERIAL_CONSUMPTION_WORKER_QUEUE", "material-consumption")`.
+
+**Deploy checklist** (verify before serving traffic):
+1. Enable + start the `material-consumption` worker systemd unit and watchdog.
+2. Verify Admin Dashboard `/admin/api/worker/status` shows `material-consumption` queue with ≥ 1 worker.
+3. Verify `docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json` includes `/material-consumption` → dist asset. Missing entry crashes gunicorn via `_validate_in_scope_asset_readiness()`.
+4. Verify `docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json` classifies `/material-consumption` as in-scope.
+5. Verify `data/page_status.json` includes `/material-consumption` page object in drawer-2.
+
+**Rollback checklist** (complete before gunicorn restart):
+1. Remove `/material-consumption` entry from `asset_readiness_manifest.json` BEFORE restart — stale entry with no dist asset crashes gunicorn.
+2. Remove `/material-consumption` entry from `data/page_status.json` — stale entry emits "缺少 route contract: /material-consumption" in sidebar.
+3. Run `rm -f tmp/query_spool/material_consumption/*.parquet` — spool files become orphaned after rollback (parquet schema is breaking-change surface per data-shape-contract.md §3.9).
+4. Disable + stop the `material-consumption` worker systemd unit and watchdog.
+
+**Parquet schema gate**: any PR that renames, adds, or removes a column in the `material_consumption_service.py` spool write path MUST add `rm -f tmp/query_spool/material_consumption/*.parquet` to both deploy and rollback runbooks and update `data-shape-contract.md §3.9`.
+
+**No parquet cleanup in query-tool**: this gate entry is specific to `material_consumption`. Do NOT add `rm tmp/query_spool/material_consumption/*.parquet` to query-tool rollbacks (query-tool has no persistent spool).
+
+---
+
 ## Rollback Policy
 
 - 任何 Tier 1 gate 變紅後 main branch 不得合入新 PR，直到修復。
@@ -248,4 +271,9 @@ Promote from informational to required after ALL of:
 ## Contract Change Policy
 
 新增、移除或修改 CI gate 時，必須同步更新此契約（同一 PR），並在 PR 描述說明影響的 tier 和原因。
+
+## CHANGELOG
+
+## [ci 1.3.17]
+- material-part-consumption (2026-05-20): Added worker queue deploy/rollback checklist for the new `material-consumption` RQ worker. No existing gates changed.
 

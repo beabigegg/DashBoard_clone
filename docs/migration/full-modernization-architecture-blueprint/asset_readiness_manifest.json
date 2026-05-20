@@ -15,7 +15,8 @@
     "/mid-section-defect": ["mid-section-defect.js"],
     "/yield-alert-center": ["yield-alert-center.js"],
     "/admin/dashboard": ["admin-dashboard.js"],
-    "/admin/pages": ["admin-pages.js"]
+    "/admin/pages": ["admin-pages.js"],
+    "/material-consumption": ["material-consumption.js"]
   },
   "deferred_routes": []
 }

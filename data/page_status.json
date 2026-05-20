@@ -119,6 +119,13 @@
       "status": "dev",
       "drawer_id": "dev-tools",
       "order": 2
+    },
+    {
+      "route": "/material-consumption",
+      "name": "原物料用量查詢",
+      "status": "released",
+      "drawer_id": "drawer",
+      "order": 6
     }
   ],
   "api_public": true,

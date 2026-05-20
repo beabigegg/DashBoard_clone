@@ -1,0 +1,79 @@
+agent: frontend-engineer
+change-id: material-part-consumption
+date: 2026-05-20
+status: complete
+
+summary: |
+  Implemented the complete material-consumption Vue3 SPA (料號用量報表)
+  including TDD Vitest unit tests, Playwright E2E/resilience/data-boundary
+  specs, 5 components, the useConsumptionQuery composable, scoped CSS,
+  and portal-shell registration. All verification gates pass.
+
+  UX reviewer pass-2 (2026-05-20): Fixed all 5 blocking a11y/loading-state
+  bugs before release. BLOCKING-1: separated isSummaryLoading (page-level)
+  from isViewLoading (block-level) for granularity switches. BLOCKING-2:
+  added full WAI-ARIA tab widget (tablist/tab/tabpanel + aria-selected/controls/
+  labelledby) to App.vue tab bar. BLOCKING-3: replaced custom chart-loading divs
+  in ConsumptionTrendChart and TypeBreakdownChart with BlockLoadingState component.
+  BLOCKING-4: removed concurrent LoadingOverlay + pending text in DetailTable async
+  branch; now uses descriptive text only. BLOCKING-5: wrapped MultiSelect controls
+  in role="group" + aria-labelledby to semantically associate labels. NON-BLOCKING-1:
+  added aria-pressed to FilterPanel granularity buttons.
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/index.html"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/main.ts"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/App.vue:1-300"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/style.css"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/components/FilterPanel.vue:191-245"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/components/ConsumptionTrendChart.vue:15,143-144"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/components/TypeBreakdownChart.vue:14,109-110"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/components/DetailTable.vue:12-14,80-95"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/composables/useConsumptionQuery.ts:77-78,161-194,365-366"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/__tests__/TrendChart.test.ts"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/__tests__/useConsumptionQuery.test.ts"
+  - type: files-changed
+    pointer: "frontend/src/material-consumption/__tests__/FilterPanel.test.ts"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/material-consumption.spec.ts"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/material-consumption-resilience.spec.ts"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/material-consumption-data-boundary.spec.ts"
+  - type: files-changed
+    pointer: "frontend/src/portal-shell/routeContracts.js"
+  - type: files-changed
+    pointer: "frontend/vite.config.ts"
+  - type: components-affected
+    pointer: "FilterPanel, ConsumptionTrendChart, TypeBreakdownChart, DetailTable, App (material-consumption)"
+  - type: screenshot-paths
+    pointer: "n/a (no visual screenshots captured; E2E Playwright specs cover visual assertions)"
+  - type: accessibility-audit
+    pointer: "pass: tablist/tab/tabpanel ARIA, aria-selected, aria-controls, aria-labelledby on MultiSelect groups, aria-pressed on granularity buttons, aria-live on pending state, role=alert on validation error, BlockLoadingState handles prefers-reduced-motion"
+
+verification:
+  vitest: "6/6 tests pass (TrendChart×3, useConsumptionQuery×2, FilterPanel×1)"
+  css-check: "0 errors, 47 warnings (pre-existing warnings in shared-ui, not introduced by this change)"
+  type-check: "vue-tsc --noEmit: clean (0 errors)"
+  build: "npm run build: successful — emits material-consumption.js"
+  dist-filename: "material-consumption.js (matches asset_readiness_manifest.json entry set by backend-engineer)"
+
+notes: |
+  - switchGranularity() calls GET /view only, never POST /query (AC-3 / MC-03)
+  - isViewLoading (new) used only for granularity regroup; isSummaryLoading only for initial POST /query
+  - BlockLoadingState imported from shared-ui in ConsumptionTrendChart, TypeBreakdownChart, DetailTable
+  - Tab panels use v-show (not v-if) to preserve chart DOM state across tab switches
+  - MultiSelect shared by 12 apps; no emit/prop surface changed (additive only)
+  - Focus return handled by MultiSelect.vue::closeDropdown() (existing pattern)
+  - echarts callback params annotated with '// TODO: type echarts callback' per CLAUDE.md

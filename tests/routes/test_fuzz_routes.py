@@ -575,3 +575,128 @@ def test_wildcard_textarea_paste_with_carriage_returns(field):
         f"CRLF/tab/comma paste did not normalise: got {values!r}"
     )
     assert all(t.kind == "exact" for t in tokens)
+
+
+# ---------------------------------------------------------------------------
+# Material Consumption routes — MC-02 SQL meta-char + wildcard token cases
+# ---------------------------------------------------------------------------
+
+_MC_QUERY_URL = "/api/material-consumption/query"
+_MC_DETAIL_URL = "/api/material-consumption/detail"
+
+
+def _base_mc_query_body() -> dict:
+    return {
+        "material_parts": ["MAT-A"],
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-31",
+        "granularity": "week",
+    }
+
+
+@pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
+def test_mc_query_rejects_malicious_material_parts(payload):
+    """MC-02: SQL meta-chars in material_parts MUST NOT return 500.
+
+    Inputs that contain SQL meta-chars are rejected by validate_material_parts
+    before the service is called (400 VALIDATION_ERROR).  Inputs that do NOT
+    contain meta-chars pass validation and reach the service; mock the service
+    so Oracle is never contacted in the test environment.
+    """
+    from unittest.mock import patch
+
+    client = _make_client()
+    body = _base_mc_query_body()
+    if isinstance(payload, dict):
+        body.update(payload)
+    else:
+        body["material_parts"] = [_payload_to_str(payload)]
+
+    _MOCK_SUMMARY = {
+        "query_id": "fuzz-qid",
+        "kpi": {},
+        "trend": [],
+        "type_breakdown": [],
+    }
+    with patch(
+        "mes_dashboard.services.material_consumption_service.get_summary",
+        return_value=_MOCK_SUMMARY,
+    ):
+        r = client.post(_MC_QUERY_URL, json=body, content_type="application/json")
+
+    _assert_not_500(r, payload, _MC_QUERY_URL)
+    _assert_valid_json(r, _MC_QUERY_URL)
+
+
+@pytest.mark.parametrize("meta_char", ["'", ";", "--", "/*", "*/"])
+def test_mc_query_sql_meta_char_rejected(meta_char):
+    """MC-02: specific SQL meta-chars in material_parts MUST 400 VALIDATION_ERROR."""
+    client = _make_client()
+    body = _base_mc_query_body()
+    body["material_parts"] = [f"MAT{meta_char}A"]
+    r = client.post(_MC_QUERY_URL, json=body, content_type="application/json")
+    _assert_validation_error(r, meta_char, _MC_QUERY_URL)
+
+
+def test_mc_query_wildcard_star_accepted_and_forwarded():
+    """MC-02: * wildcard is accepted (not rejected as meta-char)."""
+    client = _make_client()
+    from unittest.mock import patch
+
+    with patch("mes_dashboard.services.material_consumption_service.get_summary") as mock_svc:
+        mock_svc.return_value = {
+            "query_id": "fuzz-qid",
+            "kpi": {},
+            "trend": [],
+            "type_breakdown": [],
+        }
+        body = _base_mc_query_body()
+        body["material_parts"] = ["MAT-A*"]
+        r = client.post(_MC_QUERY_URL, json=body, content_type="application/json")
+
+    assert r.status_code == 200, f"Expected 200 for wildcard token, got {r.status_code}"
+
+
+def test_mc_query_over_20_parts_rejected():
+    """MC-02: > 20 material_parts returns 400 VALIDATION_ERROR."""
+    client = _make_client()
+    body = _base_mc_query_body()
+    body["material_parts"] = [f"P{i}" for i in range(21)]
+    r = client.post(_MC_QUERY_URL, json=body, content_type="application/json")
+    _assert_validation_error(r, "21 parts", _MC_QUERY_URL)
+
+
+@pytest.mark.parametrize("payload", MALICIOUS_INPUTS)
+def test_mc_detail_rejects_malicious_material_parts(payload):
+    """MC-02 on detail endpoint: SQL meta-chars in material_parts must not 500.
+
+    Inputs that contain SQL meta-chars are rejected by validate_material_parts
+    before the service is called (400 VALIDATION_ERROR).  Inputs that pass
+    MC-02 reach the service; mock it so Oracle is never contacted.
+    """
+    from unittest.mock import patch
+
+    client = _make_client()
+    if isinstance(payload, dict):
+        body = payload
+    else:
+        body = {
+            "material_parts": [_payload_to_str(payload)],
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+        }
+
+    _MOCK_DETAIL = {
+        "async": False,
+        "query_id": "fuzz-detail-qid",
+        "rows": [],
+        "pagination": {"page": 1, "per_page": 50, "total_rows": 0, "total_pages": 1},
+    }
+    with patch(
+        "mes_dashboard.services.material_consumption_service.get_detail_summary",
+        return_value=_MOCK_DETAIL,
+    ):
+        r = client.post(_MC_DETAIL_URL, json=body, content_type="application/json")
+
+    _assert_not_500(r, payload, _MC_DETAIL_URL)
+    _assert_valid_json(r, _MC_DETAIL_URL)

@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => ({
         'material-trace': resolve(__dirname, 'src/material-trace/index.html'),
         'yield-alert-center': resolve(__dirname, 'src/yield-alert-center/index.html'),
         'anomaly-overview': resolve(__dirname, 'src/anomaly-overview/index.html'),
+        'material-consumption': resolve(__dirname, 'src/material-consumption/index.html'),
       },
       output: {
         entryFileNames: '[name].js',

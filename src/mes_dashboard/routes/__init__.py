@@ -25,6 +25,7 @@ from .analytics_routes import analytics_bp
 from .ai_routes import ai_bp
 from .production_history_routes import production_history_bp
 from .job_routes import job_bp
+from .material_consumption_routes import material_consumption_bp
 
 
 def register_routes(app) -> None:
@@ -49,6 +50,7 @@ def register_routes(app) -> None:
     app.register_blueprint(ai_bp)
     app.register_blueprint(production_history_bp)
     app.register_blueprint(job_bp)
+    app.register_blueprint(material_consumption_bp)
 
 __all__ = [
     'wip_bp',
@@ -72,5 +74,6 @@ __all__ = [
     'ai_bp',
     'production_history_bp',
     'job_bp',
+    'material_consumption_bp',
     'register_routes',
 ]
