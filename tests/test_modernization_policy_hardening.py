@@ -83,8 +83,8 @@ class TestMaterialConsumptionRegistration:
             "This will crash gunicorn at startup."
         )
 
-    def test_page_status_contains_material_consumption_in_drawer2(self):
-        """page_status.json must have /material-consumption page in drawer-2."""
+    def test_page_status_contains_material_consumption_in_drawer(self):
+        """page_status.json must have /material-consumption page in drawer (查詢工具)."""
         page_status = self._load_page_status()
         pages = page_status.get("pages", [])
         mc_pages = [p for p in pages if p.get("route") == "/material-consumption"]
@@ -92,6 +92,6 @@ class TestMaterialConsumptionRegistration:
             "page_status.json missing '/material-consumption' page entry."
         )
         mc_page = mc_pages[0]
-        assert mc_page.get("drawer_id") == "drawer-2", (
-            f"Expected drawer-2 for /material-consumption, got {mc_page.get('drawer_id')!r}"
+        assert mc_page.get("drawer_id") == "drawer", (
+            f"Expected drawer for /material-consumption, got {mc_page.get('drawer_id')!r}"
         )
