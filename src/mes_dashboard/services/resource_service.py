@@ -23,7 +23,11 @@ from mes_dashboard.config.constants import (
 )
 from mes_dashboard.sql import SQLLoader, QueryBuilder
 from mes_dashboard.sql.filters import CommonFilters
-from mes_dashboard.services.resource_cache import get_all_resources
+from mes_dashboard.services.resource_cache import (
+    get_all_resources,
+    get_package_group_name,
+    get_package_groups,
+)
 from mes_dashboard.services.realtime_equipment_cache import (
     get_all_equipment_status,
     get_equipment_status_lookup,
@@ -304,6 +308,7 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
         departments = get_departments()
         locations = get_locations()
         assets_statuses = get_distinct_values('PJ_ASSETSSTATUS')
+        package_groups_list = get_package_groups()
 
         # Use STATUS_CATEGORIES constant — status values are fixed, no Oracle query needed
         statuses = list(STATUS_CATEGORIES)
@@ -314,7 +319,8 @@ def query_resource_filter_options(days_back: int = 30) -> Optional[Dict]:
             'families': families,
             'departments': departments,
             'locations': locations,
-            'assets_statuses': assets_statuses
+            'assets_statuses': assets_statuses,
+            'package_groups': package_groups_list,
         }
     except (DatabasePoolExhaustedError, DatabaseCircuitOpenError):
         raise
@@ -364,6 +370,7 @@ def get_merged_resource_status(
     status_categories: Optional[List[str]] = None,
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
+    package_groups: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get merged resource status from three cache layers.
 
@@ -423,6 +430,9 @@ def get_merged_resource_status(
         wc_group_seq = wc_group_seq_map.get(workcenter_name) if workcenter_name else None
         wc_short = wc_short_map.get(workcenter_name) if workcenter_name else None
 
+        # Resolve PACKAGEGROUPNAME before filter evaluation (IP-6)
+        pgname = get_package_group_name(resource.get('PACKAGEGROUPID'))
+
         # Apply filters before creating merged payload.
         if workcenter_groups and wc_group not in workcenter_groups:
             continue
@@ -437,6 +447,10 @@ def get_merged_resource_status(
         if resource_ids and str(resource_id) not in resource_ids:
             continue
         if status_categories and realtime.get('STATUS_CATEGORY') not in status_categories:
+            continue
+        # IP-6: exclude records where PACKAGEGROUPNAME not in package_groups list.
+        # null PACKAGEGROUPNAME is also excluded when filter is active (data-shape §3.10.3).
+        if package_groups and pgname not in package_groups:
             continue
 
         # Build merged record
@@ -454,6 +468,7 @@ def get_merged_resource_status(
             'VENDORNAME': resource.get('VENDORNAME'),
             'VENDORMODEL': resource.get('VENDORMODEL'),
             'LOCATIONNAME': resource.get('LOCATIONNAME'),
+            'PACKAGEGROUPNAME': pgname,
             # From workcenter-mapping
             'WORKCENTER_GROUP': wc_group,
             'WORKCENTER_GROUP_SEQ': wc_group_seq,
@@ -496,6 +511,7 @@ def get_resource_status_summary(
     is_monitor: Optional[bool] = None,
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
+    package_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Get resource status summary statistics.
 
@@ -506,6 +522,7 @@ def get_resource_status_summary(
         is_monitor: Filter by PJ_ISMONITOR flag
         families: Filter by RESOURCEFAMILYNAME
         resource_ids: Filter by RESOURCEID
+        package_groups: Filter by PACKAGEGROUPNAME (IP-7)
 
     Returns:
         Dict with summary statistics including OU%, Availability%, and per-status counts.
@@ -518,6 +535,7 @@ def get_resource_status_summary(
         is_monitor=is_monitor,
         families=families,
         resource_ids=resource_ids,
+        package_groups=package_groups,
     )
 
     if not data:
@@ -592,6 +610,7 @@ def get_workcenter_status_matrix(
     is_monitor: Optional[bool] = None,
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
+    package_groups: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get workcenter × status matrix.
 
@@ -603,6 +622,7 @@ def get_workcenter_status_matrix(
         is_monitor: Filter by PJ_ISMONITOR flag
         families: Filter by RESOURCEFAMILYNAME
         resource_ids: Filter by RESOURCEID
+        package_groups: Filter by PACKAGEGROUPNAME (IP-7)
 
     Returns:
         List of dicts with workcenter_group and status counts.
@@ -614,6 +634,7 @@ def get_workcenter_status_matrix(
         is_monitor=is_monitor,
         families=families,
         resource_ids=resource_ids,
+        package_groups=package_groups,
     )
 
     if not data:

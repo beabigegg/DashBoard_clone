@@ -262,6 +262,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
+    <div class="theme-resource">
     <div v-if="visible" ref="tooltipRef" class="floating-tooltip" :style="tooltipStyle" @click.stop>
       <div class="floating-tooltip-header" :class="{ dragging: isDragging }" @mousedown="onDragStart">
         <h3 class="floating-tooltip-title">{{ tooltipTitle }}</h3>
@@ -353,6 +354,7 @@ onBeforeUnmount(() => {
           <div v-else class="tooltip-empty">無 JOB 明細</div>
         </template>
       </div>
+    </div>
     </div>
   </Teleport>
 </template>

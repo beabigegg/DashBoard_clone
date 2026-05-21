@@ -34,6 +34,7 @@ interface EquipmentItem {
   CAUSECODE: string;
   REPAIRCODE: string;
   STATUS_CATEGORY: string;
+  PACKAGEGROUPNAME: string | null;
 }
 
 interface TooltipPayload {
@@ -107,6 +108,10 @@ function emitJob(event: MouseEvent): void {
       <span class="eq-info-item">
         <span class="label">位置</span>
         <span class="value">{{ equipment.LOCATIONNAME || '--' }}</span>
+      </span>
+      <span v-if="equipment.PACKAGEGROUPNAME" class="eq-info-item">
+        <span class="label">Package</span>
+        <span class="value">{{ equipment.PACKAGEGROUPNAME }}</span>
       </span>
     </div>
 

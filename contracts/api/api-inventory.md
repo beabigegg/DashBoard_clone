@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.8
-last-changed: 2026-05-20
+schema-version: 1.1.9
+last-changed: 2026-05-21
 ---
 
 # API Inventory
@@ -25,7 +25,7 @@ last-changed: 2026-05-20
 | `hold_overview_routes.py` | All JSON API endpoints — `/summary`, `/matrix`, `/treemap`, `/lots` 接受 `POST` JSON body；`reason` 可為 CSV string (GET) 或 JSON array (POST) |
 | `hold_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410)；`duration` payload: `{ items: [{range, count, qty, pct}], avgReleasedHours, avgOnHoldHours, maxReleasedHours, maxOnHoldHours }`；trend day 含 `repeatQualityHoldQty`；**`POST /api/hold-history/today-snapshot`**: inputs `{ hold_type, record_type, reason, duration_range, page, per_page }`，response `{ query_id, summary: { onHoldTotalCount, onHoldTotalQty, todayNewQty, todayReleaseQty, todayFutureHoldQty, onHoldAvgHours, onHoldMaxHours }, reason_pareto, duration, list }`；cache `hold_today:*` TTL 60s；DB 不可用 → 503 `service_unavailable` |
 | `reject_history_routes.py` | All JSON API endpoints — **Type B** (async 202 polling on 410)；含 `GET /api/reject-history/job/<job_id>`；`/batch-pareto` / `/view` 接受 `POST` JSON body |
-| `resource_routes.py` | All JSON API endpoints |
+| `resource_routes.py` | All JSON API endpoints — `/status`、`/status/summary`、`/status/matrix` 新增可選查詢參數 `package_groups`（逗號分隔字串，resource-status-package-group）；`/status/options` response 新增 `package_groups: string[]`；`/status` response record 新增 `PACKAGEGROUPNAME: string \| null`（PACKAGEGROUPID NULL 時為 null）。 |
 | `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410)；`POST /api/resource/history/query` 先查 canonical base spool（DuckDB filter）；response: `{query_id, summary, detail}`；**新增** `GET /api/resource/history/query/progress?query_id=<uuid>` — batch 查詢進度 side-channel；progress state 存於 Redis key `resource:history:progress:<query_id>`；400 on missing param，404 on unknown query_id；auth required（與其他端點相同 `login_required` guard）（resource-history-perf）。 |
 | `yield_alert_routes.py` | All JSON API endpoints — **Type B** (async 202 polling)；`POST /api/yield-alert/query` 可回傳 202；RQ 不可用 fallback sync 200；`GET /api/yield-alert/cross-filter-options?query_id=...&lines[]=...&packages[]=...`，410 on spool expired |
 | `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` 驗證 `pj_types`, `start_date`, `end_date`；缺少/無效 → 400 `VALIDATION_ERROR`；date range > 730d → 400；spool hit → 200，miss+RQ → 202；含 `POST /page`（DuckDB paged）、`/matrix`、`/options`；gated by `PROD_HISTORY_ENABLED`。**新增** `GET /api/production-history/filter-options?selected=<json>` — cross-filter cached options（4-tuple in-memory filter over `container_filter_cache`），auth required，400 on malformed `selected` JSON，404 on cache cold start failure，500 on Oracle build error；payload schema `{data: {pj_types, packages, bops, pj_functions}, meta: {updated_at, schema_version: 2}}`（prod-history-first-tier-cache-filters）。主查詢端點 `POST /api/production-history/query` 新增可選欄位 `pj_packages[]`、`pj_bops[]`、`pj_functions[]`（cached MultiSelect，plain `IN`）、`mfg_orders[]`、`lot_ids[]`、`wafer_lots[]`（多行 + `*` 萬用字元，依 PHF-02 規則 `LIKE ESCAPE '\'` bind）；全部 additive、缺省時保持 Type-only 行為。`start_date` / `end_date` 自 prod-history-query-mode-tabs 起為**條件必填**：classification mode（無 identifier token）仍必填；identifier mode（含 `mfg_orders` / `lot_ids` / `wafer_lots` token）可省略，省略時走 wide / all-time 查詢。 |

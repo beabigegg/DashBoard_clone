@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.3.0
-last-changed: 2026-05-20
+schema-version: 1.4.0
+last-changed: 2026-05-21
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -108,6 +108,18 @@ breaking-change-policy: deprecate-2-minors
 
 **material-consumption（2026-05-20）**: `frontend/src/material-consumption/style.css` 的全部 CSS 規則必須以 `.theme-material-consumption` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行；CI fails on any violation。
 
+## Resource-Status UI Surface Rules
+
+Added by `resource-status-package-group`.
+
+| surface | component | rule |
+|---|---|---|
+| FilterBar | Package Group MultiSelect | Must be scoped under `.theme-resource`; uses shared `MultiSelect.vue`; prop/emit surface must be additive (do not change existing emit signatures). If the MultiSelect is inside a `.ui-card`, add a scoped modifier class and `overflow: visible` per Known Global Rule Interactions pattern. |
+| EquipmentCard | PACKAGEGROUPNAME text row | Render only when `PACKAGEGROUPNAME !== null`. Must be scoped under `.theme-resource`. Use existing text-row pattern alongside WORKCENTERNAME / RESOURCEFAMILYNAME rows; no new CSS class required. |
+| MatrixSection | Package expandable dimension | Must be scoped under `.theme-resource`. New dimension column follows the same CSS class pattern as existing expandable dimensions; no new authored class names required unless existing ones cannot cover the Package column. |
+
+All new CSS rules (if any) added to `frontend/src/resource-status/style.css` must be scoped under `.theme-resource` and must pass `npm run css:check` Rule 6. No new `.css` source file is created by this change; `css-inventory.md` does not require an update.
+
 ## Known Global Rule Interactions
 
 - **`.ui-card { overflow: hidden }` (defined in `frontend/src/styles/tailwind.css`) clips any `position: absolute` dropdown (MultiSelect, custom select) nested inside it.** When a card must contain such a dropdown, add a scoped modifier class to the card (e.g., `filter-query-card`, `type-filter-card`) and override `overflow: visible` in the feature's scoped `style.css` — never change the global rule. The pattern has been applied in 7+ feature CSS files and is established as the correct override contract. Evidence: `material-part-consumption` — filter panel MultiSelect clipped by `.ui-card { overflow: hidden }` until scoped override was added.
@@ -127,6 +139,9 @@ breaking-change-policy: deprecate-2-minors
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.4.0]
+- resource-status-package-group (2026-05-21): Added "Resource-Status UI Surface Rules" section documenting FilterBar Package Group MultiSelect, EquipmentCard PACKAGEGROUPNAME text row (hide when null), and MatrixSection Package dimension scoping requirements. All rules enforce existing `.theme-resource` scope contract; no new CSS source file; css-inventory.md unchanged.
 
 ## [css 1.3.0]
 - material-part-consumption (2026-05-20): Added "Known Global Rule Interactions" section documenting `.ui-card { overflow: hidden }` clipping behaviour and the scoped modifier class override pattern. Added corresponding Forbidden Practice entry prohibiting direct modification of the global `overflow` property. Evidence: filter panel MultiSelect dropdown was clipped until `.filter-query-card` scoped override was introduced.

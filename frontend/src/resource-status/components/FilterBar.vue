@@ -20,6 +20,8 @@ const props = withDefaults(defineProps<{
   machineOptions?: (string | number | Record<string, unknown>)[];
   selectedFamilies?: string[];
   selectedMachines?: string[];
+  packageGroups?: string[];
+  selectedPackageGroups?: string[];
   loading?: boolean;
 }>(), {
   workcenterGroups: () => [],
@@ -29,6 +31,8 @@ const props = withDefaults(defineProps<{
   machineOptions: () => [],
   selectedFamilies: () => [],
   selectedMachines: () => [],
+  packageGroups: () => [],
+  selectedPackageGroups: () => [],
   loading: false,
 });
 
@@ -37,6 +41,7 @@ const emit = defineEmits<{
   'change-flags': [flags: FilterFlags];
   'change-families': [families: string[]];
   'change-machines': [machines: string[]];
+  'change-package-groups': [groups: string[]];
 }>();
 
 function updateFlag(key: keyof FilterFlags, event: Event): void {
@@ -82,6 +87,17 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
           placeholder="全部機台"
           searchable
           @update:model-value="$emit('change-machines', $event)"
+        />
+      </div>
+
+      <div class="filter-block">
+        <label>封裝群組</label>
+        <MultiSelect
+          :model-value="selectedPackageGroups"
+          :options="packageGroups"
+          :disabled="loading"
+          placeholder="全部封裝群組"
+          @update:model-value="$emit('change-package-groups', $event)"
         />
       </div>
 

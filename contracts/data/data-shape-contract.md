@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.8.0
-last-changed: 2026-05-20
+schema-version: 1.9.0
+last-changed: 2026-05-21
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -561,6 +561,69 @@ Same breaking-change surface rule as summary spool.
 
 ---
 
+### 3.10 Resource-Status Merged Record（`GET /api/resource/status`）
+
+Each element in the `data` array returned by `/api/resource/status` is a merged record combining three cache layers (resource-cache, realtime-equipment-cache, workcenter-mapping). Fields are sourced and merged in `resource_service.py::get_merged_resource_status()`.
+
+#### 3.10.1 Field table
+
+| field | type | nullable | source | notes |
+|---|---|---|---|---|
+| RESOURCEID | string \| integer | no | resource-cache | Primary resource identifier |
+| RESOURCENAME | string | yes | resource-cache | Display name |
+| WORKCENTERNAME | string | yes | resource-cache | |
+| RESOURCEFAMILYNAME | string | yes | resource-cache | |
+| PJ_DEPARTMENT | string | yes | resource-cache | |
+| PJ_ASSETSSTATUS | string | yes | resource-cache | |
+| PJ_ISPRODUCTION | boolean | yes | resource-cache | |
+| PJ_ISKEY | boolean | yes | resource-cache | |
+| PJ_ISMONITOR | boolean | yes | resource-cache | |
+| VENDORNAME | string | yes | resource-cache | |
+| VENDORMODEL | string | yes | resource-cache | |
+| LOCATIONNAME | string | yes | resource-cache | |
+| PACKAGEGROUPNAME | string \| null | yes | DW_MES_RESOURCE_PACKAGEGROUP lookup | **Added resource-status-package-group.** Resolved via 46-row in-process dict keyed by PACKAGEGROUPID (CHAR). NULL when PACKAGEGROUPID is null (~91% of resources) or has no match. Frontend MUST hide the display row when null. |
+| WORKCENTER_GROUP | string | yes | workcenter-mapping | |
+| WORKCENTER_GROUP_SEQ | integer | yes | workcenter-mapping | |
+| WORKCENTER_SHORT | string | yes | workcenter-mapping | |
+| EQUIPMENTASSETSSTATUS | string | yes | realtime-equipment-cache | |
+| EQUIPMENTASSETSSTATUSREASON | string | yes | realtime-equipment-cache | |
+| STATUS_CATEGORY | string | yes | realtime-equipment-cache | Closed enum used for status filter |
+| JOBORDER | string | yes | realtime-equipment-cache | |
+| JOBMODEL | string | yes | realtime-equipment-cache | |
+| JOBSTAGE | string | yes | realtime-equipment-cache | |
+| JOBID | string | yes | realtime-equipment-cache | |
+| JOBSTATUS | string | yes | realtime-equipment-cache | |
+| CREATEDATE | datetime | yes | realtime-equipment-cache | |
+| CREATEUSERNAME | string | yes | realtime-equipment-cache | |
+| CREATEUSER | string | yes | realtime-equipment-cache | |
+| TECHNICIANUSERNAME | string | yes | realtime-equipment-cache | |
+| TECHNICIANUSER | string | yes | realtime-equipment-cache | |
+| SYMPTOMCODE | string | yes | realtime-equipment-cache | |
+| CAUSECODE | string | yes | realtime-equipment-cache | |
+| REPAIRCODE | string | yes | realtime-equipment-cache | |
+| LOT_COUNT | integer | yes | realtime-equipment-cache | |
+| LOT_DETAILS | array | yes | realtime-equipment-cache | |
+| TOTAL_TRACKIN_QTY | integer | yes | realtime-equipment-cache | |
+| LATEST_TRACKIN_TIME | datetime | yes | realtime-equipment-cache | |
+
+#### 3.10.2 PACKAGEGROUPNAME NULL semantics
+
+- `PACKAGEGROUPID` originates from `DWH.DW_MES_RESOURCE` (already in the 24h resource_cache full-table load; no extra Oracle query at request time).
+- Lookup is performed against an in-process dict populated from `DWH.DW_MES_RESOURCE_PACKAGEGROUP` (46 rows). Dict TTL = 7 days, independent of the 24h `resource_cache` cycle; no new Redis key.
+- `PACKAGEGROUPID` is Oracle CHAR type. Dict key must use `str(pgid).strip()` normalization on both sides to handle CHAR padding.
+- A dict load failure degrades gracefully: all records return `PACKAGEGROUPNAME = null` rather than raising a 500.
+- Frontend contract: when `PACKAGEGROUPNAME is null`, the EquipmentCard row MUST NOT render. When non-null, render as a text row alongside WORKCENTERNAME / RESOURCEFAMILYNAME.
+
+#### 3.10.3 `package_groups` filter semantics
+
+- Query param: `package_groups` (comma-separated string, optional). Parsed as `package_groups_param.split(',') if package_groups_param else None`.
+- Filter logic in `get_merged_resource_status()`: records with `PACKAGEGROUPNAME not in package_groups` (or `PACKAGEGROUPNAME = null`) are excluded when a `package_groups` filter is active.
+- Applied on both the warm-cache path and any Oracle-fallback path (per CLAUDE.md Test Coverage Discipline).
+
+Added by change `resource-status-package-group`.
+
+---
+
 ## 6. Row Limit / Truncation Policy
 
 | scope | limit | behavior |
@@ -581,6 +644,9 @@ Removing a required column, changing a column type, or removing a key from the e
 3. Updating related tests before removing the field.
 
 ## CHANGELOG
+
+## [data 1.9.0]
+- resource-status-package-group (2026-05-21): Added §3.10 documenting the merged resource-status record shape (all 35+ fields). New field PACKAGEGROUPNAME (string | null) added to each record; NULL for ~91% of resources (PACKAGEGROUPID is null in DWH.DW_MES_RESOURCE). Lookup via 46-row in-process dict (DW_MES_RESOURCE_PACKAGEGROUP, 7-day TTL, independent of 24h resource_cache cycle). No existing fields removed or renamed.
 
 ## [data 1.8.0]
 - material-part-consumption (2026-05-20): Added §3.9 with summary spool schema (8 columns: txn_date, material_part, pj_type, primary_category, total_consumed, total_required, lot_count, workorder_count) and detail spool schema (mirrors forward_by_lot.sql columns + pj_type). New spool namespaces only; no existing schemas changed.

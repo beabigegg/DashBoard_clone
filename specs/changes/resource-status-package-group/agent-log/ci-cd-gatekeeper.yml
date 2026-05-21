@@ -1,0 +1,14 @@
+change-id: resource-status-package-group
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-21T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (backend-unit, frontend-unit, css-governance, contract-tests), 2 (type-check)" }
+  - { type: gate-promotions, pointer: "none — no existing gate moved tiers; type-check remains Tier 2 informational" }
+  - { type: workflow-files-changed, pointer: "n/a (no new workflow files; existing backend-tests.yml and frontend-tests.yml cover all gates via path triggers)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, frontend-unit-tests, contract-and-fast-tests" }
+next-action: none
+notes: >
+  All required gates are served by existing workflows. No new nightly/weekly/manual gates.
+  Rollback policy explicitly documents no parquet cleanup and no manifest edits needed.
+  Oracle-unavailable-at-startup degraded behavior (PACKAGEGROUPNAME null) documented.

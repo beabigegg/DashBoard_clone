@@ -1,0 +1,41 @@
+change-id: resource-status-package-group
+status: in-progress
+tier: 2
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "Architecture Review not required; no design.md" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "No env changes" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "No new KPI/calculation; non-goal excludes OU%/AVAIL% package dimension" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "No new gates; existing gates apply" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "Not required for Tier 2 additive feature" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "46-row in-process lookup; no load risk" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "No env or deploy changes" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "No workflow changes needed; existing gates cover all new tests" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "approved-with-suggestions; label renamed to 封裝群組; Package column moved after OU%" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "Additive UI rows; ui-ux-reviewer covers interaction; no pixel-level blocking risk" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contracts updated before implementation; all version bumps applied" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "Initial blocks fixed (CHANGELOG entries + ci-gates contract-tests command); gate passed" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed; pytest 82/82 backend, 413 frontend; css:check 0 unscoped rules; validate passed" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "All Tier 1 commands pass locally; CI runs identical commands per ci-gates.md" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "type-check informational pass confirmed by frontend-engineer" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly/manual gates defined for this change" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

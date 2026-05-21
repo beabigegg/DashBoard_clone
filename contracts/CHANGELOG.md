@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.10.0] — 2026-05-21
+### Added
+- resource-status-package-group: Added optional `package_groups` query param to `/api/resource/status`, `/api/resource/status/summary`, `/api/resource/status/matrix`; added `package_groups: string[]` to `/api/resource/status/options` response; added `PACKAGEGROUPNAME: string | null` to each `/api/resource/status` record (null for ~91% of resources). All additive; no existing endpoints changed.
+
+## [css 1.4.0] — 2026-05-21
+### Added
+- resource-status-package-group: Added "Resource-Status UI Surface Rules" section documenting FilterBar Package Group MultiSelect (label 封裝群組, scoped under `.theme-resource`), EquipmentCard PACKAGEGROUPNAME text row (hide when null, same scope), and MatrixSection Package dimension column (after OU%, same scope). No new CSS source file; css-inventory.md unchanged.
+
+## [data 1.9.0] — 2026-05-21
+### Added
+- resource-status-package-group: Added §3.10 documenting the merged resource-status record shape (35+ fields). New field PACKAGEGROUPNAME (string | null) resolved via 46-row in-process lookup dict (DW_MES_RESOURCE_PACKAGEGROUP, 7-day TTL, independent of 24h resource_cache cycle). NULL for ~91% of resources. No existing fields removed or renamed.
+
 ## [api 1.9.0] — 2026-05-20
 ### Added
 - material-part-consumption: Added 7 endpoints under `/api/material-consumption` (filter-options, query, view, detail, detail/page, detail/job, export). Summary query always synchronous; detail sync ≤ SYNC_ROW_LIMIT, async Type B (RQ queue `material-consumption`) for larger sets. `/view` regroups from DuckDB spool without Oracle re-query. Additive; no existing endpoints changed.

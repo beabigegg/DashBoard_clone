@@ -5,9 +5,117 @@ Tests cache read/write functionality, fallback mechanism, and distinct values AP
 """
 
 import pytest
+import time
 from unittest.mock import patch, MagicMock
 import pandas as pd
 import json
+
+
+class TestPackageGroupLookup:
+    """Tests for package-group lookup dict (IP-1..IP-5 acceptance criteria AC-5/AC-6)."""
+
+    def _reset_pkg_state(self, rc):
+        """Reset module-level package-group state before each test."""
+        rc._package_group_lookup = {}
+        rc._package_group_refreshed_at = 0.0
+
+    def test_package_group_lookup_dict_build(self):
+        """test_builds_lookup_dict_from_oracle_rows: _load_package_group_lookup builds
+        {str(PACKAGEGROUPID).strip(): PACKAGEGROUPNAME} from read_sql_df rows."""
+        import mes_dashboard.services.resource_cache as rc
+        self._reset_pkg_state(rc)
+
+        mock_df = pd.DataFrame([
+            {'PACKAGEGROUPID': 'P01', 'PACKAGEGROUPNAME': 'SOT-23'},
+            {'PACKAGEGROUPID': 'P02', 'PACKAGEGROUPNAME': 'SOT-89'},
+        ])
+
+        with patch.object(rc, 'read_sql_df', return_value=mock_df):
+            rc._load_package_group_lookup()
+
+        assert rc._package_group_lookup.get('P01') == 'SOT-23'
+        assert rc._package_group_lookup.get('P02') == 'SOT-89'
+        assert rc._package_group_refreshed_at > 0.0
+
+    def test_package_group_lookup_dict_ttl_independent(self):
+        """test_lookup_ttl_is_7_days_independent_of_resource_cache: _package_group_refreshed_at
+        is a separate timestamp from the 24h resource_cache refresh timer.
+        After _load_package_group_lookup() completes, the module-level
+        _package_group_refreshed_at must be set and _PACKAGE_GROUP_SYNC_INTERVAL must be 604800.
+        """
+        import mes_dashboard.services.resource_cache as rc
+        self._reset_pkg_state(rc)
+
+        assert rc._PACKAGE_GROUP_SYNC_INTERVAL == 604_800  # 7 days in seconds
+
+        mock_df = pd.DataFrame([
+            {'PACKAGEGROUPID': 'P01', 'PACKAGEGROUPNAME': 'SOT-23'},
+        ])
+
+        before = time.time()
+        with patch.object(rc, 'read_sql_df', return_value=mock_df):
+            rc._load_package_group_lookup()
+
+        # Timer was updated independently
+        assert rc._package_group_refreshed_at >= before
+        # It is NOT the same object as any other cache timer (just verify it's a float attr)
+        assert isinstance(rc._package_group_refreshed_at, float)
+
+    def test_package_group_lookup_char_key_normalization(self):
+        """test_char_key_trailing_space_stripped_on_build: Oracle CHAR columns pad to fixed
+        width with trailing spaces. Build must strip so lookup key is clean."""
+        import mes_dashboard.services.resource_cache as rc
+        self._reset_pkg_state(rc)
+
+        mock_df = pd.DataFrame([
+            {'PACKAGEGROUPID': 'P01   ', 'PACKAGEGROUPNAME': 'SOT-23'},
+        ])
+
+        with patch.object(rc, 'read_sql_df', return_value=mock_df):
+            rc._load_package_group_lookup()
+
+        # Key must be stripped — 'P01' resolves but 'P01   ' does not
+        assert 'P01' in rc._package_group_lookup
+        assert 'P01   ' not in rc._package_group_lookup
+
+    def test_get_package_groups_returns_sorted_list(self):
+        """get_package_groups() returns sorted distinct PACKAGEGROUPNAME values."""
+        import mes_dashboard.services.resource_cache as rc
+        self._reset_pkg_state(rc)
+
+        rc._package_group_lookup = {'P01': 'SOT-23', 'P02': 'DFN-3', 'P03': 'SOT-89'}
+        # Pre-set refreshed_at to avoid TTL reload during test
+        rc._package_group_refreshed_at = time.time()
+
+        result = rc.get_package_groups()
+
+        assert result == sorted(['SOT-23', 'DFN-3', 'SOT-89'])
+
+    def test_package_group_lookup_null_pgid_returns_none(self):
+        """test_null_packagegroupid_resolves_to_none (data-boundary): get_package_group_name(None)
+        must return None without triggering a lookup error."""
+        import mes_dashboard.services.resource_cache as rc
+        self._reset_pkg_state(rc)
+        rc._package_group_refreshed_at = time.time()  # avoid TTL reload
+
+        result = rc.get_package_group_name(None)
+
+        assert result is None
+
+    def test_package_group_lookup_char_trailing_space(self):
+        """test_char_key_trailing_space_stripped_on_resolve (data-boundary): A PACKAGEGROUPID
+        value arriving with trailing spaces (Oracle CHAR) must still resolve correctly."""
+        import mes_dashboard.services.resource_cache as rc
+        self._reset_pkg_state(rc)
+
+        # Dict built with clean key
+        rc._package_group_lookup = {'P01': 'SOT-23'}
+        rc._package_group_refreshed_at = time.time()
+
+        # PGID arriving with trailing space should resolve via .strip()
+        result = rc.get_package_group_name('P01   ')
+
+        assert result == 'SOT-23'
 
 
 class TestGetDistinctValues:

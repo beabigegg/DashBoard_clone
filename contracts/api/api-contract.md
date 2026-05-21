@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.9.0
-last-changed: 2026-05-20
+schema-version: 1.10.0
+last-changed: 2026-05-21
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -104,10 +104,10 @@ breaking-change-policy: deprecate-2-minors
 | POST | /api/resource/detail | required | JSON body | success_response | 400/500 | route tests |
 | GET | /api/resource/filter_options | required | — | success_response | 500 | route tests |
 | GET | /api/resource/status_values | required | — | success_response | 500 | route tests |
-| GET | /api/resource/status | required | query params | success_response | 400/500 | route tests |
-| GET | /api/resource/status/options | required | — | success_response | 500 | route tests |
-| GET | /api/resource/status/summary | required | query params | success_response | 400/500 | route tests |
-| GET | /api/resource/status/matrix | required | query params | success_response | 400/500 | route tests |
+| GET | /api/resource/status | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
+| GET | /api/resource/status/options | required | — | success_response (incl. package_groups[]) | 500 | route tests |
+| GET | /api/resource/status/summary | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
+| GET | /api/resource/status/matrix | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
 | GET | /api/resource/history/options | required | — | success_response | 500 | route tests |
 | POST | /api/resource/history/query | required | JSON body | success_response | 400/410/500 | route tests |
 | GET | /api/resource/history/view | required | ?query_id= | success_response | 400/410 | route tests |
@@ -301,6 +301,17 @@ breaking-change-policy: deprecate-2-minors
   - `POST /api/query-tool/export-csv`（`export_type=lot_history` 與 `export_type=equipment_lots`）CSV 新增 `partial_count` 為傳遞欄位；以位置解析 CSV 的 consumer 需處理新尾欄。
 - **Query-Tool equipment-rejects detail rewrite (2026-05-18, `equipment-rejects-by-lots`)**: `POST /api/query-tool/equipment-period` (`query_type='rejects'`) and `POST /api/query-tool/export-csv` (`export_type='equipment_rejects'`) response shape changed from aggregate (EQUIPMENTNAME, LOSSREASONNAME, TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) to per-reject-event detail rows (see data-shape-contract.md §3.7). Data source changed from LOTREJECTHISTORY filtered by EQUIPMENTNAME to LOTWIPHISTORY→LOTREJECTHISTORY via CONTAINERID (fixes cross-station reject omission). Service parameter renamed `equipment_names → equipment_ids`. Hard cutover — both EquipmentView and LotEquipmentView consumers ship in the same PR. Deprecate-2-minors policy bypassed because all consumers are in the same monorepo and shipped atomically.
 
+- **Resource-Status Package Group（2026-05-21，resource-status-package-group）**：以下為 additive，backward-compatible：
+  - `GET /api/resource/status`：新增可選查詢參數 `package_groups`（逗號分隔字串，optional）；回應每筆 record 新增 `PACKAGEGROUPNAME: string | null`（來源：`DW_MES_RESOURCE_PACKAGEGROUP` 46-row in-process lookup dict，`PACKAGEGROUPID` 為 null 時回傳 `null`；約佔所有設備的 91%）。
+  - `GET /api/resource/status/summary`：新增可選查詢參數 `package_groups`；不影響 OU%/AVAIL% 計算。
+  - `GET /api/resource/status/matrix`：新增可選查詢參數 `package_groups`；Package 為新增可展開維度，不改變現有 workcenter/family 維度行為。
+  - `GET /api/resource/status/options`：回應 `data` 物件新增 `package_groups: string[]`（distinct 排序字串陣列）。
+  - `package_groups` 篩選器在 warm-cache 路徑與 Oracle fallback 路徑均套用。
+  - Lookup dict（`DW_MES_RESOURCE_PACKAGEGROUP`，46 筆）為 in-process dict，TTL = 7 天，獨立於 `resource_cache` 的 24h 週期；不新增 Redis key，不需 DB migration。
+  - PACKAGEGROUPID 為 Oracle CHAR 型別；join key 比對使用 `str(...).strip()` 兩側正規化，確保型別一致。
+  - 無端點移除、無欄位移除、無錯誤碼變更；所有改動為 additive。
+  - Consumers：`frontend/src/resource-status/`（FilterBar、EquipmentCard、MatrixSection）。
+
 - **Material-Consumption endpoints（2026-05-20，material-part-consumption）**：以下為 additive，新頁面，不影響既有端點：
   - 新增 7 個端點：`GET /api/material-consumption/filter-options` → `{workcenter_groups, primary_categories, pj_types}`；`POST /api/material-consumption/query`（summary sync，body: `{material_parts[1..20], start_date, end_date, granularity: week|month|quarter, workcenter_groups?, primary_categories?, pj_types?}`，response: `{query_id, kpi: {total_consumed, total_required, efficiency_pct, lot_count, workorder_count}, trend[], type_breakdown[]}`）；`GET /api/material-consumption/view?query_id=X&granularity=Y`（DuckDB regroup，no Oracle，410 on spool miss）；`POST /api/material-consumption/detail`（sync 200 when rows ≤ SYNC_ROW_LIMIT，else 202 async；response: `{query_id, rows[], pagination: {page, total_pages, total_rows, per_page}}`）；`GET /api/material-consumption/detail/page?query_id=X&page=N`；`GET /api/material-consumption/detail/job/<job_id>` → `{status: pending|running|done|failed, query_id?}`；`POST /api/material-consumption/export`（csv-stream，text/csv，DuckDB chunked，no full-memory load）。
   - Summary query always synchronous. Detail query sync ≤ `SYNC_ROW_LIMIT` (env default 30000); async Type B (RQ queue `material-consumption`) for larger sets.
@@ -314,6 +325,9 @@ breaking-change-policy: deprecate-2-minors
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.10.0]
+- resource-status-package-group (2026-05-21): Added optional `package_groups` query param to `/api/resource/status`, `/api/resource/status/summary`, `/api/resource/status/matrix`; added `package_groups[]` to `/api/resource/status/options` response; added `PACKAGEGROUPNAME: string | null` to each `/api/resource/status` record. All additive; no existing endpoints changed.
 
 ## [api 1.9.0]
 - material-part-consumption (2026-05-20): Added 7 endpoints under `/api/material-consumption` (filter-options, query, view, detail, detail/page, detail/job, export). New additive surface; no existing endpoints changed.

@@ -34,6 +34,7 @@ interface EquipmentItem {
   CAUSECODE: string;
   REPAIRCODE: string;
   STATUS_CATEGORY: string;
+  PACKAGEGROUPNAME: string | null;
 }
 
 interface LotItem {
@@ -101,6 +102,7 @@ const API_TIMEOUT = 60000;
 
 const allEquipment = ref<EquipmentItem[]>([]);
 const workcenterGroups = ref<string[]>([]);
+const packageGroups = ref<string[]>([]);
 const allResources = ref<ResourceOption[]>([]);
 const summary = ref<SummaryData>({
   totalCount: 0,
@@ -126,6 +128,7 @@ interface FilterState {
   isMonitor: boolean;
   families: string[];
   machines: string[];
+  packageGroups: string[];
 }
 
 const {
@@ -133,12 +136,13 @@ const {
   updateField,
 } = useFilterOrchestrator({
   fields: {
-    groups:       { trigger: 'immediate', initial: [] },
-    isProduction: { trigger: 'immediate', initial: false },
-    isKey:        { trigger: 'immediate', initial: false },
-    isMonitor:    { trigger: 'immediate', initial: false },
-    families:     { trigger: 'immediate', initial: [] },
-    machines:     { trigger: 'immediate', initial: [] },
+    groups:        { trigger: 'immediate', initial: [] },
+    isProduction:  { trigger: 'immediate', initial: false },
+    isKey:         { trigger: 'immediate', initial: false },
+    isMonitor:     { trigger: 'immediate', initial: false },
+    families:      { trigger: 'immediate', initial: [] },
+    machines:      { trigger: 'immediate', initial: [] },
+    packageGroups: { trigger: 'immediate', initial: [] },
   },
   dependencies: [
     { when: 'groups',       then: ['families', 'machines'], action: 'clear' },
@@ -231,6 +235,9 @@ function buildFilterParams(): Record<string, string | number> {
   if (filterState.machines.length) {
     params.resource_ids = filterState.machines.join(',');
   }
+  if (filterState.packageGroups.length) {
+    params.package_groups = filterState.packageGroups.join(',');
+  }
 
   return params;
 }
@@ -280,9 +287,10 @@ async function loadOptions() {
       timeout: API_TIMEOUT,
       silent: true,
     });
-    const data = unwrapApiResult(result, '載入篩選選項失敗') as { workcenter_groups?: unknown; resources?: unknown } | null | undefined;
+    const data = unwrapApiResult(result, '載入篩選選項失敗') as { workcenter_groups?: unknown; resources?: unknown; package_groups?: unknown } | null | undefined;
     workcenterGroups.value = Array.isArray(data?.workcenter_groups) ? (data.workcenter_groups as string[]) : [];
     allResources.value = Array.isArray(data?.resources) ? (data.resources as ResourceOption[]) : [];
+    packageGroups.value = Array.isArray(data?.package_groups) ? (data.package_groups as string[]) : [];
   } finally {
     loading.options = false;
   }
@@ -554,6 +562,10 @@ function updateMachines(machines: string[]): void {
   updateField('machines', machines || []);
 }
 
+function updatePackageGroups(groups: string[]): void {
+  updateField('packageGroups', groups || []);
+}
+
 const { resetAutoRefresh, triggerRefresh } = useAutoRefresh({
   onRefresh: () => loadData(false),
   intervalMs: 5 * 60 * 1000,
@@ -599,11 +611,14 @@ onMounted(() => {
         :machine-options="machineOptions"
         :selected-families="filterState.families"
         :selected-machines="filterState.machines"
+        :package-groups="packageGroups"
+        :selected-package-groups="filterState.packageGroups"
         :loading="loading.options || loading.refreshing"
         @change-groups="updateGroups"
         @change-flags="updateFlags"
         @change-families="updateFamilies"
         @change-machines="updateMachines"
+        @change-package-groups="updatePackageGroups"
       />
 
       <ErrorBanner :message="summaryError" @dismiss="summaryError = ''" />

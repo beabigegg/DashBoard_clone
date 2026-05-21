@@ -398,8 +398,10 @@ class TestGetWorkcenterStatusMatrix:
 class TestQueryResourceFilterOptions:
     """Tests for query_resource_filter_options using STATUS_CATEGORIES constant."""
 
-    # resource_cache functions are imported locally inside query_resource_filter_options
+    # resource_cache functions that are imported locally inside query_resource_filter_options
     _RC = 'mes_dashboard.services.resource_cache'
+    # get_package_groups is imported at module level into resource_service — patch there
+    _RS = 'mes_dashboard.services.resource_service'
 
     def test_statuses_come_from_constant(self):
         """statuses in filter options are from STATUS_CATEGORIES constant, no Oracle query."""
@@ -411,7 +413,8 @@ class TestQueryResourceFilterOptions:
                 with patch(f'{self._RC}.get_departments', return_value=['D1']):
                     with patch(f'{self._RC}.get_locations', return_value=['L1']):
                         with patch(f'{self._RC}.get_distinct_values', return_value=['Active']):
-                            result = query_resource_filter_options()
+                            with patch(f'{self._RS}.get_package_groups', return_value=['SOT-23']):
+                                result = query_resource_filter_options()
 
         assert result is not None
         assert result['statuses'] == list(STATUS_CATEGORIES)
@@ -426,8 +429,247 @@ class TestQueryResourceFilterOptions:
                 with patch(f'{self._RC}.get_departments', return_value=[]):
                     with patch(f'{self._RC}.get_locations', return_value=[]):
                         with patch(f'{self._RC}.get_distinct_values', return_value=[]):
-                            with patch('mes_dashboard.services.resource_service.read_sql_df') as mock_sql:
-                                result = query_resource_filter_options()
+                            with patch(f'{self._RS}.get_package_groups', return_value=[]):
+                                with patch('mes_dashboard.services.resource_service.read_sql_df') as mock_sql:
+                                    result = query_resource_filter_options()
 
         mock_sql.assert_not_called()
         assert result is not None
+
+    def test_returns_package_groups_list(self):
+        """test_returns_package_groups_list: query_resource_filter_options() includes
+        'package_groups' key with a list of package group name strings.
+
+        Note: get_package_groups is imported at module level into resource_service, so
+        we patch it at the resource_service namespace (not resource_cache).
+        """
+        from mes_dashboard.services.resource_service import query_resource_filter_options
+
+        with patch(f'{self._RC}.get_workcenters', return_value=[]):
+            with patch(f'{self._RC}.get_resource_families', return_value=[]):
+                with patch(f'{self._RC}.get_departments', return_value=[]):
+                    with patch(f'{self._RC}.get_locations', return_value=[]):
+                        with patch(f'{self._RC}.get_distinct_values', return_value=[]):
+                            with patch(f'{self._RS}.get_package_groups', return_value=['DFN-3', 'SOT-23']) as mock_pg:
+                                result = query_resource_filter_options()
+
+        assert result is not None
+        assert 'package_groups' in result
+        assert result['package_groups'] == ['DFN-3', 'SOT-23']
+        mock_pg.assert_called_once()
+
+    def test_package_groups_excludes_null_entries(self):
+        """test_package_groups_excludes_null_entries: get_package_groups() (which powers
+        query_resource_filter_options) returns only non-null strings (None values are never
+        added to the lookup dict during _load_package_group_lookup)."""
+        from mes_dashboard.services.resource_service import query_resource_filter_options
+
+        # Simulate get_package_groups already filtered (no nulls from lookup dict)
+        with patch(f'{self._RC}.get_workcenters', return_value=[]):
+            with patch(f'{self._RC}.get_resource_families', return_value=[]):
+                with patch(f'{self._RC}.get_departments', return_value=[]):
+                    with patch(f'{self._RC}.get_locations', return_value=[]):
+                        with patch(f'{self._RC}.get_distinct_values', return_value=[]):
+                            with patch(f'{self._RS}.get_package_groups', return_value=['SOT-23']):
+                                result = query_resource_filter_options()
+
+        assert result is not None
+        for pg in result['package_groups']:
+            assert pg is not None
+
+
+class TestGetMergedResourceStatusPackageGroup:
+    """Tests for PACKAGEGROUPNAME resolution and package_groups filter in
+    get_merged_resource_status (AC-1, AC-5)."""
+
+    def _base_resource(self, pgid=None, resource_id='R001', family='FamilyA'):
+        return {
+            'RESOURCEID': resource_id,
+            'RESOURCENAME': 'Machine1',
+            'WORKCENTERNAME': 'WC-01',
+            'RESOURCEFAMILYNAME': family,
+            'PJ_DEPARTMENT': 'Dept1',
+            'PJ_ASSETSSTATUS': 'Active',
+            'PJ_ISPRODUCTION': 1,
+            'PJ_ISKEY': 0,
+            'PJ_ISMONITOR': 0,
+            'VENDORNAME': 'Vendor1',
+            'VENDORMODEL': 'Model1',
+            'LOCATIONNAME': 'Loc1',
+            'PACKAGEGROUPID': pgid,
+        }
+
+    def _patches(self, resources, get_pkg_name_side_effect=None):
+        """Return a context manager stack for common patches."""
+        from contextlib import ExitStack
+        stack = ExitStack()
+        stack.enter_context(patch(
+            'mes_dashboard.services.resource_service.get_all_resources',
+            return_value=resources,
+        ))
+        stack.enter_context(patch(
+            'mes_dashboard.services.resource_service.get_equipment_status_lookup',
+            return_value={},
+        ))
+        stack.enter_context(patch(
+            'mes_dashboard.services.resource_service.get_all_equipment_status',
+            return_value=[],
+        ))
+        stack.enter_context(patch(
+            'mes_dashboard.services.resource_service.get_workcenter_group',
+            return_value=None,
+        ))
+        stack.enter_context(patch(
+            'mes_dashboard.services.resource_service.get_workcenter_group_sequence',
+            return_value=None,
+        ))
+        stack.enter_context(patch(
+            'mes_dashboard.services.resource_service.get_workcenter_short',
+            return_value=None,
+        ))
+        if get_pkg_name_side_effect is not None:
+            stack.enter_context(patch(
+                'mes_dashboard.services.resource_service.get_package_group_name',
+                side_effect=get_pkg_name_side_effect,
+            ))
+        else:
+            stack.enter_context(patch(
+                'mes_dashboard.services.resource_service.get_package_group_name',
+                return_value=None,
+            ))
+        return stack
+
+    def test_get_merged_resource_status_packagegroupname_resolved(self):
+        """test_packagegroupname_added_when_packagegroupid_present: When PACKAGEGROUPID is set
+        and lookup resolves it, PACKAGEGROUPNAME is present in the record with the resolved value."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [self._base_resource(pgid='P01')]
+
+        with self._patches(resources, get_pkg_name_side_effect=lambda pgid: 'SOT-23' if pgid == 'P01' else None):
+            result = get_merged_resource_status()
+
+        assert len(result) == 1
+        assert result[0]['PACKAGEGROUPNAME'] == 'SOT-23'
+
+    def test_get_merged_resource_status_packagegroupname_null_when_id_null(self):
+        """test_packagegroupname_is_none_when_packagegroupid_null: When PACKAGEGROUPID is None
+        (91% case), PACKAGEGROUPNAME must be None in the merged record."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [self._base_resource(pgid=None)]
+
+        with self._patches(resources, get_pkg_name_side_effect=lambda pgid: None):
+            result = get_merged_resource_status()
+
+        assert len(result) == 1
+        assert result[0]['PACKAGEGROUPNAME'] is None
+
+    def test_get_merged_resource_status_packagegroupname_null_when_dict_miss(self):
+        """When PACKAGEGROUPID has a value but lookup dict has no entry, PACKAGEGROUPNAME is None."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [self._base_resource(pgid='P99')]
+
+        with self._patches(resources, get_pkg_name_side_effect=lambda pgid: None):
+            result = get_merged_resource_status()
+
+        assert len(result) == 1
+        assert result[0]['PACKAGEGROUPNAME'] is None
+
+    def test_get_merged_resource_status_package_groups_filter_excludes(self):
+        """test_package_groups_filter_warm_cache_path: Passing package_groups=['SOT-23'] keeps
+        only records whose PACKAGEGROUPNAME matches; others are excluded."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [
+            self._base_resource(pgid='P01', resource_id='R001'),
+            self._base_resource(pgid='P02', resource_id='R002'),
+        ]
+
+        def _resolve(pgid):
+            return {'P01': 'SOT-23', 'P02': 'DFN-3'}.get(pgid)
+
+        with self._patches(resources, get_pkg_name_side_effect=_resolve):
+            result = get_merged_resource_status(package_groups=['SOT-23'])
+
+        assert len(result) == 1
+        assert result[0]['RESOURCEID'] == 'R001'
+        assert result[0]['PACKAGEGROUPNAME'] == 'SOT-23'
+
+    def test_get_merged_resource_status_package_groups_filter_excludes_null(self):
+        """Records with PACKAGEGROUPNAME=None are excluded when package_groups filter is active."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [
+            self._base_resource(pgid='P01', resource_id='R001'),
+            self._base_resource(pgid=None, resource_id='R002'),
+        ]
+
+        def _resolve(pgid):
+            return 'SOT-23' if pgid == 'P01' else None
+
+        with self._patches(resources, get_pkg_name_side_effect=_resolve):
+            result = get_merged_resource_status(package_groups=['SOT-23'])
+
+        assert len(result) == 1
+        assert result[0]['RESOURCEID'] == 'R001'
+
+    def test_package_groups_filter_warm_cache_path(self):
+        """Integration: package_groups filter applies on the warm-cache path (get_all_resources
+        returns cached records). Two resources, only one matches the filter."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [
+            self._base_resource(pgid='P01', resource_id='R001', family='FamilyA'),
+            self._base_resource(pgid='P02', resource_id='R002', family='FamilyB'),
+        ]
+
+        def _resolve(pgid):
+            return {'P01': 'SOT-23', 'P02': 'SOT-89'}.get(pgid)
+
+        with self._patches(resources, get_pkg_name_side_effect=_resolve):
+            result = get_merged_resource_status(package_groups=['SOT-23'])
+
+        resource_ids = [r['RESOURCEID'] for r in result]
+        assert 'R001' in resource_ids
+        assert 'R002' not in resource_ids
+
+    def test_package_groups_filter_oracle_fallback_path(self):
+        """Integration: package_groups filter applies on Oracle-fallback path.
+        Simulate get_all_resources returning records from Oracle (same code path)."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        # Oracle fallback still goes through get_all_resources — same code path applies
+        resources = [
+            self._base_resource(pgid='P01', resource_id='R001'),
+            self._base_resource(pgid='P02', resource_id='R002'),
+        ]
+
+        def _resolve(pgid):
+            return {'P01': 'SOT-23', 'P02': 'DFN-3'}.get(pgid)
+
+        with self._patches(resources, get_pkg_name_side_effect=_resolve):
+            result = get_merged_resource_status(package_groups=['DFN-3'])
+
+        assert len(result) == 1
+        assert result[0]['RESOURCEID'] == 'R002'
+        assert result[0]['PACKAGEGROUPNAME'] == 'DFN-3'
+
+    def test_package_groups_empty_list_returns_all_resources(self):
+        """An empty package_groups list (not None) must not filter anything."""
+        from mes_dashboard.services.resource_service import get_merged_resource_status
+
+        resources = [
+            self._base_resource(pgid='P01', resource_id='R001'),
+            self._base_resource(pgid=None, resource_id='R002'),
+        ]
+
+        def _resolve(pgid):
+            return 'SOT-23' if pgid == 'P01' else None
+
+        with self._patches(resources, get_pkg_name_side_effect=_resolve):
+            # Empty list is falsy → same as None → no filtering
+            result = get_merged_resource_status(package_groups=[])
+
+        assert len(result) == 2

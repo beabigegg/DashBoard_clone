@@ -40,6 +40,7 @@ interface EquipmentItem {
   CAUSECODE: string;
   REPAIRCODE: string;
   STATUS_CATEGORY: string;
+  PACKAGEGROUPNAME?: string | null;
 }
 
 interface MatrixFilter {
@@ -68,6 +69,7 @@ interface ResourceNode {
   workcenterGroup: string;
   family: string;
   resource: string | null;
+  packageGroupName: string | null;
   statusKey: string;
   statusRaw: string;
   statusCategory: string;
@@ -156,6 +158,7 @@ function buildResourceNode(eq: EquipmentItem, groupName: string, familyName: str
     workcenterGroup: groupName,
     family: familyName,
     resource: eq.RESOURCEID || null,
+    packageGroupName: eq.PACKAGEGROUPNAME ?? null,
     statusKey,
     statusRaw,
     statusCategory: String(eq.STATUS_CATEGORY || '').toLowerCase(),
@@ -387,6 +390,20 @@ const columns = computed<MatrixColumn[]>(() => {
     };
   });
 
+  const packageColumn: MatrixColumn = {
+    key: 'package',
+    label: 'Package',
+    className: 'col-package',
+    render: (node: unknown) => {
+      // TODO: type hierarchy node union
+      const n = node as ResourceNode | FamilyNode | GroupNode;
+      if (n.level === 2) {
+        return { text: (n as ResourceNode).packageGroupName || '--' };
+      }
+      return { text: '--' };
+    },
+  };
+
   const ouColumn: MatrixColumn = {
     key: 'ou',
     label: 'OU%',
@@ -409,7 +426,7 @@ const columns = computed<MatrixColumn[]>(() => {
     },
   };
 
-  return [...baseColumns, ...statusColumns, ouColumn];
+  return [...baseColumns, ...statusColumns, ouColumn, packageColumn];
 });
 
 function handleCellClick({ payload }: { payload: MatrixFilter | null }): void {

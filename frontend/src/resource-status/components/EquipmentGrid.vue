@@ -32,6 +32,7 @@ interface EquipmentItem {
   CAUSECODE: string;
   REPAIRCODE: string;
   STATUS_CATEGORY: string;
+  PACKAGEGROUPNAME: string | null;
 }
 
 interface TooltipPayload {

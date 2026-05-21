@@ -1,6 +1,6 @@
-# generated: 2026-05-20T10:39:15Z by cdd-kit 2.0.20
-# files: 795, src-lines: 219571, map-lines: 16734, compression: 13.1x
-# sources-digest: 72837e97c63fabc1f3bdd96db431ca8365c58e2f253ef368a00c7c9ec6fe2370
+# generated: 2026-05-21T05:11:05Z by cdd-kit 2.0.20
+# files: 795, src-lines: 220503, map-lines: 16778, compression: 13.1x
+# sources-digest: 18b1a71fd43da009322800b595604f30a61f09867004d1bbc3bd5e8a7aecda4b
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1664,17 +1664,17 @@ frontend/src/resource-shared/constants.ts:  # 79 lines
 
 frontend/src/resource-shared/index.ts:  # 13 lines
 
-frontend/src/resource-status/App.vue:  # 680 lines
+frontend/src/resource-status/App.vue:  # 695 lines
 
-frontend/src/resource-status/components/EquipmentCard.vue:  # 120 lines
+frontend/src/resource-status/components/EquipmentCard.vue:  # 125 lines
 
-frontend/src/resource-status/components/EquipmentGrid.vue:  # 83 lines
+frontend/src/resource-status/components/EquipmentGrid.vue:  # 84 lines
 
-frontend/src/resource-status/components/FilterBar.vue:  # 119 lines
+frontend/src/resource-status/components/FilterBar.vue:  # 135 lines
 
-frontend/src/resource-status/components/FloatingTooltip.vue:  # 358 lines
+frontend/src/resource-status/components/FloatingTooltip.vue:  # 360 lines
 
-frontend/src/resource-status/components/MatrixSection.vue:  # 457 lines
+frontend/src/resource-status/components/MatrixSection.vue:  # 474 lines
 
 frontend/src/resource-status/components/StatusHeader.vue:  # 45 lines
 
@@ -2368,11 +2368,21 @@ frontend/tests/legacy/resource-history.test.js:  # 132 lines
     - { name: calcAvailPct, lines: 28-32 }
     - { name: statusPct, lines: 34-36 }
 
-frontend/tests/legacy/resource-status.test.js:  # 114 lines
+frontend/tests/legacy/resource-status.test.js:  # 438 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
     - { module: '../../src/resource-shared/constants.js', items: [normalizeStatus, resolveOuBadgeClass, getStatusDisplay, STATUS_DISPLAY_MAP, STATUS_AGGREGATION, MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS], line: 4 }
+    - { module: '@vue/server-renderer', items: [renderToString], line: 123 }
+    - { module: vue, items: [createSSRApp, defineComponent, h], line: 124 }
+  functions:
+    - { name: async ssrRender, lines: 127-130 }
+    - { name: EquipmentCardStub, lines: 133-154 }
+    - { name: MultiSelectStub, lines: 194-210 }
+    - { name: FilterBarStub, lines: 213-238 }
+    - { name: calcOuPct, lines: 319-328 }
+    - { name: buildPackageAwareHierarchy, lines: 331-368 }
+    - { name: MatrixSectionStub, lines: 371-404 }
 
 frontend/tests/legacy/shell-navigation.test.js:  # 89 lines
   imports:
@@ -4681,7 +4691,7 @@ src/mes_dashboard/routes/resource_history_routes.py:  # 388 lines
     - { name: api_resource_history_query_progress, lines: 263-307 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
     - { name: api_resource_history_export, lines: 315-388 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
 
-src/mes_dashboard/routes/resource_routes.py:  # 464 lines
+src/mes_dashboard/routes/resource_routes.py:  # 475 lines
   imports:
     - { module: math, items: [], line: 7 }
     - { module: logging, items: [], line: 8 }
@@ -4694,22 +4704,22 @@ src/mes_dashboard/routes/resource_routes.py:  # 464 lines
     - { module: mes_dashboard.core.utils, items: [get_days_back, parse_bool_query], line: 26 }
     - { module: mes_dashboard.services.resource_service, items: [query_resource_by_status, query_resource_by_workcenter, query_resource_detail, query_resource_workcenter_status_matrix, query_resource_filter_options, get_merged_resource_status, get_resource_status_summary, get_workcenter_status_matrix, get_resource_status_values], line: 109 }
     - { module: mes_dashboard.services.filter_cache, items: [get_workcenter_groups], line: 120 }
-    - { module: mes_dashboard.services.resource_cache, items: [get_resource_families, get_resource_cascade_metadata], line: 121 }
-    - { module: mes_dashboard.config.constants, items: [STATUS_CATEGORIES], line: 125 }
+    - { module: mes_dashboard.services.resource_cache, items: [get_resource_families, get_resource_cascade_metadata, get_package_groups], line: 121 }
+    - { module: mes_dashboard.config.constants, items: [STATUS_CATEGORIES], line: 126 }
   functions:
     - { name: _clean_nan_values, lines: 29-107 }
-    - { name: _optional_bool_arg, lines: 148-155 }
-    - { name: _config_int, lines: 158-163 }
-    - { name: api_resource_by_status, lines: 167-181 }  # @resource_bp.route('/by_status')
-    - { name: api_resource_by_workcenter, lines: 185-199 }  # @resource_bp.route('/by_workcenter')
-    - { name: api_resource_workcenter_status_matrix, lines: 203-217 }  # @resource_bp.route('/workcenter_status_matrix')
-    - { name: api_resource_detail, lines: 222-257 }  # @resource_bp.route('/detail', methods=['POST'])
-    - { name: api_resource_filter_options, lines: 261-272 }  # @resource_bp.route('/filter_options')
-    - { name: api_resource_status_values, lines: 276-289 }  # @resource_bp.route('/status_values')
-    - { name: api_resource_status, lines: 298-345 }  # @resource_bp.route('/status')
-    - { name: api_resource_status_options, lines: 349-380 }  # @resource_bp.route('/status/options')
-    - { name: api_resource_status_summary, lines: 385-423 }  # @resource_bp.route('/status/summary')
-    - { name: api_resource_status_matrix, lines: 428-464 }  # @resource_bp.route('/status/matrix')
+    - { name: _optional_bool_arg, lines: 149-156 }
+    - { name: _config_int, lines: 159-164 }
+    - { name: api_resource_by_status, lines: 168-182 }  # @resource_bp.route('/by_status')
+    - { name: api_resource_by_workcenter, lines: 186-200 }  # @resource_bp.route('/by_workcenter')
+    - { name: api_resource_workcenter_status_matrix, lines: 204-218 }  # @resource_bp.route('/workcenter_status_matrix')
+    - { name: api_resource_detail, lines: 223-258 }  # @resource_bp.route('/detail', methods=['POST'])
+    - { name: api_resource_filter_options, lines: 262-273 }  # @resource_bp.route('/filter_options')
+    - { name: api_resource_status_values, lines: 277-290 }  # @resource_bp.route('/status_values')
+    - { name: api_resource_status, lines: 299-349 }  # @resource_bp.route('/status')
+    - { name: api_resource_status_options, lines: 353-385 }  # @resource_bp.route('/status/options')
+    - { name: api_resource_status_summary, lines: 390-431 }  # @resource_bp.route('/status/summary')
+    - { name: api_resource_status_matrix, lines: 436-475 }  # @resource_bp.route('/status/matrix')
 
 src/mes_dashboard/routes/spool_routes.py:  # 107 lines
   imports:
@@ -6486,7 +6496,7 @@ src/mes_dashboard/services/reject_query_job_service.py:  # 187 lines
     - { name: enqueue_reject_query, lines: 87-113 }
     - { name: execute_reject_query_job, lines: 120-187 }
 
-src/mes_dashboard/services/resource_cache.py:  # 1151 lines
+src/mes_dashboard/services/resource_cache.py:  # 1250 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
     - { module: io, items: [], line: 10 }
@@ -6513,62 +6523,65 @@ src/mes_dashboard/services/resource_cache.py:  # 1151 lines
     - { name: RESOURCE_DF_CACHE_KEY, line: 53 }
     - { name: TRUE_BUCKET, line: 54 }
     - { name: FALSE_BUCKET, line: 55 }
-    - { name: PROCESS_CACHE_MAX_SIZE, line: 132 }
-    - { name: RESOURCE_PROCESS_CACHE_MAX_SIZE, line: 133 }
-    - { name: RESOURCE_CACHE_ENABLED, line: 456 }
-    - { name: RESOURCE_SYNC_INTERVAL, line: 457 }
-    - { name: RESOURCE_INDEX_VERSION_CHECK_INTERVAL, line: 460 }
+    - { name: PROCESS_CACHE_MAX_SIZE, line: 141 }
+    - { name: RESOURCE_PROCESS_CACHE_MAX_SIZE, line: 142 }
+    - { name: RESOURCE_CACHE_ENABLED, line: 465 }
+    - { name: RESOURCE_SYNC_INTERVAL, line: 466 }
+    - { name: RESOURCE_INDEX_VERSION_CHECK_INTERVAL, line: 469 }
   classes:
     - name: _ProcessLevelCache
-      lines: 61-118
+      lines: 70-127
       methods:
-        - { name: __init__, lines: 64-68 }
-        - { name: max_size, lines: 71-72 }
-        - { name: _evict_expired_locked, lines: 74-80 }
-        - { name: get, lines: 82-94 }
-        - { name: set, lines: 96-106 }
-        - { name: invalidate, lines: 108-111 }
-        - { name: stats, lines: 113-118 }
+        - { name: __init__, lines: 73-77 }
+        - { name: max_size, lines: 80-81 }
+        - { name: _evict_expired_locked, lines: 83-89 }
+        - { name: get, lines: 91-103 }
+        - { name: set, lines: 105-115 }
+        - { name: invalidate, lines: 117-120 }
+        - { name: stats, lines: 122-127 }
   functions:
-    - { name: _resolve_cache_max_size, lines: 121-128 }
-    - { name: _new_empty_index, lines: 172-198 }
-    - { name: _invalidate_resource_index, lines: 201-204 }
-    - { name: _is_truthy_flag, lines: 207-214 }
-    - { name: _bucket_append, lines: 217-223 }
-    - { name: _estimate_dataframe_bytes, lines: 226-230 }
-    - { name: _estimate_index_bytes, lines: 233-259 }
-    - { name: _build_resource_index, lines: 262-321 }
-    - { name: _index_matches, lines: 324-337 }
-    - { name: _ensure_resource_index, lines: 340-360 }
-    - { name: _get_resource_index, lines: 363-365 }
-    - { name: _get_cache_meta, lines: 368-380 }
-    - { name: _redis_data_available, lines: 383-392 }
-    - { name: _pick_bucket_positions, lines: 395-408 }
-    - { name: _records_from_positions, lines: 411-417 }
-    - { name: _records_from_index, lines: 420-450 }
-    - { name: _get_key, lines: 465-467 }
-    - { name: _build_filter_builder, lines: 474-504 }
-    - { name: _load_from_oracle, lines: 507-524 }
-    - { name: _get_version_from_oracle, lines: 527-548 }
-    - { name: _get_version_from_redis, lines: 555-569 }
-    - { name: _sync_to_redis, lines: 572-617 }
-    - { name: _get_cached_data, lines: 620-692 }
-    - { name: refresh_cache, lines: 699-742 }
-    - { name: init_cache, lines: 745-768 }
-    - { name: get_cache_status, lines: 771-807 }
-    - { name: get_resource_index_status, lines: 814-842 }
-    - { name: get_resource_index_snapshot, lines: 845-919 }
-    - { name: get_all_resources, lines: 922-931 }
-    - { name: get_resource_by_id, lines: 934-958 }
-    - { name: get_resources_by_ids, lines: 961-980 }
-    - { name: get_resources_by_filter, lines: 983-1071 }
-    - { name: get_distinct_values, lines: 1078-1098 }
-    - { name: get_resource_families, lines: 1101-1103 }
-    - { name: get_workcenters, lines: 1106-1108 }
-    - { name: get_departments, lines: 1111-1113 }
-    - { name: get_locations, lines: 1116-1118 }
-    - { name: get_vendors, lines: 1121-1123 }
-    - { name: get_resource_cascade_metadata, lines: 1126-1151 }
+    - { name: _resolve_cache_max_size, lines: 130-137 }
+    - { name: _new_empty_index, lines: 181-207 }
+    - { name: _invalidate_resource_index, lines: 210-213 }
+    - { name: _is_truthy_flag, lines: 216-223 }
+    - { name: _bucket_append, lines: 226-232 }
+    - { name: _estimate_dataframe_bytes, lines: 235-239 }
+    - { name: _estimate_index_bytes, lines: 242-268 }
+    - { name: _build_resource_index, lines: 271-330 }
+    - { name: _index_matches, lines: 333-346 }
+    - { name: _ensure_resource_index, lines: 349-369 }
+    - { name: _get_resource_index, lines: 372-374 }
+    - { name: _get_cache_meta, lines: 377-389 }
+    - { name: _redis_data_available, lines: 392-401 }
+    - { name: _pick_bucket_positions, lines: 404-417 }
+    - { name: _records_from_positions, lines: 420-426 }
+    - { name: _records_from_index, lines: 429-459 }
+    - { name: _get_key, lines: 474-476 }
+    - { name: _build_filter_builder, lines: 483-513 }
+    - { name: _load_from_oracle, lines: 516-533 }
+    - { name: _get_version_from_oracle, lines: 536-557 }
+    - { name: _get_version_from_redis, lines: 564-578 }
+    - { name: _sync_to_redis, lines: 581-626 }
+    - { name: _get_cached_data, lines: 629-701 }
+    - { name: _load_package_group_lookup, lines: 709-745 }
+    - { name: get_package_group_name, lines: 748-775 }
+    - { name: get_package_groups, lines: 778-786 }
+    - { name: refresh_cache, lines: 793-841 }
+    - { name: init_cache, lines: 844-867 }
+    - { name: get_cache_status, lines: 870-906 }
+    - { name: get_resource_index_status, lines: 913-941 }
+    - { name: get_resource_index_snapshot, lines: 944-1018 }
+    - { name: get_all_resources, lines: 1021-1030 }
+    - { name: get_resource_by_id, lines: 1033-1057 }
+    - { name: get_resources_by_ids, lines: 1060-1079 }
+    - { name: get_resources_by_filter, lines: 1082-1170 }
+    - { name: get_distinct_values, lines: 1177-1197 }
+    - { name: get_resource_families, lines: 1200-1202 }
+    - { name: get_workcenters, lines: 1205-1207 }
+    - { name: get_departments, lines: 1210-1212 }
+    - { name: get_locations, lines: 1215-1217 }
+    - { name: get_vendors, lines: 1220-1222 }
+    - { name: get_resource_cascade_metadata, lines: 1225-1250 }
 
 src/mes_dashboard/services/resource_dataset_cache.py:  # 577 lines
   imports:
@@ -6703,7 +6716,7 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 748 lines
     - { name: try_compute_view_from_spool, lines: 508-599 }
     - { name: try_compute_query_from_canonical_spool, lines: 604-748 }
 
-src/mes_dashboard/services/resource_service.py:  # 658 lines
+src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:
     - { module: logging, items: [], line: 7 }
     - { module: os, items: [], line: 8 }
@@ -6713,21 +6726,21 @@ src/mes_dashboard/services/resource_service.py:  # 658 lines
     - { module: mes_dashboard.config.constants, items: [EXCLUDED_LOCATIONS, EXCLUDED_ASSET_STATUSES, STATUS_CATEGORIES], line: 19 }
     - { module: mes_dashboard.sql, items: [SQLLoader, QueryBuilder], line: 24 }
     - { module: mes_dashboard.sql.filters, items: [CommonFilters], line: 25 }
-    - { module: mes_dashboard.services.resource_cache, items: [get_all_resources], line: 26 }
-    - { module: mes_dashboard.services.realtime_equipment_cache, items: [get_all_equipment_status, get_equipment_status_lookup], line: 27 }
-    - { module: mes_dashboard.services.filter_cache, items: [get_workcenter_group, get_workcenter_group_sequence, get_workcenter_short, get_workcenter_groups], line: 31 }
+    - { module: mes_dashboard.services.resource_cache, items: [get_all_resources, get_package_group_name, get_package_groups], line: 26 }
+    - { module: mes_dashboard.services.realtime_equipment_cache, items: [get_all_equipment_status, get_equipment_status_lookup], line: 31 }
+    - { module: mes_dashboard.services.filter_cache, items: [get_workcenter_group, get_workcenter_group_sequence, get_workcenter_short, get_workcenter_groups], line: 35 }
   functions:
-    - { name: _is_valid_value, lines: 44-63 }
-    - { name: get_resource_latest_status_subquery, lines: 70-107 }
-    - { name: query_resource_by_status, lines: 114-132 }
-    - { name: query_resource_by_workcenter, lines: 135-153 }
-    - { name: query_resource_detail, lines: 156-248 }
-    - { name: query_resource_workcenter_status_matrix, lines: 251-277 }
-    - { name: query_resource_filter_options, lines: 280-323 }
-    - { name: get_resource_status_values, lines: 326-352 }
-    - { name: get_merged_resource_status, lines: 359-489 }
-    - { name: get_resource_status_summary, lines: 492-586 }
-    - { name: get_workcenter_status_matrix, lines: 589-658 }
+    - { name: _is_valid_value, lines: 48-67 }
+    - { name: get_resource_latest_status_subquery, lines: 74-111 }
+    - { name: query_resource_by_status, lines: 118-136 }
+    - { name: query_resource_by_workcenter, lines: 139-157 }
+    - { name: query_resource_detail, lines: 160-252 }
+    - { name: query_resource_workcenter_status_matrix, lines: 255-281 }
+    - { name: query_resource_filter_options, lines: 284-329 }
+    - { name: get_resource_status_values, lines: 332-358 }
+    - { name: get_merged_resource_status, lines: 365-504 }
+    - { name: get_resource_status_summary, lines: 507-604 }
+    - { name: get_workcenter_status_matrix, lines: 607-679 }
 
 src/mes_dashboard/services/rq_monitor_service.py:  # 247 lines
   imports:
@@ -12870,7 +12883,7 @@ tests/test_modernization_policy_hardening.py:  # 97 lines
         - { name: _load_asset_manifest, lines: 56-66 }
         - { name: _load_page_status, lines: 68-76 }
         - { name: test_asset_readiness_manifest_contains_material_consumption_key, lines: 78-84 }
-        - { name: test_page_status_contains_material_consumption_in_drawer2, lines: 86-97 }
+        - { name: test_page_status_contains_material_consumption_in_drawer, lines: 86-97 }
   functions:
     - { name: test_scope_matrix_loader_returns_defensive_copy, lines: 11-25 }
     - { name: test_scope_matrix_cache_refresh_requires_explicit_clear, lines: 28-45 }
@@ -14816,88 +14829,99 @@ tests/test_resilience.py:  # 58 lines
     - { name: test_summarize_restart_history_counts_entries_in_window, lines: 26-38 }
     - { name: test_build_recovery_recommendation_for_pool_churn_and_cooldown, lines: 41-58 }
 
-tests/test_resource_cache.py:  # 665 lines
+tests/test_resource_cache.py:  # 773 lines
   imports:
     - { module: pytest, items: [], line: 7 }
-    - { module: unittest.mock, items: [patch, MagicMock], line: 8 }
-    - { module: pandas, items: [], line: 9 }
-    - { module: json, items: [], line: 10 }
+    - { module: time, items: [], line: 8 }
+    - { module: unittest.mock, items: [patch, MagicMock], line: 9 }
+    - { module: pandas, items: [], line: 10 }
+    - { module: json, items: [], line: 11 }
   classes:
+    - name: TestPackageGroupLookup
+      lines: 14-118
+      methods:
+        - { name: _reset_pkg_state, lines: 17-20 }
+        - { name: test_package_group_lookup_dict_build, lines: 22-38 }
+        - { name: test_package_group_lookup_dict_ttl_independent, lines: 40-62 }
+        - { name: test_package_group_lookup_char_key_normalization, lines: 64-79 }
+        - { name: test_get_package_groups_returns_sorted_list, lines: 81-92 }
+        - { name: test_package_group_lookup_null_pgid_returns_none, lines: 94-103 }
+        - { name: test_package_group_lookup_char_trailing_space, lines: 105-118 }
     - name: TestGetDistinctValues
-      lines: 13-97
+      lines: 121-205
       methods:
-        - { name: reset_modules, lines: 17-22 }
-        - { name: test_returns_sorted_unique_values, lines: 24-38 }
-        - { name: test_excludes_none_and_empty_strings, lines: 40-54 }
-        - { name: test_handles_nan_values, lines: 56-71 }
-        - { name: test_handles_mixed_types, lines: 73-88 }
-        - { name: test_returns_empty_list_when_no_resources, lines: 90-97 }
+        - { name: reset_modules, lines: 125-130 }
+        - { name: test_returns_sorted_unique_values, lines: 132-146 }
+        - { name: test_excludes_none_and_empty_strings, lines: 148-162 }
+        - { name: test_handles_nan_values, lines: 164-179 }
+        - { name: test_handles_mixed_types, lines: 181-196 }
+        - { name: test_returns_empty_list_when_no_resources, lines: 198-205 }
     - name: TestConvenienceMethods
-      lines: 100-131
+      lines: 208-239
       methods:
-        - { name: test_get_resource_families_calls_get_distinct_values, lines: 103-111 }
-        - { name: test_get_workcenters_calls_get_distinct_values, lines: 113-121 }
-        - { name: test_get_departments_calls_get_distinct_values, lines: 123-131 }
+        - { name: test_get_resource_families_calls_get_distinct_values, lines: 211-219 }
+        - { name: test_get_workcenters_calls_get_distinct_values, lines: 221-229 }
+        - { name: test_get_departments_calls_get_distinct_values, lines: 231-239 }
     - name: TestGetAllResources
-      lines: 134-200
+      lines: 242-308
       methods:
-        - { name: reset_modules, lines: 138-143 }
-        - { name: test_returns_cached_data_when_available, lines: 145-164 }
-        - { name: test_falls_back_to_oracle_when_cache_miss, lines: 166-185 }
-        - { name: test_returns_empty_when_both_unavailable, lines: 187-200 }
+        - { name: reset_modules, lines: 246-251 }
+        - { name: test_returns_cached_data_when_available, lines: 253-272 }
+        - { name: test_falls_back_to_oracle_when_cache_miss, lines: 274-293 }
+        - { name: test_returns_empty_when_both_unavailable, lines: 295-308 }
     - name: TestGetResourceById
-      lines: 203-233
+      lines: 311-341
       methods:
-        - { name: test_returns_matching_resource, lines: 206-220 }
-        - { name: test_returns_none_when_not_found, lines: 222-233 }
+        - { name: test_returns_matching_resource, lines: 314-328 }
+        - { name: test_returns_none_when_not_found, lines: 330-341 }
     - name: TestGetResourcesByIds
-      lines: 236-269
+      lines: 344-377
       methods:
-        - { name: test_returns_matching_resources, lines: 239-255 }
-        - { name: test_ignores_missing_ids, lines: 257-269 }
+        - { name: test_returns_matching_resources, lines: 347-363 }
+        - { name: test_ignores_missing_ids, lines: 365-377 }
     - name: TestGetResourcesByFilter
-      lines: 272-344
+      lines: 380-452
       methods:
-        - { name: _legacy_snapshot, lines: 276-279 }
-        - { name: test_filters_by_workcenter, lines: 281-295 }
-        - { name: test_filters_by_family, lines: 297-311 }
-        - { name: test_filters_by_production_flag, lines: 313-327 }
-        - { name: test_combines_multiple_filters, lines: 329-344 }
+        - { name: _legacy_snapshot, lines: 384-387 }
+        - { name: test_filters_by_workcenter, lines: 389-403 }
+        - { name: test_filters_by_family, lines: 405-419 }
+        - { name: test_filters_by_production_flag, lines: 421-435 }
+        - { name: test_combines_multiple_filters, lines: 437-452 }
     - name: TestGetCacheStatus
-      lines: 347-386
+      lines: 455-494
       methods:
-        - { name: reset_modules, lines: 351-356 }
-        - { name: test_returns_disabled_when_cache_disabled, lines: 358-366 }
-        - { name: test_returns_loaded_status_when_data_exists, lines: 368-386 }
+        - { name: reset_modules, lines: 459-464 }
+        - { name: test_returns_disabled_when_cache_disabled, lines: 466-474 }
+        - { name: test_returns_loaded_status_when_data_exists, lines: 476-494 }
     - name: TestRefreshCache
-      lines: 389-466
+      lines: 497-574
       methods:
-        - { name: reset_modules, lines: 393-398 }
-        - { name: test_returns_false_when_disabled, lines: 400-407 }
-        - { name: test_skips_sync_when_version_unchanged, lines: 409-424 }
-        - { name: test_syncs_when_version_changed, lines: 426-445 }
-        - { name: test_force_sync_ignores_version, lines: 447-466 }
+        - { name: reset_modules, lines: 501-506 }
+        - { name: test_returns_false_when_disabled, lines: 508-515 }
+        - { name: test_skips_sync_when_version_unchanged, lines: 517-532 }
+        - { name: test_syncs_when_version_changed, lines: 534-553 }
+        - { name: test_force_sync_ignores_version, lines: 555-574 }
     - name: TestBuildFilterBuilder
-      lines: 469-536
+      lines: 577-644
       methods:
-        - { name: test_includes_equipment_type_filter, lines: 472-481 }
-        - { name: test_includes_location_filter, lines: 483-494 }
-        - { name: test_includes_asset_status_filter, lines: 496-507 }
-        - { name: test_resource_load_uses_shared_sql_fragment_template, lines: 509-518 }
-        - { name: test_resource_version_sql_replaces_where_clause_placeholder, lines: 520-536 }
+        - { name: test_includes_equipment_type_filter, lines: 580-589 }
+        - { name: test_includes_location_filter, lines: 591-602 }
+        - { name: test_includes_asset_status_filter, lines: 604-615 }
+        - { name: test_resource_load_uses_shared_sql_fragment_template, lines: 617-626 }
+        - { name: test_resource_version_sql_replaces_where_clause_placeholder, lines: 628-644 }
     - name: TestResourceDerivedIndex
-      lines: 539-638
+      lines: 647-746
       methods:
-        - { name: reset_state, lines: 543-549 }
-        - { name: test_get_resource_by_id_uses_index_snapshot, lines: 551-564 }
-        - { name: test_get_cache_status_includes_derived_index_freshness, lines: 566-592 }
-        - { name: test_index_rebuilds_when_redis_version_changes, lines: 594-623 }
-        - { name: test_normalized_index_does_not_store_full_records_copy, lines: 625-638 }
+        - { name: reset_state, lines: 651-657 }
+        - { name: test_get_resource_by_id_uses_index_snapshot, lines: 659-672 }
+        - { name: test_get_cache_status_includes_derived_index_freshness, lines: 674-700 }
+        - { name: test_index_rebuilds_when_redis_version_changes, lines: 702-731 }
+        - { name: test_normalized_index_does_not_store_full_records_copy, lines: 733-746 }
     - name: TestResourceProcessLevelCache
-      lines: 641-665
+      lines: 749-773
       methods:
-        - { name: test_lru_eviction_prefers_recent_keys, lines: 644-659 }
-        - { name: test_resource_process_cache_uses_bounded_config, lines: 661-665 }
+        - { name: test_lru_eviction_prefers_recent_keys, lines: 752-767 }
+        - { name: test_resource_process_cache_uses_bounded_config, lines: 769-773 }
 
 tests/test_resource_dataset_cache.py:  # 468 lines
   imports:
@@ -15182,7 +15206,7 @@ tests/test_resource_history_sql_runtime.py:  # 87 lines
         - { name: test_primary_namespace, lines: 83-84 }
         - { name: test_oee_namespace, lines: 86-87 }
 
-tests/test_resource_routes.py:  # 148 lines
+tests/test_resource_routes.py:  # 219 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
@@ -15199,8 +15223,13 @@ tests/test_resource_routes.py:  # 148 lines
     - { name: test_resource_detail_rejects_limit_over_configured_max, lines: 108-120 }  # @patch('mes_dashboard.routes.resource_routes.query_resource_detail')
     - { name: test_resource_detail_rejects_invalid_limit_type, lines: 124-134 }  # @patch('mes_dashboard.routes.resource_routes.query_resource_detail')
     - { name: test_resource_detail_rejects_negative_offset, lines: 138-148 }  # @patch('mes_dashboard.routes.resource_routes.query_resource_detail')
+    - { name: test_resource_status_route_forwards_package_groups_kwarg, lines: 157-165 }  # @patch('mes_dashboard.routes.resource_routes.get_merged_resource_status', return_...
+    - { name: test_resource_status_package_groups_non_default_value_forwarded, lines: 169-176 }  # @patch('mes_dashboard.routes.resource_routes.get_merged_resource_status', return_...
+    - { name: test_resource_status_summary_route_forwards_package_groups_kwarg, lines: 183-190 }  # @patch('mes_dashboard.routes.resource_routes.get_resource_status_summary', return...
+    - { name: test_resource_status_matrix_route_forwards_package_groups_kwarg, lines: 194-201 }  # @patch('mes_dashboard.routes.resource_routes.get_workcenter_status_matrix', retur...
+    - { name: test_resource_status_options_returns_package_groups_field, lines: 208-219 }  # @patch('mes_dashboard.routes.resource_routes.get_package_groups', return_value=['...
 
-tests/test_resource_service.py:  # 433 lines
+tests/test_resource_service.py:  # 675 lines
   imports:
     - { module: unittest.mock, items: [patch], line: 7 }
   classes:
@@ -15232,10 +15261,25 @@ tests/test_resource_service.py:  # 433 lines
         - { name: test_builds_matrix_by_workcenter_and_status, lines: 348-378 }
         - { name: test_handles_unknown_status, lines: 380-395 }
     - name: TestQueryResourceFilterOptions
-      lines: 398-433
+      lines: 398-478
       methods:
-        - { name: test_statuses_come_from_constant, lines: 404-418 }
-        - { name: test_no_read_sql_df_call_for_statuses, lines: 420-433 }
+        - { name: test_statuses_come_from_constant, lines: 406-421 }
+        - { name: test_no_read_sql_df_call_for_statuses, lines: 423-437 }
+        - { name: test_returns_package_groups_list, lines: 439-459 }
+        - { name: test_package_groups_excludes_null_entries, lines: 461-478 }
+    - name: TestGetMergedResourceStatusPackageGroup
+      lines: 481-675
+      methods:
+        - { name: _base_resource, lines: 485-500 }
+        - { name: _patches, lines: 502-540 }
+        - { name: test_get_merged_resource_status_packagegroupname_resolved, lines: 542-553 }
+        - { name: test_get_merged_resource_status_packagegroupname_null_when_id_null, lines: 555-566 }
+        - { name: test_get_merged_resource_status_packagegroupname_null_when_dict_miss, lines: 568-578 }
+        - { name: test_get_merged_resource_status_package_groups_filter_excludes, lines: 580-598 }
+        - { name: test_get_merged_resource_status_package_groups_filter_excludes_null, lines: 600-616 }
+        - { name: test_package_groups_filter_warm_cache_path, lines: 618-636 }
+        - { name: test_package_groups_filter_oracle_fallback_path, lines: 638-657 }
+        - { name: test_package_groups_empty_list_returns_all_resources, lines: 659-675 }
 
 tests/test_rq_monitor_service.py:  # 224 lines
   imports:

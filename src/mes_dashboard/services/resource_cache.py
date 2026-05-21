@@ -55,6 +55,15 @@ TRUE_BUCKET = "1"
 FALSE_BUCKET = "0"
 
 # ============================================================
+# Package-Group Lookup Dict (IP-1: 7-day TTL, independent of 24h resource-cache cycle)
+# ============================================================
+
+_PACKAGE_GROUP_SYNC_INTERVAL: int = 604_800  # 7 days in seconds
+_package_group_lookup: dict[str, str] = {}
+_package_group_refreshed_at: float = 0.0
+_package_group_lock: threading.Lock = threading.Lock()
+
+# ============================================================
 # Process-Level Cache (Prevents redundant JSON parsing)
 # ============================================================
 
@@ -693,6 +702,91 @@ def _get_cached_data() -> pd.DataFrame | None:
 
 
 # ============================================================
+# Package-Group Lookup Functions (IP-2..IP-4)
+# ============================================================
+
+
+def _load_package_group_lookup() -> None:
+    """Query DWH.DW_MES_RESOURCE_PACKAGEGROUP and build the in-process lookup dict.
+
+    Uses `read_sql_df` (already imported). Strips CHAR trailing spaces from PACKAGEGROUPID
+    keys (AC-5/R-4). On failure, logs and leaves the existing dict unchanged (AC-7/R-5).
+    Sets `_package_group_refreshed_at` on success so the 7-day TTL advances independently
+    of the 24h resource_cache cycle (AC-6/R-3).
+    """
+    global _package_group_lookup, _package_group_refreshed_at
+
+    sql = "SELECT PACKAGEGROUPID, PACKAGEGROUPNAME FROM DWH.DW_MES_RESOURCE_PACKAGEGROUP"
+    try:
+        with _package_group_lock:
+            df = read_sql_df(sql, {}, caller="resource_cache:package_group_lookup")
+            if df is None or df.empty:
+                logger.warning("_load_package_group_lookup: query returned empty result")
+                _package_group_refreshed_at = time.time()
+                return
+
+            lookup: dict[str, str] = {}
+            for _, row in df.iterrows():
+                pgid = row.get('PACKAGEGROUPID')
+                pgname = row.get('PACKAGEGROUPNAME')
+                if pgid is not None and pgname is not None:
+                    key = str(pgid).strip()
+                    if key:
+                        lookup[key] = str(pgname)
+
+            _package_group_lookup = lookup
+            _package_group_refreshed_at = time.time()
+            logger.info("_load_package_group_lookup: loaded %d package groups", len(lookup))
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "_load_package_group_lookup failed, leaving existing lookup unchanged: %s",
+            exc,
+            exc_info=True,
+        )
+
+
+def get_package_group_name(pgid: str | None) -> str | None:
+    """Resolve a PACKAGEGROUPID to its PACKAGEGROUPNAME.
+
+    Returns None when:
+    - pgid is None, NaN, or empty (91% of resources; AC-5 NULL semantics)
+    - the lookup dict has no matching entry (AC-5 miss)
+
+    Triggers a reload when the 7-day TTL has expired (AC-6/R-3).
+    Strips Oracle CHAR trailing spaces from pgid before lookup (AC-5/R-4).
+    """
+    if pgid is None:
+        return None
+
+    # Guard against float NaN values that may arrive from pandas rows
+    try:
+        if pgid != pgid:  # NaN != NaN
+            return None
+    except Exception:  # noqa: BLE001
+        return None
+
+    key = str(pgid).strip()
+    if not key:
+        return None
+
+    if time.time() - _package_group_refreshed_at > _PACKAGE_GROUP_SYNC_INTERVAL:
+        _load_package_group_lookup()
+
+    return _package_group_lookup.get(key)
+
+
+def get_package_groups() -> list[str]:
+    """Return sorted distinct PACKAGEGROUPNAME values from the lookup dict.
+
+    Triggers a TTL reload when the 7-day interval has expired (AC-6).
+    """
+    if time.time() - _package_group_refreshed_at > _PACKAGE_GROUP_SYNC_INTERVAL:
+        _load_package_group_lookup()
+
+    return sorted(_package_group_lookup.values())
+
+
+# ============================================================
 # Cache Management API
 # ============================================================
 
@@ -734,6 +828,11 @@ def refresh_cache(force: bool = False) -> bool:
         if df is None or df.empty:
             logger.error("Failed to load resources from Oracle")
             return False
+
+        # IP-5: refresh package-group lookup only when its own 7-day TTL has expired.
+        # Do NOT reload on every 24h resource_cache refresh — keeps the timers independent (AC-6/R-3).
+        if time.time() - _package_group_refreshed_at > _PACKAGE_GROUP_SYNC_INTERVAL:
+            _load_package_group_lookup()
 
         return _sync_to_redis(df, oracle_version)
 

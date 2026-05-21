@@ -1,0 +1,12 @@
+agent: test-strategist
+change-id: resource-status-package-group
+date: 2026-05-21
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/resource-status-package-group/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_resource_cache.py ↔ src/mes_dashboard/services/resource_cache.py" }
+  - { type: tdd-pairs, pointer: "tests/test_resource_service.py ↔ src/mes_dashboard/services/resource_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_resource_routes.py ↔ src/mes_dashboard/routes/resource_routes.py" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/resource-status.test.js ↔ frontend/src/resource-status/components/{FilterBar,EquipmentCard,MatrixSection}.vue" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, data-boundary" }
+  - { type: mapping-completeness, pointer: "all 7 acceptance criteria (AC-1 through AC-7) mapped to at least one test family and named test" }

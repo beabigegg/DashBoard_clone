@@ -1,0 +1,21 @@
+agent: frontend-engineer
+change-id: resource-status-package-group
+timestamp: 2026-05-21
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/resource-status/components/FilterBar.vue" }
+  - { type: files-changed, pointer: "frontend/src/resource-status/components/EquipmentCard.vue" }
+  - { type: files-changed, pointer: "frontend/src/resource-status/components/MatrixSection.vue" }
+  - { type: files-changed, pointer: "frontend/src/resource-status/components/EquipmentGrid.vue" }
+  - { type: files-changed, pointer: "frontend/src/resource-status/App.vue" }
+  - { type: files-changed, pointer: "frontend/tests/legacy/resource-status.test.js" }
+  - { type: components-affected, pointer: "FilterBar, EquipmentCard, MatrixSection, EquipmentGrid, App (resource-status)" }
+  - { type: screenshot-paths, pointer: "n/a (no visual screenshot generated; visual review deferred to ui-ux-reviewer)" }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements; Package Group MultiSelect reuses shared MultiSelect.vue which has existing a11y coverage)" }
+
+test-results:
+  vitest: "44 test files passed, 413 passed 1 skipped"
+  legacy: "242 tests passed, 0 failed — 7 new tests added"
+  css-check: "PASS 0 errors, 0 unscoped feature-CSS rules"
+  type-check: "PASS (vue-tsc --noEmit clean)"
+  build: "PASS (built in 10.93s)"

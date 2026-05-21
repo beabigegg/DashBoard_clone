@@ -146,3 +146,74 @@ def test_resource_detail_rejects_negative_offset(mock_query):
     assert payload["success"] is False
     assert "offset" in payload["error"]["message"]
     mock_query.assert_not_called()
+
+
+# ============================================================
+# Package Group Route Tests (resource-status-package-group)
+# ============================================================
+
+
+@patch("mes_dashboard.routes.resource_routes.get_merged_resource_status", return_value=[])
+def test_resource_status_route_forwards_package_groups_kwarg(mock_service):
+    """test_resource_status_forwards_package_groups_kwarg: /api/resource/status must parse
+    ?package_groups= and forward package_groups kwarg to get_merged_resource_status.
+    Uses a non-default value per CLAUDE.md route-forwarding discipline."""
+    response = _client().get("/api/resource/status?package_groups=SOT-23")
+
+    assert response.status_code == 200
+    mock_service.assert_called_once()
+    assert mock_service.call_args.kwargs['package_groups'] == ['SOT-23']
+
+
+@patch("mes_dashboard.routes.resource_routes.get_merged_resource_status", return_value=[])
+def test_resource_status_package_groups_non_default_value_forwarded(mock_service):
+    """test_resource_status_package_groups_non_default_value_forwarded: Multiple values
+    in comma-separated ?package_groups= are correctly split and forwarded."""
+    response = _client().get("/api/resource/status?package_groups=SOT-23,DFN-3")
+
+    assert response.status_code == 200
+    mock_service.assert_called_once()
+    assert mock_service.call_args.kwargs['package_groups'] == ['SOT-23', 'DFN-3']
+
+
+@patch("mes_dashboard.routes.resource_routes.get_resource_status_summary", return_value={
+    'total_count': 0, 'by_status_category': {}, 'by_status': {}, 'by_workcenter_group': {},
+    'with_active_job': 0, 'with_wip': 0, 'ou_pct': 0, 'availability_pct': 0,
+})
+def test_resource_status_summary_route_forwards_package_groups_kwarg(mock_service):
+    """test_resource_status_summary_route_forwards_package_groups_kwarg: /api/resource/status/summary
+    must parse ?package_groups= and forward package_groups kwarg to get_resource_status_summary."""
+    response = _client().get("/api/resource/status/summary?package_groups=SOT-23")
+
+    assert response.status_code == 200
+    mock_service.assert_called_once()
+    assert mock_service.call_args.kwargs['package_groups'] == ['SOT-23']
+
+
+@patch("mes_dashboard.routes.resource_routes.get_workcenter_status_matrix", return_value=[])
+def test_resource_status_matrix_route_forwards_package_groups_kwarg(mock_service):
+    """test_resource_status_matrix_route_forwards_package_groups_kwarg: /api/resource/status/matrix
+    must parse ?package_groups= and forward package_groups kwarg to get_workcenter_status_matrix."""
+    response = _client().get("/api/resource/status/matrix?package_groups=SOT-23")
+
+    assert response.status_code == 200
+    mock_service.assert_called_once()
+    assert mock_service.call_args.kwargs['package_groups'] == ['SOT-23']
+
+
+@patch("mes_dashboard.routes.resource_routes.get_package_groups", return_value=['DFN-3', 'SOT-23'])
+@patch("mes_dashboard.routes.resource_routes.get_workcenter_groups", return_value=[])
+@patch("mes_dashboard.routes.resource_routes.get_resource_families", return_value=[])
+@patch("mes_dashboard.routes.resource_routes.get_resource_cascade_metadata", return_value=[])
+def test_resource_status_options_returns_package_groups_field(
+    mock_cascade, mock_families, mock_wc_groups, mock_pkg_groups
+):
+    """test_resource_filter_options_returns_package_groups_field: /api/resource/status/options
+    must include 'package_groups' key in the response data object."""
+    response = _client().get("/api/resource/status/options")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert "package_groups" in payload["data"]
+    assert payload["data"]["package_groups"] == ['DFN-3', 'SOT-23']
