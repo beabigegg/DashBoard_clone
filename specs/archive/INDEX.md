@@ -38,3 +38,4 @@
 | admin-dashboard-ux | 2026 | 2026-05-19 | specs/archive/2026/admin-dashboard-ux/ |
 | admin-perf-detail-ui | 2026 | 2026-05-19 | specs/archive/2026/admin-perf-detail-ui/ |
 | material-part-consumption | 2026 | 2026-05-20 | specs/archive/2026/material-part-consumption/ |
+| resource-status-package-group | 2026 | 2026-05-21 | specs/archive/2026/resource-status-package-group/ |

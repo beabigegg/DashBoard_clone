@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.4.0
+schema-version: 1.5.0
 last-changed: 2026-05-21
 breaking-change-policy: deprecate-2-minors
 ---
@@ -41,6 +41,7 @@ breaking-change-policy: deprecate-2-minors
 | 4.1 | 功能區塊的樣式檔（如 `resource-shared/styles.css`）**嚴禁**包含 `html`, `body`, `*` 等全域標籤的樣式 |
 | 4.2 | 每個主要功能區塊必須定義唯一「主題根類別」（如 `.theme-resource`, `.theme-wip`），應用於最外層容器 |
 | 4.3 | 功能區塊所有樣式規則必須以主題根類別為父選擇器，防止洩漏 |
+| 4.4 | `<Teleport to="body">` 將 DOM 節點移出功能根元素，使 `.theme-<feature> .component` 子孫選擇器失效。必須在 Teleport 傳送內容的最外層包一個 `<div class="theme-<feature>">` wrapper（無額外 styling），為所有子孫 CSS 規則提供作用域祖先。切勿將 `theme-<feature>` 與元件類別寫在同一元素上（`.theme-x.component` 合併選擇器不符合現有 CSS 寫法）。Evidence: `FloatingTooltip.vue` fix, `resource-status-package-group`. |
 
 ## 基礎樣式
 
@@ -139,6 +140,9 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.5.0]
+- resource-status-package-group (2026-05-21): Added rule 4.4 — `<Teleport to="body">` CSS scoping: teleported content must be wrapped in `<div class="theme-<feature>">` ancestor so all descendant CSS selectors resolve correctly. Evidence: `FloatingTooltip.vue` fix; `frontend/src/resource-status/style.css` descendant selectors.
 
 ## [css 1.4.0]
 - resource-status-package-group (2026-05-21): Added "Resource-Status UI Surface Rules" section documenting FilterBar Package Group MultiSelect, EquipmentCard PACKAGEGROUPNAME text row (hide when null), and MatrixSection Package dimension scoping requirements. All rules enforce existing `.theme-resource` scope contract; no new CSS source file; css-inventory.md unchanged.

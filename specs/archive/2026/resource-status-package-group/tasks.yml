@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "All Tier 1 commands pass locally; CI runs identical commands per ci-gates.md" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "type-check informational pass confirmed by frontend-engineer" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly/manual gates defined for this change" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "3 lessons promoted: resource-options inline dict (CLAUDE.md), Oracle CHAR strip both sides (CLAUDE.md), Teleport CSS ancestor wrapper (css-contract.md rule 4.4 + CLAUDE.md)" }

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 161
-visible-files: 760
+visible-files: 778
 omitted-dirs: 55
 truncated-dirs: 4
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -532,6 +532,33 @@ DashBoard_vite/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
+|   |-- archive/
+|   |   |-- access_20260521_115836.log
+|   |   |-- error_20260521_115836.log
+|   |   |-- rq_msd_worker_20260521_115836.log
+|   |   |-- rq_prod_hist_worker_20260521_115836.log
+|   |   |-- rq_reject_worker_20260521_115836.log
+|   |   |-- rq_worker_20260521_115836.log
+|   |   |-- rq_yield_alert_worker_20260521_115836.log
+|   |   \-- watchdog_20260521_115836.log
+|   |-- access.log
+|   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
+|   |-- error.log
+|   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
+|   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
+|   |-- rq_msd_worker.log
+|   |-- rq_prod_hist_worker.log
+|   |-- rq_reject_worker.log
+|   |-- rq_worker.log
+|   |-- rq_yield_alert_worker.log
+|   |-- startup.log
+|   \-- watchdog.log
 |-- scripts/
 |   |-- capture_spool_snapshot.py
 |   |-- deploy.sh
@@ -921,18 +948,8 @@ DashBoard_vite/
 |   |-- query_spool/
 |   |   |-- anomaly_resource_dataset/
 |   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- material_consumption_detail/
-|   |   |   |-- 101cccc0d82186b0.parquet
-|   |   |   |-- 73dbeab3e07d3143.parquet
-|   |   |   |-- d36b0ab051fce642.parquet
-|   |   |   \-- f1fcac9b7cc12559.parquet
 |   |   |-- material_consumption_summary/
-|   |   |   |-- 134ce682a624c91e.parquet
-|   |   |   |-- 24fba4ef206b81b2.parquet
-|   |   |   |-- 48def8a793c594af.parquet
-|   |   |   |-- e25f0fc14bf7a5c0.parquet
-|   |   |   |-- e3fdd668c64fe659.parquet
-|   |   |   \-- ee8bf6cd7f7ce1d8.parquet
+|   |   |   \-- 01a419324f3fe08f.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -980,7 +997,8 @@ DashBoard_vite/
 |   |   |-- probe_113869.json
 |   |   |-- probe_116133.json
 |   |   |-- probe_116787.json
-|   |   \-- ... (504 more entries truncated; cap=50)
+|   |   |-- probe_116823.json
+|   |   \-- ... (512 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
 |   \-- resource_history.duckdb
 |-- tools/
