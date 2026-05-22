@@ -39,3 +39,4 @@
 | admin-perf-detail-ui | 2026 | 2026-05-19 | specs/archive/2026/admin-perf-detail-ui/ |
 | material-part-consumption | 2026 | 2026-05-20 | specs/archive/2026/material-part-consumption/ |
 | resource-status-package-group | 2026 | 2026-05-21 | specs/archive/2026/resource-status-package-group/ |
+| add-package-detail-tables | 2026 | 2026-05-22 | specs/archive/2026/add-package-detail-tables/ |

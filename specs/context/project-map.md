@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 161
-visible-files: 778
+visible-files: 780
 omitted-dirs: 55
 truncated-dirs: 4
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -65,6 +65,7 @@ DashBoard_vite/
 |   |   |-- 0e749cfd569a40b7
 |   |   |-- 0f2d4ac438e36262
 |   |   |-- 0fb4599ed66628f4
+|   |   |-- 11326b1300e7c559
 |   |   |-- 15a2721810beed32
 |   |   |-- 17a6952f61650689
 |   |   |-- 1fcb892092629696
@@ -93,13 +94,12 @@ DashBoard_vite/
 |   |   |-- 3dc02da381254368
 |   |   |-- 4093a4056e3ed640
 |   |   |-- 40bd549cffe1dc41
+|   |   |-- 4104bc5ffa6b7168
 |   |   |-- 41d662f99bd58f37
+|   |   |-- 432ffc6b1d3385af
 |   |   |-- 436a639fd17d1c38
 |   |   |-- 46b03a60678f44dd
-|   |   |-- 471dc2d32d0357fb
-|   |   |-- 47b65f8dbbcf8e4a
-|   |   |-- 4a9dd532b412d992
-|   |   \-- ... (90 more entries truncated; cap=50)
+|   |   \-- ... (100 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -534,21 +534,25 @@ DashBoard_vite/
 |-- logs/
 |   |-- archive/
 |   |   |-- access_20260521_115836.log
+|   |   |-- access_20260522_081950.log
 |   |   |-- error_20260521_115836.log
+|   |   |-- error_20260522_081950.log
 |   |   |-- rq_msd_worker_20260521_115836.log
+|   |   |-- rq_msd_worker_20260522_081950.log
 |   |   |-- rq_prod_hist_worker_20260521_115836.log
+|   |   |-- rq_prod_hist_worker_20260522_081950.log
 |   |   |-- rq_reject_worker_20260521_115836.log
+|   |   |-- rq_reject_worker_20260522_081950.log
 |   |   |-- rq_worker_20260521_115836.log
+|   |   |-- rq_worker_20260522_081950.log
 |   |   |-- rq_yield_alert_worker_20260521_115836.log
-|   |   \-- watchdog_20260521_115836.log
+|   |   |-- rq_yield_alert_worker_20260522_081950.log
+|   |   |-- watchdog_20260521_115836.log
+|   |   \-- watchdog_20260522_081950.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
 |   |-- metrics_history.sqlite-shm
 |   |-- metrics_history.sqlite-wal
@@ -946,10 +950,8 @@ DashBoard_vite/
 |   \-- ... (157 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
-|   |   |-- anomaly_resource_dataset/
-|   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- material_consumption_summary/
-|   |   |   \-- 01a419324f3fe08f.parquet
+|   |   |-- msd-events/
+|   |   |-- production_history/
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -998,7 +1000,7 @@ DashBoard_vite/
 |   |   |-- probe_116133.json
 |   |   |-- probe_116787.json
 |   |   |-- probe_116823.json
-|   |   \-- ... (512 more entries truncated; cap=50)
+|   |   \-- ... (530 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
 |   \-- resource_history.duckdb
 |-- tools/
