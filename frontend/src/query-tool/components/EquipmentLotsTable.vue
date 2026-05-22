@@ -35,6 +35,7 @@ const COLUMN_DEFS = Object.freeze([
   { key: 'WAFER_LOT_ID', label: 'WAFER LOT' },
   { key: 'PJ_TYPE', label: 'TYPE' },
   { key: 'PJ_BOP', label: 'BOP' },
+  { key: 'PRODUCTLINENAME', label: 'PACKAGE' },
   { key: 'SPECNAME', label: 'SPECNAME' },
   { key: 'PJ_WORKORDER', label: 'WORKORDER' },
   { key: 'TRACKINTIMESTAMP', label: 'TRACKINTIMESTAMP' },

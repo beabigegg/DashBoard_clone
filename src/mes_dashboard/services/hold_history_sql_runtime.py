@@ -478,6 +478,19 @@ def _query_list(
     count_rows = _fetch_dict_rows(conn, count_sql, params)
     total = _si(count_rows[0]["total"]) if count_rows else 0
 
+    # Detect whether the spool parquet has the 'package' column (additive field).
+    # Older spool files written before the schema change will not have it.
+    _available_cols = {
+        r[0].lower()
+        for r in conn.execute("DESCRIBE hold_src").fetchall()
+        if len(r) > 0
+    }
+    _package_col = (
+        'CAST(hold_src."package" AS VARCHAR) AS package'
+        if "package" in _available_cols
+        else "NULL AS package"
+    )
+
     if export_mode:
         page_sql = f"""
             SELECT
@@ -496,7 +509,8 @@ def _query_list(
                 CAST("RELEASECOMMENTS" AS VARCHAR) AS RELEASECOMMENTS,
                 "HOLD_HOURS",
                 CAST("NCRID" AS VARCHAR)         AS NCRID,
-                CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS
+                CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS,
+                {_package_col}
             FROM hold_src
             {where_sql}
             ORDER BY "HOLDTXNDATE" DESC NULLS LAST
@@ -527,7 +541,8 @@ def _query_list(
                 CAST("RELEASECOMMENTS" AS VARCHAR) AS RELEASECOMMENTS,
                 "HOLD_HOURS",
                 CAST("NCRID" AS VARCHAR)         AS NCRID,
-                CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS
+                CAST("FUTUREHOLDCOMMENTS" AS VARCHAR) AS FUTUREHOLDCOMMENTS,
+                {_package_col}
             FROM hold_src
             {where_sql}
             ORDER BY "HOLDTXNDATE" DESC NULLS LAST
@@ -574,6 +589,7 @@ def _query_list(
             "holdHours": round(_safe_float(r.get("HOLD_HOURS")), 2),
             "ncr": _clean_text(r.get("NCRID")),
             "futureHoldComment": _clean_text(r.get("FUTUREHOLDCOMMENTS")),
+            "package": _clean_text(r.get("package")),
         })
 
     return {

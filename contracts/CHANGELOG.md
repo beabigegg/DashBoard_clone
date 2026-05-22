@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.11.0] — 2026-05-22
+### Added
+- add-package-detail-tables: Added `package: string | null` to hold-history detail rows; added `PRODUCTLINENAME: string | null` to query-tool lot-history and equipment-lots rows; confirmed equipment-rejects already had PRODUCTLINENAME; added `PRODUCTLINENAME: string | null` to material-consumption detail rows (detail spool schema change — parquet cleanup required on deploy/rollback). All additive; no existing fields removed.
+
+## [api-inventory 1.1.10] — 2026-05-22
+### Added
+- add-package-detail-tables: Updated `hold_history_routes.py` (detail list `package` field), `query_tool_routes.py` (lot-history + equipment-lots `PRODUCTLINENAME`; equipment-rejects confirmation), `material_consumption_routes.py` (detail/page `PRODUCTLINENAME`; parquet cleanup note). All additive.
+
+## [data 1.10.0] — 2026-05-22
+### Added
+- add-package-detail-tables: Added §3.11 documenting hold-history detail row schema (new `package: string | null` field). Updated §3.6 (query-tool lot-history / equipment-lots) with `PRODUCTLINENAME: string | null` and `_PARTIAL_NONKEY_COLS_LOT` extension note. Updated §3.9.2 (material-consumption detail spool) with `PRODUCTLINENAME: VARCHAR | null` (breaking-change surface — parquet cleanup required). §3.7 (equipment-rejects) unchanged. All additive; no existing columns removed.
+
 ## [api 1.10.0] — 2026-05-21
 ### Added
 - resource-status-package-group: Added optional `package_groups` query param to `/api/resource/status`, `/api/resource/status/summary`, `/api/resource/status/matrix`; added `package_groups: string[]` to `/api/resource/status/options` response; added `PACKAGEGROUPNAME: string | null` to each `/api/resource/status` record (null for ~91% of resources). All additive; no existing endpoints changed.

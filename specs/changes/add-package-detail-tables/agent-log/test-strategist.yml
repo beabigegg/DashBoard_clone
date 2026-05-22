@@ -1,0 +1,17 @@
+change-id: add-package-detail-tables
+agent: test-strategist
+timestamp: "2026-05-22T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/add-package-detail-tables/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_hold_history_service.py ↔ src/mes_dashboard/services/hold_history_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_sql_runtime.py ↔ src/mes_dashboard/services/query_tool_sql_runtime.py" }
+  - { type: tdd-pairs, pointer: "tests/test_material_consumption_service.py ↔ src/mes_dashboard/services/material_consumption_service.py" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1)" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-8 all mapped; AC-4 delegated to contract gate; AC-5 no-export tab explicitly excluded" }
+next-action: none
+notes: >
+  AC-6 (trailing-space trim) is the highest silent-failure risk — each service
+  trims differently (_clean_text vs TRIM() in SQL vs _df_to_records). The
+  per-service trim tests are the most important pre-implementation red tests.
+  _PARTIAL_NONKEY_COLS_LOT membership test guards the QT-06 strict path.

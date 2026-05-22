@@ -1,6 +1,6 @@
-# generated: 2026-05-21T05:11:05Z by cdd-kit 2.0.20
-# files: 795, src-lines: 220503, map-lines: 16778, compression: 13.1x
-# sources-digest: 18b1a71fd43da009322800b595604f30a61f09867004d1bbc3bd5e8a7aecda4b
+# generated: 2026-05-22T08:19:00Z by cdd-kit 2.0.20
+# files: 795, src-lines: 221086, map-lines: 16834, compression: 13.1x
+# sources-digest: 745797ddf40d24a73ea44476d542abe9408601bc5524392ec599d479a0ae5487
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -744,7 +744,7 @@ frontend/src/hold-history/App.vue:  # 1109 lines
 
 frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
 
-frontend/src/hold-history/components/DetailTable.vue:  # 331 lines
+frontend/src/hold-history/components/DetailTable.vue:  # 336 lines
 
 frontend/src/hold-history/components/DurationChart.vue:  # 130 lines
 
@@ -923,30 +923,30 @@ frontend/src/material-consumption/__tests__/useConsumptionQuery.test.ts:  # 183 
 
 frontend/src/material-consumption/components/ConsumptionTrendChart.vue:  # 130 lines
 
-frontend/src/material-consumption/components/DetailTable.vue:  # 180 lines
+frontend/src/material-consumption/components/DetailTable.vue:  # 181 lines
 
 frontend/src/material-consumption/components/FilterPanel.vue:  # 212 lines
 
 frontend/src/material-consumption/components/TypeBreakdownChart.vue:  # 125 lines
 
-frontend/src/material-consumption/composables/useConsumptionQuery.ts:  # 393 lines
+frontend/src/material-consumption/composables/useConsumptionQuery.ts:  # 394 lines
   imports:
     - { module: vue, items: [ref], line: 13 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 14 }
   constants:
-    - { name: POLL_INTERVAL_MS, line: 66 }
-    - { name: POLL_MAX_ATTEMPTS, line: 67 }
+    - { name: POLL_INTERVAL_MS, line: 67 }
+    - { name: POLL_MAX_ATTEMPTS, line: 68 }
   functions:
-    - { name: useConsumptionQuery, lines: 69-393 }
+    - { name: useConsumptionQuery, lines: 70-394 }
   interfaces:
     - { name: ConsumptionKpi, lines: 17-23 }
     - { name: TrendItem, lines: 25-29 }
     - { name: TypeBreakdownItem, lines: 31-35 }
-    - { name: DetailRow, lines: 37-48 }
-    - { name: DetailPagination, lines: 50-55 }
-    - { name: QueryParams, lines: 59-64 }
+    - { name: DetailRow, lines: 37-49 }
+    - { name: DetailPagination, lines: 51-56 }
+    - { name: QueryParams, lines: 60-65 }
   types:
-    - { name: Granularity, lines: 57-57 }
+    - { name: Granularity, lines: 58-58 }
 
 frontend/src/material-consumption/main.ts:  # 5 lines
   imports:
@@ -1331,9 +1331,9 @@ frontend/src/query-tool/App.vue:  # 705 lines
 
 frontend/src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
 
-frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 80 lines
+frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 81 lines
 
-frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 256 lines
+frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 260 lines
 
 frontend/src/query-tool/components/EquipmentView.vue:  # 246 lines
 
@@ -1347,7 +1347,7 @@ frontend/src/query-tool/components/LotDetail.vue:  # 350 lines
 
 frontend/src/query-tool/components/LotEquipmentView.vue:  # 392 lines
 
-frontend/src/query-tool/components/LotHistoryTable.vue:  # 128 lines
+frontend/src/query-tool/components/LotHistoryTable.vue:  # 129 lines
 
 frontend/src/query-tool/components/LotJobsTable.vue:  # 265 lines
 
@@ -4579,7 +4579,7 @@ src/mes_dashboard/routes/qc_gate_routes.py:  # 20 lines
   functions:
     - { name: api_qc_gate_summary, lines: 15-20 }  # @qc_gate_bp.route('/summary')
 
-src/mes_dashboard/routes/query_tool_routes.py:  # 989 lines
+src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
   imports:
     - { module: gc, items: [], line: 12 }
     - { module: hashlib, items: [], line: 13 }
@@ -4606,21 +4606,21 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 989 lines
     - { name: _sanitize_per_page, lines: 208-213 }
     - { name: _format_lot_materials_export_rows, lines: 216-231 }
     - { name: _format_lot_holds_export_rows, lines: 234-254 }
-    - { name: _format_equipment_lots_export_rows, lines: 257-275 }
-    - { name: _format_lot_history_export_rows, lines: 288-299 }
-    - { name: _format_lot_rejects_export_rows, lines: 302-315 }
-    - { name: _format_lot_jobs_export_rows, lines: 318-329 }
-    - { name: query_tool_page, lines: 337-342 }  # @query_tool_bp.route('/query-tool')
-    - { name: resolve_lot_input, lines: 352-406 }  # @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
-    - { name: query_lot_history, lines: 416-474 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
-    - { name: query_adjacent_lots, lines: 484-506 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
-    - { name: query_lot_associations, lines: 516-580 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
-    - { name: query_equipment_period, lines: 590-674 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
-    - { name: get_equipment_list, lines: 682-713 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
-    - { name: get_workcenter_groups_list, lines: 721-740 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
-    - { name: lookup_lot_equipment, lines: 750-785 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
-    - { name: get_equipment_recent_jobs_route, lines: 793-806 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
-    - { name: export_csv, lines: 816-989 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+    - { name: _format_equipment_lots_export_rows, lines: 257-276 }
+    - { name: _format_lot_history_export_rows, lines: 289-300 }
+    - { name: _format_lot_rejects_export_rows, lines: 303-316 }
+    - { name: _format_lot_jobs_export_rows, lines: 319-330 }
+    - { name: query_tool_page, lines: 338-343 }  # @query_tool_bp.route('/query-tool')
+    - { name: resolve_lot_input, lines: 353-407 }  # @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
+    - { name: query_lot_history, lines: 417-475 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
+    - { name: query_adjacent_lots, lines: 485-507 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
+    - { name: query_lot_associations, lines: 517-581 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
+    - { name: query_equipment_period, lines: 591-675 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+    - { name: get_equipment_list, lines: 683-714 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
+    - { name: get_workcenter_groups_list, lines: 722-741 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
+    - { name: lookup_lot_equipment, lines: 751-786 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
+    - { name: get_equipment_recent_jobs_route, lines: 794-807 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
+    - { name: export_csv, lines: 817-990 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
 src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
   imports:
@@ -5380,7 +5380,7 @@ src/mes_dashboard/services/hold_dataset_cache.py:  # 369 lines
     - { name: make_canonical_warmup_query_id, lines: 347-349 }
     - { name: ensure_dataset_loaded, lines: 352-369 }
 
-src/mes_dashboard/services/hold_history_service.py:  # 506 lines
+src/mes_dashboard/services/hold_history_service.py:  # 507 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -5421,9 +5421,9 @@ src/mes_dashboard/services/hold_history_service.py:  # 506 lines
     - { name: get_hold_history_trend, lines: 318-345 }
     - { name: get_hold_history_reason_pareto, lines: 348-381 }
     - { name: get_hold_history_duration, lines: 384-431 }
-    - { name: get_hold_history_list, lines: 434-506 }
+    - { name: get_hold_history_list, lines: 434-507 }
 
-src/mes_dashboard/services/hold_history_sql_runtime.py:  # 754 lines
+src/mes_dashboard/services/hold_history_sql_runtime.py:  # 770 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -5451,11 +5451,11 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 754 lines
     - { name: _query_trend, lines: 135-281 }
     - { name: _query_reason_pareto, lines: 286-337 }
     - { name: _query_duration, lines: 342-432 }
-    - { name: _query_list, lines: 437-587 }
-    - { name: _build_hold_type_clause, lines: 592-596 }
-    - { name: _build_record_type_clause, lines: 599-623 }
-    - { name: _build_duration_clause, lines: 626-637 }
-    - { name: try_compute_view_from_spool, lines: 642-754 }
+    - { name: _query_list, lines: 437-603 }
+    - { name: _build_hold_type_clause, lines: 608-612 }
+    - { name: _build_record_type_clause, lines: 615-639 }
+    - { name: _build_duration_clause, lines: 642-653 }
+    - { name: try_compute_view_from_spool, lines: 658-770 }
 
 src/mes_dashboard/services/hold_today_snapshot_service.py:  # 475 lines
   imports:
@@ -5586,7 +5586,7 @@ src/mes_dashboard/services/lineage_engine.py:  # 853 lines
     - { name: _to_edge_payload, lines: 68-86 }
     - { name: _build_parent_map, lines: 89-127 }
 
-src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 422 lines
+src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 429 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: csv, items: [], line: 17 }
@@ -5597,24 +5597,24 @@ src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 422 lines
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 23 }
   classes:
     - name: MaterialConsumptionDetailRuntime
-      lines: 293-422
+      lines: 300-429
       methods:
-        - { name: __init__, lines: 296-299 }
-        - { name: _resolve_path, lines: 301-305 }
-        - { name: is_available, lines: 307-309 }
-        - { name: get_page, lines: 311-373 }
-        - { name: export_csv, lines: 375-422 }
+        - { name: __init__, lines: 303-306 }
+        - { name: _resolve_path, lines: 308-312 }
+        - { name: is_available, lines: 314-316 }
+        - { name: get_page, lines: 318-380 }
+        - { name: export_csv, lines: 382-429 }
   functions:
-    - { name: _normalize_detail_df, lines: 63-66 }
-    - { name: _granularity_bucket_expr, lines: 74-96 }
-    - { name: _sql_str_literal, lines: 99-100 }
-    - { name: _type_where, lines: 103-111 }
-    - { name: _fetch_dict_rows, lines: 114-119 }
-    - { name: regroup_summary, lines: 127-161 }
-    - { name: _query_kpi, lines: 164-189 }
-    - { name: _empty_kpi, lines: 192-199 }
-    - { name: _query_trend, lines: 202-243 }
-    - { name: _query_type_breakdown, lines: 246-285 }
+    - { name: _normalize_detail_df, lines: 64-73 }
+    - { name: _granularity_bucket_expr, lines: 81-103 }
+    - { name: _sql_str_literal, lines: 106-107 }
+    - { name: _type_where, lines: 110-118 }
+    - { name: _fetch_dict_rows, lines: 121-126 }
+    - { name: regroup_summary, lines: 134-168 }
+    - { name: _query_kpi, lines: 171-196 }
+    - { name: _empty_kpi, lines: 199-206 }
+    - { name: _query_trend, lines: 209-250 }
+    - { name: _query_type_breakdown, lines: 253-292 }
 
 src/mes_dashboard/services/material_consumption_service.py:  # 677 lines
   imports:
@@ -6159,7 +6159,7 @@ src/mes_dashboard/services/query_tool_service.py:  # 2776 lines
     - { name: generate_csv_stream, lines: 2696-2738 }
     - { name: get_equipment_recent_jobs, lines: 2745-2776 }
 
-src/mes_dashboard/services/query_tool_sql_runtime.py:  # 396 lines
+src/mes_dashboard/services/query_tool_sql_runtime.py:  # 404 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -6179,12 +6179,12 @@ src/mes_dashboard/services/query_tool_sql_runtime.py:  # 396 lines
     - { name: _sql_str_literal, lines: 160-161 }
     - { name: _fetch_dict_rows, lines: 164-167 }
     - { name: _serialize_value, lines: 170-177 }
-    - { name: _serialize_rows, lines: 180-184 }
-    - { name: _normalize_tokens, lines: 187-196 }
-    - { name: _available_columns, lines: 199-201 }
-    - { name: _best_order_clause, lines: 204-208 }
-    - { name: _append_reject_policy_conditions, lines: 211-277 }
-    - { name: try_compute_page_from_spool, lines: 280-396 }
+    - { name: _serialize_rows, lines: 183-192 }
+    - { name: _normalize_tokens, lines: 195-204 }
+    - { name: _available_columns, lines: 207-209 }
+    - { name: _best_order_clause, lines: 212-216 }
+    - { name: _append_reject_policy_conditions, lines: 219-285 }
+    - { name: try_compute_page_from_spool, lines: 288-404 }
 
 src/mes_dashboard/services/realtime_equipment_cache.py:  # 813 lines
   imports:
@@ -11620,7 +11620,7 @@ tests/test_hold_history_routes.py:  # 395 lines
         - { name: test_config_returns_200, lines: 385-389 }
         - { name: test_config_has_feature_flag_keys, lines: 391-395 }
 
-tests/test_hold_history_service.py:  # 425 lines
+tests/test_hold_history_service.py:  # 520 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -11656,6 +11656,15 @@ tests/test_hold_history_service.py:  # 425 lines
         - { name: test_empty_trend_metrics_includes_repeat_quality, lines: 390-393 }
         - { name: test_normalize_trend_day_old_payload_defaults_repeat_quality_to_zero, lines: 395-407 }
         - { name: test_normalize_trend_day_reads_repeat_quality_when_present, lines: 409-421 }
+    - name: TestHoldHistoryListPackageField
+      lines: 424-516
+      methods:
+        - { name: _make_row, lines: 427-453 }
+        - { name: setUp, lines: 455-456 }
+        - { name: test_get_hold_detail_includes_package_field, lines: 460-472 }
+        - { name: test_get_hold_detail_package_null_when_missing, lines: 476-485 }
+        - { name: test_get_hold_detail_package_empty_string_normalized, lines: 489-499 }
+        - { name: test_get_hold_detail_existing_columns_unchanged, lines: 503-516 }
 
 tests/test_hold_history_sql_parity.py:  # 361 lines
   imports:
@@ -12383,7 +12392,7 @@ tests/test_material_consumption_routes.py:  # 449 lines
     - { name: client, lines: 26-35 }  # @pytest.fixture
     - { name: _reset_rate_limiter, lines: 39-46 }  # @pytest.fixture(autouse=True)
 
-tests/test_material_consumption_service.py:  # 795 lines
+tests/test_material_consumption_service.py:  # 952 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: datetime, items: [], line: 15 }
@@ -12461,9 +12470,25 @@ tests/test_material_consumption_service.py:  # 795 lines
         - { name: test_detail_cache_key_excludes_removed_filters, lines: 767-775 }
         - { name: test_summary_key_differs_on_material_parts, lines: 777-785 }
         - { name: test_detail_key_differs_on_date_range, lines: 787-795 }
+    - name: TestSampleDetailDfIncludesProductlinenamColumn
+      lines: 831-839
+      methods:
+        - { name: test_sample_detail_df_includes_productlinename_column, lines: 834-839 }
+    - name: TestGetDetailPageIncludesProductlinename
+      lines: 842-927
+      methods:
+        - { name: test_get_detail_page_includes_productlinename, lines: 845-865 }
+        - { name: test_get_detail_page_productlinename_trailing_space_trimmed, lines: 867-885 }
+        - { name: test_get_detail_page_productlinename_null_safe, lines: 887-903 }
+        - { name: test_get_detail_page_existing_columns_unchanged, lines: 905-927 }
+    - name: TestDetailExportCsvIncludesProductlinename
+      lines: 930-952
+      methods:
+        - { name: test_detail_export_csv_includes_productlinename, lines: 933-952 }
   functions:
     - { name: _sample_summary_df, lines: 30-56 }
     - { name: _sample_detail_df, lines: 59-82 }
+    - { name: _sample_detail_df_with_productlinename, lines: 803-828 }
 
 tests/test_material_trace_duckdb_runtime.py:  # 104 lines
   imports:
@@ -14183,7 +14208,7 @@ tests/test_query_tool_service.py:  # 689 lines
         - { name: test_get_equipment_rejects_no_aggregate_columns, lines: 600-662 }
         - { name: test_get_equipment_rejects_empty_short_circuit, lines: 664-689 }
 
-tests/test_query_tool_sql_runtime.py:  # 207 lines
+tests/test_query_tool_sql_runtime.py:  # 492 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: datetime, items: [date, datetime], line: 16 }
@@ -14191,54 +14216,85 @@ tests/test_query_tool_sql_runtime.py:  # 207 lines
     - { module: unittest.mock, items: [patch], line: 18 }
     - { module: pandas, items: [], line: 21 }
     - { module: mes_dashboard.services.query_tool_sql_runtime, items: [_qid, _sql_str_literal, _serialize_value, _serialize_rows, _normalize_tokens, try_compute_page_from_spool, aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_NONKEY_COLS_LOT, SQL_FALLBACK_DISABLED, SQL_FALLBACK_SPOOL_MISS, SQL_FALLBACK_DEP_MISSING, SQL_FALLBACK_RUNTIME_ERROR], line: 23 }
+    - { module: mes_dashboard.services.query_tool_service, items: [], line: 38 }
   classes:
     - name: TestQid
-      lines: 40-50
+      lines: 41-51
       methods:
-        - { name: test_wraps_in_double_quotes, lines: 43-44 }
-        - { name: test_escapes_embedded_double_quotes, lines: 46-47 }
-        - { name: test_empty_string, lines: 49-50 }
+        - { name: test_wraps_in_double_quotes, lines: 44-45 }
+        - { name: test_escapes_embedded_double_quotes, lines: 47-48 }
+        - { name: test_empty_string, lines: 50-51 }
     - name: TestSqlStrLiteral
-      lines: 53-63
+      lines: 54-64
       methods:
-        - { name: test_wraps_in_single_quotes, lines: 56-57 }
-        - { name: test_escapes_single_quotes, lines: 59-60 }
-        - { name: test_empty_string, lines: 62-63 }
+        - { name: test_wraps_in_single_quotes, lines: 57-58 }
+        - { name: test_escapes_single_quotes, lines: 60-61 }
+        - { name: test_empty_string, lines: 63-64 }
     - name: TestSerializeValue
-      lines: 66-92
+      lines: 67-93
       methods:
-        - { name: test_datetime_formats_correctly, lines: 69-72 }
-        - { name: test_date_formats_correctly, lines: 74-77 }
-        - { name: test_decimal_converts_to_float, lines: 79-83 }
-        - { name: test_string_passes_through, lines: 85-86 }
-        - { name: test_int_passes_through, lines: 88-89 }
-        - { name: test_none_passes_through, lines: 91-92 }
+        - { name: test_datetime_formats_correctly, lines: 70-73 }
+        - { name: test_date_formats_correctly, lines: 75-78 }
+        - { name: test_decimal_converts_to_float, lines: 80-84 }
+        - { name: test_string_passes_through, lines: 86-87 }
+        - { name: test_int_passes_through, lines: 89-90 }
+        - { name: test_none_passes_through, lines: 92-93 }
     - name: TestSerializeRows
-      lines: 95-106
+      lines: 96-107
       methods:
-        - { name: test_serializes_each_value, lines: 98-103 }
-        - { name: test_empty_rows_returns_empty, lines: 105-106 }
+        - { name: test_serializes_each_value, lines: 99-104 }
+        - { name: test_empty_rows_returns_empty, lines: 106-107 }
     - name: TestNormalizeTokens
-      lines: 109-128
+      lines: 110-129
       methods:
-        - { name: test_strips_whitespace, lines: 112-114 }
-        - { name: test_deduplicates, lines: 116-118 }
-        - { name: test_removes_empty_strings, lines: 120-122 }
-        - { name: test_none_input, lines: 124-125 }
-        - { name: test_empty_list, lines: 127-128 }
+        - { name: test_strips_whitespace, lines: 113-115 }
+        - { name: test_deduplicates, lines: 117-119 }
+        - { name: test_removes_empty_strings, lines: 121-123 }
+        - { name: test_none_input, lines: 125-126 }
+        - { name: test_empty_list, lines: 128-129 }
     - name: TestFallbackConstants
-      lines: 131-144
+      lines: 132-145
       methods:
-        - { name: test_disabled_constant, lines: 134-135 }
-        - { name: test_spool_miss_constant, lines: 137-138 }
-        - { name: test_dep_missing_constant, lines: 140-141 }
-        - { name: test_runtime_error_constant, lines: 143-144 }
+        - { name: test_disabled_constant, lines: 135-136 }
+        - { name: test_spool_miss_constant, lines: 138-139 }
+        - { name: test_dep_missing_constant, lines: 141-142 }
+        - { name: test_runtime_error_constant, lines: 144-145 }
     - name: TestTryComputePageFromSpool
-      lines: 147-207
+      lines: 148-208
       methods:
-        - { name: test_returns_none_when_spool_file_missing, lines: 150-162 }
-        - { name: test_returns_none_when_feature_disabled, lines: 164-176 }
-        - { name: test_partial_count_present_in_returned_data, lines: 178-207 }
+        - { name: test_returns_none_when_spool_file_missing, lines: 151-163 }
+        - { name: test_returns_none_when_feature_disabled, lines: 165-177 }
+        - { name: test_partial_count_present_in_returned_data, lines: 179-208 }
+    - name: TestPartialNonkeyColsLotContainsProductlinename
+      lines: 216-223
+      methods:
+        - { name: test_partial_nonkey_cols_lot_includes_productlinename, lines: 219-223 }
+    - name: TestAggregatePartialTrackoutsPreservesProductlinename
+      lines: 226-291
+      methods:
+        - { name: _make_partial_rows, lines: 229-252 }
+        - { name: test_aggregate_partial_trackouts_preserves_productlinename, lines: 254-260 }
+        - { name: test_divergent_productlinename_emits_raw_rows, lines: 262-291 }
+    - name: TestProductlinenameTrimmedInSerialization
+      lines: 294-309
+      methods:
+        - { name: test_productlinename_trailing_space_trimmed_in_serialization, lines: 297-303 }
+        - { name: test_productlinename_none_safe_in_serialization, lines: 305-309 }
+    - name: TestLotHistoryResponseIncludesProductlinename
+      lines: 312-357
+      methods:
+        - { name: test_lot_history_response_includes_productlinename, lines: 315-357 }
+    - name: TestEquipmentLotsResponseIncludesProductlinename
+      lines: 360-426
+      methods:
+        - { name: test_equipment_lots_response_includes_productlinename, lines: 363-399 }
+        - { name: test_equipment_lots_export_csv_includes_productlinename, lines: 401-426 }
+    - name: TestEquipmentRejectsResponseIncludesProductlinename
+      lines: 429-492
+      methods:
+        - { name: _make_rejects_df, lines: 432-452 }
+        - { name: test_equipment_rejects_response_includes_productlinename, lines: 454-472 }
+        - { name: test_equipment_rejects_export_csv_includes_productlinename, lines: 474-492 }
 
 tests/test_rate_limit.py:  # 223 lines
   imports:

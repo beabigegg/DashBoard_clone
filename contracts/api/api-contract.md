@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.10.0
-last-changed: 2026-05-21
+schema-version: 1.11.0
+last-changed: 2026-05-22
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -301,6 +301,17 @@ breaking-change-policy: deprecate-2-minors
   - `POST /api/query-tool/export-csv`（`export_type=lot_history` 與 `export_type=equipment_lots`）CSV 新增 `partial_count` 為傳遞欄位；以位置解析 CSV 的 consumer 需處理新尾欄。
 - **Query-Tool equipment-rejects detail rewrite (2026-05-18, `equipment-rejects-by-lots`)**: `POST /api/query-tool/equipment-period` (`query_type='rejects'`) and `POST /api/query-tool/export-csv` (`export_type='equipment_rejects'`) response shape changed from aggregate (EQUIPMENTNAME, LOSSREASONNAME, TOTAL_REJECT_QTY, TOTAL_DEFECT_QTY, AFFECTED_LOT_COUNT) to per-reject-event detail rows (see data-shape-contract.md §3.7). Data source changed from LOTREJECTHISTORY filtered by EQUIPMENTNAME to LOTWIPHISTORY→LOTREJECTHISTORY via CONTAINERID (fixes cross-station reject omission). Service parameter renamed `equipment_names → equipment_ids`. Hard cutover — both EquipmentView and LotEquipmentView consumers ship in the same PR. Deprecate-2-minors policy bypassed because all consumers are in the same monorepo and shipped atomically.
 
+- **Package / PRODUCTLINENAME additive field（2026-05-22，add-package-detail-tables）**：以下為 additive，backward-compatible：
+  - `GET /api/hold-history/detail/page`（DuckDB spool 路徑）detail list 每筆明細列新增 `package: string | null`（來源：`list.sql` 中 `c.PRODUCTLINENAME AS package`；service 以 `row.get('PACKAGE')` → camelCase `package` 映射；LEFT JOIN 無比對時為 `null`；Oracle CHAR trailing-space 以 `_clean_text()` 消除）。
+  - `GET /api/query-tool/lot-history` response rows 新增 `PRODUCTLINENAME: string | null`（來源：`lot_history.sql` 新增 `c.PRODUCTLINENAME`；`_df_to_records()` pass-through；LEFT JOIN 無比對時為 `null`）。
+  - `POST /api/query-tool/equipment-period`（`query_type=lots`）response rows 新增 `PRODUCTLINENAME: string | null`（來源：`equipment_lots.sql` 新增 `c.PRODUCTLINENAME`；同上）。
+  - `POST /api/query-tool/equipment-period`（`query_type=rejects`）：`PRODUCTLINENAME` 已在 `equipment_lot_rejects.sql` line 52 存在；本次僅確認 API response 已包含此欄及前端補顯示；無 SQL 或 service 變更。
+  - `GET /api/material-consumption/detail/page` response rows 新增 `PRODUCTLINENAME: string | null`（來源：`detail_rows.sql` 新增 `c.PRODUCTLINENAME`；detail spool parquet 新增欄位；spool schema breaking-change — 需 `rm -f tmp/query_spool/material_consumption/detail-*.parquet` upon deploy/rollback，見 ci-gates.md §Rollback Policy）。
+  - CSV/Excel export 對應更新：hold-history、query-tool equipment lots、query-tool equipment rejects（已含）、material-consumption 匯出檔案均新增 Package / PRODUCTLINENAME 欄。query-tool Lot History tab 無 export，不適用。
+  - `_PARTIAL_NONKEY_COLS_LOT`（`query_tool_sql_runtime.py`）須加入 `"PRODUCTLINENAME"`，確保 QT-06 strict guard 將其視為 non-key column（divergence → raw rows with `partial_count=1`）。
+  - 無端點移除、無欄位移除、無 error code 變更；所有改動為 additive。
+  - Consumers：`frontend/src/hold-history/` (DetailTable)、`frontend/src/query-tool/` (LotHistoryTable, EquipmentLotsTable, EquipmentRejectsTable)、`frontend/src/material-consumption/` (DetailTable + export)。
+
 - **Resource-Status Package Group（2026-05-21，resource-status-package-group）**：以下為 additive，backward-compatible：
   - `GET /api/resource/status`：新增可選查詢參數 `package_groups`（逗號分隔字串，optional）；回應每筆 record 新增 `PACKAGEGROUPNAME: string | null`（來源：`DW_MES_RESOURCE_PACKAGEGROUP` 46-row in-process lookup dict，`PACKAGEGROUPID` 為 null 時回傳 `null`；約佔所有設備的 91%）。
   - `GET /api/resource/status/summary`：新增可選查詢參數 `package_groups`；不影響 OU%/AVAIL% 計算。
@@ -325,6 +336,9 @@ breaking-change-policy: deprecate-2-minors
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.11.0]
+- add-package-detail-tables (2026-05-22): Added `package: string | null` to hold-history detail rows; added `PRODUCTLINENAME: string | null` to query-tool lot-history and equipment-lots rows; confirmed equipment-rejects already had PRODUCTLINENAME; added `PRODUCTLINENAME: string | null` to material-consumption detail rows (detail spool schema updated — parquet cleanup required on deploy/rollback). All additive; no existing fields removed.
 
 ## [api 1.10.0]
 - resource-status-package-group (2026-05-21): Added optional `package_groups` query param to `/api/resource/status`, `/api/resource/status/summary`, `/api/resource/status/matrix`; added `package_groups[]` to `/api/resource/status/options` response; added `PACKAGEGROUPNAME: string | null` to each `/api/resource/status` record. All additive; no existing endpoints changed.

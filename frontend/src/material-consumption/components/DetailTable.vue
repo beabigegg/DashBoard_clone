@@ -52,6 +52,7 @@ const TABLE_COLUMNS: { key: string; label: string; sortable: boolean }[] = [
   { key: 'qty_required', label: '應扣量', sortable: true },
   { key: 'qty_consumed', label: '實扣量', sortable: true },
   { key: 'pj_type', label: 'TYPE', sortable: true },
+  { key: 'PRODUCTLINENAME', label: 'Package', sortable: true },
   { key: 'txn_date', label: '交易日期', sortable: true },
 ];
 
@@ -168,7 +169,7 @@ function handleExport() {
           />
           <template #cell="{ columnKey, value }">
             <span v-if="columnKey === 'txn_date'">{{ formatTxnDate(value) }}</span>
-            <span v-else>{{ value }}</span>
+            <span v-else>{{ value ?? '-' }}</span>
           </template>
         </DataTable>
 

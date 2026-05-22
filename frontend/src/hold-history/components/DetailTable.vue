@@ -19,6 +19,7 @@ interface HoldItem {
   holdHours?: number | null;
   ncr?: string | null;
   futureHoldComment?: string | null;
+  package?: string | null;
 }
 
 interface Pagination {
@@ -258,6 +259,7 @@ onUnmounted(() => {
           <DataTableColumn columnKey="holdHours" label="時長(hr)" :sortable="true" align="right" />
           <DataTableColumn columnKey="ncr" label="NCR" :sortable="true" />
           <DataTableColumn columnKey="futureHoldComment" label="Future Hold Comment" :sortable="true" />
+          <DataTableColumn columnKey="package" label="Package" :sortable="true" />
 
           <template #cell="{ row, columnKey }">
             <template v-if="columnKey === 'lotId'">{{ row.lotId || '-' }}</template>
@@ -281,6 +283,7 @@ onUnmounted(() => {
             <template v-else-if="columnKey === 'futureHoldComment'">
               <span class="cell-comment" :data-tip="row.futureHoldComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ row.futureHoldComment || '-' }}</span>
             </template>
+            <template v-else-if="columnKey === 'package'">{{ (row as HoldItem).package || '-' }}</template>
           </template>
         </DataTable>
       </div>
@@ -288,8 +291,10 @@ onUnmounted(() => {
   </section>
 
   <Teleport to="body">
-    <div v-if="tip.visible" class="cell-tip" :style="{ left: tip.x + 'px', top: tip.y + 'px' }">
-      {{ tip.text }}
+    <div class="theme-hold-history">
+      <div v-if="tip.visible" class="cell-tip" :style="{ left: tip.x + 'px', top: tip.y + 'px' }">
+        {{ tip.text }}
+      </div>
     </div>
   </Teleport>
 </template>

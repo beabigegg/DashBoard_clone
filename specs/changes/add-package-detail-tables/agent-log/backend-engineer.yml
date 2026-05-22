@@ -1,0 +1,38 @@
+agent: backend-engineer
+change-id: add-package-detail-tables
+timestamp: 2026-05-22
+status: complete
+
+summary: |
+  Implemented all backend IP items for add-package-detail-tables. TDD approach:
+  wrote 20 failing tests first across 3 test files, then implemented to green.
+  Full suite: 4123 passed, 550 skipped, 0 failures.
+
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/query_tool_sql_runtime.py:31-34 (_PARTIAL_NONKEY_COLS_LOT + PRODUCTLINENAME), 180-194 (_serialize_rows + trim for PRODUCTLINENAME)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/query_tool/lot_history.sql:36,59-61 (TRIM PRODUCTLINENAME in CTE + outer SELECT)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/query_tool/equipment_lots.sql:34,57-61 (TRIM PRODUCTLINENAME in CTE + outer SELECT)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/hold_history/list.sql:70,89 (TRIM PRODUCTLINENAME AS package in ranked CTE + outer SELECT)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/hold_history_service.py:488 (package key in items.append dict)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/hold_history_sql_runtime.py:477-598 (_query_list: DESCRIBE-based package column detection, package in both export/page SQL, items dict)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/query_tool_routes.py:261-275 (_format_equipment_lots_export_rows: added PRODUCTLINENAME key)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/material_consumption/detail_rows.sql:19 (TRIM PRODUCTLINENAME AS PRODUCTLINENAME)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/material_consumption_duckdb_runtime.py:31-52 (_EXPORT_COLS + _EXPORT_HEADERS + PRODUCTLINENAME), 63-74 (_normalize_detail_df trim)" }
+  - { type: tests-added, pointer: "tests/test_hold_history_service.py::TestHoldHistoryListPackageField (4 tests: includes, null, empty, existing_columns_unchanged)" }
+  - { type: tests-added, pointer: "tests/test_query_tool_sql_runtime.py::TestPartialNonkeyColsLotContainsProductlinename, TestAggregatePartialTrackoutsPreservesProductlinename, TestProductlinenameTrimmedInSerialization, TestLotHistoryResponseIncludesProductlinename, TestEquipmentLotsResponseIncludesProductlinename (export+response), TestEquipmentRejectsResponseIncludesProductlinename (export+response)" }
+  - { type: tests-added, pointer: "tests/test_material_consumption_service.py::TestSampleDetailDfIncludesProductlinenamColumn, TestGetDetailPageIncludesProductlinename (4 tests), TestDetailExportCsvIncludesProductlinename" }
+  - { type: test-output, pointer: "4123 passed, 550 skipped, 0 failed (full suite, 139s)" }
+  - { type: contracts-touched, pointer: "n/a (contract updates are IP-17, assigned to contract-reviewer agent)" }
+
+notes: |
+  - IP-4 (_PARTIAL_NONKEY_COLS_LOT) landed atomically with SQL changes per implementation-plan constraint.
+  - hold_history_sql_runtime._query_list uses DESCRIBE hold_src to detect 'package' column at runtime,
+    providing forward/backward compatibility with existing spool parquets that predate this schema change.
+  - equipment_lot_rejects.sql already had PRODUCTLINENAME at line 52 (confirmed read-only per IP-7);
+    _df_to_records pass-through confirmed to carry field — no SQL change required.
+  - material_consumption detail spool schema changed: deploy runbook must run
+    'rm -f tmp/query_spool/material_consumption_detail/*.parquet' per ci-gates.md Rollback Policy.
+  - query_tool has no persistent spool — no parquet cleanup needed (per CLAUDE.md).
+  - JSON key choices: hold-history uses 'package' (camelCase/snake mapping convention);
+    query-tool and material-consumption use 'PRODUCTLINENAME' / 'productlinename'
+    (raw Oracle pass-through convention) — intentional per implementation-plan AC-7 additive.

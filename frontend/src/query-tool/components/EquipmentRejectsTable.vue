@@ -57,6 +57,7 @@ function normalizeText(value: unknown, fallback = ''): string {
 
 interface NormalizedRejectRow extends Record<string, unknown> {
   CONTAINERNAME: string;
+  PRODUCTLINENAME: string | null;
   WORKCENTERNAME: string;
   SPECNAME: string;
   LOSSREASONNAME: string;
@@ -92,6 +93,7 @@ function normalizeRejectRow(rawRow: unknown): NormalizedRejectRow {
 
   return {
     CONTAINERNAME: normalizeText(row?.CONTAINERNAME, normalizeText(row?.CONTAINERID)),
+    PRODUCTLINENAME: row?.PRODUCTLINENAME != null ? String(row.PRODUCTLINENAME).trim() || null : null,
     WORKCENTERNAME: normalizeText(row?.WORKCENTERNAME),
     SPECNAME: normalizeText(row?.SPECNAME),
     LOSSREASONNAME: normalizeText(row?.LOSSREASONNAME),
@@ -175,6 +177,7 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
         <thead>
           <tr>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('CONTAINERNAME')" @click="toggleSort('CONTAINERNAME')" @keydown.enter.space.prevent="toggleSort('CONTAINERNAME')">批次ID <span class="sort-indicator">{{ sortLabel('CONTAINERNAME') }}</span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('PRODUCTLINENAME')" @click="toggleSort('PRODUCTLINENAME')" @keydown.enter.space.prevent="toggleSort('PRODUCTLINENAME')">Package <span class="sort-indicator">{{ sortLabel('PRODUCTLINENAME') }}</span></th>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('WORKCENTERNAME')" @click="toggleSort('WORKCENTERNAME')" @keydown.enter.space.prevent="toggleSort('WORKCENTERNAME')">站點 <span class="sort-indicator">{{ sortLabel('WORKCENTERNAME') }}</span></th>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('SPECNAME')" @click="toggleSort('SPECNAME')" @keydown.enter.space.prevent="toggleSort('SPECNAME')">製程規格 <span class="sort-indicator">{{ sortLabel('SPECNAME') }}</span></th>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('LOSSREASONNAME')" @click="toggleSort('LOSSREASONNAME')" @keydown.enter.space.prevent="toggleSort('LOSSREASONNAME')">報廢原因 <span class="sort-indicator">{{ sortLabel('LOSSREASONNAME') }}</span></th>
@@ -212,6 +215,7 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
             :key="`${row.TXN_TIME_RAW}-${row.CONTAINERNAME}-${row.LOSSREASONNAME}-${idx}`"
           >
             <td>{{ row.CONTAINERNAME }}</td>
+            <td>{{ row.PRODUCTLINENAME || '-' }}</td>
             <td>{{ row.WORKCENTERNAME || '-' }}</td>
             <td>{{ row.SPECNAME || '-' }}</td>
             <td>{{ row.LOSSREASONNAME || '-' }}</td>

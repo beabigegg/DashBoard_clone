@@ -34,6 +34,7 @@ const COLUMN_LABELS = Object.freeze({
   PJ_TYPE: 'TYPE',
   PJ_BOP: 'BOP',
   PJ_WORKORDER: 'WORKORDER',
+  PRODUCTLINENAME: 'PACKAGE',
 });
 
 const columns = computed(() =>

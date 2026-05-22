@@ -30,7 +30,7 @@ _PARTIAL_KEY_COLS_3 = ["CONTAINERID", "EQUIPMENTID", "TRACKINTIMESTAMP"]
 
 _PARTIAL_NONKEY_COLS_LOT = [
     "WORKCENTERNAME", "EQUIPMENTNAME", "FINISHEDRUNCARD", "PJ_WORKORDER",
-    "CONTAINERNAME", "PJ_TYPE", "PJ_BOP", "WAFER_LOT_ID",
+    "CONTAINERNAME", "PJ_TYPE", "PJ_BOP", "WAFER_LOT_ID", "PRODUCTLINENAME",
 ]
 
 # adjacent_lots has SPECNAME as non-key (it's not in the 3-tuple key)
@@ -177,10 +177,18 @@ def _serialize_value(value: Any) -> Any:
     return value
 
 
+_TRIM_STR_COLS = frozenset({"PRODUCTLINENAME"})
+
+
 def _serialize_rows(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     serialized: List[Dict[str, Any]] = []
     for row in rows:
-        serialized.append({k: _serialize_value(v) for k, v in row.items()})
+        out: Dict[str, Any] = {}
+        for k, v in row.items():
+            if k in _TRIM_STR_COLS and isinstance(v, str):
+                v = v.strip() or None
+            out[k] = _serialize_value(v)
+        serialized.append(out)
     return serialized
 
 

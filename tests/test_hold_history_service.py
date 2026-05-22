@@ -421,5 +421,100 @@ class TestHoldHistoryServiceFunctions(unittest.TestCase):
         self.assertEqual(normalized['all']['repeatQualityHoldQty'], 5)
 
 
+class TestHoldHistoryListPackageField(unittest.TestCase):
+    """TDD: add-package-detail-tables — package field in hold-history list response."""
+
+    def _make_row(self, **overrides):
+        """Build a minimal fixture row with all existing columns plus package (SQL alias).
+
+        The SQL list.sql aliases TRIM(c.PRODUCTLINENAME) AS package, so the pandas
+        DataFrame row has key 'package' (lowercase), not 'PRODUCTLINENAME'.
+        """
+        base = {
+            'LOT_ID': 'LOT001',
+            'WORKORDER': 'GA26010001',
+            'PRODUCT': 'PROD-A',
+            'WORKCENTER': 'WB',
+            'HOLD_REASON': '品質確認',
+            'QTY': 250,
+            'HOLD_DATE': None,
+            'HOLD_EMP': 'EMP01',
+            'HOLD_COMMENT': 'comment',
+            'RELEASE_DATE': None,
+            'RELEASE_EMP': None,
+            'RELEASE_COMMENT': None,
+            'HOLD_HOURS': 1.0,
+            'NCR_ID': None,
+            'FUTURE_HOLD_COMMENT': None,
+            'TOTAL_COUNT': 1,
+            'package': 'PKG-A',
+        }
+        base.update(overrides)
+        return base
+
+    def setUp(self):
+        hold_history_service._load_hold_history_sql.cache_clear()
+
+    @patch('mes_dashboard.services.hold_history_service._get_wc_group', return_value=None)
+    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
+    def test_get_hold_detail_includes_package_field(self, mock_read, mock_wc):
+        """Fixture row with package='PKG-A  ' (CHAR-padded); response has package='PKG-A' (trimmed).
+
+        The SQL alias is 'package' (lowercase); _clean_text strips trailing space.
+        """
+        mock_read.return_value = pd.DataFrame([self._make_row(package='PKG-A  ')])
+        result = hold_history_service.get_hold_history_list(
+            start_date='2026-02-01', end_date='2026-02-07', hold_type='quality'
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result['items']), 1)
+        self.assertIn('package', result['items'][0])
+        self.assertEqual(result['items'][0]['package'], 'PKG-A')
+
+    @patch('mes_dashboard.services.hold_history_service._get_wc_group', return_value=None)
+    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
+    def test_get_hold_detail_package_null_when_missing(self, mock_read, mock_wc):
+        """Fixture row with package=None; response has package=None."""
+        mock_read.return_value = pd.DataFrame([self._make_row(package=None)])
+        result = hold_history_service.get_hold_history_list(
+            start_date='2026-02-01', end_date='2026-02-07', hold_type='quality'
+        )
+        self.assertIsNotNone(result)
+        item = result['items'][0]
+        self.assertIn('package', item)
+        self.assertIsNone(item['package'])
+
+    @patch('mes_dashboard.services.hold_history_service._get_wc_group', return_value=None)
+    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
+    def test_get_hold_detail_package_empty_string_normalized(self, mock_read, mock_wc):
+        """Fixture row with package='   ' (all spaces); response has package=None (empty-after-strip)."""
+        mock_read.return_value = pd.DataFrame([self._make_row(package='   ')])
+        result = hold_history_service.get_hold_history_list(
+            start_date='2026-02-01', end_date='2026-02-07', hold_type='quality'
+        )
+        self.assertIsNotNone(result)
+        item = result['items'][0]
+        self.assertIn('package', item)
+        # _clean_text strips and returns None for empty-after-strip
+        self.assertNotEqual(item['package'], '   ', 'Padded spaces must not appear in output')
+
+    @patch('mes_dashboard.services.hold_history_service._get_wc_group', return_value=None)
+    @patch('mes_dashboard.services.hold_history_service.read_sql_df')
+    def test_get_hold_detail_existing_columns_unchanged(self, mock_read, mock_wc):
+        """All pre-existing keys still present with original values after adding package."""
+        row = self._make_row(package='PKG-B')
+        mock_read.return_value = pd.DataFrame([row])
+        result = hold_history_service.get_hold_history_list(
+            start_date='2026-02-01', end_date='2026-02-07', hold_type='quality'
+        )
+        self.assertIsNotNone(result)
+        item = result['items'][0]
+        # All pre-existing camelCase keys must be present
+        for key in ('lotId', 'workorder', 'product', 'workcenter', 'holdReason',
+                    'qty', 'holdDate', 'holdEmp', 'holdComment', 'releaseDate',
+                    'releaseEmp', 'releaseComment', 'holdHours', 'ncr', 'futureHoldComment'):
+            self.assertIn(key, item, f'Pre-existing key {key!r} missing from response')
+
+
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()

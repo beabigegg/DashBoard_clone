@@ -43,6 +43,7 @@ export interface DetailRow {
   qty_required?: number;
   qty_consumed?: number;
   pj_type?: string;
+  PRODUCTLINENAME?: string | null;
   txn_date?: string;
   [key: string]: unknown;
 }

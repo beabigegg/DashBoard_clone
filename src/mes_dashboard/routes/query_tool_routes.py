@@ -271,6 +271,7 @@ def _format_equipment_lots_export_rows(rows):
             'TRACKOUTQTY': row.get('TRACKOUTQTY', ''),
             'EQUIPMENTNAME': row.get('EQUIPMENTNAME', ''),
             'WORKCENTERNAME': row.get('WORKCENTERNAME', ''),
+            'PRODUCTLINENAME': row.get('PRODUCTLINENAME', ''),
         })
     return normalized_rows
 

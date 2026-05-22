@@ -1,0 +1,7 @@
+agent: implementation-planner
+change-id: add-package-detail-tables
+status: done
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/add-package-detail-tables/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-11, IP-18), frontend-engineer (IP-12..IP-16), contract-reviewer (IP-17)" }
+  - { type: scope-summary, pointer: "5 endpoints / 3 modules in scope; E2E/perf/soak/CSS-edit/lot-history-export out of scope" }

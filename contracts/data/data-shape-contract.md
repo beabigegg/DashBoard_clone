@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.9.0
-last-changed: 2026-05-21
+schema-version: 1.10.0
+last-changed: 2026-05-22
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -392,10 +392,13 @@ One row per aggregated partial-trackout group for `GET /api/query-tool/lot-histo
 | PJ_TYPE | string | yes | from DW_MES_CONTAINER |
 | PJ_BOP | string | yes | from DW_MES_CONTAINER |
 | WAFER_LOT_ID | string | yes | FIRSTNAME from DW_MES_CONTAINER |
+| PRODUCTLINENAME | string | yes | from DW_MES_CONTAINER; `null` when LEFT JOIN returns no match; Oracle CHAR trailing-space trimmed. Not present in adjacent_lots output (adjacent_lots SQL does not SELECT PRODUCTLINENAME). **Added add-package-detail-tables.** |
 | RELATIVE_POSITION | integer | yes | adjacent_lots only — lot position relative to target lot (negative = before, 0 = target, positive = after) |
 | partial_count | integer | no | group size; `1` for unaggregated rows (single partial or strict-guard divergence); `≥ 2` for merged partial-trackout groups. Computed by service layer; not stored in Oracle. |
 
-**Prior behavior (before `query-tool-partial-trackout`):** `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY TRACKOUTTIMESTAMP DESC) WHERE rn = 1` was used in all three SQL files. This returned only the last partial row, emitting the wrong TRACKINQTY (remaining qty of the last partial, not original load) and wrong TRACKOUTQTY (only the last partial's output, not cumulative). The `partial_count` column did not exist. Added by change `query-tool-partial-trackout`.
+**Prior behavior (before `query-tool-partial-trackout`):** `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY TRACKOUTTIMESTAMP DESC) WHERE rn = 1` was used in all three SQL files. This returned only the last partial row, emitting the wrong TRACKINQTY (remaining qty of the last partial, not original load) and wrong TRACKOUTQTY (only the last partial's output, not cumulative). The `partial_count` column did not exist. Added by change `query-tool-partial-trackout`. `PRODUCTLINENAME` column added by change `add-package-detail-tables`; `_PARTIAL_NONKEY_COLS_LOT` in `query_tool_sql_runtime.py` must be extended to include `"PRODUCTLINENAME"` so the strict guard (QT-06) treats it as a non-key column.
+
+**CSV export column order** (for `export_type=lot_history`): CONTAINERID, CONTAINERNAME, WORKCENTERNAME, EQUIPMENTID, EQUIPMENTNAME, SPECNAME, TRACKINTIMESTAMP, TRACKOUTTIMESTAMP, TRACKINQTY, TRACKOUTQTY, FINISHEDRUNCARD, PJ_WORKORDER, PJ_TYPE, PJ_BOP, WAFER_LOT_ID, **PRODUCTLINENAME**, partial_count. **CSV export column order** (for `export_type=equipment_lots`): same minus RELATIVE_POSITION, plus PRODUCTLINENAME before partial_count.
 
 ### 3.7 Query-Tool Equipment-Lot-Rejects Row
 
@@ -552,6 +555,7 @@ One row per raw lot-material event from `DWH.DW_MES_LOTMATERIALSHISTORY`, with `
 | PRIMARY_CATEGORY | VARCHAR | yes | Material primary category |
 | SECONDARY_CATEGORY | VARCHAR | yes | Material secondary category |
 | pj_type | VARCHAR | yes | `DWH.DW_MES_CONTAINER.PJ_TYPE`; null when JOIN returns no match |
+| PRODUCTLINENAME | VARCHAR | yes | `DWH.DW_MES_CONTAINER.PRODUCTLINENAME`; null when LEFT JOIN returns no match. Oracle CHAR trailing-space trimmed. **Added add-package-detail-tables.** Breaking-change surface: adding this column requires `rm -f tmp/query_spool/material_consumption/detail-*.parquet` on deploy and rollback. |
 
 Same breaking-change surface rule as summary spool.
 
@@ -624,6 +628,35 @@ Added by change `resource-status-package-group`.
 
 ---
 
+### 3.11 Hold-History Detail Row（`GET /api/hold-history/detail/page`）
+
+One row per hold/release event returned by `hold_history/list.sql` and the DuckDB spool view. Columns are aliased to lowercase in the `ranked` CTE of `list.sql` and mapped to camelCase JSON keys by the hold-history service.
+
+| SQL alias | JSON key | type | nullable | notes |
+|---|---|---|---|---|
+| lot_id | lotId | string | yes | `NVL(c.CONTAINERNAME, TRIM(f.CONTAINERID))` |
+| workorder | workorder | string | yes | `f.PJ_WORKORDER` |
+| product | product | string | yes | `c.PRODUCTNAME` |
+| workcenter | workcenter | string | yes | WORKCENTERNAME resolved to workcenter group |
+| hold_reason | holdReason | string | yes | HOLDREASONNAME |
+| qty | qty | integer | no | NVL(QTY, 0) |
+| hold_date | holdDate | datetime | yes | HOLDTXNDATE |
+| hold_emp | holdEmp | string | yes | HOLDEMP |
+| hold_comment | holdComment | string | yes | HOLDCOMMENTS |
+| release_date | releaseDate | datetime | yes | RELEASETXNDATE; null if still on hold |
+| release_emp | releaseEmp | string | yes | RELEASEEMP |
+| release_comment | releaseComment | string | yes | RELEASECOMMENTS |
+| hold_hours | holdHours | float | no | computed; rounded to 2 decimal places |
+| ncr_id | ncr | string | yes | NCRID |
+| future_hold_comment | futureHoldComment | string | yes | FUTUREHOLDCOMMENTS; may decay after MES lot release |
+| package | package | string | yes | `c.PRODUCTLINENAME`; null when LEFT JOIN returns no match or PRODUCTLINENAME is null; Oracle CHAR trailing-space trimmed via `_clean_text()`. **Added add-package-detail-tables.** |
+
+**CSV/Excel export column order**: lotId, workorder, product, workcenter, holdReason, qty, holdDate, holdEmp, holdComment, releaseDate, releaseEmp, releaseComment, holdHours, ncr, futureHoldComment, **package** (appended; additive).
+
+Added by change `add-package-detail-tables`.
+
+---
+
 ## 6. Row Limit / Truncation Policy
 
 | scope | limit | behavior |
@@ -644,6 +677,9 @@ Removing a required column, changing a column type, or removing a key from the e
 3. Updating related tests before removing the field.
 
 ## CHANGELOG
+
+## [data 1.10.0]
+- add-package-detail-tables (2026-05-22): Added §3.11 documenting hold-history detail row schema with new `package: string | null` field. Updated §3.6 (query-tool lot-history / equipment-lots) with new `PRODUCTLINENAME: string | null` field, `_PARTIAL_NONKEY_COLS_LOT` extension note, and CSV export column order. Updated §3.9.2 (material-consumption detail spool) with new `PRODUCTLINENAME: VARCHAR | null` column (detail spool schema breaking-change surface — parquet cleanup required on deploy/rollback). §3.7 (equipment-rejects) already had PRODUCTLINENAME documented — no change. All additive; no existing columns removed or renamed.
 
 ## [data 1.9.0]
 - resource-status-package-group (2026-05-21): Added §3.10 documenting the merged resource-status record shape (all 35+ fields). New field PACKAGEGROUPNAME (string | null) added to each record; NULL for ~91% of resources (PACKAGEGROUPID is null in DWH.DW_MES_RESOURCE). Lookup via 46-row in-process dict (DW_MES_RESOURCE_PACKAGEGROUP, 7-day TTL, independent of 24h resource_cache cycle). No existing fields removed or renamed.

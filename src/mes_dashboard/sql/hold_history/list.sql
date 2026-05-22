@@ -67,6 +67,7 @@ ranked AS (
     f.hold_hours,
     f.NCRID AS ncr_id,
     f.FUTUREHOLDCOMMENTS AS future_hold_comment,
+    TRIM(c.PRODUCTLINENAME) AS package,
     ROW_NUMBER() OVER (ORDER BY f.HOLDTXNDATE DESC, f.CONTAINERID) AS rn,
     COUNT(*) OVER () AS total_count
   FROM filtered f
@@ -88,6 +89,7 @@ SELECT
   hold_hours,
   ncr_id,
   future_hold_comment,
+  package,
   total_count
 FROM ranked
 WHERE rn > :offset

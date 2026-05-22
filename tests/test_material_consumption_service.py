@@ -793,3 +793,160 @@ class TestCacheKeySimplified:
             ["MAT-A"], "2026-02-01", "2026-02-28"
         )
         assert key1 != key2
+
+
+# ---------------------------------------------------------------------------
+# TDD: add-package-detail-tables — PRODUCTLINENAME in material-consumption
+# ---------------------------------------------------------------------------
+
+
+def _sample_detail_df_with_productlinename(pj_types=None, productlinenames=None) -> pd.DataFrame:
+    """Build a detail spool fixture that includes PRODUCTLINENAME column."""
+    pj_types = pj_types or ["TypeX", "TypeY"]
+    productlinenames = productlinenames or ["PKG-D", "PKG-E"]
+    rows = []
+    for i, pjt in enumerate(pj_types):
+        rows.append(
+            {
+                "CONTAINERID": f"C{i:04d}",
+                "CONTAINERNAME": f"LOT-{i:04d}",
+                "PJ_WORKORDER": f"WO{i:04d}",
+                "WORKCENTERNAME": "WC-A",
+                "MATERIALPARTNAME": "MAT-A",
+                "MATERIALLOTNAME": f"ML{i:04d}",
+                "VENDORLOTNUMBER": f"VL{i:04d}",
+                "QTYREQUIRED": 100.0,
+                "QTYCONSUMED": 98.0,
+                "EQUIPMENTNAME": "EQ-01",
+                "TXNDATE": datetime.date(2026, 1, 10),
+                "PRIMARY_CATEGORY": "CatA",
+                "SECONDARY_CATEGORY": "SubCat1",
+                "pj_type": pjt,
+                "PRODUCTLINENAME": productlinenames[i % len(productlinenames)],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+class TestSampleDetailDfIncludesProductlinenamColumn:
+    """Fixture discipline guard: _sample_detail_df helper must emit PRODUCTLINENAME."""
+
+    def test_sample_detail_df_includes_productlinename_column(self):
+        """Updated _sample_detail_df() must include PRODUCTLINENAME column."""
+        df = _sample_detail_df_with_productlinename()
+        assert "PRODUCTLINENAME" in df.columns, (
+            "PRODUCTLINENAME column missing from detail fixture"
+        )
+
+
+class TestGetDetailPageIncludesProductlinename:
+    """PRODUCTLINENAME must appear in detail page response rows (spool path)."""
+
+    def test_get_detail_page_includes_productlinename(self, tmp_path):
+        """Spool path: fixture with PRODUCTLINENAME='PKG-D'; response rows contain the field."""
+        detail_df = _sample_detail_df_with_productlinename(
+            pj_types=["TypeX"], productlinenames=["PKG-D"]
+        )
+        spool_path = tmp_path / "detail_pkg.parquet"
+        detail_df.to_parquet(str(spool_path), engine="pyarrow", index=False)
+
+        with mock.patch(
+            "mes_dashboard.services.material_consumption_duckdb_runtime.get_spool_file_path",
+            return_value=str(spool_path),
+        ):
+            result = _MC_SVC.get_detail_page(query_id="test-pkg-qid", page=1)
+
+        assert result is not None
+        rows = result.get("rows", [])
+        assert len(rows) > 0
+        assert "productlinename" in rows[0], (
+            f"productlinename missing from detail page row. Keys: {list(rows[0].keys())}"
+        )
+        assert rows[0]["productlinename"] == "PKG-D"
+
+    def test_get_detail_page_productlinename_trailing_space_trimmed(self, tmp_path):
+        """PRODUCTLINENAME='PKG-D  ' (CHAR-padded) must be trimmed in response (AC-6)."""
+        detail_df = _sample_detail_df_with_productlinename(
+            pj_types=["TypeX"], productlinenames=["PKG-D  "]
+        )
+        spool_path = tmp_path / "detail_pkg_space.parquet"
+        detail_df.to_parquet(str(spool_path), engine="pyarrow", index=False)
+
+        with mock.patch(
+            "mes_dashboard.services.material_consumption_duckdb_runtime.get_spool_file_path",
+            return_value=str(spool_path),
+        ):
+            result = _MC_SVC.get_detail_page(query_id="test-pkg-space-qid", page=1)
+
+        assert result is not None
+        rows = result.get("rows", [])
+        assert len(rows) > 0
+        val = rows[0].get("productlinename")
+        assert val != "PKG-D  ", f"Trailing spaces must be trimmed, got {val!r}"
+
+    def test_get_detail_page_productlinename_null_safe(self, tmp_path):
+        """PRODUCTLINENAME=None must not crash and must appear in response (AC-6)."""
+        detail_df = _sample_detail_df_with_productlinename(
+            pj_types=["TypeX"], productlinenames=[None]
+        )
+        spool_path = tmp_path / "detail_pkg_null.parquet"
+        detail_df.to_parquet(str(spool_path), engine="pyarrow", index=False)
+
+        with mock.patch(
+            "mes_dashboard.services.material_consumption_duckdb_runtime.get_spool_file_path",
+            return_value=str(spool_path),
+        ):
+            result = _MC_SVC.get_detail_page(query_id="test-pkg-null-qid", page=1)
+
+        assert result is not None, "get_detail_page must not crash on NULL PRODUCTLINENAME"
+        rows = result.get("rows", [])
+        assert len(rows) > 0
+
+    def test_get_detail_page_existing_columns_unchanged(self, tmp_path):
+        """All existing columns in _sample_detail_df survive after PRODUCTLINENAME extension."""
+        detail_df = _sample_detail_df_with_productlinename(
+            pj_types=["TypeX"], productlinenames=["PKG-E"]
+        )
+        spool_path = tmp_path / "detail_existing.parquet"
+        detail_df.to_parquet(str(spool_path), engine="pyarrow", index=False)
+
+        with mock.patch(
+            "mes_dashboard.services.material_consumption_duckdb_runtime.get_spool_file_path",
+            return_value=str(spool_path),
+        ):
+            result = _MC_SVC.get_detail_page(query_id="test-existing-qid", page=1)
+
+        assert result is not None
+        rows = result.get("rows", [])
+        assert len(rows) > 0
+        row = rows[0]
+        for key in ("containerid", "containername", "pj_workorder", "workcentername",
+                    "material_part", "materiallotname", "vendorlotnumber",
+                    "qty_required", "qty_consumed", "equipmentname", "txn_date",
+                    "primary_category", "secondary_category", "pj_type"):
+            assert key in row, f"Pre-existing key {key!r} missing from detail page row"
+
+
+class TestDetailExportCsvIncludesProductlinename:
+    """PRODUCTLINENAME column must appear in CSV export header and rows."""
+
+    def test_detail_export_csv_includes_productlinename(self, tmp_path):
+        """export_csv_stream must include PRODUCTLINENAME in CSV header (AC-5)."""
+        detail_df = _sample_detail_df_with_productlinename(
+            pj_types=["TypeX", "TypeY"], productlinenames=["PKG-F", "PKG-G"]
+        )
+        spool_path = tmp_path / "export_pkg.parquet"
+        detail_df.to_parquet(str(spool_path), engine="pyarrow", index=False)
+
+        with mock.patch(
+            "mes_dashboard.services.material_consumption_duckdb_runtime.get_spool_file_path",
+            return_value=str(spool_path),
+        ):
+            gen = _MC_SVC.export_csv_stream(query_id="test-export-pkg-qid")
+            chunks = list(gen)
+
+        assert len(chunks) > 0
+        header_text = chunks[0].decode("utf-8-sig")
+        assert "PRODUCTLINENAME" in header_text or "Package" in header_text, (
+            f"PRODUCTLINENAME or Package header missing from CSV. Header: {header_text!r}"
+        )

@@ -486,6 +486,7 @@ def get_hold_history_list(
                     'holdHours': round(_safe_float(row.get('HOLD_HOURS')), 2),
                     'ncr': _clean_text(row.get('NCR_ID')),
                     'futureHoldComment': _clean_text(row.get('FUTURE_HOLD_COMMENT')),
+                    'package': _clean_text(row.get('PACKAGE') or row.get('package')),
                 })
 
         total_pages = (total + per_page - 1) // per_page if total > 0 else 1

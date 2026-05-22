@@ -32,7 +32,7 @@ _EXPORT_COLS = [
     "CONTAINERID", "CONTAINERNAME", "PJ_WORKORDER", "WORKCENTERNAME",
     "MATERIALPARTNAME", "MATERIALLOTNAME", "VENDORLOTNUMBER",
     "QTYREQUIRED", "QTYCONSUMED", "EQUIPMENTNAME", "TXNDATE",
-    "PRIMARY_CATEGORY", "SECONDARY_CATEGORY", "PJ_TYPE",
+    "PRIMARY_CATEGORY", "SECONDARY_CATEGORY", "PJ_TYPE", "PRODUCTLINENAME",
 ]
 _EXPORT_HEADERS = {
     "CONTAINERID": "容器ID",
@@ -49,6 +49,7 @@ _EXPORT_HEADERS = {
     "PRIMARY_CATEGORY": "主分類",
     "SECONDARY_CATEGORY": "副分類",
     "PJ_TYPE": "產品類型",
+    "PRODUCTLINENAME": "PRODUCTLINENAME",
 }
 
 # Column rename map: Oracle uppercase → frontend snake_case API keys
@@ -63,6 +64,12 @@ _DETAIL_COL_RENAME = {
 def _normalize_detail_df(df: Any) -> Any:
     """Rename and lowercase detail spool columns to match the frontend API contract."""
     df.columns = [_DETAIL_COL_RENAME.get(c, c.lower()) for c in df.columns]
+    # Trim Oracle CHAR-padded PRODUCTLINENAME values (AC-6)
+    if "productlinename" in df.columns:
+        df["productlinename"] = (
+            df["productlinename"]
+            .apply(lambda v: v.strip() if isinstance(v, str) else v)
+        )
     return df
 
 

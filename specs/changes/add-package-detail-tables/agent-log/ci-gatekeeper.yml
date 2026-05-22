@@ -1,0 +1,14 @@
+change-id: add-package-detail-tables
+agent: ci-gatekeeper
+timestamp: "2026-05-22T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (backend-unit, frontend-unit, type-check, css-governance, contract-validate), 2 (python-lint)" }
+  - { type: gate-promotions, pointer: "n/a (no tier promotions; all gates served by existing workflows)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow edits required; existing backend-tests.yml, frontend-tests.yml, contract-driven-gates.yml already cover all change paths)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests (backend-tests.yml), frontend-unit-tests (frontend-tests.yml), contract-and-fast-tests (contract-driven-gates.yml)" }
+next-action: none
+notes: >
+  Parquet cleanup command documented in Rollback Policy section of ci-gates.md.
+  material-consumption spool schema change (PRODUCTLINENAME added) is the sole
+  deployment risk; hold-history and query-tool have no persistent spool files.
