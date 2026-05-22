@@ -486,7 +486,7 @@ def _query_list(
         if len(r) > 0
     }
     _package_col = (
-        'CAST(hold_src."package" AS VARCHAR) AS package'
+        'CAST(hold_src."PACKAGE" AS VARCHAR) AS package'
         if "package" in _available_cols
         else "NULL AS package"
     )

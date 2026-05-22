@@ -247,6 +247,7 @@ onUnmounted(() => {
           <DataTableColumn columnKey="lotId" label="Lot ID" :sortable="true" />
           <DataTableColumn columnKey="workorder" label="WorkOrder" :sortable="true" />
           <DataTableColumn columnKey="product" label="Product" :sortable="true" />
+          <DataTableColumn columnKey="package" label="Package" :sortable="true" />
           <DataTableColumn columnKey="workcenter" label="站別" :sortable="true" />
           <DataTableColumn columnKey="holdReason" label="Hold Reason" :sortable="true" />
           <DataTableColumn columnKey="qty" label="數量" :sortable="true" align="right" />
@@ -259,12 +260,12 @@ onUnmounted(() => {
           <DataTableColumn columnKey="holdHours" label="時長(hr)" :sortable="true" align="right" />
           <DataTableColumn columnKey="ncr" label="NCR" :sortable="true" />
           <DataTableColumn columnKey="futureHoldComment" label="Future Hold Comment" :sortable="true" />
-          <DataTableColumn columnKey="package" label="Package" :sortable="true" />
 
           <template #cell="{ row, columnKey }">
             <template v-if="columnKey === 'lotId'">{{ row.lotId || '-' }}</template>
             <template v-else-if="columnKey === 'workorder'">{{ row.workorder || '-' }}</template>
             <template v-else-if="columnKey === 'product'">{{ row.product || '-' }}</template>
+            <template v-else-if="columnKey === 'package'">{{ (row as HoldItem).package || '-' }}</template>
             <template v-else-if="columnKey === 'workcenter'">{{ row.workcenter || '-' }}</template>
             <template v-else-if="columnKey === 'holdReason'">{{ row.holdReason || '-' }}</template>
             <template v-else-if="columnKey === 'qty'">{{ formatNumber(row.qty) }}</template>
@@ -283,7 +284,6 @@ onUnmounted(() => {
             <template v-else-if="columnKey === 'futureHoldComment'">
               <span class="cell-comment" :data-tip="row.futureHoldComment || ''" @mouseenter="showTip" @mouseleave="hideTip">{{ row.futureHoldComment || '-' }}</span>
             </template>
-            <template v-else-if="columnKey === 'package'">{{ (row as HoldItem).package || '-' }}</template>
           </template>
         </DataTable>
       </div>

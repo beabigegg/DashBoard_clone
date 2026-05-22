@@ -379,6 +379,7 @@ def _build_list(df: pd.DataFrame, page: int, per_page: int) -> Dict[str, Any]:
             'lotId': _clean_text(row.get('LOT_ID')),
             'workorder': _clean_text(row.get('PJ_WORKORDER')),
             'product': _clean_text(row.get('PRODUCTNAME')),
+            'package': _clean_text(row.get('PACKAGE')),
             'workcenter': wc_group or wc_name,
             'holdReason': _clean_text(row.get('HOLDREASONNAME')),
             'qty': _safe_int(row.get('QTY')),
