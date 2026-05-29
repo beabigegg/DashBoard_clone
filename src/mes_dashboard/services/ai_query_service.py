@@ -720,8 +720,10 @@ def _review_sql(
     try:
         result = _call_llm(review_messages)
     except Exception as exc:
-        logger.warning("Reviewer LLM call failed, skipping review: %s", exc)
-        return ""
+        # Fail-closed: if the reviewer is unavailable, refuse to execute rather
+        # than silently approving — a downed reviewer must not become a bypass.
+        logger.warning("Reviewer LLM call failed, rejecting SQL: %s", exc)
+        return "LLM 審查服務暫時不可用，拒絕執行"
 
     if result.get("approved", True):
         return ""
@@ -812,6 +814,21 @@ def _load_valid_columns() -> dict[str, set[str]]:
         logger.warning("Failed to load table_schema_info.json: %s", exc)
         _VALID_COLUMNS = {}
     return _VALID_COLUMNS
+
+
+# Only these statement types are allowed through the AI pipeline.
+_ALLOWED_SQL_STARTS = frozenset({"SELECT", "WITH"})
+
+
+def _assert_select_only(sql: str) -> None:
+    """Raise ValueError if the first SQL keyword is not SELECT or WITH."""
+    text = sql.strip().lstrip("-– \t\n")
+    m = re.match(r"\w+", text)
+    first_kw = m.group(0).upper() if m else ""
+    if first_kw not in _ALLOWED_SQL_STARTS:
+        raise ValueError(
+            f"只允許 SELECT 查詢，拒絕執行 '{first_kw or text[:20]}' 語句"
+        )
 
 
 def _sanitize_sql(sql: str) -> str:
@@ -1026,10 +1043,20 @@ def process_query_text2sql(
                     ),
                 })
                 continue  # Skip execution, go to next attempt
-            # Last attempt — try executing anyway
-            logger.warning("Reviewer rejected on last attempt, executing anyway")
+            # Reviewer rejected on every attempt — abort without executing.
+            return {
+                "answer": f"SQL 審查未通過（已重試 {MAX_RETRIES} 次）：{review_issue}",
+                "chart_data": None,
+                "query_used": "text2sql",
+                "params_used": params_used,
+                "sql_used": sql_used,
+                "tool_trace": tool_trace,
+                "suggestions": [],
+            }
 
         # ── Execute SQL ──────────────────────────────────────────────────────
+        # 0. Statement type guard — only SELECT/WITH allowed.
+        _assert_select_only(sql)
         sql = _sanitize_sql(sql)
         params = _coerce_date_params(params)
         try:
