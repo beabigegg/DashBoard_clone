@@ -146,6 +146,7 @@ def _get_filtered_resources_and_lookup(
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
+    package_groups: Optional[List[str]] = None,
 ) -> tuple:
     """Returns (resources_list, resource_lookup_dict, historyid_filter_sql)."""
     from mes_dashboard.services.resource_history_service import (
@@ -161,6 +162,7 @@ def _get_filtered_resources_and_lookup(
         is_production=is_production,
         is_key=is_key,
         is_monitor=is_monitor,
+        package_groups=package_groups,
     )
     lookup = _build_resource_lookup(resources)
     historyid_filter = _build_historyid_filter(resources)
@@ -183,6 +185,7 @@ def execute_primary_query(
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
+    package_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute Oracle query -> spool to Parquet -> return DuckDB-computed result."""
 
@@ -195,6 +198,7 @@ def execute_primary_query(
         "is_production": is_production,
         "is_key": is_key,
         "is_monitor": is_monitor,
+        "package_groups": sorted(package_groups or []),
     }
     query_id = _make_query_id(query_id_input)
 
@@ -217,6 +221,7 @@ def execute_primary_query(
             is_production=is_production,
             is_key=is_key,
             is_monitor=is_monitor,
+            package_groups=package_groups,
         )
 
         if not resources:

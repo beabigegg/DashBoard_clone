@@ -43,6 +43,7 @@ function createDefaultFilters() {
     isProduction: false,
     isKey: false,
     isMonitor: false,
+    packageGroups: [],
   });
 }
 
@@ -61,6 +62,7 @@ const {
     isProduction:    { trigger: 'immediate', initial: false },
     isKey:           { trigger: 'immediate', initial: false },
     isMonitor:       { trigger: 'immediate', initial: false },
+    packageGroups:   { trigger: 'immediate', initial: [] },
   },
   dependencies: [],
 });
@@ -69,10 +71,12 @@ const options = reactive<{
   workcenterGroups: (string | number | Record<string, unknown>)[];
   families: (string | number | Record<string, unknown>)[];
   resources: ResourceItem[];
+  packageGroups: (string | number | Record<string, unknown>)[];
 }>({
   workcenterGroups: [],
   families: [],
   resources: [],
+  packageGroups: [],
 });
 
 const summaryData = ref<{
@@ -222,6 +226,7 @@ function assignFilterState(target: Record<string, unknown>, source: Record<strin
   target.isProduction = snapshot.isProduction;
   target.isKey = snapshot.isKey;
   target.isMonitor = snapshot.isMonitor;
+  target.packageGroups = [...snapshot.packageGroups];
 }
 
 function resetToDefaultFilters(target: Record<string, unknown>): void {
@@ -253,6 +258,7 @@ function buildQueryStringFromFilters(filters: Record<string, unknown>): string {
   appendArrayParams(params, 'workcenter_groups', queryParams.workcenter_groups || []);
   appendArrayParams(params, 'families', queryParams.families || []);
   appendArrayParams(params, 'resource_ids', queryParams.resource_ids || []);
+  appendArrayParams(params, 'package_groups', queryParams.package_groups || []);
 
   if (queryParams.is_production) {
     params.append('is_production', queryParams.is_production);
@@ -295,6 +301,7 @@ function restoreCommittedFiltersFromUrl() {
     isProduction: readBooleanParam(params, 'is_production'),
     isKey: readBooleanParam(params, 'is_key'),
     isMonitor: readBooleanParam(params, 'is_monitor'),
+    packageGroups: readArrayParam(params, 'package_groups'),
   };
 
   if (next.startDate) {
@@ -314,6 +321,9 @@ function restoreCommittedFiltersFromUrl() {
   }
   if (next.machines.length > 0) {
     committedFilters.machines = next.machines;
+  }
+  if (next.packageGroups.length > 0) {
+    committedFilters.packageGroups = next.packageGroups;
   }
   committedFilters.isProduction = next.isProduction;
   committedFilters.isKey = next.isKey;
@@ -360,6 +370,7 @@ async function loadOptions() {
     options.workcenterGroups = Array.isArray(data.workcenter_groups) ? (data.workcenter_groups as (string | number | Record<string, unknown>)[]) : [];
     options.families = Array.isArray(data.families) ? (data.families as (string | number | Record<string, unknown>)[]) : [];
     options.resources = Array.isArray(data.resources) ? (data.resources as ResourceItem[]) : [];
+    options.packageGroups = Array.isArray(data.package_groups) ? (data.package_groups as (string | number | Record<string, unknown>)[]) : [];
   } finally {
     loading.options = false;
   }
@@ -377,6 +388,7 @@ const filterBarOptions = computed(() => {
   return {
     workcenterGroups: options.workcenterGroups,
     families: familyOptions.value,
+    packageGroups: options.packageGroups,
   };
 });
 
@@ -448,6 +460,7 @@ function buildPrimarySnapshot(filters: Record<string, unknown>): string {
     is_production: p.is_production || '',
     is_key: p.is_key || '',
     is_monitor: p.is_monitor || '',
+    package_groups: p.package_groups || [],
   });
 }
 
@@ -502,6 +515,7 @@ async function executePrimaryQuery() {
       is_production: !!queryParams.is_production,
       is_key: !!queryParams.is_key,
       is_monitor: !!queryParams.is_monitor,
+      package_groups: queryParams.package_groups || [],
     };
 
     const response = await apiPost('/api/resource/history/query', body, {

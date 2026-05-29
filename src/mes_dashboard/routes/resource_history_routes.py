@@ -152,6 +152,7 @@ def _parse_resource_filters(data: dict) -> dict:
         "is_production": _bool_param(data.get("is_production")),
         "is_key": _bool_param(data.get("is_key")),
         "is_monitor": _bool_param(data.get("is_monitor")),
+        "package_groups": data.get("package_groups") or None,
     }
 
 
@@ -210,6 +211,7 @@ def api_resource_history_query():
                 is_production=filters.get("is_production", False),
                 is_key=filters.get("is_key", False),
                 is_monitor=filters.get("is_monitor", False),
+                package_groups=filters.get("package_groups"),
             )
             if canonical_result is not None:
                 _inject_resource_spool_info(canonical_result, canonical_result.get("query_id", ""))

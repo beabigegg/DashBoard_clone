@@ -45,6 +45,7 @@ def _get_filtered_resources(
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
+    package_groups: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get filtered resources from resource_cache.
 
@@ -57,11 +58,12 @@ def _get_filtered_resources(
         is_production: Filter by production flag
         is_key: Filter by key equipment flag
         is_monitor: Filter by monitor flag
+        package_groups: Optional list of PACKAGEGROUPNAME values
 
     Returns:
         List of resource dicts matching the filters.
     """
-    from mes_dashboard.services.resource_cache import get_all_resources
+    from mes_dashboard.services.resource_cache import get_all_resources, get_package_group_name
     from mes_dashboard.services.filter_cache import get_workcenter_mapping
 
     resources = get_all_resources()
@@ -81,6 +83,7 @@ def _get_filtered_resources(
                 allowed_workcenters.add(wc_name)
 
     resource_id_set = set(resource_ids) if resource_ids else None
+    package_group_set = set(package_groups) if package_groups else None
 
     # Apply filters
     filtered = []
@@ -105,6 +108,12 @@ def _get_filtered_resources(
             continue
         if is_monitor and r.get('PJ_ISMONITOR') != 1:
             continue
+
+        # Package group filter — resolve PACKAGEGROUPID → name, exclude null when filter active
+        if package_group_set is not None:
+            pgname = get_package_group_name(r.get('PACKAGEGROUPID'))
+            if pgname not in package_group_set:
+                continue
 
         filtered.append(r)
 
@@ -194,6 +203,7 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
     from mes_dashboard.services.resource_cache import (
         get_resource_families,
         get_resource_cascade_metadata,
+        get_package_groups,
     )
 
     try:
@@ -208,6 +218,7 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
             'workcenter_groups': groups,
             'families': families,
             'resources': get_resource_cascade_metadata(),
+            'package_groups': get_package_groups(),
         }
     except Exception as exc:
         logger.error(f"Filter options query failed: {exc}")

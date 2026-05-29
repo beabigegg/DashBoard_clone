@@ -73,6 +73,7 @@ export interface ResourceFilterInput {
   isProduction?: unknown;
   isKey?: unknown;
   isMonitor?: unknown;
+  packageGroups?: unknown;
   [key: string]: unknown;
 }
 
@@ -86,6 +87,7 @@ export interface ResourceFilterSnapshot {
   isProduction: boolean;
   isKey: boolean;
   isMonitor: boolean;
+  packageGroups: string[];
 }
 
 export function toResourceFilterSnapshot(input: ResourceFilterInput = {}): ResourceFilterSnapshot {
@@ -99,6 +101,7 @@ export function toResourceFilterSnapshot(input: ResourceFilterInput = {}): Resou
     isProduction: normalizeBoolean(input.isProduction, false),
     isKey: normalizeBoolean(input.isKey, false),
     isMonitor: normalizeBoolean(input.isMonitor, false),
+    packageGroups: normalizeArray(input.packageGroups),
   };
 }
 
@@ -213,6 +216,7 @@ export interface ResourceHistoryQueryParams {
   is_production?: string;
   is_key?: string;
   is_monitor?: string;
+  package_groups?: string[];
 }
 
 export function buildResourceHistoryQueryParams(
@@ -235,6 +239,9 @@ export function buildResourceHistoryQueryParams(
   }
   if (next.isMonitor) {
     params.is_monitor = '1';
+  }
+  if (next.packageGroups.length > 0) {
+    params.package_groups = next.packageGroups;
   }
   return params;
 }

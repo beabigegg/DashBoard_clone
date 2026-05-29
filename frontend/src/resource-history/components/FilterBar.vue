@@ -10,6 +10,7 @@ interface GranularityItem {
 interface FilterOptions {
   workcenterGroups: (string | number | Record<string, unknown>)[];
   families: (string | number | Record<string, unknown>)[];
+  packageGroups: (string | number | Record<string, unknown>)[];
 }
 
 
@@ -29,6 +30,7 @@ const props = withDefaults(defineProps<{
   options: () => ({
     workcenterGroups: [],
     families: [],
+    packageGroups: [],
   }),
   machineOptions: () => [],
   loading: false,
@@ -122,6 +124,17 @@ function updateFilters(patch: Record<string, unknown>): void {
             placeholder="全部機台"
             searchable
             @update:model-value="updateFilters({ machines: $event })"
+          />
+        </div>
+
+        <div class="filter-field">
+          <label>封裝群組</label>
+          <MultiSelect
+            :model-value="(filters.packageGroups as string[])"
+            :options="options.packageGroups"
+            :disabled="loading"
+            placeholder="全部封裝群組"
+            @update:model-value="updateFilters({ packageGroups: $event })"
           />
         </div>
 
