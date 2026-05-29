@@ -17,7 +17,11 @@ import os
 import re
 from typing import Any
 
+import ssl
+
 import requests
+import urllib3
+from requests.adapters import HTTPAdapter
 
 from mes_dashboard.services.ai_function_registry import (
     REGISTRY,
@@ -49,6 +53,36 @@ _AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
 _AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "false").strip().lower() in {"1", "true", "yes"}
 # No max_tokens cap — internal LLM with 16K context, no token cost.
 _AI_MODE = os.getenv("AI_MODE", "text2sql")  # "text2sql" | "function"
+
+# ---------------------------------------------------------------------------
+# HTTP session: verify CA chain but skip hostname check.
+# The endpoint hostname (ollama_pjapi.theaken.com) contains an underscore,
+# which OpenSSL 3.x refuses to match against *.theaken.com even though the
+# wildcard is technically valid. CA chain is Google-issued and fully trusted.
+# ---------------------------------------------------------------------------
+class _SkipHostnameAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False  # OpenSSL rejects underscore in wildcard match
+        kwargs["ssl_context"] = ctx
+        super().init_poolmanager(*args, **kwargs)
+
+    def proxy_manager_for(self, proxy, **proxy_kwargs):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        proxy_kwargs["ssl_context"] = ctx
+        return super().proxy_manager_for(proxy, **proxy_kwargs)
+
+
+def _make_ai_session() -> requests.Session:
+    s = requests.Session()
+    if not _AI_VERIFY_TLS:
+        s.mount("https://", _SkipHostnameAdapter())
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    return s
+
+
+_AI_SESSION = _make_ai_session()
 
 # ID type detection order for auto_resolve_id functions
 _ID_RESOLVE_ORDER = ["lot", "workorder"]
@@ -120,11 +154,10 @@ def _call_llm(messages: list[dict]) -> dict:
         "stream": False,
     }
 
-    response = requests.post(
+    response = _AI_SESSION.post(
         url,
         headers=headers,
         json=body,
-        verify=_AI_VERIFY_TLS,
         timeout=_AI_REQUEST_TIMEOUT,
     )
 
@@ -181,11 +214,10 @@ def call_llm_text(messages: list[dict]) -> str:
         "stream": False,
     }
 
-    response = requests.post(
+    response = _AI_SESSION.post(
         url,
         headers=headers,
         json=body,
-        verify=_AI_VERIFY_TLS,
         timeout=_AI_REQUEST_TIMEOUT,
     )
 
