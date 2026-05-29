@@ -1,0 +1,19 @@
+agent: test-strategist
+change-id: downtime-analysis-page
+timestamp: 2026-05-29
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/downtime-analysis-page/test-plan.md" }
+  - type: tdd-pairs
+    pointer: >
+      tests/test_downtime_analysis_service.py ↔ src/mes_dashboard/services/downtime_analysis_service.py;
+      tests/test_downtime_analysis_routes.py ↔ src/mes_dashboard/routes/downtime_analysis_routes.py;
+      tests/test_api_contract.py (new entries) ↔ contracts/data/data-shape-contract.md §3.12;
+      tests/test_modernization_policy_hardening.py (new entries) ↔ data/page_status.json + docs/migration/full-modernization-architecture-blueprint/;
+      tests/e2e/test_downtime_analysis_e2e.py ↔ src/mes_dashboard/services/downtime_analysis_service.py;
+      frontend/tests/playwright/downtime-analysis.spec.js ↔ frontend/src/downtime-analysis/;
+      frontend/src/downtime-analysis/__tests__/formatDowntimeDate.test.ts ↔ frontend/src/downtime-analysis/ date formatter;
+      frontend/src/downtime-analysis/__tests__/useBigCategory.test.ts ↔ frontend/src/downtime-analysis/ composable;
+      frontend/src/downtime-analysis/__tests__/useFilterState.test.ts ↔ frontend/src/downtime-analysis/ composable
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1), integration (Tier 1), e2e (Tier 1), data-boundary (Tier 0), resilience (Tier 1), visual (manual), stress (nightly), soak (weekly)" }
+  - { type: mapping-completeness, pointer: "all AC-1..AC-8 covered; DA-01..DA-06 each pinned to at least one test class; §3.12.1–3.12.7 shapes each have a contract test entry; modernization-policy JSON entries have hardening-test coverage" }

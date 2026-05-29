@@ -1,0 +1,8 @@
+agent: implementation-planner
+change-id: downtime-analysis-page
+timestamp: 2026-05-29
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/downtime-analysis-page/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-10, IP-16 verify), frontend-engineer (IP-11..IP-14, IP-15), ci-cd-gatekeeper (IP-15 alt)" }
+  - { type: scope-summary, pointer: "in-scope: 5 endpoints (/api/downtime-analysis/*), new spool namespace downtime_analysis_*, Vue3 app .theme-downtime-analysis, 4 JSON updates (page_status + asset_readiness + route_scope + route_contracts); out-of-scope: TBD 落差分析, OEE recompute, IT JOBID backfill execution, stress/soak/monkey gates" }

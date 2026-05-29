@@ -126,6 +126,13 @@
       "status": "released",
       "drawer_id": "drawer",
       "order": 6
+    },
+    {
+      "route": "/downtime-analysis",
+      "name": "設備停機分析",
+      "status": "released",
+      "drawer_id": "drawer-2",
+      "order": 6
     }
   ],
   "api_public": true,

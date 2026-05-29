@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.12.0
+schema-version: 1.12.1
 last-changed: 2026-05-29
 breaking-change-policy: deprecate-2-minors
 ---
@@ -824,9 +824,6 @@ Paginated: `page` (default 1), `page_size` (default 50, max 200). Response inclu
 ---
 
 ## CHANGELOG
-
-## [data 1.12.0]
-- downtime-analysis-page (2026-05-29): Added §3.12 documenting all downtime-analysis response shapes (§3.12.1–3.12.7): DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow, EquipmentDetailRow, EventDetailRow, JobEnrichment. Documented null-sentinel semantics, match_source closed enum, midnight-UTC DATE note, spool namespace, IT JOBID backfill invalidation. Additive; no existing schemas changed.
 
 ## [data 1.11.0]
 - ai-pipeline-upgrade (2026-05-29): Added §2.9 (AI Session Store Shape including `chat_history` pairs, cap 8/16, TTL, pop-preservation semantics) and three new AI function param schemas (`production_history_query` raw_params dispatch, `resource_history_summary` kwargs, `qc_gate_status` no-params). Added `normalize_chart_data` output for `qc_gate_status` (→ stations list) and pass-through for `production_history_query`/`resource_history_summary`. Additive; no existing schemas changed.

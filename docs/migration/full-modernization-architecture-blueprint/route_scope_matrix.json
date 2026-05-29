@@ -16,7 +16,8 @@
     { "route": "/yield-alert-center", "category": "report" },
     { "route": "/admin/pages", "category": "admin" },
     { "route": "/admin/dashboard", "category": "admin" },
-    { "route": "/material-consumption", "category": "report" }
+    { "route": "/material-consumption", "category": "report" },
+    { "route": "/downtime-analysis", "category": "report" }
   ],
   "deferred": []
 }

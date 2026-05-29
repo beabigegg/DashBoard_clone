@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => ({
         'yield-alert-center': resolve(__dirname, 'src/yield-alert-center/index.html'),
         'anomaly-overview': resolve(__dirname, 'src/anomaly-overview/index.html'),
         'material-consumption': resolve(__dirname, 'src/material-consumption/index.html'),
+        'downtime-analysis': resolve(__dirname, 'src/downtime-analysis/index.html'),
       },
       output: {
         entryFileNames: '[name].js',

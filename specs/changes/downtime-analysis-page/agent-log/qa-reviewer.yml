@@ -1,0 +1,12 @@
+agent: qa-reviewer
+change-id: downtime-analysis-page
+timestamp: "2026-05-29"
+status: complete
+artifacts:
+  - { type: qa-report, pointer: "specs/changes/downtime-analysis-page/qa-report.md" }
+  - { type: gate-results, pointer: "lint: PASS, contract-validate: PASS, unit-mock-integration: PASS (150 tests), frontend-unit: PASS (486 tests; 1 pre-existing fail), css-governance: PASS, frontend-type-check: PASS (informational), cdd-kit gate: PASS" }
+  - { type: ac-coverage, pointer: "AC-1..AC-8 all covered and passing" }
+  - { type: known-risk, pointer: "JOBID coverage gap (~50% UDT) approved-with-risk; IT backfill runbook in ci-gates.md §Rollback Policy" }
+  - { type: verdict, pointer: "MERGE READY (pending CI playwright-downtime-analysis + e2e-backend gates)" }
+  - { type: version-bumps-triggered, pointer: "api 1.13.1, data 1.12.1, business 1.12.1 (post-review patch bumps)" }
+next-action: archive (task 7.1, 7.2)

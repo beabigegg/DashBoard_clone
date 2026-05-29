@@ -639,5 +639,344 @@ class TestProductionHistoryPartialMergeContract(unittest.TestCase):
             shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+# ===========================================================================
+# Downtime Analysis shape tests (§3.12.1..§3.12.7)
+# ===========================================================================
+
+
+class TestDowntimeSummaryShape(unittest.TestCase):
+    """§3.12.1 DowntimeKpiShape — all required fields present and typed."""
+
+    def _build_summary(self, events_df=None):
+        from mes_dashboard.services.downtime_analysis_service import _build_summary
+        import pandas as pd
+        if events_df is None:
+            events_df = pd.DataFrame({
+                'status': ['UDT', 'SDT', 'EGT'],
+                'hours': [2.0, 3.0, 1.0],
+            })
+        return _build_summary(events_df)
+
+    def test_total_hours_present_and_float(self):
+        s = self._build_summary()
+        self.assertIn('total_hours', s)
+        self.assertIsInstance(s['total_hours'], float)
+
+    def test_udt_sdt_egt_hours_present(self):
+        s = self._build_summary()
+        for key in ('udt_hours', 'sdt_hours', 'egt_hours'):
+            self.assertIn(key, s, f"Missing field '{key}'")
+            self.assertIsInstance(s[key], float)
+
+    def test_event_count_is_integer(self):
+        s = self._build_summary()
+        self.assertIn('event_count', s)
+        self.assertIsInstance(s['event_count'], int)
+
+    def test_avg_event_min_is_float(self):
+        s = self._build_summary()
+        self.assertIn('avg_event_min', s)
+        self.assertIsInstance(s['avg_event_min'], float)
+
+    def test_empty_df_returns_zeros(self):
+        import pandas as pd
+        s = self._build_summary(pd.DataFrame())
+        self.assertEqual(s['event_count'], 0)
+        self.assertEqual(s['total_hours'], 0.0)
+        self.assertEqual(s['avg_event_min'], 0.0)
+
+    def test_nst_excluded_from_totals(self):
+        """NST hours must NOT appear in summary (DA-01)."""
+        # DA-01 is enforced at SQL layer; service receives only UDT/SDT/EGT events.
+        # This test verifies _build_summary does NOT have an NST bucket.
+        s = self._build_summary()
+        self.assertNotIn('nst_hours', s)
+
+
+class TestDailyTrendShape(unittest.TestCase):
+    """§3.12.2 DailyTrendRow — fields and types."""
+
+    def _build_trend(self):
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import _build_daily_trend
+        df = pd.DataFrame({
+            'status': ['UDT', 'SDT'],
+            'hours': [2.0, 1.0],
+            'start_ts': ['2026-05-27T08:00:00', '2026-05-27T10:00:00'],
+        })
+        return _build_daily_trend(df)
+
+    def test_rows_have_required_fields(self):
+        rows = self._build_trend()
+        self.assertGreater(len(rows), 0)
+        row = rows[0]
+        for field in ('date', 'udt_hours', 'sdt_hours', 'egt_hours', 'total_hours'):
+            self.assertIn(field, row, f"Missing DailyTrendRow field '{field}'")
+
+    def test_date_is_string(self):
+        rows = self._build_trend()
+        self.assertIsInstance(rows[0]['date'], str)
+
+    def test_hours_are_floats(self):
+        rows = self._build_trend()
+        for field in ('udt_hours', 'sdt_hours', 'egt_hours', 'total_hours'):
+            self.assertIsInstance(rows[0][field], float)
+
+
+class TestBigCategoryShape(unittest.TestCase):
+    """§3.12.3 BigCategoryRow — fields and types."""
+
+    def _build_big_cat(self):
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import _build_big_category
+        df = pd.DataFrame({
+            'category': ['維修', '保養'],
+            'hours': [3.0, 1.0],
+        })
+        return _build_big_category(df)
+
+    def test_rows_have_required_fields(self):
+        rows = self._build_big_cat()
+        self.assertGreater(len(rows), 0)
+        for field in ('category', 'hours', 'event_count', 'pct'):
+            self.assertIn(field, rows[0], f"Missing BigCategoryRow field '{field}'")
+
+    def test_category_is_string(self):
+        rows = self._build_big_cat()
+        self.assertIsInstance(rows[0]['category'], str)
+
+    def test_pct_sums_to_100(self):
+        rows = self._build_big_cat()
+        total_pct = sum(r['pct'] for r in rows)
+        self.assertAlmostEqual(total_pct, 100.0, delta=0.1)
+
+    def test_sorted_by_hours_desc(self):
+        rows = self._build_big_cat()
+        hours = [r['hours'] for r in rows]
+        self.assertEqual(hours, sorted(hours, reverse=True))
+
+
+class TestTopReasonsShape(unittest.TestCase):
+    """§3.12.4 TopReasonRow — fields, ordering, avg_min."""
+
+    def _build_top(self, top_n=10):
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import _build_top_reasons
+        df = pd.DataFrame({
+            'reason': ['EE Repair', 'EE_PM', 'EE Repair'],
+            'status': ['UDT', 'SDT', 'UDT'],
+            'hours': [5.0, 2.0, 3.0],
+        })
+        return _build_top_reasons(df, top_n=top_n)
+
+    def test_rows_have_required_fields(self):
+        rows = self._build_top()
+        self.assertGreater(len(rows), 0)
+        for field in ('reason', 'status', 'hours', 'event_count', 'avg_min'):
+            self.assertIn(field, rows[0], f"Missing TopReasonRow field '{field}'")
+
+    def test_sorted_by_hours_desc(self):
+        rows = self._build_top()
+        hours = [r['hours'] for r in rows]
+        self.assertEqual(hours, sorted(hours, reverse=True))
+
+    def test_top_n_respected(self):
+        rows = self._build_top(top_n=1)
+        self.assertEqual(len(rows), 1)
+
+    def test_avg_min_is_float(self):
+        rows = self._build_top()
+        for r in rows:
+            self.assertIsInstance(r['avg_min'], float)
+
+    def test_null_reason_becomes_unfilled(self):
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import _build_top_reasons
+        df = pd.DataFrame({'reason': [None, ''], 'status': ['UDT', 'SDT'], 'hours': [1.0, 2.0]})
+        rows = _build_top_reasons(df)
+        for r in rows:
+            self.assertEqual(r['reason'], '(未填寫)')
+
+
+class TestEquipmentDetailShape(unittest.TestCase):
+    """§3.12.5 EquipmentDetailRow — fields and match_source enum."""
+
+    def _build_eq_detail(self):
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import _build_equipment_detail
+        df = pd.DataFrame({
+            'resource_id': ['R-001', 'R-001', 'R-002'],
+            'status': ['UDT', 'SDT', 'EGT'],
+            'hours': [2.0, 1.5, 0.5],
+            'reason': ['EE Repair', 'EE_PM', 'Engineering'],
+        })
+        return _build_equipment_detail(df, resource_lookup={})
+
+    def test_rows_have_required_fields(self):
+        rows = self._build_eq_detail()
+        self.assertGreater(len(rows), 0)
+        for field in ('resource_id', 'resource_name', 'workcenter', 'family',
+                      'udt_hours', 'sdt_hours', 'egt_hours', 'total_hours',
+                      'event_count', 'top_reason'):
+            self.assertIn(field, rows[0], f"Missing EquipmentDetailRow field '{field}'")
+
+    def test_sorted_by_total_hours_desc(self):
+        rows = self._build_eq_detail()
+        total_hours = [r['total_hours'] for r in rows]
+        self.assertEqual(total_hours, sorted(total_hours, reverse=True))
+
+    def test_resource_name_nullable(self):
+        rows = self._build_eq_detail()
+        # Without a lookup dict, resource_name should be None (lookup miss)
+        self.assertIsNone(rows[0].get('resource_name'))
+
+
+class TestEventDetailShape(unittest.TestCase):
+    """§3.12.6 EventDetailRow — fields, match_source enum, job null when no-match."""
+
+    def _build_events_df(self):
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import (
+            _enrich_events_df, _bridge_jobid, _merge_cross_shift_events
+        )
+        from datetime import datetime
+        rows = [
+            {
+                'HISTORYID': 'R-001', 'OLDSTATUSNAME': 'UDT', 'OLDREASONNAME': 'EE Repair',
+                'OLDLASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 8, 0),
+                'LASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 10, 0),
+                'HOURS': 2.0, 'JOBID': None,
+            }
+        ]
+        merged = _merge_cross_shift_events(pd.DataFrame(rows))
+        bridged = _bridge_jobid(merged, pd.DataFrame())
+        return _enrich_events_df(bridged)
+
+    def test_event_detail_page_has_pagination(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        df = self._build_events_df()
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        self.assertIn('events', result)
+        self.assertIn('pagination', result)
+        pagination = result['pagination']
+        for key in ('page', 'page_size', 'total_rows', 'total_pages'):
+            self.assertIn(key, pagination)
+
+    def test_event_detail_row_has_required_fields(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        df = self._build_events_df()
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        row = result['events'][0]
+        for field in ('event_id', 'resource_id', 'resource_name', 'status', 'reason',
+                      'category', 'start_ts', 'end_ts', 'hours', 'match_source', 'job'):
+            self.assertIn(field, row, f"Missing EventDetailRow field '{field}'")
+
+    def test_match_source_closed_enum(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        df = self._build_events_df()
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        for row in result['events']:
+            self.assertIn(row['match_source'], ('jobid', 'overlap', 'none'),
+                          f"match_source must be closed enum, got {row['match_source']!r}")
+
+    def test_job_is_null_when_no_match(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        df = self._build_events_df()
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        for row in result['events']:
+            if row['match_source'] == 'none':
+                self.assertIsNone(row['job'],
+                                  "job sub-object must be null when match_source='none'")
+
+
+class TestJobEnrichmentShape(unittest.TestCase):
+    """§3.12.7 JobEnrichment — fields and null contract."""
+
+    def _build_enriched_event(self):
+        """Build an event with Path A match to get a non-null job sub-object."""
+        from datetime import datetime
+        import pandas as pd
+        from mes_dashboard.services.downtime_analysis_service import (
+            _bridge_jobid, _enrich_events_df, _merge_cross_shift_events
+        )
+        rows = [
+            {
+                'HISTORYID': 'R-001', 'OLDSTATUSNAME': 'UDT', 'OLDREASONNAME': 'EE Repair',
+                'OLDLASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 8, 0),
+                'LASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 10, 0),
+                'HOURS': 2.0, 'JOBID': 'J-TEST',
+            }
+        ]
+        jobs = [
+            {
+                'JOBID': 'J-TEST', 'RESOURCEID': 'R-001',
+                'CREATEDATE': datetime(2026, 5, 27, 7, 0),
+                'COMPLETEDATE': datetime(2026, 5, 27, 11, 0),
+                'SYMPTOMCODENAME': 'VIBRATION', 'CAUSECODENAME': 'WEAR',
+                'REPAIRCODENAME': 'REPLACE', 'COMPLETE_FULLNAME': 'TechA',
+                'FIRSTCLOCKONDATE': datetime(2026, 5, 27, 7, 30),
+                'LASTCLOCKOFFDATE': datetime(2026, 5, 27, 9, 30),
+                'JOBORDERNAME': 'JO-001', 'JOBMODELNAME': 'MODEL-A',
+            }
+        ]
+        merged = _merge_cross_shift_events(pd.DataFrame(rows))
+        bridged = _bridge_jobid(merged, pd.DataFrame(jobs))
+        return _enrich_events_df(bridged)
+
+    def test_job_enrichment_fields_present(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        df = self._build_enriched_event()
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        event_row = result['events'][0]
+        self.assertIsNotNone(event_row['job'])
+        job = event_row['job']
+        for field in ('job_order_name', 'job_model', 'symptom', 'cause', 'repair',
+                      'wait_min', 'repair_min', 'handler', 'match_ambiguous'):
+            self.assertIn(field, job, f"Missing JobEnrichment field '{field}'")
+
+    def test_wait_min_nullable(self):
+        """wait_min may be null per §3.12.7."""
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        import pandas as pd
+        from datetime import datetime
+        from mes_dashboard.services.downtime_analysis_service import (
+            _bridge_jobid, _enrich_events_df, _merge_cross_shift_events
+        )
+        rows = [
+            {
+                'HISTORYID': 'R-001', 'OLDSTATUSNAME': 'UDT', 'OLDREASONNAME': 'EE Repair',
+                'OLDLASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 8, 0),
+                'LASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 10, 0),
+                'HOURS': 2.0, 'JOBID': 'J-NOCLK',
+            }
+        ]
+        jobs = [
+            {
+                'JOBID': 'J-NOCLK', 'RESOURCEID': 'R-001',
+                'CREATEDATE': datetime(2026, 5, 27, 7, 0),
+                'COMPLETEDATE': datetime(2026, 5, 27, 11, 0),
+                'SYMPTOMCODENAME': None, 'CAUSECODENAME': None,
+                'REPAIRCODENAME': None, 'COMPLETE_FULLNAME': None,
+                'FIRSTCLOCKONDATE': None,  # null clock
+                'LASTCLOCKOFFDATE': None,
+                'JOBORDERNAME': None, 'JOBMODELNAME': None,
+            }
+        ]
+        merged = _merge_cross_shift_events(pd.DataFrame(rows))
+        bridged = _bridge_jobid(merged, pd.DataFrame(jobs))
+        df = _enrich_events_df(bridged)
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        job = result['events'][0]['job']
+        self.assertIsNone(job['wait_min'])
+        self.assertIsNone(job['repair_min'])
+
+    def test_match_ambiguous_is_boolean(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_event_detail_page
+        df = self._build_enriched_event()
+        result = _build_event_detail_page(df, page=1, page_size=50, resource_lookup={})
+        job = result['events'][0]['job']
+        self.assertIsInstance(job['match_ambiguous'], bool)
+
+
 if __name__ == "__main__":
     unittest.main()

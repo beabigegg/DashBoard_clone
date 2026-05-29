@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.12.0
+schema-version: 1.12.1
 last-changed: 2026-05-29
 breaking-change-policy: deprecate-2-minors
 ---
@@ -250,9 +250,6 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
-
-## [business 1.12.0]
-- downtime-analysis-page (2026-05-29): Added DA-01..DA-06 — E10 status filter (UDT/SDT/EGT; NST excluded), cross-shift event merge key/contiguity-rule (DA-02), JOBID bridge Path A/B/tiebreak/no-match/match_source (DA-03), big-category taxonomy reference (DA-04), wait/repair hours derivation (DA-05), IT backfill cache invalidation via DOWNTIME_BRIDGE_VERSION (DA-06). Eight new decision table rows. Additive; no existing rules changed.
 
 ## [business 1.11.0]
 - ai-pipeline-upgrade (2026-05-29): Added AI-04 (combined-prompt output schema), AI-05 (malformed-JSON fallback), AI-06 (chat_history append policy), AI-07 (chat_history cap/eviction), AI-08 (history injection ordering), AI-09 (three new function behaviors). Updated AI-01 description to reflect combined-call. Additive; no existing rules changed.

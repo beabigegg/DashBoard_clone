@@ -1,0 +1,23 @@
+agent: frontend-engineer
+change-id: downtime-analysis-page
+timestamp: "2026-05-29"
+status: complete
+artifacts:
+  - { type: vue-app-created, pointer: "frontend/src/downtime-analysis/ (App.vue, main.ts, index.html, style.css, types.ts, formatDowntimeDate.ts)" }
+  - { type: components-created, pointer: "frontend/src/downtime-analysis/components/{FilterBar,KpiCards,DailyTrendChart,BigCategoryChart,TopReasonsTable,EquipmentDetail,EventDetail}.vue" }
+  - { type: composables-created, pointer: "frontend/src/downtime-analysis/composables/{useFilterState,useBigCategory,useDowntimeData}.ts" }
+  - { type: tests-created, pointer: "frontend/src/downtime-analysis/__tests__/{formatDowntimeDate,useBigCategory,useFilterState,css-scope}.test.ts (65 unit tests); frontend/tests/playwright/downtime-analysis.spec.js" }
+  - { type: vite-entry-added, pointer: "frontend/vite.config.ts; frontend/index.html; frontend/tsconfig.json include updated" }
+  - { type: portal-shell-registered, pointer: "frontend/src/portal-shell/nativeModuleRegistry.js (/downtime-analysis entry); routeContracts.js (IN_SCOPE_REPORT_ROUTES + ROUTE_CONTRACTS)" }
+  - { type: build-artifact, pointer: "src/mes_dashboard/static/dist/downtime-analysis.js (present after npm run build)" }
+test-results:
+  - { suite: "css:check", result: "PASS (0 errors, 0 unscoped feature-CSS rules)" }
+  - { suite: "type-check", result: "PASS (0 errors, informational)" }
+  - { suite: "frontend unit tests (new downtime tests)", result: "PASS (65 tests)" }
+  - { suite: "npm run build", result: "PASS (dist/downtime-analysis.js generated)" }
+notes: >
+  router.js and sidebarState.js use dynamic navigation driven by page_status.json
+  (already updated by backend-engineer with drawer_id='drawer-2', order=6);
+  no additional static entries required. 1 pre-existing test failure in api-dedup
+  (unrelated to this change).
+next-action: contract-reviewer (post-impl) → ui-ux-reviewer → visual-reviewer → qa-reviewer

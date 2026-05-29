@@ -145,3 +145,13 @@ STATUS_CATEGORIES = [
     'INACTIVE',
     'OTHER',
 ]
+
+
+# ============================================================
+# Downtime Analysis — bridge version (DA-06)
+# ============================================================
+
+# Bump this constant after IT restores SHIFT.JOBID backfill.
+# The spool cache key includes this value so that all downtime_analysis_*
+# entries are invalidated on redeploy without touching resource_dataset_* spools.
+DOWNTIME_BRIDGE_VERSION = "1.0.0"

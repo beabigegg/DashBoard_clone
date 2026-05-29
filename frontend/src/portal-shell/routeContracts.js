@@ -16,6 +16,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/anomaly-overview',
   '/production-history',
   '/material-consumption',
+  '/downtime-analysis',
   '/login',
 ]);
 
@@ -263,6 +264,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '料號用量報表',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/downtime-analysis': buildContract({
+    route: '/downtime-analysis',
+    routeId: 'downtime-analysis',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '設備停機分析',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

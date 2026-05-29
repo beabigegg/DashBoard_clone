@@ -1,0 +1,44 @@
+agent: backend-engineer
+change-id: downtime-analysis-page
+date: 2026-05-29
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/config/constants.py:148-158 — added DOWNTIME_BRIDGE_VERSION='1.0.0'"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/downtime_analysis/base_events.sql — NEW; IN ('UDT','SDT','EGT') filter (DA-01)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/downtime_analysis/job_bridge.sql — NEW"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/downtime_analysis/{big_category,top_reasons,equipment_detail,event_detail}.sql — NEW"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_service.py — NEW; DA-01..DA-06 implemented"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_cache.py — NEW; namespace downtime_analysis_events"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/downtime_analysis_routes.py — NEW; 5 endpoints"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/__init__.py:29,53,78 — added downtime_analysis_bp import/register/__all__"
+  - type: files-changed
+    pointer: "data/page_status.json — added /downtime-analysis in drawer-2, order 6"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json — added /downtime-analysis"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json — added /downtime-analysis"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/route_contracts.json — added /downtime-analysis entry"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_service.py — 63 tests (TestE10StatusFilter, TestCrossShiftMerge, TestJobidBridge, TestBigCategoryMapping, TestWaitRepairHours, TestFilterCrossNarrowing, TestFilterKwargsForwarding, TestBridgeVersionCacheKey)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_routes.py — 29 tests (TestSummaryRoute, TestBigCategoryRoute, TestTopReasonsRoute, TestEquipmentDetailRoute, TestEventDetailRoute)"
+  - type: tests-added
+    pointer: "tests/test_api_contract.py — 28 new tests (§3.12.1..§3.12.7 shapes)"
+  - type: tests-added
+    pointer: "tests/test_modernization_policy_hardening.py::TestDowntimeAnalysisPage — 3 new asserts"
+  - type: tests-added
+    pointer: "tests/e2e/test_downtime_analysis_e2e.py — 4 tests (marker: local_e2e)"
+  - type: test-output
+    pointer: "test_downtime_analysis_service.py: 63 passed; test_downtime_analysis_routes.py: 29 passed; test_api_contract.py (downtime): 28 passed; test_modernization_policy_hardening.py (downtime): 3 passed; ruff: PASS"
+  - type: contracts-touched
+    pointer: "none — contracts already authored by contract-reviewer; backend verified presence only"

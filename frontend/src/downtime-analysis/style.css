@@ -1,0 +1,382 @@
+/* ============================================================
+ * downtime-analysis/style.css
+ * ALL top-level rules MUST start with .theme-downtime-analysis
+ * Enforced by npm run css:check Rule 6 (portal-shell caches CSS permanently)
+ * ============================================================ */
+
+.theme-downtime-analysis .dashboard {
+  padding: 0 16px 32px;
+  background: theme('colors.surface.app');
+  min-height: 100vh;
+}
+
+.theme-downtime-analysis .downtime-header {
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+  padding: theme('spacing.token.p24') theme('spacing.token.p24');
+  color: theme('colors.token.hffffff');
+  margin: 0 -16px 16px;
+}
+
+.theme-downtime-analysis .downtime-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.theme-downtime-analysis .header-subtitle {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin: 0;
+}
+
+/* Filter bar */
+.theme-downtime-analysis .downtime-filter-bar {
+  background: theme('colors.surface.card');
+  border-radius: 8px;
+  padding: theme('spacing.token.p16');
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+.theme-downtime-analysis .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.theme-downtime-analysis .filter-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-downtime-analysis .filter-field label {
+  font-size: 13px;
+  color: theme('colors.text.subtle');
+  white-space: nowrap;
+}
+
+.theme-downtime-analysis .filter-field input[type='date'] {
+  border: 1px solid theme('colors.stroke.input');
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: theme('colors.surface.card');
+  color: theme('colors.text.primary');
+}
+
+.theme-downtime-analysis .granularity-btns {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid theme('colors.stroke.panel');
+  background: theme('colors.surface.muted');
+}
+
+.theme-downtime-analysis .granularity-btn {
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: theme('colors.text.subtle');
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.theme-downtime-analysis .granularity-btn.active {
+  background: theme('colors.surface.card');
+  color: theme('colors.brand.500');
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+.theme-downtime-analysis .filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-downtime-analysis .btn-query {
+  background: theme('colors.brand.500');
+  color: theme('colors.token.hffffff');
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.theme-downtime-analysis .btn-query:hover:not(:disabled) {
+  background: theme('colors.brand.600');
+}
+
+.theme-downtime-analysis .btn-query:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-downtime-analysis .btn-clear {
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.secondary');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.theme-downtime-analysis .btn-clear:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+}
+
+.theme-downtime-analysis .btn-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-downtime-analysis .date-error {
+  color: theme('colors.state.danger');
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* View tabs */
+.theme-downtime-analysis .view-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid theme('colors.stroke.soft');
+}
+
+.theme-downtime-analysis .view-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  color: theme('colors.text.secondary');
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.theme-downtime-analysis .view-tab.active {
+  color: theme('colors.brand.500');
+  border-bottom-color: theme('colors.brand.500');
+  font-weight: 600;
+}
+
+/* Section card */
+.theme-downtime-analysis .section-card {
+  background: theme('colors.surface.card');
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+}
+
+.theme-downtime-analysis .section-inner {
+  padding: 16px;
+}
+
+/* Chart grid */
+.theme-downtime-analysis .chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+/* Chart cards */
+.theme-downtime-analysis .chart-card {
+  background: theme('colors.surface.muted');
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-downtime-analysis .chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme('colors.text.primary');
+  margin: 0 0 10px;
+}
+
+.theme-downtime-analysis .chart-container {
+  width: 100%;
+  height: 300px;
+}
+
+.theme-downtime-analysis .chart-empty {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: theme('colors.text.muted');
+  font-size: 13px;
+}
+
+/* Section titles */
+.theme-downtime-analysis .section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: theme('colors.text.primary');
+  margin: 0 0 12px;
+}
+
+/* Tables */
+.theme-downtime-analysis .table-wrapper {
+  overflow-x: auto;
+}
+
+.theme-downtime-analysis .data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.theme-downtime-analysis .data-table th {
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.subtle');
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  white-space: nowrap;
+}
+
+.theme-downtime-analysis .data-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  color: theme('colors.text.primary');
+}
+
+.theme-downtime-analysis .data-table tr:hover td {
+  background: theme('colors.surface.hover');
+}
+
+.theme-downtime-analysis .data-table .row-no-job td {
+  color: theme('colors.text.muted');
+}
+
+/* Sort buttons */
+.theme-downtime-analysis .sort-btn {
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 600;
+  text-align: left;
+}
+
+.theme-downtime-analysis .sort-btn:hover {
+  color: theme('colors.brand.500');
+}
+
+/* Status badges */
+.theme-downtime-analysis .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.theme-downtime-analysis .status-badge.status-udt {
+  background: theme('colors.state.danger');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .status-badge.status-sdt {
+  background: theme('colors.state.warning');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .status-badge.status-egt {
+  background: theme('colors.state.info');
+  color: theme('colors.token.hffffff');
+}
+
+/* Match-source badges */
+.theme-downtime-analysis .match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.theme-downtime-analysis .match-badge.badge-success {
+  background: theme('colors.state.success');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .match-badge.badge-warning {
+  background: theme('colors.state.warning');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .match-badge.badge-muted {
+  background: theme('colors.state.neutral');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .ambiguous-indicator {
+  font-size: 12px;
+}
+
+/* Pagination */
+.theme-downtime-analysis .pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 0;
+  font-size: 13px;
+}
+
+.theme-downtime-analysis .page-btn {
+  background: theme('colors.surface.card');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  color: theme('colors.text.primary');
+  transition: background 0.12s;
+}
+
+.theme-downtime-analysis .page-btn:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+}
+
+.theme-downtime-analysis .page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.theme-downtime-analysis .page-info {
+  color: theme('colors.text.secondary');
+}
+
+/* Empty state */
+.theme-downtime-analysis .empty-state {
+  padding: 32px;
+  text-align: center;
+  color: theme('colors.text.muted');
+  font-size: 14px;
+}
+
+/* Event detail table — wider layout */
+.theme-downtime-analysis .event-detail-table {
+  min-width: 1200px;
+}

@@ -95,3 +95,84 @@ class TestMaterialConsumptionRegistration:
         assert mc_page.get("drawer_id") == "drawer", (
             f"Expected drawer for /material-consumption, got {mc_page.get('drawer_id')!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# AC-7: downtime-analysis registration assertions
+# ---------------------------------------------------------------------------
+
+
+class TestDowntimeAnalysisPage:
+    """AC-7: assert /downtime-analysis is registered in manifests and page_status."""
+
+    def _load_asset_manifest(self) -> dict:
+        import os
+        manifest_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "docs",
+            "migration",
+            "full-modernization-architecture-blueprint",
+            "asset_readiness_manifest.json",
+        )
+        with open(manifest_path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def _load_page_status(self) -> dict:
+        import os
+        page_status_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data",
+            "page_status.json",
+        )
+        with open(page_status_path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def _load_scope_matrix(self) -> dict:
+        import os
+        matrix_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "docs",
+            "migration",
+            "full-modernization-architecture-blueprint",
+            "route_scope_matrix.json",
+        )
+        with open(matrix_path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_page_status_contains_downtime_analysis_in_drawer_2(self):
+        """page_status.json must have /downtime-analysis in drawer-2 (歷史報表)."""
+        page_status = self._load_page_status()
+        pages = page_status.get("pages", [])
+        da_pages = [p for p in pages if p.get("route") == "/downtime-analysis"]
+        assert len(da_pages) >= 1, (
+            "page_status.json missing '/downtime-analysis' page entry. "
+            "This will leave an orphan sidebar entry."
+        )
+        da_page = da_pages[0]
+        assert da_page.get("drawer_id") == "drawer-2", (
+            f"Expected drawer_id='drawer-2' for /downtime-analysis, "
+            f"got {da_page.get('drawer_id')!r}"
+        )
+
+    def test_asset_readiness_manifest_contains_downtime_analysis(self):
+        """asset_readiness_manifest.json must have /downtime-analysis entry.
+
+        Omitting it crashes gunicorn at startup via _validate_in_scope_asset_readiness().
+        """
+        manifest = self._load_asset_manifest()
+        assert "/downtime-analysis" in manifest.get("in_scope_required_assets", {}), (
+            "asset_readiness_manifest.json missing '/downtime-analysis' key. "
+            "This will crash gunicorn at startup."
+        )
+        asset_list = manifest["in_scope_required_assets"]["/downtime-analysis"]
+        assert len(asset_list) >= 1, (
+            "asset_readiness_manifest.json entry for /downtime-analysis has no asset paths."
+        )
+
+    def test_route_scope_matrix_contains_downtime_analysis(self):
+        """route_scope_matrix.json must classify /downtime-analysis as in-scope."""
+        matrix = self._load_scope_matrix()
+        in_scope_routes = [item.get("route") for item in matrix.get("in_scope", [])]
+        assert "/downtime-analysis" in in_scope_routes, (
+            "route_scope_matrix.json missing '/downtime-analysis' in 'in_scope' list."
+        )

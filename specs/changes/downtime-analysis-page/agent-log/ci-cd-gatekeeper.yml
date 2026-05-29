@@ -1,0 +1,17 @@
+change-id: downtime-analysis-page
+agent: ci-cd-gatekeeper
+timestamp: "2026-05-29T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 2" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml:54-56 (added Run Playwright downtime-analysis spec step)" }
+  - { type: required-status-checks, pointer: "unit-mock-integration, frontend-unit, css-governance, playwright-downtime-analysis, playwright-resilience, playwright-data-boundary, e2e-backend" }
+next-action: none
+notes: >
+  All new tests plug into existing backend-tests.yml and frontend-tests.yml
+  jobs via path globs already in place.  The only workflow edit was adding a
+  named Playwright step for branch-protection binding.  frontend-type-check
+  gains downtime-analysis scope (tsconfig.json include) but remains
+  informational.  Tier 3/4/5 gates are skipped per change-classification.md
+  task 6.4.

@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.13.0
+schema-version: 1.13.1
 last-changed: 2026-05-29
 breaking-change-policy: deprecate-2-minors
 ---
@@ -214,7 +214,7 @@ breaking-change-policy: deprecate-2-minors
 
 | GET | /api/downtime-analysis/options | required | — | success_response | 500 | route tests |
 | POST | /api/downtime-analysis/query | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/downtime-analysis/view | required | ?query_id=&granularity= | success_response | 400/410 | route tests |
+| GET | /api/downtime-analysis/view | required | ?query_id=&granularity=&top_n= (granularity: day only; week/month planned) | success_response | 400/410 | route tests |
 | GET | /api/downtime-analysis/equipment-detail | required | ?query_id= | success_response | 400/410 | route tests |
 | GET | /api/downtime-analysis/event-detail | required | ?query_id=&page=&page_size= | success_response | 400/410 | route tests |
 
@@ -346,7 +346,7 @@ breaking-change-policy: deprecate-2-minors
 - **downtime-analysis-page (2026-05-29)**: New endpoint family `/api/downtime-analysis/*` (5 endpoints). All auth required; Type A spool pattern.
   - `GET /api/downtime-analysis/options` → `{workcenter_groups[], families[], resources[], package_groups[], big_categories[], reasons[]}`. 500 on cache unavailable.
   - `POST /api/downtime-analysis/query` — body: `{start_date, end_date, workcenter_groups?, families?, resource_ids?, package_groups?, big_categories?, status_types?}`; date range cap 730d (SYS-04); response: `{query_id, summary: DowntimeKpiShape, daily_trend: DailyTrendRow[], big_category: BigCategoryRow[], top_reasons: TopReasonRow[]}` (see data-shape-contract.md §3.12). 400 on invalid/missing dates; 500 on Oracle error.
-  - `GET /api/downtime-analysis/view?query_id=&granularity=` — granularity: `day|week|month`; DuckDB regroup from spool; no Oracle re-query; 410 on spool miss.
+  - `GET /api/downtime-analysis/view?query_id=&granularity=&top_n=` — granularity: `day` only (`week`/`month` planned; 400 on invalid value); `top_n` default 10; DuckDB regroup from spool; no Oracle re-query; 410 on spool miss.
   - `GET /api/downtime-analysis/equipment-detail?query_id=` → `EquipmentDetailRow[]`; 410 on spool miss.
   - `GET /api/downtime-analysis/event-detail?query_id=&page=&page_size=` → paginated `EventDetailRow[]` with nullable `JobEnrichment` (null when `match_source='none'`); page default 1, page_size default 50 max 200; 410 on spool miss.
   - Spool namespace `downtime_analysis_*`, cache key includes `DOWNTIME_BRIDGE_VERSION`. Additive; no existing endpoints changed.
@@ -356,9 +356,6 @@ breaking-change-policy: deprecate-2-minors
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
-
-## [api 1.13.0]
-- downtime-analysis-page (2026-05-29): Added 5 new endpoints under `/api/downtime-analysis/*`. Type A spool; spool namespace `downtime_analysis_*`; `DOWNTIME_BRIDGE_VERSION` in cache key. See data-shape-contract.md §3.12 and business-rules.md DA-01..DA-06. Additive; no existing endpoints changed.
 
 ## [api 1.12.0]
 - ai-pipeline-upgrade (2026-05-29): [api-pipeline-upgrade] Internal function-mode pipeline collapsed from two LLM calls (R1 intent + R2 params) to one combined call returning `{"function","params","explanation"}`. `_SESSION_STORE` extended with `chat_history` key (list of role/content pairs, cap 8 pairs); history injected into combined call and text2sql Stage 1 only. Three new AI functions registered (`production_history_query`, `resource_history_summary`, `qc_gate_status`). Route surface (`/api/ai/query`), response envelope keys, TTL, and error codes are unchanged. No fields removed; all changes internal to the AI service layer. Backward-compatible.

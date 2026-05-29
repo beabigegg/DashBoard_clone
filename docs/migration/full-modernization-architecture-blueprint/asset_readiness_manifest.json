@@ -16,7 +16,8 @@
     "/yield-alert-center": ["yield-alert-center.js"],
     "/admin/dashboard": ["admin-dashboard.js"],
     "/admin/pages": ["admin-pages.js"],
-    "/material-consumption": ["material-consumption.js"]
+    "/material-consumption": ["material-consumption.js"],
+    "/downtime-analysis": ["downtime-analysis.js"]
   },
   "deferred_routes": []
 }
