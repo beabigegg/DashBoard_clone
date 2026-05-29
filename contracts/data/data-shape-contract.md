@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.11.0
-last-changed: 2026-05-22
+schema-version: 1.12.0
+last-changed: 2026-05-29
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -726,7 +726,107 @@ Removing a required column, changing a column type, or removing a key from the e
 2. Adding a compatibility note to `contracts/api/api-contract.md`.
 3. Updating related tests before removing the field.
 
+### 3.12 Downtime Analysis Response Shapes
+
+Added by change `downtime-analysis-page`. All shapes wrapped in standard `success_response` envelope (§1.1). Spool namespace: `tmp/query_spool/downtime_analysis/`.
+
+#### 3.12.1 DowntimeKpiShape (`data.summary` in `POST /api/downtime-analysis/query`)
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| total_hours | float | no | Sum of HOURS across all events (UDT+SDT+EGT) |
+| udt_hours | float | no | Sum of HOURS for OLDSTATUSNAME='UDT' |
+| sdt_hours | float | no | Sum of HOURS for OLDSTATUSNAME='SDT' |
+| egt_hours | float | no | Sum of HOURS for OLDSTATUSNAME='EGT' |
+| event_count | integer | no | Count of logical events after cross-shift merge (DA-02) |
+| avg_event_min | float | no | `(total_hours / event_count) * 60`; 0.0 when event_count=0 |
+
+#### 3.12.2 DailyTrendRow (`data.daily_trend` array)
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| date | string | no | ISO 8601 `YYYY-MM-DD`; granularity-bucketed by DuckDB |
+| udt_hours | float | no | UDT hours for this bucket |
+| sdt_hours | float | no | SDT hours for this bucket |
+| egt_hours | float | no | EGT hours for this bucket |
+| total_hours | float | no | Sum of three buckets |
+
+#### 3.12.3 BigCategoryRow (`data.big_category` array)
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| category | string | no | One of eight categories per DA-04 |
+| hours | float | no | Total hours for this category |
+| event_count | integer | no | Count of logical events |
+| pct | float | no | category.hours / total_hours * 100; 0.0 when total_hours=0 |
+
+#### 3.12.4 TopReasonRow (`data.top_reasons` array)
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| reason | string | no | OLDREASONNAME after strip(); `"(未填寫)"` when null/blank |
+| status | string | no | OLDSTATUSNAME of dominant status for this reason |
+| hours | float | no | Total hours for this reason |
+| event_count | integer | no | Count of logical events |
+| avg_min | float | no | `(hours / event_count) * 60`; 0.0 when event_count=0 |
+
+#### 3.12.5 EquipmentDetailRow (`GET /api/downtime-analysis/equipment-detail`)
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| resource_id | string | no | HISTORYID from SHIFT table |
+| resource_name | string | yes | RESOURCENAME from resource lookup |
+| workcenter | string | yes | WORKCENTERNAME from resource lookup |
+| family | string | yes | RESOURCEFAMILYNAME from resource lookup |
+| udt_hours | float | no | UDT hours for this equipment |
+| sdt_hours | float | no | SDT hours for this equipment |
+| egt_hours | float | no | EGT hours for this equipment |
+| total_hours | float | no | Sum of udt+sdt+egt |
+| event_count | integer | no | Count of logical events |
+| top_reason | string | yes | OLDREASONNAME with highest hours; null if no events |
+
+#### 3.12.6 EventDetailRow (`GET /api/downtime-analysis/event-detail`)
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| event_id | string | no | Stable composite key: `(HISTORYID, OLDSTATUSNAME, OLDREASONNAME, event_start_iso)` |
+| resource_id | string | no | HISTORYID |
+| resource_name | string | yes | RESOURCENAME from resource lookup |
+| status | string | no | OLDSTATUSNAME |
+| reason | string | yes | OLDREASONNAME after strip(); null when blank/unset |
+| category | string | no | Big-category per DA-04 |
+| start_ts | string | no | event_start ISO 8601 UTC |
+| end_ts | string | no | event_end ISO 8601 UTC |
+| hours | float | no | Merged event duration (SUM(HOURS) after DA-02 merge) |
+| match_source | string | no | Closed enum `'jobid' \| 'overlap' \| 'none'`; always present at top level |
+| job | object\|null | yes | JobEnrichment sub-object; null when match_source='none'. Frontend MUST render all job-derived fields as `—` when null. |
+
+Paginated: `page` (default 1), `page_size` (default 50, max 200). Response includes `pagination: {page, page_size, total_rows, total_pages}`.
+
+#### 3.12.7 JobEnrichment (sub-object of EventDetailRow.job — null when match_source='none')
+
+| field | type | nullable | notes |
+|---|---|---|---|
+| job_order_name | string | yes | JOB.JOBORDERNAME |
+| job_model | string | yes | JOB.JOBMODELNAME |
+| symptom | string | yes | JOB.SYMPTOMCODENAME |
+| cause | string | yes | JOB.CAUSECODENAME |
+| repair | string | yes | JOB.REPAIRCODENAME |
+| wait_min | float | yes | (FIRSTCLOCKONDATE − CREATEDATE) × 60; null when FIRSTCLOCKONDATE null (DA-05) |
+| repair_min | float | yes | (LASTCLOCKOFFDATE − FIRSTCLOCKONDATE) × 60; null when either null (DA-05) |
+| handler | string | yes | JOB.COMPLETE_FULLNAME |
+| match_ambiguous | boolean | no | true when runner-up Path-B overlap ≥ 80% of winner; false otherwise |
+
+**Oracle DATE midnight-UTC handling:** `start_ts` and `end_ts` derive from `OLDLASTSTATUSCHANGEDATE`/`LASTSTATUSCHANGEDATE`. Frontend formatters must apply midnight-UTC detection (raw H/M/S check before `new Date()`) per CLAUDE.md Frontend Date Formatting Notes.
+
+**Spool schema breaking-change surface:** column rename/add/remove to `tmp/query_spool/downtime_analysis/*.parquet` requires `rm tmp/query_spool/downtime_analysis/*.parquet` on deploy/rollback. IT JOBID backfill uses `DOWNTIME_BRIDGE_VERSION` constant to force cache-key change without manual parquet deletion (DA-06).
+
+---
+
 ## CHANGELOG
+
+## [data 1.12.0]
+- downtime-analysis-page (2026-05-29): Added §3.12 documenting all downtime-analysis response shapes (§3.12.1–3.12.7): DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow, EquipmentDetailRow, EventDetailRow, JobEnrichment. Documented null-sentinel semantics, match_source closed enum, midnight-UTC DATE note, spool namespace, IT JOBID backfill invalidation. Additive; no existing schemas changed.
 
 ## [data 1.11.0]
 - ai-pipeline-upgrade (2026-05-29): Added §2.9 (AI Session Store Shape including `chat_history` pairs, cap 8/16, TTL, pop-preservation semantics) and three new AI function param schemas (`production_history_query` raw_params dispatch, `resource_history_summary` kwargs, `qc_gate_status` no-params). Added `normalize_chart_data` output for `qc_gate_status` (→ stations list) and pass-through for `production_history_query`/`resource_history_summary`. Additive; no existing schemas changed.

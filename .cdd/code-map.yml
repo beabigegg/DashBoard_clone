@@ -1,6 +1,6 @@
-# generated: 2026-05-29T04:41:50Z by cdd-kit 2.1.0
-# files: 795, src-lines: 221853, map-lines: 16969, compression: 13.1x
-# sources-digest: 154f902e783a3874dac47e5bf5ab4cf672928458cabe7a57bb6399911b0baf0d
+# generated: 2026-05-29T08:52:08Z by cdd-kit 2.1.2
+# files: 795, src-lines: 221964, map-lines: 16980, compression: 13.1x
+# sources-digest: 83808f1e239d2f29512e62fd1efe59f1159a7e33c15cce08a5b906dba6212bc6
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -403,7 +403,7 @@ frontend/src/anomaly-overview/main.js:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/core/api.ts:  # 396 lines
+frontend/src/core/api.ts:  # 394 lines
   imports:
     - { module: './types.js', items: [ApiResponse], line: 3 }
   constants:
@@ -416,16 +416,16 @@ frontend/src/core/api.ts:  # 396 lines
     - { name: buildUrlWithParams, lines: 104-133 }
     - { name: isExternalMesApiBridge, lines: 135-138 }
     - { name: createAbortSignal, lines: 145-179 }
-    - { name: _buildDedupKey, lines: 187-196 }
-    - { name: async parseResponsePayload, lines: 198-211 }
-    - { name: async _fetchJsonRaw, lines: 213-251 }
-    - { name: async fetchJson, lines: 253-279 }
-    - { name: async apiGet, lines: 281-289 }
-    - { name: async apiPost, lines: 291-319 }
-    - { name: async apiUpload, lines: 321-343 }
-    - { name: _inFlightSize, lines: 348-350 }
-    - { name: _clearInFlight, lines: 355-357 }
-    - { name: ensureMesApiAvailable, lines: 359-396 }
+    - { name: _buildDedupKey, lines: 190-194 }
+    - { name: async parseResponsePayload, lines: 196-209 }
+    - { name: async _fetchJsonRaw, lines: 211-249 }
+    - { name: async fetchJson, lines: 251-277 }
+    - { name: async apiGet, lines: 279-287 }
+    - { name: async apiPost, lines: 289-317 }
+    - { name: async apiUpload, lines: 319-341 }
+    - { name: _inFlightSize, lines: 346-348 }
+    - { name: _clearInFlight, lines: 353-355 }
+    - { name: ensureMesApiAvailable, lines: 357-394 }
   interfaces:
     - { name: FetchOptions, lines: 32-39 }
     - { name: MesApiBridge, lines: 42-46 }  # local
@@ -612,25 +612,25 @@ frontend/src/core/reject-history-filters.ts:  # 358 lines
     - { name: BuildRejectCommonQueryOptions, lines: 209-211 }
     - { name: ViewParamsOptions, lines: 275-299 }
 
-frontend/src/core/resource-history-filters.ts:  # 240 lines
+frontend/src/core/resource-history-filters.ts:  # 247 lines
   functions:
     - { name: normalizeText, lines: 1-6 }
     - { name: normalizeBoolean, lines: 8-13 }
     - { name: normalizeArray, lines: 15-30 }
     - { name: applyUpstreamResourceFilters, lines: 43-64 }
-    - { name: toResourceFilterSnapshot, lines: 91-103 }
-    - { name: deriveResourceFamilyOptions, lines: 105-119 }
-    - { name: deriveResourceMachineOptions, lines: 126-144 }
-    - { name: pruneResourceFilterSelections, lines: 160-204 }
-    - { name: buildResourceHistoryQueryParams, lines: 218-240 }
+    - { name: toResourceFilterSnapshot, lines: 93-106 }
+    - { name: deriveResourceFamilyOptions, lines: 108-122 }
+    - { name: deriveResourceMachineOptions, lines: 129-147 }
+    - { name: pruneResourceFilterSelections, lines: 163-207 }
+    - { name: buildResourceHistoryQueryParams, lines: 222-247 }
   interfaces:
     - { name: ResourceItem, lines: 32-41 }
-    - { name: ResourceFilterInput, lines: 66-77 }
-    - { name: ResourceFilterSnapshot, lines: 79-89 }
-    - { name: MachineOption, lines: 121-124 }
-    - { name: PruneResourceFilterOptions, lines: 146-149 }
-    - { name: PruneResourceFilterResult, lines: 151-158 }
-    - { name: ResourceHistoryQueryParams, lines: 206-216 }
+    - { name: ResourceFilterInput, lines: 66-78 }
+    - { name: ResourceFilterSnapshot, lines: 80-91 }
+    - { name: MachineOption, lines: 124-127 }
+    - { name: PruneResourceFilterOptions, lines: 149-152 }
+    - { name: PruneResourceFilterResult, lines: 154-161 }
+    - { name: ResourceHistoryQueryParams, lines: 209-220 }
 
 frontend/src/core/risk-score.ts:  # 55 lines
   functions:
@@ -1584,13 +1584,13 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
   types:
     - { name: ParetoSelections, lines: 139-139 }
 
-frontend/src/resource-history/App.vue:  # 776 lines
+frontend/src/resource-history/App.vue:  # 790 lines
 
 frontend/src/resource-history/components/ComparisonChart.vue:  # 97 lines
 
 frontend/src/resource-history/components/DetailSection.vue:  # 300 lines
 
-frontend/src/resource-history/components/FilterBar.vue:  # 163 lines
+frontend/src/resource-history/components/FilterBar.vue:  # 176 lines
 
 frontend/src/resource-history/components/HeatmapChart.vue:  # 161 lines
 
@@ -4666,7 +4666,7 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
     - { name: api_reject_history_view, lines: 832-910 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
     - { name: api_reject_history_export_cached, lines: 914-992 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
-src/mes_dashboard/routes/resource_history_routes.py:  # 388 lines
+src/mes_dashboard/routes/resource_history_routes.py:  # 390 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: datetime, items: [datetime], line: 9 }
@@ -4684,12 +4684,12 @@ src/mes_dashboard/routes/resource_history_routes.py:  # 388 lines
     - { name: api_resource_history_page, lines: 102-104 }  # @resource_history_bp.route('/page', methods=['GET'], endpoint='page_alias')
     - { name: api_resource_history_options, lines: 112-128 }  # @resource_history_bp.route('/options', methods=['GET'])
     - { name: _validate_dates, lines: 135-143 }
-    - { name: _parse_resource_filters, lines: 146-155 }
-    - { name: _bool_param, lines: 158-164 }
-    - { name: api_resource_history_query, lines: 168-229 }  # @resource_history_bp.route('/query', methods=['POST'])
-    - { name: api_resource_history_view, lines: 233-254 }  # @resource_history_bp.route('/view', methods=['GET'])
-    - { name: api_resource_history_query_progress, lines: 263-307 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
-    - { name: api_resource_history_export, lines: 315-388 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
+    - { name: _parse_resource_filters, lines: 146-156 }
+    - { name: _bool_param, lines: 159-165 }
+    - { name: api_resource_history_query, lines: 169-231 }  # @resource_history_bp.route('/query', methods=['POST'])
+    - { name: api_resource_history_view, lines: 235-256 }  # @resource_history_bp.route('/view', methods=['GET'])
+    - { name: api_resource_history_query_progress, lines: 265-309 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
+    - { name: api_resource_history_export, lines: 317-390 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/resource_routes.py:  # 475 lines
   imports:
@@ -4946,7 +4946,7 @@ src/mes_dashboard/services/ai_function_registry.py:  # 648 lines
     - { name: get_suggestions, lines: 521-588 }
     - { name: build_agent_system_prompt, lines: 595-648 }
 
-src/mes_dashboard/services/ai_query_service.py:  # 1327 lines
+src/mes_dashboard/services/ai_query_service.py:  # 1386 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: json, items: [], line: 14 }
@@ -4954,26 +4954,37 @@ src/mes_dashboard/services/ai_query_service.py:  # 1327 lines
     - { module: os, items: [], line: 16 }
     - { module: re, items: [], line: 17 }
     - { module: typing, items: [Any], line: 18 }
-    - { module: requests, items: [], line: 20 }
-    - { module: mes_dashboard.services.ai_function_registry, items: [REGISTRY, build_combined_prompt, build_round3_prompt, build_stage1_prompt, build_stage2_prompt, get_service_function, get_suggestions, validate_intent], line: 22 }
-    - { module: mes_dashboard.services.ai_query_understanding, items: [advance_query_state, append_to_chat_history, get_chat_history], line: 32 }
-    - { module: pandas, items: [], line: 38 }
+    - { module: ssl, items: [], line: 20 }
+    - { module: requests, items: [], line: 22 }
+    - { module: urllib3, items: [], line: 23 }
+    - { module: requests.adapters, items: [HTTPAdapter], line: 24 }
+    - { module: mes_dashboard.services.ai_function_registry, items: [REGISTRY, build_combined_prompt, build_round3_prompt, build_stage1_prompt, build_stage2_prompt, get_service_function, get_suggestions, validate_intent], line: 26 }
+    - { module: mes_dashboard.services.ai_query_understanding, items: [advance_query_state, append_to_chat_history, get_chat_history], line: 36 }
+    - { module: pandas, items: [], line: 42 }
+  classes:
+    - name: _SkipHostnameAdapter
+      lines: 63-74
+      methods:
+        - { name: init_poolmanager, lines: 64-68 }
+        - { name: proxy_manager_for, lines: 70-74 }
   functions:
-    - { name: _auto_resolve_id, lines: 61-97 }
-    - { name: _call_llm, lines: 104-164 }
-    - { name: call_llm_text, lines: 167-197 }
-    - { name: summarize_for_llm, lines: 204-288 }
-    - { name: normalize_chart_data, lines: 295-599 }
-    - { name: _coerce_date_params, lines: 606-648 }
-    - { name: _review_sql, lines: 655-700 }
-    - { name: _deterministic_review_issues, lines: 703-745 }
-    - { name: _load_valid_columns, lines: 762-782 }
-    - { name: _sanitize_sql, lines: 785-833 }
-    - { name: _extract_oracle_error, lines: 836-846 }
-    - { name: _summarize_dataframe, lines: 849-866 }
-    - { name: process_query_text2sql, lines: 873-1104 }
-    - { name: process_query_function, lines: 1111-1276 }
-    - { name: process_query, lines: 1283-1327 }
+    - { name: _make_ai_session, lines: 77-82 }
+    - { name: _auto_resolve_id, lines: 95-131 }
+    - { name: _call_llm, lines: 138-197 }
+    - { name: call_llm_text, lines: 200-229 }
+    - { name: summarize_for_llm, lines: 236-320 }
+    - { name: normalize_chart_data, lines: 327-631 }
+    - { name: _coerce_date_params, lines: 638-680 }
+    - { name: _review_sql, lines: 687-734 }
+    - { name: _deterministic_review_issues, lines: 737-779 }
+    - { name: _load_valid_columns, lines: 796-816 }
+    - { name: _assert_select_only, lines: 823-831 }
+    - { name: _sanitize_sql, lines: 834-882 }
+    - { name: _extract_oracle_error, lines: 885-895 }
+    - { name: _summarize_dataframe, lines: 898-915 }
+    - { name: process_query_text2sql, lines: 922-1163 }
+    - { name: process_query_function, lines: 1170-1335 }
+    - { name: process_query, lines: 1342-1386 }
 
 src/mes_dashboard/services/ai_query_understanding.py:  # 681 lines
   imports:
@@ -6587,7 +6598,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1250 lines
     - { name: get_vendors, lines: 1220-1222 }
     - { name: get_resource_cascade_metadata, lines: 1225-1250 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 577 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 582 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6613,15 +6624,15 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 577 lines
     - { name: _store_oee_df, lines: 107-109 }
     - { name: _get_resource_lookup, lines: 117-128 }
     - { name: _get_workcenter_mapping, lines: 131-138 }
-    - { name: _get_filtered_resources_and_lookup, lines: 141-167 }
-    - { name: execute_primary_query, lines: 175-438 }
-    - { name: apply_view, lines: 446-473 }
-    - { name: _empty_summary, lines: 476-482 }
-    - { name: _empty_detail, lines: 485-486 }
-    - { name: _empty_kpi, lines: 489-510 }
-    - { name: make_canonical_base_query_id, lines: 527-538 }
-    - { name: make_canonical_oee_query_id, lines: 541-552 }
-    - { name: ensure_dataset_loaded, lines: 555-577 }
+    - { name: _get_filtered_resources_and_lookup, lines: 141-169 }
+    - { name: execute_primary_query, lines: 177-443 }
+    - { name: apply_view, lines: 451-478 }
+    - { name: _empty_summary, lines: 481-487 }
+    - { name: _empty_detail, lines: 490-491 }
+    - { name: _empty_kpi, lines: 494-515 }
+    - { name: make_canonical_base_query_id, lines: 532-543 }
+    - { name: make_canonical_oee_query_id, lines: 546-557 }
+    - { name: ensure_dataset_loaded, lines: 560-582 }
 
 src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 332 lines
   imports:
@@ -6646,7 +6657,7 @@ src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 332 lines
     - { name: _load_and_save, lines: 180-290 }
     - { name: start_duckdb_prewarm, lines: 293-332 }
 
-src/mes_dashboard/services/resource_history_service.py:  # 1015 lines
+src/mes_dashboard/services/resource_history_service.py:  # 1026 lines
   imports:
     - { module: io, items: [], line: 16 }
     - { module: csv, items: [], line: 17 }
@@ -6662,28 +6673,28 @@ src/mes_dashboard/services/resource_history_service.py:  # 1015 lines
     - { name: MAX_QUERY_DAYS, line: 31 }
     - { name: E10_STATUSES, line: 34 }
   functions:
-    - { name: _get_filtered_resources, lines: 41-112 }
-    - { name: _build_resource_lookup, lines: 115-124 }
-    - { name: _get_resource_ids_sql_list, lines: 127-152 }
-    - { name: _build_historyid_filter, lines: 155-175 }
-    - { name: get_filter_options, lines: 182-214 }
-    - { name: query_summary, lines: 221-333 }
-    - { name: query_detail, lines: 340-423 }
-    - { name: export_csv, lines: 430-639 }
-    - { name: _validate_date_range, lines: 646-659 }
-    - { name: _get_date_trunc, lines: 662-673 }
-    - { name: _safe_float, lines: 676-680 }
-    - { name: _calc_ou_pct, lines: 683-686 }
-    - { name: _calc_availability_pct, lines: 689-693 }
-    - { name: _calc_status_pct, lines: 696-698 }
-    - { name: _build_kpi_from_df, lines: 701-750 }
-    - { name: _format_date, lines: 753-765 }
-    - { name: _build_trend_from_df, lines: 768-794 }
-    - { name: _build_heatmap_from_raw_df, lines: 797-864 }
-    - { name: _build_comparison_from_raw_df, lines: 867-939 }
-    - { name: _build_detail_from_raw_df, lines: 942-1013 }
+    - { name: _get_filtered_resources, lines: 41-121 }
+    - { name: _build_resource_lookup, lines: 124-133 }
+    - { name: _get_resource_ids_sql_list, lines: 136-161 }
+    - { name: _build_historyid_filter, lines: 164-184 }
+    - { name: get_filter_options, lines: 191-225 }
+    - { name: query_summary, lines: 232-344 }
+    - { name: query_detail, lines: 351-434 }
+    - { name: export_csv, lines: 441-650 }
+    - { name: _validate_date_range, lines: 657-670 }
+    - { name: _get_date_trunc, lines: 673-684 }
+    - { name: _safe_float, lines: 687-691 }
+    - { name: _calc_ou_pct, lines: 694-697 }
+    - { name: _calc_availability_pct, lines: 700-704 }
+    - { name: _calc_status_pct, lines: 707-709 }
+    - { name: _build_kpi_from_df, lines: 712-761 }
+    - { name: _format_date, lines: 764-776 }
+    - { name: _build_trend_from_df, lines: 779-805 }
+    - { name: _build_heatmap_from_raw_df, lines: 808-875 }
+    - { name: _build_comparison_from_raw_df, lines: 878-950 }
+    - { name: _build_detail_from_raw_df, lines: 953-1024 }
 
-src/mes_dashboard/services/resource_history_sql_runtime.py:  # 748 lines
+src/mes_dashboard/services/resource_history_sql_runtime.py:  # 750 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -6718,7 +6729,7 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 748 lines
     - { name: _query_detail, lines: 405-486 }
     - { name: _empty_kpi, lines: 491-503 }
     - { name: try_compute_view_from_spool, lines: 508-599 }
-    - { name: try_compute_query_from_canonical_spool, lines: 604-748 }
+    - { name: try_compute_query_from_canonical_spool, lines: 604-750 }
 
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:

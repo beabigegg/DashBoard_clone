@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.13.0] — 2026-05-29
+### Added
+- downtime-analysis-page: Added 5 new endpoints under `/api/downtime-analysis/*` (options, query, view, equipment-detail, event-detail). All require auth; Type A spool pattern (410 → client re-triggers POST /query). Spool namespace `downtime_analysis_*` independent of `resource_dataset_*`; cache key includes `DOWNTIME_BRIDGE_VERSION` constant for IT JOBID backfill invalidation. Response shapes documented in data-shape-contract.md §3.12; domain rules DA-01..DA-06 in business-rules.md. Additive; no existing endpoints changed.
+
+## [api-inventory 1.1.12] — 2026-05-29
+### Added
+- downtime-analysis-page: Registered `downtime_analysis_routes.py` in standard-json table; documented all 5 endpoint scopes and Type A spool pattern. Added compatibility note. No existing rows changed.
+
+## [data 1.12.0] — 2026-05-29
+### Added
+- downtime-analysis-page: Added §3.12 documenting DowntimeKpiShape (§3.12.1), DailyTrendRow (§3.12.2), BigCategoryRow (§3.12.3), TopReasonRow (§3.12.4), EquipmentDetailRow (§3.12.5), EventDetailRow (§3.12.6), JobEnrichment sub-object (§3.12.7, including null-sentinel semantics, match_source closed enum, midnight-UTC DATE note). Additive; no existing schemas changed.
+
+## [business 1.12.0] — 2026-05-29
+### Added
+- downtime-analysis-page: Added DA-01..DA-06 (E10 status filter, cross-shift merge key, JOBID bridge algorithm Path A/B with tiebreak, big-category taxonomy reference, wait/repair hours derivation, IT backfill cache invalidation). Eight new decision table rows. Additive; no existing rules changed.
+
+## [css-inventory 1.2.4] — 2026-05-29
+### Added
+- downtime-analysis-page: Added `frontend/src/downtime-analysis/style.css` (`theme-downtime-analysis`) to Route-Local Feature Layers table. Teleport wrapper rule 4.4 applies.
+
 ## [api 1.12.0] — 2026-05-29
 ### Changed
 - ai-pipeline-upgrade: Internal function-mode pipeline collapsed from two LLM calls (R1+R2) to one combined call returning `{"function","params","explanation"}`. `_SESSION_STORE` extended with `chat_history` (cap 8 pairs / 16 messages); injected into combined call and text2sql Stage 1 only. Three new AI functions: `production_history_query`, `resource_history_summary`, `qc_gate_status`. Route surface, response envelope keys, TTL, and error codes unchanged. Backward-compatible.

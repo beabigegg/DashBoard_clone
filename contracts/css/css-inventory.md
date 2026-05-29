@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.3
+schema-version: 1.2.4
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-05-20
+last-changed: 2026-05-29
 ---
 
 # CSS Inventory (Governed Source List)
@@ -57,6 +57,7 @@ last-changed: 2026-05-20
 | `frontend/src/admin-dashboard/style.css` | `theme-admin-dashboard` | admin-dashboard |
 | `frontend/src/admin-pages/style.css` | `theme-admin-pages` | admin-pages |
 | `frontend/src/anomaly-overview/style.css` | `theme-anomaly-overview` | anomaly-overview |
+| `frontend/src/downtime-analysis/style.css` | `theme-downtime-analysis` | downtime-analysis |
 | `frontend/src/hold-detail/style.css` | `theme-hold-detail` | hold-detail |
 | `frontend/src/hold-history/style.css` | `theme-hold-history` | hold-history |
 | `frontend/src/hold-overview/style.css` | `theme-hold-overview` | hold-overview |

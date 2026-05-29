@@ -49,6 +49,10 @@ jobs:
         working-directory: frontend
         run: npm run test:legacy
 
+      - name: Run Playwright downtime-analysis spec
+        working-directory: frontend
+        run: npx playwright test tests/playwright/downtime-analysis.spec.js
+
       - name: Verify test discovery
         working-directory: frontend
         run: |

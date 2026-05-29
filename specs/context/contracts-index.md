@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: d89c342cfe1404cef3d5fa21adafa8af6e6f1e22b1777d0f74df0d39b1382531
+inputs-digest: a03cbddd942a318c60be39a24e53a7500705c7674370c180bf2941569615ce7a
 ---
 
 # Contracts Index
@@ -35,7 +35,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.12.0
+- schema-version: 1.13.0
 - last-changed: 2026-05-29
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
@@ -48,7 +48,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Inventory
 - owner: application-team
 - surface: api
-- schema-version: 1.1.11
+- schema-version: 1.1.12
 - last-changed: 2026-05-29
 - summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 
@@ -72,8 +72,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.11.0
-- last-changed: 2026-05-20
+- schema-version: 1.12.0
+- last-changed: 2026-05-29
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
 
@@ -109,10 +109,10 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - type: css-inventory
 - directory: contracts/css
 - title: CSS Inventory (Governed Source List)
-- schema-version: 1.2.3
+- schema-version: 1.2.4
 - owner: application-team
 - surface: ui
-- last-changed: 2026-05-20
+- last-changed: 2026-05-29
 - summary: Governed inventory of authored CSS source files under frontend/src/.
 
 
@@ -135,8 +135,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.11.0
-- last-changed: 2026-05-22
+- schema-version: 1.12.0
+- last-changed: 2026-05-29
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
 

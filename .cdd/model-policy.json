@@ -3,8 +3,24 @@
   "generated_at": "2026-05-15T04:02:23.264Z",
   "schema-version": "0.2.0",
   "roles": {
+    "backend-engineer": "sonnet",
+    "bug-fix-engineer": "sonnet",
+    "change-classifier": "opus",
+    "ci-cd-gatekeeper": "sonnet",
+    "contract-reviewer": "sonnet",
+    "dependency-security-reviewer": "sonnet",
+    "e2e-resilience-engineer": "sonnet",
+    "frontend-engineer": "sonnet",
     "implementation-planner": "opus",
-    "panjit-vue-frontend": "sonnet"
+    "monkey-test-engineer": "sonnet",
+    "qa-reviewer": "opus",
+    "repo-context-scanner": "haiku",
+    "spec-architect": "opus",
+    "spec-drift-auditor": "opus",
+    "stress-soak-engineer": "sonnet",
+    "test-strategist": "sonnet",
+    "ui-ux-reviewer": "sonnet",
+    "visual-reviewer": "haiku"
   },
   "_notes": "Roles map agent name -> model ID. Override per-project as needed. cdd-kit doctor warns when an installed agent's frontmatter `model:` does not match this policy."
 }

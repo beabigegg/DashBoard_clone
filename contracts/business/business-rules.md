@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.11.0
-last-changed: 2026-05-20
+schema-version: 1.12.0
+last-changed: 2026-05-29
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -230,6 +230,17 @@ breaking-change-policy: deprecate-2-minors
 | MC-04 | Detail async threshold | `POST /api/material-consumption/detail` sync when rows ≤ `SYNC_ROW_LIMIT` (env, default 30000); async Type B (RQ queue `material-consumption`) for larger sets. Worker absent → detail jobs pending; Admin Dashboard `rq_monitor` surfaces zero workers for queue. | unit + resilience + integration |
 | MC-05 | No DuckDB prewarm | No startup pre-warm performed. Cold queries hit Oracle once, populate Redis + spool cache. Subsequent requests and all granularity switches served from spool. | — (by design) |
 
+## Downtime Analysis Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| DA-01 | E10 status filter | Only `OLDSTATUSNAME IN ('UDT','SDT','EGT')` rows from `DWH.DW_MES_RESOURCESTATUS_SHIFT` are included in all downtime-analysis aggregations. `NST` rows are excluded at the query layer. `HOURS` column is the authoritative duration source. | `tests/test_downtime_analysis_service.py::TestE10StatusFilter` |
+| DA-02 | Cross-shift event merge | Logical-event identity = `(HISTORYID, OLDSTATUSNAME, OLDREASONNAME, run_seed_start)` where `run_seed_start` is the earliest `OLDLASTSTATUSCHANGEDATE` in the contiguous run. A run starts a new group when the gap between the prior fragment's `LASTSTATUSCHANGEDATE` and the current fragment's `OLDLASTSTATUSCHANGEDATE` exceeds 60 seconds. `hours = SUM(HOURS)`, `event_start = MIN(OLDLASTSTATUSCHANGEDATE)`, `event_end = MAX(LASTSTATUSCHANGEDATE)`. Full formal definition: `specs/changes/downtime-analysis-page/design.md §Decision 1`. | `tests/test_downtime_analysis_service.py::TestCrossShiftMerge` |
+| DA-03 | JOBID bridge algorithm | Path A: `SHIFT.JOBID IS NOT NULL` → direct `JOB.JOBID = SHIFT.JOBID`; `match_source = 'jobid'`. Path B: `SHIFT.JOBID IS NULL` → candidates where `JOB.RESOURCEID = SHIFT.HISTORYID AND event_start < JOB.COMPLETEDATE AND event_end > JOB.CREATEDATE`; tiebreak by largest temporal overlap, then `JOB.CREATEDATE ASC`, then `JOB.JOBID ASC`; `match_source = 'overlap'`; `match_ambiguous = true` when runner-up overlap ≥ 80% of winner. No match: all JOB fields null, `match_source = 'none'`. Full algorithm: `specs/changes/downtime-analysis-page/design.md §Decision 2`. | `tests/test_downtime_analysis_service.py::TestJobidBridge` |
+| DA-04 | Big-category taxonomy | Authoritative OLDREASONNAME → category mapping: `specs/changes/downtime-analysis-page/design.md §Big-category taxonomy`. Eight buckets: 維修, 保養, 換型換線, 換刀清模, 檢查, 待料待指示, 工程 (all EGT events), 其他/未分類. OLDREASONNAME must be `strip()`ped before lookup (Oracle CHAR trailing-space). Unknown or blank → `其他/未分類`. | `tests/test_downtime_analysis_service.py::TestBigCategoryMapping` |
+| DA-05 | Wait/repair hours derivation | `wait_hours = (FIRSTCLOCKONDATE − CREATEDATE)` in hours; `repair_hours = (LASTCLOCKOFFDATE − FIRSTCLOCKONDATE)` in hours. Both null when `match_source = 'none'`. Null `FIRSTCLOCKONDATE` or `LASTCLOCKOFFDATE` on a matched JOB also yields null for the corresponding field. `wait_min` and `repair_min` = hours × 60, rounded to 2 d.p. | `tests/test_downtime_analysis_service.py::TestWaitRepairHours` |
+| DA-06 | IT JOBID backfill cache invalidation | When IT restores `SHIFT.JOBID`, all existing `downtime_analysis_*` spool files serve stale Path-B matches. Invalidation: increment `DOWNTIME_BRIDGE_VERSION` integer in `src/mes_dashboard/config/constants.py` and redeploy; spool cache key includes this constant. Optionally purge `tmp/query_spool/downtime_analysis/*.parquet` immediately. Does not affect `resource_dataset_*` spool. Runbook documented in `ci-gates.md §Rollback Policy`. | `TestDowntimeBridgeVersionKey` |
+
 ## Change Policy
 
 任何業務邏輯變更必須：
@@ -239,6 +250,9 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.12.0]
+- downtime-analysis-page (2026-05-29): Added DA-01..DA-06 — E10 status filter (UDT/SDT/EGT; NST excluded), cross-shift event merge key/contiguity-rule (DA-02), JOBID bridge Path A/B/tiebreak/no-match/match_source (DA-03), big-category taxonomy reference (DA-04), wait/repair hours derivation (DA-05), IT backfill cache invalidation via DOWNTIME_BRIDGE_VERSION (DA-06). Eight new decision table rows. Additive; no existing rules changed.
 
 ## [business 1.11.0]
 - ai-pipeline-upgrade (2026-05-29): Added AI-04 (combined-prompt output schema), AI-05 (malformed-JSON fallback), AI-06 (chat_history append policy), AI-07 (chat_history cap/eviction), AI-08 (history injection ordering), AI-09 (three new function behaviors). Updated AI-01 description to reflect combined-call. Additive; no existing rules changed.
