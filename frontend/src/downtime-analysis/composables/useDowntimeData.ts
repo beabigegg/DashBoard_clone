@@ -205,8 +205,8 @@ export function useDowntimeData() {
         params: { query_id: queryId.value },
       });
 
-      const data = (response as Record<string, unknown>)?.data;
-      equipmentRows.value = Array.isArray(data) ? (data as EquipmentDetailRow[]) : [];
+      const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      equipmentRows.value = Array.isArray(data?.equipment_detail) ? (data!.equipment_detail as EquipmentDetailRow[]) : [];
     } catch (err) {
       const e = err as Error & { status?: number };
       if (e?.status === 410 || e?.message === 'cache_expired') {
@@ -237,7 +237,7 @@ export function useDowntimeData() {
 
       const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (data) {
-        eventData.rows = Array.isArray(data.rows) ? (data.rows as EventDetailRow[]) : [];
+        eventData.rows = Array.isArray(data.events) ? (data.events as EventDetailRow[]) : [];
         const pag = data.pagination as Partial<Pagination> | undefined;
         eventData.pagination = {
           page: Number(pag?.page ?? page),
