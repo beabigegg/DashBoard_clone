@@ -181,17 +181,15 @@ function createAbortSignal(
 /**
  * Build a dedup key for an in-flight request.
  *
- * Only deduplicates GET requests and safe POST requests where body is a plain
- * JSON object.  Non-deduplicable requests (FormData, streaming) return null.
+ * Only deduplicates GET requests.  POST/PUT/PATCH/DELETE are mutations triggered
+ * by user action and must never be deduplicated — sharing a single in-flight
+ * promise across two POST calls means the second caller can receive an abort
+ * signal (e.g. timeout) that originated from the first call's AbortController,
+ * producing a misleading "signal is aborted without reason" error.
  */
-function _buildDedupKey(method: string, url: string, body: unknown): string | null {
+function _buildDedupKey(method: string, url: string, _body: unknown): string | null {
   const m = String(method).toUpperCase();
   if (m === 'GET') return `GET|${url}|`;
-
-  if (m === 'POST' && body && typeof body === 'string') {
-    // body is JSON.stringify'd payload — use it as fingerprint directly
-    return `POST|${url}|${body}`;
-  }
   return null;
 }
 
