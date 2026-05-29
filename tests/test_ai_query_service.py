@@ -223,18 +223,18 @@ class TestSummarizeForLlm(unittest.TestCase):
         self.assertIn("10", result)
 
     def test_trend_truncation(self):
-        """Trend data with > 30 points must be truncated to head/tail + stats."""
-        items = [{"date": f"2026-01-{i:02d}", "reject_rate": float(i)} for i in range(1, 35)]
+        """Trend data with > 200 points must be truncated to head/tail + stats."""
+        items = [{"date": f"2026-{i // 30 + 1:02d}-{i % 30 + 1:02d}", "reject_rate": float(i)} for i in range(205)]
         result = svc.summarize_for_llm("reject_trend", items)
-        self.assertIn("前5筆", result)
-        self.assertIn("後5筆", result)
+        self.assertIn("前20筆", result)
+        self.assertIn("後20筆", result)
         self.assertIn("統計", result)
 
-    def test_trend_no_truncation_under_30(self):
-        """Trend data with <= 30 points must be returned as-is."""
+    def test_trend_no_truncation_under_200(self):
+        """Trend data with <= 200 points must be returned as-is."""
         items = [{"date": f"2026-01-{i:02d}", "reject_rate": 1.0} for i in range(1, 10)]
         result = svc.summarize_for_llm("reject_trend", items)
-        self.assertNotIn("前5筆", result)
+        self.assertNotIn("前20筆", result)
 
     def test_heatmap_top10(self):
         """Heatmap must include top-10 cells."""
@@ -247,11 +247,11 @@ class TestSummarizeForLlm(unittest.TestCase):
         self.assertIn("top10_cells", result)
 
     def test_table_truncation(self):
-        """Table data with > 10 rows must include first 10 + total count."""
-        rows = [{"id": i, "val": i * 2} for i in range(20)]
+        """Table data with > 50 rows must include first 50 + total count."""
+        rows = [{"id": i, "val": i * 2} for i in range(60)]
         result = svc.summarize_for_llm("reject_lot_list", rows)
         self.assertIn("共", result)
-        self.assertIn("20", result)
+        self.assertIn("60", result)
 
     def test_kpi_full(self):
         """KPI data must be returned in full."""
@@ -492,21 +492,19 @@ class TestText2SqlSqlErrorRetrySuccess(unittest.TestCase):
 
 
 class TestText2SqlAllRetriesFail(unittest.TestCase):
-    """All 3 SQL execution attempts fail → return error message."""
+    """All 5 SQL execution attempts fail → return error message."""
 
     @patch("mes_dashboard.services.ai_query_service._call_llm")
     def test_all_retries_return_error(self, mock_call_llm):
+        sql_resp = {"sql": "SELECT X FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
+                    "params": {}, "explanation": "查詢"}
         mock_call_llm.side_effect = [
             {"domains": ["hold"], "thought": "查詢"},
-            {"sql": "SELECT X FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
-             "params": {}, "explanation": "查詢"},
-            {"approved": True},  # Reviewer
-            {"sql": "SELECT Y FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
-             "params": {}, "explanation": "再次查詢"},
-            {"approved": True},  # Reviewer
-            {"sql": "SELECT Z FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
-             "params": {}, "explanation": "第三次查詢"},
-            {"approved": True},  # Reviewer
+            sql_resp, {"approved": True},  # attempt 1
+            sql_resp, {"approved": True},  # attempt 2
+            sql_resp, {"approved": True},  # attempt 3
+            sql_resp, {"approved": True},  # attempt 4
+            sql_resp, {"approved": True},  # attempt 5
         ]
 
         with patch("mes_dashboard.core.database.read_sql_df",

@@ -41,8 +41,8 @@ logger = logging.getLogger("mes_dashboard.ai_query_service")
 # ---------------------------------------------------------------------------
 _AI_API_URL = os.getenv("AI_API_URL", "https://ollama_pjapi.theaken.com")
 _AI_API_KEY = os.getenv("AI_API_KEY", "")
-_AI_MODEL = os.getenv("AI_MODEL", "gpt-oss:120b")
-_AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
+_AI_MODEL = os.getenv("AI_MODEL", "mlx-community/gpt-oss-120b-MXFP4-Q4")
+_AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "60"))
 _AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "false").strip().lower() in {"1", "true", "yes"}
 # Disable reasoning/thinking for structured JSON calls (default: disabled).
 # Set AI_ENABLE_THINK=true only if the model supports it and you want reasoning traces.
@@ -50,7 +50,7 @@ _AI_ENABLE_THINK: bool = os.getenv("AI_ENABLE_THINK", "false").strip().lower() i
 # Force the model to output only valid JSON (OpenAI-compatible response_format).
 # Disable with AI_FORCE_JSON_FORMAT=false if the model rejects the parameter.
 _AI_FORCE_JSON_FORMAT: bool = os.getenv("AI_FORCE_JSON_FORMAT", "true").strip().lower() not in {"0", "false", "no", "off"}
-# No max_tokens cap — internal LLM with 16K context, no token cost.
+# No max_tokens cap — internal LLM with 131K context, no token cost.
 _AI_MODE = os.getenv("AI_MODE", "text2sql")  # "text2sql" | "function"
 
 # ID type detection order for auto_resolve_id functions
@@ -336,7 +336,7 @@ def call_llm_text(messages: list[dict]) -> str:
 # Result truncation for Round 3
 # ---------------------------------------------------------------------------
 
-def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500) -> str:
+def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 20000) -> str:
     """Truncate query results to fit within LLM context for Round 3."""
     if chart_data is None:
         return "（查詢結果為空）"
@@ -353,9 +353,9 @@ def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500
 
     if chart_type == "trend":
         items = chart_data if isinstance(chart_data, list) else []
-        if len(items) > 30:
-            head = items[:5]
-            tail = items[-5:]
+        if len(items) > 200:
+            head = items[:20]
+            tail = items[-20:]
             # Compute numeric stats on first numeric value field
             numeric_vals: list[float] = []
             if items:
@@ -368,7 +368,7 @@ def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500
                 stats["最小"] = min(numeric_vals)
                 stats["最大"] = max(numeric_vals)
                 stats["平均"] = round(sum(numeric_vals) / len(numeric_vals), 4)
-            truncated = {"前5筆": head, "後5筆": tail, "統計": stats}
+            truncated = {"前20筆": head, "後20筆": tail, "統計": stats}
             text = json.dumps(truncated, ensure_ascii=False)
         else:
             text = json.dumps(chart_data, ensure_ascii=False)
@@ -403,13 +403,9 @@ def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500
     if chart_type == "table":
         rows = chart_data if isinstance(chart_data, list) else []
         total = len(rows)
-        if total > 10:
-            # Keep first 10 rows, limit to 5 important columns
-            subset = rows[:10]
-            if subset and isinstance(subset[0], dict):
-                keys = list(subset[0].keys())[:5]
-                subset = [{k: row.get(k) for k in keys} for row in subset]
-            text = json.dumps({"共": f"{total}筆", "前10筆": subset}, ensure_ascii=False)
+        if total > 50:
+            subset = rows[:50]
+            text = json.dumps({"共": f"{total}筆", "前50筆": subset}, ensure_ascii=False)
         else:
             text = json.dumps(chart_data, ensure_ascii=False)
         if len(text) <= max_chars:
@@ -1005,18 +1001,18 @@ def _extract_oracle_error(exc: Exception) -> str:
     return msg[:300]
 
 
-def _summarize_dataframe(df: "pd.DataFrame", max_chars: int = 4000) -> str:
+def _summarize_dataframe(df: "pd.DataFrame", max_chars: int = 20000) -> str:
     """Truncate a DataFrame to a LLM-digestible text format.
 
-    Shows first 10 rows for large DataFrames; always stays within max_chars.
+    Shows first 50 rows for large DataFrames; always stays within max_chars.
     """
     if df is None or df.empty:
         return "（查詢結果為空）"
 
     total = len(df)
-    if total > 10:
-        subset = df.head(10)
-        text = f"共 {total} 筆，顯示前 10 筆：\n{subset.to_string(index=False)}"
+    if total > 50:
+        subset = df.head(50)
+        text = f"共 {total} 筆，顯示前 50 筆：\n{subset.to_string(index=False)}"
     else:
         text = df.to_string(index=False)
 
@@ -1078,7 +1074,7 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
         {"role": "user", "content": question},
     ]
 
-    MAX_RETRIES = 3
+    MAX_RETRIES = 5
     last_error: str = ""
     df: "pd.DataFrame | None" = None
     sql_used: str | None = None
