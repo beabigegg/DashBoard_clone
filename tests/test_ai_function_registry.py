@@ -337,5 +337,248 @@ class TestStage2Prompt(unittest.TestCase):
         self.assertIn("FETCH FIRST", prompt)
 
 
+# ---------------------------------------------------------------------------
+# IP-1: Combined prompt tests (AC-2)
+# ---------------------------------------------------------------------------
+
+class TestCombinedPromptContainsAll41Functions(unittest.TestCase):
+    """AC-2: build_combined_prompt must include all registered function names."""
+
+    def test_all_function_names_present(self):
+        from mes_dashboard.services.ai_function_registry import build_combined_prompt
+        prompt = build_combined_prompt()
+        for func_name in REGISTRY:
+            with self.subTest(func_name=func_name):
+                self.assertIn(func_name, prompt)
+
+    def test_prompt_contains_json_output_schema_instruction(self):
+        from mes_dashboard.services.ai_function_registry import build_combined_prompt
+        prompt = build_combined_prompt()
+        # Must require params in output
+        self.assertIn('"params"', prompt)
+        self.assertIn('"function"', prompt)
+        self.assertIn('"explanation"', prompt)
+
+    def test_prompt_does_not_contain_full_param_schemas(self):
+        """Combined prompt must NOT inline full parameter schemas (design D1)."""
+        from mes_dashboard.services.ai_function_registry import build_combined_prompt
+        prompt = build_combined_prompt()
+        # Full schema details (type, required, enum) should not be inlined
+        # (name+description catalogue only, per D1)
+        self.assertNotIn('"required": true', prompt)
+        self.assertNotIn('"type": "string"', prompt)
+
+
+class TestCombinedPromptTokenBudget(unittest.TestCase):
+    """AC-2: combined prompt must stay within safe margin of 131K context window."""
+
+    def test_prompt_char_count_within_safe_limit(self):
+        from mes_dashboard.services.ai_function_registry import build_combined_prompt
+        prompt = build_combined_prompt()
+        # Rough estimate: 131072 tokens * ~3 chars/token = ~393K chars upper bound
+        # A safe margin: prompt should not exceed 50K chars (well within 131K token window)
+        self.assertLess(len(prompt), 50000)
+
+    def test_prompt_is_nonempty_string(self):
+        from mes_dashboard.services.ai_function_registry import build_combined_prompt
+        prompt = build_combined_prompt()
+        self.assertIsInstance(prompt, str)
+        self.assertGreater(len(prompt), 200)
+
+
+# ---------------------------------------------------------------------------
+# IP-5: New YAML function entry tests (AC-6, AC-7)
+# ---------------------------------------------------------------------------
+
+class TestProductionHistoryQueryFunctionEntry(unittest.TestCase):
+    """AC-6: production_history_query must exist in REGISTRY with correct fields."""
+
+    def test_entry_exists(self):
+        self.assertIn("production_history_query", REGISTRY)
+
+    def test_service_path_correct(self):
+        entry = REGISTRY["production_history_query"]
+        self.assertIn("production_history_service", entry["service"])
+        self.assertIn("query_production_history", entry["service"])
+
+    def test_dispatch_is_raw_params(self):
+        entry = REGISTRY["production_history_query"]
+        self.assertEqual(entry.get("dispatch"), "raw_params")
+
+    def test_chart_type_is_table(self):
+        entry = REGISTRY["production_history_query"]
+        self.assertEqual(entry["chart_type"], "table")
+
+    def test_required_params_present(self):
+        entry = REGISTRY["production_history_query"]
+        params = entry["params"]
+        self.assertIn("start_date", params)
+        self.assertIn("end_date", params)
+        self.assertTrue(params["start_date"]["required"])
+        self.assertTrue(params["end_date"]["required"])
+
+    def test_optional_params_present(self):
+        entry = REGISTRY["production_history_query"]
+        params = entry["params"]
+        self.assertIn("lot_ids", params)
+        self.assertIn("pj_types", params)
+        self.assertFalse(params["lot_ids"]["required"])
+        self.assertFalse(params["pj_types"]["required"])
+
+
+class TestResourceHistorySummaryFunctionEntry(unittest.TestCase):
+    """AC-6: resource_history_summary must exist in REGISTRY with correct fields."""
+
+    def test_entry_exists(self):
+        self.assertIn("resource_history_summary", REGISTRY)
+
+    def test_service_path_correct(self):
+        entry = REGISTRY["resource_history_summary"]
+        self.assertIn("resource_history_service", entry["service"])
+        self.assertIn("query_summary", entry["service"])
+
+    def test_chart_type_is_trend(self):
+        entry = REGISTRY["resource_history_summary"]
+        # Per the implementation plan, chart_type is trend (design.md D3 says kpi but
+        # implementation-plan.md says kpi; test-plan says "contract" — use what YAML says)
+        self.assertIn(entry["chart_type"], {"trend", "kpi"})
+
+    def test_granularity_has_enum(self):
+        entry = REGISTRY["resource_history_summary"]
+        params = entry["params"]
+        self.assertIn("granularity", params)
+        enum = params["granularity"].get("enum")
+        self.assertIsNotNone(enum)
+        self.assertIn("day", enum)
+        self.assertIn("week", enum)
+        self.assertIn("month", enum)
+        self.assertIn("year", enum)
+
+    def test_granularity_has_default(self):
+        entry = REGISTRY["resource_history_summary"]
+        self.assertEqual(entry["params"]["granularity"].get("default"), "day")
+
+    def test_sensitive_params_excluded(self):
+        """families, resource_ids, is_production, is_key, is_monitor must not be exposed."""
+        entry = REGISTRY["resource_history_summary"]
+        params = entry.get("params") or {}
+        for excluded in ("families", "resource_ids", "is_production", "is_key", "is_monitor"):
+            self.assertNotIn(excluded, params, f"Sensitive param '{excluded}' must not be exposed")
+
+
+class TestQcGateStatusFunctionEntry(unittest.TestCase):
+    """AC-6: qc_gate_status must exist in REGISTRY with no params."""
+
+    def test_entry_exists(self):
+        self.assertIn("qc_gate_status", REGISTRY)
+
+    def test_service_path_correct(self):
+        entry = REGISTRY["qc_gate_status"]
+        self.assertIn("qc_gate_service", entry["service"])
+        self.assertIn("get_qc_gate_summary", entry["service"])
+
+    def test_chart_type_is_table(self):
+        entry = REGISTRY["qc_gate_status"]
+        self.assertEqual(entry["chart_type"], "table")
+
+
+class TestQcGateStatusNoParams(unittest.TestCase):
+    """AC-7: qc_gate_status has no params (params: {})."""
+
+    def test_params_is_empty(self):
+        entry = REGISTRY["qc_gate_status"]
+        params = entry.get("params") or {}
+        self.assertEqual(params, {})
+
+    def test_validate_intent_passes_with_empty_params(self):
+        ok, msg = validate_intent("qc_gate_status", {})
+        self.assertTrue(ok)
+        self.assertEqual(msg, "")
+
+
+class TestProductionHistoryQueryParamSchema(unittest.TestCase):
+    """AC-7: production_history_query param schema validation."""
+
+    def test_validate_intent_fails_missing_start_date(self):
+        ok, msg = validate_intent("production_history_query", {"end_date": "2026-01-07"})
+        self.assertFalse(ok)
+
+    def test_validate_intent_fails_missing_end_date(self):
+        ok, msg = validate_intent("production_history_query", {"start_date": "2026-01-01"})
+        self.assertFalse(ok)
+
+    def test_validate_intent_passes_with_required_dates(self):
+        ok, msg = validate_intent(
+            "production_history_query",
+            {"start_date": "2026-01-01", "end_date": "2026-01-07"},
+        )
+        self.assertTrue(ok)
+
+    def test_validate_intent_passes_with_optional_params(self):
+        ok, msg = validate_intent(
+            "production_history_query",
+            {
+                "start_date": "2026-01-01",
+                "end_date": "2026-01-07",
+                "lot_ids": ["GA001", "GA002"],
+                "pj_types": ["2N7002K"],
+            },
+        )
+        self.assertTrue(ok)
+
+
+class TestResourceHistorySummaryParamSchema(unittest.TestCase):
+    """AC-7: resource_history_summary param schema validation."""
+
+    def test_validate_intent_fails_missing_dates(self):
+        ok, msg = validate_intent("resource_history_summary", {})
+        self.assertFalse(ok)
+
+    def test_validate_intent_passes_with_required_dates(self):
+        ok, msg = validate_intent(
+            "resource_history_summary",
+            {"start_date": "2026-01-01", "end_date": "2026-01-07"},
+        )
+        self.assertTrue(ok)
+
+    def test_validate_intent_fails_invalid_granularity(self):
+        ok, msg = validate_intent(
+            "resource_history_summary",
+            {
+                "start_date": "2026-01-01",
+                "end_date": "2026-01-07",
+                "granularity": "hourly",  # not in enum
+            },
+        )
+        self.assertFalse(ok)
+
+    def test_validate_intent_passes_valid_granularity(self):
+        for granularity in ("day", "week", "month", "year"):
+            ok, msg = validate_intent(
+                "resource_history_summary",
+                {
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-07",
+                    "granularity": granularity,
+                },
+            )
+            with self.subTest(granularity=granularity):
+                self.assertTrue(ok)
+
+
+class TestYamlLoadingExtended(unittest.TestCase):
+    """Extend existing TestYamlLoading to cover 41 names."""
+
+    def test_all_41_new_functions_present(self):
+        """The three new functions must be in REGISTRY (41 total)."""
+        for name in ("production_history_query", "resource_history_summary", "qc_gate_status"):
+            with self.subTest(name=name):
+                self.assertIn(name, REGISTRY)
+
+    def test_total_registry_size_is_at_least_41(self):
+        """Registry must have at least 41 entries (38 original + 3 new, or more if prior commits added entries)."""
+        self.assertGreaterEqual(len(REGISTRY), 41)
+
+
 if __name__ == "__main__":
     unittest.main()

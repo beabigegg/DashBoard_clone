@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.11.0
-last-changed: 2026-05-22
+schema-version: 1.12.0
+last-changed: 2026-05-29
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -323,6 +323,12 @@ breaking-change-policy: deprecate-2-minors
   - 無端點移除、無欄位移除、無錯誤碼變更；所有改動為 additive。
   - Consumers：`frontend/src/resource-status/`（FilterBar、EquipmentCard、MatrixSection）。
 
+- **[api-pipeline-upgrade] AI function-mode combined call（2026-05-29）**：以下為 additive，不影響既有端點：
+  - `process_query_function()` 改為單一 combined LLM call（原 R1+R2 → combined），輸出 schema `{"function","params","explanation"}`；malformed JSON 安全降級為 null-intent 回應（不拋出例外）。
+  - `_SESSION_STORE` 新增 `chat_history` 鍵（list of `{"role","content"}` pairs，cap 8 對/16 訊息，FIFO eviction）；history 注入 combined call 與 text2sql Stage 1；成功後 append；例外時不 append。
+  - 新增三個 AI 函式：`production_history_query`（raw_params 派遣）、`resource_history_summary`、`qc_gate_status`。
+  - Route surface、response envelope、TTL、error codes 均不變；無欄位移除；全部 additive。
+
 - **Material-Consumption endpoints（2026-05-20，material-part-consumption）**：以下為 additive，新頁面，不影響既有端點：
   - 新增 7 個端點：`GET /api/material-consumption/filter-options` → `{workcenter_groups, primary_categories, pj_types}`；`POST /api/material-consumption/query`（summary sync，body: `{material_parts[1..20], start_date, end_date, granularity: week|month|quarter, workcenter_groups?, primary_categories?, pj_types?}`，response: `{query_id, kpi: {total_consumed, total_required, efficiency_pct, lot_count, workorder_count}, trend[], type_breakdown[]}`）；`GET /api/material-consumption/view?query_id=X&granularity=Y`（DuckDB regroup，no Oracle，410 on spool miss）；`POST /api/material-consumption/detail`（sync 200 when rows ≤ SYNC_ROW_LIMIT，else 202 async；response: `{query_id, rows[], pagination: {page, total_pages, total_rows, per_page}}`）；`GET /api/material-consumption/detail/page?query_id=X&page=N`；`GET /api/material-consumption/detail/job/<job_id>` → `{status: pending|running|done|failed, query_id?}`；`POST /api/material-consumption/export`（csv-stream，text/csv，DuckDB chunked，no full-memory load）。
   - Summary query always synchronous. Detail query sync ≤ `SYNC_ROW_LIMIT` (env default 30000); async Type B (RQ queue `material-consumption`) for larger sets.
@@ -336,6 +342,9 @@ breaking-change-policy: deprecate-2-minors
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.12.0]
+- ai-pipeline-upgrade (2026-05-29): [api-pipeline-upgrade] Internal function-mode pipeline collapsed from two LLM calls (R1 intent + R2 params) to one combined call returning `{"function","params","explanation"}`. `_SESSION_STORE` extended with `chat_history` key (list of role/content pairs, cap 8 pairs); history injected into combined call and text2sql Stage 1 only. Three new AI functions registered (`production_history_query`, `resource_history_summary`, `qc_gate_status`). Route surface (`/api/ai/query`), response envelope keys, TTL, and error codes are unchanged. No fields removed; all changes internal to the AI service layer. Backward-compatible.
 
 ## [api 1.11.0]
 - add-package-detail-tables (2026-05-22): Added `package: string | null` to hold-history detail rows; added `PRODUCTLINENAME: string | null` to query-tool lot-history and equipment-lots rows; confirmed equipment-rejects already had PRODUCTLINENAME; added `PRODUCTLINENAME: string | null` to material-consumption detail rows (detail spool schema updated — parquet cleanup required on deploy/rollback). All additive; no existing fields removed.

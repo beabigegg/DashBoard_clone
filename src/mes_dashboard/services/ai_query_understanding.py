@@ -123,6 +123,52 @@ def get_query_session_for_tests(conversation_id: str) -> dict[str, Any] | None:
         return deepcopy(value) if value is not None else None
 
 
+# ---------------------------------------------------------------------------
+# Chat history helpers (D2)
+# ---------------------------------------------------------------------------
+
+_CHAT_HISTORY_CAP = 8  # max pairs (16 messages total)
+
+
+def _evict_if_needed(history: list) -> list:
+    """Remove oldest pair (first 2 elements) until len <= 16.
+
+    Returns a new list; does not mutate the input.
+    """
+    result = list(history)
+    while len(result) > _CHAT_HISTORY_CAP * 2:
+        del result[0:2]  # remove oldest user/assistant pair
+    return result
+
+
+def get_chat_history(conversation_id: str) -> list[dict]:
+    """Return a copy of chat_history for the session, or [] if absent."""
+    with _SESSION_LOCK:
+        session = _SESSION_STORE.get(conversation_id)
+        if session is None:
+            return []
+        return deepcopy(session.get("chat_history") or [])
+
+
+def append_to_chat_history(conversation_id: str, question: str, answer: str) -> None:
+    """Append user/assistant pair to chat_history, evicting oldest pair if cap exceeded.
+
+    Creates the session entry if it does not exist (chat_history key only).
+    Updates updated_at so the entry is not immediately expired by cleanup.
+    """
+    now = time.time()
+    with _SESSION_LOCK:
+        if conversation_id not in _SESSION_STORE:
+            _SESSION_STORE[conversation_id] = {"updated_at": now}
+        session = _SESSION_STORE[conversation_id]
+        history = list(session.get("chat_history") or [])
+        history.append({"role": "user", "content": question})
+        history.append({"role": "assistant", "content": answer})
+        session["chat_history"] = _evict_if_needed(history)
+        # Keep updated_at fresh so the session is not prematurely expired
+        session["updated_at"] = now
+
+
 def advance_query_state(
     conversation_id: str | None,
     user_input: str,
@@ -209,8 +255,13 @@ def advance_query_state(
             "query_state": deepcopy(merged_slots),
         }
 
+    # R3 fix: preserve chat_history across the slot-filling completion pop.
+    # The pop removes the slot-filling state but must NOT evict chat_history.
     with _SESSION_LOCK:
-        _SESSION_STORE.pop(conversation_id, None)
+        existing = _SESSION_STORE.pop(conversation_id, None)
+        saved_chat_history = (existing or {}).get("chat_history")
+        if saved_chat_history:
+            _SESSION_STORE[conversation_id] = {"chat_history": saved_chat_history}
 
     return {
         "ready_to_search": True,

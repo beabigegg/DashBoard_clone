@@ -1,0 +1,16 @@
+agent: spec-architect
+change-id: ai-pipeline-upgrade
+status: complete
+summary: >
+  Wrote design.md covering D1 (R1+R2 combined prompt: catalogue-only + post-hoc
+  validation, null/malformed fallback to existing null-intent path, single tool_trace
+  entry), D2 (raw chat_history pairs in _SESSION_STORE, 8-pair FIFO cap, append-on-success
+  incl. empty result, text2sql Stage 1 only, slot-pop interaction flagged), D3 (three new
+  functions: production_history_query INCLUDE with raw_params dispatch adapter + scope hint,
+  resource_history_summary 4-param subset, qc_gate_status table normalize branch). No ADR
+  required — reuses existing in-memory session/RLock/TTL; no boundary/substrate/guarantee change.
+artifacts:
+  - { type: adr-written, pointer: "none (no boundary/substrate/guarantee change)" }
+  - { type: affected-areas, pointer: "ai_query_service, ai_function_registry, ai_query_understanding, ai_functions.yaml" }
+  - { type: decision-summary, pointer: "merge R1+R2 into one catalogue-prompt call; bounded in-memory chat_history; 3 new functions (production_history_query needs raw_params dispatch adapter)" }
+  - { type: risks-noted, pointer: "2 medium, 1 low" }

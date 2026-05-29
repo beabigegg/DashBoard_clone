@@ -293,17 +293,57 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         "- 只列出上述 7 類已知問題（含即時 View 禁加日期），不要做其他審查",
         "- issues 要具體說明哪裡錯、應該怎麼做（讓 SQL 生成器能根據 issues 修正）",
         "- 不要自己重寫 SQL",
-        "",
-        "重要：直接輸出 JSON 物件，不要加任何說明文字、推理過程或 markdown 包裝。",
     ])
 
 
 # ---------------------------------------------------------------------------
-# Prompt builders — three rounds
+# Prompt builders — combined (D1) and three-round (deprecated R1/R2)
 # ---------------------------------------------------------------------------
 
+def build_combined_prompt() -> str:
+    """Combined prompt: select function AND fill params in a single LLM call.
+
+    Replaces the two-round R1 (intent select) + R2 (param fill) sequence.
+    The model receives all function names + descriptions (same as R1 catalogue)
+    plus an instruction to also emit params for the chosen function.
+
+    Output schema: {"function": "<name>", "params": {...}, "explanation": "<string>"}
+
+    Per design D1: does NOT inline full parameter schemas (param correctness is
+    enforced post-hoc by validate_intent + YAML default-merge).
+    """
+    lines = [
+        "你是 MES Dashboard AI 助手。使用者會用中文描述查詢需求。",
+        "從下方函式目錄中選出最合適的函式，並同時填入該函式所需的參數。",
+        "",
+        "## 嚴格規則",
+        "- 你的回覆必須是且僅是一個 JSON 物件",
+        "- 禁止輸出任何推理過程、解釋、markdown 或其他文字",
+        "- 直接輸出 JSON，不要用 ```json 包裝",
+        "",
+        "## 回覆格式",
+        '{"function": "<函式名稱>", "params": {<依函式需求填入>}, "explanation": "<一句話說明>"}',
+        "",
+        "若無合適函式：",
+        '{"function": null, "params": {}, "explanation": "<說明原因>"}',
+        "",
+        "## 參數填寫說明",
+        "- params 只填入使用者問題中明確提及的資訊",
+        "- 日期格式：YYYY-MM-DD；若未指定，start_date 預設今天往前 7 天，end_date 預設今天",
+        "- 不確定的可選參數可省略（留空）",
+        "",
+        "## 函式目錄",
+    ]
+    for func_name, entry in REGISTRY.items():
+        lines.append(f"- {func_name}：{entry['description']}")
+    return "\n".join(lines)
+
+
 def build_round1_prompt() -> str:
-    """Round 1: compact function list (name + description only, ~400-500 tokens)."""
+    """Round 1: compact function list (name + description only, ~400-500 tokens).
+
+    # deprecated — use build_combined_prompt()
+    """
     lines = [
         "你是 MES Dashboard AI 助手。使用者會用中文描述查詢需求。",
         "從下方函式目錄中選出最合適的函式名稱。",
@@ -327,7 +367,10 @@ def build_round1_prompt() -> str:
 
 
 def build_round2_prompt(function_name: str) -> str:
-    """Round 2: single function full schema + date rules + workcenter list (~500 tokens)."""
+    """Round 2: single function full schema + date rules + workcenter list (~500 tokens).
+
+    # deprecated — use build_combined_prompt()
+    """
     entry = REGISTRY.get(function_name)
     if entry is None:
         raise KeyError(f"Unknown function: {function_name}")

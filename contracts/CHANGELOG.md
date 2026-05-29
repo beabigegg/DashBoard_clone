@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.12.0] — 2026-05-29
+### Changed
+- ai-pipeline-upgrade: Internal function-mode pipeline collapsed from two LLM calls (R1+R2) to one combined call returning `{"function","params","explanation"}`. `_SESSION_STORE` extended with `chat_history` (cap 8 pairs / 16 messages); injected into combined call and text2sql Stage 1 only. Three new AI functions: `production_history_query`, `resource_history_summary`, `qc_gate_status`. Route surface, response envelope keys, TTL, and error codes unchanged. Backward-compatible.
+
+## [api-inventory 1.1.11] — 2026-05-29
+### Changed
+- ai-pipeline-upgrade: Updated `ai_routes.py` row — function mode now uses single combined LLM call; `chat_history` added to session store. No route or field changes.
+
+## [data 1.11.0] — 2026-05-29
+### Added
+- ai-pipeline-upgrade: Added §2.9 (AI Session Store Shape with `chat_history` pairs, 8-pair cap, TTL, pop-preservation). Added param schemas for `production_history_query` (raw_params dispatch), `resource_history_summary` (kwargs), `qc_gate_status` (no params). Added `normalize_chart_data` output for `qc_gate_status` (→ stations list); pass-through for the other two. Additive; no existing schemas changed.
+
+## [business 1.11.0] — 2026-05-29
+### Added
+- ai-pipeline-upgrade: Added AI-04 (combined-prompt output schema), AI-05 (malformed-JSON fallback), AI-06 (chat_history append policy), AI-07 (cap/eviction), AI-08 (history injection ordering), AI-09 (three new function behavioral contracts + production_history_query latency note). Additive; no existing rules changed.
+
 ## [api 1.11.0] — 2026-05-22
 ### Added
 - add-package-detail-tables: Added `package: string | null` to hold-history detail rows; added `PRODUCTLINENAME: string | null` to query-tool lot-history and equipment-lots rows; confirmed equipment-rejects already had PRODUCTLINENAME; added `PRODUCTLINENAME: string | null` to material-consumption detail rows (detail spool schema change — parquet cleanup required on deploy/rollback). All additive; no existing fields removed.

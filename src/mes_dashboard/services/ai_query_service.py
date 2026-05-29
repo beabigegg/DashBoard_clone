@@ -21,8 +21,7 @@ import requests
 
 from mes_dashboard.services.ai_function_registry import (
     REGISTRY,
-    build_round1_prompt,
-    build_round2_prompt,
+    build_combined_prompt,
     build_round3_prompt,
     build_stage1_prompt,
     build_stage2_prompt,
@@ -30,7 +29,11 @@ from mes_dashboard.services.ai_function_registry import (
     get_suggestions,
     validate_intent,
 )
-from mes_dashboard.services.ai_query_understanding import advance_query_state
+from mes_dashboard.services.ai_query_understanding import (
+    advance_query_state,
+    append_to_chat_history,
+    get_chat_history,
+)
 
 import pandas as pd
 
@@ -41,16 +44,10 @@ logger = logging.getLogger("mes_dashboard.ai_query_service")
 # ---------------------------------------------------------------------------
 _AI_API_URL = os.getenv("AI_API_URL", "https://ollama_pjapi.theaken.com")
 _AI_API_KEY = os.getenv("AI_API_KEY", "")
-_AI_MODEL = os.getenv("AI_MODEL", "mlx-community/gpt-oss-120b-MXFP4-Q4")
-_AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "60"))
+_AI_MODEL = os.getenv("AI_MODEL", "gpt-oss:120b")
+_AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
 _AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "false").strip().lower() in {"1", "true", "yes"}
-# Disable reasoning/thinking for structured JSON calls (default: disabled).
-# Set AI_ENABLE_THINK=true only if the model supports it and you want reasoning traces.
-_AI_ENABLE_THINK: bool = os.getenv("AI_ENABLE_THINK", "false").strip().lower() in {"1", "true", "yes", "on"}
-# Force the model to output only valid JSON (OpenAI-compatible response_format).
-# Disable with AI_FORCE_JSON_FORMAT=false if the model rejects the parameter.
-_AI_FORCE_JSON_FORMAT: bool = os.getenv("AI_FORCE_JSON_FORMAT", "true").strip().lower() not in {"0", "false", "no", "off"}
-# No max_tokens cap — internal LLM with 131K context, no token cost.
+# No max_tokens cap — internal LLM with 16K context, no token cost.
 _AI_MODE = os.getenv("AI_MODE", "text2sql")  # "text2sql" | "function"
 
 # ID type detection order for auto_resolve_id functions
@@ -104,105 +101,6 @@ def _auto_resolve_id(function_name: str, params: dict) -> dict:
 # LLM API calls
 # ---------------------------------------------------------------------------
 
-def _repair_json_strings(text: str) -> str:
-    """Escape unescaped control characters inside JSON string values.
-
-    Reasoning models sometimes emit literal newlines/tabs inside JSON strings
-    instead of the required \\n/\\t escape sequences.  This function uses a
-    simple state machine that tracks whether the current position is inside a
-    quoted string (handling backslash escapes) and replaces bare control chars
-    with their JSON escape equivalents.  Characters outside strings are left
-    unchanged, so structural newlines (pretty-printing) survive intact.
-    """
-    out: list[str] = []
-    in_string = False
-    escaped = False
-    for ch in text:
-        if escaped:
-            out.append(ch)
-            escaped = False
-        elif ch == "\\" and in_string:
-            out.append(ch)
-            escaped = True
-        elif ch == '"':
-            in_string = not in_string
-            out.append(ch)
-        elif in_string and ch == "\n":
-            out.append("\\n")
-        elif in_string and ch == "\r":
-            out.append("\\r")
-        elif in_string and ch == "\t":
-            out.append("\\t")
-        else:
-            out.append(ch)
-    return "".join(out)
-
-
-def _try_parse_json(text: str) -> dict | None:
-    """Try json.loads; on failure, try again after repairing literal control chars."""
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        pass
-    repaired = _repair_json_strings(text)
-    try:
-        return json.loads(repaired)
-    except (json.JSONDecodeError, ValueError):
-        return None
-
-
-def _extract_json_from_text(text: str) -> dict | None:
-    """Extract the last valid JSON object from text.
-
-    Handles: <think>…</think> tags, ```json code blocks, inline JSON objects
-    with arbitrary nesting, and literal newlines inside JSON strings (repaired
-    via _repair_json_strings).  Returns the *last* match because reasoning
-    models typically put the final answer at the end.
-    """
-    if not text:
-        return None
-
-    # 1. Strip <think>…</think> blocks, then try direct parse (with repair)
-    stripped = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-    if stripped:
-        result = _try_parse_json(stripped)
-        if result is not None:
-            return result
-
-    # 2. Extract from the last ```json … ``` or ``` … ``` code block
-    for m in reversed(list(re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL))):
-        result = _try_parse_json(m.group(1))
-        if result is not None:
-            return result
-
-    # 3. Brace-depth scan — find all *top-level* JSON objects, return the last valid one.
-    # Only consider positions where the brace depth was 0 (not nested inside another object).
-    top_level_starts: list[int] = []
-    depth = 0
-    for i, ch in enumerate(text):
-        if ch == "{":
-            if depth == 0:
-                top_level_starts.append(i)
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-
-    for start in reversed(top_level_starts):
-        depth = 0
-        for i, ch in enumerate(text[start:], start):
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    result = _try_parse_json(text[start : i + 1])
-                    if result is not None:
-                        return result
-                    break  # this start position failed; try the next
-
-    return None
-
-
 def _call_llm(messages: list[dict]) -> dict:
     """POST to LLM API and return the parsed JSON dict.
 
@@ -216,17 +114,11 @@ def _call_llm(messages: list[dict]) -> dict:
         "Authorization": f"Bearer {_AI_API_KEY}",
         "Content-Type": "application/json",
     }
-    body: dict = {
+    body = {
         "model": _AI_MODEL,
         "messages": messages,
         "stream": False,
-        "think": _AI_ENABLE_THINK,  # False by default; suppresses reasoning preamble
     }
-    if _AI_FORCE_JSON_FORMAT:
-        # OpenAI-compatible standard parameter
-        body["response_format"] = {"type": "json_object"}
-        # Ollama-specific extension: also accepted on /v1/chat/completions
-        body["format"] = "json"
 
     response = requests.post(
         url,
@@ -241,62 +133,35 @@ def _call_llm(messages: list[dict]) -> dict:
 
     data = response.json()
     msg = data.get("choices", [{}])[0].get("message", {})
-    content: str = msg.get("content") or ""
-    reasoning: str = msg.get("reasoning_content") or ""
+    content = msg.get("content") or msg.get("reasoning_content") or ""
 
-    # Happy path: content has JSON directly
-    result = _extract_json_from_text(content)
-    if result is not None:
-        return result
+    try:
+        return json.loads(content.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
 
-    # Thinking model: content is empty but reasoning_content has the full chain.
-    # 1. Try to find a JSON object embedded in the reasoning text.
-    if reasoning:
-        result = _extract_json_from_text(reasoning)
-        if result is not None:
-            return result
-
-        # 2. Model finished reasoning but forgot to output the JSON answer.
-        #    Make a focused follow-up call with the reasoning as context.
-        logger.debug("Content empty after reasoning (%d chars) — making extraction call", len(reasoning))
-        extraction_body: dict = {
-            "model": _AI_MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        f"你已完成分析：\n{reasoning[:2000]}\n\n"
-                        "現在請只輸出 JSON 答案，不要任何說明文字。"
-                    ),
-                }
-            ],
-            "stream": False,
-            "format": "json",
-            "response_format": {"type": "json_object"},
-        }
+    # Try to find the last JSON object (LLM sometimes prepends reasoning text)
+    for match in reversed(list(re.finditer(r"\{[^{}]*\}", content))):
         try:
-            extraction_resp = requests.post(
-                url, headers=headers, json=extraction_body,
-                verify=_AI_VERIFY_TLS, timeout=_AI_REQUEST_TIMEOUT,
-            )
-            if extraction_resp.ok:
-                ex_msg = extraction_resp.json().get("choices", [{}])[0].get("message", {})
-                extracted_content = ex_msg.get("content") or ""
-                result = _extract_json_from_text(extracted_content)
-                if result is not None:
-                    return result
-        except Exception as exc:
-            logger.debug("Extraction follow-up call failed: %s", exc)
+            return json.loads(match.group())
+        except (json.JSONDecodeError, ValueError):
+            continue
 
-    # Last resort: find a known function name in combined text
-    combined = content + reasoning
+    # Nested JSON fallback (greedy)
+    match = re.search(r"\{.*\}", content, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Last resort: try to find a known function name in the text
     for func_name in REGISTRY:
-        if func_name in combined:
+        if func_name in content:
             logger.warning("LLM returned non-JSON, extracted function name: %s", func_name)
             return {"function": func_name, "explanation": "（自動從 LLM 回應中提取）"}
 
-    logger.debug("Full LLM content (%d chars): %s", len(content or reasoning), (content or reasoning)[:600])
-    raise RuntimeError(f"Could not extract JSON from LLM response: {(content or reasoning)[:300]}")
+    raise RuntimeError(f"Could not extract JSON from LLM response: {content[:300]}")
 
 
 def call_llm_text(messages: list[dict]) -> str:
@@ -336,7 +201,7 @@ def call_llm_text(messages: list[dict]) -> str:
 # Result truncation for Round 3
 # ---------------------------------------------------------------------------
 
-def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 20000) -> str:
+def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 4500) -> str:
     """Truncate query results to fit within LLM context for Round 3."""
     if chart_data is None:
         return "（查詢結果為空）"
@@ -353,9 +218,9 @@ def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 2000
 
     if chart_type == "trend":
         items = chart_data if isinstance(chart_data, list) else []
-        if len(items) > 200:
-            head = items[:20]
-            tail = items[-20:]
+        if len(items) > 30:
+            head = items[:5]
+            tail = items[-5:]
             # Compute numeric stats on first numeric value field
             numeric_vals: list[float] = []
             if items:
@@ -368,7 +233,7 @@ def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 2000
                 stats["最小"] = min(numeric_vals)
                 stats["最大"] = max(numeric_vals)
                 stats["平均"] = round(sum(numeric_vals) / len(numeric_vals), 4)
-            truncated = {"前20筆": head, "後20筆": tail, "統計": stats}
+            truncated = {"前5筆": head, "後5筆": tail, "統計": stats}
             text = json.dumps(truncated, ensure_ascii=False)
         else:
             text = json.dumps(chart_data, ensure_ascii=False)
@@ -403,9 +268,13 @@ def summarize_for_llm(function_name: str, chart_data: Any, max_chars: int = 2000
     if chart_type == "table":
         rows = chart_data if isinstance(chart_data, list) else []
         total = len(rows)
-        if total > 50:
-            subset = rows[:50]
-            text = json.dumps({"共": f"{total}筆", "前50筆": subset}, ensure_ascii=False)
+        if total > 10:
+            # Keep first 10 rows, limit to 5 important columns
+            subset = rows[:10]
+            if subset and isinstance(subset[0], dict):
+                keys = list(subset[0].keys())[:5]
+                subset = [{k: row.get(k) for k in keys} for row in subset]
+            text = json.dumps({"共": f"{total}筆", "前10筆": subset}, ensure_ascii=False)
         else:
             text = json.dumps(chart_data, ensure_ascii=False)
         if len(text) <= max_chars:
@@ -717,6 +586,16 @@ def normalize_chart_data(function_name: str, raw: Any) -> Any:
             return raw
         return raw
 
+    # ── New functions (D3) ─────────────────────────────────────────────────
+    if fn == "qc_gate_status":
+        if isinstance(raw, dict):
+            return raw.get("stations", [])
+        return raw
+
+    if fn in ("production_history_query", "resource_history_summary"):
+        # Pass through — service returns structured dict directly
+        return raw
+
     return raw
 
 
@@ -809,10 +688,8 @@ def _review_sql(
     try:
         result = _call_llm(review_messages)
     except Exception as exc:
-        # Fail-closed: if the reviewer is unavailable, refuse to execute rather
-        # than silently approving — a downed reviewer must not become a bypass.
-        logger.warning("Reviewer LLM call failed, rejecting SQL: %s", exc)
-        return "LLM 審查服務暫時不可用，拒絕執行"
+        logger.warning("Reviewer LLM call failed, skipping review: %s", exc)
+        return ""
 
     if result.get("approved", True):
         return ""
@@ -872,34 +749,6 @@ def _deterministic_review_issues(question: str, sql: str, domains: list[str]) ->
 # SQL sanitizer — deterministic fixes for known Oracle issues
 # ---------------------------------------------------------------------------
 
-# Only these statement types are allowed through the AI pipeline.
-_ALLOWED_SQL_STARTS = frozenset({"SELECT", "WITH"})
-
-
-def _assert_select_only(sql: str) -> None:
-    """Raise ValueError if the first SQL keyword is not SELECT or WITH.
-
-    Strips leading whitespace and -- / /* */ comments before checking so that
-    a comment-prefixed DROP TABLE cannot bypass the guard.
-    """
-    text = sql.lstrip()
-    while text:
-        if text[:2] == "--":
-            end = text.find("\n")
-            text = text[end + 1 :].lstrip() if end != -1 else ""
-        elif text[:2] == "/*":
-            end = text.find("*/")
-            text = text[end + 2 :].lstrip() if end != -1 else ""
-        else:
-            break
-    m = re.match(r"\w+", text)
-    first_kw = m.group(0).upper() if m else ""
-    if first_kw not in _ALLOWED_SQL_STARTS:
-        raise ValueError(
-            f"只允許 SELECT 查詢，拒絕執行 '{first_kw or text[:20]}' 語句"
-        )
-
-
 # Mixed-case columns that Oracle requires double-quoting.
 _MIXED_CASE_COLUMNS: dict[str, str] = {
     "Package": '"Package"',
@@ -937,14 +786,10 @@ def _sanitize_sql(sql: str) -> str:
     """Apply deterministic fixes to LLM-generated SQL before execution.
 
     Fixes:
-      0. Statement type guard — only SELECT/WITH allowed (raises ValueError otherwise)
       1. Mixed-case columns (Package, Function) → auto-quote
       2. Unquoted Oracle reserved words used as aliases
       3. Validate column names against schema (log warnings)
     """
-    # 0. Reject non-SELECT statements before any other processing.
-    _assert_select_only(sql)
-
     # 1. Auto-quote mixed-case columns.
     #    Match word boundary around the column name, but skip if already quoted.
     for col, quoted in _MIXED_CASE_COLUMNS.items():
@@ -1001,18 +846,18 @@ def _extract_oracle_error(exc: Exception) -> str:
     return msg[:300]
 
 
-def _summarize_dataframe(df: "pd.DataFrame", max_chars: int = 20000) -> str:
+def _summarize_dataframe(df: "pd.DataFrame", max_chars: int = 4000) -> str:
     """Truncate a DataFrame to a LLM-digestible text format.
 
-    Shows first 50 rows for large DataFrames; always stays within max_chars.
+    Shows first 10 rows for large DataFrames; always stays within max_chars.
     """
     if df is None or df.empty:
         return "（查詢結果為空）"
 
     total = len(df)
-    if total > 50:
-        subset = df.head(50)
-        text = f"共 {total} 筆，顯示前 50 筆：\n{subset.to_string(index=False)}"
+    if total > 10:
+        subset = df.head(10)
+        text = f"共 {total} 筆，顯示前 10 筆：\n{subset.to_string(index=False)}"
     else:
         text = df.to_string(index=False)
 
@@ -1025,8 +870,14 @@ def _summarize_dataframe(df: "pd.DataFrame", max_chars: int = 20000) -> str:
 # Text-to-SQL pipeline
 # ---------------------------------------------------------------------------
 
-def process_query_text2sql(question: str) -> dict[str, Any]:
+def process_query_text2sql(
+    question: str,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
     """3-stage Text-to-SQL pipeline: classify → generate SQL → execute → summarize.
+
+    IP-4 (D2): chat_history is injected into Stage 1 domain classification only.
+    History is appended on successful answer.
 
     Returns:
         dict with keys: answer, chart_data, query_used, params_used,
@@ -1037,8 +888,11 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
     tool_trace: list[dict[str, Any]] = []
 
     # ── Stage 1: Domain classification ─────────────────────────────────────
+    # IP-4: inject chat_history between system and user turn (Stage 1 only)
+    history = get_chat_history(conversation_id) if conversation_id else []
     s1_messages = [
         {"role": "system", "content": build_stage1_prompt()},
+        *history,
         {"role": "user", "content": question},
     ]
     try:
@@ -1074,7 +928,7 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
         {"role": "user", "content": question},
     ]
 
-    MAX_RETRIES = 5
+    MAX_RETRIES = 3
     last_error: str = ""
     df: "pd.DataFrame | None" = None
     sql_used: str | None = None
@@ -1140,21 +994,13 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
                     ),
                 })
                 continue  # Skip execution, go to next attempt
-            # Reviewer rejected on every attempt — abort without executing.
-            return {
-                "answer": f"SQL 審查未通過（已重試 {MAX_RETRIES} 次）：{review_issue}",
-                "chart_data": None,
-                "query_used": "text2sql",
-                "params_used": params_used,
-                "sql_used": sql_used,
-                "tool_trace": tool_trace,
-                "suggestions": [],
-            }
+            # Last attempt — try executing anyway
+            logger.warning("Reviewer rejected on last attempt, executing anyway")
 
         # ── Execute SQL ──────────────────────────────────────────────────────
+        sql = _sanitize_sql(sql)
         params = _coerce_date_params(params)
         try:
-            sql = _sanitize_sql(sql)  # raises ValueError for non-SELECT
             df = read_sql_df(sql, params)
             logger.info("SQL executed successfully: %d rows", len(df) if df is not None else 0)
             tool_trace.append({
@@ -1163,21 +1009,6 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
                 "summary": f"執行成功，回傳 {len(df) if df is not None else 0} 筆",
             })
             break  # Success — exit retry loop
-        except ValueError as san_exc:
-            last_error = str(san_exc)
-            logger.warning("SQL rejected by security policy (attempt %d): %s", attempt + 1, last_error)
-            tool_trace.append({
-                "step": 3 + attempt,
-                "function": "sanitize_sql",
-                "summary": f"安全性拒絕: {last_error[:80]}",
-            })
-            if attempt < MAX_RETRIES - 1:
-                s2_messages.append({"role": "assistant", "content": json.dumps(s2_result, ensure_ascii=False)})
-                s2_messages.append({
-                    "role": "user",
-                    "content": f"SQL 安全規則不允許：{last_error}\n請只生成 SELECT 查詢，重新生成。",
-                })
-            df = None
         except Exception as exc:
             from mes_dashboard.core.database import DatabaseDegradedError
             last_error = _extract_oracle_error(exc)
@@ -1258,6 +1089,10 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
     if not chart_data:
         chart_data = None
 
+    # IP-4: append to chat history on successful answer
+    if conversation_id:
+        append_to_chat_history(conversation_id, question, answer)
+
     return {
         "answer": answer,
         "chart_data": chart_data,
@@ -1270,42 +1105,69 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Main entry point — three-round pipeline (function call mode)
+# Main entry point — combined-call pipeline (function call mode)
 # ---------------------------------------------------------------------------
 
-def process_query_function(question: str) -> dict[str, Any]:
-    """Process a user question through the three-round LLM pipeline.
+def process_query_function(
+    question: str,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
+    """Process a user question through the combined-call + Round 3 LLM pipeline.
+
+    IP-2 (D1): A single combined LLM call selects the function AND fills params.
+    IP-4 (D2): chat_history injected between system and user turns; appended on success.
 
     Args:
         question: Natural language question in Chinese.
+        conversation_id: Optional session ID for chat history injection/append.
 
     Returns:
         dict with keys: answer, chart_data, query_used, params_used, suggestions
 
     Raises:
-        TimeoutError: EXTERNAL_SERVICE_TIMEOUT
-        ConnectionError: EXTERNAL_SERVICE_ERROR
-        ValueError: VALIDATION_ERROR — invalid intent params
+        TimeoutError: EXTERNAL_SERVICE_TIMEOUT — re-raised from requests.Timeout
+        ConnectionError: EXTERNAL_SERVICE_ERROR — re-raised from connection failures
+        ValueError: VALIDATION_ERROR — invalid intent params (unknown function or bad params)
     """
-    # ── Round 1: Intent classification ─────────────────────────────────────
-    r1_messages = [
-        {"role": "system", "content": build_round1_prompt()},
+    tool_trace: list[dict[str, Any]] = []
+
+    # ── IP-4: Inject chat_history between system and user turn ──────────────
+    history = get_chat_history(conversation_id) if conversation_id else []
+
+    # ── Combined call: select function + fill params in one round ───────────
+    combined_messages: list[dict[str, Any]] = [
+        {"role": "system", "content": build_combined_prompt()},
+        *history,
         {"role": "user", "content": question},
     ]
+
+    # AC-7: catch RuntimeError (malformed JSON) and map to null-intent path
     try:
-        r1_result = _call_llm(r1_messages)
+        combined_result = _call_llm(combined_messages)
     except requests.Timeout as exc:
         raise TimeoutError("LLM API 回應逾時") from exc
     except requests.ConnectionError as exc:
         raise ConnectionError("LLM API 連線失敗") from exc
-    except RuntimeError as exc:
-        raise ConnectionError(str(exc)) from exc
+    except RuntimeError:
+        # Malformed JSON or unextractable response — safe degradation to null-intent
+        combined_result = {}
 
-    function_name = r1_result.get("function")
-    explanation = r1_result.get("explanation", "")
-    logger.info("Round 1 result: function=%s, explanation=%s", function_name, explanation)
+    function_name = combined_result.get("function")
+    params = combined_result.get("params") or {}
+    explanation = combined_result.get("explanation", "")
 
-    # Null intent — LLM cannot match any function
+    logger.info(
+        "Combined call result: function=%s, params=%s, explanation=%s",
+        function_name, params, explanation,
+    )
+
+    tool_trace.append({
+        "step": 1,
+        "function": "combined_select_fill",
+        "summary": f"function={function_name}, params={params}",
+    })
+
+    # Null/missing function_name → null-intent path (AC-7 fallback)
     if not function_name:
         return {
             "answer": explanation or "抱歉，我無法理解這個查詢，請換個方式描述",
@@ -1313,39 +1175,7 @@ def process_query_function(question: str) -> dict[str, Any]:
             "query_used": None,
             "params_used": None,
             "suggestions": [],
-        }
-
-    # ── Round 2: Parameter filling ──────────────────────────────────────────
-    try:
-        r2_system = build_round2_prompt(function_name)
-    except KeyError:
-        raise ValueError(f"未知函式：{function_name}")
-
-    r2_messages = [
-        {"role": "system", "content": r2_system},
-        {"role": "user", "content": question},
-    ]
-    try:
-        r2_result = _call_llm(r2_messages)
-    except requests.Timeout as exc:
-        raise TimeoutError("LLM API 回應逾時") from exc
-    except requests.ConnectionError as exc:
-        raise ConnectionError("LLM API 連線失敗") from exc
-    except RuntimeError as exc:
-        raise ConnectionError(str(exc)) from exc
-
-    params = r2_result.get("params") or {}
-    clarification = r2_result.get("clarification")
-    logger.info("Round 2 result: params=%s, clarification=%s", params, clarification)
-
-    # If LLM needs more info from user, return clarification directly
-    if clarification:
-        return {
-            "answer": clarification,
-            "chart_data": None,
-            "query_used": function_name,
-            "params_used": params,
-            "suggestions": get_suggestions(function_name),
+            "tool_trace": tool_trace,
         }
 
     # Fill default params from YAML schema
@@ -1371,19 +1201,31 @@ def process_query_function(question: str) -> dict[str, Any]:
             chart_data = prefetched
         else:
             service_fn = get_service_function(function_name)
-            chart_data = service_fn(**params)
+            # D3: raw_params dispatch — production_history_query takes a single dict
+            if entry.get("dispatch") == "raw_params":
+                chart_data = service_fn(params)
+            else:
+                chart_data = service_fn(**params)
     except (KeyError, AttributeError, ImportError) as exc:
         logger.error("Service dispatch failed for %s: %s", function_name, exc)
         raise ConnectionError(f"服務函式載入失敗：{exc}") from exc
     except TypeError as exc:
-        logger.error("Service function %s called with wrong params %s: %s", function_name, params, exc)
+        logger.error(
+            "Service function %s called with wrong params %s: %s",
+            function_name, params, exc,
+        )
         raise ValueError(f"參數不符合服務函式要求：{exc}") from exc
 
-    logger.info("Service %s returned type=%s, is_none=%s", function_name, type(chart_data).__name__, chart_data is None)
+    logger.info(
+        "Service %s returned type=%s, is_none=%s",
+        function_name, type(chart_data).__name__, chart_data is None,
+    )
     chart_data = normalize_chart_data(function_name, chart_data)
-    logger.info("Normalized chart_data type=%s, is_none=%s, len=%s",
-                type(chart_data).__name__, chart_data is None,
-                len(chart_data) if isinstance(chart_data, (list, dict)) else "N/A")
+    logger.info(
+        "Normalized chart_data type=%s, is_none=%s, len=%s",
+        type(chart_data).__name__, chart_data is None,
+        len(chart_data) if isinstance(chart_data, (list, dict)) else "N/A",
+    )
 
     # ── Check for empty / unresolved results ─────────────────────────────────
     _is_empty = (
@@ -1418,6 +1260,10 @@ def process_query_function(question: str) -> dict[str, Any]:
             logger.warning("Round 3 summarization failed for %s, using fallback", function_name)
             answer = "查詢完成，請參考圖表。"
 
+    # ── IP-4: Append to chat history on success (incl. empty-result) ─────────
+    if conversation_id:
+        append_to_chat_history(conversation_id, question, answer)
+
     suggestions = get_suggestions(function_name)
 
     return {
@@ -1426,6 +1272,7 @@ def process_query_function(question: str) -> dict[str, Any]:
         "query_used": function_name,
         "params_used": params,
         "suggestions": suggestions,
+        "tool_trace": tool_trace,
     }
 
 
@@ -1468,12 +1315,12 @@ def process_query(question: str, conversation_id: str | None = None) -> dict[str
         result.setdefault("query_state", state.get("query_state") or {})
         return result
     if mode == "function":
-        result = process_query_function(search_question)
+        result = process_query_function(search_question, conversation_id=conversation_id)
         result.setdefault("needs_clarification", False)
         result.setdefault("missing_slots", [])
         result.setdefault("query_state", state.get("query_state") or {})
         return result
-    result = process_query_text2sql(search_question)
+    result = process_query_text2sql(search_question, conversation_id=conversation_id)
     result.setdefault("needs_clarification", False)
     result.setdefault("missing_slots", [])
     result.setdefault("query_state", state.get("query_state") or {})

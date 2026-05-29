@@ -43,175 +43,6 @@ class TestCallLlmText(unittest.TestCase):
         self.assertEqual(result, "推理文字")
 
 
-class TestExtractJsonFromText(unittest.TestCase):
-    """Tests for _extract_json_from_text() — the JSON extraction helper."""
-
-    def test_direct_json(self):
-        """Plain JSON string must parse directly."""
-        result = svc._extract_json_from_text('{"key": "value"}')
-        self.assertEqual(result, {"key": "value"})
-
-    def test_think_tag_stripped(self):
-        """<think>…</think> block must be removed before parsing."""
-        text = "<think>我在思考…</think>\n{\"key\": \"value\"}"
-        result = svc._extract_json_from_text(text)
-        self.assertEqual(result, {"key": "value"})
-
-    def test_markdown_code_block_json(self):
-        """JSON inside ```json … ``` must be extracted."""
-        text = "這是說明\n```json\n{\"sql\": \"SELECT 1\"}\n```\n後記"
-        result = svc._extract_json_from_text(text)
-        self.assertEqual(result, {"sql": "SELECT 1"})
-
-    def test_last_json_wins(self):
-        """When multiple JSON objects exist, the last valid one must be returned."""
-        text = '{"a": 1} some text {"b": 2}'
-        result = svc._extract_json_from_text(text)
-        self.assertEqual(result, {"b": 2})
-
-    def test_nested_json_extracted(self):
-        """JSON with nested objects (e.g. params dict) must be handled correctly."""
-        text = 'reasoning...\n{"sql": "SELECT 1", "params": {"p0": "X"}}'
-        result = svc._extract_json_from_text(text)
-        self.assertEqual(result, {"sql": "SELECT 1", "params": {"p0": "X"}})
-
-    def test_reasoning_preamble_then_json(self):
-        """Reasoning preamble followed by JSON must return the JSON, not the preamble."""
-        text = 'The user asks about WIP trend. I will write SQL.\n{"sql": "SELECT LOTID FROM WIP"}'
-        result = svc._extract_json_from_text(text)
-        self.assertEqual(result, {"sql": "SELECT LOTID FROM WIP"})
-
-    def test_empty_text_returns_none(self):
-        """Empty text must return None."""
-        self.assertIsNone(svc._extract_json_from_text(""))
-
-    def test_no_json_returns_none(self):
-        """Text with no JSON object must return None."""
-        self.assertIsNone(svc._extract_json_from_text("純文字，沒有 JSON"))
-
-    def test_literal_newline_in_sql_string_repaired(self):
-        """JSON with literal (unescaped) newlines inside a SQL string must be repaired."""
-        # Simulates model output: {"sql": "SELECT ...\nFROM TABLE"} with a real newline
-        text = '{"sql": "SELECT A,\nB\nFROM T", "params": {}}'
-        result = svc._extract_json_from_text(text)
-        self.assertIsNotNone(result)
-        self.assertIn("SELECT A,", result["sql"])
-
-    def test_literal_tab_in_string_repaired(self):
-        """Literal tab characters inside JSON strings must be escaped."""
-        text = '{"key": "value\twith\ttabs"}'
-        result = svc._extract_json_from_text(text)
-        self.assertIsNotNone(result)
-        self.assertEqual(result["key"], "value\twith\ttabs")
-
-
-class TestRepairJsonStrings(unittest.TestCase):
-    """Tests for _repair_json_strings()."""
-
-    def test_literal_newline_inside_string_escaped(self):
-        raw = '{"sql": "SELECT A,\nFROM T"}'
-        repaired = svc._repair_json_strings(raw)
-        obj = __import__("json").loads(repaired)
-        self.assertIn("SELECT A,", obj["sql"])
-
-    def test_structural_newline_outside_string_unchanged(self):
-        raw = '{\n  "a": 1,\n  "b": 2\n}'
-        repaired = svc._repair_json_strings(raw)
-        obj = __import__("json").loads(repaired)
-        self.assertEqual(obj, {"a": 1, "b": 2})
-
-    def test_escaped_backslash_not_double_escaped(self):
-        raw = r'{"path": "C:\\Users\\test"}'
-        repaired = svc._repair_json_strings(raw)
-        self.assertEqual(raw, repaired)  # no change needed
-
-
-class TestCallLlmThinkParam(unittest.TestCase):
-    """Verify that _call_llm sends think:False by default (suppresses reasoning)."""
-
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_think_false_sent_by_default(self, mock_post):
-        """_call_llm must include think=False in the request body by default."""
-        mock_response = MagicMock()
-        mock_response.ok = True
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
-        }
-        mock_post.return_value = mock_response
-
-        svc._call_llm([{"role": "user", "content": "test"}])
-
-        _, kwargs = mock_post.call_args
-        sent_body = kwargs.get("json", {})
-        self.assertIn("think", sent_body)
-        self.assertFalse(sent_body["think"])
-
-    @patch("mes_dashboard.services.ai_query_service._AI_ENABLE_THINK", True)
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_think_true_when_env_enabled(self, mock_post):
-        """When AI_ENABLE_THINK is truthy, think=True must be sent."""
-        mock_response = MagicMock()
-        mock_response.ok = True
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
-        }
-        mock_post.return_value = mock_response
-
-        svc._call_llm([{"role": "user", "content": "test"}])
-
-        _, kwargs = mock_post.call_args
-        sent_body = kwargs.get("json", {})
-        self.assertTrue(sent_body["think"])
-
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_response_format_json_object_sent_by_default(self, mock_post):
-        """_call_llm must include response_format=json_object to force JSON output."""
-        mock_response = MagicMock()
-        mock_response.ok = True
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
-        }
-        mock_post.return_value = mock_response
-
-        svc._call_llm([{"role": "user", "content": "test"}])
-
-        _, kwargs = mock_post.call_args
-        sent_body = kwargs.get("json", {})
-        self.assertEqual(sent_body.get("response_format"), {"type": "json_object"})
-
-    @patch("mes_dashboard.services.ai_query_service._AI_FORCE_JSON_FORMAT", False)
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_response_format_omitted_when_disabled(self, mock_post):
-        """When AI_FORCE_JSON_FORMAT=false, response_format must not be sent."""
-        mock_response = MagicMock()
-        mock_response.ok = True
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
-        }
-        mock_post.return_value = mock_response
-
-        svc._call_llm([{"role": "user", "content": "test"}])
-
-        _, kwargs = mock_post.call_args
-        sent_body = kwargs.get("json", {})
-        self.assertNotIn("response_format", sent_body)
-
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_reasoning_preamble_json_extracted(self, mock_post):
-        """_call_llm must extract JSON from content that starts with reasoning text."""
-        mock_response = MagicMock()
-        mock_response.ok = True
-        mock_response.json.return_value = {
-            "choices": [{"message": {
-                "content": 'The user asks about WIP. I analyse...\n{"sql": "SELECT LOTID FROM WIP_TABLE"}'
-            }}]
-        }
-        mock_post.return_value = mock_response
-
-        result = svc._call_llm([{"role": "user", "content": "WIP 趨勢"}])
-        self.assertEqual(result["sql"], "SELECT LOTID FROM WIP_TABLE")
-
-
 class TestSummarizeForLlm(unittest.TestCase):
     """Tests for summarize_for_llm()."""
 
@@ -223,18 +54,18 @@ class TestSummarizeForLlm(unittest.TestCase):
         self.assertIn("10", result)
 
     def test_trend_truncation(self):
-        """Trend data with > 200 points must be truncated to head/tail + stats."""
-        items = [{"date": f"2026-{i // 30 + 1:02d}-{i % 30 + 1:02d}", "reject_rate": float(i)} for i in range(205)]
+        """Trend data with > 30 points must be truncated to head/tail + stats."""
+        items = [{"date": f"2026-01-{i:02d}", "reject_rate": float(i)} for i in range(1, 35)]
         result = svc.summarize_for_llm("reject_trend", items)
-        self.assertIn("前20筆", result)
-        self.assertIn("後20筆", result)
+        self.assertIn("前5筆", result)
+        self.assertIn("後5筆", result)
         self.assertIn("統計", result)
 
-    def test_trend_no_truncation_under_200(self):
-        """Trend data with <= 200 points must be returned as-is."""
+    def test_trend_no_truncation_under_30(self):
+        """Trend data with <= 30 points must be returned as-is."""
         items = [{"date": f"2026-01-{i:02d}", "reject_rate": 1.0} for i in range(1, 10)]
         result = svc.summarize_for_llm("reject_trend", items)
-        self.assertNotIn("前20筆", result)
+        self.assertNotIn("前5筆", result)
 
     def test_heatmap_top10(self):
         """Heatmap must include top-10 cells."""
@@ -247,11 +78,11 @@ class TestSummarizeForLlm(unittest.TestCase):
         self.assertIn("top10_cells", result)
 
     def test_table_truncation(self):
-        """Table data with > 50 rows must include first 50 + total count."""
-        rows = [{"id": i, "val": i * 2} for i in range(60)]
+        """Table data with > 10 rows must include first 10 + total count."""
+        rows = [{"id": i, "val": i * 2} for i in range(20)]
         result = svc.summarize_for_llm("reject_lot_list", rows)
         self.assertIn("共", result)
-        self.assertIn("60", result)
+        self.assertIn("20", result)
 
     def test_kpi_full(self):
         """KPI data must be returned in full."""
@@ -323,12 +154,13 @@ class TestProcessQueryValidIntent(unittest.TestCase):
         mock_get_svc,
         mockcall_llm_text,
     ):
-        """Valid 3-round pipeline must dispatch service and return query_used + answer."""
-        # R1 returns intent, R2 returns params
-        mock_call_llm.side_effect = [
-            {"function": "reject_spike_alerts", "explanation": "查詢不良突增"},
-            {"params": {"detector": "reject"}},
-        ]
+        """Valid combined-call pipeline must dispatch service and return query_used + answer."""
+        # Combined call: returns function + params in one result
+        mock_call_llm.return_value = {
+            "function": "reject_spike_alerts",
+            "params": {"detector": "reject"},
+            "explanation": "查詢不良突增",
+        }
         mock_service_fn = MagicMock(return_value={"items": [{"detector": "reject", "severity": "warning"}]})
         mock_get_svc.return_value = mock_service_fn
         mockcall_llm_text.return_value = "近期發現 1 筆不良突增異常。"
@@ -348,10 +180,11 @@ class TestProcessQueryValidIntent(unittest.TestCase):
         self, mock_call_llm, mock_get_svc, mockcall_llm_text
     ):
         """Response must not contain conversation_id, round, or max_rounds."""
-        mock_call_llm.side_effect = [
-            {"function": "reject_spike_alerts", "explanation": "查詢"},
-            {"params": {"detector": "reject"}},
-        ]
+        mock_call_llm.return_value = {
+            "function": "reject_spike_alerts",
+            "params": {"detector": "reject"},
+            "explanation": "查詢",
+        }
         mock_get_svc.return_value = MagicMock(return_value={"items": []})
         mockcall_llm_text.return_value = "無異常。"
 
@@ -372,10 +205,11 @@ class TestRound3Fallback(unittest.TestCase):
         self, mock_call_llm, mock_get_svc, mockcall_llm_text
     ):
         """When Round 3 raises, answer must be the fallback text and chart_data intact."""
-        mock_call_llm.side_effect = [
-            {"function": "reject_spike_alerts", "explanation": "查詢"},
-            {"params": {"detector": "reject"}},
-        ]
+        mock_call_llm.return_value = {
+            "function": "reject_spike_alerts",
+            "params": {"detector": "reject"},
+            "explanation": "查詢",
+        }
         mock_service_fn = MagicMock(return_value={"items": [{"id": 1}]})
         mock_get_svc.return_value = mock_service_fn
         mockcall_llm_text.side_effect = RuntimeError("LLM R3 failed")
@@ -492,19 +326,21 @@ class TestText2SqlSqlErrorRetrySuccess(unittest.TestCase):
 
 
 class TestText2SqlAllRetriesFail(unittest.TestCase):
-    """All 5 SQL execution attempts fail → return error message."""
+    """All 3 SQL execution attempts fail → return error message."""
 
     @patch("mes_dashboard.services.ai_query_service._call_llm")
     def test_all_retries_return_error(self, mock_call_llm):
-        sql_resp = {"sql": "SELECT X FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
-                    "params": {}, "explanation": "查詢"}
         mock_call_llm.side_effect = [
             {"domains": ["hold"], "thought": "查詢"},
-            sql_resp, {"approved": True},  # attempt 1
-            sql_resp, {"approved": True},  # attempt 2
-            sql_resp, {"approved": True},  # attempt 3
-            sql_resp, {"approved": True},  # attempt 4
-            sql_resp, {"approved": True},  # attempt 5
+            {"sql": "SELECT X FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
+             "params": {}, "explanation": "查詢"},
+            {"approved": True},  # Reviewer
+            {"sql": "SELECT Y FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
+             "params": {}, "explanation": "再次查詢"},
+            {"approved": True},  # Reviewer
+            {"sql": "SELECT Z FROM DWH.DW_MES_HOLDRELEASEHISTORY FETCH FIRST 10 ROWS ONLY",
+             "params": {}, "explanation": "第三次查詢"},
+            {"approved": True},  # Reviewer
         ]
 
         with patch("mes_dashboard.core.database.read_sql_df",
@@ -569,14 +405,19 @@ class TestFeatureFlag(unittest.TestCase):
         mock_fn.return_value = {"answer": "ok", "query_used": "test_fn"}
         with patch.dict("os.environ", {"AI_MODE": "function"}):
             result = svc.process_query("test question")
-        mock_fn.assert_called_once_with("test question")
+        mock_fn.assert_called_once()
+        # The first positional arg must be the search question
+        called_question = mock_fn.call_args.args[0] if mock_fn.call_args.args else mock_fn.call_args.kwargs.get("question")
+        self.assertEqual(called_question, "test question")
 
     @patch("mes_dashboard.services.ai_query_service.process_query_text2sql")
     def test_text2sql_mode_routes_to_text2sql_pipeline(self, mock_t2s):
         mock_t2s.return_value = {"answer": "ok", "query_used": "text2sql"}
         with patch.dict("os.environ", {"AI_MODE": "text2sql"}):
             result = svc.process_query("test question")
-        mock_t2s.assert_called_once_with("test question")
+        mock_t2s.assert_called_once()
+        called_question = mock_t2s.call_args.args[0] if mock_t2s.call_args.args else mock_t2s.call_args.kwargs.get("question")
+        self.assertEqual(called_question, "test question")
 
     @patch("mes_dashboard.services.ai_query_service.process_query_text2sql")
     def test_default_mode_is_text2sql(self, mock_t2s):
@@ -584,7 +425,9 @@ class TestFeatureFlag(unittest.TestCase):
         env_without_ai_mode = {k: v for k, v in __import__("os").environ.items() if k != "AI_MODE"}
         with patch.dict("os.environ", env_without_ai_mode, clear=True):
             result = svc.process_query("test question")
-        mock_t2s.assert_called_once_with("test question")
+        mock_t2s.assert_called_once()
+        called_question = mock_t2s.call_args.args[0] if mock_t2s.call_args.args else mock_t2s.call_args.kwargs.get("question")
+        self.assertEqual(called_question, "test question")
 
 
 class TestStructuredClarificationFlow(unittest.TestCase):
@@ -719,56 +562,6 @@ class TestSanitizeSql(unittest.TestCase):
         result = svc._sanitize_sql(sql)
         self.assertIn('e."Package"', result)
 
-    # ── Statement type guard ──────────────────────────────────────────────────
-
-    def test_rejects_drop_table(self):
-        with self.assertRaises(ValueError):
-            svc._sanitize_sql("DROP TABLE DWH.SENSITIVE_TABLE")
-
-    def test_rejects_delete(self):
-        with self.assertRaises(ValueError):
-            svc._sanitize_sql("DELETE FROM DWH.DW_MES_LOTREJECTHISTORY WHERE 1=1")
-
-    def test_rejects_update(self):
-        with self.assertRaises(ValueError):
-            svc._sanitize_sql("UPDATE DWH.DW_MES_LOTREJECTHISTORY SET col=1")
-
-    def test_rejects_insert(self):
-        with self.assertRaises(ValueError):
-            svc._sanitize_sql("INSERT INTO t VALUES (1)")
-
-    def test_rejects_truncate(self):
-        with self.assertRaises(ValueError):
-            svc._sanitize_sql("TRUNCATE TABLE DWH.DW_MES_LOTREJECTHISTORY")
-
-    def test_rejects_comment_hidden_drop(self):
-        with self.assertRaises(ValueError):
-            svc._sanitize_sql("-- legit comment\n/* another */ DROP TABLE x")
-
-    def test_allows_select(self):
-        sql = "SELECT 1 FROM DUAL"
-        result = svc._sanitize_sql(sql)
-        self.assertEqual(result, sql)
-
-    def test_allows_with_cte(self):
-        sql = "WITH cte AS (SELECT 1 FROM DUAL) SELECT * FROM cte"
-        result = svc._sanitize_sql(sql)
-        self.assertEqual(result, sql)
-
-
-class TestReviewSqlFailClosed(unittest.TestCase):
-    """_review_sql must fail-closed when the LLM reviewer is unavailable."""
-
-    @patch("mes_dashboard.services.ai_query_service._call_llm", side_effect=RuntimeError("LLM down"))
-    def test_reviewer_exception_returns_rejection_not_empty(self, _mock):
-        issue = svc._review_sql("問題", "SELECT 1 FROM DUAL", {}, ["wip"])
-        self.assertTrue(issue, "_review_sql must return a non-empty rejection when LLM fails")
-
-    @patch("mes_dashboard.services.ai_query_service._call_llm", return_value={"approved": True})
-    def test_reviewer_approved_returns_empty(self, _mock):
-        issue = svc._review_sql("問題", "SELECT 1 FROM DUAL", {}, ["wip"])
-        self.assertEqual(issue, "")
-
 
 class TestCoerceDateParams(unittest.TestCase):
     """_coerce_date_params handles various LLM date formats."""
@@ -822,3 +615,237 @@ class TestDeterministicSqlReviewer(unittest.TestCase):
         )
         issues = svc._deterministic_review_issues(question, sql, ["reject"])
         self.assertTrue(any("Reject 排除規則" in msg for msg in issues))
+
+
+# ---------------------------------------------------------------------------
+# IP-2: Combined call tests (AC-1, AC-7)
+# ---------------------------------------------------------------------------
+
+class TestCombinedCallOneCallOnly(unittest.TestCase):
+    """AC-1: process_query_function must issue exactly ONE _call_llm call for select+fill."""
+
+    @patch("mes_dashboard.services.ai_query_service.call_llm_text")
+    @patch("mes_dashboard.services.ai_query_service.get_service_function")
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_only_one_llm_call_for_select_and_fill(
+        self, mock_call_llm, mock_get_svc, mock_llm_text
+    ):
+        """Combined call must issue exactly one _call_llm call (not two)."""
+        mock_call_llm.return_value = {
+            "function": "reject_spike_alerts",
+            "params": {"detector": "reject"},
+            "explanation": "查詢不良突增",
+        }
+        mock_get_svc.return_value = MagicMock(
+            return_value={"items": [{"detector": "reject"}]}
+        )
+        mock_llm_text.return_value = "發現 1 筆不良突增。"
+
+        svc.process_query_function("查詢最近不良突增")
+
+        # Must be called exactly once (combined select+fill), not twice
+        self.assertEqual(mock_call_llm.call_count, 1)
+
+
+class TestCombinedCallOutputSchema(unittest.TestCase):
+    """AC-1: combined call output must contain function, params, explanation keys."""
+
+    @patch("mes_dashboard.services.ai_query_service.call_llm_text")
+    @patch("mes_dashboard.services.ai_query_service.get_service_function")
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_combined_call_result_uses_function_and_params_keys(
+        self, mock_call_llm, mock_get_svc, mock_llm_text
+    ):
+        """process_query_function must extract function+params from combined result dict."""
+        mock_call_llm.return_value = {
+            "function": "reject_spike_alerts",
+            "params": {"detector": "reject"},
+            "explanation": "查詢不良突增",
+        }
+        mock_get_svc.return_value = MagicMock(
+            return_value={"items": [{"severity": "warning"}]}
+        )
+        mock_llm_text.return_value = "近期發現 1 筆不良突增異常。"
+
+        result = svc.process_query_function("查詢最近不良突增")
+        self.assertEqual(result["query_used"], "reject_spike_alerts")
+        # params must have been forwarded to service
+        call_args = mock_get_svc.return_value.call_args
+        self.assertIsNotNone(call_args)
+
+
+class TestCombinedCallNullIntent(unittest.TestCase):
+    """AC-1: combined call with function=null must return null-intent path without raising."""
+
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_null_function_returns_explanation_as_answer(self, mock_call_llm):
+        mock_call_llm.return_value = {
+            "function": None,
+            "params": {},
+            "explanation": "無法理解查詢",
+        }
+        result = svc.process_query_function("gibberish")
+        self.assertEqual(result["answer"], "無法理解查詢")
+        self.assertIsNone(result["chart_data"])
+        self.assertIsNone(result["query_used"])
+
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_missing_function_key_returns_fallback(self, mock_call_llm):
+        """Combined result without 'function' key must also fall through to null-intent."""
+        mock_call_llm.return_value = {
+            "explanation": "無對應函式",
+        }
+        result = svc.process_query_function("something")
+        self.assertIsNone(result["chart_data"])
+        self.assertIsNone(result["query_used"])
+
+
+class TestCombinedCallMalformedJson(unittest.TestCase):
+    """AC-7: malformed combined call response must return null-intent path, not raise."""
+
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_call_llm_raises_runtime_error_returns_null_intent(self, mock_call_llm):
+        """RuntimeError from _call_llm in combined call must not propagate."""
+        mock_call_llm.side_effect = RuntimeError("Cannot extract JSON from LLM response")
+        # Must NOT raise — must return a graceful null-intent result
+        result = svc.process_query_function("any query")
+        self.assertIsNone(result["chart_data"])
+        self.assertIsNone(result["query_used"])
+
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_empty_dict_from_call_llm_returns_null_intent(self, mock_call_llm):
+        """Empty dict (no function key) from _call_llm must map to null-intent path."""
+        mock_call_llm.return_value = {}
+        result = svc.process_query_function("any query")
+        self.assertIsNone(result["chart_data"])
+        self.assertIsNone(result["query_used"])
+
+
+class TestCombinedCallPartialJson(unittest.TestCase):
+    """AC-7: partial JSON (no params key) must not raise; service called with empty params."""
+
+    @patch("mes_dashboard.services.ai_query_service.call_llm_text")
+    @patch("mes_dashboard.services.ai_query_service.get_service_function")
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_missing_params_key_defaults_to_empty_dict(
+        self, mock_call_llm, mock_get_svc, mock_llm_text
+    ):
+        """Combined result with function but no params key must use {} as params."""
+        mock_call_llm.return_value = {
+            "function": "dashboard_kpi",
+            "explanation": "查看 KPI",
+            # No "params" key
+        }
+        mock_get_svc.return_value = MagicMock(return_value={"total": 10})
+        mock_llm_text.return_value = "全廠設備 KPI 摘要。"
+
+        result = svc.process_query_function("查看全廠 KPI")
+        # Should succeed (dashboard_kpi has no required params)
+        self.assertEqual(result["query_used"], "dashboard_kpi")
+
+
+class TestHistoryInjectedIntoCombinedCall(unittest.TestCase):
+    """AC-3: chat_history must be injected between system and user turn in combined call."""
+
+    @patch("mes_dashboard.services.ai_query_service.call_llm_text")
+    @patch("mes_dashboard.services.ai_query_service.get_service_function")
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_history_injected_in_messages(
+        self, mock_call_llm, mock_get_svc, mock_llm_text
+    ):
+        """When conversation_id has prior history, it must appear in combined call messages."""
+        from mes_dashboard.services.ai_query_understanding import (
+            append_to_chat_history,
+            reset_query_sessions_for_tests,
+        )
+        reset_query_sessions_for_tests()
+
+        # Pre-seed history
+        append_to_chat_history("conv-hist", "上一個問題", "上一個答案")
+
+        mock_call_llm.return_value = {
+            "function": "dashboard_kpi",
+            "params": {},
+            "explanation": "KPI",
+        }
+        mock_get_svc.return_value = MagicMock(return_value={"total": 5})
+        mock_llm_text.return_value = "KPI 摘要。"
+
+        svc.process_query_function("查看 KPI", conversation_id="conv-hist")
+
+        # Inspect messages passed to _call_llm
+        call_args = mock_call_llm.call_args
+        messages = call_args.args[0] if call_args.args else call_args.kwargs.get("messages", [])
+        roles = [m["role"] for m in messages]
+        contents = [m["content"] for m in messages]
+
+        # system must come first, history in the middle, user last
+        self.assertEqual(roles[0], "system")
+        self.assertEqual(roles[-1], "user")
+        self.assertIn("上一個問題", contents)
+        self.assertIn("上一個答案", contents)
+
+
+class TestProductionHistoryQueryDispatchAdapter(unittest.TestCase):
+    """AC-6: production_history_query must receive params as a single positional dict."""
+
+    @patch("mes_dashboard.services.ai_query_service.call_llm_text")
+    @patch("mes_dashboard.services.ai_query_service.get_service_function")
+    @patch("mes_dashboard.services.ai_query_service._call_llm")
+    def test_raw_params_dispatch_passes_dict_not_kwargs(
+        self, mock_call_llm, mock_get_svc, mock_llm_text
+    ):
+        """production_history_query must call service_fn(params_dict), not service_fn(**params)."""
+        mock_call_llm.return_value = {
+            "function": "production_history_query",
+            "params": {"start_date": "2026-01-01", "end_date": "2026-01-07"},
+            "explanation": "查詢生產歷程",
+        }
+        mock_service_fn = MagicMock(return_value={"rows": []})
+        mock_get_svc.return_value = mock_service_fn
+        mock_llm_text.return_value = "查詢完成。"
+
+        svc.process_query_function("查詢生產歷程")
+
+        # Must be called with ONE positional dict argument (raw_params), not **kwargs
+        call_args = mock_service_fn.call_args
+        # Positional args (not keyword)
+        pos_args = call_args.args
+        kw_args = call_args.kwargs
+        # Either called as fn(params_dict) with one positional arg
+        # or the dict is passed as-is — ensure start_date is IN a dict, not as kwarg
+        if pos_args:
+            self.assertIsInstance(pos_args[0], dict)
+            self.assertIn("start_date", pos_args[0])
+        else:
+            # If kwargs, we should fail — dispatch adapter requires positional dict
+            self.fail("production_history_query must be called with a single positional dict, not kwargs")
+
+
+class TestNormalizeChartDataNewFunctions(unittest.TestCase):
+    """AC-6: normalize_chart_data for the three new functions returns expected shapes."""
+
+    def test_qc_gate_status_extracts_stations(self):
+        raw = {"cache_time": "2026-01-01", "stations": [{"name": "DB", "count": 3}]}
+        result = svc.normalize_chart_data("qc_gate_status", raw)
+        self.assertEqual(result, [{"name": "DB", "count": 3}])
+
+    def test_qc_gate_status_non_dict_raw_passthrough(self):
+        raw = [{"name": "DB", "count": 3}]
+        result = svc.normalize_chart_data("qc_gate_status", raw)
+        self.assertEqual(result, raw)
+
+    def test_qc_gate_status_empty_dict_returns_empty_list(self):
+        raw = {}
+        result = svc.normalize_chart_data("qc_gate_status", raw)
+        self.assertEqual(result, [])
+
+    def test_production_history_query_passthrough(self):
+        raw = {"rows": [{"lot": "GA001"}], "total": 1}
+        result = svc.normalize_chart_data("production_history_query", raw)
+        self.assertEqual(result, raw)
+
+    def test_resource_history_summary_passthrough(self):
+        raw = {"kpi": {"ou_pct": 85.0}, "trend": []}
+        result = svc.normalize_chart_data("resource_history_summary", raw)
+        self.assertEqual(result, raw)

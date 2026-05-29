@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.1.10
-last-changed: 2026-05-22
+schema-version: 1.1.11
+last-changed: 2026-05-29
 ---
 
 # API Inventory
@@ -39,7 +39,7 @@ last-changed: 2026-05-22
 | `material_consumption_routes.py` | All JSON API endpoints — **Type B** (async 202 for detail; summary always sync)；`GET /api/material-consumption/filter-options` → `{workcenter_groups, primary_categories, pj_types}`；`POST /api/material-consumption/query` → summary spool sync → `{query_id, kpi, trend[], type_breakdown[]}`；`GET /api/material-consumption/view?query_id=&granularity=` → DuckDB regroup of summary spool（no Oracle；410 on spool miss）；`POST /api/material-consumption/detail` → sync 200 when rows ≤ SYNC_ROW_LIMIT，else 202 async；`GET /api/material-consumption/detail/page?query_id=&page=` 每筆 row 新增 `PRODUCTLINENAME: string \| null`（add-package-detail-tables，additive；detail spool parquet schema updated — `rm -f tmp/query_spool/material_consumption/detail-*.parquet` required on deploy/rollback）；`GET /api/material-consumption/detail/job/<job_id>` → `{status: pending\|running\|done\|failed, query_id?}`；`material_parts` cap 20，`*` wildcard allowed（MC-01 / MC-02）。 |
 | `analytics_routes.py` | `GET /api/analytics/yield-anomalies`, `/reject-spikes`, `/hold-outliers`, `/equipment-deviation`, `/anomaly-summary` 及各 `/drilldown`；gated by `ANALYTICS_ANOMALY_DETECTION_ENABLED`；`anomaly-summary` 注入 `meta.cache_state` |
 | `user_auth_routes.py` | `POST /api/auth/login` (public, rate-limited 5/5min, JSON `{username, password}`)、`POST /api/auth/logout`、`GET /api/auth/me`（null if not logged in）、`PATCH /api/auth/heartbeat` (login_required) |
-| `ai_routes.py` | `POST /api/ai/query` — NL query；`AI_MODE` 決定 pipeline；response: `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}`；gated by `AI_QUERY_ENABLED` |
+| `ai_routes.py` | `POST /api/ai/query` — NL query；`AI_MODE` 決定 pipeline；function mode 使用 combined call（select+fill 合一），text2sql mode 注入 chat_history 至 Stage 1；response: `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}`；新增三個 AI 函式（production_history_query、resource_history_summary、qc_gate_status）；route surface 不變；gated by `AI_QUERY_ENABLED` |
 | `job_routes.py` | `GET /api/job/<job_id>?prefix=<p>` — async 狀態；`POST /api/job/<job_id>/abandon` — idempotent，rate-limited 30/60s |
 
 ## Admin Page Routes（非 API）

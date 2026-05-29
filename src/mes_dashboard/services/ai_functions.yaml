@@ -772,3 +772,67 @@ anomaly_summary:
     - reject_spike_alerts
     - hold_outlier_alerts
     - equipment_deviation_alerts
+
+# ── Production History ────────────────────────────────────────────────────────
+
+production_history_query:
+  description: 查詢 Lot 進出站生產歷程（最近 7 天預設），可依工單或 Lot ID 篩選
+  service: mes_dashboard.services.production_history_service.query_production_history
+  dispatch: raw_params
+  chart_type: table
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 開始日期 YYYY-MM-DD（建議範圍不超過 7 天）
+    end_date:
+      type: string
+      required: true
+      description: 結束日期 YYYY-MM-DD
+    lot_ids:
+      type: array
+      required: false
+      description: Lot ID 清單（選填）
+    pj_types:
+      type: array
+      required: false
+      description: 產品型號清單（選填）
+
+# ── Resource History ──────────────────────────────────────────────────────────
+
+resource_history_summary:
+  description: 設備稼動率歷史摘要，按站別 × 日期顯示 OU%、PRD/SBY/UDT 小時
+  service: mes_dashboard.services.resource_history_service.query_summary
+  chart_type: trend
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 開始日期 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 結束日期 YYYY-MM-DD
+    granularity:
+      type: string
+      required: false
+      default: day
+      enum:
+        - day
+        - week
+        - month
+        - year
+      description: 時間粒度
+    workcenter_groups:
+      type: array
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼清單（選填）
+
+# ── QC Gate ───────────────────────────────────────────────────────────────────
+
+qc_gate_status:
+  description: QC-GATE 目前待確認批次一覽（各站點待 QC 確認數量與批次列表）
+  service: mes_dashboard.services.qc_gate_service.get_qc_gate_summary
+  chart_type: table
+  params: {}

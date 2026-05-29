@@ -1,6 +1,6 @@
-# generated: 2026-05-22T08:19:00Z by cdd-kit 2.0.20
-# files: 795, src-lines: 221086, map-lines: 16834, compression: 13.1x
-# sources-digest: 745797ddf40d24a73ea44476d542abe9408601bc5524392ec599d479a0ae5487
+# generated: 2026-05-29T04:41:50Z by cdd-kit 2.1.0
+# files: 795, src-lines: 221853, map-lines: 16969, compression: 13.1x
+# sources-digest: 154f902e783a3874dac47e5bf5ab4cf672928458cabe7a57bb6399911b0baf0d
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -35,7 +35,7 @@ frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   imports:
     - { module: 'node:fs', items: [existsSync], line: 12 }
     - { module: 'node:url', items: [fileURLToPath, pathToFileURL], line: 13 }
-    - { module: 'node:path', items: [resolve, dirname], line: 14 }
+    - { module: 'node:path', items: ['resolve:pathResolve', dirname], line: 14 }
   functions:
     - { name: async resolve, lines: 16-50 }
 
@@ -1041,7 +1041,7 @@ frontend/src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/portal-shell/App.vue:  # 346 lines
+frontend/src/portal-shell/App.vue:  # 350 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
     - { module: lucide-vue-next, items: [ChevronRight], line: 4 }
@@ -1057,17 +1057,17 @@ frontend/src/portal-shell/App.vue:  # 346 lines
     - { module: './routeContracts.js', items: [normalizeRoutePath], line: 15 }
     - { module: './sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, isMobileViewport, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 16 }
   functions:
-    - { name: toShellPath, lines: 42-44 }
-    - { name: isPortalShellRootPath, lines: 46-49 }
-    - { name: async handleLogout, lines: 67-70 }
-    - { name: restoreSidebarPreference, lines: 87-94 }
-    - { name: persistSidebarPreference, lines: 96-105 }
-    - { name: checkViewport, lines: 107-112 }
-    - { name: closeMobileSidebar, lines: 114-116 }
-    - { name: toggleSidebar, lines: 118-125 }
-    - { name: handleViewportResize, lines: 127-129 }
-    - { name: handleGlobalKeydown, lines: 131-138 }
-    - { name: async loadNavigation, lines: 140-200 }
+    - { name: toShellPath, lines: 43-45 }
+    - { name: isPortalShellRootPath, lines: 47-50 }
+    - { name: async handleLogout, lines: 68-71 }
+    - { name: restoreSidebarPreference, lines: 88-95 }
+    - { name: persistSidebarPreference, lines: 97-106 }
+    - { name: checkViewport, lines: 108-113 }
+    - { name: closeMobileSidebar, lines: 115-117 }
+    - { name: toggleSidebar, lines: 119-126 }
+    - { name: handleViewportResize, lines: 128-130 }
+    - { name: handleGlobalKeydown, lines: 132-139 }
+    - { name: async loadNavigation, lines: 141-202 }
 
 frontend/src/portal-shell/components/AnomalyIndicator.vue:  # 58 lines
   imports:
@@ -1727,7 +1727,7 @@ frontend/src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
 
 frontend/src/shared-composables/useAutoRefresh.ts:  # 23 lines
   imports:
-    - { module: '../wip-shared/composables/useAutoRefresh', items: [useAutoRefresh], line: 1 }
+    - { module: '../wip-shared/composables/useAutoRefresh', items: ['useAutoRefresh:useAutoRefreshBase'], line: 1 }
   functions:
     - { name: useAutoRefresh, lines: 21-23 }
   interfaces:
@@ -1736,7 +1736,7 @@ frontend/src/shared-composables/useAutoRefresh.ts:  # 23 lines
 
 frontend/src/shared-composables/useAutocomplete.ts:  # 33 lines
   imports:
-    - { module: '../wip-shared/composables/useAutocomplete', items: [useAutocomplete], line: 1 }
+    - { module: '../wip-shared/composables/useAutocomplete', items: ['useAutocomplete:useAutocompleteBase'], line: 1 }
   functions:
     - { name: useAutocomplete, lines: 31-33 }
   interfaces:
@@ -2703,21 +2703,21 @@ frontend/tests/validation/useHoldOverview.validation.test.js:  # 287 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
     - { module: '../../src/core/endpoint-schemas.js', items: [HOLD_OVERVIEW_SUMMARY_SCHEMA, HOLD_OVERVIEW_TREEMAP_SCHEMA], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 20 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 20 }
 
 frontend/tests/validation/useMaterialTrace.validation.test.js:  # 220 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 17 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 18 }
     - { module: '../../src/core/endpoint-schemas.js', items: [MATERIAL_TRACE_SPOOL_SCHEMA, MATERIAL_TRACE_QUERY_SCHEMA], line: 19 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 23 }
 
 frontend/tests/validation/useProductionHistory.validation.test.js:  # 537 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 16 }
     - { module: '../../src/core/endpoint-schemas.js', items: [PRODUCTION_HISTORY_QUERY_SCHEMA, PRODUCTION_HISTORY_TYPE_OPTIONS_SCHEMA, PRODUCTION_HISTORY_COUNT_SCHEMA, PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA], line: 17 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 23 }
     - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, _buildUrl, useFirstTierFilters], line: 24 }
     - { module: '../../src/production-history/composables/useProductionHistory.ts', items: [validateQueryMode, buildModePayload, useProductionHistory], line: 29 }
 
@@ -2726,13 +2726,13 @@ frontend/tests/validation/useRejectHistory.validation.test.js:  # 205 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
     - { module: '../../src/core/endpoint-schemas.js', items: [REJECT_HISTORY_SUMMARY_SCHEMA, REJECT_HISTORY_OPTIONS_SCHEMA], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 20 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 20 }
 
 frontend/tests/validation/useYieldAlert.validation.test.js:  # 216 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, detectUnknownEnvelope, _resetWarned], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 17 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 17 }
     - { module: '../../src/core/dev-warnings.js', items: [detectSpoolContentType], line: 189 }
   constants:
     - { name: SUMMARY_SHAPE, line: 75 }
@@ -2939,7 +2939,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1405 lines
+src/mes_dashboard/app.py:  # 1411 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -2997,8 +2997,8 @@ src/mes_dashboard/app.py:  # 1405 lines
     - { name: _is_runtime_contract_enforced, lines: 514-519 }
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
-    - { name: create_app, lines: 569-1279 }
-    - { name: _register_error_handlers, lines: 1282-1405 }
+    - { name: create_app, lines: 569-1285 }
+    - { name: _register_error_handlers, lines: 1288-1411 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4922,7 +4922,7 @@ src/mes_dashboard/services/ai_business_context.py:  # 353 lines
     - { name: get_equipment_statuses, lines: 319-326 }
     - { name: get_dynamic_metadata_block, lines: 329-353 }
 
-src/mes_dashboard/services/ai_function_registry.py:  # 603 lines
+src/mes_dashboard/services/ai_function_registry.py:  # 648 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: importlib, items: [], line: 11 }
@@ -4937,15 +4937,16 @@ src/mes_dashboard/services/ai_function_registry.py:  # 603 lines
     - { name: build_stage1_prompt, lines: 86-124 }
     - { name: build_stage2_prompt, lines: 127-209 }
     - { name: build_reviewer_prompt, lines: 212-296 }
-    - { name: build_round1_prompt, lines: 303-324 }
-    - { name: build_round2_prompt, lines: 327-395 }
-    - { name: build_round3_prompt, lines: 398-412 }
-    - { name: validate_intent, lines: 419-449 }
-    - { name: get_service_function, lines: 456-469 }
-    - { name: get_suggestions, lines: 476-543 }
-    - { name: build_agent_system_prompt, lines: 550-603 }
+    - { name: build_combined_prompt, lines: 303-339 }
+    - { name: build_round1_prompt, lines: 342-366 }
+    - { name: build_round2_prompt, lines: 369-440 }
+    - { name: build_round3_prompt, lines: 443-457 }
+    - { name: validate_intent, lines: 464-494 }
+    - { name: get_service_function, lines: 501-514 }
+    - { name: get_suggestions, lines: 521-588 }
+    - { name: build_agent_system_prompt, lines: 595-648 }
 
-src/mes_dashboard/services/ai_query_service.py:  # 1289 lines
+src/mes_dashboard/services/ai_query_service.py:  # 1327 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: json, items: [], line: 14 }
@@ -4954,27 +4955,27 @@ src/mes_dashboard/services/ai_query_service.py:  # 1289 lines
     - { module: re, items: [], line: 17 }
     - { module: typing, items: [Any], line: 18 }
     - { module: requests, items: [], line: 20 }
-    - { module: mes_dashboard.services.ai_function_registry, items: [REGISTRY, build_round1_prompt, build_round2_prompt, build_round3_prompt, build_stage1_prompt, build_stage2_prompt, get_service_function, get_suggestions, validate_intent], line: 22 }
-    - { module: mes_dashboard.services.ai_query_understanding, items: [advance_query_state], line: 33 }
-    - { module: pandas, items: [], line: 35 }
+    - { module: mes_dashboard.services.ai_function_registry, items: [REGISTRY, build_combined_prompt, build_round3_prompt, build_stage1_prompt, build_stage2_prompt, get_service_function, get_suggestions, validate_intent], line: 22 }
+    - { module: mes_dashboard.services.ai_query_understanding, items: [advance_query_state, append_to_chat_history, get_chat_history], line: 32 }
+    - { module: pandas, items: [], line: 38 }
   functions:
-    - { name: _auto_resolve_id, lines: 58-94 }
-    - { name: _call_llm, lines: 101-161 }
-    - { name: call_llm_text, lines: 164-194 }
-    - { name: summarize_for_llm, lines: 201-285 }
-    - { name: normalize_chart_data, lines: 292-586 }
-    - { name: _coerce_date_params, lines: 593-635 }
-    - { name: _review_sql, lines: 642-687 }
-    - { name: _deterministic_review_issues, lines: 690-732 }
-    - { name: _load_valid_columns, lines: 749-769 }
-    - { name: _sanitize_sql, lines: 772-820 }
-    - { name: _extract_oracle_error, lines: 823-833 }
-    - { name: _summarize_dataframe, lines: 836-853 }
-    - { name: process_query_text2sql, lines: 860-1078 }
-    - { name: process_query_function, lines: 1085-1238 }
-    - { name: process_query, lines: 1245-1289 }
+    - { name: _auto_resolve_id, lines: 61-97 }
+    - { name: _call_llm, lines: 104-164 }
+    - { name: call_llm_text, lines: 167-197 }
+    - { name: summarize_for_llm, lines: 204-288 }
+    - { name: normalize_chart_data, lines: 295-599 }
+    - { name: _coerce_date_params, lines: 606-648 }
+    - { name: _review_sql, lines: 655-700 }
+    - { name: _deterministic_review_issues, lines: 703-745 }
+    - { name: _load_valid_columns, lines: 762-782 }
+    - { name: _sanitize_sql, lines: 785-833 }
+    - { name: _extract_oracle_error, lines: 836-846 }
+    - { name: _summarize_dataframe, lines: 849-866 }
+    - { name: process_query_text2sql, lines: 873-1104 }
+    - { name: process_query_function, lines: 1111-1276 }
+    - { name: process_query, lines: 1283-1327 }
 
-src/mes_dashboard/services/ai_query_understanding.py:  # 630 lines
+src/mes_dashboard/services/ai_query_understanding.py:  # 681 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
@@ -4987,23 +4988,26 @@ src/mes_dashboard/services/ai_query_understanding.py:  # 630 lines
   functions:
     - { name: reset_query_sessions_for_tests, lines: 113-116 }
     - { name: get_query_session_for_tests, lines: 119-123 }
-    - { name: advance_query_state, lines: 126-220 }
-    - { name: _cleanup_expired_sessions, lines: 223-232 }
-    - { name: _extract_query_state, lines: 235-261 }
-    - { name: _build_understanding_messages, lines: 264-303 }
-    - { name: _normalize_understanding_result, lines: 306-323 }
-    - { name: _rule_based_extract, lines: 326-433 }
-    - { name: _merge_slots, lines: 436-451 }
-    - { name: _compute_completion, lines: 454-493 }
-    - { name: _build_default_clarification, lines: 496-508 }
-    - { name: _default_suggestions, lines: 511-523 }
-    - { name: _build_search_question, lines: 526-561 }
-    - { name: _normalize_choice, lines: 564-568 }
-    - { name: _normalize_suggestions, lines: 571-579 }
-    - { name: _clean_text, lines: 582-586 }
-    - { name: _topic_label, lines: 589-601 }
-    - { name: _intent_label, lines: 604-616 }
-    - { name: _target_type_label, lines: 619-630 }
+    - { name: _evict_if_needed, lines: 133-141 }
+    - { name: get_chat_history, lines: 144-150 }
+    - { name: append_to_chat_history, lines: 153-169 }
+    - { name: advance_query_state, lines: 172-271 }
+    - { name: _cleanup_expired_sessions, lines: 274-283 }
+    - { name: _extract_query_state, lines: 286-312 }
+    - { name: _build_understanding_messages, lines: 315-354 }
+    - { name: _normalize_understanding_result, lines: 357-374 }
+    - { name: _rule_based_extract, lines: 377-484 }
+    - { name: _merge_slots, lines: 487-502 }
+    - { name: _compute_completion, lines: 505-544 }
+    - { name: _build_default_clarification, lines: 547-559 }
+    - { name: _default_suggestions, lines: 562-574 }
+    - { name: _build_search_question, lines: 577-612 }
+    - { name: _normalize_choice, lines: 615-619 }
+    - { name: _normalize_suggestions, lines: 622-630 }
+    - { name: _clean_text, lines: 633-637 }
+    - { name: _topic_label, lines: 640-652 }
+    - { name: _intent_label, lines: 655-667 }
+    - { name: _target_type_label, lines: 670-681 }
 
 src/mes_dashboard/services/ai_schema_context.py:  # 879 lines
   imports:
@@ -5457,7 +5461,7 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 770 lines
     - { name: _build_duration_clause, lines: 642-653 }
     - { name: try_compute_view_from_spool, lines: 658-770 }
 
-src/mes_dashboard/services/hold_today_snapshot_service.py:  # 475 lines
+src/mes_dashboard/services/hold_today_snapshot_service.py:  # 476 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: hashlib, items: [], line: 6 }
@@ -5493,9 +5497,9 @@ src/mes_dashboard/services/hold_today_snapshot_service.py:  # 475 lines
     - { name: _build_current_summary, lines: 270-299 }
     - { name: _build_reason_pareto, lines: 302-323 }
     - { name: _build_duration, lines: 326-361 }
-    - { name: _build_list, lines: 364-403 }
-    - { name: _make_query_id, lines: 406-409 }
-    - { name: execute_today_snapshot, lines: 412-475 }
+    - { name: _build_list, lines: 364-404 }
+    - { name: _make_query_id, lines: 407-410 }
+    - { name: execute_today_snapshot, lines: 413-476 }
 
 src/mes_dashboard/services/internal_metrics_service.py:  # 356 lines
   imports:
@@ -9664,7 +9668,7 @@ tests/test_ai_business_context.py:  # 53 lines
         - { name: test_module_has_business_terminology, lines: 47-48 }
         - { name: test_both_constants_are_non_empty_strings, lines: 50-53 }
 
-tests/test_ai_function_registry.py:  # 341 lines
+tests/test_ai_function_registry.py:  # 584 lines
   imports:
     - { module: importlib, items: [], line: 11 }
     - { module: unittest, items: [], line: 12 }
@@ -9736,8 +9740,67 @@ tests/test_ai_function_registry.py:  # 341 lines
         - { name: test_reviewer_prompt_contains_workcenter_group_and_reject_policy, lines: 322-325 }
         - { name: test_contains_json_format_instruction, lines: 327-331 }
         - { name: test_empty_domains_returns_prompt_without_schema, lines: 333-337 }
+    - name: TestCombinedPromptContainsAll41Functions
+      lines: 344-369
+      methods:
+        - { name: test_all_function_names_present, lines: 347-352 }
+        - { name: test_prompt_contains_json_output_schema_instruction, lines: 354-360 }
+        - { name: test_prompt_does_not_contain_full_param_schemas, lines: 362-369 }
+    - name: TestCombinedPromptTokenBudget
+      lines: 372-386
+      methods:
+        - { name: test_prompt_char_count_within_safe_limit, lines: 375-380 }
+        - { name: test_prompt_is_nonempty_string, lines: 382-386 }
+    - name: TestProductionHistoryQueryFunctionEntry
+      lines: 393-426
+      methods:
+        - { name: test_entry_exists, lines: 396-397 }
+        - { name: test_service_path_correct, lines: 399-402 }
+        - { name: test_dispatch_is_raw_params, lines: 404-406 }
+        - { name: test_chart_type_is_table, lines: 408-410 }
+        - { name: test_required_params_present, lines: 412-418 }
+        - { name: test_optional_params_present, lines: 420-426 }
+    - name: TestResourceHistorySummaryFunctionEntry
+      lines: 429-466
+      methods:
+        - { name: test_entry_exists, lines: 432-433 }
+        - { name: test_service_path_correct, lines: 435-438 }
+        - { name: test_chart_type_is_trend, lines: 440-444 }
+        - { name: test_granularity_has_enum, lines: 446-455 }
+        - { name: test_granularity_has_default, lines: 457-459 }
+        - { name: test_sensitive_params_excluded, lines: 461-466 }
+    - name: TestQcGateStatusFunctionEntry
+      lines: 469-482
+      methods:
+        - { name: test_entry_exists, lines: 472-473 }
+        - { name: test_service_path_correct, lines: 475-478 }
+        - { name: test_chart_type_is_table, lines: 480-482 }
+    - name: TestQcGateStatusNoParams
+      lines: 485-496
+      methods:
+        - { name: test_params_is_empty, lines: 488-491 }
+        - { name: test_validate_intent_passes_with_empty_params, lines: 493-496 }
+    - name: TestProductionHistoryQueryParamSchema
+      lines: 499-527
+      methods:
+        - { name: test_validate_intent_fails_missing_start_date, lines: 502-504 }
+        - { name: test_validate_intent_fails_missing_end_date, lines: 506-508 }
+        - { name: test_validate_intent_passes_with_required_dates, lines: 510-515 }
+        - { name: test_validate_intent_passes_with_optional_params, lines: 517-527 }
+    - name: TestResourceHistorySummaryParamSchema
+      lines: 530-566
+      methods:
+        - { name: test_validate_intent_fails_missing_dates, lines: 533-535 }
+        - { name: test_validate_intent_passes_with_required_dates, lines: 537-542 }
+        - { name: test_validate_intent_fails_invalid_granularity, lines: 544-553 }
+        - { name: test_validate_intent_passes_valid_granularity, lines: 555-566 }
+    - name: TestYamlLoadingExtended
+      lines: 569-580
+      methods:
+        - { name: test_all_41_new_functions_present, lines: 572-576 }
+        - { name: test_total_registry_size_is_at_least_41, lines: 578-580 }
 
-tests/test_ai_query_service.py:  # 607 lines
+tests/test_ai_query_service.py:  # 851 lines
   imports:
     - { module: unittest, items: [], line: 8 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 9 }
@@ -9770,95 +9833,167 @@ tests/test_ai_query_service.py:  # 607 lines
       methods:
         - { name: test_process_query_null_intent_returns_answer, lines: 130-142 }
     - name: TestProcessQueryValidIntent
-      lines: 145-193
+      lines: 145-195
       methods:
-        - { name: test_process_query_valid_intent_dispatches_service, lines: 151-173 }
-        - { name: test_process_query_no_conversation_id_in_response, lines: 178-193 }
+        - { name: test_process_query_valid_intent_dispatches_service, lines: 151-174 }
+        - { name: test_process_query_no_conversation_id_in_response, lines: 179-195 }
     - name: TestRound3Fallback
-      lines: 196-218
+      lines: 198-221
       methods:
-        - { name: test_round3_failure_returns_fallback_answer, lines: 202-218 }
+        - { name: test_round3_failure_returns_fallback_answer, lines: 204-221 }
     - name: TestText2SqlHappyPath
-      lines: 225-283
+      lines: 228-286
       methods:
-        - { name: test_happy_path_returns_all_fields, lines: 230-261 }
-        - { name: test_happy_path_tool_trace_contains_stages, lines: 265-283 }
+        - { name: test_happy_path_returns_all_fields, lines: 233-264 }
+        - { name: test_happy_path_tool_trace_contains_stages, lines: 268-286 }
     - name: TestText2SqlSqlErrorRetrySuccess
-      lines: 286-322
+      lines: 289-325
       methods:
-        - { name: test_retry_success, lines: 291-322 }
+        - { name: test_retry_success, lines: 294-325 }
     - name: TestText2SqlAllRetriesFail
-      lines: 325-350
+      lines: 328-353
       methods:
-        - { name: test_all_retries_return_error, lines: 329-350 }
+        - { name: test_all_retries_return_error, lines: 332-353 }
     - name: TestText2SqlEmptyResult
-      lines: 353-374
+      lines: 356-377
       methods:
-        - { name: test_empty_result_no_stage3, lines: 358-374 }
+        - { name: test_empty_result_no_stage3, lines: 361-377 }
     - name: TestText2SqlNoDomains
-      lines: 377-394
+      lines: 380-397
       methods:
-        - { name: test_no_domains_returns_thought, lines: 381-394 }
+        - { name: test_no_domains_returns_thought, lines: 384-397 }
     - name: TestFeatureFlag
-      lines: 397-420
+      lines: 400-430
       methods:
-        - { name: test_function_mode_routes_to_function_pipeline, lines: 401-405 }
-        - { name: test_text2sql_mode_routes_to_text2sql_pipeline, lines: 408-412 }
-        - { name: test_default_mode_is_text2sql, lines: 415-420 }
+        - { name: test_function_mode_routes_to_function_pipeline, lines: 404-411 }
+        - { name: test_text2sql_mode_routes_to_text2sql_pipeline, lines: 414-420 }
+        - { name: test_default_mode_is_text2sql, lines: 423-430 }
     - name: TestStructuredClarificationFlow
-      lines: 423-460
+      lines: 433-470
       methods:
-        - { name: test_process_query_returns_clarification_before_search, lines: 426-441 }
-        - { name: test_process_query_uses_enriched_search_question, lines: 445-460 }
+        - { name: test_process_query_returns_clarification_before_search, lines: 436-451 }
+        - { name: test_process_query_uses_enriched_search_question, lines: 455-470 }
     - name: TestText2SqlTimeoutError
-      lines: 463-485
+      lines: 473-495
       methods:
-        - { name: test_timeout_no_retry, lines: 467-485 }
+        - { name: test_timeout_no_retry, lines: 477-495 }
     - name: TestExtractOracleError
-      lines: 488-499
+      lines: 498-509
       methods:
-        - { name: test_extracts_ora_code, lines: 491-494 }
-        - { name: test_returns_full_message_if_no_ora, lines: 496-499 }
+        - { name: test_extracts_ora_code, lines: 501-504 }
+        - { name: test_returns_full_message_if_no_ora, lines: 506-509 }
     - name: TestSummarizeDataframe
-      lines: 502-522
+      lines: 512-532
       methods:
-        - { name: test_empty_df_returns_empty_message, lines: 505-508 }
-        - { name: test_large_df_truncated_to_10_rows, lines: 510-515 }
-        - { name: test_small_df_not_truncated, lines: 517-522 }
+        - { name: test_empty_df_returns_empty_message, lines: 515-518 }
+        - { name: test_large_df_truncated_to_10_rows, lines: 520-525 }
+        - { name: test_small_df_not_truncated, lines: 527-532 }
     - name: TestSanitizeSql
-      lines: 525-553
+      lines: 535-563
       methods:
-        - { name: test_auto_quotes_package, lines: 528-532 }
-        - { name: test_auto_quotes_function, lines: 534-537 }
-        - { name: test_does_not_double_quote, lines: 539-543 }
-        - { name: test_leaves_normal_columns_alone, lines: 545-548 }
-        - { name: test_package_in_where_clause, lines: 550-553 }
+        - { name: test_auto_quotes_package, lines: 538-542 }
+        - { name: test_auto_quotes_function, lines: 544-547 }
+        - { name: test_does_not_double_quote, lines: 549-553 }
+        - { name: test_leaves_normal_columns_alone, lines: 555-558 }
+        - { name: test_package_in_where_clause, lines: 560-563 }
     - name: TestCoerceDateParams
-      lines: 556-577
+      lines: 566-587
       methods:
-        - { name: test_sysdate, lines: 559-562 }
-        - { name: test_sysdate_minus_n, lines: 564-567 }
-        - { name: test_iso_date_string, lines: 569-572 }
-        - { name: test_non_date_untouched, lines: 574-577 }
+        - { name: test_sysdate, lines: 569-572 }
+        - { name: test_sysdate_minus_n, lines: 574-577 }
+        - { name: test_iso_date_string, lines: 579-582 }
+        - { name: test_non_date_untouched, lines: 584-587 }
     - name: TestDeterministicSqlReviewer
-      lines: 580-607
+      lines: 590-617
       methods:
-        - { name: test_rejects_station_rate_sql_without_group_aggregation, lines: 583-594 }
-        - { name: test_rejects_rate_sql_without_reject_exclusion_policy, lines: 596-607 }
+        - { name: test_rejects_station_rate_sql_without_group_aggregation, lines: 593-604 }
+        - { name: test_rejects_rate_sql_without_reject_exclusion_policy, lines: 606-617 }
+    - name: TestCombinedCallOneCallOnly
+      lines: 624-647
+      methods:
+        - { name: test_only_one_llm_call_for_select_and_fill, lines: 630-647 }
+    - name: TestCombinedCallOutputSchema
+      lines: 650-674
+      methods:
+        - { name: test_combined_call_result_uses_function_and_params_keys, lines: 656-674 }
+    - name: TestCombinedCallNullIntent
+      lines: 677-700
+      methods:
+        - { name: test_null_function_returns_explanation_as_answer, lines: 681-690 }
+        - { name: test_missing_function_key_returns_fallback, lines: 693-700 }
+    - name: TestCombinedCallMalformedJson
+      lines: 703-721
+      methods:
+        - { name: test_call_llm_raises_runtime_error_returns_null_intent, lines: 707-713 }
+        - { name: test_empty_dict_from_call_llm_returns_null_intent, lines: 716-721 }
+    - name: TestCombinedCallPartialJson
+      lines: 724-744
+      methods:
+        - { name: test_missing_params_key_defaults_to_empty_dict, lines: 730-744 }
+    - name: TestHistoryInjectedIntoCombinedCall
+      lines: 747-786
+      methods:
+        - { name: test_history_injected_in_messages, lines: 753-786 }
+    - name: TestProductionHistoryQueryDispatchAdapter
+      lines: 789-822
+      methods:
+        - { name: test_raw_params_dispatch_passes_dict_not_kwargs, lines: 795-822 }
+    - name: TestNormalizeChartDataNewFunctions
+      lines: 825-851
+      methods:
+        - { name: test_qc_gate_status_extracts_stations, lines: 828-831 }
+        - { name: test_qc_gate_status_non_dict_raw_passthrough, lines: 833-836 }
+        - { name: test_qc_gate_status_empty_dict_returns_empty_list, lines: 838-841 }
+        - { name: test_production_history_query_passthrough, lines: 843-846 }
+        - { name: test_resource_history_summary_passthrough, lines: 848-851 }
 
-tests/test_ai_query_understanding.py:  # 87 lines
+tests/test_ai_query_understanding.py:  # 222 lines
   imports:
     - { module: unittest, items: [], line: 4 }
     - { module: mes_dashboard.services, items: [uds], line: 6 }
   classes:
-    - name: TestAdvanceQueryState
-      lines: 9-87
+    - name: TestChatHistoryAppendOnSuccess
+      lines: 9-32
       methods:
-        - { name: setUp, lines: 10-11 }
-        - { name: test_without_conversation_id_bypasses_session_state, lines: 13-22 }
-        - { name: test_ambiguous_query_stores_session_and_returns_clarification, lines: 24-36 }
-        - { name: test_followup_fills_missing_slots_and_clears_session, lines: 38-57 }
-        - { name: test_llm_can_force_context_reset, lines: 59-87 }
+        - { name: setUp, lines: 12-13 }
+        - { name: test_append_creates_pair, lines: 15-20 }
+        - { name: test_append_multiple_pairs_ordered, lines: 22-28 }
+        - { name: test_get_history_missing_key_returns_empty, lines: 30-32 }
+    - name: TestChatHistoryNoAppendOnFailure
+      lines: 35-47
+      methods:
+        - { name: setUp, lines: 38-39 }
+        - { name: test_get_history_returns_copy_not_reference, lines: 41-47 }
+    - name: TestChatHistoryAppendOnEmptyResult
+      lines: 50-61
+      methods:
+        - { name: setUp, lines: 53-54 }
+        - { name: test_empty_result_answer_is_stored, lines: 56-61 }
+    - name: TestChatHistoryCapEnforcement
+      lines: 64-88
+      methods:
+        - { name: setUp, lines: 67-68 }
+        - { name: test_nine_pairs_evicts_oldest, lines: 70-79 }
+        - { name: test_oldest_evicted_first, lines: 81-88 }
+    - name: TestChatHistoryCapExactBoundary
+      lines: 91-114
+      methods:
+        - { name: setUp, lines: 94-95 }
+        - { name: test_exactly_eight_pairs_no_eviction, lines: 97-105 }
+        - { name: test_ninth_pair_evicts_first, lines: 107-114 }
+    - name: TestHistorySurvivesAdvanceQueryStatePop
+      lines: 117-141
+      methods:
+        - { name: setUp, lines: 120-121 }
+        - { name: test_history_survives_slot_filling_completion, lines: 123-141 }
+    - name: TestAdvanceQueryState
+      lines: 144-222
+      methods:
+        - { name: setUp, lines: 145-146 }
+        - { name: test_without_conversation_id_bypasses_session_state, lines: 148-157 }
+        - { name: test_ambiguous_query_stores_session_and_returns_clarification, lines: 159-171 }
+        - { name: test_followup_fills_missing_slots_and_clears_session, lines: 173-192 }
+        - { name: test_llm_can_force_context_reset, lines: 194-222 }
 
 tests/test_ai_routes.py:  # 291 lines
   imports:

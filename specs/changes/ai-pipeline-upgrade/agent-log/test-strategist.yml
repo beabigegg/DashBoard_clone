@@ -1,0 +1,15 @@
+agent: test-strategist
+change-id: ai-pipeline-upgrade
+status: done
+summary: >
+  Test plan written. 22 test cases mapped across 5 families (unit/contract/integration/
+  data-boundary/resilience). All 7 ACs covered. Open Risk R3 pinned with
+  TestHistorySurvivesAdvanceQueryStatePop. TestCombinedCallMalformedJson flagged
+  as most critical new test. Existing TestYamlLoading extended rather than duplicated.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/ai-pipeline-upgrade/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_ai_query_service.py ↔ services/ai_query_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_ai_function_registry.py ↔ services/ai_function_registry.py" }
+  - { type: tdd-pairs, pointer: "tests/test_ai_query_understanding.py ↔ services/ai_query_understanding.py" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract/integration/data-boundary/resilience (Tier 1)" }
+  - { type: mapping-completeness, pointer: "all 7 ACs covered; all 15 contract-reviewer test classes included" }

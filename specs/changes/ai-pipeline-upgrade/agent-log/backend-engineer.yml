@@ -1,0 +1,19 @@
+agent: backend-engineer
+change-id: ai-pipeline-upgrade
+status: done
+summary: >
+  Implemented all 8 items (IP-1 through IP-8) per implementation-plan.md.
+  Combined-call pipeline (D1), chat_history session helpers + R3 pop fix (D2),
+  three new YAML function entries + dispatch adapter + normalize_chart_data (D3),
+  four contract bumps (IP-7), and 28 new/updated tests (exceeds the 22 planned).
+  All 146 AI-module tests pass; full suite 4144 passed 190 skipped.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/ai_function_registry.py:300-340 (build_combined_prompt, deprecated markers on R1/R2)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/ai_functions.yaml:775-835 (3 new entries: production_history_query, resource_history_summary, qc_gate_status)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/ai_query_service.py:22-37 (imports), 580-610 (normalize_chart_data new branches), 1096-1255 (rewritten process_query_function)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/ai_query_understanding.py:113-170 (chat_history helpers: get_chat_history, append_to_chat_history, _evict_if_needed), 254-267 (R3 pop fix)" }
+  - { type: tests-added, pointer: "tests/test_ai_query_understanding.py::TestChatHistoryAppendOnSuccess, TestChatHistoryNoAppendOnFailure, TestChatHistoryAppendOnEmptyResult, TestChatHistoryCapEnforcement, TestChatHistoryCapExactBoundary, TestHistorySurvivesAdvanceQueryStatePop" }
+  - { type: tests-added, pointer: "tests/test_ai_query_service.py::TestCombinedCallOneCallOnly, TestCombinedCallOutputSchema, TestCombinedCallNullIntent, TestCombinedCallMalformedJson, TestCombinedCallPartialJson, TestHistoryInjectedIntoCombinedCall, TestProductionHistoryQueryDispatchAdapter, TestNormalizeChartDataNewFunctions" }
+  - { type: tests-added, pointer: "tests/test_ai_function_registry.py::TestCombinedPromptContainsAll41Functions, TestCombinedPromptTokenBudget, TestProductionHistoryQueryFunctionEntry, TestResourceHistorySummaryFunctionEntry, TestQcGateStatusFunctionEntry, TestQcGateStatusNoParams, TestProductionHistoryQueryParamSchema, TestResourceHistorySummaryParamSchema, TestYamlLoadingExtended" }
+  - { type: test-output, pointer: "146 passed (tests/test_ai_query_service.py + test_ai_function_registry.py + test_ai_query_understanding.py); full suite 4144 passed 190 skipped" }
+  - { type: contracts-touched, pointer: "contracts/api/api-contract.md:schema-version 1.11.0→1.12.0; contracts/api/api-inventory.md:1.1.10→1.1.11; contracts/business/business-rules.md:1.10.0→1.11.0 (AI-04..AI-09); contracts/data/data-shape-contract.md:1.10.0→1.11.0 (§2.9)" }

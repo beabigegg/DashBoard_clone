@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.10.0
+schema-version: 1.11.0
 last-changed: 2026-05-20
 breaking-change-policy: deprecate-2-minors
 ---
@@ -68,9 +68,15 @@ breaking-change-policy: deprecate-2-minors
 
 | rule id | name | current behavior |
 |---|---|---|
-| AI-01 | Pipeline selection | `AI_MODE` env 決定：`text2sql`（分類→SQL→執行→摘要）、`function`（3-round function call）、`agent`（多工具 agentic loop） |
+| AI-01 | Pipeline selection | `AI_MODE` env 決定：`text2sql`（分類→SQL→執行→摘要）、`function`（combined-call function pipeline）、`agent`（多工具 agentic loop） |
 | AI-02 | Clarification flag | `needs_clarification: true` 表示 AI 需要更多資訊，而非最終答案；`text2sql` / `function` mode 永遠為 `false` |
 | AI-03 | Response fields | `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}` |
+| AI-04 | Combined-prompt output schema | function mode 的 LLM call 輸出 schema：`{"function": "<name>|null", "params": {...}, "explanation": "<string>"}`；null function → null-intent path（`query_used=null`，`chart_data=null`） |
+| AI-05 | Malformed JSON fallback | combined call 發生 malformed JSON（`_call_llm` 拋出 `RuntimeError` 或結果無 `function` key）→ 安全降級為 null-intent 回應；不拋出例外（AC-7）；`requests.Timeout`/`ConnectionError` 仍正常拋出 |
+| AI-06 | chat_history append policy | 成功回答（含空結果）後 append `(user question, assistant answer)` 至 session chat_history；`TimeoutError`/`ConnectionError`/`ValueError` 時不 append |
+| AI-07 | chat_history cap and eviction | 每個 conversation_id 最多保存 8 對/16 訊息；超過上限時以 FIFO 刪除最舊的一對（2 訊息） |
+| AI-08 | History injection ordering | messages = `[system(combined prompt), ...chat_history..., user(current question)]`；history 僅注入 combined call 與 text2sql Stage 1；不注入 text2sql Stage 2（SQL 生成）或 Round 3（摘要） |
+| AI-09 | Three new function behaviors | `production_history_query`：oracle/spool 同步呼叫，寬查詢可能超過 `AI_REQUEST_TIMEOUT`，建議 YAML 參數說明限制範圍不超過 7 天；`resource_history_summary`：暴露 start_date/end_date/granularity/workcenter_groups，不暴露 families/resource_ids/is_*；`qc_gate_status`：無參數，normalize_chart_data 回傳 `raw.get("stations", [])` |
 
 ## WIP Rules
 
@@ -233,6 +239,9 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.11.0]
+- ai-pipeline-upgrade (2026-05-29): Added AI-04 (combined-prompt output schema), AI-05 (malformed-JSON fallback), AI-06 (chat_history append policy), AI-07 (chat_history cap/eviction), AI-08 (history injection ordering), AI-09 (three new function behaviors). Updated AI-01 description to reflect combined-call. Additive; no existing rules changed.
 
 ## [business 1.10.0]
 - material-part-consumption (2026-05-20): Added MC-01..MC-05 rules for the new material-consumption report (aggregation grouping, input cap/wildcard/meta-char, granularity cache key exclusion, async threshold, no prewarm). Additive; no existing rules changed.

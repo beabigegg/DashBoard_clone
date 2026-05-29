@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.10.0
+schema-version: 1.11.0
 last-changed: 2026-05-22
 breaking-change-policy: deprecate-2-minors
 ---
@@ -261,6 +261,56 @@ Constraints:
 - Rollback: bump `schema_version` → `3` in a follow-up to invalidate L2 entries on next deploy without `redis-cli DEL`.
 - Multi-worker rebuild lock at `tmp/container_filter_cache.loading` (`O_CREAT|O_EXCL`); losers poll Redis L2 every 5 s up to 90 s (business-rules.md PHF-05).
 - Added by change `prod-history-first-tier-cache-filters`.
+
+### 2.9 AI Session Store Shape（`_SESSION_STORE[conversation_id]`）
+
+Internal in-process dict extended by ai-pipeline-upgrade. Keyed by `conversation_id` (string).
+
+```json
+{
+  "chat_history": [
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
+  ],
+  "initial_question": "...",
+  "slots": { "topic": null, "intent": null, "time_scope": null },
+  "updated_at": 1748476800.0
+}
+```
+
+- `chat_history`: list of `{"role": "user"|"assistant", "content": string}` pairs. Cap 8 pairs / 16 messages; FIFO eviction on overflow. Key may be absent for sessions created before this change.
+- TTL: 1800 s (same as slot-filling keys, set via `AI_QUERY_SESSION_TTL_SECONDS`).
+- `chat_history` is preserved across the `ready_to_search` slot-filling pop.
+
+#### AI Function Parameter Schemas (D3)
+
+**production_history_query** (`dispatch: raw_params` — receives params as a single positional dict):
+```json
+{
+  "start_date": "YYYY-MM-DD",
+  "end_date": "YYYY-MM-DD",
+  "lot_ids": ["string"],
+  "pj_types": ["string"]
+}
+```
+`start_date` and `end_date` are required. `lot_ids` and `pj_types` are optional arrays. Synchronous Oracle/spool call; latency expectation documented in business-rules AI-09.
+
+**resource_history_summary** (standard kwargs dispatch):
+```json
+{
+  "start_date": "YYYY-MM-DD",
+  "end_date": "YYYY-MM-DD",
+  "granularity": "day|week|month|year",
+  "workcenter_groups": ["string"]
+}
+```
+`start_date` and `end_date` are required. `granularity` defaults to `"day"`. `workcenter_groups` is optional. Excluded params: `families`, `resource_ids`, `is_production`, `is_key`, `is_monitor`.
+
+**qc_gate_status** (no params):
+```json
+{}
+```
+`normalize_chart_data("qc_gate_status", raw)` returns `raw.get("stations", [])` when `raw` is a dict; otherwise passes through.
 
 ### 2.4 Truncated Payload（memory pressure guard）
 
@@ -677,6 +727,9 @@ Removing a required column, changing a column type, or removing a key from the e
 3. Updating related tests before removing the field.
 
 ## CHANGELOG
+
+## [data 1.11.0]
+- ai-pipeline-upgrade (2026-05-29): Added §2.9 (AI Session Store Shape including `chat_history` pairs, cap 8/16, TTL, pop-preservation semantics) and three new AI function param schemas (`production_history_query` raw_params dispatch, `resource_history_summary` kwargs, `qc_gate_status` no-params). Added `normalize_chart_data` output for `qc_gate_status` (→ stations list) and pass-through for `production_history_query`/`resource_history_summary`. Additive; no existing schemas changed.
 
 ## [data 1.10.0]
 - add-package-detail-tables (2026-05-22): Added §3.11 documenting hold-history detail row schema with new `package: string | null` field. Updated §3.6 (query-tool lot-history / equipment-lots) with new `PRODUCTLINENAME: string | null` field, `_PARTIAL_NONKEY_COLS_LOT` extension note, and CSV export column order. Updated §3.9.2 (material-consumption detail spool) with new `PRODUCTLINENAME: VARCHAR | null` column (detail spool schema breaking-change surface — parquet cleanup required on deploy/rollback). §3.7 (equipment-rejects) already had PRODUCTLINENAME documented — no change. All additive; no existing columns removed or renamed.
