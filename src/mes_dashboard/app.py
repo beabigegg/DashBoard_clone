@@ -993,6 +993,9 @@ def create_app(config_name: str | None = None) -> Flask:
         )
         diagnostics["contract_mismatch_routes"] = sorted(mismatch_routes)
 
+        _ai_enabled = os.getenv("AI_QUERY_ENABLED", "false").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
         return jsonify(
             {
                 "drawers": drawers,
@@ -1006,6 +1009,9 @@ def create_app(config_name: str | None = None) -> Flask:
                 },
                 "diagnostics": diagnostics,
                 "portal_spa_enabled": bool(app.config.get("PORTAL_SPA_ENABLED", False)),
+                "features": {
+                    "ai_query_enabled": _ai_enabled,
+                },
             }
         )
 

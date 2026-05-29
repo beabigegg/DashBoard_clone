@@ -293,6 +293,8 @@ def build_reviewer_prompt(domains: list[str]) -> str:
         "- 只列出上述 7 類已知問題（含即時 View 禁加日期），不要做其他審查",
         "- issues 要具體說明哪裡錯、應該怎麼做（讓 SQL 生成器能根據 issues 修正）",
         "- 不要自己重寫 SQL",
+        "",
+        "重要：直接輸出 JSON 物件，不要加任何說明文字、推理過程或 markdown 包裝。",
     ])
 
 

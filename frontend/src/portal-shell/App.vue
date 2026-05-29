@@ -38,6 +38,7 @@ const adminLinks = ref({
 const sidebarCollapsed = ref(false);
 const sidebarMobileOpen = ref(false);
 const isMobile = ref(false);
+const aiEnabled = ref(false);
 
 function toShellPath(targetRoute) {
   return normalizeRoutePath(targetRoute);
@@ -130,7 +131,7 @@ function handleViewportResize() {
 
 function handleGlobalKeydown(event) {
   if (event.key === 'Escape') {
-    if (aiChat.isOpen.value) {
+    if (aiEnabled.value && aiChat.isOpen.value) {
       aiChat.togglePanel();
     }
     closeMobileSidebar();
@@ -150,6 +151,7 @@ async function loadNavigation() {
     isAdmin.value = Boolean(payload.is_admin);
     adminUser.value = payload.admin_user || null;
     adminLinks.value = payload.admin_links || adminLinks.value;
+    aiEnabled.value = Boolean(payload.features?.ai_query_enabled);
     const state = syncNavigationRoutes(payload.drawers, {
       isAdmin: isAdmin.value,
       includeStandaloneDrilldown: true,
@@ -330,17 +332,19 @@ watch(isLoginPage, (isLogin, wasLogin) => {
       </section>
     </main>
 
-    <AiChatTrigger v-if="!aiChat.isOpen.value" @click="aiChat.togglePanel" />
-    <AiChatPanel
-      v-if="aiChat.isOpen.value"
-      :messages="aiChat.messages.value"
-      :is-loading="aiChat.isLoading.value"
-      :is-rate-limited="aiChat.isRateLimited.value"
-      :can-submit="aiChat.canSubmit.value"
-      :loading-step-text="aiChat.loadingStepText.value"
-      @close="aiChat.togglePanel"
-      @submit="aiChat.submitQuestion"
-      @reset="aiChat.clearHistory"
-    />
+    <template v-if="aiEnabled">
+      <AiChatTrigger v-if="!aiChat.isOpen.value" @click="aiChat.togglePanel" />
+      <AiChatPanel
+        v-if="aiChat.isOpen.value"
+        :messages="aiChat.messages.value"
+        :is-loading="aiChat.isLoading.value"
+        :is-rate-limited="aiChat.isRateLimited.value"
+        :can-submit="aiChat.canSubmit.value"
+        :loading-step-text="aiChat.loadingStepText.value"
+        @close="aiChat.togglePanel"
+        @submit="aiChat.submitQuestion"
+        @reset="aiChat.clearHistory"
+      />
+    </template>
   </div>
 </template>

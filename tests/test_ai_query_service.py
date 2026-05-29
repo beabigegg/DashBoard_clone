@@ -43,6 +43,175 @@ class TestCallLlmText(unittest.TestCase):
         self.assertEqual(result, "推理文字")
 
 
+class TestExtractJsonFromText(unittest.TestCase):
+    """Tests for _extract_json_from_text() — the JSON extraction helper."""
+
+    def test_direct_json(self):
+        """Plain JSON string must parse directly."""
+        result = svc._extract_json_from_text('{"key": "value"}')
+        self.assertEqual(result, {"key": "value"})
+
+    def test_think_tag_stripped(self):
+        """<think>…</think> block must be removed before parsing."""
+        text = "<think>我在思考…</think>\n{\"key\": \"value\"}"
+        result = svc._extract_json_from_text(text)
+        self.assertEqual(result, {"key": "value"})
+
+    def test_markdown_code_block_json(self):
+        """JSON inside ```json … ``` must be extracted."""
+        text = "這是說明\n```json\n{\"sql\": \"SELECT 1\"}\n```\n後記"
+        result = svc._extract_json_from_text(text)
+        self.assertEqual(result, {"sql": "SELECT 1"})
+
+    def test_last_json_wins(self):
+        """When multiple JSON objects exist, the last valid one must be returned."""
+        text = '{"a": 1} some text {"b": 2}'
+        result = svc._extract_json_from_text(text)
+        self.assertEqual(result, {"b": 2})
+
+    def test_nested_json_extracted(self):
+        """JSON with nested objects (e.g. params dict) must be handled correctly."""
+        text = 'reasoning...\n{"sql": "SELECT 1", "params": {"p0": "X"}}'
+        result = svc._extract_json_from_text(text)
+        self.assertEqual(result, {"sql": "SELECT 1", "params": {"p0": "X"}})
+
+    def test_reasoning_preamble_then_json(self):
+        """Reasoning preamble followed by JSON must return the JSON, not the preamble."""
+        text = 'The user asks about WIP trend. I will write SQL.\n{"sql": "SELECT LOTID FROM WIP"}'
+        result = svc._extract_json_from_text(text)
+        self.assertEqual(result, {"sql": "SELECT LOTID FROM WIP"})
+
+    def test_empty_text_returns_none(self):
+        """Empty text must return None."""
+        self.assertIsNone(svc._extract_json_from_text(""))
+
+    def test_no_json_returns_none(self):
+        """Text with no JSON object must return None."""
+        self.assertIsNone(svc._extract_json_from_text("純文字，沒有 JSON"))
+
+    def test_literal_newline_in_sql_string_repaired(self):
+        """JSON with literal (unescaped) newlines inside a SQL string must be repaired."""
+        # Simulates model output: {"sql": "SELECT ...\nFROM TABLE"} with a real newline
+        text = '{"sql": "SELECT A,\nB\nFROM T", "params": {}}'
+        result = svc._extract_json_from_text(text)
+        self.assertIsNotNone(result)
+        self.assertIn("SELECT A,", result["sql"])
+
+    def test_literal_tab_in_string_repaired(self):
+        """Literal tab characters inside JSON strings must be escaped."""
+        text = '{"key": "value\twith\ttabs"}'
+        result = svc._extract_json_from_text(text)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["key"], "value\twith\ttabs")
+
+
+class TestRepairJsonStrings(unittest.TestCase):
+    """Tests for _repair_json_strings()."""
+
+    def test_literal_newline_inside_string_escaped(self):
+        raw = '{"sql": "SELECT A,\nFROM T"}'
+        repaired = svc._repair_json_strings(raw)
+        obj = __import__("json").loads(repaired)
+        self.assertIn("SELECT A,", obj["sql"])
+
+    def test_structural_newline_outside_string_unchanged(self):
+        raw = '{\n  "a": 1,\n  "b": 2\n}'
+        repaired = svc._repair_json_strings(raw)
+        obj = __import__("json").loads(repaired)
+        self.assertEqual(obj, {"a": 1, "b": 2})
+
+    def test_escaped_backslash_not_double_escaped(self):
+        raw = r'{"path": "C:\\Users\\test"}'
+        repaired = svc._repair_json_strings(raw)
+        self.assertEqual(raw, repaired)  # no change needed
+
+
+class TestCallLlmThinkParam(unittest.TestCase):
+    """Verify that _call_llm sends think:False by default (suppresses reasoning)."""
+
+    @patch("mes_dashboard.services.ai_query_service.requests.post")
+    def test_think_false_sent_by_default(self, mock_post):
+        """_call_llm must include think=False in the request body by default."""
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
+        }
+        mock_post.return_value = mock_response
+
+        svc._call_llm([{"role": "user", "content": "test"}])
+
+        _, kwargs = mock_post.call_args
+        sent_body = kwargs.get("json", {})
+        self.assertIn("think", sent_body)
+        self.assertFalse(sent_body["think"])
+
+    @patch("mes_dashboard.services.ai_query_service._AI_ENABLE_THINK", True)
+    @patch("mes_dashboard.services.ai_query_service.requests.post")
+    def test_think_true_when_env_enabled(self, mock_post):
+        """When AI_ENABLE_THINK is truthy, think=True must be sent."""
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
+        }
+        mock_post.return_value = mock_response
+
+        svc._call_llm([{"role": "user", "content": "test"}])
+
+        _, kwargs = mock_post.call_args
+        sent_body = kwargs.get("json", {})
+        self.assertTrue(sent_body["think"])
+
+    @patch("mes_dashboard.services.ai_query_service.requests.post")
+    def test_response_format_json_object_sent_by_default(self, mock_post):
+        """_call_llm must include response_format=json_object to force JSON output."""
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
+        }
+        mock_post.return_value = mock_response
+
+        svc._call_llm([{"role": "user", "content": "test"}])
+
+        _, kwargs = mock_post.call_args
+        sent_body = kwargs.get("json", {})
+        self.assertEqual(sent_body.get("response_format"), {"type": "json_object"})
+
+    @patch("mes_dashboard.services.ai_query_service._AI_FORCE_JSON_FORMAT", False)
+    @patch("mes_dashboard.services.ai_query_service.requests.post")
+    def test_response_format_omitted_when_disabled(self, mock_post):
+        """When AI_FORCE_JSON_FORMAT=false, response_format must not be sent."""
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"sql": "SELECT 1"}'}}]
+        }
+        mock_post.return_value = mock_response
+
+        svc._call_llm([{"role": "user", "content": "test"}])
+
+        _, kwargs = mock_post.call_args
+        sent_body = kwargs.get("json", {})
+        self.assertNotIn("response_format", sent_body)
+
+    @patch("mes_dashboard.services.ai_query_service.requests.post")
+    def test_reasoning_preamble_json_extracted(self, mock_post):
+        """_call_llm must extract JSON from content that starts with reasoning text."""
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.json.return_value = {
+            "choices": [{"message": {
+                "content": 'The user asks about WIP. I analyse...\n{"sql": "SELECT LOTID FROM WIP_TABLE"}'
+            }}]
+        }
+        mock_post.return_value = mock_response
+
+        result = svc._call_llm([{"role": "user", "content": "WIP 趨勢"}])
+        self.assertEqual(result["sql"], "SELECT LOTID FROM WIP_TABLE")
+
+
 class TestSummarizeForLlm(unittest.TestCase):
     """Tests for summarize_for_llm()."""
 
@@ -551,6 +720,56 @@ class TestSanitizeSql(unittest.TestCase):
         sql = "SELECT * FROM DWH.DW_MES_EQUIPMENTSTATUS_WIP_V e WHERE e.Package = :pkg"
         result = svc._sanitize_sql(sql)
         self.assertIn('e."Package"', result)
+
+    # ── Statement type guard ──────────────────────────────────────────────────
+
+    def test_rejects_drop_table(self):
+        with self.assertRaises(ValueError):
+            svc._sanitize_sql("DROP TABLE DWH.SENSITIVE_TABLE")
+
+    def test_rejects_delete(self):
+        with self.assertRaises(ValueError):
+            svc._sanitize_sql("DELETE FROM DWH.DW_MES_LOTREJECTHISTORY WHERE 1=1")
+
+    def test_rejects_update(self):
+        with self.assertRaises(ValueError):
+            svc._sanitize_sql("UPDATE DWH.DW_MES_LOTREJECTHISTORY SET col=1")
+
+    def test_rejects_insert(self):
+        with self.assertRaises(ValueError):
+            svc._sanitize_sql("INSERT INTO t VALUES (1)")
+
+    def test_rejects_truncate(self):
+        with self.assertRaises(ValueError):
+            svc._sanitize_sql("TRUNCATE TABLE DWH.DW_MES_LOTREJECTHISTORY")
+
+    def test_rejects_comment_hidden_drop(self):
+        with self.assertRaises(ValueError):
+            svc._sanitize_sql("-- legit comment\n/* another */ DROP TABLE x")
+
+    def test_allows_select(self):
+        sql = "SELECT 1 FROM DUAL"
+        result = svc._sanitize_sql(sql)
+        self.assertEqual(result, sql)
+
+    def test_allows_with_cte(self):
+        sql = "WITH cte AS (SELECT 1 FROM DUAL) SELECT * FROM cte"
+        result = svc._sanitize_sql(sql)
+        self.assertEqual(result, sql)
+
+
+class TestReviewSqlFailClosed(unittest.TestCase):
+    """_review_sql must fail-closed when the LLM reviewer is unavailable."""
+
+    @patch("mes_dashboard.services.ai_query_service._call_llm", side_effect=RuntimeError("LLM down"))
+    def test_reviewer_exception_returns_rejection_not_empty(self, _mock):
+        issue = svc._review_sql("問題", "SELECT 1 FROM DUAL", {}, ["wip"])
+        self.assertTrue(issue, "_review_sql must return a non-empty rejection when LLM fails")
+
+    @patch("mes_dashboard.services.ai_query_service._call_llm", return_value={"approved": True})
+    def test_reviewer_approved_returns_empty(self, _mock):
+        issue = svc._review_sql("問題", "SELECT 1 FROM DUAL", {}, ["wip"])
+        self.assertEqual(issue, "")
 
 
 class TestCoerceDateParams(unittest.TestCase):

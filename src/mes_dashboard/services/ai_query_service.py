@@ -44,6 +44,12 @@ _AI_API_KEY = os.getenv("AI_API_KEY", "")
 _AI_MODEL = os.getenv("AI_MODEL", "gpt-oss:120b")
 _AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
 _AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "false").strip().lower() in {"1", "true", "yes"}
+# Disable reasoning/thinking for structured JSON calls (default: disabled).
+# Set AI_ENABLE_THINK=true only if the model supports it and you want reasoning traces.
+_AI_ENABLE_THINK: bool = os.getenv("AI_ENABLE_THINK", "false").strip().lower() in {"1", "true", "yes", "on"}
+# Force the model to output only valid JSON (OpenAI-compatible response_format).
+# Disable with AI_FORCE_JSON_FORMAT=false if the model rejects the parameter.
+_AI_FORCE_JSON_FORMAT: bool = os.getenv("AI_FORCE_JSON_FORMAT", "true").strip().lower() not in {"0", "false", "no", "off"}
 # No max_tokens cap — internal LLM with 16K context, no token cost.
 _AI_MODE = os.getenv("AI_MODE", "text2sql")  # "text2sql" | "function"
 
@@ -98,6 +104,105 @@ def _auto_resolve_id(function_name: str, params: dict) -> dict:
 # LLM API calls
 # ---------------------------------------------------------------------------
 
+def _repair_json_strings(text: str) -> str:
+    """Escape unescaped control characters inside JSON string values.
+
+    Reasoning models sometimes emit literal newlines/tabs inside JSON strings
+    instead of the required \\n/\\t escape sequences.  This function uses a
+    simple state machine that tracks whether the current position is inside a
+    quoted string (handling backslash escapes) and replaces bare control chars
+    with their JSON escape equivalents.  Characters outside strings are left
+    unchanged, so structural newlines (pretty-printing) survive intact.
+    """
+    out: list[str] = []
+    in_string = False
+    escaped = False
+    for ch in text:
+        if escaped:
+            out.append(ch)
+            escaped = False
+        elif ch == "\\" and in_string:
+            out.append(ch)
+            escaped = True
+        elif ch == '"':
+            in_string = not in_string
+            out.append(ch)
+        elif in_string and ch == "\n":
+            out.append("\\n")
+        elif in_string and ch == "\r":
+            out.append("\\r")
+        elif in_string and ch == "\t":
+            out.append("\\t")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _try_parse_json(text: str) -> dict | None:
+    """Try json.loads; on failure, try again after repairing literal control chars."""
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    repaired = _repair_json_strings(text)
+    try:
+        return json.loads(repaired)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def _extract_json_from_text(text: str) -> dict | None:
+    """Extract the last valid JSON object from text.
+
+    Handles: <think>…</think> tags, ```json code blocks, inline JSON objects
+    with arbitrary nesting, and literal newlines inside JSON strings (repaired
+    via _repair_json_strings).  Returns the *last* match because reasoning
+    models typically put the final answer at the end.
+    """
+    if not text:
+        return None
+
+    # 1. Strip <think>…</think> blocks, then try direct parse (with repair)
+    stripped = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    if stripped:
+        result = _try_parse_json(stripped)
+        if result is not None:
+            return result
+
+    # 2. Extract from the last ```json … ``` or ``` … ``` code block
+    for m in reversed(list(re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL))):
+        result = _try_parse_json(m.group(1))
+        if result is not None:
+            return result
+
+    # 3. Brace-depth scan — find all *top-level* JSON objects, return the last valid one.
+    # Only consider positions where the brace depth was 0 (not nested inside another object).
+    top_level_starts: list[int] = []
+    depth = 0
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                top_level_starts.append(i)
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+
+    for start in reversed(top_level_starts):
+        depth = 0
+        for i, ch in enumerate(text[start:], start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    result = _try_parse_json(text[start : i + 1])
+                    if result is not None:
+                        return result
+                    break  # this start position failed; try the next
+
+    return None
+
+
 def _call_llm(messages: list[dict]) -> dict:
     """POST to LLM API and return the parsed JSON dict.
 
@@ -111,11 +216,17 @@ def _call_llm(messages: list[dict]) -> dict:
         "Authorization": f"Bearer {_AI_API_KEY}",
         "Content-Type": "application/json",
     }
-    body = {
+    body: dict = {
         "model": _AI_MODEL,
         "messages": messages,
         "stream": False,
+        "think": _AI_ENABLE_THINK,  # False by default; suppresses reasoning preamble
     }
+    if _AI_FORCE_JSON_FORMAT:
+        # OpenAI-compatible standard parameter
+        body["response_format"] = {"type": "json_object"}
+        # Ollama-specific extension: also accepted on /v1/chat/completions
+        body["format"] = "json"
 
     response = requests.post(
         url,
@@ -130,35 +241,62 @@ def _call_llm(messages: list[dict]) -> dict:
 
     data = response.json()
     msg = data.get("choices", [{}])[0].get("message", {})
-    content = msg.get("content") or msg.get("reasoning_content") or ""
+    content: str = msg.get("content") or ""
+    reasoning: str = msg.get("reasoning_content") or ""
 
-    try:
-        return json.loads(content.strip())
-    except (json.JSONDecodeError, ValueError):
-        pass
+    # Happy path: content has JSON directly
+    result = _extract_json_from_text(content)
+    if result is not None:
+        return result
 
-    # Try to find the last JSON object (LLM sometimes prepends reasoning text)
-    for match in reversed(list(re.finditer(r"\{[^{}]*\}", content))):
+    # Thinking model: content is empty but reasoning_content has the full chain.
+    # 1. Try to find a JSON object embedded in the reasoning text.
+    if reasoning:
+        result = _extract_json_from_text(reasoning)
+        if result is not None:
+            return result
+
+        # 2. Model finished reasoning but forgot to output the JSON answer.
+        #    Make a focused follow-up call with the reasoning as context.
+        logger.debug("Content empty after reasoning (%d chars) — making extraction call", len(reasoning))
+        extraction_body: dict = {
+            "model": _AI_MODEL,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        f"你已完成分析：\n{reasoning[:2000]}\n\n"
+                        "現在請只輸出 JSON 答案，不要任何說明文字。"
+                    ),
+                }
+            ],
+            "stream": False,
+            "format": "json",
+            "response_format": {"type": "json_object"},
+        }
         try:
-            return json.loads(match.group())
-        except (json.JSONDecodeError, ValueError):
-            continue
+            extraction_resp = requests.post(
+                url, headers=headers, json=extraction_body,
+                verify=_AI_VERIFY_TLS, timeout=_AI_REQUEST_TIMEOUT,
+            )
+            if extraction_resp.ok:
+                ex_msg = extraction_resp.json().get("choices", [{}])[0].get("message", {})
+                extracted_content = ex_msg.get("content") or ""
+                result = _extract_json_from_text(extracted_content)
+                if result is not None:
+                    return result
+        except Exception as exc:
+            logger.debug("Extraction follow-up call failed: %s", exc)
 
-    # Nested JSON fallback (greedy)
-    match = re.search(r"\{.*\}", content, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-    # Last resort: try to find a known function name in the text
+    # Last resort: find a known function name in combined text
+    combined = content + reasoning
     for func_name in REGISTRY:
-        if func_name in content:
+        if func_name in combined:
             logger.warning("LLM returned non-JSON, extracted function name: %s", func_name)
             return {"function": func_name, "explanation": "（自動從 LLM 回應中提取）"}
 
-    raise RuntimeError(f"Could not extract JSON from LLM response: {content[:300]}")
+    logger.debug("Full LLM content (%d chars): %s", len(content or reasoning), (content or reasoning)[:600])
+    raise RuntimeError(f"Could not extract JSON from LLM response: {(content or reasoning)[:300]}")
 
 
 def call_llm_text(messages: list[dict]) -> str:
@@ -675,8 +813,10 @@ def _review_sql(
     try:
         result = _call_llm(review_messages)
     except Exception as exc:
-        logger.warning("Reviewer LLM call failed, skipping review: %s", exc)
-        return ""
+        # Fail-closed: if the reviewer is unavailable, refuse to execute rather
+        # than silently approving — a downed reviewer must not become a bypass.
+        logger.warning("Reviewer LLM call failed, rejecting SQL: %s", exc)
+        return "LLM 審查服務暫時不可用，拒絕執行"
 
     if result.get("approved", True):
         return ""
@@ -736,6 +876,34 @@ def _deterministic_review_issues(question: str, sql: str, domains: list[str]) ->
 # SQL sanitizer — deterministic fixes for known Oracle issues
 # ---------------------------------------------------------------------------
 
+# Only these statement types are allowed through the AI pipeline.
+_ALLOWED_SQL_STARTS = frozenset({"SELECT", "WITH"})
+
+
+def _assert_select_only(sql: str) -> None:
+    """Raise ValueError if the first SQL keyword is not SELECT or WITH.
+
+    Strips leading whitespace and -- / /* */ comments before checking so that
+    a comment-prefixed DROP TABLE cannot bypass the guard.
+    """
+    text = sql.lstrip()
+    while text:
+        if text[:2] == "--":
+            end = text.find("\n")
+            text = text[end + 1 :].lstrip() if end != -1 else ""
+        elif text[:2] == "/*":
+            end = text.find("*/")
+            text = text[end + 2 :].lstrip() if end != -1 else ""
+        else:
+            break
+    m = re.match(r"\w+", text)
+    first_kw = m.group(0).upper() if m else ""
+    if first_kw not in _ALLOWED_SQL_STARTS:
+        raise ValueError(
+            f"只允許 SELECT 查詢，拒絕執行 '{first_kw or text[:20]}' 語句"
+        )
+
+
 # Mixed-case columns that Oracle requires double-quoting.
 _MIXED_CASE_COLUMNS: dict[str, str] = {
     "Package": '"Package"',
@@ -773,10 +941,14 @@ def _sanitize_sql(sql: str) -> str:
     """Apply deterministic fixes to LLM-generated SQL before execution.
 
     Fixes:
+      0. Statement type guard — only SELECT/WITH allowed (raises ValueError otherwise)
       1. Mixed-case columns (Package, Function) → auto-quote
       2. Unquoted Oracle reserved words used as aliases
       3. Validate column names against schema (log warnings)
     """
+    # 0. Reject non-SELECT statements before any other processing.
+    _assert_select_only(sql)
+
     # 1. Auto-quote mixed-case columns.
     #    Match word boundary around the column name, but skip if already quoted.
     for col, quoted in _MIXED_CASE_COLUMNS.items():
@@ -972,13 +1144,21 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
                     ),
                 })
                 continue  # Skip execution, go to next attempt
-            # Last attempt — try executing anyway
-            logger.warning("Reviewer rejected on last attempt, executing anyway")
+            # Reviewer rejected on every attempt — abort without executing.
+            return {
+                "answer": f"SQL 審查未通過（已重試 {MAX_RETRIES} 次）：{review_issue}",
+                "chart_data": None,
+                "query_used": "text2sql",
+                "params_used": params_used,
+                "sql_used": sql_used,
+                "tool_trace": tool_trace,
+                "suggestions": [],
+            }
 
         # ── Execute SQL ──────────────────────────────────────────────────────
-        sql = _sanitize_sql(sql)
         params = _coerce_date_params(params)
         try:
+            sql = _sanitize_sql(sql)  # raises ValueError for non-SELECT
             df = read_sql_df(sql, params)
             logger.info("SQL executed successfully: %d rows", len(df) if df is not None else 0)
             tool_trace.append({
@@ -987,6 +1167,21 @@ def process_query_text2sql(question: str) -> dict[str, Any]:
                 "summary": f"執行成功，回傳 {len(df) if df is not None else 0} 筆",
             })
             break  # Success — exit retry loop
+        except ValueError as san_exc:
+            last_error = str(san_exc)
+            logger.warning("SQL rejected by security policy (attempt %d): %s", attempt + 1, last_error)
+            tool_trace.append({
+                "step": 3 + attempt,
+                "function": "sanitize_sql",
+                "summary": f"安全性拒絕: {last_error[:80]}",
+            })
+            if attempt < MAX_RETRIES - 1:
+                s2_messages.append({"role": "assistant", "content": json.dumps(s2_result, ensure_ascii=False)})
+                s2_messages.append({
+                    "role": "user",
+                    "content": f"SQL 安全規則不允許：{last_error}\n請只生成 SELECT 查詢，重新生成。",
+                })
+            df = None
         except Exception as exc:
             from mes_dashboard.core.database import DatabaseDegradedError
             last_error = _extract_oracle_error(exc)
