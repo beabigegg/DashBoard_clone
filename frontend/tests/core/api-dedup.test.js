@@ -114,7 +114,9 @@ describe('in-flight dedup: POST requests', () => {
     global.document = { querySelector: () => null };
   });
 
-  it('two identical POST calls with same body share one in-flight fetch', async () => {
+  it('two identical POST calls each issue separate fetches (POST not deduped)', async () => {
+    // POST dedup was intentionally removed in c27a9f9 to prevent
+    // abort-signal cross-contamination between concurrent spool queries.
     const { apiPost, _clearInFlight } = await import('../../src/core/api.js');
     _clearInFlight();
 
@@ -124,7 +126,7 @@ describe('in-flight dedup: POST requests', () => {
       apiPost('/api/test/post-dedup', body),
     ]);
 
-    expect(fetchCallCount).toBe(1);
+    expect(fetchCallCount).toBe(2);
     expect(r1.success).toBe(r2.success);
     _clearInFlight();
   });

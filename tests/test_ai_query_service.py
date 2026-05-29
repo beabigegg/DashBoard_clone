@@ -16,28 +16,28 @@ import mes_dashboard.services.ai_query_service as svc
 class TestCallLlmText(unittest.TestCase):
     """Tests for call_llm_text()."""
 
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_returns_content_text(self, mock_post):
+    @patch("mes_dashboard.services.ai_query_service._AI_SESSION")
+    def test_returns_content_text(self, mock_session):
         """call_llm_text must return raw text without JSON parsing."""
         mock_response = MagicMock()
         mock_response.ok = True
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "這是自然語言回答"}}]
         }
-        mock_post.return_value = mock_response
+        mock_session.post.return_value = mock_response
 
         result = svc.call_llm_text([{"role": "user", "content": "test"}])
         self.assertEqual(result, "這是自然語言回答")
 
-    @patch("mes_dashboard.services.ai_query_service.requests.post")
-    def test_fallback_to_reasoning_content(self, mock_post):
+    @patch("mes_dashboard.services.ai_query_service._AI_SESSION")
+    def test_fallback_to_reasoning_content(self, mock_session):
         """call_llm_text must fall back to reasoning_content if content is empty."""
         mock_response = MagicMock()
         mock_response.ok = True
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "", "reasoning_content": "推理文字"}}]
         }
-        mock_post.return_value = mock_response
+        mock_session.post.return_value = mock_response
 
         result = svc.call_llm_text([{"role": "user", "content": "test"}])
         self.assertEqual(result, "推理文字")
