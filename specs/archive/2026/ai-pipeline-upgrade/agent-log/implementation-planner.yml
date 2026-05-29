@@ -1,0 +1,14 @@
+agent: implementation-planner
+change-id: ai-pipeline-upgrade
+status: done
+summary: >
+  Wrote implementation-plan.md execution packet for backend-engineer. Covers
+  D1 (combined-prompt merge, retain deprecated R1/R2 builders), D2 (chat_history
+  helpers under existing RLock + R3 pop-preservation fix, inject into combined
+  call + text2sql Stage 1 only), D3 (three new YAML functions incl. raw_params
+  dispatch adapter for production_history_query and qc_gate_status normalize
+  branch), four contract bumps, and the 22-test TDD plan from test-plan.md.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/ai-pipeline-upgrade/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-8)" }
+  - { type: scope-summary, pointer: "5 in-scope areas (D1/D2/D3/contracts/tests); 8 explicit non-goals incl. keep deprecated builders, no Stage-2 history, no env var" }

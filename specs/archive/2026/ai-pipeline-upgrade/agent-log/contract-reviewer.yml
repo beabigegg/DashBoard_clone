@@ -1,0 +1,15 @@
+agent: contract-reviewer
+change-id: ai-pipeline-upgrade
+status: changes-required
+summary: >
+  Four contract files reviewed. Public API surface non-breaking.
+  Five gaps to resolve during implementation: AI-04 (combined-prompt output schema),
+  AI-05 (malformed-JSON fallback — AC-7), AI-06/07/08 (chat_history policy),
+  AI-09 (three new function behavioral contracts + production_history_query latency risk),
+  data-shape §2.9 (session store shape) and three new function param schemas.
+  normalize_chart_data has no branch for any of the three new functions — output
+  shape must be pinned before frontend integration.
+artifacts:
+  - { type: version-bumps, pointer: "api-contract 1.11→1.12, api-inventory 1.1.10→1.1.11, business-rules 1.10→1.11, data-shape 1.10→1.11" }
+  - { type: breaking-changes, pointer: "none — route surface and response envelope unchanged" }
+  - { type: latency-risk, pointer: "production_history_query triggers full Oracle spool pipeline; must be addressed in design.md" }
