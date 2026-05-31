@@ -171,6 +171,37 @@ const isDisabled = computed(() => props.loading);
         />
       </div>
 
+      <!-- Equipment type checkboxes -->
+      <div class="checkbox-row">
+        <label class="checkbox-pill">
+          <input
+            type="checkbox"
+            :checked="state.is_production"
+            :disabled="isDisabled"
+            @change="emit('update-state', { is_production: ($event.target as HTMLInputElement).checked })"
+          />
+          生產設備
+        </label>
+        <label class="checkbox-pill">
+          <input
+            type="checkbox"
+            :checked="state.is_key"
+            :disabled="isDisabled"
+            @change="emit('update-state', { is_key: ($event.target as HTMLInputElement).checked })"
+          />
+          重點設備
+        </label>
+        <label class="checkbox-pill">
+          <input
+            type="checkbox"
+            :checked="state.is_monitor"
+            :disabled="isDisabled"
+            @change="emit('update-state', { is_monitor: ($event.target as HTMLInputElement).checked })"
+          />
+          監控設備
+        </label>
+      </div>
+
       <!-- Actions -->
       <div class="filter-actions">
         <button

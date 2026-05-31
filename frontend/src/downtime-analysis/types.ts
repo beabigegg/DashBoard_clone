@@ -97,4 +97,7 @@ export interface FilterState {
   start_date: string;
   end_date: string;
   granularity: string;
+  is_production: boolean;
+  is_key: boolean;
+  is_monitor: boolean;
 }

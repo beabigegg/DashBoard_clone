@@ -487,11 +487,15 @@ def get_filter_options(
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
     package_groups: Optional[List[str]] = None,
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Return filter options for the downtime-analysis page.
 
     Reuses resource_cache for workcenter/family/resource/package_group dimensions.
     Also provides big_categories and reasons from the taxonomy.
+    resource_ids contains RESOURCENAME values (display names, not IDs).
     """
     try:
         from mes_dashboard.services.resource_cache import get_all_resources, get_package_group_name
@@ -519,9 +523,10 @@ def get_filter_options(
         if families:
             filtered = [r for r in filtered if r.get('RESOURCEFAMILYNAME') in families]
 
+        # resource_ids contains resource names (RESOURCENAME), not IDs
         if resource_ids:
-            rid_set = {str(x).strip() for x in resource_ids}
-            filtered = [r for r in filtered if str(r.get('RESOURCEID', '')).strip() in rid_set]
+            name_set = {str(x).strip() for x in resource_ids}
+            filtered = [r for r in filtered if str(r.get('RESOURCENAME', '')).strip() in name_set]
 
         if package_groups:
             pg_set = set(package_groups)
@@ -532,8 +537,17 @@ def get_filter_options(
                     filtered_pg.append(r)
             filtered = filtered_pg
 
+        # Equipment type flags
+        if is_production:
+            filtered = [r for r in filtered if r.get('PJ_ISPRODUCTION') == 1]
+        if is_key:
+            filtered = [r for r in filtered if r.get('PJ_ISKEY') == 1]
+        if is_monitor:
+            filtered = [r for r in filtered if r.get('PJ_ISMONITOR') == 1]
+
         fam_list = sorted({r.get('RESOURCEFAMILYNAME') or '' for r in filtered if r.get('RESOURCEFAMILYNAME')})
-        res_list = sorted({str(r.get('RESOURCEID', '')).strip() for r in filtered if r.get('RESOURCEID')})
+        # Return resource names for display
+        res_list = sorted({str(r.get('RESOURCENAME', '')).strip() for r in filtered if r.get('RESOURCENAME')})
 
         # Package groups from filtered resources
         pg_list = sorted({
@@ -573,6 +587,9 @@ def query_downtime_dataset(
     package_groups: Optional[List[str]] = None,
     big_categories: Optional[List[str]] = None,
     status_types: Optional[List[str]] = None,
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
 ) -> Dict[str, Any]:
     """Execute Oracle query → cross-shift merge → JOBID bridge → spool.
 
@@ -617,10 +634,11 @@ def query_downtime_dataset(
     if job_df is None:
         job_df = pd.DataFrame()
 
-    # Apply resource filters (workcenter/family/resource_id/package_group)
+    # Apply resource filters (workcenter/family/resource_id/package_group/flags)
     if not base_df.empty:
         base_df = _apply_resource_filters(
-            base_df, workcenter_groups, families, resource_ids, package_groups
+            base_df, workcenter_groups, families, resource_ids, package_groups,
+            is_production=is_production, is_key=is_key, is_monitor=is_monitor,
         )
 
     # Cross-shift merge (DA-02)
@@ -659,9 +677,17 @@ def _apply_resource_filters(
     families: Optional[List[str]],
     resource_ids: Optional[List[str]],
     package_groups: Optional[List[str]],
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
 ) -> pd.DataFrame:
-    """Filter events DataFrame by resource dimension filters."""
-    if not workcenter_groups and not families and not resource_ids and not package_groups:
+    """Filter events DataFrame by resource dimension filters.
+
+    resource_ids contains RESOURCENAME values (display names); they are resolved
+    to RESOURCEID for HISTORYID matching against the events DataFrame.
+    """
+    if (not workcenter_groups and not families and not resource_ids
+            and not package_groups and not is_production and not is_key and not is_monitor):
         return df
 
     try:
@@ -673,7 +699,7 @@ def _apply_resource_filters(
 
         allowed_hist_ids: Optional[set] = None
 
-        if workcenter_groups or families or package_groups:
+        if workcenter_groups or families or package_groups or is_production or is_key or is_monitor:
             allowed_wcs = None
             if workcenter_groups:
                 allowed_wcs = {
@@ -691,10 +717,22 @@ def _apply_resource_filters(
                     r for r in filtered
                     if get_package_group_name(r.get('PACKAGEGROUPID')) in pg_set
                 ]
+            if is_production:
+                filtered = [r for r in filtered if r.get('PJ_ISPRODUCTION') == 1]
+            if is_key:
+                filtered = [r for r in filtered if r.get('PJ_ISKEY') == 1]
+            if is_monitor:
+                filtered = [r for r in filtered if r.get('PJ_ISMONITOR') == 1]
             allowed_hist_ids = {str(r.get('RESOURCEID', '')).strip() for r in filtered if r.get('RESOURCEID')}
 
         if resource_ids:
-            rid_set = {str(x).strip() for x in resource_ids}
+            # resource_ids contains RESOURCENAME values; resolve to RESOURCEID
+            name_set = {str(x).strip() for x in resource_ids}
+            name_to_id = {
+                str(r.get('RESOURCENAME', '')).strip(): str(r.get('RESOURCEID', '')).strip()
+                for r in resources if r.get('RESOURCENAME') and r.get('RESOURCEID')
+            }
+            rid_set = {name_to_id[n] for n in name_set if n in name_to_id}
             if allowed_hist_ids is not None:
                 allowed_hist_ids = allowed_hist_ids & rid_set
             else:

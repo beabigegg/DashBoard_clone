@@ -62,7 +62,6 @@ function goToPage(page: number): void {
         <table class="data-table event-detail-table" aria-label="停機事件明細">
           <thead>
             <tr>
-              <th scope="col">設備ID</th>
               <th scope="col">設備名稱</th>
               <th scope="col">狀態</th>
               <th scope="col">原因</th>
@@ -87,8 +86,7 @@ function goToPage(page: number): void {
               :key="row.event_id"
               :class="{ 'row-no-job': row.job === null }"
             >
-              <td>{{ row.resource_id }}</td>
-              <td>{{ row.resource_name ?? '—' }}</td>
+              <td>{{ row.resource_name ?? row.resource_id }}</td>
               <td>
                 <span class="status-badge" :class="`status-${row.status.toLowerCase()}`">
                   {{ row.status }}

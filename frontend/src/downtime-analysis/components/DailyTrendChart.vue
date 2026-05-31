@@ -35,8 +35,8 @@ const chartOption = computed(() => {
         return `${date}<br/>${lines.join('<br/>')}`;
       },
     },
-    legend: { data: ['UDT', 'SDT', 'EGT'] },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    legend: { data: ['UDT', 'SDT', 'EGT'], top: 0, left: 'center' },
+    grid: { left: '3%', right: '4%', bottom: '3%', top: '40px', containLabel: true },
     xAxis: {
       type: 'category',
       data: dates,

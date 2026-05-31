@@ -88,12 +88,18 @@ def api_downtime_options():
     families = _csv_param(request.args.get('families', ''))
     resource_ids = _csv_param(request.args.get('resource_ids', ''))
     package_groups = _csv_param(request.args.get('package_groups', ''))
+    is_production = request.args.get('is_production', '').lower() in ('1', 'true')
+    is_key = request.args.get('is_key', '').lower() in ('1', 'true')
+    is_monitor = request.args.get('is_monitor', '').lower() in ('1', 'true')
 
     options = get_filter_options(
         workcenter_groups=workcenter_groups,
         families=families,
         resource_ids=resource_ids,
         package_groups=package_groups,
+        is_production=is_production,
+        is_key=is_key,
+        is_monitor=is_monitor,
     )
     if options is None:
         return internal_error("篩選條件選項載入失敗")
@@ -137,6 +143,9 @@ def api_downtime_query():
     package_groups = body.get('package_groups') or None
     big_categories = body.get('big_categories') or None
     status_types = body.get('status_types') or None
+    is_production = bool(body.get('is_production', False))
+    is_key = bool(body.get('is_key', False))
+    is_monitor = bool(body.get('is_monitor', False))
 
     try:
         result = query_downtime_dataset(
@@ -148,6 +157,9 @@ def api_downtime_query():
             package_groups=package_groups,
             big_categories=big_categories,
             status_types=status_types,
+            is_production=is_production,
+            is_key=is_key,
+            is_monitor=is_monitor,
         )
         return success_response(result)
     except Exception as exc:

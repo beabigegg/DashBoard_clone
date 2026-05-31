@@ -11,6 +11,9 @@ const DEFAULT_STATE: FilterState = {
   start_date: '',
   end_date: '',
   granularity: 'day',
+  is_production: false,
+  is_key: false,
+  is_monitor: false,
 };
 
 /**
@@ -82,6 +85,9 @@ export function useFilterState() {
     if (state.package_groups.length > 0) body.package_groups = state.package_groups;
     if (state.big_categories.length > 0) body.big_categories = state.big_categories;
     if (state.status_types.length > 0) body.status_types = state.status_types;
+    if (state.is_production) body.is_production = true;
+    if (state.is_key) body.is_key = true;
+    if (state.is_monitor) body.is_monitor = true;
     return body;
   }
 

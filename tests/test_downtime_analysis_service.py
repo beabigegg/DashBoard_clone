@@ -575,8 +575,8 @@ class TestFilterCrossNarrowing:
         from mes_dashboard.services.downtime_analysis_service import get_filter_options
 
         mock_resources.return_value = [
-            {'RESOURCEID': 'R1', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
-            {'RESOURCEID': 'R2', 'WORKCENTERNAME': 'WC_B', 'RESOURCEFAMILYNAME': 'FAM2', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'Machine-A', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'Machine-B', 'WORKCENTERNAME': 'WC_B', 'RESOURCEFAMILYNAME': 'FAM2', 'PACKAGEGROUPID': None},
         ]
         mock_wc_map.return_value = {
             'WC_A': {'group': 'GRP_A', 'sequence': 1},
@@ -585,8 +585,8 @@ class TestFilterCrossNarrowing:
         mock_pg.return_value = None
 
         opts = get_filter_options(workcenter_groups=['GRP_A'])
-        assert 'R1' in opts['resources']
-        assert 'R2' not in opts['resources']
+        assert 'Machine-A' in opts['resources']
+        assert 'Machine-B' not in opts['resources']
 
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
@@ -598,8 +598,8 @@ class TestFilterCrossNarrowing:
         from mes_dashboard.services.downtime_analysis_service import get_filter_options
 
         mock_resources.return_value = [
-            {'RESOURCEID': 'R1', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
-            {'RESOURCEID': 'R2', 'WORKCENTERNAME': 'WC_B', 'RESOURCEFAMILYNAME': 'FAM2', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'Machine-A', 'WORKCENTERNAME': 'WC_A', 'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'Machine-B', 'WORKCENTERNAME': 'WC_B', 'RESOURCEFAMILYNAME': 'FAM2', 'PACKAGEGROUPID': None},
         ]
         mock_wc_map.return_value = {
             'WC_A': {'group': 'GRP_A', 'sequence': 1},
@@ -608,8 +608,8 @@ class TestFilterCrossNarrowing:
         mock_pg.return_value = None
 
         opts = get_filter_options()
-        assert 'R1' in opts['resources']
-        assert 'R2' in opts['resources']
+        assert 'Machine-A' in opts['resources']
+        assert 'Machine-B' in opts['resources']
 
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')

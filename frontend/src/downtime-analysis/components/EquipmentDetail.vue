@@ -52,11 +52,10 @@ const sortedRows = computed(() => {
         <thead>
           <tr>
             <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('resource_id')">
-                設備ID {{ sortIndicator('resource_id') }}
+              <button type="button" class="sort-btn" @click="toggleSort('resource_name')">
+                設備名稱 {{ sortIndicator('resource_name') }}
               </button>
             </th>
-            <th scope="col">設備名稱</th>
             <th scope="col">工作站</th>
             <th scope="col">機種</th>
             <th scope="col">
@@ -89,8 +88,7 @@ const sortedRows = computed(() => {
         </thead>
         <tbody>
           <tr v-for="row in sortedRows" :key="row.resource_id">
-            <td>{{ row.resource_id }}</td>
-            <td>{{ row.resource_name ?? '—' }}</td>
+            <td>{{ row.resource_name ?? row.resource_id }}</td>
             <td>{{ row.workcenter ?? '—' }}</td>
             <td>{{ row.family ?? '—' }}</td>
             <td>{{ row.udt_hours.toFixed(2) }}</td>

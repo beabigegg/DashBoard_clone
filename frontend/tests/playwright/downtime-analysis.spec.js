@@ -11,7 +11,7 @@
  *   test_teleport_tooltip_carries_theme_wrapper
  */
 
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://localhost:5173';
 const PAGE_URL = `${BASE_URL}/portal-shell/downtime-analysis`;

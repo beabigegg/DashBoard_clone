@@ -57,6 +57,9 @@ const draftFilters = reactive<FilterState>({
   start_date: '',
   end_date: '',
   granularity: 'day',
+  is_production: false,
+  is_key: false,
+  is_monitor: false,
 });
 
 function syncDraftFromState(): void {
@@ -69,6 +72,9 @@ function syncDraftFromState(): void {
   draftFilters.start_date = filterState.start_date;
   draftFilters.end_date = filterState.end_date;
   draftFilters.granularity = filterState.granularity;
+  draftFilters.is_production = filterState.is_production;
+  draftFilters.is_key = filterState.is_key;
+  draftFilters.is_monitor = filterState.is_monitor;
 }
 
 async function runPrimaryQuery(): Promise<void> {
@@ -113,6 +119,9 @@ async function handleClear(): Promise<void> {
     start_date: draftFilters.start_date,
     end_date: draftFilters.end_date,
     granularity: 'day',
+    is_production: false,
+    is_key: false,
+    is_monitor: false,
   });
   syncDraftFromState();
   await runPrimaryQuery();
