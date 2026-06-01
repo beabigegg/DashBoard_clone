@@ -150,12 +150,12 @@ async function handleClear(): Promise<void> {
 }
 
 async function handleTabChange(tab: 'charts' | 'equipment' | 'events'): Promise<void> {
-  activeTab.value = tab;
   if (tab === 'equipment' && equipmentData.rows.length === 0) {
     await loadEquipmentDetail(1, 20);
   } else if (tab === 'events' && eventData.rows.length === 0) {
     await loadEventDetail(1, 20);
   }
+  activeTab.value = tab;
 }
 
 async function handleEquipmentPageChange(page: number): Promise<void> {
