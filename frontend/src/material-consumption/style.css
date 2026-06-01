@@ -549,28 +549,6 @@
   gap: theme('spacing.token.p8');
 }
 
-.theme-material-consumption .pagination button {
-  display: inline-flex;
-  align-items: center;
-  padding: theme('spacing.token.p4') theme('spacing.token.p12');
-  border: 1px solid theme('colors.stroke.soft');
-  border-radius: theme('borderRadius.button');
-  background: theme('colors.surface.card');
-  font-size: theme('fontSize.xs.0');
-  color: theme('colors.text.primary');
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
-  white-space: nowrap;
-}
-
-.theme-material-consumption .pagination button:hover:not(:disabled) {
-  background: theme('colors.surface.hover');
-}
-
-.theme-material-consumption .pagination button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 
 .theme-material-consumption .page-info {
   font-size: theme('fontSize.xs.0');

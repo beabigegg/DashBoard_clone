@@ -249,29 +249,22 @@
   margin-bottom: 12px;
 }
 
-.theme-downtime-analysis .export-csv-btn {
-  padding: 5px 14px;
-  font-size: 12px;
+
+
+.theme-downtime-analysis .data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.theme-downtime-analysis .data-table thead th {
+  background: theme('colors.token.hf8f9fa');
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 2px solid theme('colors.stroke.soft');
   font-weight: 600;
-  border: 1px solid theme('colors.brand.500');
-  border-radius: 4px;
-  background: transparent;
-  color: theme('colors.brand.500');
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
   white-space: nowrap;
 }
-
-.theme-downtime-analysis .export-csv-btn:hover:not(:disabled) {
-  background: theme('colors.brand.500');
-  color: theme('colors.token.hffffff');
-}
-
-.theme-downtime-analysis .export-csv-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 
 .theme-downtime-analysis .data-table td {
   padding: 7px 10px;
@@ -281,6 +274,15 @@
 
 .theme-downtime-analysis .data-table tr:hover td {
   background: theme('colors.surface.hover');
+}
+
+.theme-downtime-analysis .pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: theme('spacing.3');
+  padding: theme('spacing.4');
+  border-top: 1px solid theme('colors.stroke.soft');
 }
 
 /* Status badges */

@@ -84,19 +84,19 @@ const pageInfo = computed(() => {
       <table class="lot-table">
         <thead>
           <tr>
-            <th class="cursor-pointer" @click="toggleSort('lotId')" :aria-sort="ariaSortFor('lotId')">LOTID <span>{{ currentSortLabel('lotId') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('workorder')" :aria-sort="ariaSortFor('workorder')">WORKORDER <span>{{ currentSortLabel('workorder') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('qty')" :aria-sort="ariaSortFor('qty')">QTY <span>{{ currentSortLabel('qty') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('product')" :aria-sort="ariaSortFor('product')">Product <span>{{ currentSortLabel('product') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('package')" :aria-sort="ariaSortFor('package')">Package <span>{{ currentSortLabel('package') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('workcenter')" :aria-sort="ariaSortFor('workcenter')">Workcenter <span>{{ currentSortLabel('workcenter') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdReason')" :aria-sort="ariaSortFor('holdReason')">Hold Reason <span>{{ currentSortLabel('holdReason') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('spec')" :aria-sort="ariaSortFor('spec')">Spec <span>{{ currentSortLabel('spec') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('age')" :aria-sort="ariaSortFor('age')">Age <span>{{ currentSortLabel('age') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdBy')" :aria-sort="ariaSortFor('holdBy')">Hold By <span>{{ currentSortLabel('holdBy') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('dept')" :aria-sort="ariaSortFor('dept')">Dept <span>{{ currentSortLabel('dept') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('holdComment')" :aria-sort="ariaSortFor('holdComment')">Hold Comment <span>{{ currentSortLabel('holdComment') }}</span></th>
-            <th class="cursor-pointer" @click="toggleSort('futureHoldComment')" :aria-sort="ariaSortFor('futureHoldComment')">Future Hold Comment <span>{{ currentSortLabel('futureHoldComment') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('lotId')" :aria-sort="ariaSortFor('lotId')">LOTID <span>{{ currentSortLabel('lotId') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('workorder')" :aria-sort="ariaSortFor('workorder')">WORKORDER <span>{{ currentSortLabel('workorder') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('qty')" :aria-sort="ariaSortFor('qty')">QTY <span>{{ currentSortLabel('qty') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('product')" :aria-sort="ariaSortFor('product')">Product <span>{{ currentSortLabel('product') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('package')" :aria-sort="ariaSortFor('package')">Package <span>{{ currentSortLabel('package') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('workcenter')" :aria-sort="ariaSortFor('workcenter')">Workcenter <span>{{ currentSortLabel('workcenter') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('holdReason')" :aria-sort="ariaSortFor('holdReason')">Hold Reason <span>{{ currentSortLabel('holdReason') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('spec')" :aria-sort="ariaSortFor('spec')">Spec <span>{{ currentSortLabel('spec') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('age')" :aria-sort="ariaSortFor('age')">Age <span>{{ currentSortLabel('age') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('holdBy')" :aria-sort="ariaSortFor('holdBy')">Hold By <span>{{ currentSortLabel('holdBy') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('dept')" :aria-sort="ariaSortFor('dept')">Dept <span>{{ currentSortLabel('dept') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('holdComment')" :aria-sort="ariaSortFor('holdComment')">Hold Comment <span>{{ currentSortLabel('holdComment') }}</span></th>
+            <th class="cursor-pointer sortable-th" @click="toggleSort('futureHoldComment')" :aria-sort="ariaSortFor('futureHoldComment')">Future Hold Comment <span>{{ currentSortLabel('futureHoldComment') }}</span></th>
           </tr>
         </thead>
         <tbody>

@@ -552,24 +552,6 @@
   border-top: 1px solid var(--msd-border);
 }
 
-.theme-mid-section-defect .pagination button {
-  padding: theme('spacing.2') theme('spacing.4');
-  border: 1px solid var(--msd-border);
-  background: theme('colors.surface.card');
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.theme-mid-section-defect .pagination button:hover:not(:disabled) {
-  border-color: var(--msd-primary);
-  color: var(--msd-primary);
-}
-
-.theme-mid-section-defect .pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 .theme-mid-section-defect .pagination .page-info {
   font-size: 13px;

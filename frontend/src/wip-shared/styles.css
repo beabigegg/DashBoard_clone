@@ -163,24 +163,6 @@
   border-top: 1px solid var(--border);
 }
 
-:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center, .theme-production-history) .pagination button {
-  padding: theme('spacing.2') theme('spacing.4');
-  border: 1px solid var(--border);
-  background: theme('colors.surface.card');
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center, .theme-production-history) .pagination button:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-:is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center, .theme-production-history) .pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 :is(.theme-wip-overview, .theme-wip-detail, .theme-hold-overview, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-query-tool, .theme-material-trace, .theme-yield-alert-center, .theme-production-history) .pagination .page-info {
   font-size: 13px;

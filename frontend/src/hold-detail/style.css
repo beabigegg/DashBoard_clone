@@ -220,6 +220,14 @@
   z-index: 1;
 }
 
+.theme-hold-detail .lot-table th.sortable-th {
+  user-select: none;
+}
+
+.theme-hold-detail .lot-table th.sortable-th:hover {
+  background: theme('colors.token.he2e8f0');
+}
+
 .theme-hold-detail .lot-table th:nth-child(3),
 .theme-hold-detail .lot-table td:nth-child(3),
 .theme-hold-detail .lot-table td:nth-child(3) {

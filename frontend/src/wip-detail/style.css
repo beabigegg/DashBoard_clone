@@ -166,6 +166,14 @@
   white-space: nowrap;
 }
 
+.theme-wip-detail .table-container th.sortable-th {
+  user-select: none;
+}
+
+.theme-wip-detail .table-container th.sortable-th:hover {
+  background: theme('colors.token.he2e8f0');
+}
+
 .theme-wip-detail .table-container td {
   padding: theme('spacing.token.p10') theme('spacing.block');
   border-bottom: 1px solid theme('colors.token.hf0f0f0');

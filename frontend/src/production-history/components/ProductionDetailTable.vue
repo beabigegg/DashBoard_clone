@@ -56,7 +56,8 @@ function getPartialCount(row: Record<string, unknown>): number {
           <button
             v-if="canExport"
             type="button"
-            class="ui-btn ui-btn--sm"
+            class="ui-btn ui-btn--secondary"
+            :disabled="loading"
             @click="emit('export-csv')"
           >
             匯出 CSV

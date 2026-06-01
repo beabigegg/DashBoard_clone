@@ -120,11 +120,11 @@ const pageInfo = computed(() => {
       <table v-else>
         <thead>
           <tr>
-            <th class="fixed-col cursor-pointer" @click="toggleSort('lotId')" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer" @click="toggleSort('pjType')" :aria-sort="sortKey === 'pjType' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Type <span>{{ sortKey === 'pjType' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer" @click="toggleSort('equipment')" :aria-sort="sortKey === 'equipment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Equipment <span>{{ sortKey === 'equipment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer" @click="toggleSort('wipStatus')" :aria-sort="sortKey === 'wipStatus' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WIP Status <span>{{ sortKey === 'wipStatus' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer" @click="toggleSort('package')" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'package' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('lotId')" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('pjType')" :aria-sort="sortKey === 'pjType' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Type <span>{{ sortKey === 'pjType' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('equipment')" :aria-sort="sortKey === 'equipment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Equipment <span>{{ sortKey === 'equipment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('wipStatus')" :aria-sort="sortKey === 'wipStatus' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WIP Status <span>{{ sortKey === 'wipStatus' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('package')" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'package' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
             <th v-for="spec in data.specs" :key="spec" class="spec-col">{{ spec }}</th>
           </tr>
         </thead>

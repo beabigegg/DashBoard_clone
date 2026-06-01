@@ -74,7 +74,8 @@ const exportBtnRef = ref<HTMLButtonElement | null>(null);
       <button
         ref="exportBtnRef"
         type="button"
-        class="export-csv-btn"
+        class="ui-btn ui-btn--secondary"
+        :class="{ 'is-loading': exporting }"
         :disabled="rows.length === 0 || exporting"
         @click="emit('export')"
       >
