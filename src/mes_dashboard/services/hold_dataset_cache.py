@@ -150,6 +150,8 @@ def execute_primary_query(
         )
 
         from mes_dashboard.services.batch_query_engine import (
+            _USE_ROW_COUNT_CHUNKING,
+            decompose_by_row_count,
             decompose_by_time_range,
             execute_plan,
             get_batch_progress,
@@ -160,28 +162,66 @@ def execute_primary_query(
 
         if should_decompose_by_time(start_date, end_date):
             # --- Engine path for long date ranges → stream to Parquet spool ---
-            engine_chunks = decompose_by_time_range(start_date, end_date)
-            engine_hash = compute_query_hash(
-                {"start_date": start_date, "end_date": end_date}
-            )
-            base_sql = _load_sql("base_facts")
-
-            def _run_hold_chunk(chunk, max_rows_per_chunk=None):
-                params = {
-                    "start_date": chunk["chunk_start"],
-                    "end_date": chunk["chunk_end"],
-                }
-                result = read_sql_df(
-                    base_sql,
-                    params,
-                    caller="hold_dataset_cache:execute_primary_query_chunk",
+            if _USE_ROW_COUNT_CHUNKING:
+                # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+                count_sql = _load_sql("count_query")
+                count_params = {"start_date": start_date, "end_date": end_date}
+                _count_df = read_sql_df(
+                    count_sql, count_params,
+                    caller="hold_dataset_cache:count_query",
                 )
-                return result if result is not None else pd.DataFrame()
+                total_rows = int(_count_df.iloc[0].get("ROW_COUNT") or 0) if (
+                    _count_df is not None and not _count_df.empty
+                ) else 0
+                engine_chunks = decompose_by_row_count(total_rows)
+                engine_hash = compute_query_hash({
+                    "start_date": start_date, "end_date": end_date,
+                    "mode": "row_count", "total_rows": total_rows,
+                })
+                paged_sql = _load_sql("list_paged")
 
-            logger.info(
-                "Engine activated for hold: %d chunks (query_id=%s)",
-                len(engine_chunks), query_id,
-            )
+                def _run_hold_chunk(chunk, max_rows_per_chunk=None):
+                    params = {
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "start_row": chunk["start_row"],
+                        "end_row": chunk["end_row"],
+                    }
+                    result = read_sql_df(
+                        paged_sql, params,
+                        caller="hold_dataset_cache:execute_paged_chunk",
+                    )
+                    return result if result is not None else pd.DataFrame()
+
+                logger.info(
+                    "Engine (row-count) activated for hold: total=%d chunks=%d (query_id=%s)",
+                    total_rows, len(engine_chunks), query_id,
+                )
+            else:
+                # --- Date-range chunking path (default, BQE-04) ---
+                engine_chunks = decompose_by_time_range(start_date, end_date)
+                engine_hash = compute_query_hash(
+                    {"start_date": start_date, "end_date": end_date}
+                )
+                base_sql = _load_sql("base_facts")
+
+                def _run_hold_chunk(chunk, max_rows_per_chunk=None):
+                    params = {
+                        "start_date": chunk["chunk_start"],
+                        "end_date": chunk["chunk_end"],
+                    }
+                    result = read_sql_df(
+                        base_sql,
+                        params,
+                        caller="hold_dataset_cache:execute_primary_query_chunk",
+                    )
+                    return result if result is not None else pd.DataFrame()
+
+                logger.info(
+                    "Engine activated for hold: %d chunks (query_id=%s)",
+                    len(engine_chunks), query_id,
+                )
+
             execute_plan(
                 engine_chunks, _run_hold_chunk,
                 parallel=_HOLD_ENGINE_PARALLEL,

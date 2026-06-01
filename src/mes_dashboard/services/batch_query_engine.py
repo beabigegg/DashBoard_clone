@@ -2,8 +2,8 @@
 """BatchQueryEngine — reusable batch query orchestration.
 
 Provides time-range decomposition, ID-batch decomposition,
-memory guards, controlled parallelism, Redis chunk caching
-with partial cache hits, and progress tracking.
+row-count decomposition, memory guards, controlled parallelism,
+Redis chunk caching with partial cache hits, and progress tracking.
 
 Any service that plugs into this module automatically gains:
   - Oracle timeout protection (via read_sql_df_slow, 300s)
@@ -16,6 +16,8 @@ Usage::
     from mes_dashboard.services.batch_query_engine import (
         decompose_by_time_range,
         decompose_by_ids,
+        decompose_by_row_count,
+        should_decompose_by_row_count,
         execute_plan,
         merge_chunks,
         compute_query_hash,
@@ -25,6 +27,10 @@ Usage::
     qh = compute_query_hash({"mode": "date_range", ...})
     execute_plan(chunks, my_query_fn, query_hash=qh, cache_prefix="reject")
     df = merge_chunks("reject", qh)
+
+    # Row-count chunking (USE_ROW_COUNT_CHUNKING=true path):
+    rc_chunks = decompose_by_row_count(total_rows=150000)
+    execute_plan(rc_chunks, my_paged_query_fn, query_hash=qh, cache_prefix="reject")
 """
 
 from __future__ import annotations
@@ -79,6 +85,14 @@ BATCH_QUERY_TIME_THRESHOLD_DAYS: int = int(
 
 BATCH_QUERY_ID_THRESHOLD: int = int(
     os.getenv("BATCH_QUERY_ID_THRESHOLD", "1000")
+)
+
+BATCH_QUERY_ROWS_PER_CHUNK: int = int(
+    os.getenv("BATCH_QUERY_ROWS_PER_CHUNK", "50000")
+)
+
+_USE_ROW_COUNT_CHUNKING: bool = (
+    os.getenv("USE_ROW_COUNT_CHUNKING", "false").lower() == "true"
 )
 
 
@@ -152,6 +166,48 @@ def decompose_by_ids(
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
     return [ids[i : i + batch_size] for i in range(0, len(ids), batch_size)]
+
+
+# ============================================================
+# 2.5. Row-count decomposition (BQE-02)
+# ============================================================
+
+
+def decompose_by_row_count(
+    total_rows: int,
+    rows_per_chunk: int = BATCH_QUERY_ROWS_PER_CHUNK,
+) -> List[Dict[str, int]]:
+    """Split *total_rows* into 1-based inclusive ``{start_row, end_row}`` chunks.
+
+    Each chunk maps directly to ``rn BETWEEN :start_row AND :end_row``
+    in a ``ROW_NUMBER() OVER (ORDER BY <BQE-03 key>) AS rn`` paged SQL.
+
+    Args:
+        total_rows:     Total row count from ``SELECT COUNT(*)``. Must be >= 0.
+        rows_per_chunk: Maximum rows per chunk (default ``BATCH_QUERY_ROWS_PER_CHUNK``).
+                        Must be >= 1.
+
+    Returns:
+        List of ``{"start_row": int, "end_row": int}`` dicts (1-based, inclusive).
+        Returns ``[]`` when ``total_rows == 0``.
+
+    Raises:
+        ValueError: When ``total_rows < 0`` or ``rows_per_chunk < 1``.
+    """
+    if total_rows < 0:
+        raise ValueError(f"total_rows must be >= 0, got {total_rows}")
+    if rows_per_chunk < 1:
+        raise ValueError(f"rows_per_chunk must be >= 1, got {rows_per_chunk}")
+    if total_rows == 0:
+        return []
+
+    chunks: List[Dict[str, int]] = []
+    start = 1
+    while start <= total_rows:
+        end = min(start + rows_per_chunk - 1, total_rows)
+        chunks.append({"start_row": start, "end_row": end})
+        start = end + 1
+    return chunks
 
 
 # ============================================================
@@ -863,3 +919,13 @@ def should_decompose_by_time(start_date: str, end_date: str) -> bool:
 def should_decompose_by_ids(ids: List[Any]) -> bool:
     """Return True if the ID list exceeds the threshold for engine use."""
     return len(ids) > BATCH_QUERY_ID_THRESHOLD
+
+
+def should_decompose_by_row_count(total_rows: int) -> bool:
+    """Return True if *total_rows* exceeds ``BATCH_QUERY_ROWS_PER_CHUNK``.
+
+    Services with ``USE_ROW_COUNT_CHUNKING=true`` call this after ``COUNT(*)``
+    to decide whether to issue a paged SQL or a single full-table query.
+    The threshold is ``BATCH_QUERY_ROWS_PER_CHUNK`` (default 50000).
+    """
+    return total_rows > BATCH_QUERY_ROWS_PER_CHUNK

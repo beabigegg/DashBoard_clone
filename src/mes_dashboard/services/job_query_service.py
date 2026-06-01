@@ -177,6 +177,8 @@ def get_jobs_by_resources(
     try:
         _job_partial_failure: Dict[str, Any] = {}
         from mes_dashboard.services.batch_query_engine import (
+            _USE_ROW_COUNT_CHUNKING,
+            decompose_by_row_count,
             decompose_by_time_range,
             execute_plan,
             get_batch_progress,
@@ -205,27 +207,58 @@ def get_jobs_by_resources(
             data = cached_records
         elif should_decompose_by_time(start_date, end_date):
             # --- Engine path for long date ranges → stream to spool ---
-            engine_chunks = decompose_by_time_range(start_date, end_date)
-
             resource_filter, resource_params = _build_resource_filter_sql(
                 resource_ids, return_params=True
             )
-            sql = SQLLoader.load("job_query/job_list")
-            sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
 
-            def _run_job_chunk(chunk, max_rows_per_chunk=None):
-                chunk_params = {
-                    'start_date': chunk['chunk_start'],
-                    'end_date': chunk['chunk_end'],
-                    **resource_params,
-                }
-                result = read_sql_df(sql, chunk_params)
-                return result if result is not None else pd.DataFrame()
+            if _USE_ROW_COUNT_CHUNKING:
+                # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+                count_sql = SQLLoader.load("job_query/count_query")
+                count_sql = count_sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
+                _count_params = {"start_date": start_date, "end_date": end_date, **resource_params}
+                _count_df = read_sql_df(count_sql, _count_params)
+                total_rows = int(_count_df.iloc[0].get("ROW_COUNT") or 0) if (
+                    _count_df is not None and not _count_df.empty
+                ) else 0
+                engine_chunks = decompose_by_row_count(total_rows)
+                paged_sql = SQLLoader.load("job_query/job_list_paged")
+                paged_sql = paged_sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
 
-            logger.info(
-                "Engine activated for job query: %d chunks, %d resources",
-                len(engine_chunks), len(resource_ids),
-            )
+                def _run_job_chunk(chunk, max_rows_per_chunk=None):
+                    chunk_params = {
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'start_row': chunk['start_row'],
+                        'end_row': chunk['end_row'],
+                        **resource_params,
+                    }
+                    result = read_sql_df(paged_sql, chunk_params)
+                    return result if result is not None else pd.DataFrame()
+
+                logger.info(
+                    "Engine (row-count) activated for job query: total=%d chunks=%d, %d resources",
+                    total_rows, len(engine_chunks), len(resource_ids),
+                )
+            else:
+                # --- Date-range chunking path (default, BQE-04) ---
+                engine_chunks = decompose_by_time_range(start_date, end_date)
+                sql = SQLLoader.load("job_query/job_list")
+                sql = sql.replace("{{ RESOURCE_FILTER }}", resource_filter)
+
+                def _run_job_chunk(chunk, max_rows_per_chunk=None):
+                    chunk_params = {
+                        'start_date': chunk['chunk_start'],
+                        'end_date': chunk['chunk_end'],
+                        **resource_params,
+                    }
+                    result = read_sql_df(sql, chunk_params)
+                    return result if result is not None else pd.DataFrame()
+
+                logger.info(
+                    "Engine activated for job query: %d chunks, %d resources",
+                    len(engine_chunks), len(resource_ids),
+                )
+
             execute_plan(
                 engine_chunks, _run_job_chunk,
                 parallel=_JOB_ENGINE_PARALLEL,

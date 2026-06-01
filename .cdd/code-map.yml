@@ -1,6 +1,6 @@
-# generated: 2026-05-29T10:27:59Z by cdd-kit 2.1.2
-# files: 820, src-lines: 227601, map-lines: 17420, compression: 13.1x
-# sources-digest: 3de8dbf78cb4a3c5fc12ac07669419be61ace2c2fda73877ec5b1d8f17aa8163
+# generated: 2026-06-01T03:14:05Z by cdd-kit 2.1.2
+# files: 820, src-lines: 227698, map-lines: 17422, compression: 13.1x
+# sources-digest: 00dd539fb22a0159fcb90f929121a950ace799829cecf0e56828ac7e19e0ec98
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -725,7 +725,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 267 lines
+frontend/src/downtime-analysis/App.vue:  # 276 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -757,11 +757,11 @@ frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 84 lines
 
 frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 77 lines
 
-frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 107 lines
+frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 105 lines
 
-frontend/src/downtime-analysis/components/EventDetail.vue:  # 158 lines
+frontend/src/downtime-analysis/components/EventDetail.vue:  # 156 lines
 
-frontend/src/downtime-analysis/components/FilterBar.vue:  # 202 lines
+frontend/src/downtime-analysis/components/FilterBar.vue:  # 233 lines
 
 frontend/src/downtime-analysis/components/KpiCards.vue:  # 70 lines
 
@@ -790,14 +790,14 @@ frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 297 lines
     - { name: SummaryData, lines: 16-21 }  # local
     - { name: EventDetailData, lines: 23-26 }  # local
 
-frontend/src/downtime-analysis/composables/useFilterState.ts:  # 98 lines
+frontend/src/downtime-analysis/composables/useFilterState.ts:  # 104 lines
   imports:
     - { module: vue, items: [reactive, computed], line: 1 }
     - { module: '../types', items: [FilterState], line: 2 }
   constants:
     - { name: DEFAULT_STATE, line: 4 }
   functions:
-    - { name: useFilterState, lines: 23-98 }
+    - { name: useFilterState, lines: 26-104 }
 
 frontend/src/downtime-analysis/formatDowntimeDate.ts:  # 50 lines
   functions:
@@ -810,7 +810,7 @@ frontend/src/downtime-analysis/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/downtime-analysis/types.ts:  # 100 lines
+frontend/src/downtime-analysis/types.ts:  # 103 lines
   interfaces:
     - { name: DowntimeKpiShape, lines: 1-8 }
     - { name: DailyTrendRow, lines: 10-16 }
@@ -821,7 +821,7 @@ frontend/src/downtime-analysis/types.ts:  # 100 lines
     - { name: EventDetailRow, lines: 60-72 }
     - { name: Pagination, lines: 74-79 }
     - { name: FilterOptions, lines: 81-88 }
-    - { name: FilterState, lines: 90-100 }
+    - { name: FilterState, lines: 90-103 }
   types:
     - { name: MatchSource, lines: 58-58 }
 
@@ -2239,7 +2239,7 @@ frontend/tests/components/ProductionDetailTable.test.js:  # 70 lines
   functions:
     - { name: makeRow, lines: 17-36 }
 
-frontend/tests/core/api-dedup.test.js:  # 172 lines
+frontend/tests/core/api-dedup.test.js:  # 174 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 12 }
   functions:
@@ -2569,6 +2569,8 @@ frontend/tests/playwright/data-boundary/resource-history-progress-malformed.spec
     - { name: async setupResourceHistoryWithMalformedProgress, lines: 32-72 }
 
 frontend/tests/playwright/downtime-analysis.spec.js:  # 236 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 14 }
   constants:
     - { name: BASE_URL, line: 16 }
     - { name: PAGE_URL, line: 17 }
@@ -4447,7 +4449,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 288 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 300 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: datetime, items: [datetime], line: 17 }
@@ -4457,12 +4459,12 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 288 lines
   functions:
     - { name: _validate_dates, lines: 48-57 }
     - { name: _csv_param, lines: 60-65 }
-    - { name: api_downtime_options, lines: 74-100 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 109-154 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 163-193 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 202-227 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 236-269 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 277-288 }
+    - { name: api_downtime_options, lines: 74-106 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
+    - { name: api_downtime_query, lines: 115-166 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 175-205 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 214-239 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 248-281 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 289-300 }
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5425,7 +5427,7 @@ src/mes_dashboard/services/downtime_analysis_cache.py:  # 91 lines
     - { name: store_downtime_events, lines: 64-76 }
     - { name: load_downtime_events, lines: 79-91 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 992 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1030 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5447,18 +5449,18 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 992 lines
     - { name: _enrich_events_df, lines: 421-454 }
     - { name: _ts_to_iso, lines: 457-466 }
     - { name: make_downtime_query_id, lines: 473-478 }
-    - { name: get_filter_options, lines: 485-559 }
-    - { name: query_downtime_dataset, lines: 566-653 }
-    - { name: _apply_resource_filters, lines: 656-708 }
-    - { name: _empty_events_df, lines: 711-718 }
-    - { name: _build_response, lines: 725-738 }
-    - { name: _build_summary, lines: 741-767 }
-    - { name: _build_daily_trend, lines: 770-791 }
-    - { name: _build_big_category, lines: 794-813 }
-    - { name: _build_top_reasons, lines: 816-842 }
-    - { name: apply_view, lines: 849-889 }
-    - { name: _build_equipment_detail, lines: 892-929 }
-    - { name: _build_event_detail_page, lines: 932-992 }
+    - { name: get_filter_options, lines: 485-573 }
+    - { name: query_downtime_dataset, lines: 580-671 }
+    - { name: _apply_resource_filters, lines: 674-746 }
+    - { name: _empty_events_df, lines: 749-756 }
+    - { name: _build_response, lines: 763-776 }
+    - { name: _build_summary, lines: 779-805 }
+    - { name: _build_daily_trend, lines: 808-829 }
+    - { name: _build_big_category, lines: 832-851 }
+    - { name: _build_top_reasons, lines: 854-880 }
+    - { name: apply_view, lines: 887-927 }
+    - { name: _build_equipment_detail, lines: 930-967 }
+    - { name: _build_event_detail_page, lines: 970-1030 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:

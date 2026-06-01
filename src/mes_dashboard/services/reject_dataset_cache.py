@@ -507,8 +507,10 @@ def _execute_and_spool(
         Exception: Any Oracle or engine error is propagated to the caller.
     """
     from mes_dashboard.services.batch_query_engine import (
+        _USE_ROW_COUNT_CHUNKING,
         compute_query_hash,
         decompose_by_ids,
+        decompose_by_row_count,
         decompose_by_time_range,
         execute_plan,
         get_batch_progress,
@@ -533,11 +535,35 @@ def _execute_and_spool(
     end_date = base_params.get("end_date")
 
     if mode == "date_range" and start_date and end_date and should_decompose_by_time(start_date, end_date):
-        engine_chunks = decompose_by_time_range(
-            start_date,
-            end_date,
-            grain_days=_REJECT_ENGINE_GRAIN_DAYS,
-        )
+        if _USE_ROW_COUNT_CHUNKING:
+            # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+            count_sql_template = _prepare_sql(
+                "count_query",
+                where_clause=base_where,
+                base_variant="lot",
+                base_where="",
+            )
+            _count_df = _read_sql_with_caller(
+                count_sql_template,
+                base_params,
+                "reject_dataset_cache:count_query",
+            )
+            total_rows = int(_count_df.iloc[0].get("ROW_COUNT") or 0) if (
+                _count_df is not None and not _count_df.empty
+            ) else 0
+            engine_chunks = decompose_by_row_count(total_rows)
+            engine_parallel = _REJECT_ENGINE_PARALLEL
+            use_engine = True
+            logger.info(
+                "Engine (row-count) activated for reject date_range: total=%d chunks=%d (query_id=%s)",
+                total_rows, len(engine_chunks), query_id,
+            )
+        else:
+            engine_chunks = decompose_by_time_range(
+                start_date,
+                end_date,
+                grain_days=_REJECT_ENGINE_GRAIN_DAYS,
+            )
         engine_parallel = _REJECT_ENGINE_PARALLEL
         use_engine = True
         logger.info(
@@ -564,7 +590,34 @@ def _execute_and_spool(
             chunk_where_parts: List[str] = []
             chunk_params: Dict[str, Any] = {}
 
-            if "chunk_start" in chunk:
+            if "start_row" in chunk:
+                # Row-count paged chunk (USE_ROW_COUNT_CHUNKING=true)
+                paged_sql = _prepare_sql(
+                    "list_paged",
+                    where_clause=base_where,
+                    base_variant="lot",
+                    base_where="",
+                )
+                chunk_params = dict(base_params)
+                chunk_params["start_row"] = chunk["start_row"]
+                chunk_params["end_row"] = chunk["end_row"]
+                chunk_df = _read_sql_with_caller(
+                    paged_sql,
+                    chunk_params,
+                    "reject_dataset_cache:_execute_paged_chunk",
+                )
+                if chunk_df is None:
+                    return pd.DataFrame()
+                if progress_callback is not None:
+                    _chunk_counter[0] += 1
+                    completed = _chunk_counter[0]
+                    pct = int(completed / total_chunks * 100) if total_chunks > 0 else 0
+                    try:
+                        progress_callback("running", f"{completed}/{total_chunks}", pct)
+                    except Exception:
+                        pass
+                return chunk_df
+            elif "chunk_start" in chunk:
                 chunk_where_parts.append(
                     "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
                     " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
@@ -614,14 +667,30 @@ def _execute_and_spool(
             return chunk_df
 
         # Build engine hash from the query_id_input-equivalent fields
-        engine_hash_input = {
-            "cache_schema_version": _CACHE_SCHEMA_VERSION,
-            "mode": mode,
-            "start_date": start_date,
-            "end_date": end_date,
-            "container_values": sorted(container_ids or []),
-        }
-        engine_hash = compute_query_hash(engine_hash_input)
+        _is_row_count_mode = (
+            _USE_ROW_COUNT_CHUNKING
+            and engine_chunks
+            and "start_row" in engine_chunks[0]
+        )
+        if _is_row_count_mode:
+            # Row-count hash: includes total_rows to distinguish from date-range hashes
+            _total_rows_for_hash = engine_chunks[-1]["end_row"] if engine_chunks else 0
+            engine_hash = compute_query_hash({
+                "cache_schema_version": _CACHE_SCHEMA_VERSION,
+                "mode": "row_count",
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_rows": _total_rows_for_hash,
+            })
+        else:
+            engine_hash_input = {
+                "cache_schema_version": _CACHE_SCHEMA_VERSION,
+                "mode": mode,
+                "start_date": start_date,
+                "end_date": end_date,
+                "container_values": sorted(container_ids or []),
+            }
+            engine_hash = compute_query_hash(engine_hash_input)
         redis_clear_batch("reject", engine_hash)
         logger.info(
             "Reject primary SQL selected for engine execution (template=%s, chunks=%d)",
@@ -900,8 +969,10 @@ def execute_primary_query(
 
         # Decide whether to route through BatchQueryEngine
         from mes_dashboard.services.batch_query_engine import (
+            _USE_ROW_COUNT_CHUNKING,
             compute_query_hash,
             decompose_by_ids,
+            decompose_by_row_count,
             decompose_by_time_range,
             execute_plan,
             get_batch_progress,
@@ -921,17 +992,38 @@ def execute_primary_query(
         partial_failure_meta: Dict[str, Any] = {}
 
         if mode == "date_range" and should_decompose_by_time(start_date, end_date):
-            engine_chunks = decompose_by_time_range(
-                start_date,
-                end_date,
-                grain_days=_REJECT_ENGINE_GRAIN_DAYS,
-            )
+            if _USE_ROW_COUNT_CHUNKING:
+                # Row-count branch: count first, then paged chunks
+                _count_sql_exec = _prepare_sql(
+                    "count_query",
+                    where_clause=base_where,
+                    base_variant="lot",
+                    base_where="",
+                )
+                _count_df_exec = _read_sql_with_caller(
+                    _count_sql_exec, base_params,
+                    "reject_dataset_cache:count_query_exec",
+                )
+                _total_rows_exec = int(_count_df_exec.iloc[0].get("ROW_COUNT") or 0) if (
+                    _count_df_exec is not None and not _count_df_exec.empty
+                ) else 0
+                engine_chunks = decompose_by_row_count(_total_rows_exec)
+                logger.info(
+                    "Engine (row-count) activated for date_range: total=%d chunks=%d (query_id=%s)",
+                    _total_rows_exec, len(engine_chunks), query_id,
+                )
+            else:
+                engine_chunks = decompose_by_time_range(
+                    start_date,
+                    end_date,
+                    grain_days=_REJECT_ENGINE_GRAIN_DAYS,
+                )
+                logger.info(
+                    "Engine activated for date_range: %d chunks (query_id=%s, grain_days=%d, parallel=%d)",
+                    len(engine_chunks), query_id, _REJECT_ENGINE_GRAIN_DAYS, _REJECT_ENGINE_PARALLEL,
+                )
             engine_parallel = _REJECT_ENGINE_PARALLEL
             use_engine = True
-            logger.info(
-                "Engine activated for date_range: %d chunks (query_id=%s, grain_days=%d, parallel=%d)",
-                len(engine_chunks), query_id, _REJECT_ENGINE_GRAIN_DAYS, engine_parallel,
-            )
         elif mode == "container" and should_decompose_by_ids(container_ids):
             id_batches = decompose_by_ids(container_ids)
             engine_chunks = [{"ids": batch} for batch in id_batches]

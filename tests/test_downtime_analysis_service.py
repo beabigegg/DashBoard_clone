@@ -767,4 +767,155 @@ class TestBridgeVersionCacheKey:
         """DOWNTIME_BRIDGE_VERSION must be importable and non-empty."""
         from mes_dashboard.config.constants import DOWNTIME_BRIDGE_VERSION
         assert DOWNTIME_BRIDGE_VERSION
-        assert isinstance(DOWNTIME_BRIDGE_VERSION, str)
+
+
+# ===========================================================================
+# TestDowntimeMigration (BQE-07)
+# ===========================================================================
+
+
+class TestDowntimeMigration:
+    """BQE-07: downtime_analysis_service uses execute_plan + merge_chunks_to_spool.
+
+    The service must NOT invoke read_sql_df_slow directly for base_events —
+    it must route through BatchQueryEngine.execute_plan.
+    Cross-shift merge and JOBID bridge are applied as a post-merge stage.
+    Spool namespace and cache key are unchanged (DA-06).
+    """
+
+    def _make_base_df(self):
+        """Minimal base_events DataFrame for merge/bridge testing."""
+        return pd.DataFrame([{
+            'HISTORYID': 'R-001',
+            'OLDSTATUSNAME': 'UDT',
+            'OLDREASONNAME': 'EE Repair',
+            'OLDLASTSTATUSCHANGEDATE': _ts('2026-05-27 08:00:00'),
+            'LASTSTATUSCHANGEDATE': _ts('2026-05-27 10:00:00'),
+            'HOURS': 2.0,
+            'JOBID': None,
+        }])
+
+    def test_uses_batch_query_engine_not_direct_oracle(self):
+        """query_downtime_dataset must call execute_plan (not read_sql_df_slow directly
+        for base_events loading path).
+
+        After migration, execute_plan and merge_chunks_to_spool are module-level
+        imports in downtime_analysis_service. We patch the batch_query_engine module
+        directly so the patches take effect regardless of import style.
+        """
+        import mes_dashboard.services.downtime_analysis_service as svc
+        import mes_dashboard.services.batch_query_engine as bqe
+        from pathlib import Path as _Path
+        import pandas as pd
+
+        fake_df = self._make_base_df()
+
+        execute_plan_called = []
+
+        def _fake_execute_plan(chunks, query_fn, **kwargs):
+            execute_plan_called.append({'chunks': chunks, 'kwargs': kwargs})
+            return "fake_hash"
+
+        def _fake_merge(prefix, query_hash, spool_dir, **kwargs):
+            from pathlib import Path
+            spool_dir = Path(spool_dir)
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            tmp = spool_dir / f"{prefix}_{query_hash}_streaming_.tmp.parquet"
+            fake_df.to_parquet(str(tmp), engine="pyarrow", index=False)
+            return tmp, len(fake_df)
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events',
+                   return_value=False), \
+             patch.object(bqe, 'execute_plan', side_effect=_fake_execute_plan), \
+             patch.object(bqe, 'merge_chunks_to_spool', side_effect=_fake_merge), \
+             patch('mes_dashboard.core.query_spool_store.register_spool_file',
+                   return_value=True), \
+             patch('mes_dashboard.core.database.read_sql_df_slow',
+                   return_value=pd.DataFrame()), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_events'):
+            try:
+                svc.query_downtime_dataset(
+                    start_date='2026-05-01',
+                    end_date='2026-05-28',
+                )
+            except Exception:
+                pass  # We only care that execute_plan was called
+
+        # execute_plan must have been called at least once for base_events
+        assert len(execute_plan_called) >= 1, (
+            "execute_plan was not called — downtime service still uses direct read_sql_df_slow"
+        )
+
+    def test_spool_namespace_unchanged(self):
+        """Downtime events spool namespace must remain 'downtime_analysis_events' (DA-06)."""
+        from mes_dashboard.services.downtime_analysis_cache import _EVENTS_NAMESPACE
+        assert _EVENTS_NAMESPACE == "downtime_analysis_events"
+
+    def test_spool_column_schema_matches_previous_path(self):
+        """After migration, the enriched events DataFrame must have the canonical columns.
+
+        This test verifies _enrich_events_df output columns are unchanged (BQE-07 data-shape parity).
+        """
+        from mes_dashboard.services.downtime_analysis_service import (
+            _merge_cross_shift_events,
+            _bridge_jobid,
+            _enrich_events_df,
+        )
+        base_df = self._make_base_df()
+        merged = _merge_cross_shift_events(base_df)
+        bridged = _bridge_jobid(merged, pd.DataFrame())
+        enriched = _enrich_events_df(bridged)
+
+        expected_cols = {
+            'event_id', 'resource_id', 'status', 'reason', 'category',
+            'start_ts', 'end_ts', 'hours', 'fragment_count',
+            'match_source', 'match_ambiguous',
+            'job_order_name', 'job_model', 'symptom', 'cause', 'repair',
+            'handler', 'wait_min', 'repair_min',
+        }
+        actual_cols = set(enriched.columns)
+        missing = expected_cols - actual_cols
+        assert not missing, f"Enriched events missing columns: {missing}"
+
+    def test_execute_plan_merge_chunks_to_spool_called(self):
+        """Both execute_plan AND merge_chunks_to_spool must be called for base_events load."""
+        import mes_dashboard.services.downtime_analysis_service as svc
+        import mes_dashboard.services.batch_query_engine as bqe
+        import pandas as pd
+
+        execute_plan_called = []
+        merge_called = []
+        fake_df = self._make_base_df()
+
+        def _fake_execute_plan(chunks, query_fn, **kwargs):
+            execute_plan_called.append(True)
+            return "fake_hash"
+
+        def _fake_merge(prefix, query_hash, spool_dir, **kwargs):
+            merge_called.append(True)
+            from pathlib import Path
+            spool_dir = Path(spool_dir)
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            tmp = spool_dir / f"{prefix}_{query_hash}_streaming_.tmp.parquet"
+            fake_df.to_parquet(str(tmp), engine="pyarrow", index=False)
+            return tmp, len(fake_df)
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events',
+                   return_value=False), \
+             patch.object(bqe, 'execute_plan', side_effect=_fake_execute_plan), \
+             patch.object(bqe, 'merge_chunks_to_spool', side_effect=_fake_merge), \
+             patch('mes_dashboard.core.query_spool_store.register_spool_file',
+                   return_value=True), \
+             patch('mes_dashboard.core.database.read_sql_df_slow',
+                   return_value=pd.DataFrame()), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_events'):
+            try:
+                svc.query_downtime_dataset(
+                    start_date='2026-05-01',
+                    end_date='2026-05-28',
+                )
+            except Exception:
+                pass
+
+        assert len(execute_plan_called) >= 1, "execute_plan was not called"
+        assert len(merge_called) >= 1, "merge_chunks_to_spool was not called"

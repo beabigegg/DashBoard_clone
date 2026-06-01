@@ -273,3 +273,123 @@ class TestBatchDecompositionBoundary:
         assert elapsed < _TIMEOUT, f"ID batch timed out after {elapsed:.1f}s"
 
         record_chunk_boundary(label, "OK", f"HTTP {status}, {elapsed:.1f}s, {id_count} IDs")
+
+
+# ─────────────────────────────────────────────────────────────
+# 8.4 — Row-count chunk seam correctness (BQE-02 / BQE-03)
+#
+# These tests are Tier 1 unit tests embedded in the stress directory
+# because they share the conftest.  They do NOT require a live server
+# and are NOT marked @pytest.mark.stress — they run in the normal
+# pytest suite.
+# ─────────────────────────────────────────────────────────────
+
+
+class TestChunkSeam:
+    """Verify that decompose_by_row_count produces seam-correct ranges."""
+
+    def _import(self):
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+        from mes_dashboard.services.batch_query_engine import decompose_by_row_count
+        return decompose_by_row_count
+
+    def test_rn_start_row_included(self):
+        """First row of each chunk (rn == start_row) is included."""
+        fn = self._import()
+        chunks = fn(100, rows_per_chunk=40)
+        # First chunk: start_row = 1
+        assert chunks[0]["start_row"] == 1
+        # Second chunk: start_row = 41
+        assert chunks[1]["start_row"] == 41
+
+    def test_rn_end_row_included(self):
+        """Last row of each chunk (rn == end_row) is included."""
+        fn = self._import()
+        chunks = fn(100, rows_per_chunk=40)
+        # First chunk ends at 40
+        assert chunks[0]["end_row"] == 40
+        # Second chunk ends at 80
+        assert chunks[1]["end_row"] == 80
+        # Third chunk ends at 100
+        assert chunks[2]["end_row"] == 100
+
+    def test_no_row_duplicated_across_adjacent_chunks(self):
+        """No row number appears in two consecutive chunks."""
+        fn = self._import()
+        chunks = fn(150, rows_per_chunk=50)
+        for i in range(len(chunks) - 1):
+            end_i = chunks[i]["end_row"]
+            start_next = chunks[i + 1]["start_row"]
+            assert start_next == end_i + 1, (
+                f"chunk {i} ends at {end_i} but chunk {i+1} starts at {start_next} "
+                "(gap or overlap)"
+            )
+
+    def test_no_row_dropped_at_adjacent_chunk_boundary(self):
+        """No row number is skipped between consecutive chunks."""
+        fn = self._import()
+        total = 300
+        chunks = fn(total, rows_per_chunk=100)
+        all_rows = []
+        for c in chunks:
+            all_rows.extend(range(c["start_row"], c["end_row"] + 1))
+        assert len(all_rows) == total
+        assert sorted(all_rows) == list(range(1, total + 1))
+
+    def test_boundary_mid_logical_group_no_split_artifact(self):
+        """When chunk boundary falls mid-group (same TRACKINTIMESTAMP), the
+        decompose function still produces correct non-overlapping ranges.
+
+        The application-level concern (cross-shift merge spanning chunks) is
+        an ADR-0003 concern for downtime; this test verifies that the pure
+        arithmetic boundary is correct regardless of logical grouping.
+        """
+        fn = self._import()
+        # 5 rows in a "logical group" spanning chunk boundary at row 3
+        # Rows 1-3 in chunk 1, rows 4-5 in chunk 2
+        chunks = fn(5, rows_per_chunk=3)
+        assert len(chunks) == 2
+        assert chunks[0] == {"start_row": 1, "end_row": 3}
+        assert chunks[1] == {"start_row": 4, "end_row": 5}
+
+
+class TestOrderByTieStability:
+    """Verify that the ORDER BY keys documented in BQE-03 are present in paged SQL files."""
+
+    def _sql_path(self, relative: str) -> "Path":
+        import os
+        from pathlib import Path
+        base = Path(__file__).resolve().parent.parent.parent
+        return base / "src" / "mes_dashboard" / "sql" / relative
+
+    def test_production_history_tie_stable_across_chunks(self):
+        """production_history paged SQL must include TRACKINTIMESTAMP ASC, CONTAINERID."""
+        p = self._sql_path("production_history/main_query_paged.sql")
+        if not p.exists():
+            pytest.skip("main_query_paged.sql not yet created")
+        text = p.read_text(encoding="utf-8").upper()
+        assert "TRACKINTIMESTAMP" in text
+        assert "CONTAINERID" in text
+        assert "ROW_NUMBER()" in text
+
+    def test_reject_dataset_tie_stable(self):
+        """reject_history paged SQL must include TXN_DAY, CONTAINERNAME."""
+        p = self._sql_path("reject_history/list_paged.sql")
+        if not p.exists():
+            pytest.skip("list_paged.sql not yet created")
+        text = p.read_text(encoding="utf-8").upper()
+        assert "TXN_DAY" in text
+        assert "CONTAINERNAME" in text
+        assert "ROW_NUMBER()" in text
+
+    def test_hold_dataset_tie_stable(self):
+        """hold_history paged SQL must include HOLDTXNDATE, CONTAINERID."""
+        p = self._sql_path("hold_history/list_paged.sql")
+        if not p.exists():
+            pytest.skip("list_paged.sql not yet created")
+        text = p.read_text(encoding="utf-8").upper()
+        assert "HOLDTXNDATE" in text
+        assert "CONTAINERID" in text
+        assert "ROW_NUMBER()" in text

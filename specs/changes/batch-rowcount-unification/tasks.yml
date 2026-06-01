@@ -25,9 +25,9 @@ tasks:
   - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "resilience tests planned; no new E2E authored" }
   - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "data-boundary planned; monkey not required" }
   - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: done }
-  - { id: "4.1", section: Implementation, title: "Backend", status: pending }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "decompose_by_row_count + 11 SQL files + 6 service flag-gating + downtime execute_plan migration; 4298 tests pass" }
   - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no frontend changes" }
-  - { id: "4.3", section: Implementation, title: "Env/deploy", status: pending }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done, note: "HOLD/JOB/MSD_ENGINE_PARALLEL=1, USE_ROW_COUNT_CHUNKING=false, BATCH_QUERY_ROWS_PER_CHUNK=50000 added to all .env files and .env.example.template" }
   - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "chunk-boundary data-boundary step added to backend-tests.yml" }
   - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI changes" }
   - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI changes" }

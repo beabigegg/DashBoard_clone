@@ -591,15 +591,29 @@ def query_downtime_dataset(
     is_key: bool = False,
     is_monitor: bool = False,
 ) -> Dict[str, Any]:
-    """Execute Oracle query → cross-shift merge → JOBID bridge → spool.
+    """Execute Oracle query via BatchQueryEngine → post-merge stage → spool.
+
+    Migration (BQE-07, ADR-0003): base_events are loaded via execute_plan
+    (whole-dataset, single chunk — permanently excluded from USE_ROW_COUNT_CHUNKING).
+    _merge_cross_shift_events and _bridge_jobid are applied as post-merge stage
+    on the assembled DataFrame.  Spool namespace and cache key are unchanged.
 
     Returns query_id + summary + daily_trend + big_category + top_reasons.
     """
-    from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
+    from mes_dashboard.core.database import read_sql_df_slow as _read_sql_df
     from mes_dashboard.services.downtime_analysis_cache import (
         store_downtime_events,
         has_downtime_events,
         load_downtime_events,
+    )
+    from mes_dashboard.services.batch_query_engine import (
+        compute_query_hash as _compute_query_hash,
+        execute_plan,
+        merge_chunks_to_spool,
+    )
+    from mes_dashboard.core.query_spool_store import (
+        QUERY_SPOOL_DIR,
+        register_spool_file,
     )
     from pathlib import Path
 
@@ -620,17 +634,57 @@ def query_downtime_dataset(
         if events_df is not None and not events_df.empty:
             return _build_response(query_id, events_df)
 
-    # --- Oracle query path ---
+    # --- BatchQueryEngine path (BQE-07) ---
+    # ADR-0003: whole-dataset single chunk only; no row-count chunking ever.
     sql_dir = Path(__file__).resolve().parent.parent / 'sql' / 'downtime_analysis'
     base_sql = (sql_dir / 'base_events.sql').read_text(encoding='utf-8')
     job_sql = (sql_dir / 'job_bridge.sql').read_text(encoding='utf-8')
 
     base_params = {'start_date': start_date, 'end_date': end_date}
-    base_df = read_sql_df(base_sql, base_params, caller='downtime_analysis:base_events')
-    if base_df is None:
+
+    # Single whole-dataset chunk covering the entire date range (ADR-0003).
+    whole_dataset_chunk = [{'start_date': start_date, 'end_date': end_date}]
+    engine_hash = _compute_query_hash({
+        'downtime_base_events': True,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
+
+    def _run_base_chunk(chunk, max_rows_per_chunk=None):
+        params = {
+            'start_date': chunk['start_date'],
+            'end_date': chunk['end_date'],
+        }
+        result = _read_sql_df(base_sql, params, caller='downtime_analysis:base_events')
+        return result if result is not None else pd.DataFrame()
+
+    execute_plan(
+        whole_dataset_chunk,
+        _run_base_chunk,
+        parallel=1,  # whole-dataset single chunk; parallel=1 per ADR-0003
+        query_hash=engine_hash,
+        cache_prefix='downtime_analysis',
+    )
+
+    _spool_dir = QUERY_SPOOL_DIR / 'downtime_analysis'
+    tmp_path, _total_rows = merge_chunks_to_spool(
+        'downtime_analysis',
+        engine_hash,
+        spool_dir=_spool_dir,
+    )
+
+    # Assemble base_df from the spool (post-merge stage for ADR-0003 reductions)
+    if tmp_path is not None and tmp_path.exists():
+        base_df = pd.read_parquet(str(tmp_path))
+        try:
+            tmp_path.unlink()  # clean up temp spool; final events go to store_downtime_events
+        except Exception:
+            pass
+    else:
         base_df = pd.DataFrame()
 
-    job_df = read_sql_df(job_sql, base_params, caller='downtime_analysis:job_bridge')
+    # Also read job bridge data (still via direct read_sql_df — not chunked)
+    job_df = _read_sql_df(job_sql, base_params, caller='downtime_analysis:job_bridge')
     if job_df is None:
         job_df = pd.DataFrame()
 
@@ -641,13 +695,13 @@ def query_downtime_dataset(
             is_production=is_production, is_key=is_key, is_monitor=is_monitor,
         )
 
-    # Cross-shift merge (DA-02)
+    # Post-merge stage: cross-shift merge (DA-02) — must run on whole dataset (ADR-0003)
     if not base_df.empty:
         merged_df = _merge_cross_shift_events(base_df)
     else:
         merged_df = pd.DataFrame()
 
-    # JOBID bridge (DA-03)
+    # Post-merge stage: JOBID bridge (DA-03) — cross-product join over whole dataset
     if not merged_df.empty:
         bridged_df = _bridge_jobid(merged_df, job_df)
     else:
@@ -665,7 +719,7 @@ def query_downtime_dataset(
     if not events_df.empty and status_types:
         events_df = events_df[events_df['status'].isin(status_types)]
 
-    # Spool
+    # Spool final enriched events (DA-06: cache key includes DOWNTIME_BRIDGE_VERSION)
     store_downtime_events(query_id, events_df, end_date=end_date)
 
     return _build_response(query_id, events_df)

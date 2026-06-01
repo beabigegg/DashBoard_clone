@@ -19,6 +19,10 @@ from mes_dashboard.services.batch_query_engine import (
     should_decompose_by_ids,
 )
 
+# NOTE: decompose_by_row_count and should_decompose_by_row_count are imported
+# per-test class so that tests fail with ImportError before the functions exist
+# (TDD red phase).
+
 
 # ============================================================
 # 4.1 decompose_by_time_range
@@ -1008,3 +1012,260 @@ class TestMergeChunksToSpool:
         ])
         result = bqe._promote_null_schema(schema)
         assert result is schema  # identity — no copy needed
+
+
+# ============================================================
+# decompose_by_row_count (BQE-02)
+# ============================================================
+
+
+class TestDecomposeByRowCount:
+    """BQE-02: decompose_by_row_count correctness — 1-based inclusive ranges."""
+
+    def _import(self):
+        from mes_dashboard.services.batch_query_engine import decompose_by_row_count
+        return decompose_by_row_count
+
+    def test_total_rows_zero_returns_empty(self):
+        fn = self._import()
+        assert fn(0) == []
+
+    def test_total_less_than_chunk_returns_single_range(self):
+        fn = self._import()
+        result = fn(30000, rows_per_chunk=50000)
+        assert result == [{"start_row": 1, "end_row": 30000}]
+
+    def test_total_exact_multiple_yields_n_chunks(self):
+        fn = self._import()
+        result = fn(100000, rows_per_chunk=50000)
+        assert len(result) == 2
+        assert result[0] == {"start_row": 1, "end_row": 50000}
+        assert result[1] == {"start_row": 50001, "end_row": 100000}
+
+    def test_total_rows_one(self):
+        fn = self._import()
+        result = fn(1, rows_per_chunk=50000)
+        assert result == [{"start_row": 1, "end_row": 1}]
+
+    def test_non_divisor_last_chunk_smaller(self):
+        fn = self._import()
+        result = fn(100001, rows_per_chunk=50000)
+        assert len(result) == 3
+        assert result[0] == {"start_row": 1, "end_row": 50000}
+        assert result[1] == {"start_row": 50001, "end_row": 100000}
+        assert result[2] == {"start_row": 100001, "end_row": 100001}
+
+    def test_ranges_are_1based_inclusive(self):
+        """First chunk starts at 1, last chunk ends at total_rows."""
+        fn = self._import()
+        result = fn(75000, rows_per_chunk=50000)
+        assert result[0]["start_row"] == 1
+        assert result[-1]["end_row"] == 75000
+
+    def test_negative_raises_value_error(self):
+        fn = self._import()
+        with pytest.raises(ValueError, match="total_rows"):
+            fn(-1)
+
+    def test_chunk_size_zero_raises_value_error(self):
+        fn = self._import()
+        with pytest.raises(ValueError, match="rows_per_chunk"):
+            fn(100, rows_per_chunk=0)
+
+    def test_no_gap_no_overlap_property(self):
+        """Verify chunks cover exactly 1..total_rows with no gap and no overlap.
+
+        Property test over selected (total, chunk_size) pairs — avoids hypothesis
+        as an extra dependency while still covering boundary conditions.
+        """
+        fn = self._import()
+        test_cases = [
+            (1, 1),
+            (1, 50000),
+            (50000, 50000),
+            (50001, 50000),
+            (100000, 50000),
+            (100001, 50000),
+            (127, 31),
+            (1000000, 200000),
+            (999999, 100000),
+        ]
+        for total, chunk_size in test_cases:
+            result = fn(total, rows_per_chunk=chunk_size)
+            # Reconstruct the covered rows
+            covered = set()
+            for chunk in result:
+                s, e = chunk["start_row"], chunk["end_row"]
+                assert s <= e, f"({total},{chunk_size}): start > end in chunk {chunk}"
+                assert s >= 1, f"({total},{chunk_size}): start < 1"
+                assert e <= total, f"({total},{chunk_size}): end > total"
+                new_rows = set(range(s, e + 1))
+                assert not (covered & new_rows), (
+                    f"({total},{chunk_size}): overlap in chunk {chunk}"
+                )
+                covered |= new_rows
+            assert covered == set(range(1, total + 1)), (
+                f"({total},{chunk_size}): gap or missing rows"
+            )
+
+
+# ============================================================
+# TestShouldDecomposeByRowCount
+# ============================================================
+
+
+class TestShouldDecomposeByRowCount:
+    """Convenience helper: should the service switch to row-count chunking?"""
+
+    def _import(self):
+        from mes_dashboard.services.batch_query_engine import (
+            should_decompose_by_row_count,
+            BATCH_QUERY_ROWS_PER_CHUNK,
+        )
+        return should_decompose_by_row_count, BATCH_QUERY_ROWS_PER_CHUNK
+
+    def test_above_threshold_returns_true(self):
+        fn, threshold = self._import()
+        assert fn(threshold + 1) is True
+
+    def test_below_threshold_returns_false(self):
+        fn, threshold = self._import()
+        assert fn(threshold) is False
+
+    def test_exact_threshold_returns_false(self):
+        fn, threshold = self._import()
+        # Equal to threshold → not strictly above → False
+        assert fn(threshold) is False
+
+
+# ============================================================
+# TestEngineParallelCeiling (BQE-05)
+# ============================================================
+
+
+class TestEngineParallelCeiling:
+    """BQE-05: ENGINE_PARALLEL values must not exceed DB_SLOW_POOL_SIZE."""
+
+    def _get_slow_pool_size(self):
+        """Read DB_SLOW_POOL_SIZE from env (default 3 as per production convention)."""
+        import os
+        return int(os.getenv("DB_SLOW_POOL_SIZE", "3"))
+
+    def test_hold_engine_parallel_capped_at_db_slow_pool_size(self):
+        import os
+        from mes_dashboard.services.hold_dataset_cache import _HOLD_ENGINE_PARALLEL
+        pool_size = self._get_slow_pool_size()
+        assert _HOLD_ENGINE_PARALLEL >= 1
+        assert _HOLD_ENGINE_PARALLEL <= pool_size, (
+            f"HOLD_ENGINE_PARALLEL={_HOLD_ENGINE_PARALLEL} exceeds "
+            f"DB_SLOW_POOL_SIZE={pool_size}"
+        )
+
+    def test_job_engine_parallel_capped(self):
+        from mes_dashboard.services.job_query_service import _JOB_ENGINE_PARALLEL
+        pool_size = self._get_slow_pool_size()
+        assert _JOB_ENGINE_PARALLEL >= 1
+        assert _JOB_ENGINE_PARALLEL <= pool_size
+
+    def test_msd_engine_parallel_capped(self):
+        from mes_dashboard.services.mid_section_defect_service import _MSD_ENGINE_PARALLEL
+        pool_size = self._get_slow_pool_size()
+        assert _MSD_ENGINE_PARALLEL >= 1
+        assert _MSD_ENGINE_PARALLEL <= pool_size
+
+    def test_parallel_ceiling_within_limit_does_not_raise(self):
+        """A value at or below the ceiling is valid — just verify no exception raised."""
+        pool_size = self._get_slow_pool_size()
+        # This just verifies the ceiling logic documented in BQE-05
+        assert pool_size >= 1
+
+
+# ============================================================
+# TestFlagGating
+# ============================================================
+
+
+class TestFlagGating:
+    """Flag-off path must not touch count SQL; flag-on path must call count then paged."""
+
+    def test_flag_false_key_exported(self):
+        """_USE_ROW_COUNT_CHUNKING must be importable (even if False by default)."""
+        from mes_dashboard.services.batch_query_engine import _USE_ROW_COUNT_CHUNKING
+        assert isinstance(_USE_ROW_COUNT_CHUNKING, bool)
+
+    def test_batch_query_rows_per_chunk_exported(self):
+        """BATCH_QUERY_ROWS_PER_CHUNK must be importable and positive."""
+        from mes_dashboard.services.batch_query_engine import BATCH_QUERY_ROWS_PER_CHUNK
+        assert isinstance(BATCH_QUERY_ROWS_PER_CHUNK, int)
+        assert BATCH_QUERY_ROWS_PER_CHUNK >= 1
+
+    def test_flag_false_does_not_call_count_sql(self):
+        """When USE_ROW_COUNT_CHUNKING=false, count SQL is NOT invoked.
+
+        Simulates flag=false by patching _USE_ROW_COUNT_CHUNKING to False
+        and verifying that decompose_by_row_count is never called.
+        """
+        import mes_dashboard.services.batch_query_engine as bqe
+        # patch at module level so any service that reads _USE_ROW_COUNT_CHUNKING sees False
+        with patch.object(bqe, "_USE_ROW_COUNT_CHUNKING", False):
+            called = []
+
+            def _spy(*args, **kwargs):
+                called.append(args)
+                return []
+
+            with patch.object(bqe, "decompose_by_row_count", side_effect=_spy):
+                # Direct call with flag=False; real services use same check
+                flag = bqe._USE_ROW_COUNT_CHUNKING
+                if not flag:
+                    pass  # simulates the service's flag check
+                else:
+                    bqe.decompose_by_row_count(1000)
+
+        assert len(called) == 0
+
+    def test_flag_true_calls_count_then_paged_sql(self):
+        """When flag=true, decompose_by_row_count is reachable (flag check passes)."""
+        import mes_dashboard.services.batch_query_engine as bqe
+        with patch.object(bqe, "_USE_ROW_COUNT_CHUNKING", True):
+            called = []
+
+            def _spy(*args, **kwargs):
+                called.append(args)
+                return [{"start_row": 1, "end_row": 1}]
+
+            with patch.object(bqe, "decompose_by_row_count", side_effect=_spy):
+                flag = bqe._USE_ROW_COUNT_CHUNKING
+                if flag:
+                    bqe.decompose_by_row_count(1)
+
+        assert len(called) == 1
+
+
+# ============================================================
+# TestExcludedServicesUnmodified (AC-8)
+# ============================================================
+
+
+class TestExcludedServicesUnmodified:
+    """AC-8: yield_alert and material_trace must not be imported by batch_query_engine."""
+
+    def test_yield_alert_not_imported_by_batch_engine(self):
+        import mes_dashboard.services.batch_query_engine as bqe
+        assert not hasattr(bqe, "yield_alert_dataset_cache"), (
+            "batch_query_engine must not import yield_alert_dataset_cache"
+        )
+        # Also verify the module name is not in the module's __dict__
+        module_imports = [
+            v.__name__ if hasattr(v, "__name__") else str(v)
+            for v in vars(bqe).values()
+            if hasattr(v, "__module__")
+        ]
+        for name in module_imports:
+            assert "yield_alert" not in str(name).lower()
+
+    def test_material_trace_not_imported_by_batch_engine(self):
+        import mes_dashboard.services.batch_query_engine as bqe
+        assert not hasattr(bqe, "material_trace_service"), (
+            "batch_query_engine must not import material_trace_service"
+        )

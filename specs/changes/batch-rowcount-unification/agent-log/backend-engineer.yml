@@ -1,0 +1,86 @@
+change-id: batch-rowcount-unification
+agent: backend-engineer
+date: 2026-06-01
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/batch_query_engine.py:80-100,178-220,880-895"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_service.py:580-710"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/downtime_analysis/base_events.sql:20-24 (ORDER BY reconciled)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/production_history_service.py:44-48,340-390,595-640"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/hold_dataset_cache.py:152-220 (flag-gated branch)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/reject_dataset_cache.py:509-700,971-1015 (two engine paths)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_dataset_cache.py:258-450 (flag-gated branch + OEE fix)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/job_query_service.py:178-270 (flag-gated branch)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/mid_section_defect_service.py:1477-1580 (flag-gated branch)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/production_history/main_query_paged.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/reject_history/count_query.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/reject_history/list_paged.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/resource_history/count_query.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/resource_history/dataset_paged.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/hold_history/count_query.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/hold_history/list_paged.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/job_query/count_query.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/job_query/job_list_paged.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/mid_section_defect/count_query.sql (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/sql/mid_section_defect/dataset_paged.sql (new)"
+  - type: files-changed
+    pointer: ".env:384-397 (HOLD/JOB/MSD_ENGINE_PARALLEL, USE_ROW_COUNT_CHUNKING, BATCH_QUERY_ROWS_PER_CHUNK)"
+  - type: files-changed
+    pointer: ".env.production:57-67"
+  - type: files-changed
+    pointer: ".env.development:53-62"
+  - type: files-changed
+    pointer: ".env.example:413-424"
+  - type: files-changed
+    pointer: "contracts/env/.env.example.template:6-16"
+  - type: tests-added
+    pointer: "tests/test_batch_query_engine.py::TestDecomposeByRowCount (9 cases including property)"
+  - type: tests-added
+    pointer: "tests/test_batch_query_engine.py::TestShouldDecomposeByRowCount (3 cases)"
+  - type: tests-added
+    pointer: "tests/test_batch_query_engine.py::TestEngineParallelCeiling (4 cases, BQE-05)"
+  - type: tests-added
+    pointer: "tests/test_batch_query_engine.py::TestFlagGating (4 cases)"
+  - type: tests-added
+    pointer: "tests/test_batch_query_engine.py::TestExcludedServicesUnmodified (2 cases, AC-8)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_service.py::TestDowntimeMigration (4 cases, BQE-07)"
+  - type: tests-added
+    pointer: "tests/stress/test_chunk_boundary.py::TestChunkSeam (5 cases)"
+  - type: tests-added
+    pointer: "tests/stress/test_chunk_boundary.py::TestOrderByTieStability (3 cases)"
+  - type: test-output
+    pointer: "4298 passed, 187 skipped in 144.65s (full suite); 141 passed targeted suite"
+  - type: contracts-touched
+    pointer: "n/a (env-contract.md and business-rules.md already authored; CHANGELOG update pending)"
+
+notes: |
+  Phase 0 (env vars) and Phase 1 (decompose_by_row_count + flag-gated service branches) and
+  Phase 2 (downtime migration) all completed in this run.
+  HOLD/JOB/MSD_ENGINE_PARALLEL were already wired in services; only .env files needed.
+  USE_ROW_COUNT_CHUNKING=false by default in all envs (BQE-04).
+  Resource dataset OEE path always uses date-range chunks even when base uses row-count (correct).
+  downtime: single whole-dataset chunk, parallel=1, no paged SQL (ADR-0003).
+  base_events.sql ORDER BY reconciled to OLDLASTSTATUSCHANGEDATE DESC, HISTORYID ASC (BQE-03).
+  CONTRACTS/CHANGELOG.md entry not yet written — pending reviewer approval.

@@ -40,7 +40,10 @@ from mes_dashboard.core.query_spool_store import (
     register_spool_file,
 )
 from mes_dashboard.services.batch_query_engine import (
+    _USE_ROW_COUNT_CHUNKING,
+    BATCH_QUERY_ROWS_PER_CHUNK,
     compute_query_hash,
+    decompose_by_row_count,
     decompose_by_time_range,
     execute_plan,
     get_batch_progress,
@@ -339,6 +342,37 @@ def _make_chunk_query_fn(params: Dict[str, Any]):
     return _run_history_chunk
 
 
+def _make_paged_query_fn(params: Dict[str, Any]):
+    """Return a paged query function for row-count chunking (USE_ROW_COUNT_CHUNKING=true).
+
+    Each chunk dict has {start_row, end_row} from decompose_by_row_count.
+    """
+    extra_sql, extra_params = _build_extra_filters(params)
+    paged_sql_base = SQLLoader.load("production_history/main_query_paged")
+    paged_sql = paged_sql_base.replace("{{ EXTRA_FILTERS }}", extra_sql)
+
+    def _run_paged_chunk(
+        chunk: Dict[str, int],
+        max_rows_per_chunk: Optional[int] = None,
+    ) -> pd.DataFrame:
+        bind_params: Dict[str, Any] = {
+            "chunk_start": params["start_date"],
+            "chunk_end_excl": params["end_date_exclusive"],
+            "start_row": chunk["start_row"],
+            "end_row": chunk["end_row"],
+        }
+        bind_params.update(extra_params)
+
+        df = read_sql_df_slow(
+            paged_sql,
+            params=bind_params,
+            caller="production_history.paged_chunk",
+        )
+        return df if df is not None else pd.DataFrame()
+
+    return _run_paged_chunk
+
+
 # ── LOT split-chain trace ─────────────────────────────────────────────────────
 
 def _resolve_lot_ids_with_trace(
@@ -577,20 +611,43 @@ def _make_dataset_id(params: Dict[str, Any]) -> str:
 def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> Dict[str, Any]:
     """Execute Oracle chunked query and write results to Parquet spool.
 
+    When USE_ROW_COUNT_CHUNKING=true, issues a COUNT(*) first then uses
+    decompose_by_row_count + paged ROW_NUMBER() SQL (BQE-02, BQE-03, IP-5).
+    Flag-off path (default) is byte-for-byte identical to previous behavior (BQE-04).
+
     Returns:
         partial_failure_meta dict (empty if all chunks succeeded).
     """
-    chunks = decompose_by_time_range(
-        params["start_date"],
-        params["end_date"],
-        grain_days=ENGINE_GRAIN_DAYS,
-    )
-
-    query_fn = _make_chunk_query_fn(params)
-    query_hash = compute_query_hash({
-        "dataset_id": dataset_id,
-        "chunks": [c["chunk_start"] for c in chunks],
-    })
+    if _USE_ROW_COUNT_CHUNKING:
+        # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+        total_rows = query_row_count(
+            start_date=params["start_date"],
+            end_date=params["end_date"],
+            pj_types=params.get("pj_types"),
+        )
+        chunks = decompose_by_row_count(total_rows)
+        query_fn = _make_paged_query_fn(params)
+        query_hash = compute_query_hash({
+            "dataset_id": dataset_id,
+            "mode": "row_count",
+            "total_rows": total_rows,
+        })
+        logger.info(
+            "production_history row-count path: total_rows=%d, chunks=%d",
+            total_rows, len(chunks),
+        )
+    else:
+        # --- Date-range chunking path (default, BQE-04) ---
+        chunks = decompose_by_time_range(
+            params["start_date"],
+            params["end_date"],
+            grain_days=ENGINE_GRAIN_DAYS,
+        )
+        query_fn = _make_chunk_query_fn(params)
+        query_hash = compute_query_hash({
+            "dataset_id": dataset_id,
+            "chunks": [c["chunk_start"] for c in chunks],
+        })
 
     execute_plan(
         chunks,
@@ -598,7 +655,7 @@ def _run_oracle_to_spool(params: Dict[str, Any], dataset_id: str) -> Dict[str, A
         parallel=_PRODUCTION_ENGINE_PARALLEL,
         query_hash=query_hash,
         cache_prefix=_CACHE_PREFIX,
-        max_rows_per_chunk=MAX_ROWS_PER_CHUNK,
+        max_rows_per_chunk=MAX_ROWS_PER_CHUNK if not _USE_ROW_COUNT_CHUNKING else None,
     )
 
     _prod_progress = get_batch_progress(_CACHE_PREFIX, query_hash) or {}

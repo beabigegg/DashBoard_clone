@@ -1475,6 +1475,8 @@ def _fetch_station_detection_data(
         )
 
         from mes_dashboard.services.batch_query_engine import (
+            _USE_ROW_COUNT_CHUNKING,
+            decompose_by_row_count,
             decompose_by_time_range,
             execute_plan,
             get_batch_progress,
@@ -1498,22 +1500,65 @@ def _fetch_station_detection_data(
             if df is not None:
                 logger.info("Detection spool hit (hash=%s)", engine_hash)
             else:
-                engine_chunks = decompose_by_time_range(start_date, end_date)
-
-                def _run_detection_chunk(chunk, max_rows_per_chunk=None):
-                    chunk_params = {
-                        'start_date': chunk['chunk_start'],
-                        'end_date': chunk['chunk_end'],
+                if _USE_ROW_COUNT_CHUNKING:
+                    # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+                    count_sql = SQLLoader.load_with_params(
+                        "mid_section_defect/count_query",
+                        STATION_FILTER=wip_filter,
+                        STATION_FILTER_REJECTS=rej_filter,
+                    )
+                    _count_params = {
+                        'start_date': start_date,
+                        'end_date': end_date,
                         **wip_params,
                         **rej_params,
                     }
-                    result = read_sql_df(sql, chunk_params)
-                    return result if result is not None else pd.DataFrame()
+                    _count_df = read_sql_df(count_sql, _count_params)
+                    total_rows = int(_count_df.iloc[0].get("ROW_COUNT") or 0) if (
+                        _count_df is not None and not _count_df.empty
+                    ) else 0
+                    engine_chunks = decompose_by_row_count(total_rows)
+                    paged_sql = SQLLoader.load_with_params(
+                        "mid_section_defect/dataset_paged",
+                        STATION_FILTER=wip_filter,
+                        STATION_FILTER_REJECTS=rej_filter,
+                    )
 
-                logger.info(
-                    "Engine activated for detection (%s): %d chunks",
-                    station, len(engine_chunks),
-                )
+                    def _run_detection_chunk(chunk, max_rows_per_chunk=None):
+                        chunk_params = {
+                            'start_date': start_date,
+                            'end_date': end_date,
+                            'start_row': chunk['start_row'],
+                            'end_row': chunk['end_row'],
+                            **wip_params,
+                            **rej_params,
+                        }
+                        result = read_sql_df(paged_sql, chunk_params)
+                        return result if result is not None else pd.DataFrame()
+
+                    logger.info(
+                        "Engine (row-count) activated for detection (%s): total=%d chunks=%d",
+                        station, total_rows, len(engine_chunks),
+                    )
+                else:
+                    # --- Date-range chunking path (default, BQE-04) ---
+                    engine_chunks = decompose_by_time_range(start_date, end_date)
+
+                    def _run_detection_chunk(chunk, max_rows_per_chunk=None):
+                        chunk_params = {
+                            'start_date': chunk['chunk_start'],
+                            'end_date': chunk['chunk_end'],
+                            **wip_params,
+                            **rej_params,
+                        }
+                        result = read_sql_df(sql, chunk_params)
+                        return result if result is not None else pd.DataFrame()
+
+                    logger.info(
+                        "Engine activated for detection (%s): %d chunks",
+                        station, len(engine_chunks),
+                    )
+
                 execute_plan(
                     engine_chunks, _run_detection_chunk,
                     parallel=_MSD_ENGINE_PARALLEL,

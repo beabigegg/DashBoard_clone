@@ -258,6 +258,8 @@ def execute_primary_query(
         if not (_spool_available and _oee_spool_available):
             # --- Oracle query path (DuckDB miss or outside cache window) ---
             from mes_dashboard.services.batch_query_engine import (
+                _USE_ROW_COUNT_CHUNKING,
+                decompose_by_row_count,
                 decompose_by_time_range,
                 execute_plan,
                 get_batch_progress,
@@ -303,30 +305,68 @@ def execute_primary_query(
 
             if should_decompose_by_time(start_date, end_date):
                 # --- Engine path for long date ranges ---
-                engine_chunks = decompose_by_time_range(start_date, end_date)
-                engine_hash = compute_query_hash(query_id_input)
-
-                def _run_base_chunk(chunk, max_rows_per_chunk=None):
-                    params = {
-                        "start_date": chunk["chunk_start"],
-                        "end_date": chunk["chunk_end"],
-                    }
-                    result = read_sql_df(
-                        base_sql, params,
-                        caller="resource_dataset_cache:execute_primary_query_chunk",
+                if _USE_ROW_COUNT_CHUNKING:
+                    # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+                    count_sql = _load_sql("count_query")
+                    count_sql = count_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+                    _count_df = read_sql_df(
+                        count_sql, {"start_date": start_date, "end_date": end_date},
+                        caller="resource_dataset_cache:count_query",
                     )
-                    return result if result is not None else pd.DataFrame()
+                    total_rows = int(_count_df.iloc[0].get("ROW_COUNT") or 0) if (
+                        _count_df is not None and not _count_df.empty
+                    ) else 0
+                    engine_chunks = decompose_by_row_count(total_rows)
+                    engine_hash = compute_query_hash({**query_id_input, "mode": "row_count", "total_rows": total_rows})
+                    paged_sql = _load_sql("dataset_paged")
+                    paged_sql = paged_sql.replace("{{ HISTORYID_FILTER }}", historyid_filter)
+
+                    def _run_base_chunk(chunk, max_rows_per_chunk=None):
+                        params = {
+                            "start_date": start_date,
+                            "end_date": end_date,
+                            "start_row": chunk["start_row"],
+                            "end_row": chunk["end_row"],
+                        }
+                        result = read_sql_df(
+                            paged_sql, params,
+                            caller="resource_dataset_cache:execute_paged_chunk",
+                        )
+                        return result if result is not None else pd.DataFrame()
+
+                    logger.info(
+                        "Engine (row-count) activated for resource: total=%d chunks=%d (query_id=%s)",
+                        total_rows, len(engine_chunks), query_id,
+                    )
+                else:
+                    # --- Date-range chunking path (default, BQE-04) ---
+                    engine_chunks = decompose_by_time_range(start_date, end_date)
+                    engine_hash = compute_query_hash(query_id_input)
+
+                    def _run_base_chunk(chunk, max_rows_per_chunk=None):
+                        params = {
+                            "start_date": chunk["chunk_start"],
+                            "end_date": chunk["chunk_end"],
+                        }
+                        result = read_sql_df(
+                            base_sql, params,
+                            caller="resource_dataset_cache:execute_primary_query_chunk",
+                        )
+                        return result if result is not None else pd.DataFrame()
 
                 def _run_oee_chunk(chunk, max_rows_per_chunk=None):
+                    # OEE always uses chunk_start/chunk_end from date-range decomposition
+                    _cs = chunk.get("chunk_start", start_date)
+                    _ce = chunk.get("chunk_end", end_date)
                     chunk_reject_start = (
-                        date.fromisoformat(chunk["chunk_start"]) - timedelta(days=30)
+                        date.fromisoformat(_cs) - timedelta(days=30)
                     ).isoformat()
                     chunk_reject_end = (
-                        date.fromisoformat(chunk["chunk_end"]) + timedelta(days=30)
+                        date.fromisoformat(_ce) + timedelta(days=30)
                     ).isoformat()
                     params = {
-                        "start_date": chunk["chunk_start"],
-                        "end_date": chunk["chunk_end"],
+                        "start_date": _cs,
+                        "end_date": _ce,
                         "reject_start": chunk_reject_start,
                         "reject_end": chunk_reject_end,
                     }
@@ -376,8 +416,11 @@ def execute_primary_query(
 
                 if not _oee_spool_available:
                     oee_engine_hash = compute_query_hash({**query_id_input, "_oee": True})
+                    # OEE always uses date-range chunks (not row-count chunks) because
+                    # the OEE SQL uses chunk_start/chunk_end params, not start_row/end_row.
+                    oee_chunks = engine_chunks if not _USE_ROW_COUNT_CHUNKING else decompose_by_time_range(start_date, end_date)
                     execute_plan(
-                        engine_chunks, _run_oee_chunk,
+                        oee_chunks, _run_oee_chunk,
                         parallel=_RESOURCE_ENGINE_PARALLEL,
                         query_hash=oee_engine_hash,
                         cache_prefix="resource_oee",
