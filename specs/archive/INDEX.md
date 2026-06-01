@@ -42,3 +42,4 @@
 | add-package-detail-tables | 2026 | 2026-05-22 | specs/archive/2026/add-package-detail-tables/ |
 | ai-pipeline-upgrade | 2026 | 2026-05-29 | specs/archive/2026/ai-pipeline-upgrade/ |
 | downtime-analysis-page | 2026 | 2026-06-01 | specs/archive/2026/downtime-analysis-page/ |
+| batch-rowcount-unification | 2026 | 2026-06-01 | specs/archive/2026/batch-rowcount-unification/ |

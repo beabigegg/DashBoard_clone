@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 171
-visible-files: 836
+visible-files: 838
 omitted-dirs: 59
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -58,6 +58,7 @@ DashBoard_vite/
 |   |   |-- 02bca2c9d2f8566d
 |   |   |-- 03d72be617fe07b9
 |   |   |-- 0478f49b48ee4a27
+|   |   |-- 04e26e6472111f2c
 |   |   |-- 04f75a340f5aee98
 |   |   |-- 06e37be44b7c2558
 |   |   |-- 09af02b32eace3be
@@ -72,6 +73,7 @@ DashBoard_vite/
 |   |   |-- 11d2c913de0cba90
 |   |   |-- 15a2721810beed32
 |   |   |-- 17a6952f61650689
+|   |   |-- 1fa576bc7d285941
 |   |   |-- 1fcb892092629696
 |   |   |-- 2079893a07ce42c4
 |   |   |-- 20a29d650996dc03
@@ -99,9 +101,7 @@ DashBoard_vite/
 |   |   |-- 3e01fb0275e6bced
 |   |   |-- 4093a4056e3ed640
 |   |   |-- 40bd549cffe1dc41
-|   |   |-- 4104bc5ffa6b7168
-|   |   |-- 41d662f99bd58f37
-|   |   \-- ... (117 more entries truncated; cap=50)
+|   |   \-- ... (128 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -156,7 +156,8 @@ DashBoard_vite/
 |-- docs/
 |   |-- adr/
 |   |   |-- 0001-material-consumption-summary-spool-granularity-key.md
-|   |   \-- 0002-downtime-analysis-spool-namespace.md
+|   |   |-- 0002-downtime-analysis-spool-namespace.md
+|   |   \-- 0003-downtime-rowcount-chunking-exclusion.md
 |   |-- migration/
 |   |   |-- full-modernization-architecture-blueprint/
 |   |   |   |-- asset_readiness_manifest.json
@@ -900,6 +901,7 @@ DashBoard_vite/
 |   |   |-- test_real_oracle_fault_injection.py
 |   |   |-- test_redis_chaos.py
 |   |   |-- test_redis_timeout_fallback.py
+|   |   |-- test_rowcount_flag_parity.py
 |   |   \-- test_soak_workload.py
 |   |-- manual/
 |   |   \-- test_job_owner_auth_live.py
@@ -1008,7 +1010,7 @@ DashBoard_vite/
 |   |-- test_dashboard_routes.py
 |   |-- test_dashboard_service.py
 |   |-- test_database_redaction.py
-|   \-- ... (159 more entries truncated; cap=50)
+|   \-- ... (160 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
 |   |   |-- anomaly_hold_dataset/
@@ -1071,7 +1073,7 @@ DashBoard_vite/
 |   |   |-- probe_112651.json
 |   |   |-- probe_113602.json
 |   |   |-- probe_113603.json
-|   |   \-- ... (603 more entries truncated; cap=50)
+|   |   \-- ... (622 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
 |   \-- resource_history.duckdb
 |-- tools/

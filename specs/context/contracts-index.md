@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 7734ea32b247a2c4c2f3f6578aef73874e681546edf33ffc22e5941fd2190ef3
+inputs-digest: f593698086c33c7b12b4f99b0e81962eb1f88c225b469a2224c28a217415c72f
 ---
 
 # Contracts Index
@@ -72,8 +72,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.12.1
-- last-changed: 2026-05-29
+- schema-version: 1.13.1
+- last-changed: 2026-06-01
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
 
@@ -135,8 +135,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.12.1
-- last-changed: 2026-05-29
+- schema-version: 1.12.2
+- last-changed: 2026-06-01
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
 
@@ -148,8 +148,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Env Contract — MES Dashboard
 - owner: platform-team
 - surface: runtime-config
-- schema-version: 1.0.2
-- last-changed: 2026-05-13
+- schema-version: 1.0.4
+- last-changed: 2026-06-01
 - breaking-change-policy: deprecate-2-minors
 - summary: Environment variable inventory, secret handling, and deployment sync policy.
 
