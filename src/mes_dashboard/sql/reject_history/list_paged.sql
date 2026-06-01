@@ -44,7 +44,7 @@ ranked AS (
         b.REJECT_SHARE_PCT,
         ROW_NUMBER() OVER (
             ORDER BY b.TXN_DAY DESC, b.CONTAINERNAME ASC
-        ) AS _rn
+        ) AS rn_
     FROM base b
     {{ WHERE_CLAUSE }}
 )
@@ -80,4 +80,4 @@ SELECT
     DEFECT_RATE_PCT,
     REJECT_SHARE_PCT
 FROM ranked
-WHERE _rn BETWEEN :start_row AND :end_row
+WHERE rn_ BETWEEN :start_row AND :end_row

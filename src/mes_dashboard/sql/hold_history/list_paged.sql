@@ -8,7 +8,7 @@
 --   :start_row  - 1-based inclusive start (from decompose_by_row_count)
 --   :end_row    - 1-based inclusive end
 --
--- ORDER BY key (BQE-03): HOLDTXNDATE DESC, CONTAINERID ASC
+-- ORDER BY key (BQE-03): HOLDTXNDATE DESC, CONTAINERID ASC (paging alias: rn_)
 
 WITH history_base AS (
   SELECT
@@ -108,7 +108,7 @@ ranked AS (
     END AS FUTURE_HOLD_FLAG,
     ROW_NUMBER() OVER (
         ORDER BY HOLDTXNDATE DESC, CONTAINERID ASC
-    ) AS _rn
+    ) AS rn_
   FROM history_base
 )
 SELECT
@@ -138,4 +138,4 @@ SELECT
   RN_FUTURE_REASON,
   FUTURE_HOLD_FLAG
 FROM ranked
-WHERE _rn BETWEEN :start_row AND :end_row
+WHERE rn_ BETWEEN :start_row AND :end_row

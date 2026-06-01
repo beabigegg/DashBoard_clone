@@ -13,13 +13,16 @@ Cache key INCLUDES DOWNTIME_BRIDGE_VERSION (DA-06) via make_downtime_query_id()
 in downtime_analysis_service.py — bumping the version constant invalidates all
 downtime_analysis_* entries without touching resource_dataset_* spools.
 
-No startup pre-warm by default (design.md §Decision 3, IP-3).
+Pre-warm: controlled by DOWNTIME_ANALYSIS_PREWARM_DAYS (default 30 days, 0 disables).
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
+from datetime import date, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -35,6 +38,9 @@ logger = logging.getLogger("mes_dashboard.downtime_analysis_cache")
 
 # ── TTL ──────────────────────────────────────────────────────────────────────
 _CACHE_TTL = int(os.getenv("DOWNTIME_ANALYSIS_CACHE_TTL", str(CACHE_TTL_DATASET)))
+
+# ── Pre-warm config ───────────────────────────────────────────────────────────
+_PREWARM_DAYS: int = int(os.getenv("DOWNTIME_ANALYSIS_PREWARM_DAYS", "30"))
 
 # ── Redis / spool namespaces ──────────────────────────────────────────────────
 _EVENTS_NAMESPACE = "downtime_analysis_events"
@@ -89,3 +95,49 @@ def load_downtime_events(query_id: str) -> Optional[pd.DataFrame]:
         logger.warning("load_downtime_events failed for query_id=%s: %s", query_id, exc)
         _events_cache.delete(query_id)
         return None
+
+
+# ============================================================
+# Startup pre-warm
+# ============================================================
+
+
+def start_downtime_prewarm() -> None:
+    """Start downtime-analysis pre-warm as a daemon background thread (15s startup delay).
+
+    Fires query_downtime_dataset for [today-DOWNTIME_ANALYSIS_PREWARM_DAYS, yesterday]
+    with no filters so the broadest spool is ready before the first user request.
+    Disabled when DOWNTIME_ANALYSIS_PREWARM_DAYS=0.
+    """
+    if _PREWARM_DAYS <= 0:
+        logger.info("downtime_analysis prewarm disabled (DOWNTIME_ANALYSIS_PREWARM_DAYS=0)")
+        return
+
+    try:
+        from mes_dashboard.core.redis_client import REDIS_ENABLED
+        if not REDIS_ENABLED:
+            logger.info("downtime_analysis prewarm skipped (Redis disabled)")
+            return
+    except Exception:
+        return
+
+    def _run() -> None:
+        time.sleep(15)
+        try:
+            end = date.today() - timedelta(days=1)
+            start = end - timedelta(days=_PREWARM_DAYS - 1)
+            from mes_dashboard.services.downtime_analysis_service import query_downtime_dataset
+            logger.info(
+                "downtime_analysis prewarm: querying %s → %s (%d days)",
+                start.isoformat(), end.isoformat(), _PREWARM_DAYS,
+            )
+            query_downtime_dataset(
+                start_date=start.isoformat(),
+                end_date=end.isoformat(),
+            )
+            logger.info("downtime_analysis prewarm complete")
+        except Exception as exc:
+            logger.warning("downtime_analysis prewarm failed: %s", exc)
+
+    threading.Thread(target=_run, daemon=True, name="downtime-analysis-prewarm").start()
+    logger.info("downtime_analysis prewarm background thread started")

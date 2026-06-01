@@ -94,7 +94,7 @@ combined AS (
         NVL(r.REJECTQTY, 0) AS REJECTQTY,
         ROW_NUMBER() OVER (
             ORDER BY t.TRACKINTIMESTAMP ASC, t.CONTAINERID ASC
-        ) AS _rn
+        ) AS rn_
     FROM detection_deduped t
     LEFT JOIN lot_metadata m ON t.CONTAINERID = m.CONTAINERID
     LEFT JOIN workflow_info wf ON t.CONTAINERID = wf.CONTAINERID
@@ -115,4 +115,4 @@ SELECT
     LOSSREASONNAME,
     REJECTQTY
 FROM combined
-WHERE _rn BETWEEN :start_row AND :end_row
+WHERE rn_ BETWEEN :start_row AND :end_row

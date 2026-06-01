@@ -10,23 +10,11 @@
   min-height: 100vh;
 }
 
-.theme-downtime-analysis .downtime-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
-  padding: theme('spacing.token.p24') theme('spacing.token.p24');
-  color: theme('colors.token.hffffff');
-  margin: 0 -16px 16px;
-}
-
-.theme-downtime-analysis .downtime-header h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0 0 4px;
-}
-
 .theme-downtime-analysis .header-subtitle {
   font-size: 0.85rem;
   opacity: 0.85;
   margin: 0;
+  color: theme('colors.token.hffffff');
 }
 
 /* Filter bar */
@@ -91,6 +79,32 @@
   color: theme('colors.brand.500');
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   font-weight: 600;
+}
+
+.theme-downtime-analysis .checkbox-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.theme-downtime-analysis .checkbox-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid theme('colors.stroke.input');
+  border-radius: 999px;
+  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  font-size: 13px;
+  color: theme('colors.text.secondary');
+  background: theme('colors.surface.muted');
+}
+
+.theme-downtime-analysis .checkbox-pill input[type='checkbox'] {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: theme('colors.brand.600');
 }
 
 .theme-downtime-analysis .filter-actions {

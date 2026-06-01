@@ -33,7 +33,7 @@ WITH ranked AS (
         j.COMPLETE_EMPNAME,
         ROW_NUMBER() OVER (
             ORDER BY j.CREATEDATE DESC, j.JOBID ASC
-        ) AS _rn
+        ) AS rn_
     FROM DWH.DW_MES_JOB j
     WHERE {{ RESOURCE_FILTER }}
       AND j.CREATEDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
@@ -60,4 +60,4 @@ SELECT
     CREATE_EMPNAME,
     COMPLETE_EMPNAME
 FROM ranked
-WHERE _rn BETWEEN :start_row AND :end_row
+WHERE rn_ BETWEEN :start_row AND :end_row

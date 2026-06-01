@@ -32,7 +32,7 @@ WITH ranked AS (
         h.TRACKOUTQTY,
         ROW_NUMBER() OVER (
             ORDER BY h.TRACKINTIMESTAMP ASC, c.CONTAINERNAME ASC
-        ) AS _rn
+        ) AS rn_
     FROM DWH.DW_MES_CONTAINER c
     JOIN DWH.DW_MES_LOTWIPHISTORY h ON c.CONTAINERID = h.CONTAINERID
     WHERE h.TRACKINTIMESTAMP >= TO_TIMESTAMP(:chunk_start,    'YYYY-MM-DD')
@@ -58,4 +58,4 @@ SELECT
     TRACKINQTY,
     TRACKOUTQTY
 FROM ranked
-WHERE _rn BETWEEN :start_row AND :end_row
+WHERE rn_ BETWEEN :start_row AND :end_row

@@ -23,7 +23,7 @@ WITH ranked AS (
         SUM(HOURS) AS TOTAL_HOURS,
         ROW_NUMBER() OVER (
             ORDER BY HISTORYID ASC, TRUNC(TXNDATE) ASC
-        ) AS _rn
+        ) AS rn_
     FROM DWH.DW_MES_RESOURCESTATUS_SHIFT
     WHERE TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
       AND TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
@@ -41,4 +41,4 @@ SELECT
     NST_HOURS,
     TOTAL_HOURS
 FROM ranked
-WHERE _rn BETWEEN :start_row AND :end_row
+WHERE rn_ BETWEEN :start_row AND :end_row

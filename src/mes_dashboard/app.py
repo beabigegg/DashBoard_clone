@@ -647,6 +647,8 @@ def create_app(config_name: str | None = None) -> Flask:
             init_anomaly_detection_scheduler(app)  # Start anomaly detection scheduler
             from mes_dashboard.services.resource_history_duckdb_cache import start_duckdb_prewarm
             start_duckdb_prewarm()  # Pre-warm resource-history DuckDB cache for 3-month queries
+            from mes_dashboard.services.downtime_analysis_cache import start_downtime_prewarm
+            start_downtime_prewarm()  # Pre-warm downtime-analysis spool (DOWNTIME_ANALYSIS_PREWARM_DAYS days)
             from mes_dashboard.services.material_consumption_service import start_parts_cache_warmup
             start_parts_cache_warmup()  # Pre-warm material-consumption parts list Redis cache
             from mes_dashboard.core.metrics_history import start_metrics_history

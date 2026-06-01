@@ -85,10 +85,12 @@ breaking-change-policy: deprecate-2-minors
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | RESOURCE_HISTORY_HISTORICAL_TTL | cache | all | no | no | 86400 | 86400 | application-team | positive integer (seconds); minimum 3600 | yes | uses default 86400 |
 | RESOURCE_HISTORY_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables DuckDB prewarm | yes | uses default 3 |
+| DOWNTIME_ANALYSIS_PREWARM_DAYS | cache | all | no | no | 30 | 30 | application-team | non-negative integer; 0 disables prewarm | yes | uses default 30 |
 | RESOURCE_HISTORY_DUCKDB_PATH | storage | all | no | no | tmp/resource_history.duckdb | /var/lib/mes/resource_history.duckdb | application-team | file path (relative resolved to CWD; use absolute for Docker) | yes | uses default path |
 
 - `RESOURCE_HISTORY_HISTORICAL_TTL`: Redis TTL for resource-history queries where `end_date < today − 2 days`. Historical data is immutable; default 86400s (24h) vs the general 2h TTL for recent queries. Added by change `resource-history-perf`.
 - `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to load into the persistent DuckDB cache at startup. Background thread starts 10s after worker boot; `0` disables entirely. Default 3 months (~25s Oracle load time, ~15MB DuckDB file). Added by change `resource-history-perf`.
+- `DOWNTIME_ANALYSIS_PREWARM_DAYS`: Number of days of downtime-analysis data to pre-load into the spool at startup. Background thread starts 15s after worker boot; `0` disables entirely. Default 30 days. Added by change `downtime-analysis-page`.
 - `RESOURCE_HISTORY_DUCKDB_PATH`: Path to the persistent DuckDB file that caches the last N months of base_facts + oee_facts. Relative paths resolve against CWD (same as QUERY_SPOOL_DIR). For Docker set to an absolute path on a named volume. File is ~15MB; atomically replaced on each daily refresh. Added by change `resource-history-perf`.
 
 ## Batch Query Engine — Row-Count Chunking
