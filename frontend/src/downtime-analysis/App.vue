@@ -30,7 +30,7 @@ const {
   loading,
   error,
   summaryData,
-  equipmentRows,
+  equipmentData,
   eventData,
   filterOptions,
   loadOptions,
@@ -38,6 +38,8 @@ const {
   applyView,
   loadEquipmentDetail,
   loadEventDetail,
+  exportEquipmentDetailCsv,
+  exportEventDetailCsv,
   resetSummaryData,
 } = useDowntimeData();
 
@@ -45,6 +47,26 @@ const {
 const activeTab = ref<'charts' | 'equipment' | 'events'>('charts');
 
 const isInitialLoad = ref(true);
+const exportingEquipment = ref(false);
+const exportingEvents = ref(false);
+
+async function handleExportEquipment(): Promise<void> {
+  exportingEquipment.value = true;
+  try {
+    await exportEquipmentDetailCsv();
+  } finally {
+    exportingEquipment.value = false;
+  }
+}
+
+async function handleExportEvents(): Promise<void> {
+  exportingEvents.value = true;
+  try {
+    await exportEventDetailCsv();
+  } finally {
+    exportingEvents.value = false;
+  }
+}
 
 /** draftFilters is a local reactive copy; filterState is the committed state managed by useFilterState */
 const draftFilters = reactive<FilterState>({
@@ -84,9 +106,9 @@ async function runPrimaryQuery(): Promise<void> {
   }
   await executePrimaryQuery(body);
   if (activeTab.value === 'equipment') {
-    await loadEquipmentDetail();
+    await loadEquipmentDetail(1, 20);
   } else if (activeTab.value === 'events') {
-    await loadEventDetail(1, 50);
+    await loadEventDetail(1, 20);
   }
 }
 
@@ -129,11 +151,15 @@ async function handleClear(): Promise<void> {
 
 async function handleTabChange(tab: 'charts' | 'equipment' | 'events'): Promise<void> {
   activeTab.value = tab;
-  if (tab === 'equipment' && equipmentRows.value.length === 0) {
-    await loadEquipmentDetail();
+  if (tab === 'equipment' && equipmentData.rows.length === 0) {
+    await loadEquipmentDetail(1, 20);
   } else if (tab === 'events' && eventData.rows.length === 0) {
-    await loadEventDetail(1, 50);
+    await loadEventDetail(1, 20);
   }
+}
+
+async function handleEquipmentPageChange(page: number): Promise<void> {
+  await loadEquipmentDetail(page, equipmentData.pagination.page_size);
 }
 
 async function handlePageChange(page: number): Promise<void> {
@@ -251,7 +277,13 @@ onMounted(() => {
       <div v-show="isEquipmentTab" role="tabpanel" aria-label="設備明細">
         <div class="section-card">
           <div class="section-inner">
-            <EquipmentDetail :rows="equipmentRows" />
+            <EquipmentDetail
+              :rows="equipmentData.rows"
+              :pagination="equipmentData.pagination"
+              :exporting="exportingEquipment"
+              @page-change="handleEquipmentPageChange"
+              @export="handleExportEquipment"
+            />
           </div>
         </div>
       </div>
@@ -263,7 +295,9 @@ onMounted(() => {
             <EventDetail
               :rows="eventData.rows"
               :pagination="eventData.pagination"
+              :exporting="exportingEvents"
               @page-change="handlePageChange"
+              @export="handleExportEvents"
             />
           </div>
         </div>

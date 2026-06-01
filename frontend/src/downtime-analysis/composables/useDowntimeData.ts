@@ -62,11 +62,14 @@ export function useDowntimeData() {
     top_reasons: [],
   });
 
-  const equipmentRows = ref<EquipmentDetailRow[]>([]);
+  const equipmentData = reactive<{ rows: EquipmentDetailRow[]; pagination: Pagination }>({
+    rows: [],
+    pagination: { page: 1, page_size: 20, total_rows: 0, total_pages: 0 },
+  });
 
   const eventData = reactive<EventDetailData>({
     rows: [],
-    pagination: { page: 1, page_size: 50, total_rows: 0, total_pages: 0 },
+    pagination: { page: 1, page_size: 20, total_rows: 0, total_pages: 0 },
   });
 
   const filterOptions = reactive<FilterOptions>({
@@ -190,9 +193,9 @@ export function useDowntimeData() {
   }
 
   /**
-   * Load equipment detail: GET /api/downtime-analysis/equipment-detail?query_id=
+   * Load equipment detail: GET /api/downtime-analysis/equipment-detail?query_id=&page=&page_size=
    */
-  async function loadEquipmentDetail(): Promise<void> {
+  async function loadEquipmentDetail(page = 1, pageSize = 20): Promise<void> {
     if (!queryId.value) return;
 
     loading.equipment = true;
@@ -202,11 +205,20 @@ export function useDowntimeData() {
       const response = await apiGet('/api/downtime-analysis/equipment-detail', {
         timeout: API_TIMEOUT,
         silent: true,
-        params: { query_id: queryId.value },
+        params: { query_id: queryId.value, page, page_size: pageSize },
       });
 
       const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-      equipmentRows.value = Array.isArray(data?.equipment_detail) ? (data!.equipment_detail as EquipmentDetailRow[]) : [];
+      if (data) {
+        equipmentData.rows = Array.isArray(data.equipment_detail) ? (data.equipment_detail as EquipmentDetailRow[]) : [];
+        const pag = data.pagination as Partial<Pagination> | undefined;
+        equipmentData.pagination = {
+          page: Number(pag?.page ?? page),
+          page_size: Number(pag?.page_size ?? pageSize),
+          total_rows: Number(pag?.total_rows ?? 0),
+          total_pages: Number(pag?.total_pages ?? 0),
+        };
+      }
     } catch (err) {
       const e = err as Error & { status?: number };
       if (e?.status === 410 || e?.message === 'cache_expired') {
@@ -222,7 +234,7 @@ export function useDowntimeData() {
   /**
    * Load event detail: GET /api/downtime-analysis/event-detail?query_id=&page=&page_size=
    */
-  async function loadEventDetail(page = 1, pageSize = 50): Promise<void> {
+  async function loadEventDetail(page = 1, pageSize = 20): Promise<void> {
     if (!queryId.value) return;
 
     loading.events = true;
@@ -269,14 +281,47 @@ export function useDowntimeData() {
     summaryData.top_reasons = Array.isArray(data.top_reasons) ? (data.top_reasons as TopReasonRow[]) : [];
   }
 
+  async function exportEquipmentDetailCsv(): Promise<void> {
+    if (!queryId.value) return;
+    const url = `/api/downtime-analysis/export-equipment-detail?query_id=${encodeURIComponent(queryId.value)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      error.value = '設備明細匯出失敗';
+      return;
+    }
+    const blob = await response.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'downtime_equipment_detail.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function exportEventDetailCsv(): Promise<void> {
+    if (!queryId.value) return;
+    const url = `/api/downtime-analysis/export-event-detail?query_id=${encodeURIComponent(queryId.value)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      error.value = '事件明細匯出失敗';
+      return;
+    }
+    const blob = await response.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'downtime_event_detail.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   function resetSummaryData(): void {
     summaryData.summary = { ...defaultKpi };
     summaryData.daily_trend = [];
     summaryData.big_category = [];
     summaryData.top_reasons = [];
-    equipmentRows.value = [];
+    equipmentData.rows = [];
+    equipmentData.pagination = { page: 1, page_size: 20, total_rows: 0, total_pages: 0 };
     eventData.rows = [];
-    eventData.pagination = { page: 1, page_size: 50, total_rows: 0, total_pages: 0 };
+    eventData.pagination = { page: 1, page_size: 20, total_rows: 0, total_pages: 0 };
   }
 
   return {
@@ -284,7 +329,7 @@ export function useDowntimeData() {
     loading,
     error,
     summaryData,
-    equipmentRows,
+    equipmentData,
     eventData,
     filterOptions,
     loadOptions,
@@ -292,6 +337,8 @@ export function useDowntimeData() {
     applyView,
     loadEquipmentDetail,
     loadEventDetail,
+    exportEquipmentDetailCsv,
+    exportEventDetailCsv,
     resetSummaryData,
   };
 }

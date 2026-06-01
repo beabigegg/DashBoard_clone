@@ -1,6 +1,6 @@
-# generated: 2026-06-01T04:40:29Z by cdd-kit 2.1.2
-# files: 822, src-lines: 229542, map-lines: 17565, compression: 13.1x
-# sources-digest: bd0d7588638164b16f29cee113a90e04cf2926690ab29d1e5aeb2fe1d5797e55
+# generated: 2026-06-01T07:21:13Z by cdd-kit 2.1.2
+# files: 822, src-lines: 229754, map-lines: 17577, compression: 13.1x
+# sources-digest: ec4f3c26e327a13adfc7af177177631a20c086cd6c60d80f4f16f8fe024bb422
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -725,7 +725,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 276 lines
+frontend/src/downtime-analysis/App.vue:  # 284 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -757,7 +757,7 @@ frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 84 lines
 
 frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 77 lines
 
-frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 105 lines
+frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 84 lines
 
 frontend/src/downtime-analysis/components/EventDetail.vue:  # 156 lines
 
@@ -777,7 +777,7 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 297 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 310 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
@@ -785,7 +785,7 @@ frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 297 lines
   constants:
     - { name: API_TIMEOUT, line: 14 }
   functions:
-    - { name: useDowntimeData, lines: 45-297 }
+    - { name: useDowntimeData, lines: 45-310 }
   interfaces:
     - { name: SummaryData, lines: 16-21 }  # local
     - { name: EventDetailData, lines: 23-26 }  # local
@@ -3049,7 +3049,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1411 lines
+src/mes_dashboard/app.py:  # 1413 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3107,8 +3107,8 @@ src/mes_dashboard/app.py:  # 1411 lines
     - { name: _is_runtime_contract_enforced, lines: 514-519 }
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
-    - { name: create_app, lines: 569-1285 }
-    - { name: _register_error_handlers, lines: 1288-1411 }
+    - { name: create_app, lines: 569-1287 }
+    - { name: _register_error_handlers, lines: 1290-1413 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4449,7 +4449,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 300 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 309 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: datetime, items: [datetime], line: 17 }
@@ -4462,9 +4462,9 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 300 lines
     - { name: api_downtime_options, lines: 74-106 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
     - { name: api_downtime_query, lines: 115-166 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
     - { name: api_downtime_view, lines: 175-205 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 214-239 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 248-281 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 289-300 }
+    - { name: api_downtime_equipment_detail, lines: 214-248 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 257-290 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 298-309 }
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5415,22 +5415,26 @@ src/mes_dashboard/services/dashboard_service.py:  # 504 lines
     - { name: query_ou_trend, lines: 343-420 }
     - { name: query_utilization_heatmap, lines: 427-504 }
 
-src/mes_dashboard/services/downtime_analysis_cache.py:  # 91 lines
+src/mes_dashboard/services/downtime_analysis_cache.py:  # 143 lines
   imports:
     - { module: __future__, items: [annotations], line: 19 }
     - { module: logging, items: [], line: 21 }
     - { module: os, items: [], line: 22 }
-    - { module: typing, items: [Optional], line: 23 }
-    - { module: pandas, items: [], line: 25 }
-    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 27 }
-    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 28 }
-    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 29 }
+    - { module: threading, items: [], line: 23 }
+    - { module: time, items: [], line: 24 }
+    - { module: datetime, items: [date, timedelta], line: 25 }
+    - { module: typing, items: [Optional], line: 26 }
+    - { module: pandas, items: [], line: 28 }
+    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 30 }
+    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 31 }
+    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 32 }
   functions:
-    - { name: has_downtime_events, lines: 57-61 }
-    - { name: store_downtime_events, lines: 64-76 }
-    - { name: load_downtime_events, lines: 79-91 }
+    - { name: has_downtime_events, lines: 63-67 }
+    - { name: store_downtime_events, lines: 70-82 }
+    - { name: load_downtime_events, lines: 85-97 }
+    - { name: start_downtime_prewarm, lines: 105-143 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1084 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1134 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5453,17 +5457,18 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1084 lines
     - { name: _ts_to_iso, lines: 457-466 }
     - { name: make_downtime_query_id, lines: 473-478 }
     - { name: get_filter_options, lines: 485-573 }
-    - { name: query_downtime_dataset, lines: 580-725 }
-    - { name: _apply_resource_filters, lines: 728-800 }
-    - { name: _empty_events_df, lines: 803-810 }
-    - { name: _build_response, lines: 817-830 }
-    - { name: _build_summary, lines: 833-859 }
-    - { name: _build_daily_trend, lines: 862-883 }
-    - { name: _build_big_category, lines: 886-905 }
-    - { name: _build_top_reasons, lines: 908-934 }
-    - { name: apply_view, lines: 941-981 }
-    - { name: _build_equipment_detail, lines: 984-1021 }
-    - { name: _build_event_detail_page, lines: 1024-1084 }
+    - { name: query_downtime_dataset, lines: 580-739 }
+    - { name: _apply_resource_filters, lines: 742-822 }
+    - { name: _empty_events_df, lines: 825-832 }
+    - { name: _build_response, lines: 839-852 }
+    - { name: _build_summary, lines: 855-881 }
+    - { name: _build_daily_trend, lines: 884-905 }
+    - { name: _build_big_category, lines: 908-927 }
+    - { name: _build_top_reasons, lines: 930-956 }
+    - { name: apply_view, lines: 963-1003 }
+    - { name: _build_equipment_detail_page, lines: 1006-1031 }
+    - { name: _build_equipment_detail, lines: 1034-1071 }
+    - { name: _build_event_detail_page, lines: 1074-1134 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -11720,7 +11725,7 @@ tests/test_downtime_analysis_routes.py:  # 297 lines
     - { name: _mock_query_result, lines: 34-44 }
     - { name: _mock_view_result, lines: 47-56 }
 
-tests/test_downtime_analysis_service.py:  # 921 lines
+tests/test_downtime_analysis_service.py:  # 1020 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: hashlib, items: [], line: 17 }
@@ -11809,29 +11814,36 @@ tests/test_downtime_analysis_service.py:  # 921 lines
         - { name: test_workcenter_filter_narrows_resources, lines: 571-589 }
         - { name: test_unfiltered_returns_all_resources, lines: 594-612 }
         - { name: test_big_categories_always_returns_all_eight, lines: 617-628 }
+    - name: TestResourceCacheBaselineFilter
+      lines: 636-727
+      methods:
+        - { name: _make_df, lines: 645-657 }
+        - { name: test_excluded_device_removed_when_no_user_filter, lines: 662-680 }
+        - { name: test_approved_device_kept_when_no_user_filter, lines: 685-700 }
+        - { name: test_user_filter_still_narrows_after_baseline, lines: 705-727 }
     - name: TestFilterKwargsForwarding
-      lines: 636-725
+      lines: 735-824
       methods:
-        - { name: _make_app, lines: 639-645 }
-        - { name: test_post_query_forwards_start_date, lines: 648-660 }
-        - { name: test_post_query_forwards_end_date, lines: 663-674 }
-        - { name: test_post_query_forwards_status_types, lines: 677-691 }
-        - { name: test_post_query_forwards_resource_ids, lines: 694-708 }
-        - { name: test_post_query_forwards_big_categories, lines: 711-725 }
+        - { name: _make_app, lines: 738-744 }
+        - { name: test_post_query_forwards_start_date, lines: 747-759 }
+        - { name: test_post_query_forwards_end_date, lines: 762-773 }
+        - { name: test_post_query_forwards_status_types, lines: 776-790 }
+        - { name: test_post_query_forwards_resource_ids, lines: 793-807 }
+        - { name: test_post_query_forwards_big_categories, lines: 810-824 }
     - name: TestBridgeVersionCacheKey
-      lines: 733-769
+      lines: 832-868
       methods:
-        - { name: test_query_id_includes_bridge_version, lines: 736-746 }
-        - { name: test_downtime_query_id_differs_from_resource_dataset_id, lines: 748-764 }
-        - { name: test_bridge_version_constant_present, lines: 766-769 }
+        - { name: test_query_id_includes_bridge_version, lines: 835-845 }
+        - { name: test_downtime_query_id_differs_from_resource_dataset_id, lines: 847-863 }
+        - { name: test_bridge_version_constant_present, lines: 865-868 }
     - name: TestDowntimeMigration
-      lines: 777-921
+      lines: 876-1020
       methods:
-        - { name: _make_base_df, lines: 786-796 }
-        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 798-847 }
-        - { name: test_spool_namespace_unchanged, lines: 849-852 }
-        - { name: test_spool_column_schema_matches_previous_path, lines: 854-878 }
-        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 880-921 }
+        - { name: _make_base_df, lines: 885-895 }
+        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 897-946 }
+        - { name: test_spool_namespace_unchanged, lines: 948-951 }
+        - { name: test_spool_column_schema_matches_previous_path, lines: 953-977 }
+        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 979-1020 }
   functions:
     - { name: _ts, lines: 41-43 }
     - { name: _shift_row, lines: 46-63 }

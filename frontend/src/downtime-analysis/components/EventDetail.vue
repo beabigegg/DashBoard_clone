@@ -1,21 +1,21 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
 import type { EventDetailRow, Pagination } from '../types';
 import { formatDowntimeDate } from '../formatDowntimeDate';
 
 const props = defineProps<{
   rows: EventDetailRow[];
   pagination: Pagination;
+  exporting?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'page-change', page: number): void;
+  (e: 'export'): void;
 }>();
 
-/**
- * Render a JOB-derived field as '—' when the row's job object is null.
- * Contract: data-shape-contract.md §3.12.6 — Frontend MUST render all job-derived
- * fields as '—' when job is null (match_source='none').
- */
 function jobField(row: EventDetailRow, key: keyof NonNullable<EventDetailRow['job']>): string {
   if (row.job === null) return '—';
   const value = row.job[key];
@@ -34,123 +34,107 @@ function matchSourceLabel(src: string): string {
   }
 }
 
-function matchSourceClass(src: string): string {
-  switch (src) {
-    case 'jobid': return 'badge-success';
-    case 'overlap': return 'badge-warning';
-    case 'none': return 'badge-muted';
-    default: return 'badge-muted';
-  }
-}
+const tableData = computed(() =>
+  props.rows.map((r) => ({
+    resource_name: r.resource_name ?? r.resource_id,
+    status: r.status,
+    reason: r.reason ?? '—',
+    category: r.category,
+    start_ts: formatDowntimeDate(r.start_ts),
+    end_ts: formatDowntimeDate(r.end_ts),
+    hours: r.hours,
+    match_source: matchSourceLabel(r.match_source),
+    job_order_name: jobField(r, 'job_order_name'),
+    job_model: jobField(r, 'job_model'),
+    symptom: jobField(r, 'symptom'),
+    cause: jobField(r, 'cause'),
+    repair: jobField(r, 'repair'),
+    wait_min: jobField(r, 'wait_min'),
+    repair_min: jobField(r, 'repair_min'),
+    handler: jobField(r, 'handler'),
+    // Keep match_source raw for badge class
+    _match_source_raw: r.match_source,
+    _match_ambiguous: r.job?.match_ambiguous ?? false,
+  }))
+);
 
-function goToPage(page: number): void {
-  if (page < 1 || page > props.pagination.total_pages) return;
-  emit('page-change', page);
-}
+const paginationShape = computed(() => ({
+  page: props.pagination.page,
+  totalPages: props.pagination.total_pages,
+  infoText: `共 ${props.pagination.total_rows} 筆`,
+}));
+
+const exportBtnRef = ref<HTMLButtonElement | null>(null);
 </script>
 
 <template>
   <div class="event-detail-section">
-    <h3 class="section-title">停機事件明細</h3>
-
-    <div v-if="rows.length === 0" class="empty-state" role="status">
-      暫無資料
+    <div class="detail-toolbar">
+      <h3 class="section-title">停機事件明細</h3>
+      <button
+        ref="exportBtnRef"
+        type="button"
+        class="export-csv-btn"
+        :disabled="rows.length === 0 || exporting"
+        @click="emit('export')"
+      >
+        {{ exporting ? '匯出中...' : '↓ 匯出 CSV' }}
+      </button>
     </div>
 
-    <div v-else>
-      <div class="table-wrapper" role="region" aria-label="停機事件明細表">
-        <table class="data-table event-detail-table" aria-label="停機事件明細">
-          <thead>
-            <tr>
-              <th scope="col">設備名稱</th>
-              <th scope="col">狀態</th>
-              <th scope="col">原因</th>
-              <th scope="col">類別</th>
-              <th scope="col">開始時間</th>
-              <th scope="col">結束時間</th>
-              <th scope="col">時數 (h)</th>
-              <th scope="col">橋接來源</th>
-              <th scope="col">工單名稱</th>
-              <th scope="col">機型</th>
-              <th scope="col">症狀</th>
-              <th scope="col">原因碼</th>
-              <th scope="col">修復</th>
-              <th scope="col">待料 (min)</th>
-              <th scope="col">維修 (min)</th>
-              <th scope="col">負責人</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in rows"
-              :key="row.event_id"
-              :class="{ 'row-no-job': row.job === null }"
-            >
-              <td>{{ row.resource_name ?? row.resource_id }}</td>
-              <td>
-                <span class="status-badge" :class="`status-${row.status.toLowerCase()}`">
-                  {{ row.status }}
-                </span>
-              </td>
-              <td>{{ row.reason ?? '—' }}</td>
-              <td>{{ row.category }}</td>
-              <td>{{ formatDowntimeDate(row.start_ts) }}</td>
-              <td>{{ formatDowntimeDate(row.end_ts) }}</td>
-              <td>{{ row.hours.toFixed(2) }}</td>
-              <td>
-                <span
-                  class="match-badge"
-                  :class="matchSourceClass(row.match_source)"
-                  :aria-label="`橋接來源: ${matchSourceLabel(row.match_source)}`"
-                >
-                  {{ matchSourceLabel(row.match_source) }}
-                  <span
-                    v-if="row.job !== null && row.job.match_ambiguous"
-                    class="ambiguous-indicator"
-                    title="候補重疊率 ≥80%，匹配結果可能存疑"
-                    aria-label="匹配存疑"
-                  >⚠</span>
-                </span>
-              </td>
-              <!-- JOB-derived fields: render '—' when job is null (match_source='none') -->
-              <td>{{ jobField(row, 'job_order_name') }}</td>
-              <td>{{ jobField(row, 'job_model') }}</td>
-              <td>{{ jobField(row, 'symptom') }}</td>
-              <td>{{ jobField(row, 'cause') }}</td>
-              <td>{{ jobField(row, 'repair') }}</td>
-              <td>{{ jobField(row, 'wait_min') }}</td>
-              <td>{{ jobField(row, 'repair_min') }}</td>
-              <td>{{ jobField(row, 'handler') }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <DataTable
+      :data="tableData"
+      :pagination="rows.length > 0 ? paginationShape : null"
+      @page-change="(p) => emit('page-change', p)"
+    >
+      <DataTableColumn column-key="resource_name" label="設備名稱" :sortable="true" />
+      <DataTableColumn column-key="status" label="狀態" :sortable="true" />
+      <DataTableColumn column-key="reason" label="原因" :sortable="true" />
+      <DataTableColumn column-key="category" label="類別" :sortable="true" />
+      <DataTableColumn column-key="start_ts" label="開始時間" :sortable="true" />
+      <DataTableColumn column-key="end_ts" label="結束時間" :sortable="true" />
+      <DataTableColumn column-key="hours" label="時數 (h)" :sortable="true" align="right" />
+      <DataTableColumn column-key="match_source" label="橋接來源" :sortable="true" />
+      <DataTableColumn column-key="job_order_name" label="工單名稱" :sortable="true" />
+      <DataTableColumn column-key="job_model" label="機型" :sortable="true" />
+      <DataTableColumn column-key="symptom" label="症狀" :sortable="true" />
+      <DataTableColumn column-key="cause" label="原因碼" :sortable="true" />
+      <DataTableColumn column-key="repair" label="修復" :sortable="true" />
+      <DataTableColumn column-key="wait_min" label="待料 (min)" :sortable="true" align="right" />
+      <DataTableColumn column-key="repair_min" label="維修 (min)" :sortable="true" align="right" />
+      <DataTableColumn column-key="handler" label="負責人" :sortable="true" />
 
-      <!-- Pagination -->
-      <div class="pagination-row" role="navigation" aria-label="分頁導覽">
-        <button
-          type="button"
-          class="page-btn"
-          :disabled="pagination.page <= 1"
-          aria-label="上一頁"
-          @click="goToPage(pagination.page - 1)"
-        >
-          ‹
-        </button>
-        <span class="page-info">
-          第 {{ pagination.page }} / {{ pagination.total_pages }} 頁
-          （共 {{ pagination.total_rows }} 筆）
-        </span>
-        <button
-          type="button"
-          class="page-btn"
-          :disabled="pagination.page >= pagination.total_pages"
-          aria-label="下一頁"
-          @click="goToPage(pagination.page + 1)"
-        >
-          ›
-        </button>
-      </div>
-    </div>
+      <template #cell="{ columnKey, row, value }">
+        <template v-if="columnKey === 'status'">
+          <span class="status-badge" :class="`status-${String(value).toLowerCase()}`">
+            {{ value }}
+          </span>
+        </template>
+        <template v-else-if="columnKey === 'match_source'">
+          <span
+            class="match-badge"
+            :class="{
+              'badge-success': row._match_source_raw === 'jobid',
+              'badge-warning': row._match_source_raw === 'overlap',
+              'badge-muted': row._match_source_raw === 'none',
+            }"
+          >
+            {{ value }}
+            <span
+              v-if="row._match_source_raw !== 'none' && row._match_ambiguous"
+              class="ambiguous-indicator"
+              title="候補重疊率 ≥80%，匹配結果可能存疑"
+              aria-label="匹配存疑"
+            >⚠</span>
+          </span>
+        </template>
+        <template v-else-if="columnKey === 'hours'">
+          {{ typeof value === 'number' ? value.toFixed(2) : value }}
+        </template>
+        <template v-else>
+          {{ value }}
+        </template>
+      </template>
+    </DataTable>
   </div>
 </template>

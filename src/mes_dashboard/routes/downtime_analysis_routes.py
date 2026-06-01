@@ -10,13 +10,16 @@ Endpoints per api-contract.md §10:
   GET  /api/downtime-analysis/view
   GET  /api/downtime-analysis/equipment-detail
   GET  /api/downtime-analysis/event-detail
+  GET  /api/downtime-analysis/export-equipment-detail
+  GET  /api/downtime-analysis/export-event-detail
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from flask import Blueprint, request
+from flask import Blueprint, Response, request
+from flask import stream_with_context
 
 from mes_dashboard.core.response import (
     cache_expired_error,
@@ -26,6 +29,8 @@ from mes_dashboard.core.response import (
 )
 from mes_dashboard.services.downtime_analysis_service import (
     apply_view,
+    export_equipment_detail_csv,
+    export_event_detail_csv,
     get_filter_options,
     query_downtime_dataset,
 )
@@ -212,19 +217,26 @@ def api_downtime_view():
 
 @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
 def api_downtime_equipment_detail():
-    """API: Per-equipment summary from spool.
+    """API: Paginated per-equipment summary from spool.
 
     Query Parameters:
-        query_id: str (required)
+        query_id:  str (required)
+        page:      int (default: 1)
+        page_size: int (default: 20, max: 200)
 
     Returns:
-        JSON { success, data: { equipment_detail: EquipmentDetailRow[] } }
+        JSON { success, data: { equipment_detail: EquipmentDetailRow[], pagination: {...} } }
         or 410 on spool miss.
     """
     query_id = request.args.get('query_id', '').strip()
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
 
     if not query_id:
         return validation_error("必須提供 query_id")
+
+    page_size = min(max(page_size, 1), 200)
+    page = max(page, 1)
 
     # Build resource lookup for display names
     resource_lookup = _get_resource_lookup_safe()
@@ -232,6 +244,8 @@ def api_downtime_equipment_detail():
     result = apply_view(
         view_name='equipment_detail',
         query_id=query_id,
+        page=page,
+        page_size=page_size,
         resource_lookup=resource_lookup,
     )
     if result is None:
@@ -251,7 +265,7 @@ def api_downtime_event_detail():
     Query Parameters:
         query_id:  str (required)
         page:      int (default: 1)
-        page_size: int (default: 50, max: 200)
+        page_size: int (default: 20, max: 200)
 
     Returns:
         JSON { success, data: { events: EventDetailRow[], pagination: {...} } }
@@ -259,7 +273,7 @@ def api_downtime_event_detail():
     """
     query_id = request.args.get('query_id', '').strip()
     page = request.args.get('page', 1, type=int)
-    page_size = request.args.get('page_size', 50, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
 
     if not query_id:
         return validation_error("必須提供 query_id")
@@ -279,6 +293,74 @@ def api_downtime_event_detail():
     if result is None:
         return cache_expired_error()
     return success_response(result)
+
+
+# ============================================================
+# GET /api/downtime-analysis/export-equipment-detail
+# ============================================================
+
+
+@downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+def api_export_equipment_detail():
+    """GET /export-equipment-detail — stream equipment detail as CSV.
+
+    Query Parameters:
+        query_id: str (required)
+
+    Returns:
+        CSV file download (utf-8-sig, Excel-compatible).
+        410 on spool miss.
+    """
+    query_id = request.args.get('query_id', '').strip()
+    if not query_id:
+        return validation_error("必須提供 query_id")
+
+    gen = export_equipment_detail_csv(query_id)
+    if gen is None:
+        return cache_expired_error()
+
+    return Response(
+        stream_with_context(gen),
+        content_type='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': 'attachment; filename=downtime_equipment_detail.csv',
+            'X-Accel-Buffering': 'no',
+        },
+    )
+
+
+# ============================================================
+# GET /api/downtime-analysis/export-event-detail
+# ============================================================
+
+
+@downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+def api_export_event_detail():
+    """GET /export-event-detail — stream event detail as CSV.
+
+    Query Parameters:
+        query_id: str (required)
+
+    Returns:
+        CSV file download (utf-8-sig, Excel-compatible).
+        410 on spool miss.
+    """
+    query_id = request.args.get('query_id', '').strip()
+    if not query_id:
+        return validation_error("必須提供 query_id")
+
+    gen = export_event_detail_csv(query_id)
+    if gen is None:
+        return cache_expired_error()
+
+    return Response(
+        stream_with_context(gen),
+        content_type='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': 'attachment; filename=downtime_event_detail.csv',
+            'X-Accel-Buffering': 'no',
+        },
+    )
 
 
 # ============================================================

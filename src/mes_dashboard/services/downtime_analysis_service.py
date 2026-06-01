@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import pandas as pd
 
@@ -994,13 +994,41 @@ def apply_view(
         return {'top_reasons': _build_top_reasons(events_df, top_n=top_n)}
 
     if view_name == 'equipment_detail':
-        return {'equipment_detail': _build_equipment_detail(events_df, resource_lookup or {})}
+        return _build_equipment_detail_page(events_df, resource_lookup or {}, page=page, page_size=page_size)
 
     if view_name == 'event_detail':
         return _build_event_detail_page(events_df, page=page, page_size=page_size, resource_lookup=resource_lookup or {})
 
     logger.warning("apply_view: unknown view_name=%s", view_name)
     return None
+
+
+def _build_equipment_detail_page(
+    df: pd.DataFrame,
+    resource_lookup: Dict[str, Any],
+    page: int = 1,
+    page_size: int = 20,
+) -> Dict[str, Any]:
+    """Build paginated EquipmentDetailRow list."""
+    page_size = min(max(int(page_size), 1), 200)
+    page = max(int(page), 1)
+
+    rows = _build_equipment_detail(df, resource_lookup)
+
+    total_rows = len(rows)
+    total_pages = max(1, (total_rows + page_size - 1) // page_size) if total_rows > 0 else 0
+    offset = (page - 1) * page_size
+    page_rows = rows[offset:offset + page_size]
+
+    return {
+        'equipment_detail': page_rows,
+        'pagination': {
+            'page': page,
+            'page_size': page_size,
+            'total_rows': total_rows,
+            'total_pages': total_pages,
+        },
+    }
 
 
 def _build_equipment_detail(
@@ -1104,3 +1132,116 @@ def _build_event_detail_page(
             'total_pages': total_pages,
         },
     }
+
+
+# ============================================================
+# CSV export helpers
+# ============================================================
+
+
+def export_equipment_detail_csv(query_id: str) -> Optional[Generator[bytes, None, None]]:
+    """Stream equipment detail as CSV bytes (utf-8-sig for Excel compatibility)."""
+    from mes_dashboard.services.downtime_analysis_cache import load_downtime_events
+    from mes_dashboard.services.resource_cache import get_all_resources
+    import io
+    import csv
+
+    events_df = load_downtime_events(query_id)
+    if events_df is None:
+        return None
+
+    resource_lookup: Dict[str, Any] = {}
+    try:
+        resources = get_all_resources()
+        for r in resources:
+            rid = str(r.get('HISTORYID', '')).strip()
+            resource_lookup[rid] = r
+    except Exception:
+        pass
+
+    rows = _build_equipment_detail(events_df, resource_lookup)
+
+    def _gen() -> Generator[bytes, None, None]:
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(['設備名稱', '工作站', '機種', 'UDT (h)', 'SDT (h)', 'EGT (h)', '總計 (h)', '事件數', '主要原因'])
+        yield buf.getvalue().encode('utf-8-sig')
+        for row in rows:
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow([
+                row.get('resource_name') or row.get('resource_id', ''),
+                row.get('workcenter') or '',
+                row.get('family') or '',
+                row.get('udt_hours', 0),
+                row.get('sdt_hours', 0),
+                row.get('egt_hours', 0),
+                row.get('total_hours', 0),
+                row.get('event_count', 0),
+                row.get('top_reason') or '',
+            ])
+            yield buf.getvalue().encode('utf-8-sig')
+
+    return _gen()
+
+
+def export_event_detail_csv(query_id: str) -> Optional[Generator[bytes, None, None]]:
+    """Stream event detail as CSV bytes (utf-8-sig for Excel compatibility)."""
+    from mes_dashboard.services.downtime_analysis_cache import load_downtime_events
+    from mes_dashboard.services.resource_cache import get_all_resources
+    import io
+    import csv
+
+    events_df = load_downtime_events(query_id)
+    if events_df is None:
+        return None
+
+    resource_lookup: Dict[str, Any] = {}
+    try:
+        resources = get_all_resources()
+        for r in resources:
+            rid = str(r.get('HISTORYID', '')).strip()
+            resource_lookup[rid] = r
+    except Exception:
+        pass
+
+    def _gen() -> Generator[bytes, None, None]:
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([
+            '設備名稱', '狀態', '原因', '類別',
+            '開始時間', '結束時間', '時數 (h)', '橋接來源',
+            '工單名稱', '機型', '症狀', '原因碼', '修復', '待料 (min)', '維修 (min)', '負責人',
+        ])
+        yield buf.getvalue().encode('utf-8-sig')
+
+        for _, row in events_df.iterrows():
+            rid = str(row.get('resource_id', '')).strip()
+            res_info = resource_lookup.get(rid, {})
+            ms = row.get('match_source', 'none')
+
+            match_label = {'jobid': 'JOBID', 'overlap': '時間重疊', 'none': '未匹配'}.get(str(ms), str(ms))
+
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow([
+                res_info.get('RESOURCENAME') or rid,
+                row.get('status', ''),
+                row.get('reason') or '',
+                row.get('category', ''),
+                row.get('start_ts') or '',
+                row.get('end_ts') or '',
+                row.get('hours', 0),
+                match_label,
+                row.get('job_order_name') or '' if ms != 'none' else '',
+                row.get('job_model') or '' if ms != 'none' else '',
+                row.get('symptom') or '' if ms != 'none' else '',
+                row.get('cause') or '' if ms != 'none' else '',
+                row.get('repair') or '' if ms != 'none' else '',
+                row.get('wait_min') or '' if ms != 'none' else '',
+                row.get('repair_min') or '' if ms != 'none' else '',
+                row.get('handler') or '' if ms != 'none' else '',
+            ])
+            yield buf.getvalue().encode('utf-8-sig')
+
+    return _gen()

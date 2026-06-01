@@ -234,34 +234,44 @@
   font-size: 13px;
 }
 
-/* Section titles */
+/* Section titles & toolbar */
 .theme-downtime-analysis .section-title {
   font-size: 15px;
   font-weight: 600;
   color: theme('colors.text.primary');
-  margin: 0 0 12px;
+  margin: 0;
 }
 
-/* Tables */
-.theme-downtime-analysis .table-wrapper {
-  overflow-x: auto;
+.theme-downtime-analysis .detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.theme-downtime-analysis .data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.theme-downtime-analysis .data-table th {
-  background: theme('colors.surface.muted');
-  color: theme('colors.text.subtle');
+.theme-downtime-analysis .export-csv-btn {
+  padding: 5px 14px;
+  font-size: 12px;
   font-weight: 600;
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid theme('colors.stroke.soft');
+  border: 1px solid theme('colors.brand.500');
+  border-radius: 4px;
+  background: transparent;
+  color: theme('colors.brand.500');
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
   white-space: nowrap;
 }
+
+.theme-downtime-analysis .export-csv-btn:hover:not(:disabled) {
+  background: theme('colors.brand.500');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .export-csv-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 
 .theme-downtime-analysis .data-table td {
   padding: 7px 10px;
@@ -271,26 +281,6 @@
 
 .theme-downtime-analysis .data-table tr:hover td {
   background: theme('colors.surface.hover');
-}
-
-.theme-downtime-analysis .data-table .row-no-job td {
-  color: theme('colors.text.muted');
-}
-
-/* Sort buttons */
-.theme-downtime-analysis .sort-btn {
-  background: transparent;
-  border: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-  font-weight: 600;
-  text-align: left;
-}
-
-.theme-downtime-analysis .sort-btn:hover {
-  color: theme('colors.brand.500');
 }
 
 /* Status badges */
@@ -348,49 +338,10 @@
   font-size: 12px;
 }
 
-/* Pagination */
-.theme-downtime-analysis .pagination-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 12px 0;
-  font-size: 13px;
-}
-
-.theme-downtime-analysis .page-btn {
-  background: theme('colors.surface.card');
-  border: 1px solid theme('colors.stroke.soft');
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 16px;
-  cursor: pointer;
-  color: theme('colors.text.primary');
-  transition: background 0.12s;
-}
-
-.theme-downtime-analysis .page-btn:hover:not(:disabled) {
-  background: theme('colors.surface.hover');
-}
-
-.theme-downtime-analysis .page-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.theme-downtime-analysis .page-info {
-  color: theme('colors.text.secondary');
-}
-
 /* Empty state */
 .theme-downtime-analysis .empty-state {
   padding: 32px;
   text-align: center;
   color: theme('colors.text.muted');
   font-size: 14px;
-}
-
-/* Event detail table — wider layout */
-.theme-downtime-analysis .event-detail-table {
-  min-width: 1200px;
 }

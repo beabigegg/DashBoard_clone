@@ -1,105 +1,84 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import type { EquipmentDetailRow } from '../types';
+import { computed, ref } from 'vue';
+import DataTable from '../../shared-ui/components/DataTable.vue';
+import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
+import type { EquipmentDetailRow, Pagination } from '../types';
 
 const props = defineProps<{
   rows: EquipmentDetailRow[];
+  pagination: Pagination;
+  exporting?: boolean;
 }>();
 
-type SortKey = keyof EquipmentDetailRow;
-const sortKey = ref<SortKey>('total_hours');
-const sortAsc = ref(false);
+const emit = defineEmits<{
+  (e: 'page-change', page: number): void;
+  (e: 'export'): void;
+}>();
 
-function toggleSort(key: SortKey): void {
-  if (sortKey.value === key) {
-    sortAsc.value = !sortAsc.value;
-  } else {
-    sortKey.value = key;
-    sortAsc.value = false;
-  }
+const tableData = computed(() =>
+  props.rows.map((r) => ({
+    resource_name: r.resource_name ?? r.resource_id,
+    workcenter: r.workcenter ?? '—',
+    family: r.family ?? '—',
+    udt_hours: r.udt_hours,
+    sdt_hours: r.sdt_hours,
+    egt_hours: r.egt_hours,
+    total_hours: r.total_hours,
+    event_count: r.event_count,
+    top_reason: r.top_reason ?? '—',
+  }))
+);
+
+const paginationShape = computed(() => ({
+  page: props.pagination.page,
+  totalPages: props.pagination.total_pages,
+  infoText: `共 ${props.pagination.total_rows} 筆`,
+}));
+
+function formatHours(val: unknown): string {
+  return typeof val === 'number' ? val.toFixed(2) : String(val ?? '');
 }
 
-function sortIndicator(key: SortKey): string {
-  if (sortKey.value !== key) return '';
-  return sortAsc.value ? '▲' : '▼';
-}
-
-const sortedRows = computed(() => {
-  const copy = [...props.rows];
-  copy.sort((a, b) => {
-    const av = a[sortKey.value];
-    const bv = b[sortKey.value];
-    let cmp = 0;
-    if (typeof av === 'number' && typeof bv === 'number') {
-      cmp = av - bv;
-    } else {
-      cmp = String(av ?? '').localeCompare(String(bv ?? ''), 'zh-Hant');
-    }
-    return sortAsc.value ? cmp : -cmp;
-  });
-  return copy;
-});
+// Toolbar ref for focus management
+const exportBtnRef = ref<HTMLButtonElement | null>(null);
 </script>
 
 <template>
   <div class="equipment-detail-section">
-    <h3 class="section-title">設備停機明細</h3>
-    <div v-if="rows.length === 0" class="empty-state" role="status">
-      暫無資料
+    <div class="detail-toolbar">
+      <h3 class="section-title">設備停機明細</h3>
+      <button
+        ref="exportBtnRef"
+        type="button"
+        class="export-csv-btn"
+        :disabled="rows.length === 0 || exporting"
+        @click="emit('export')"
+      >
+        {{ exporting ? '匯出中...' : '↓ 匯出 CSV' }}
+      </button>
     </div>
-    <div v-else class="table-wrapper" role="region" aria-label="設備停機明細表">
-      <table class="data-table" aria-label="設備停機明細">
-        <thead>
-          <tr>
-            <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('resource_name')">
-                設備名稱 {{ sortIndicator('resource_name') }}
-              </button>
-            </th>
-            <th scope="col">工作站</th>
-            <th scope="col">機種</th>
-            <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('udt_hours')">
-                UDT (h) {{ sortIndicator('udt_hours') }}
-              </button>
-            </th>
-            <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('sdt_hours')">
-                SDT (h) {{ sortIndicator('sdt_hours') }}
-              </button>
-            </th>
-            <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('egt_hours')">
-                EGT (h) {{ sortIndicator('egt_hours') }}
-              </button>
-            </th>
-            <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('total_hours')">
-                總計 (h) {{ sortIndicator('total_hours') }}
-              </button>
-            </th>
-            <th scope="col">
-              <button type="button" class="sort-btn" @click="toggleSort('event_count')">
-                事件數 {{ sortIndicator('event_count') }}
-              </button>
-            </th>
-            <th scope="col">主要原因</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in sortedRows" :key="row.resource_id">
-            <td>{{ row.resource_name ?? row.resource_id }}</td>
-            <td>{{ row.workcenter ?? '—' }}</td>
-            <td>{{ row.family ?? '—' }}</td>
-            <td>{{ row.udt_hours.toFixed(2) }}</td>
-            <td>{{ row.sdt_hours.toFixed(2) }}</td>
-            <td>{{ row.egt_hours.toFixed(2) }}</td>
-            <td>{{ row.total_hours.toFixed(2) }}</td>
-            <td>{{ row.event_count }}</td>
-            <td>{{ row.top_reason ?? '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+
+    <DataTable
+      :data="tableData"
+      :pagination="rows.length > 0 ? paginationShape : null"
+      @page-change="(p) => emit('page-change', p)"
+    >
+      <DataTableColumn column-key="resource_name" label="設備名稱" :sortable="true" />
+      <DataTableColumn column-key="workcenter" label="工作站" :sortable="true" />
+      <DataTableColumn column-key="family" label="機種" :sortable="true" />
+      <DataTableColumn column-key="udt_hours" label="UDT (h)" :sortable="true" align="right" />
+      <DataTableColumn column-key="sdt_hours" label="SDT (h)" :sortable="true" align="right" />
+      <DataTableColumn column-key="egt_hours" label="EGT (h)" :sortable="true" align="right" />
+      <DataTableColumn column-key="total_hours" label="總計 (h)" :sortable="true" align="right" />
+      <DataTableColumn column-key="event_count" label="事件數" :sortable="true" align="right" />
+      <DataTableColumn column-key="top_reason" label="主要原因" :sortable="true" />
+
+      <template #cell="{ columnKey, value }">
+        <span v-if="['udt_hours','sdt_hours','egt_hours','total_hours'].includes(columnKey)">
+          {{ formatHours(value) }}
+        </span>
+        <span v-else>{{ value }}</span>
+      </template>
+    </DataTable>
   </div>
 </template>
