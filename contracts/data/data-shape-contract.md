@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.12.1
-last-changed: 2026-05-29
+schema-version: 1.12.2
+last-changed: 2026-06-01
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -819,7 +819,7 @@ Paginated: `page` (default 1), `page_size` (default 50, max 200). Response inclu
 
 **Oracle DATE midnight-UTC handling:** `start_ts` and `end_ts` derive from `OLDLASTSTATUSCHANGEDATE`/`LASTSTATUSCHANGEDATE`. Frontend formatters must apply midnight-UTC detection (raw H/M/S check before `new Date()`) per CLAUDE.md Frontend Date Formatting Notes.
 
-**Spool schema breaking-change surface:** column rename/add/remove to `tmp/query_spool/downtime_analysis/*.parquet` requires `rm tmp/query_spool/downtime_analysis/*.parquet` on deploy/rollback. IT JOBID backfill uses `DOWNTIME_BRIDGE_VERSION` constant to force cache-key change without manual parquet deletion (DA-06).
+**Spool schema breaking-change surface:** column rename/add/remove to `tmp/query_spool/downtime_analysis/*.parquet` requires `rm tmp/query_spool/downtime_analysis/*.parquet` on deploy/rollback. IT JOBID backfill uses `DOWNTIME_BRIDGE_VERSION` constant to force cache-key change without manual parquet deletion (DA-06). Migration of `downtime_analysis_service` to `BatchQueryEngine → execute_plan → merge_chunks_to_spool` (change `batch-rowcount-unification`) does not alter the parquet column schema or namespace; no parquet cleanup is required for this migration alone.
 
 ---
 

@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.13.0] — 2026-06-01
+### Added
+- batch-rowcount-unification: Added "Batch Query Engine Rules" group BQE-01..BQE-07. BQE-01: row-count chunking parity (flag=true path produces identical row set to date-range path; spool column schema identical). BQE-02: decompose_by_row_count correctness (inclusive ranges covering 1..total_rows; four edge cases). BQE-03: deterministic ORDER BY key per service (seven authoritative keys guaranteeing tie-breaking pagination). BQE-04: flag-off fallback guarantee (USE_ROW_COUNT_CHUNKING=false preserves existing behavior; spool TTL/cleanup/memory-guard unaffected). BQE-05: DB_SLOW_POOL_SIZE ceiling (HOLD/JOB/MSD ENGINE_PARALLEL must not exceed pool size). BQE-06: count-vs-paged consistency (completeness guarantee applies to non-concurrent reads; concurrent insert/delete mid-query is documented limitation). BQE-07: downtime_analysis_service migration to BatchQueryEngine; spool schema and namespace unchanged. Additive; no existing rules changed.
+
+## [env 1.0.3] — 2026-06-01
+### Added
+- batch-rowcount-unification: New section "Batch Query Engine — Row-Count Chunking": `USE_ROW_COUNT_CHUNKING` (optional, bool, default false; true activates ROW_NUMBER() CTE paging path; restart required). New section "Engine Parallelism — Hold / Job / MSD": `HOLD_ENGINE_PARALLEL`, `JOB_ENGINE_PARALLEL`, `MSD_ENGINE_PARALLEL` (all optional, positive int, default 1; must not exceed DB_SLOW_POOL_SIZE; restart required). All additive with safe defaults; no existing variable defaults or semantics changed.
+
+## [data 1.12.2] — 2026-06-01
+### Changed
+- batch-rowcount-unification (confirm-only): §3.12.7 spool-schema note clarified — migration of downtime_analysis_service to BatchQueryEngine does not alter the parquet column schema or namespace; no parquet cleanup required for this migration. No column added, removed, or renamed.
+
 ## [api 1.13.1] — 2026-05-29
 ### Changed
 - downtime-analysis-page (post-review patch): `GET /api/downtime-analysis/view` now returns 400 for `granularity` values other than `day` (week/month planned). Added `top_n` to endpoint params column. Removed duplicate CHANGELOG entries from individual contract file bodies. Non-breaking.

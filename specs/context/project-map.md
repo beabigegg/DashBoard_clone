@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 161
-visible-files: 824
-omitted-dirs: 55
+visible-dirs: 171
+visible-files: 836
+omitted-dirs: 59
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -101,7 +101,7 @@ DashBoard_vite/
 |   |   |-- 40bd549cffe1dc41
 |   |   |-- 4104bc5ffa6b7168
 |   |   |-- 41d662f99bd58f37
-|   |   \-- ... (108 more entries truncated; cap=50)
+|   |   \-- ... (117 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -243,6 +243,19 @@ DashBoard_vite/
 |   |   |   |-- unwrap-api-result.ts
 |   |   |   |-- wip-derive.ts
 |   |   |   \-- wip-navigation-state.ts
+|   |   |-- downtime-analysis/
+|   |   |   |-- __tests__/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- components/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- App.vue
+|   |   |   |-- formatDowntimeDate.ts
+|   |   |   |-- index.html
+|   |   |   |-- main.ts
+|   |   |   |-- style.css
+|   |   |   \-- types.ts
 |   |   |-- hold-detail/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -488,6 +501,7 @@ DashBoard_vite/
 |   |   |   |-- resilience/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- _auth.js
+|   |   |   |-- downtime-analysis.spec.js
 |   |   |   |-- hold-history-flat-table.spec.js
 |   |   |   |-- hold-overview.spec.js
 |   |   |   |-- job-abandon-on-unload.spec.js
@@ -537,9 +551,6 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260522_173905.log
-|   |   |-- access_20260529_080754.log
-|   |   |-- access_20260529_081745.log
 |   |   |-- access_20260529_083521.log
 |   |   |-- access_20260529_083822.log
 |   |   |-- access_20260529_084223.log
@@ -547,9 +558,9 @@ DashBoard_vite/
 |   |   |-- access_20260529_122551.log
 |   |   |-- access_20260529_135237.log
 |   |   |-- access_20260529_154707.log
-|   |   |-- error_20260522_173905.log
-|   |   |-- error_20260529_080754.log
-|   |   |-- error_20260529_081745.log
+|   |   |-- access_20260529_182819.log
+|   |   |-- access_20260529_185338.log
+|   |   |-- access_20260601_074822.log
 |   |   |-- error_20260529_083521.log
 |   |   |-- error_20260529_083822.log
 |   |   |-- error_20260529_084223.log
@@ -557,9 +568,9 @@ DashBoard_vite/
 |   |   |-- error_20260529_122551.log
 |   |   |-- error_20260529_135237.log
 |   |   |-- error_20260529_154707.log
-|   |   |-- rq_msd_worker_20260522_173905.log
-|   |   |-- rq_msd_worker_20260529_080754.log
-|   |   |-- rq_msd_worker_20260529_081745.log
+|   |   |-- error_20260529_182819.log
+|   |   |-- error_20260529_185338.log
+|   |   |-- error_20260601_074822.log
 |   |   |-- rq_msd_worker_20260529_083521.log
 |   |   |-- rq_msd_worker_20260529_083822.log
 |   |   |-- rq_msd_worker_20260529_084223.log
@@ -567,9 +578,9 @@ DashBoard_vite/
 |   |   |-- rq_msd_worker_20260529_122551.log
 |   |   |-- rq_msd_worker_20260529_135237.log
 |   |   |-- rq_msd_worker_20260529_154707.log
-|   |   |-- rq_prod_hist_worker_20260522_173905.log
-|   |   |-- rq_prod_hist_worker_20260529_080754.log
-|   |   |-- rq_prod_hist_worker_20260529_081745.log
+|   |   |-- rq_msd_worker_20260529_182819.log
+|   |   |-- rq_msd_worker_20260529_185338.log
+|   |   |-- rq_msd_worker_20260601_074822.log
 |   |   |-- rq_prod_hist_worker_20260529_083521.log
 |   |   |-- rq_prod_hist_worker_20260529_083822.log
 |   |   |-- rq_prod_hist_worker_20260529_084223.log
@@ -577,9 +588,9 @@ DashBoard_vite/
 |   |   |-- rq_prod_hist_worker_20260529_122551.log
 |   |   |-- rq_prod_hist_worker_20260529_135237.log
 |   |   |-- rq_prod_hist_worker_20260529_154707.log
-|   |   |-- rq_reject_worker_20260522_173905.log
-|   |   |-- rq_reject_worker_20260529_080754.log
-|   |   |-- rq_reject_worker_20260529_081745.log
+|   |   |-- rq_prod_hist_worker_20260529_182819.log
+|   |   |-- rq_prod_hist_worker_20260529_185338.log
+|   |   |-- rq_prod_hist_worker_20260601_074822.log
 |   |   |-- rq_reject_worker_20260529_083521.log
 |   |   |-- rq_reject_worker_20260529_083822.log
 |   |   |-- rq_reject_worker_20260529_084223.log
@@ -587,6 +598,9 @@ DashBoard_vite/
 |   |   |-- rq_reject_worker_20260529_122551.log
 |   |   |-- rq_reject_worker_20260529_135237.log
 |   |   |-- rq_reject_worker_20260529_154707.log
+|   |   |-- rq_reject_worker_20260529_182819.log
+|   |   |-- rq_reject_worker_20260529_185338.log
+|   |   |-- rq_reject_worker_20260601_074822.log
 |   |   \-- ... (30 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
@@ -699,6 +713,7 @@ DashBoard_vite/
 |       |   |-- ai_routes.py
 |       |   |-- analytics_routes.py
 |       |   |-- dashboard_routes.py
+|       |   |-- downtime_analysis_routes.py
 |       |   |-- health_routes.py
 |       |   |-- hold_history_routes.py
 |       |   |-- hold_overview_routes.py
@@ -739,6 +754,8 @@ DashBoard_vite/
 |       |   |-- container_filter_cache.py
 |       |   |-- container_resolution_policy.py
 |       |   |-- dashboard_service.py
+|       |   |-- downtime_analysis_cache.py
+|       |   |-- downtime_analysis_service.py
 |       |   |-- event_fetcher.py
 |       |   |-- filter_cache.py
 |       |   |-- hold_dataset_cache.py
@@ -769,13 +786,13 @@ DashBoard_vite/
 |       |   |-- reject_dataset_cache.py
 |       |   |-- reject_history_service.py
 |       |   |-- reject_pareto_materialized.py
-|       |   |-- reject_query_job_service.py
-|       |   |-- resource_cache.py
-|       |   \-- ... (17 more entries truncated; cap=50)
+|       |   \-- ... (19 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
 |       |   |-- dashboard/
+|       |   |   \-- ... (max depth)
+|       |   |-- downtime_analysis/
 |       |   |   \-- ... (max depth)
 |       |   |-- hold_history/
 |       |   |   \-- ... (max depth)
@@ -837,6 +854,7 @@ DashBoard_vite/
 |   |   |-- test_admin_dashboard_e2e.py
 |   |   |-- test_anomaly_overview_e2e.py
 |   |   |-- test_cache_e2e.py
+|   |   |-- test_downtime_analysis_e2e.py
 |   |   |-- test_global_connection.py
 |   |   |-- test_hold_history_e2e.py
 |   |   |-- test_hold_overview_e2e.py
@@ -990,13 +1008,26 @@ DashBoard_vite/
 |   |-- test_dashboard_routes.py
 |   |-- test_dashboard_service.py
 |   |-- test_database_redaction.py
-|   \-- ... (157 more entries truncated; cap=50)
+|   \-- ... (159 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- anomaly_reject_dataset/
+|   |   |   \-- 858f092b53042f96.parquet
 |   |   |-- anomaly_resource_dataset/
 |   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- material_consumption_summary/
-|   |   |   \-- d1f99cbd47195dd0.parquet
+|   |   |-- anomaly_yield_dataset/
+|   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- resource_dataset/
+|   |   |   |-- b42069ee2c991376.parquet
+|   |   |   \-- ed3f090bc1b044e8.parquet
+|   |   |-- resource_oee/
+|   |   |   |-- b42069ee2c991376.parquet
+|   |   |   \-- ed3f090bc1b044e8.parquet
+|   |   |-- yield_alert_dataset/
+|   |   |   |-- b14cb138e6173d12.parquet
+|   |   |   \-- f90475d8fa771e62.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1040,12 +1071,7 @@ DashBoard_vite/
 |   |   |-- probe_112651.json
 |   |   |-- probe_113602.json
 |   |   |-- probe_113603.json
-|   |   |-- probe_113666.json
-|   |   |-- probe_113869.json
-|   |   |-- probe_116133.json
-|   |   |-- probe_116787.json
-|   |   |-- probe_116823.json
-|   |   \-- ... (573 more entries truncated; cap=50)
+|   |   \-- ... (603 more entries truncated; cap=50)
 |   |-- mes_dashboard_restart_state.json
 |   \-- resource_history.duckdb
 |-- tools/

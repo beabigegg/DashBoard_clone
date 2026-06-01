@@ -1,0 +1,17 @@
+change-id: batch-rowcount-unification
+agent: test-strategist
+timestamp: "2026-06-01T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/batch-rowcount-unification/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_batch_query_engine.py ↔ src/mes_dashboard/services/batch_query_engine.py" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_rowcount_flag_parity.py ↔ all 7 service files" }
+  - { type: tdd-pairs, pointer: "tests/test_downtime_analysis_service.py ↔ src/mes_dashboard/services/downtime_analysis_service.py" }
+  - { type: tdd-pairs, pointer: "tests/stress/test_chunk_boundary.py ↔ batch_query_engine.py ROW_NUMBER CTE path" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1), integration (Tier 1), data-boundary (Tier 1), resilience (Tier 1+3), stress (Tier 4), soak (Tier 4)" }
+  - { type: mapping-completeness, pointer: "all 8 ACs covered; 2 new test files (test_rowcount_flag_parity.py, agent-log); 5 existing files extended" }
+next-action: none
+notes: >
+  TDD red tests are TestDecomposeByRowCount and TestFlagFalseRegression — both must fail
+  before implementation. Flag-parity fixtures must straddle chunk boundaries mid-logical-group.
+  Stress/soak are Tier 4 weekly gates only; do not block PR.

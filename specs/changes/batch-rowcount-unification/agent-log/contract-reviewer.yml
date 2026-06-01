@@ -1,0 +1,12 @@
+agent: contract-reviewer
+status: done
+artifacts:
+  - { type: contracts-updated, pointer: "contracts/env/env-contract.md (1.0.2 → 1.0.3), contracts/business/business-rules.md (1.12.1 → 1.13.0), contracts/data/data-shape-contract.md (1.12.1 → 1.12.2)" }
+  - { type: changelog, pointer: "contracts/CHANGELOG.md — three new entries: [business 1.13.0], [env 1.0.3], [data 1.12.2]" }
+  - { type: breaking-changes, pointer: "none — USE_ROW_COUNT_CHUNKING defaults false; ENGINE_PARALLEL defaults 1 (matches sequential); downtime_analysis spool schema/namespace unchanged" }
+  - { type: pending-backend-items, pointer: ".env.example and contracts/env/.env.example.template need 4 new vars (backend-engineer deliverable)" }
+notes: >
+  KEY risk flag: USE_ROW_COUNT_CHUNKING=true must NOT be set in production until
+  flag=true parity tests pass. This pre-condition must appear in ci-gates.md
+  §Promotion Policy. Backend-engineer must also add 4 new vars to .env.example
+  and .env.example.template.

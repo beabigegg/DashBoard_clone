@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.12.1
-last-changed: 2026-05-29
+schema-version: 1.13.0
+last-changed: 2026-06-01
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -240,6 +240,18 @@ breaking-change-policy: deprecate-2-minors
 | DA-04 | Big-category taxonomy | Authoritative OLDREASONNAME → category mapping: `specs/changes/downtime-analysis-page/design.md §Big-category taxonomy`. Eight buckets: 維修, 保養, 換型換線, 換刀清模, 檢查, 待料待指示, 工程 (all EGT events), 其他/未分類. OLDREASONNAME must be `strip()`ped before lookup (Oracle CHAR trailing-space). Unknown or blank → `其他/未分類`. | `tests/test_downtime_analysis_service.py::TestBigCategoryMapping` |
 | DA-05 | Wait/repair hours derivation | `wait_hours = (FIRSTCLOCKONDATE − CREATEDATE)` in hours; `repair_hours = (LASTCLOCKOFFDATE − FIRSTCLOCKONDATE)` in hours. Both null when `match_source = 'none'`. Null `FIRSTCLOCKONDATE` or `LASTCLOCKOFFDATE` on a matched JOB also yields null for the corresponding field. `wait_min` and `repair_min` = hours × 60, rounded to 2 d.p. | `tests/test_downtime_analysis_service.py::TestWaitRepairHours` |
 | DA-06 | IT JOBID backfill cache invalidation | When IT restores `SHIFT.JOBID`, all existing `downtime_analysis_*` spool files serve stale Path-B matches. Invalidation: increment `DOWNTIME_BRIDGE_VERSION` integer in `src/mes_dashboard/config/constants.py` and redeploy; spool cache key includes this constant. Optionally purge `tmp/query_spool/downtime_analysis/*.parquet` immediately. Does not affect `resource_dataset_*` spool. Runbook documented in `ci-gates.md §Rollback Policy`. | `TestDowntimeBridgeVersionKey` |
+
+## Batch Query Engine Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| BQE-01 | Row-count chunking parity | With `USE_ROW_COUNT_CHUNKING=true`, each service's paged path produces the identical complete row set as the date-range path for the same filters — no dropped or duplicated rows at chunk boundaries. Spool parquet column schema is identical between paths (data-shape parity). | integration parity tests; contract shape-parity tests |
+| BQE-02 | `decompose_by_row_count` correctness | `decompose_by_row_count(total_rows, rows_per_chunk)` returns inclusive `(start_row, end_row)` ranges covering exactly `1..total_rows` with no gap and no overlap. Edge cases: `total_rows=0` → empty list; `total_rows < rows_per_chunk` → single range `(1, total_rows)`; `total_rows` exact multiple → last range ends at `total_rows`; `total_rows=1` → `[(1, 1)]`. | unit tests (test_batch_query_engine.py) |
+| BQE-03 | Deterministic ORDER BY key per service | The `ROW_NUMBER()` ORDER BY key must be fully tie-breaking across the entire dataset to guarantee stable pagination with no row duplication or omission at chunk seams. Authoritative per-service ORDER BY keys: `production_history` — `TRACKINTIMESTAMP ASC, CONTAINERID`; `reject_dataset` — `TXN_DAY DESC, CONTAINERNAME ASC`; `resource_dataset` — `HISTORYID ASC, DATA_DATE ASC`; `hold_dataset` — `HOLDTXNDATE DESC, CONTAINERID ASC`; `job_query` — `CREATEDATE DESC, JOBID ASC`; `mid_section_defect` — `TRACKINTIMESTAMP ASC, CONTAINERID ASC`; `downtime_analysis` — `OLDLASTSTATUSCHANGEDATE DESC, HISTORYID ASC`. | data-boundary tests (tie-stability) |
+| BQE-04 | Flag-off fallback guarantee | `USE_ROW_COUNT_CHUNKING=false` (default) — existing date-range chunking path is unchanged for all 7 services. No behavior change on deployment. Spool TTL, cleanup, and memory-guard behavior are unaffected by this flag in either state. | integration tests (flag=false regression) |
+| BQE-05 | DB_SLOW_POOL_SIZE ceiling | `HOLD_ENGINE_PARALLEL`, `JOB_ENGINE_PARALLEL`, `MSD_ENGINE_PARALLEL` must not exceed `DB_SLOW_POOL_SIZE` (production=3, development=2). A value above the ceiling silently saturates the slow pool and causes connection timeouts for other services. | env-validation tests |
+| BQE-06 | Count-vs-paged consistency under non-concurrent reads | The `SELECT COUNT(*)` and paged fetches are executed without intervening DDL or concurrent data changes. Under concurrent data inserts between count and a paged fetch, the engine may see more or fewer rows than the count — this is an accepted and documented limitation. The completeness guarantee (BQE-01) applies only to non-concurrent scenarios. | resilience tests |
+| BQE-07 | `downtime_analysis_service` migration | `downtime_analysis_service` is migrated from direct Oracle→spool to `BatchQueryEngine → execute_plan → merge_chunks_to_spool`. No direct Oracle→spool path remains. Spool output schema and namespace (`tmp/query_spool/downtime_analysis/`) are unchanged. Cache key includes `DOWNTIME_BRIDGE_VERSION` constant (DA-06 unaffected). | integration tests |
 
 ## Change Policy
 

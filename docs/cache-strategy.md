@@ -23,7 +23,7 @@
 
 | 功能模組 | 服務檔案 | 存放路徑 | TTL | Pre-warm | 備註 |
 |---|---|---|---|---|---|
-| Resource History | `services/resource_history_duckdb_cache.py` | `tmp/resource_history.duckdb` | 永久（每日增量） | ✓ 啟動 | 預熱最近 3 個月，含 base_facts / oee_facts 兩表 |
+| Resource History | `services/resource_history_duckdb_cache.py` | `tmp/resource_history.duckdb` | 每日全量重建（sliding 3 個月 window） | ✓ 啟動 | 每天第一次啟動從 Oracle 全量撈近 3 個月並 atomic rename 覆蓋舊檔；同日重啟 reuse；Oracle 補登舊日資料隔天自動修正 |
 | Query Spool（通用） | `core/query_spool_store.py` | `tmp/query_spool/{namespace}/{id}.parquet` | 3h (可調) | ✗ | 所有大查詢結果的 Parquet 暫存層，上限 10 GB，每 5 分鐘清理 |
 | Reject Dataset | `services/reject_dataset_cache.py` | `tmp/query_spool/reject_dataset/` | L1: 15m / L2: 3h | ✓ RQ warmup | 兩層：進程 LRU → Spool |
 | Yield Alert Dataset | `services/yield_alert_dataset_cache.py` | `tmp/query_spool/yield_alert_dataset/` | L1: 30s-5m / L2: 3h | ✓ RQ warmup | 詳情 + linkage 分開存，支援串流寫入 |

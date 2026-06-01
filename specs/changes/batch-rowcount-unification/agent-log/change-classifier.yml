@@ -1,0 +1,13 @@
+agent: change-classifier
+status: done
+artifacts:
+  - { type: tier, pointer: "Tier 1 — high risk, cross-module" }
+  - { type: architecture-review, pointer: "yes — new engine primitive + SQL paging pattern + concurrency change" }
+  - { type: optional-artifacts, pointer: "design.md yes; regression-report.md yes; stress-soak-report.md yes" }
+  - { type: skipped-tasks, pointer: "2.1 (API), 2.2 (CSS/UI), 2.6 (CI/CD contract), 4.2 (frontend), 5.1 (ui-ux), 5.2 (visual)" }
+notes: >
+  Atomic-split considered and rejected — work is repetitive (same pattern 7×),
+  centrally gated by USE_ROW_COUNT_CHUNKING default-off flag, and rollback
+  control is uniform. Keeping as single change.
+  Key design risk flagged: ORDER BY tie-stability (fully deterministic key required
+  per service to prevent row drop/duplicate at chunk boundaries).

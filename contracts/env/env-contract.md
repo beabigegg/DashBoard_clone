@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.2
-last-changed: 2026-05-13
+schema-version: 1.0.3
+last-changed: 2026-06-01
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -90,6 +90,24 @@ breaking-change-policy: deprecate-2-minors
 - `RESOURCE_HISTORY_HISTORICAL_TTL`: Redis TTL for resource-history queries where `end_date < today − 2 days`. Historical data is immutable; default 86400s (24h) vs the general 2h TTL for recent queries. Added by change `resource-history-perf`.
 - `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to load into the persistent DuckDB cache at startup. Background thread starts 10s after worker boot; `0` disables entirely. Default 3 months (~25s Oracle load time, ~15MB DuckDB file). Added by change `resource-history-perf`.
 - `RESOURCE_HISTORY_DUCKDB_PATH`: Path to the persistent DuckDB file that caches the last N months of base_facts + oee_facts. Relative paths resolve against CWD (same as QUERY_SPOOL_DIR). For Docker set to an absolute path on a named volume. File is ~15MB; atomically replaced on each daily refresh. Added by change `resource-history-perf`.
+
+## Batch Query Engine — Row-Count Chunking
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| USE_ROW_COUNT_CHUNKING | batch-engine | all | no | no | false | false | application-team | true or false | yes | uses date-range path (default) |
+
+- `USE_ROW_COUNT_CHUNKING`: When `false` (default), all 7 large-query services use the existing date-range chunking path — no behavior change on deployment. When `true`, activates `decompose_by_row_count()`: each service issues a `SELECT COUNT(*)` first, then fetches rows via `ROW_NUMBER() OVER (ORDER BY <key>) AS rn` + `rn BETWEEN :start_row AND :end_row`. Per-service ORDER BY keys are deterministic and fully tie-breaking (see business-rules.md BQE-03). Must not be set to `true` in production until flag=true parity tests pass (ci-gates.md §Promotion Policy). Added by change `batch-rowcount-unification`.
+
+## Engine Parallelism — Hold / Job / MSD
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| HOLD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (prod=3, dev=2) | yes | uses default 1 (sequential) |
+| JOB_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (prod=3, dev=2) | yes | uses default 1 (sequential) |
+| MSD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (prod=3, dev=2) | yes | uses default 1 (sequential) |
+
+- `HOLD_ENGINE_PARALLEL` / `JOB_ENGINE_PARALLEL` / `MSD_ENGINE_PARALLEL`: Maximum parallel Oracle connections for the respective service's BatchQueryEngine. Hard ceiling: must not exceed `DB_SLOW_POOL_SIZE` (production=3, development=2). A value above the ceiling silently saturates the slow pool and causes connection timeouts for other services. Default `1` (sequential) matches pre-existing behavior. Added by change `batch-rowcount-unification`.
 
 ## Observability / Circuit Breaker
 
