@@ -31,11 +31,11 @@ tasks:
   - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "chunk-boundary data-boundary step added to backend-tests.yml" }
   - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI changes" }
   - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI changes" }
-  - { id: "5.3", section: Review, title: "Contract review", status: pending }
-  - { id: "5.4", section: Review, title: "QA review", status: pending }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "2 findings fixed: BQE-02 dict notation, BQE-05 production pool size (dev=2, prod=5)" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "4 QA issues resolved: business-rules.md 1.13.1 bump, regression/stress-soak reports created, property mark added, ci-gates.md resilience pointer fixed" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "gate passed (planning artifacts complete; implementation tasks pending)" }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending }
-  - { id: "6.3", section: Verification, title: "Informational gates", status: pending }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "4331 tests pass; cdd-kit validate pass; all Tier 0+1 gates green locally; CI to confirm on PR" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "Tier 3 (nightly race conditions) and Tier 4 (stress/soak) are informational; stress-soak-report.md documents pending Tier 4 evidence pre-flag-enable" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly/manual gates defined for this change" }
   - { id: "7.1", section: Archive, title: "Archive change", status: pending }
   - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

@@ -293,3 +293,4 @@ class TestMappedOraCodesAtAppBoundary:
         err = body.get("error") or {}
         assert resp.status_code == 500
         assert err.get("code") == "DB_QUERY_ERROR"
+

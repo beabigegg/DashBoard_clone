@@ -70,17 +70,37 @@ artifacts:
     pointer: "tests/stress/test_chunk_boundary.py::TestChunkSeam (5 cases)"
   - type: tests-added
     pointer: "tests/stress/test_chunk_boundary.py::TestOrderByTieStability (3 cases)"
+  - type: tests-added
+    pointer: "tests/integration/test_rowcount_flag_parity.py::TestFlagFalseRegression (7 cases, AC-2)"
+  - type: tests-added
+    pointer: "tests/integration/test_rowcount_flag_parity.py::TestFlagTrueParity (6 cases, AC-3)"
+  - type: tests-added
+    pointer: "tests/integration/test_rowcount_flag_parity.py::TestSpoolSchemaParity (4 cases, AC-5)"
+  - type: tests-added
+    pointer: "tests/integration/test_rowcount_flag_parity.py::TestSpoolLifecycle (4 cases, AC-7)"
+  - type: tests-added
+    pointer: "tests/integration/test_rowcount_flag_parity.py::TestPartialChunkFailure (2 cases)"
+  - type: tests-added
+    pointer: "tests/test_env_contract.py::TestNewEnvVarsDocumented (5 cases, AC-6)"
+  - type: tests-added
+    pointer: "tests/test_env_contract.py::TestEngineDefaultsMatchContract (5 cases, AC-6)"
   - type: test-output
-    pointer: "4298 passed, 187 skipped in 144.65s (full suite); 141 passed targeted suite"
+    pointer: "4331 passed, 187 skipped in 143.99s (full suite — no regressions)"
   - type: contracts-touched
-    pointer: "n/a (env-contract.md and business-rules.md already authored; CHANGELOG update pending)"
+    pointer: "contracts/env/env-contract.md:98 — added BATCH_QUERY_ROWS_PER_CHUNK row and note (was missing from 1.0.3); bumped schema-version to 1.0.4; CHANGELOG entry at contracts/CHANGELOG.md:[env 1.0.4]"
 
 notes: |
   Phase 0 (env vars) and Phase 1 (decompose_by_row_count + flag-gated service branches) and
-  Phase 2 (downtime migration) all completed in this run.
-  HOLD/JOB/MSD_ENGINE_PARALLEL were already wired in services; only .env files needed.
-  USE_ROW_COUNT_CHUNKING=false by default in all envs (BQE-04).
-  Resource dataset OEE path always uses date-range chunks even when base uses row-count (correct).
-  downtime: single whole-dataset chunk, parallel=1, no paged SQL (ADR-0003).
-  base_events.sql ORDER BY reconciled to OLDLASTSTATUSCHANGEDATE DESC, HISTORYID ASC (BQE-03).
-  CONTRACTS/CHANGELOG.md entry not yet written — pending reviewer approval.
+  Phase 2 (downtime migration) all completed in previous run.
+  This run (Tier 1 test completion): added 23 tests in test_rowcount_flag_parity.py and
+  10 tests in test_env_contract.py.
+  Contract gap discovered and fixed: BATCH_QUERY_ROWS_PER_CHUNK was implemented in
+  batch_query_engine.py but missing from env-contract.md table; added with env 1.0.4 bump.
+  TestPartialChunkFailure placed in test_rowcount_flag_parity.py (not test_oracle_error_path.py)
+  because test_oracle_error_path.py has module-level pytestmark=integration_real which would
+  skip mock-only tests without --run-integration-real flag.
+  Resource dataset execute_plan is called twice (base paged, OEE date-range) when flag=true;
+  test explicitly checks call_args_list[0] (base call) for paged chunk keys.
+  Downtime: has_downtime_events/store_downtime_events imported locally — patched at
+  mes_dashboard.services.downtime_analysis_cache; read_sql_df_slow patched at core.database
+  to avoid Oracle connection for job_bridge query.

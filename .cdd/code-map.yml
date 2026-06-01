@@ -1,6 +1,6 @@
-# generated: 2026-06-01T03:14:05Z by cdd-kit 2.1.2
-# files: 820, src-lines: 227698, map-lines: 17422, compression: 13.1x
-# sources-digest: 00dd539fb22a0159fcb90f929121a950ace799829cecf0e56828ac7e19e0ec98
+# generated: 2026-06-01T04:40:29Z by cdd-kit 2.1.2
+# files: 822, src-lines: 229542, map-lines: 17565, compression: 13.1x
+# sources-digest: bd0d7588638164b16f29cee113a90e04cf2926690ab29d1e5aeb2fe1d5797e55
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -5295,52 +5295,55 @@ src/mes_dashboard/services/auth_service.py:  # 212 lines
     - { name: authenticate, lines: 135-192 }
     - { name: is_admin, lines: 195-212 }
 
-src/mes_dashboard/services/batch_query_engine.py:  # 865 lines
+src/mes_dashboard/services/batch_query_engine.py:  # 931 lines
   imports:
-    - { module: __future__, items: [annotations], line: 30 }
-    - { module: hashlib, items: [], line: 32 }
-    - { module: json, items: [], line: 33 }
-    - { module: logging, items: [], line: 34 }
-    - { module: os, items: [], line: 35 }
-    - { module: tempfile, items: [], line: 36 }
-    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 37 }
-    - { module: datetime, items: [datetime, timedelta], line: 38 }
-    - { module: typing, items: [Any, Callable, Dict, Generator, List, Optional], line: 39 }
-    - { module: pandas, items: [], line: 41 }
-    - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta, serialize_partial_failure_meta], line: 43 }
-    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 47 }
-    - { module: mes_dashboard.core.redis_df_store, items: [redis_chunk_exists, redis_load_chunk, redis_store_chunk], line: 48 }
+    - { module: __future__, items: [annotations], line: 36 }
+    - { module: hashlib, items: [], line: 38 }
+    - { module: json, items: [], line: 39 }
+    - { module: logging, items: [], line: 40 }
+    - { module: os, items: [], line: 41 }
+    - { module: tempfile, items: [], line: 42 }
+    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 43 }
+    - { module: datetime, items: [datetime, timedelta], line: 44 }
+    - { module: typing, items: [Any, Callable, Dict, Generator, List, Optional], line: 45 }
+    - { module: pandas, items: [], line: 47 }
+    - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta, serialize_partial_failure_meta], line: 49 }
+    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 53 }
+    - { module: mes_dashboard.core.redis_df_store, items: [redis_chunk_exists, redis_load_chunk, redis_store_chunk], line: 54 }
   constants:
-    - { name: BATCH_CHUNK_MAX_MEMORY_MB, line: 72 }
-    - { name: BATCH_QUERY_TIME_THRESHOLD_DAYS, line: 76 }
-    - { name: BATCH_QUERY_ID_THRESHOLD, line: 80 }
+    - { name: BATCH_CHUNK_MAX_MEMORY_MB, line: 78 }
+    - { name: BATCH_QUERY_TIME_THRESHOLD_DAYS, line: 82 }
+    - { name: BATCH_QUERY_ID_THRESHOLD, line: 86 }
+    - { name: BATCH_QUERY_ROWS_PER_CHUNK, line: 90 }
   classes:
     - name: MergeChunksMaxRowsExceeded
-      lines: 544-554
+      lines: 600-610
       methods:
-        - { name: __init__, lines: 547-554 }
+        - { name: __init__, lines: 603-610 }
     - name: ChunkSchemaMismatch
-      lines: 557-572
+      lines: 613-628
       methods:
-        - { name: __init__, lines: 565-572 }
+        - { name: __init__, lines: 621-628 }
   functions:
-    - { name: decompose_by_time_range, lines: 90-130 }
-    - { name: decompose_by_ids, lines: 138-154 }
-    - { name: compute_query_hash, lines: 162-175 }
-    - { name: _canonicalize, lines: 178-191 }
-    - { name: _update_progress, lines: 199-236 }
-    - { name: get_batch_progress, lines: 239-252 }
-    - { name: execute_plan, lines: 264-364 }
-    - { name: _effective_parallelism, lines: 367-389 }
-    - { name: _execute_single_chunk, lines: 392-452 }
-    - { name: _execute_parallel, lines: 455-526 }
-    - { name: _is_retryable_error, lines: 529-536 }
-    - { name: merge_chunks, lines: 575-654 }
-    - { name: iterate_chunks, lines: 657-676 }
-    - { name: _promote_null_schema, lines: 684-705 }
-    - { name: merge_chunks_to_spool, lines: 708-845 }
-    - { name: should_decompose_by_time, lines: 853-860 }
-    - { name: should_decompose_by_ids, lines: 863-865 }
+    - { name: decompose_by_time_range, lines: 104-144 }
+    - { name: decompose_by_ids, lines: 152-168 }
+    - { name: decompose_by_row_count, lines: 176-210 }
+    - { name: compute_query_hash, lines: 218-231 }
+    - { name: _canonicalize, lines: 234-247 }
+    - { name: _update_progress, lines: 255-292 }
+    - { name: get_batch_progress, lines: 295-308 }
+    - { name: execute_plan, lines: 320-420 }
+    - { name: _effective_parallelism, lines: 423-445 }
+    - { name: _execute_single_chunk, lines: 448-508 }
+    - { name: _execute_parallel, lines: 511-582 }
+    - { name: _is_retryable_error, lines: 585-592 }
+    - { name: merge_chunks, lines: 631-710 }
+    - { name: iterate_chunks, lines: 713-732 }
+    - { name: _promote_null_schema, lines: 740-761 }
+    - { name: merge_chunks_to_spool, lines: 764-901 }
+    - { name: should_decompose_by_time, lines: 909-916 }
+    - { name: should_decompose_by_ids, lines: 919-921 }
+    - { name: should_decompose_by_row_count, lines: 924-931 }
 
 src/mes_dashboard/services/container_filter_cache.py:  # 490 lines
   imports:
@@ -5427,7 +5430,7 @@ src/mes_dashboard/services/downtime_analysis_cache.py:  # 91 lines
     - { name: store_downtime_events, lines: 64-76 }
     - { name: load_downtime_events, lines: 79-91 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1030 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1084 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5450,17 +5453,17 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1030 lines
     - { name: _ts_to_iso, lines: 457-466 }
     - { name: make_downtime_query_id, lines: 473-478 }
     - { name: get_filter_options, lines: 485-573 }
-    - { name: query_downtime_dataset, lines: 580-671 }
-    - { name: _apply_resource_filters, lines: 674-746 }
-    - { name: _empty_events_df, lines: 749-756 }
-    - { name: _build_response, lines: 763-776 }
-    - { name: _build_summary, lines: 779-805 }
-    - { name: _build_daily_trend, lines: 808-829 }
-    - { name: _build_big_category, lines: 832-851 }
-    - { name: _build_top_reasons, lines: 854-880 }
-    - { name: apply_view, lines: 887-927 }
-    - { name: _build_equipment_detail, lines: 930-967 }
-    - { name: _build_event_detail_page, lines: 970-1030 }
+    - { name: query_downtime_dataset, lines: 580-725 }
+    - { name: _apply_resource_filters, lines: 728-800 }
+    - { name: _empty_events_df, lines: 803-810 }
+    - { name: _build_response, lines: 817-830 }
+    - { name: _build_summary, lines: 833-859 }
+    - { name: _build_daily_trend, lines: 862-883 }
+    - { name: _build_big_category, lines: 886-905 }
+    - { name: _build_top_reasons, lines: 908-934 }
+    - { name: apply_view, lines: 941-981 }
+    - { name: _build_equipment_detail, lines: 984-1021 }
+    - { name: _build_event_detail_page, lines: 1024-1084 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -5543,7 +5546,7 @@ src/mes_dashboard/services/filter_cache.py:  # 637 lines
     - { name: _extract_workcenter_data_from_df, lines: 588-624 }
     - { name: init_cache, lines: 631-637 }
 
-src/mes_dashboard/services/hold_dataset_cache.py:  # 369 lines
+src/mes_dashboard/services/hold_dataset_cache.py:  # 409 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -5568,11 +5571,11 @@ src/mes_dashboard/services/hold_dataset_cache.py:  # 369 lines
     - { name: _store_query_dates, lines: 91-103 }
     - { name: _get_query_dates, lines: 106-117 }
     - { name: _store_df, lines: 120-123 }
-    - { name: execute_primary_query, lines: 131-252 }
-    - { name: apply_view, lines: 260-317 }
-    - { name: _empty_views, lines: 320-334 }
-    - { name: make_canonical_warmup_query_id, lines: 347-349 }
-    - { name: ensure_dataset_loaded, lines: 352-369 }
+    - { name: execute_primary_query, lines: 131-292 }
+    - { name: apply_view, lines: 300-357 }
+    - { name: _empty_views, lines: 360-374 }
+    - { name: make_canonical_warmup_query_id, lines: 387-389 }
+    - { name: ensure_dataset_loaded, lines: 392-409 }
 
 src/mes_dashboard/services/hold_history_service.py:  # 507 lines
   imports:
@@ -5708,7 +5711,7 @@ src/mes_dashboard/services/internal_metrics_service.py:  # 356 lines
     - { name: _collect_rq, lines: 276-331 }
     - { name: collect_internal_metrics, lines: 338-353 }
 
-src/mes_dashboard/services/job_query_service.py:  # 524 lines
+src/mes_dashboard/services/job_query_service.py:  # 557 lines
   imports:
     - { module: csv, items: [], line: 16 }
     - { module: io, items: [], line: 17 }
@@ -5730,10 +5733,10 @@ src/mes_dashboard/services/job_query_service.py:  # 524 lines
     - { name: validate_date_range, lines: 42-65 }
     - { name: _build_resource_filter, lines: 72-99 }
     - { name: _build_resource_filter_sql, lines: 102-137 }
-    - { name: get_jobs_by_resources, lines: 149-310 }
-    - { name: get_job_txn_history, lines: 313-358 }
-    - { name: export_jobs_with_history, lines: 365-458 }
-    - { name: get_export_data, lines: 461-524 }
+    - { name: get_jobs_by_resources, lines: 149-343 }
+    - { name: get_job_txn_history, lines: 346-391 }
+    - { name: export_jobs_with_history, lines: 398-491 }
+    - { name: get_export_data, lines: 494-557 }
 
 src/mes_dashboard/services/lineage_engine.py:  # 853 lines
   imports:
@@ -5925,7 +5928,7 @@ src/mes_dashboard/services/material_trace_service.py:  # 945 lines
     - { name: execute_to_spool, lines: 819-916 }
     - { name: rq_material_trace_job, lines: 919-945 }
 
-src/mes_dashboard/services/mid_section_defect_service.py:  # 3057 lines
+src/mes_dashboard/services/mid_section_defect_service.py:  # 3102 lines
   imports:
     - { module: csv, items: [], line: 35 }
     - { module: io, items: [], line: 36 }
@@ -5987,34 +5990,34 @@ src/mes_dashboard/services/mid_section_defect_service.py:  # 3057 lines
     - { name: _validate_station, lines: 1352-1356 }
     - { name: _validate_params, lines: 1359-1370 }
     - { name: _build_station_filter, lines: 1377-1416 }
-    - { name: _fetch_station_detection_data, lines: 1423-1591 }
-    - { name: _build_expanded_detection_cids, lines: 1594-1618 }
-    - { name: _fetch_detection_by_container_ids, lines: 1621-1674 }
-    - { name: _run_backward_pipeline, lines: 1681-1761 }
-    - { name: _run_forward_pipeline, lines: 1768-1872 }
-    - { name: _resolve_full_genealogy, lines: 1879-1887 }
-    - { name: _log_genealogy_summary, lines: 1890-1901 }
-    - { name: _fetch_upstream_history, lines: 1908-1934 }
-    - { name: _fetch_downstream_rejects, lines: 1941-1980 }
-    - { name: _normalize_lineage_ancestors, lines: 1983-2020 }
-    - { name: _normalize_upstream_event_records, lines: 2023-2048 }
-    - { name: _normalize_materials_event_records, lines: 2051-2075 }
-    - { name: _normalize_downstream_event_records, lines: 2078-2102 }
-    - { name: _build_trace_quality_meta, lines: 2105-2127 }
-    - { name: _build_detection_lookup, lines: 2134-2176 }
-    - { name: _attribute_defects, lines: 2183-2282 }
-    - { name: _attribute_materials, lines: 2285-2345 }
-    - { name: _attribute_wafer_roots, lines: 2348-2395 }
-    - { name: _attribute_forward_defects, lines: 2402-2479 }
-    - { name: _build_kpi, lines: 2486-2531 }
-    - { name: _build_forward_kpi, lines: 2534-2560 }
-    - { name: _build_chart_data, lines: 2567-2624 }
-    - { name: _build_loss_reason_chart, lines: 2627-2662 }
-    - { name: _build_all_charts, lines: 2665-2713 }
-    - { name: _build_forward_charts, lines: 2716-2824 }
-    - { name: _build_daily_trend, lines: 2831-2878 }
-    - { name: _build_detail_table, lines: 2885-2985 }
-    - { name: _build_forward_detail_table, lines: 2988-3057 }
+    - { name: _fetch_station_detection_data, lines: 1423-1636 }
+    - { name: _build_expanded_detection_cids, lines: 1639-1663 }
+    - { name: _fetch_detection_by_container_ids, lines: 1666-1719 }
+    - { name: _run_backward_pipeline, lines: 1726-1806 }
+    - { name: _run_forward_pipeline, lines: 1813-1917 }
+    - { name: _resolve_full_genealogy, lines: 1924-1932 }
+    - { name: _log_genealogy_summary, lines: 1935-1946 }
+    - { name: _fetch_upstream_history, lines: 1953-1979 }
+    - { name: _fetch_downstream_rejects, lines: 1986-2025 }
+    - { name: _normalize_lineage_ancestors, lines: 2028-2065 }
+    - { name: _normalize_upstream_event_records, lines: 2068-2093 }
+    - { name: _normalize_materials_event_records, lines: 2096-2120 }
+    - { name: _normalize_downstream_event_records, lines: 2123-2147 }
+    - { name: _build_trace_quality_meta, lines: 2150-2172 }
+    - { name: _build_detection_lookup, lines: 2179-2221 }
+    - { name: _attribute_defects, lines: 2228-2327 }
+    - { name: _attribute_materials, lines: 2330-2390 }
+    - { name: _attribute_wafer_roots, lines: 2393-2440 }
+    - { name: _attribute_forward_defects, lines: 2447-2524 }
+    - { name: _build_kpi, lines: 2531-2576 }
+    - { name: _build_forward_kpi, lines: 2579-2605 }
+    - { name: _build_chart_data, lines: 2612-2669 }
+    - { name: _build_loss_reason_chart, lines: 2672-2707 }
+    - { name: _build_all_charts, lines: 2710-2758 }
+    - { name: _build_forward_charts, lines: 2761-2869 }
+    - { name: _build_daily_trend, lines: 2876-2923 }
+    - { name: _build_detail_table, lines: 2930-3030 }
+    - { name: _build_forward_detail_table, lines: 3033-3102 }
 
 src/mes_dashboard/services/msd_duckdb_runtime.py:  # 1617 lines
   imports:
@@ -6168,7 +6171,7 @@ src/mes_dashboard/services/production_history_job_service.py:  # 138 lines
     - { name: enqueue_production_history_query, lines: 62-86 }
     - { name: execute_production_history_job, lines: 93-138 }
 
-src/mes_dashboard/services/production_history_service.py:  # 700 lines
+src/mes_dashboard/services/production_history_service.py:  # 757 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -6182,28 +6185,29 @@ src/mes_dashboard/services/production_history_service.py:  # 700 lines
     - { module: mes_dashboard.core.request_validation, items: [WildcardToken, parse_wildcard_tokens], line: 27 }
     - { module: mes_dashboard.core.global_concurrency, items: [acquire_heavy_query_slot, release_heavy_query_slot], line: 31 }
     - { module: mes_dashboard.core.query_spool_store, items: [QUERY_SPOOL_DIR, QUERY_SPOOL_TTL_SECONDS, get_spool_file_path, get_spool_metadata, register_spool_file], line: 35 }
-    - { module: mes_dashboard.services.batch_query_engine, items: [compute_query_hash, decompose_by_time_range, execute_plan, get_batch_progress, merge_chunks_to_spool], line: 42 }
-    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 49 }
+    - { module: mes_dashboard.services.batch_query_engine, items: [_USE_ROW_COUNT_CHUNKING, BATCH_QUERY_ROWS_PER_CHUNK, compute_query_hash, decompose_by_row_count, decompose_by_time_range, execute_plan, get_batch_progress, merge_chunks_to_spool], line: 42 }
+    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 52 }
   constants:
-    - { name: MAX_DATE_RANGE_DAYS, line: 60 }
-    - { name: ENGINE_GRAIN_DAYS, line: 61 }
-    - { name: MAX_ROWS_PER_CHUNK, line: 62 }
-    - { name: MAX_PARENT_TRACE_DEPTH, line: 63 }
-    - { name: DEFAULT_PAGE_SIZE, line: 65 }
+    - { name: MAX_DATE_RANGE_DAYS, line: 63 }
+    - { name: ENGINE_GRAIN_DAYS, line: 64 }
+    - { name: MAX_ROWS_PER_CHUNK, line: 65 }
+    - { name: MAX_PARENT_TRACE_DEPTH, line: 66 }
+    - { name: DEFAULT_PAGE_SIZE, line: 68 }
   functions:
-    - { name: _parse_date, lines: 72-76 }
-    - { name: _end_date_exclusive, lines: 79-81 }
-    - { name: validate_query_params, lines: 86-196 }
-    - { name: _build_extra_filters, lines: 201-298 }
-    - { name: _make_chunk_query_fn, lines: 303-339 }
-    - { name: _resolve_lot_ids_with_trace, lines: 344-409 }
-    - { name: _resolve_container_ids_by_names, lines: 412-436 }
-    - { name: get_type_options, lines: 445-452 }
-    - { name: query_production_history, lines: 457-539 }
-    - { name: _make_dataset_id, lines: 542-574 }
-    - { name: _run_oracle_to_spool, lines: 577-635 }
-    - { name: make_canonical_spool_id, lines: 649-659 }
-    - { name: query_row_count, lines: 662-700 }
+    - { name: _parse_date, lines: 75-79 }
+    - { name: _end_date_exclusive, lines: 82-84 }
+    - { name: validate_query_params, lines: 89-199 }
+    - { name: _build_extra_filters, lines: 204-301 }
+    - { name: _make_chunk_query_fn, lines: 306-342 }
+    - { name: _make_paged_query_fn, lines: 345-373 }
+    - { name: _resolve_lot_ids_with_trace, lines: 378-443 }
+    - { name: _resolve_container_ids_by_names, lines: 446-470 }
+    - { name: get_type_options, lines: 479-486 }
+    - { name: query_production_history, lines: 491-573 }
+    - { name: _make_dataset_id, lines: 576-608 }
+    - { name: _run_oracle_to_spool, lines: 611-692 }
+    - { name: make_canonical_spool_id, lines: 706-716 }
+    - { name: query_row_count, lines: 719-757 }
 
 src/mes_dashboard/services/production_history_sql_runtime.py:  # 1047 lines
   imports:
@@ -6492,7 +6496,7 @@ src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1047 lines
     - { name: try_compute_view_from_spool, lines: 626-892 }
     - { name: try_iter_export_rows_from_spool, lines: 895-1047 }
 
-src/mes_dashboard/services/reject_dataset_cache.py:  # 1916 lines
+src/mes_dashboard/services/reject_dataset_cache.py:  # 2008 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6543,26 +6547,26 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 1916 lines
     - { name: _maybe_collect_after_interactive_compute, lines: 397-399 }
     - { name: _read_sql_with_caller, lines: 402-408 }
     - { name: resolve_containers, lines: 423-470 }
-    - { name: _execute_and_spool, lines: 478-719 }
-    - { name: execute_primary_query, lines: 727-1115 }
-    - { name: ensure_dataset_loaded, lines: 1118-1155 }
-    - { name: _apply_policy_filters, lines: 1158-1206 }
-    - { name: apply_view, lines: 1214-1267 }
-    - { name: _apply_supplementary_filters, lines: 1270-1309 }
-    - { name: _normalize_pareto_values, lines: 1312-1321 }
-    - { name: _apply_pareto_selection_filter, lines: 1324-1371 }
-    - { name: _paginate_detail, lines: 1374-1466 }
-    - { name: _extract_available_filters, lines: 1469-1475 }
-    - { name: _project_pareto_guard_frame, lines: 1496-1513 }
-    - { name: _normalize_metric_mode, lines: 1516-1520 }
-    - { name: _normalize_pareto_scope, lines: 1523-1527 }
-    - { name: _normalize_pareto_display_scope, lines: 1530-1534 }
-    - { name: _normalize_pareto_selections, lines: 1537-1550 }
-    - { name: _build_dimension_pareto_items, lines: 1553-1618 }
-    - { name: _apply_cross_filter, lines: 1621-1648 }
-    - { name: compute_dimension_pareto, lines: 1651-1759 }
-    - { name: compute_batch_pareto, lines: 1762-1855 }
-    - { name: export_csv_from_cache, lines: 1863-1916 }
+    - { name: _execute_and_spool, lines: 478-788 }
+    - { name: execute_primary_query, lines: 796-1207 }
+    - { name: ensure_dataset_loaded, lines: 1210-1247 }
+    - { name: _apply_policy_filters, lines: 1250-1298 }
+    - { name: apply_view, lines: 1306-1359 }
+    - { name: _apply_supplementary_filters, lines: 1362-1401 }
+    - { name: _normalize_pareto_values, lines: 1404-1413 }
+    - { name: _apply_pareto_selection_filter, lines: 1416-1463 }
+    - { name: _paginate_detail, lines: 1466-1558 }
+    - { name: _extract_available_filters, lines: 1561-1567 }
+    - { name: _project_pareto_guard_frame, lines: 1588-1605 }
+    - { name: _normalize_metric_mode, lines: 1608-1612 }
+    - { name: _normalize_pareto_scope, lines: 1615-1619 }
+    - { name: _normalize_pareto_display_scope, lines: 1622-1626 }
+    - { name: _normalize_pareto_selections, lines: 1629-1642 }
+    - { name: _build_dimension_pareto_items, lines: 1645-1710 }
+    - { name: _apply_cross_filter, lines: 1713-1740 }
+    - { name: compute_dimension_pareto, lines: 1743-1851 }
+    - { name: compute_batch_pareto, lines: 1854-1947 }
+    - { name: export_csv_from_cache, lines: 1955-2008 }
 
 src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
   imports:
@@ -6777,7 +6781,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1250 lines
     - { name: get_vendors, lines: 1220-1222 }
     - { name: get_resource_cascade_metadata, lines: 1225-1250 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 582 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 625 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6804,14 +6808,14 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 582 lines
     - { name: _get_resource_lookup, lines: 117-128 }
     - { name: _get_workcenter_mapping, lines: 131-138 }
     - { name: _get_filtered_resources_and_lookup, lines: 141-169 }
-    - { name: execute_primary_query, lines: 177-443 }
-    - { name: apply_view, lines: 451-478 }
-    - { name: _empty_summary, lines: 481-487 }
-    - { name: _empty_detail, lines: 490-491 }
-    - { name: _empty_kpi, lines: 494-515 }
-    - { name: make_canonical_base_query_id, lines: 532-543 }
-    - { name: make_canonical_oee_query_id, lines: 546-557 }
-    - { name: ensure_dataset_loaded, lines: 560-582 }
+    - { name: execute_primary_query, lines: 177-486 }
+    - { name: apply_view, lines: 494-521 }
+    - { name: _empty_summary, lines: 524-530 }
+    - { name: _empty_detail, lines: 533-534 }
+    - { name: _empty_kpi, lines: 537-558 }
+    - { name: make_canonical_base_query_id, lines: 575-586 }
+    - { name: make_canonical_oee_query_id, lines: 589-600 }
+    - { name: ensure_dataset_loaded, lines: 603-625 }
 
 src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 332 lines
   imports:
@@ -8617,7 +8621,7 @@ tests/integration/test_oracle_error_codes.py:  # 180 lines
     - { name: _reset_circuit_breaker, lines: 33-43 }
     - { name: _make_minimal_app, lines: 46-64 }
 
-tests/integration/test_oracle_error_path.py:  # 295 lines
+tests/integration/test_oracle_error_path.py:  # 296 lines
   imports:
     - { module: __future__, items: [annotations], line: 43 }
     - { module: pytest, items: [], line: 45 }
@@ -8761,6 +8765,57 @@ tests/integration/test_redis_timeout_fallback.py:  # 295 lines
         - { name: test_fresh_client_reconnects_after_simulated_error, lines: 276-295 }
   functions:
     - { name: _make_redis, lines: 31-38 }
+
+tests/integration/test_rowcount_flag_parity.py:  # 772 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: pandas, items: [], line: 20 }
+    - { module: pytest, items: [], line: 21 }
+    - { module: unittest.mock, items: [MagicMock, patch, call], line: 22 }
+  classes:
+    - name: TestFlagFalseRegression
+      lines: 59-282
+      methods:
+        - { name: test_production_history_flag_false_uses_date_chunks, lines: 67-104 }
+        - { name: test_hold_dataset_flag_false_uses_date_chunks, lines: 106-128 }
+        - { name: test_reject_dataset_flag_false_uses_date_chunks, lines: 130-155 }
+        - { name: test_resource_dataset_flag_false_uses_date_chunks, lines: 157-190 }
+        - { name: test_job_query_flag_false_uses_date_chunks, lines: 192-215 }
+        - { name: test_mid_section_defect_flag_false_uses_date_chunks, lines: 217-242 }
+        - { name: test_downtime_analysis_flag_false_uses_execute_plan, lines: 244-282 }
+    - name: TestFlagTrueParity
+      lines: 289-495
+      methods:
+        - { name: test_production_history_flag_true_calls_paged_chunks, lines: 295-332 }
+        - { name: test_hold_dataset_flag_true_calls_paged_chunks, lines: 334-360 }
+        - { name: test_reject_dataset_flag_true_calls_paged_chunks, lines: 362-393 }
+        - { name: test_resource_dataset_flag_true_calls_paged_chunks, lines: 395-433 }
+        - { name: test_job_query_flag_true_calls_paged_chunks, lines: 435-464 }
+        - { name: test_mid_section_defect_flag_true_calls_paged_chunks, lines: 466-495 }
+    - name: TestSpoolSchemaParity
+      lines: 502-554
+      methods:
+        - { name: test_row_count_chunks_have_start_row_end_row_only, lines: 507-515 }
+        - { name: test_date_range_chunks_have_chunk_start_chunk_end_only, lines: 517-526 }
+        - { name: test_paged_chunks_are_1_based_inclusive_no_gap_no_overlap, lines: 528-541 }
+        - { name: test_paged_and_date_range_chunk_keys_are_disjoint, lines: 543-554 }
+    - name: TestSpoolLifecycle
+      lines: 561-678
+      methods:
+        - { name: test_production_history_cache_prefix_is_prod_hist_flag_true, lines: 567-600 }
+        - { name: test_downtime_cache_prefix_is_downtime_analysis, lines: 602-628 }
+        - { name: test_hold_cache_prefix_is_hold_flag_false, lines: 630-650 }
+        - { name: test_downtime_parallel_is_1_whole_dataset, lines: 652-678 }
+    - name: TestPartialChunkFailure
+      lines: 685-772
+      methods:
+        - { name: test_execute_plan_raises_skips_merge_chunks_to_spool, lines: 695-733 }
+        - { name: test_merge_chunks_returning_none_prevents_spool_registration, lines: 735-772 }
+  functions:
+    - { name: _make_count_df, lines: 29-31 }
+    - { name: _make_chunk_df, lines: 34-36 }
+    - { name: _extract_chunks_from_execute_plan_call, lines: 39-47 }
+    - { name: _chunk_key_sets, lines: 50-52 }
 
 tests/integration/test_soak_workload.py:  # 847 lines
   imports:
@@ -9294,7 +9349,7 @@ tests/stress/test_async_job_stress.py:  # 311 lines
     - { name: _production_history_payload, lines: 34-47 }
     - { name: _yield_alert_payload, lines: 50-52 }
 
-tests/stress/test_chunk_boundary.py:  # 275 lines
+tests/stress/test_chunk_boundary.py:  # 395 lines
   imports:
     - { module: os, items: [], line: 16 }
     - { module: time, items: [], line: 17 }
@@ -9325,6 +9380,22 @@ tests/stress/test_chunk_boundary.py:  # 275 lines
       methods:
         - { name: test_date_range_batch_decomposition, lines: 240-256 }
         - { name: test_id_batch_decomposition, lines: 262-275 }
+    - name: TestChunkSeam
+      lines: 288-355
+      methods:
+        - { name: _import, lines: 291-296 }
+        - { name: test_rn_start_row_included, lines: 298-305 }
+        - { name: test_rn_end_row_included, lines: 307-316 }
+        - { name: test_no_row_duplicated_across_adjacent_chunks, lines: 318-328 }
+        - { name: test_no_row_dropped_at_adjacent_chunk_boundary, lines: 330-339 }
+        - { name: test_boundary_mid_logical_group_no_split_artifact, lines: 341-355 }
+    - name: TestOrderByTieStability
+      lines: 358-395
+      methods:
+        - { name: _sql_path, lines: 361-365 }
+        - { name: test_production_history_tie_stable_across_chunks, lines: 367-375 }
+        - { name: test_reject_dataset_tie_stable, lines: 377-385 }
+        - { name: test_hold_dataset_tie_stable, lines: 387-395 }
   functions:
     - { name: _post, lines: 31-47 }
     - { name: _get, lines: 50-61 }
@@ -10819,7 +10890,7 @@ tests/test_auth_service.py:  # 230 lines
   functions:
     - { name: _ldap_defaults, lines: 19-22 }  # @pytest.fixture(autouse=True)
 
-tests/test_batch_query_engine.py:  # 1010 lines
+tests/test_batch_query_engine.py:  # 1272 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: pathlib, items: [Path], line: 5 }
@@ -10829,93 +10900,133 @@ tests/test_batch_query_engine.py:  # 1010 lines
     - { module: mes_dashboard.services.batch_query_engine, items: [MergeChunksMaxRowsExceeded, compute_query_hash, decompose_by_ids, decompose_by_time_range, execute_plan, merge_chunks, should_decompose_by_time, should_decompose_by_ids], line: 11 }
   classes:
     - name: TestDecomposeByTimeRange
-      lines: 28-77
+      lines: 32-81
       methods:
-        - { name: test_90_days_yields_3_chunks, lines: 29-37 }
-        - { name: test_31_days_yields_1_chunk, lines: 39-42 }
-        - { name: test_single_day, lines: 44-47 }
-        - { name: test_contiguous_no_overlap_no_gap, lines: 49-63 }
-        - { name: test_final_chunk_may_be_shorter, lines: 65-69 }
-        - { name: test_inverted_range_raises, lines: 71-73 }
-        - { name: test_365_days, lines: 75-77 }
+        - { name: test_90_days_yields_3_chunks, lines: 33-41 }
+        - { name: test_31_days_yields_1_chunk, lines: 43-46 }
+        - { name: test_single_day, lines: 48-51 }
+        - { name: test_contiguous_no_overlap_no_gap, lines: 53-67 }
+        - { name: test_final_chunk_may_be_shorter, lines: 69-73 }
+        - { name: test_inverted_range_raises, lines: 75-77 }
+        - { name: test_365_days, lines: 79-81 }
     - name: TestDecomposeByIds
-      lines: 85-106
+      lines: 89-110
       methods:
-        - { name: test_2500_ids_yields_3_batches, lines: 86-92 }
-        - { name: test_500_ids_yields_1_batch, lines: 94-98 }
-        - { name: test_empty_ids, lines: 100-101 }
-        - { name: test_exact_batch_size, lines: 103-106 }
+        - { name: test_2500_ids_yields_3_batches, lines: 90-96 }
+        - { name: test_500_ids_yields_1_batch, lines: 98-102 }
+        - { name: test_empty_ids, lines: 104-105 }
+        - { name: test_exact_batch_size, lines: 107-110 }
     - name: TestExecutePlanSequential
-      lines: 114-157
+      lines: 118-161
       methods:
-        - { name: _mock_redis, lines: 115-124 }
-        - { name: test_sequential_execution_stores_chunks, lines: 126-157 }
+        - { name: _mock_redis, lines: 119-128 }
+        - { name: test_sequential_execution_stores_chunks, lines: 130-161 }
     - name: TestExecutePlanParallel
-      lines: 165-198
+      lines: 169-202
       methods:
-        - { name: test_parallel_uses_threadpool, lines: 166-198 }
+        - { name: test_parallel_uses_threadpool, lines: 170-202 }
     - name: TestPartialCacheHit
-      lines: 206-255
+      lines: 210-259
       methods:
-        - { name: test_skips_cached_chunks, lines: 207-255 }
+        - { name: test_skips_cached_chunks, lines: 211-259 }
     - name: TestMemoryGuard
-      lines: 263-296
+      lines: 267-300
       methods:
-        - { name: test_oversized_chunk_discarded, lines: 264-296 }
+        - { name: test_oversized_chunk_discarded, lines: 268-300 }
     - name: TestMaxRowsPerChunk
-      lines: 304-333
+      lines: 308-337
       methods:
-        - { name: test_max_rows_passed_to_query_fn, lines: 305-333 }
+        - { name: test_max_rows_passed_to_query_fn, lines: 309-337 }
     - name: TestMergeChunks
-      lines: 341-449
+      lines: 345-453
       methods:
-        - { name: test_merge_produces_correct_df, lines: 342-366 }
-        - { name: test_merge_respects_max_total_rows, lines: 368-392 }
-        - { name: test_merge_raises_when_overflow_mode_error, lines: 394-420 }
-        - { name: test_merge_raises_when_cap_already_reached_and_next_chunk_exists, lines: 422-449 }
+        - { name: test_merge_produces_correct_df, lines: 346-370 }
+        - { name: test_merge_respects_max_total_rows, lines: 372-396 }
+        - { name: test_merge_raises_when_overflow_mode_error, lines: 398-424 }
+        - { name: test_merge_raises_when_cap_already_reached_and_next_chunk_exists, lines: 426-453 }
     - name: TestProgressTracking
-      lines: 457-498
+      lines: 461-502
       methods:
-        - { name: test_hset_updated_after_each_chunk, lines: 458-498 }
+        - { name: test_hset_updated_after_each_chunk, lines: 462-502 }
     - name: TestChunkFailureResilience
-      lines: 506-596
+      lines: 510-600
       methods:
-        - { name: test_one_chunk_fails_others_complete, lines: 507-552 }
-        - { name: test_chunk_store_failure_is_marked_partial, lines: 554-596 }
+        - { name: test_one_chunk_fails_others_complete, lines: 511-556 }
+        - { name: test_chunk_store_failure_is_marked_partial, lines: 558-600 }
     - name: TestQueryHash
-      lines: 604-617
+      lines: 608-621
       methods:
-        - { name: test_same_params_different_order, lines: 605-608 }
-        - { name: test_different_params_different_hash, lines: 610-613 }
-        - { name: test_hash_is_16_chars, lines: 615-617 }
+        - { name: test_same_params_different_order, lines: 609-612 }
+        - { name: test_different_params_different_hash, lines: 614-617 }
+        - { name: test_hash_is_16_chars, lines: 619-621 }
     - name: TestShouldDecompose
-      lines: 625-636
+      lines: 629-640
       methods:
-        - { name: test_long_range_true, lines: 626-627 }
-        - { name: test_short_range_false, lines: 629-630 }
-        - { name: test_large_ids_true, lines: 632-633 }
-        - { name: test_small_ids_false, lines: 635-636 }
+        - { name: test_long_range_true, lines: 630-631 }
+        - { name: test_short_range_false, lines: 633-634 }
+        - { name: test_large_ids_true, lines: 636-637 }
+        - { name: test_small_ids_false, lines: 639-640 }
     - name: TestRetryAndFailedRanges
-      lines: 639-775
+      lines: 643-779
       methods:
-        - { name: _mock_redis, lines: 640-651 }
-        - { name: test_transient_failure_retried_once, lines: 653-681 }
-        - { name: test_memory_guard_not_retried, lines: 683-706 }
-        - { name: test_failed_ranges_tracked, lines: 708-741 }
-        - { name: test_id_batch_chunk_no_failed_ranges, lines: 743-775 }
+        - { name: _mock_redis, lines: 644-655 }
+        - { name: test_transient_failure_retried_once, lines: 657-685 }
+        - { name: test_memory_guard_not_retried, lines: 687-710 }
+        - { name: test_failed_ranges_tracked, lines: 712-745 }
+        - { name: test_id_batch_chunk_no_failed_ranges, lines: 747-779 }
     - name: TestMergeChunksToSpool
-      lines: 782-1010
+      lines: 786-1014
       methods:
-        - { name: test_normal_flow_writes_parquet_and_returns_path, lines: 785-803 }
-        - { name: test_empty_result_returns_none_zero, lines: 805-817 }
-        - { name: test_overflow_error_raises_and_cleans_up, lines: 819-837 }
-        - { name: test_exception_deletes_partial_file, lines: 839-853 }
-        - { name: test_precreates_temp_file_before_parquet_writer, lines: 855-884 }
-        - { name: test_merge_chunks_to_spool_survives_cleanup_race, lines: 886-920 }
-        - { name: test_null_typed_column_in_first_chunk_succeeds, lines: 922-962 }
-        - { name: test_null_typed_column_all_chunks_null_still_works, lines: 964-980 }
-        - { name: test_promote_null_schema_helper, lines: 982-998 }
-        - { name: test_promote_null_schema_noop_when_no_nulls, lines: 1000-1010 }
+        - { name: test_normal_flow_writes_parquet_and_returns_path, lines: 789-807 }
+        - { name: test_empty_result_returns_none_zero, lines: 809-821 }
+        - { name: test_overflow_error_raises_and_cleans_up, lines: 823-841 }
+        - { name: test_exception_deletes_partial_file, lines: 843-857 }
+        - { name: test_precreates_temp_file_before_parquet_writer, lines: 859-888 }
+        - { name: test_merge_chunks_to_spool_survives_cleanup_race, lines: 890-924 }
+        - { name: test_null_typed_column_in_first_chunk_succeeds, lines: 926-966 }
+        - { name: test_null_typed_column_all_chunks_null_still_works, lines: 968-984 }
+        - { name: test_promote_null_schema_helper, lines: 986-1002 }
+        - { name: test_promote_null_schema_noop_when_no_nulls, lines: 1004-1014 }
+    - name: TestDecomposeByRowCount
+      lines: 1022-1110
+      methods:
+        - { name: _import, lines: 1025-1027 }
+        - { name: test_total_rows_zero_returns_empty, lines: 1029-1031 }
+        - { name: test_total_less_than_chunk_returns_single_range, lines: 1033-1036 }
+        - { name: test_total_exact_multiple_yields_n_chunks, lines: 1038-1043 }
+        - { name: test_total_rows_one, lines: 1045-1048 }
+        - { name: test_non_divisor_last_chunk_smaller, lines: 1050-1056 }
+        - { name: test_ranges_are_1based_inclusive, lines: 1058-1063 }
+        - { name: test_negative_raises_value_error, lines: 1065-1068 }
+        - { name: test_chunk_size_zero_raises_value_error, lines: 1070-1073 }
+        - { name: test_no_gap_no_overlap_property, lines: 1076-1110 }
+    - name: TestShouldDecomposeByRowCount
+      lines: 1118-1139
+      methods:
+        - { name: _import, lines: 1121-1126 }
+        - { name: test_above_threshold_returns_true, lines: 1128-1130 }
+        - { name: test_below_threshold_returns_false, lines: 1132-1134 }
+        - { name: test_exact_threshold_returns_false, lines: 1136-1139 }
+    - name: TestEngineParallelCeiling
+      lines: 1147-1181
+      methods:
+        - { name: _get_slow_pool_size, lines: 1150-1153 }
+        - { name: test_hold_engine_parallel_capped_at_db_slow_pool_size, lines: 1155-1163 }
+        - { name: test_job_engine_parallel_capped, lines: 1165-1169 }
+        - { name: test_msd_engine_parallel_capped, lines: 1171-1175 }
+        - { name: test_parallel_ceiling_within_limit_does_not_raise, lines: 1177-1181 }
+    - name: TestFlagGating
+      lines: 1189-1243
+      methods:
+        - { name: test_flag_false_key_exported, lines: 1192-1195 }
+        - { name: test_batch_query_rows_per_chunk_exported, lines: 1197-1201 }
+        - { name: test_flag_false_does_not_call_count_sql, lines: 1203-1226 }
+        - { name: test_flag_true_calls_count_then_paged_sql, lines: 1228-1243 }
+    - name: TestExcludedServicesUnmodified
+      lines: 1251-1272
+      methods:
+        - { name: test_yield_alert_not_imported_by_batch_engine, lines: 1254-1266 }
+        - { name: test_material_trace_not_imported_by_batch_engine, lines: 1268-1272 }
 
 tests/test_cache.py:  # 475 lines
   imports:
@@ -11609,7 +11720,7 @@ tests/test_downtime_analysis_routes.py:  # 297 lines
     - { name: _mock_query_result, lines: 34-44 }
     - { name: _mock_view_result, lines: 47-56 }
 
-tests/test_downtime_analysis_service.py:  # 770 lines
+tests/test_downtime_analysis_service.py:  # 921 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: hashlib, items: [], line: 17 }
@@ -11708,11 +11819,19 @@ tests/test_downtime_analysis_service.py:  # 770 lines
         - { name: test_post_query_forwards_resource_ids, lines: 694-708 }
         - { name: test_post_query_forwards_big_categories, lines: 711-725 }
     - name: TestBridgeVersionCacheKey
-      lines: 733-770
+      lines: 733-769
       methods:
         - { name: test_query_id_includes_bridge_version, lines: 736-746 }
         - { name: test_downtime_query_id_differs_from_resource_dataset_id, lines: 748-764 }
-        - { name: test_bridge_version_constant_present, lines: 766-770 }
+        - { name: test_bridge_version_constant_present, lines: 766-769 }
+    - name: TestDowntimeMigration
+      lines: 777-921
+      methods:
+        - { name: _make_base_df, lines: 786-796 }
+        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 798-847 }
+        - { name: test_spool_namespace_unchanged, lines: 849-852 }
+        - { name: test_spool_column_schema_matches_previous_path, lines: 854-878 }
+        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 880-921 }
   functions:
     - { name: _ts, lines: 41-43 }
     - { name: _shift_row, lines: 46-63 }
@@ -11753,6 +11872,30 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_memory_limit_applied, lines: 79-88 }
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
+
+tests/test_env_contract.py:  # 108 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 7 }
+    - { module: pathlib, items: [Path], line: 9 }
+    - { module: pytest, items: [], line: 11 }
+  classes:
+    - name: TestNewEnvVarsDocumented
+      lines: 21-40
+      methods:
+        - { name: _content, lines: 24-25 }
+        - { name: test_use_row_count_chunking_documented, lines: 27-28 }
+        - { name: test_batch_query_rows_per_chunk_documented, lines: 30-31 }
+        - { name: test_hold_engine_parallel_documented, lines: 33-34 }
+        - { name: test_job_engine_parallel_documented, lines: 36-37 }
+        - { name: test_msd_engine_parallel_documented, lines: 39-40 }
+    - name: TestEngineDefaultsMatchContract
+      lines: 47-108
+      methods:
+        - { name: test_rows_per_chunk_default_is_50000, lines: 50-69 }
+        - { name: test_use_row_count_chunking_default_is_false, lines: 71-83 }
+        - { name: test_hold_engine_parallel_default_is_positive_integer, lines: 85-96 }
+        - { name: test_job_engine_parallel_default_is_positive_integer, lines: 98-102 }
+        - { name: test_msd_engine_parallel_default_is_positive_integer, lines: 104-108 }
 
 tests/test_event_fetcher.py:  # 413 lines
   imports:

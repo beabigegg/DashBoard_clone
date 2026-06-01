@@ -8,9 +8,17 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.13.1] — 2026-06-01
+### Changed
+- batch-rowcount-unification (contract accuracy fix): BQE-02 notation corrected from ambiguous tuple `(start_row, end_row)` to explicit dict `{"start_row": int, "end_row": int}` matching implementation. BQE-05 ceiling values corrected from hardcoded "production=3, development=2" to "code default: dev=2, prod=5 per settings.py" — the previous values confused configured ENGINE_PARALLEL with the DB_SLOW_POOL_SIZE default. No behavior change; descriptive accuracy only.
+
 ## [business 1.13.0] — 2026-06-01
 ### Added
 - batch-rowcount-unification: Added "Batch Query Engine Rules" group BQE-01..BQE-07. BQE-01: row-count chunking parity (flag=true path produces identical row set to date-range path; spool column schema identical). BQE-02: decompose_by_row_count correctness (inclusive ranges covering 1..total_rows; four edge cases). BQE-03: deterministic ORDER BY key per service (seven authoritative keys guaranteeing tie-breaking pagination). BQE-04: flag-off fallback guarantee (USE_ROW_COUNT_CHUNKING=false preserves existing behavior; spool TTL/cleanup/memory-guard unaffected). BQE-05: DB_SLOW_POOL_SIZE ceiling (HOLD/JOB/MSD ENGINE_PARALLEL must not exceed pool size). BQE-06: count-vs-paged consistency (completeness guarantee applies to non-concurrent reads; concurrent insert/delete mid-query is documented limitation). BQE-07: downtime_analysis_service migration to BatchQueryEngine; spool schema and namespace unchanged. Additive; no existing rules changed.
+
+## [env 1.0.4] — 2026-06-01
+### Added
+- batch-rowcount-unification: Added missing `BATCH_QUERY_ROWS_PER_CHUNK` (optional, int, default 50000; controls ROW_NUMBER() paged window size when USE_ROW_COUNT_CHUNKING=true; must be ≥ 1; restart required) to the "Batch Query Engine — Row-Count Chunking" table in env-contract.md. The variable was implemented in batch_query_engine.py but omitted from the contract table in 1.0.3. Additive; no existing defaults or semantics changed.
 
 ## [env 1.0.3] — 2026-06-01
 ### Added

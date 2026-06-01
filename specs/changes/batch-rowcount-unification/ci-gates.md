@@ -12,7 +12,7 @@ batch-rowcount-unification
 | unit: downtime migration (TestDowntimeMigration) | 1 | yes | pull_request | `pytest tests/test_downtime_analysis_service.py` via `backend-tests.yml / unit-and-integration-tests` |
 | contract: env-contract 4 new vars | 1 | yes | pull_request | `pytest tests/test_env_contract.py` via `backend-tests.yml / unit-and-integration-tests` |
 | integration: flag=false regression + flag=true parity, spool schema, spool lifecycle (7 services) | 1 | yes | pull_request | `pytest tests/integration/test_rowcount_flag_parity.py` via `backend-tests.yml / unit-and-integration-tests` |
-| resilience: partial-chunk Oracle error → no partial spool | 1 | yes | pull_request | `pytest tests/integration/test_oracle_error_path.py` via `backend-tests.yml / unit-and-integration-tests` |
+| resilience: partial-chunk Oracle error → no partial spool | 1 | yes | pull_request | `pytest tests/integration/test_rowcount_flag_parity.py::TestPartialChunkFailure` via `backend-tests.yml / unit-and-integration-tests` |
 | data-boundary: chunk seam + ORDER BY tie-stability | 1 | yes | pull_request | `pytest tests/stress/test_chunk_boundary.py -k "TestChunkSeam or TestOrderByTieStability"` via targeted step in `backend-tests.yml / unit-and-integration-tests` |
 | cdd-kit validate (contract traceability) | 1 | yes | pull_request | `cdd-kit validate` via `contract-driven-gates.yml` |
 

@@ -1072,6 +1072,7 @@ class TestDecomposeByRowCount:
         with pytest.raises(ValueError, match="rows_per_chunk"):
             fn(100, rows_per_chunk=0)
 
+    @pytest.mark.property
     def test_no_gap_no_overlap_property(self):
         """Verify chunks cover exactly 1..total_rows with no gap and no overlap.
 

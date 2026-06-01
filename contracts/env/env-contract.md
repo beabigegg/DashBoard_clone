@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.3
+schema-version: 1.0.4
 last-changed: 2026-06-01
 breaking-change-policy: deprecate-2-minors
 ---
@@ -96,18 +96,20 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | USE_ROW_COUNT_CHUNKING | batch-engine | all | no | no | false | false | application-team | true or false | yes | uses date-range path (default) |
+| BATCH_QUERY_ROWS_PER_CHUNK | batch-engine | all | no | no | 50000 | 50000 | application-team | positive integer; must be >= 1 | yes | uses default 50000 |
 
 - `USE_ROW_COUNT_CHUNKING`: When `false` (default), all 7 large-query services use the existing date-range chunking path — no behavior change on deployment. When `true`, activates `decompose_by_row_count()`: each service issues a `SELECT COUNT(*)` first, then fetches rows via `ROW_NUMBER() OVER (ORDER BY <key>) AS rn` + `rn BETWEEN :start_row AND :end_row`. Per-service ORDER BY keys are deterministic and fully tie-breaking (see business-rules.md BQE-03). Must not be set to `true` in production until flag=true parity tests pass (ci-gates.md §Promotion Policy). Added by change `batch-rowcount-unification`.
+- `BATCH_QUERY_ROWS_PER_CHUNK`: Maximum rows per chunk when `USE_ROW_COUNT_CHUNKING=true`. Controls the `end_row - start_row + 1` window in each `rn BETWEEN :start_row AND :end_row` paged SQL. Default `50000`. Must be >= 1; values above DB_SLOW_POOL_SIZE × connection timeout may cause individual chunk timeouts. Added by change `batch-rowcount-unification`.
 
 ## Engine Parallelism — Hold / Job / MSD
 
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
-| HOLD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (prod=3, dev=2) | yes | uses default 1 (sequential) |
-| JOB_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (prod=3, dev=2) | yes | uses default 1 (sequential) |
-| MSD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (prod=3, dev=2) | yes | uses default 1 (sequential) |
+| HOLD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (code default: dev=2, prod=5) | yes | uses default 1 (sequential) |
+| JOB_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (code default: dev=2, prod=5) | yes | uses default 1 (sequential) |
+| MSD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (code default: dev=2, prod=5) | yes | uses default 1 (sequential) |
 
-- `HOLD_ENGINE_PARALLEL` / `JOB_ENGINE_PARALLEL` / `MSD_ENGINE_PARALLEL`: Maximum parallel Oracle connections for the respective service's BatchQueryEngine. Hard ceiling: must not exceed `DB_SLOW_POOL_SIZE` (production=3, development=2). A value above the ceiling silently saturates the slow pool and causes connection timeouts for other services. Default `1` (sequential) matches pre-existing behavior. Added by change `batch-rowcount-unification`.
+- `HOLD_ENGINE_PARALLEL` / `JOB_ENGINE_PARALLEL` / `MSD_ENGINE_PARALLEL`: Maximum parallel Oracle connections for the respective service's BatchQueryEngine. Hard ceiling: must not exceed `DB_SLOW_POOL_SIZE` (env-configurable; code default: dev=2, prod=5 per `settings.py`). A value above the ceiling silently saturates the slow pool and causes connection timeouts for other services. Default `1` (sequential) matches pre-existing behavior. Added by change `batch-rowcount-unification`.
 
 ## Observability / Circuit Breaker
 
