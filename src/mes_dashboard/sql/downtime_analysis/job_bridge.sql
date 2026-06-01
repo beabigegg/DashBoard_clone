@@ -18,7 +18,8 @@ SELECT
 FROM
     DWH.DW_MES_JOB j
 WHERE
-    (
+    {{ RESOURCE_FILTER }}
+    AND (
         j.COMPLETEDATE >= TO_DATE(:start_date, 'YYYY-MM-DD') - 7
         OR j.COMPLETEDATE IS NULL
     )

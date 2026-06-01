@@ -629,6 +629,105 @@ class TestFilterCrossNarrowing:
 
 
 # ===========================================================================
+# TestResourceCacheBaselineFilter
+# ===========================================================================
+
+
+class TestResourceCacheBaselineFilter:
+    """_apply_resource_filters must always restrict to resource_cache-approved
+    HISTORYIDs, even when the caller passes no user filter arguments.
+
+    This prevents devices excluded by EQUIPMENT_TYPE_FILTER / EXCLUDED_LOCATIONS
+    / EXCLUDED_ASSET_STATUSES (e.g. LOCATIONNAME='報廢') from appearing in
+    downtime results and failing the resource_lookup name resolution.
+    """
+
+    def _make_df(self, hist_ids: List[str]) -> pd.DataFrame:
+        rows = []
+        for hid in hist_ids:
+            rows.append({
+                'HISTORYID': hid,
+                'OLDSTATUSNAME': 'UDT',
+                'OLDREASONNAME': 'EE Repair',
+                'OLDLASTSTATUSCHANGEDATE': _ts('2025-01-01 08:00:00'),
+                'LASTSTATUSCHANGEDATE': _ts('2025-01-01 10:00:00'),
+                'HOURS': 2.0,
+                'JOBID': None,
+            })
+        return pd.DataFrame(rows)
+
+    @patch('mes_dashboard.services.downtime_analysis_service.get_package_group_name', return_value=None, create=True)
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    def test_excluded_device_removed_when_no_user_filter(
+        self, mock_resources, mock_wc_map, _mock_pg
+    ):
+        """Device not in resource_cache (e.g. LOCATIONNAME=報廢) must be stripped
+        from results even when no user filter is supplied."""
+        from mes_dashboard.services.downtime_analysis_service import _apply_resource_filters
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'aabb', 'RESOURCENAME': 'Machine-OK', 'WORKCENTERNAME': 'WC1',
+             'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+        ]
+        mock_wc_map.return_value = {'WC1': {'group': 'GRP1', 'sequence': 1}}
+
+        # 48801680000002af is in SHIFT but NOT in resource_cache (報廢)
+        df = self._make_df(['aabb', '48801680000002af'])
+        result = _apply_resource_filters(df, None, None, None, None)
+
+        assert list(result['HISTORYID']) == ['aabb']
+        assert '48801680000002af' not in result['HISTORYID'].values
+
+    @patch('mes_dashboard.services.downtime_analysis_service.get_package_group_name', return_value=None, create=True)
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    def test_approved_device_kept_when_no_user_filter(
+        self, mock_resources, mock_wc_map, _mock_pg
+    ):
+        """Device that IS in resource_cache must not be stripped."""
+        from mes_dashboard.services.downtime_analysis_service import _apply_resource_filters
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'aabb', 'RESOURCENAME': 'Machine-OK', 'WORKCENTERNAME': 'WC1',
+             'RESOURCEFAMILYNAME': 'FAM1', 'PACKAGEGROUPID': None},
+        ]
+        mock_wc_map.return_value = {'WC1': {'group': 'GRP1', 'sequence': 1}}
+
+        df = self._make_df(['aabb'])
+        result = _apply_resource_filters(df, None, None, None, None)
+
+        assert list(result['HISTORYID']) == ['aabb']
+
+    @patch('mes_dashboard.services.downtime_analysis_service.get_package_group_name', return_value=None, create=True)
+    @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    def test_user_filter_still_narrows_after_baseline(
+        self, mock_resources, mock_wc_map, _mock_pg
+    ):
+        """User workcenter filter narrows further on top of the baseline."""
+        from mes_dashboard.services.downtime_analysis_service import _apply_resource_filters
+
+        mock_resources.return_value = [
+            {'RESOURCEID': 'R1', 'RESOURCENAME': 'M1', 'WORKCENTERNAME': 'WC_A',
+             'RESOURCEFAMILYNAME': 'F1', 'PACKAGEGROUPID': None},
+            {'RESOURCEID': 'R2', 'RESOURCENAME': 'M2', 'WORKCENTERNAME': 'WC_B',
+             'RESOURCEFAMILYNAME': 'F1', 'PACKAGEGROUPID': None},
+        ]
+        mock_wc_map.return_value = {
+            'WC_A': {'group': 'GRP_A', 'sequence': 1},
+            'WC_B': {'group': 'GRP_B', 'sequence': 2},
+        }
+
+        df = self._make_df(['R1', 'R2', 'EXCLUDED'])
+        result = _apply_resource_filters(df, workcenter_groups=['GRP_A'],
+                                         families=None, resource_ids=None,
+                                         package_groups=None)
+
+        assert list(result['HISTORYID']) == ['R1']
+
+
+# ===========================================================================
 # TestFilterKwargsForwarding
 # ===========================================================================
 

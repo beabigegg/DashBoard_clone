@@ -683,8 +683,22 @@ def query_downtime_dataset(
     else:
         base_df = pd.DataFrame()
 
+    # Build RESOURCEID IN filter from base_events HISTORYIDs so job_bridge only
+    # scans equipment that actually has downtime records in this date range.
+    if not base_df.empty:
+        from mes_dashboard.sql.builder import QueryBuilder as _QB
+        hist_ids = sorted({str(x).strip() for x in base_df['HISTORYID'].dropna() if str(x).strip()})
+        _jb_builder = _QB()
+        _jb_builder.add_in_condition('j.RESOURCEID', hist_ids)
+        resource_filter_sql = _jb_builder.get_conditions_sql() or '1=1'
+        job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', resource_filter_sql)
+        job_params = {**base_params, **_jb_builder.params}
+    else:
+        job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', '1=0')
+        job_params = base_params
+
     # Also read job bridge data (still via direct read_sql_df — not chunked)
-    job_df = _read_sql_df(job_sql, base_params, caller='downtime_analysis:job_bridge')
+    job_df = _read_sql_df(job_sql_rendered, job_params, caller='downtime_analysis:job_bridge')
     if job_df is None:
         job_df = pd.DataFrame()
 
@@ -737,19 +751,27 @@ def _apply_resource_filters(
 ) -> pd.DataFrame:
     """Filter events DataFrame by resource dimension filters.
 
+    Always restricts to HISTORYIDs present in resource_cache (applies
+    EQUIPMENT_TYPE_FILTER + EXCLUDED_LOCATIONS + EXCLUDED_ASSET_STATUSES as the
+    baseline), then further narrows by any user-supplied filters.
+
     resource_ids contains RESOURCENAME values (display names); they are resolved
     to RESOURCEID for HISTORYID matching against the events DataFrame.
     """
-    if (not workcenter_groups and not families and not resource_ids
-            and not package_groups and not is_production and not is_key and not is_monitor):
-        return df
-
     try:
         from mes_dashboard.services.resource_cache import get_all_resources, get_package_group_name
         from mes_dashboard.services.filter_cache import get_workcenter_mapping
 
         resources = get_all_resources() or []
         wc_mapping = get_workcenter_mapping() or {}
+
+        # Baseline: only HISTORYIDs recognised by resource_cache (enforces global
+        # exclusion rules regardless of user filter selection).
+        base_ids = {str(r.get('RESOURCEID', '')).strip() for r in resources if r.get('RESOURCEID')}
+        df = df[df['HISTORYID'].apply(lambda x: str(x).strip()).isin(base_ids)]
+
+        if df.empty:
+            return df
 
         allowed_hist_ids: Optional[set] = None
 
