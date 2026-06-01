@@ -72,6 +72,10 @@ a corresponding entry below.
 ### Added
 - resource-status-package-group: Added optional `package_groups` query param to `/api/resource/status`, `/api/resource/status/summary`, `/api/resource/status/matrix`; added `package_groups: string[]` to `/api/resource/status/options` response; added `PACKAGEGROUPNAME: string | null` to each `/api/resource/status` record (null for ~91% of resources). All additive; no existing endpoints changed.
 
+## [css 1.6.0] — 2026-06-01
+### Added
+- downtime-analysis-page (close): Added rule 4.5 to §樣式作用域與隔離 — `resource-shared/styles.css` `:is(.theme-X, …)` group maintenance: every new page theme must be added to all `:is()` groups via batch tool; omission silently breaks header/filter/section-card styles; Rule 6 does not detect this. Evidence: commit `1931d26`.
+
 ## [css 1.5.0] — 2026-05-21
 ### Added
 - resource-status-package-group (close): Added rule 4.4 to §樣式作用域與隔離 — `<Teleport to="body">` CSS scoping contract: teleported content must be wrapped in a `<div class="theme-<feature>">` ancestor so descendant CSS selectors resolve correctly. Do not combine `theme-<feature>` and component class on the same element. Evidence: FloatingTooltip.vue pre-existing bug surfaced and fixed during this change.

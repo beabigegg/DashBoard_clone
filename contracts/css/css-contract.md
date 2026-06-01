@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.5.0
+schema-version: 1.6.0
 last-changed: 2026-05-21
 breaking-change-policy: deprecate-2-minors
 ---
@@ -42,6 +42,7 @@ breaking-change-policy: deprecate-2-minors
 | 4.2 | 每個主要功能區塊必須定義唯一「主題根類別」（如 `.theme-resource`, `.theme-wip`），應用於最外層容器 |
 | 4.3 | 功能區塊所有樣式規則必須以主題根類別為父選擇器，防止洩漏 |
 | 4.4 | `<Teleport to="body">` 將 DOM 節點移出功能根元素，使 `.theme-<feature> .component` 子孫選擇器失效。必須在 Teleport 傳送內容的最外層包一個 `<div class="theme-<feature>">` wrapper（無額外 styling），為所有子孫 CSS 規則提供作用域祖先。切勿將 `theme-<feature>` 與元件類別寫在同一元素上（`.theme-x.component` 合併選擇器不符合現有 CSS 寫法）。Evidence: `FloatingTooltip.vue` fix, `resource-status-package-group`. |
+| 4.5 | `resource-shared/styles.css` 及其他使用 `:is(.theme-X, …)` 批次套用樣式的共用樣式檔，新增頁面時必須以批次工具（如 `sed`）將新主題類別加入所有 `:is()` 群組；遺漏的主題類別會造成 header/filter/section-card 樣式靜默失效（Rule 6 不會偵測此缺漏）。Evidence: `downtime-analysis-page` — batch-patched via sed in commit `1931d26`. |
 
 ## 基礎樣式
 
@@ -140,6 +141,9 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.6.0]
+- downtime-analysis-page (2026-06-01): Added rule 4.5 — `resource-shared/styles.css` `:is(.theme-X, …)` group maintenance: every new page theme must be added to all `:is()` groups via batch tool (`sed`); omission causes header/filter/section-card styles to silently fail. Rule 6 does not detect this gap. Evidence: `downtime-analysis-page` commit `1931d26`.
 
 ## [css 1.5.0]
 - resource-status-package-group (2026-05-21): Added rule 4.4 — `<Teleport to="body">` CSS scoping: teleported content must be wrapped in `<div class="theme-<feature>">` ancestor so all descendant CSS selectors resolve correctly. Evidence: `FloatingTooltip.vue` fix; `frontend/src/resource-status/style.css` descendant selectors.
