@@ -74,24 +74,16 @@ function updateFilters(patch) {
       </div>
 
       <div class="filter-row">
-        <!-- Shared: detection station -->
+        <!-- Shared: detection station (multi-select) -->
         <div class="filter-field">
-          <label for="msd-station">偵測站</label>
-          <select
-            id="msd-station"
-            :value="filters.station"
+          <label>偵測站</label>
+          <MultiSelect
+            :model-value="filters.station"
+            :options="stationOptions"
             :disabled="loading"
-            class="filter-select"
-            @change="updateFilters({ station: $event.target.value })"
-          >
-            <option
-              v-for="opt in stationOptions"
-              :key="opt.name"
-              :value="opt.name"
-            >
-              {{ opt.label || opt.name }}
-            </option>
-          </select>
+            placeholder="選擇偵測站"
+            @update:model-value="updateFilters({ station: $event })"
+          />
         </div>
 
         <!-- Container mode: input type -->

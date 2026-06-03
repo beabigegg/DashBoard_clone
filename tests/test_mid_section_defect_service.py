@@ -554,6 +554,93 @@ def test_attribute_wafer_roots_multiple_roots():
     assert result[1]['ROOT_CONTAINER_NAME'] == 'ROOT-A'
 
 
+def test_attribute_defects_filters_stations_at_or_after_detection_station():
+    """_attribute_defects must exclude upstream records at/after the detection station.
+
+    For backward tracing at 焊接_WB (order=2), records from 成型 (order=4) and 測試 (order=11)
+    are NOT upstream causes and must be excluded from the chart.
+    """
+    from mes_dashboard.services.mid_section_defect_service import _attribute_defects
+
+    detection_data = {
+        'C1': {
+            'trackinqty': 100,
+            'rejectqty_by_reason': {'R1': 10},
+            'workflow': 'W',
+            'productlinename': 'P',
+            'pj_type': 'T',
+            'detection_equipmentname': 'WB-01',
+            'detection_station_order': 2,  # 焊接_WB
+        }
+    }
+    ancestors = {'C1': {'A1'}}
+    upstream_by_cid = {
+        # A1 has records at 切割(0), 焊接_DB(1), 焊接_WB(2), 成型(4) — only 0 and 1 are upstream
+        'A1': [
+            {'workcenter_group': '切割', 'equipment_name': 'SAW-01', 'equipment_id': 'E1'},
+            {'workcenter_group': '焊接_DB', 'equipment_name': 'DB-01', 'equipment_id': 'E2'},
+            {'workcenter_group': '焊接_WB', 'equipment_name': 'WB-01', 'equipment_id': 'E3'},
+            {'workcenter_group': '成型', 'equipment_name': 'MOLD-01', 'equipment_id': 'E4'},
+        ],
+        # C1 (detection lot itself) also has subsequent history at 測試(11)
+        'C1': [
+            {'workcenter_group': '測試', 'equipment_name': 'TEST-01', 'equipment_id': 'E5'},
+        ],
+    }
+
+    result = _attribute_defects(detection_data, ancestors, upstream_by_cid)
+
+    machine_names = {r['EQUIPMENT_NAME'] for r in result}
+    assert 'SAW-01' in machine_names, 'cutting machine should be included (order=0 < 2)'
+    assert 'DB-01' in machine_names, 'DB machine should be included (order=1 < 2)'
+    assert 'WB-01' not in machine_names, 'detection station itself must not appear (order=2 >= 2)'
+    assert 'MOLD-01' not in machine_names, 'downstream station 成型 must not appear (order=4 >= 2)'
+    assert 'TEST-01' not in machine_names, 'downstream station 測試 must not appear (order=11 >= 2)'
+
+
+def test_attribute_defects_multi_station_uses_per_lot_cutoff():
+    """When detection LOTs are at different stations, each uses its own station order as cutoff."""
+    from mes_dashboard.services.mid_section_defect_service import _attribute_defects
+
+    # C1 detected at 焊接_WB (order=2), C2 detected at 測試 (order=11)
+    detection_data = {
+        'C1': {
+            'trackinqty': 100,
+            'rejectqty_by_reason': {'R1': 5},
+            'workflow': 'W', 'productlinename': 'P', 'pj_type': 'T',
+            'detection_equipmentname': 'WB-01',
+            'detection_station_order': 2,
+        },
+        'C2': {
+            'trackinqty': 200,
+            'rejectqty_by_reason': {'R1': 15},
+            'workflow': 'W', 'productlinename': 'P', 'pj_type': 'T',
+            'detection_equipmentname': 'TEST-01',
+            'detection_station_order': 11,
+        },
+    }
+    ancestors = {'C1': set(), 'C2': {'A2'}}
+    upstream_by_cid = {
+        'C1': [
+            {'workcenter_group': '切割', 'equipment_name': 'SAW-01', 'equipment_id': 'E1'},
+            {'workcenter_group': '焊接_WB', 'equipment_name': 'WB-01', 'equipment_id': 'E3'},
+        ],
+        # A2 is ancestor of C2 (detected at 測試, order=11); its 焊接_WB record IS upstream of 測試
+        'A2': [
+            {'workcenter_group': '焊接_WB', 'equipment_name': 'WB-02', 'equipment_id': 'E6'},
+        ],
+    }
+
+    result = _attribute_defects(detection_data, ancestors, upstream_by_cid)
+
+    machines = {r['EQUIPMENT_NAME']: r for r in result}
+    # C1: only SAW-01 passes (order=0 < 2); WB-01 at order=2 is excluded
+    assert 'SAW-01' in machines
+    assert 'WB-01' not in machines
+    # A2's WB-02 serves C2 (detection at 測試, order=11): order=2 < 11 → included
+    assert 'WB-02' in machines
+
+
 # --- _build_detail_table tests ---
 
 def _make_detection_df(rows):

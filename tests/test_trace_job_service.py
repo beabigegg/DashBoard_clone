@@ -699,3 +699,104 @@ def test_expand_msd_container_ids_backward():
     )
 
     assert result == ["CID-001", "CID-A", "CID-B"]
+
+
+def test_detection_hash_matches_make_detection_spool_query_id_multi_station():
+    """detection_hash in trace job must use normalized station key, not raw list.
+
+    When the frontend sends station as a list (multi-select), the trace job
+    must produce the same detection_hash that _make_detection_spool_query_id
+    uses so the D4 path can find the cached detection parquet.
+    """
+    from mes_dashboard.services.batch_query_engine import compute_query_hash
+    from mes_dashboard.services.mid_section_defect_service import (
+        _normalize_station,
+        _canon_station_key,
+        _make_detection_spool_query_id,
+    )
+
+    station_list = ['測試', '焊接_WB', '焊接_DW']
+    start_date = "2026-05-27"
+    end_date = "2026-06-02"
+
+    # Hash as computed by _make_detection_spool_query_id (canonical)
+    expected_hash = _make_detection_spool_query_id(start_date, end_date, station_list)
+
+    # Hash as computed by the trace job after the fix (normalize → canon → hash)
+    station_key = _canon_station_key(_normalize_station(station_list))
+    actual_hash = compute_query_hash({
+        "station": station_key,
+        "start_date": start_date,
+        "end_date": end_date,
+    })
+
+    assert actual_hash == expected_hash, (
+        f"detection_hash mismatch: trace job would produce {actual_hash!r} "
+        f"but spool uses {expected_hash!r}"
+    )
+
+
+def test_build_job_msd_aggregation_passes_station_order_fallback_to_get_summary():
+    """_build_job_msd_aggregation must pass station_order_fallback to get_summary.
+
+    Before the fix, get_summary was called without station_order_fallback, so
+    upstream_groups defaulted to None and no WORKCENTER_GROUP filter was applied,
+    causing downstream machines (e.g. 電鍍) to appear in the attribution chart.
+    """
+    from unittest.mock import MagicMock, patch
+
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = True
+    mock_runtime.get_summary.return_value = {"kpi": {}, "charts": {}}
+
+    payload = {
+        "params": {
+            "direction": "backward",
+            "station": "焊接_WB",
+            "loss_reasons": None,
+        }
+    }
+
+    # MsdDuckdbRuntime is imported inline; patch at definition site
+    with patch("mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime", return_value=mock_runtime):
+        tjs._build_job_msd_aggregation(payload, {}, trace_query_id="trace-abc")
+
+    call_kwargs = mock_runtime.get_summary.call_args.kwargs
+    # station_order_fallback must be 2 (焊接_WB order)
+    assert call_kwargs.get("station_order_fallback") == 2, (
+        f"Expected station_order_fallback=2 for 焊接_WB, got {call_kwargs.get('station_order_fallback')}"
+    )
+
+
+def test_build_job_msd_aggregation_passes_upstream_groups_to_get_summary_with_detection():
+    """D4 path must pass upstream_station_groups to get_summary_with_detection."""
+    from unittest.mock import MagicMock, patch
+    from pathlib import Path
+
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = True
+    mock_runtime.get_summary.return_value = None  # force D4 path
+    mock_runtime.get_summary_with_detection.return_value = {"kpi": {}, "charts": {}}
+
+    payload = {
+        "params": {
+            "direction": "backward",
+            "station": "焊接_WB",
+            "loss_reasons": None,
+        }
+    }
+
+    # Both inline imports must be patched at definition site
+    with patch("mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime", return_value=mock_runtime), \
+         patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value="/fake/det.parquet"), \
+         patch.object(Path, "exists", return_value=True):
+        tjs._build_job_msd_aggregation(
+            payload, {}, trace_query_id="trace-abc", detection_hash="hash-123"
+        )
+
+    call_kwargs = mock_runtime.get_summary_with_detection.call_args.kwargs
+    upstream = call_kwargs.get("upstream_station_groups")
+    assert upstream is not None, "upstream_station_groups must not be None for backward 焊接_WB"
+    assert "電鍍" not in upstream, f"電鍍 must not be in upstream groups: {upstream}"
+    assert "切割" in upstream, f"切割 must be in upstream groups for 焊接_WB(order=2): {upstream}"
+    assert "焊接_DB" in upstream, f"焊接_DB must be in upstream groups for 焊接_WB(order=2): {upstream}"

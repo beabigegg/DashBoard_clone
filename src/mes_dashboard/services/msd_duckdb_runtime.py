@@ -352,13 +352,26 @@ class MsdDuckdbRuntime:
         self,
         direction: str = "backward",
         loss_reasons: Optional[List[str]] = None,
+        *,
+        station_order_fallback: int = 999,
     ) -> Optional[Dict[str, Any]]:
         """Compute summary KPIs and charts from spool via DuckDB."""
         self._resolve_paths()
         if direction == "backward":
             if not self._detection_path or not Path(self._detection_path).exists():
                 return None
-            summary = self.get_summary_with_detection(self._detection_path, loss_reasons=loss_reasons)
+            upstream_groups: Optional[List[str]] = None
+            if station_order_fallback < 999:
+                from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS
+                upstream_groups = [
+                    g for g, cfg in WORKCENTER_GROUPS.items()
+                    if cfg["order"] < station_order_fallback
+                ]
+            summary = self.get_summary_with_detection(
+                self._detection_path,
+                loss_reasons=loss_reasons,
+                upstream_station_groups=upstream_groups,
+            )
             if summary is not None:
                 return summary
             return None
@@ -531,6 +544,8 @@ class MsdDuckdbRuntime:
         self,
         detection_spool_path: str,
         loss_reasons: Optional[List[str]] = None,
+        *,
+        upstream_station_groups: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Compute summary KPIs and charts using detection spool + events/lineage spools.
 
@@ -572,10 +587,10 @@ class MsdDuckdbRuntime:
             detail_total_count = self._compute_detail_total_count(conn)
 
             if lineage_available:
-                by_machine = self._compute_machine_chart(conn)
+                by_machine = self._compute_machine_chart(conn, upstream_station_groups=upstream_station_groups)
                 by_material = self._compute_material_chart(conn)
                 affected_machine_count = self._compute_affected_machine_count(conn)
-                raw_attribution = self._compute_raw_machine_attribution(conn)
+                raw_attribution = self._compute_raw_machine_attribution(conn, upstream_station_groups=upstream_station_groups)
                 raw_materials_attribution = self._compute_raw_materials_attribution(conn)
             else:
                 by_machine = []
@@ -892,11 +907,19 @@ class MsdDuckdbRuntime:
             logger.debug("_compute_wafer_root_chart failed: %s", exc)
             return []
 
-    def _compute_machine_chart(self, conn) -> List[Dict[str, Any]]:
+    def _compute_machine_chart(
+        self, conn, *, upstream_station_groups: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
         """Build by_machine Pareto chart from events + lineage + detection (TOP 10)."""
         try:
+            upstream_filter = (
+                "AND e.WORKCENTER_GROUP IN ({groups})".format(
+                    groups=", ".join(f"'{self._sql_quote(g)}'" for g in upstream_station_groups)
+                )
+                if upstream_station_groups else ""
+            )
             rows = conn.execute(
-                """
+                f"""
                 WITH defective_kpis AS (
                     SELECT CONTAINERID,
                            MAX(TRACKINQTY)  AS trackin_qty,
@@ -914,6 +937,7 @@ class MsdDuckdbRuntime:
                     JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
                     JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
                     WHERE e.EQUIPMENTNAME IS NOT NULL AND TRIM(e.EQUIPMENTNAME) != ''
+                    {upstream_filter}
                     GROUP BY name
                 )
                 SELECT name, lot_count, defect_qty, input_qty
@@ -1086,15 +1110,21 @@ class MsdDuckdbRuntime:
             logger.debug("_compute_workflow_chart failed: %s", exc)
             return []
 
-    def _compute_raw_machine_attribution(self, conn) -> List[Dict[str, Any]]:
+    def _compute_raw_machine_attribution(self, conn, *, upstream_station_groups: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Compute raw machine attribution records with WORKCENTER_GROUP and EQUIPMENT_NAME.
 
         Returns records compatible with the frontend's ``upstreamStationOptions``,
         ``upstreamSpecOptions``, and ``buildMachineChartFromAttribution`` expectations.
         """
         try:
+            upstream_filter = (
+            "AND e.WORKCENTER_GROUP IN ({groups})".format(
+                groups=", ".join(f"'{self._sql_quote(g)}'" for g in upstream_station_groups)
+            )
+            if upstream_station_groups else ""
+            )
             rows = conn.execute(
-                """
+                f"""
                 WITH defective_kpis AS (
                     SELECT CONTAINERID,
                            MAX(TRACKINQTY)  AS trackin_qty,
@@ -1114,6 +1144,7 @@ class MsdDuckdbRuntime:
                     JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
                     JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
                     WHERE e.EQUIPMENTNAME IS NOT NULL AND TRIM(e.EQUIPMENTNAME) != ''
+                    {upstream_filter}
                     GROUP BY wc_group, eq_name, eq_id
                 )
                 SELECT wc_group, eq_name, eq_id, lot_count, defect_qty, input_qty

@@ -40,7 +40,7 @@ import os
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Optional, Dict, List, Any, Set, Tuple, Generator
+from typing import Optional, Dict, List, Any, Set, Tuple, Generator, Union
 
 import pandas as pd
 
@@ -64,9 +64,25 @@ from mes_dashboard.services.async_query_job_service import (
 )
 from mes_dashboard.services.event_fetcher import EventFetcher
 from mes_dashboard.services.lineage_engine import LineageEngine
-from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_group_order
+from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS, get_group_order, get_workcenter_group
 
 logger = logging.getLogger('mes_dashboard.mid_section_defect')
+
+StationInput = Union[str, List[str]]
+
+
+def _normalize_station(station: StationInput) -> List[str]:
+    """Normalize station input (str or list, comma-separated) to a sorted deduplicated list."""
+    if isinstance(station, list):
+        result = sorted({s.strip() for s in station if s and s.strip()})
+    else:
+        result = sorted({s.strip() for s in str(station).split(',') if s.strip()})
+    return result if result else ['測試']
+
+
+def _canon_station_key(stations: List[str]) -> str:
+    """Canonical cache key for a list of stations: sorted, comma-joined."""
+    return ','.join(sorted(stations))
 
 # Constants
 MAX_QUERY_DAYS = 730  # 2 years
@@ -141,13 +157,13 @@ VALID_DIRECTIONS = ('backward', 'forward')
 def _make_detection_spool_query_id(
     start_date: str,
     end_date: str,
-    station: str,
+    station: StationInput,
 ) -> str:
     """Return the canonical spool id for station detection parquet."""
     from mes_dashboard.services.batch_query_engine import compute_query_hash
 
     return compute_query_hash({
-        "station": station,
+        "station": _canon_station_key(_normalize_station(station)),
         "start_date": start_date,
         "end_date": end_date,
     })
@@ -156,7 +172,7 @@ def _make_detection_spool_query_id(
 def resolve_analysis_trace_context(
     start_date: str,
     end_date: str,
-    station: str = '測試',
+    station: StationInput = '測試',
     direction: str = 'backward',
 ) -> Optional[Dict[str, Any]]:
     """Resolve canonical MSD trace context from compatibility query params."""
@@ -211,6 +227,8 @@ def _load_analysis_from_spool(
     available_loss_reasons: Optional[List[str]] = None,
     direction: str = 'backward',
     loss_reasons: Optional[List[str]] = None,
+    *,
+    station_order_fallback: int = 999,
 ) -> Optional[Dict[str, Any]]:
     """Build compatibility summary payload from MSD spool-backed runtime."""
     from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
@@ -219,7 +237,8 @@ def _load_analysis_from_spool(
     if not rt.is_available():
         return None
 
-    summary = rt.get_summary(direction=direction, loss_reasons=loss_reasons)
+    summary = rt.get_summary(direction=direction, loss_reasons=loss_reasons,
+                             station_order_fallback=station_order_fallback)
     if summary is None:
         return None
 
@@ -256,7 +275,7 @@ def ensure_analysis_background_job(
     *,
     start_date: str,
     end_date: str,
-    station: str,
+    station: StationInput,
     direction: str,
     trace_query_id: str,
     owner: str,
@@ -307,7 +326,7 @@ def query_analysis(
     start_date: str,
     end_date: str,
     loss_reasons: Optional[List[str]] = None,
-    station: str = '測試',
+    station: StationInput = '測試',
     direction: str = 'backward',
     owner: str = '',
 ) -> Optional[Dict[str, Any]]:
@@ -368,6 +387,7 @@ def query_analysis(
         available_loss_reasons=available_loss_reasons,
         direction=direction,
         loss_reasons=loss_reasons,
+        station_order_fallback=min(get_group_order(s) for s in _normalize_station(station)),
     )
     if staged is not None:
         cache_set(cache_key, staged, ttl=CACHE_TTL_DETECTION)
@@ -441,7 +461,7 @@ _MSD_SEED_FILTER_COLUMN: Dict[str, str] = {
 def resolve_msd_seeds_at_station(
     resolve_type: str,
     values: List[str],
-    station: str = '測試',
+    station: StationInput = '測試',
 ) -> Tuple[List[Dict[str, str]], Optional[str]]:
     """Find anchor containers at the detection station that match the user's input.
 
@@ -464,8 +484,9 @@ def resolve_msd_seeds_at_station(
     quoted_values = ", ".join(f"'{v}'" for v in cleaned)
     value_filter = f"c.{column} IN ({quoted_values})"
 
+    _stations = _normalize_station(station)
     try:
-        station_filter, station_params = _build_station_filter(station, 'h')
+        station_filter, station_params = _build_multi_station_filter(_stations, 'h')
         sql = SQLLoader.load_with_params(
             "mid_section_defect/station_seed_by_filter",
             VALUE_FILTER=value_filter,
@@ -475,7 +496,7 @@ def resolve_msd_seeds_at_station(
     except Exception as exc:
         logger.error(
             "resolve_msd_seeds_at_station failed (resolve_type=%s station=%s): %s",
-            resolve_type, station, exc, exc_info=True,
+            resolve_type, _canon_station_key(_stations), exc, exc_info=True,
         )
         return [], "偵測站種子查詢失敗"
 
@@ -502,7 +523,7 @@ def resolve_msd_seeds_at_station(
 def resolve_trace_seed_lots(
     start_date: str,
     end_date: str,
-    station: str = '測試',
+    station: StationInput = '測試',
 ) -> Optional[Dict[str, Any]]:
     """Resolve seed lots for staged mid-section trace API."""
     error = _validate_date_range(start_date, end_date)
@@ -555,7 +576,7 @@ def build_trace_aggregation_from_events(
     upstream_quality_meta: Optional[Dict[str, Any]] = None,
     materials_quality_meta: Optional[Dict[str, Any]] = None,
     downstream_quality_meta: Optional[Dict[str, Any]] = None,
-    station: str = '測試',
+    station: StationInput = '測試',
     direction: str = 'backward',
     mode: str = 'date_range',
 ) -> Optional[Dict[str, Any]]:
@@ -633,7 +654,7 @@ def build_trace_aggregation_from_events(
 
     # Forward direction: use forward pipeline
     if direction == 'forward':
-        station_order = get_group_order(station)
+        station_order = min(get_group_order(s) for s in _normalize_station(station))
         defect_cids = filtered_df.loc[
             filtered_df['REJECTQTY'] > 0, 'CONTAINERID'
         ].unique().tolist()
@@ -677,11 +698,13 @@ def build_trace_aggregation_from_events(
     normalized_upstream = _normalize_upstream_event_records(upstream_events_by_cid or {})
     normalized_materials = _normalize_materials_event_records(materials_events_by_cid or {})
 
+    _sof = min(get_group_order(s) for s in _normalize_station(station))
     attribution = _attribute_defects(
         detection_data,
         normalized_ancestors,
         normalized_upstream,
         normalized_loss_reasons,
+        station_order_fallback=_sof,
     )
     mat_attribution = _attribute_materials(
         detection_data, normalized_ancestors, normalized_materials, normalized_loss_reasons,
@@ -733,7 +756,7 @@ def _build_trace_aggregation_container_mode(
     upstream_quality_meta: Optional[Dict[str, Any]] = None,
     materials_quality_meta: Optional[Dict[str, Any]] = None,
     downstream_quality_meta: Optional[Dict[str, Any]] = None,
-    station: str = '測試',
+    station: StationInput = '測試',
     direction: str = 'backward',
 ) -> Optional[Dict[str, Any]]:
     """Container mode aggregation: same attribution pipeline, no date range."""
@@ -811,7 +834,7 @@ def _build_trace_aggregation_container_mode(
 
     # Forward direction
     if direction == 'forward':
-        station_order = get_group_order(station)
+        station_order = min(get_group_order(s) for s in _normalize_station(station))
         defect_cids = filtered_df.loc[
             filtered_df['REJECTQTY'] > 0, 'CONTAINERID'
         ].unique().tolist()
@@ -852,11 +875,13 @@ def _build_trace_aggregation_container_mode(
     normalized_upstream = _normalize_upstream_event_records(upstream_events_by_cid or {})
     normalized_materials = _normalize_materials_event_records(materials_events_by_cid or {})
 
+    _sof = min(get_group_order(s) for s in _normalize_station(station))
     attribution = _attribute_defects(
         detection_data,
         normalized_ancestors,
         normalized_upstream,
         normalized_loss_reasons,
+        station_order_fallback=_sof,
     )
     mat_attribution = _attribute_materials(
         detection_data, normalized_ancestors, normalized_materials, normalized_loss_reasons,
@@ -897,7 +922,7 @@ def query_analysis_detail(
     start_date: str,
     end_date: str,
     loss_reasons: Optional[List[str]] = None,
-    station: str = '測試',
+    station: StationInput = '測試',
     direction: str = 'backward',
     page: int = 1,
     page_size: int = 200,
@@ -957,7 +982,7 @@ def export_csv(
     start_date: str,
     end_date: str,
     loss_reasons: Optional[List[str]] = None,
-    station: str = '測試',
+    station: StationInput = '測試',
     direction: str = 'backward',
 ) -> Generator[str, None, None]:
     """Stream CSV export of detail data.
@@ -1349,15 +1374,17 @@ def _validate_date_range(start_date: str, end_date: str) -> Optional[str]:
     return None
 
 
-def _validate_station(station: str) -> Optional[str]:
-    if station not in WORKCENTER_GROUPS:
+def _validate_station(station: StationInput) -> Optional[str]:
+    stations = _normalize_station(station)
+    invalid = [s for s in stations if s not in WORKCENTER_GROUPS]
+    if invalid:
         valid_names = ', '.join(sorted(WORKCENTER_GROUPS.keys()))
-        return f'無效偵測站: {station}（有效值: {valid_names}）'
+        return f'無效偵測站: {", ".join(invalid)}（有效值: {valid_names}）'
     return None
 
 
 def _validate_params(
-    start_date: str, end_date: str, station: str, direction: str,
+    start_date: str, end_date: str, station: StationInput, direction: str,
 ) -> Optional[str]:
     error = _validate_date_range(start_date, end_date)
     if error:
@@ -1377,12 +1404,14 @@ def _validate_params(
 def _build_station_filter(
     station_name: str,
     column_prefix: str = 'h',
+    _param_prefix: str = '',
 ) -> Tuple[str, Dict[str, str]]:
     """Build SQL WHERE fragment for station workcenter name matching.
 
     Args:
         station_name: Workcenter group name (key in WORKCENTER_GROUPS)
         column_prefix: Table alias prefix (e.g. 'h' for h.WORKCENTERNAME)
+        _param_prefix: Bind-param name prefix (used internally for multi-station OR)
 
     Returns:
         (sql_fragment, bind_params) tuple.
@@ -1396,7 +1425,7 @@ def _build_station_filter(
     params = {}
 
     for i, pattern in enumerate(patterns):
-        param_name = f"wc_p{i}"
+        param_name = f"{_param_prefix}wc_p{i}"
         parts.append(f"{col} LIKE :{param_name}")
         params[param_name] = f"%{pattern.upper()}%"
 
@@ -1405,7 +1434,7 @@ def _build_station_filter(
     if excludes:
         excl_parts = []
         for i, excl in enumerate(excludes):
-            param_name = f"wc_ex{i}"
+            param_name = f"{_param_prefix}wc_ex{i}"
             excl_parts.append(f"{col} NOT LIKE :{param_name}")
             params[param_name] = f"%{excl.upper()}%"
         exclude_sql = ' AND '.join(excl_parts)
@@ -1416,6 +1445,22 @@ def _build_station_filter(
     return fragment, params
 
 
+def _build_multi_station_filter(
+    stations: List[str],
+    column_prefix: str = 'h',
+) -> Tuple[str, Dict[str, str]]:
+    """Build SQL WHERE fragment matching any of the given station groups (OR-combined)."""
+    if len(stations) == 1:
+        return _build_station_filter(stations[0], column_prefix)
+    parts: List[str] = []
+    all_params: Dict[str, str] = {}
+    for idx, name in enumerate(stations):
+        frag, params = _build_station_filter(name, column_prefix, f's{idx}_')
+        parts.append(frag)
+        all_params.update(params)
+    return '(' + ' OR '.join(parts) + ')', all_params
+
+
 # ============================================================
 # Query 1: Station Detection Data (parameterized)
 # ============================================================
@@ -1423,7 +1468,7 @@ def _build_station_filter(
 def _fetch_station_detection_data(
     start_date: str,
     end_date: str,
-    station: str = '測試',
+    station: StationInput = '測試',
 ) -> Tuple[Optional[pd.DataFrame], Dict[str, Any]]:
     """Execute station_detection.sql and return raw DataFrame.
 
@@ -1431,15 +1476,17 @@ def _fetch_station_detection_data(
     the query is decomposed into monthly chunks via BatchQueryEngine to
     prevent Oracle timeout on high-volume stations.
     """
+    stations = _normalize_station(station)
+    station_key = _canon_station_key(stations)
     cache_key = make_cache_key(
         "mid_section_detection",
         filters={
             'start_date': start_date,
             'end_date': end_date,
-            'station': station,
+            'station': station_key,
         },
     )
-    detection_spool_query_id = _make_detection_spool_query_id(start_date, end_date, station)
+    detection_spool_query_id = _make_detection_spool_query_id(start_date, end_date, stations)
     cached = cache_get(cache_key)
     if cached is not None:
         if isinstance(cached, list):
@@ -1465,8 +1512,8 @@ def _fetch_station_detection_data(
 
     _msd_partial_failure: Dict[str, Any] = {}
     try:
-        wip_filter, wip_params = _build_station_filter(station, 'h')
-        rej_filter, rej_params = _build_station_filter(station, 'r')
+        wip_filter, wip_params = _build_multi_station_filter(stations, 'h')
+        rej_filter, rej_params = _build_multi_station_filter(stations, 'r')
 
         sql = SQLLoader.load_with_params(
             "mid_section_defect/station_detection",
@@ -1665,7 +1712,7 @@ def _build_expanded_detection_cids(
 
 def _fetch_detection_by_container_ids(
     container_ids: List[str],
-    station: str = '測試',
+    station: StationInput = '測試',
 ) -> Optional[pd.DataFrame]:
     """Fetch detection data for explicit container IDs (container query mode).
 
@@ -1674,11 +1721,12 @@ def _fetch_detection_by_container_ids(
     if not container_ids:
         return pd.DataFrame()
 
+    _cid_stations = _normalize_station(station)
     cache_key = make_cache_key(
         "mid_section_detection_by_ids",
         filters={
             'cids': sorted(container_ids),
-            'station': station,
+            'station': _canon_station_key(_cid_stations),
         },
     )
     cached = cache_get(cache_key)
@@ -1688,8 +1736,8 @@ def _fetch_detection_by_container_ids(
         return None
 
     try:
-        wip_filter, wip_params = _build_station_filter(station, 'h')
-        rej_filter, rej_params = _build_station_filter(station, 'r')
+        wip_filter, wip_params = _build_multi_station_filter(_cid_stations, 'h')
+        rej_filter, rej_params = _build_multi_station_filter(_cid_stations, 'r')
 
         # Build CONTAINERID IN clause with quoted values
         quoted_ids = ", ".join(f"'{cid}'" for cid in container_ids)
@@ -1726,7 +1774,7 @@ def _fetch_detection_by_container_ids(
 def _run_backward_pipeline(
     start_date: str,
     end_date: str,
-    station: str,
+    station: StationInput,
     loss_reasons: Optional[List[str]],
 ) -> Optional[Dict[str, Any]]:
     """Run the backward traceability pipeline (detection → upstream attribution)."""
@@ -1786,8 +1834,10 @@ def _run_backward_pipeline(
             genealogy_status = 'error'
 
     detection_data = _build_detection_lookup(filtered_df)
+    _sof = min(get_group_order(s) for s in _normalize_station(station))
     attribution = _attribute_defects(
         detection_data, ancestors, upstream_by_cid, loss_reasons,
+        station_order_fallback=_sof,
     )
 
     _back: Dict[str, Any] = {
@@ -1813,11 +1863,12 @@ def _run_backward_pipeline(
 def _run_forward_pipeline(
     start_date: str,
     end_date: str,
-    station: str,
+    station: StationInput,
     loss_reasons: Optional[List[str]],
 ) -> Optional[Dict[str, Any]]:
     """Run the forward traceability pipeline (detection → downstream reject rates)."""
-    station_order = get_group_order(station)
+    _fwd_stations = _normalize_station(station)
+    station_order = min(get_group_order(s) for s in _fwd_stations)
 
     # Stage 1: Detection data
     detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
@@ -2200,6 +2251,8 @@ def _build_detection_lookup(
     for _, row in df.iterrows():
         cid = row['CONTAINERID']
         if cid not in lookup:
+            _wc_name = _safe_str(row.get('WORKCENTERNAME'))
+            _, _det_order = get_workcenter_group(_wc_name)
             lookup[cid] = {
                 'trackinqty': _safe_int(row.get('TRACKINQTY')),
                 'rejectqty_by_reason': {},
@@ -2209,6 +2262,7 @@ def _build_detection_lookup(
                 'pj_type': _safe_str(row.get('PJ_TYPE')),
                 'detection_equipmentname': _safe_str(row.get('DETECTION_EQUIPMENTNAME')),
                 'trackintimestamp': _safe_str(row.get('TRACKINTIMESTAMP')),
+                'detection_station_order': _det_order,
             }
 
         reason = row.get('LOSSREASONNAME')
@@ -2230,6 +2284,8 @@ def _attribute_defects(
     ancestors: Dict[str, Set[str]],
     upstream_by_cid: Dict[str, List[Dict[str, Any]]],
     loss_reasons: Optional[List[str]] = None,
+    *,
+    station_order_fallback: int = 999,
 ) -> List[Dict[str, Any]]:
     """Attribute detection station defects to upstream machines.
 
@@ -2245,13 +2301,19 @@ def _attribute_defects(
     machine_to_detection: Dict[Tuple[str, str, str], Set[str]] = defaultdict(set)
 
     for det_cid, data in detection_data.items():
+        det_station_order = data.get('detection_station_order') if 'detection_station_order' in data else station_order_fallback
         ancestor_set = ancestors.get(det_cid, set())
         all_cids = ancestor_set | {det_cid}
 
         for anc_cid in all_cids:
             for record in upstream_by_cid.get(anc_cid, []):
+                wc_group = record['workcenter_group']
+                # Exclude stations at or after the detection station — they are not
+                # upstream causes. Unknown groups (order=999) are always included.
+                if wc_group and get_group_order(wc_group) >= det_station_order:
+                    continue
                 machine_key = (
-                    record['workcenter_group'],
+                    wc_group,
                     record['equipment_name'],
                     record['equipment_id'],
                 )

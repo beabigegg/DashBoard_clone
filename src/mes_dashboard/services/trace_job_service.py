@@ -895,6 +895,10 @@ def execute_trace_events_job(
             # Compute detection spool hash (same key used in _fetch_station_detection_data)
             try:
                 from mes_dashboard.services.batch_query_engine import compute_query_hash as _cqh
+                from mes_dashboard.services.mid_section_defect_service import (
+                    _normalize_station as _msd_norm_st,
+                    _canon_station_key as _msd_canon_st,
+                )
                 _det_start = _msd_params.get("start_date") or ""
                 _det_end = _msd_params.get("end_date") or ""
                 if not _det_start or not _det_end:
@@ -903,8 +907,9 @@ def execute_trace_events_job(
                     if isinstance(_dr, list) and len(_dr) == 2:
                         _det_start = str(_dr[0] or "").strip()
                         _det_end = str(_dr[1] or "").strip()
+                _det_station_key = _msd_canon_st(_msd_norm_st(_msd_params.get("station") or ""))
                 _msd_detection_hash: Optional[str] = _cqh({
-                    "station": _msd_params.get("station") or "",
+                    "station": _det_station_key,
                     "start_date": _det_start,
                     "end_date": _det_end,
                 })
@@ -982,7 +987,7 @@ def execute_trace_events_job(
                             _fetch_detection_by_container_ids,
                             _write_msd_detection_stage_spool,
                         )
-                        _det_station = str(_msd_params.get("station") or "測試").strip()
+                        _det_station = _msd_params.get("station") or "測試"
                         # Use _expanded_container_ids (seeds + all lineage ancestors) so that
                         # containers related via SPLITFROMID / COMBINEDASSYLOTS that passed
                         # through the detection station are included in the spool.
@@ -1419,11 +1424,17 @@ def _build_job_msd_aggregation(
     params = payload.get("params")
     normalized_loss_reasons = None
     direction = "backward"
+    _station_order_fallback: int = 999
     if isinstance(params, dict):
         from mes_dashboard.services.mid_section_defect_service import parse_loss_reasons_param
+        from mes_dashboard.services.mid_section_defect_service import _normalize_station
+        from mes_dashboard.config.workcenter_groups import get_group_order
 
         normalized_loss_reasons = parse_loss_reasons_param(params.get("loss_reasons"))
         direction = str(params.get("direction") or "backward").strip() or "backward"
+        _raw_station = params.get("station") or "測試"
+        _stations = _normalize_station(_raw_station)
+        _station_order_fallback = min(get_group_order(s) for s in _stations)
 
     if trace_query_id:
         try:
@@ -1434,6 +1445,7 @@ def _build_job_msd_aggregation(
                 summary = runtime.get_summary(
                     direction=direction,
                     loss_reasons=normalized_loss_reasons,
+                    station_order_fallback=_station_order_fallback,
                 )
                 if summary is not None:
                     if domain_quality_meta:
@@ -1451,6 +1463,12 @@ def _build_job_msd_aggregation(
             from pathlib import Path as _AggPath
             from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
             from mes_dashboard.core.query_spool_store import get_spool_file_path
+            from mes_dashboard.config.workcenter_groups import WORKCENTER_GROUPS as _WCG
+
+            _upstream_groups = (
+                [g for g, cfg in _WCG.items() if cfg["order"] < _station_order_fallback]
+                if _station_order_fallback < 999 else None
+            )
 
             runtime = MsdDuckdbRuntime(trace_query_id)
             if runtime.is_available():
@@ -1459,6 +1477,7 @@ def _build_job_msd_aggregation(
                     summary = runtime.get_summary_with_detection(
                         str(detection_path),
                         loss_reasons=normalized_loss_reasons,
+                        upstream_station_groups=_upstream_groups,
                     )
                     if summary is not None:
                         if domain_quality_meta:
@@ -1537,7 +1556,7 @@ def _build_job_msd_aggregation(
     upstream_events = domain_results.get("upstream_history", {})
     materials_events = domain_results.get("materials", {})
     downstream_events = domain_results.get("downstream_rejects", {})
-    station = str(params.get("station") or "測試").strip()
+    station = params.get("station") or "測試"
 
     aggregation = build_trace_aggregation_from_events(
         start_date,

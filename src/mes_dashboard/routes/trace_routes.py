@@ -368,7 +368,7 @@ def _seed_resolve_mid_section_defect(
     if not start_date or not end_date:
         return None, ("INVALID_PARAMS", "start_date/end_date (or date_range) is required", 400)
 
-    station = str(params.get("station") or "測試").strip()
+    station = [s.strip() for s in str(params.get("station") or "測試").split(',') if s.strip()] or ['測試']
     result = resolve_trace_seed_lots(start_date, end_date, station=station)
     if result is None:
         return None, ("SEED_RESOLVE_FAILED", "seed resolve service unavailable", 503)
@@ -626,7 +626,7 @@ def _build_msd_aggregation(
     upstream_events = domain_results.get("upstream_history", {})
     materials_events = domain_results.get("materials", {})
     downstream_events = domain_results.get("downstream_rejects", {})
-    station = str(params.get("station") or "測試").strip()
+    station = [s.strip() for s in str(params.get("station") or "測試").split(',') if s.strip()] or ['測試']
 
     aggregation = build_trace_aggregation_from_events(
         start_date,

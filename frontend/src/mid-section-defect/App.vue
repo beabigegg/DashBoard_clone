@@ -95,7 +95,7 @@ interface CommittedFilters {
   startDate: string;
   endDate: string;
   lossReasons: string[];
-  station: string;
+  station: string[];
   direction: string;
   queryMode?: string;
   containerInputType?: string;
@@ -114,7 +114,7 @@ interface SessionCache {
     startDate: string;
     endDate: string;
     lossReasons: string[];
-    station: string;
+    station: string[];
     direction: string;
   };
   analysisData: MsdAnalysisData;
@@ -220,20 +220,20 @@ const filters = reactive<{
   startDate: string;
   endDate: string;
   lossReasons: string[];
-  station: string;
+  station: string[];
   direction: string;
 }>({
   startDate: '',
   endDate: '',
   lossReasons: [],
-  station: '測試',
+  station: ['測試'],
   direction: 'backward',
 });
 const committedFilters = ref<CommittedFilters>({
   startDate: '',
   endDate: '',
   lossReasons: [],
-  station: '測試',
+  station: ['測試'],
   direction: 'backward',
 });
 
@@ -386,8 +386,9 @@ const suspectMachineNames = computed(() => {
 
 const isForward = computed(() => committedFilters.value.direction === 'forward');
 const committedStation = computed(() => {
-  const key = committedFilters.value.station || '測試';
-  return stationLabelMap.value[key] || key;
+  const stations = committedFilters.value.station;
+  if (!stations.length) return stationLabelMap.value['測試'] || '測試';
+  return stations.map((k) => stationLabelMap.value[k] || k).join(' / ');
 });
 
 const headerSubtitle = computed(() => {
@@ -496,7 +497,7 @@ function toDateString(value: Date): string {
 function buildFilterParams(): Record<string, unknown> {
   const snapshot = committedFilters.value;
   const params: Record<string, unknown> = {
-    station: snapshot.station,
+    station: snapshot.station.join(','),
     direction: snapshot.direction,
   };
   if (snapshot.lossReasons.length) {
@@ -518,7 +519,7 @@ function buildDetailParams(): Record<string, unknown> {
   const params: Record<string, unknown> = {
     start_date: snapshot.startDate,
     end_date: snapshot.endDate,
-    station: snapshot.station,
+    station: snapshot.station.join(','),
     direction: snapshot.direction,
   };
   if (snapshot.lossReasons.length) {
@@ -543,7 +544,7 @@ function snapshotFilters() {
     startDate: filters.startDate,
     endDate: filters.endDate,
     lossReasons: [...filters.lossReasons],
-    station: filters.station,
+    station: [...filters.station],
     direction: filters.direction,
     queryMode: queryMode.value,
     containerInputType: containerInputType.value,
@@ -686,7 +687,7 @@ function exportCsv() {
   const params = new URLSearchParams({
     start_date: snapshot.startDate,
     end_date: snapshot.endDate,
-    station: snapshot.station,
+    station: snapshot.station.join(','),
     direction: snapshot.direction,
   });
   if (snapshot.lossReasons.length) {
@@ -702,7 +703,7 @@ function exportCsv() {
   const datePart = snapshot.queryMode === 'container'
     ? (currentTraceQueryId.value || snapshot.containerInputType || 'container')
     : `${snapshot.startDate}_to_${snapshot.endDate}`;
-  link.download = `mid_section_defect_${snapshot.station}_${snapshot.direction}_${datePart}.csv`;
+  link.download = `mid_section_defect_${snapshot.station.join('_')}_${snapshot.direction}_${datePart}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

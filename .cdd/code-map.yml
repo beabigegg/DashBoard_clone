@@ -1,6 +1,6 @@
-# generated: 2026-06-03T03:48:08Z by cdd-kit 2.2.0
-# files: 827, src-lines: 231740, map-lines: 17672, compression: 13.1x
-# sources-digest: 680c54781ace0345c7b162bde6a7cbaeb88c08bc346dd0b3b58a52119d7c5ea9
+# generated: 2026-06-03T10:41:51Z by cdd-kit 2.2.0
+# files: 827, src-lines: 232000, map-lines: 17678, compression: 13.1x
+# sources-digest: f859d03d9cf0699d5542bbd349edd5b2f2ec76596c779a816d3fea3f5cd19275
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -767,7 +767,7 @@ frontend/src/downtime-analysis/components/KpiCards.vue:  # 70 lines
 
 frontend/src/downtime-analysis/components/MachineEventRows.vue:  # 115 lines
 
-frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 203 lines
+frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 211 lines
 
 frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 44 lines
 
@@ -836,22 +836,22 @@ frontend/src/downtime-analysis/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/downtime-analysis/types.ts:  # 123 lines
+frontend/src/downtime-analysis/types.ts:  # 124 lines
   interfaces:
     - { name: DowntimeKpiShape, lines: 1-8 }
     - { name: DailyTrendRow, lines: 10-16 }
     - { name: BigCategoryRow, lines: 18-23 }
     - { name: TopReasonRow, lines: 25-31 }
     - { name: EquipmentDetailRow, lines: 33-44 }
-    - { name: JobEnrichment, lines: 46-56 }
-    - { name: EventDetailRow, lines: 60-72 }
-    - { name: Pagination, lines: 74-79 }
-    - { name: FilterOptions, lines: 81-88 }
-    - { name: FilterState, lines: 90-103 }
-    - { name: ChartFilter, lines: 109-112 }
-    - { name: TierThreeEntry, lines: 118-123 }
+    - { name: JobEnrichment, lines: 46-57 }
+    - { name: EventDetailRow, lines: 61-73 }
+    - { name: Pagination, lines: 75-80 }
+    - { name: FilterOptions, lines: 82-89 }
+    - { name: FilterState, lines: 91-104 }
+    - { name: ChartFilter, lines: 110-113 }
+    - { name: TierThreeEntry, lines: 119-124 }
   types:
-    - { name: MatchSource, lines: 58-58 }
+    - { name: MatchSource, lines: 59-59 }
 
 frontend/src/hold-detail/App.vue:  # 493 lines
 
@@ -1091,7 +1091,7 @@ frontend/src/material-trace/main.ts:  # 7 lines
     - { module: '../wip-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/mid-section-defect/App.vue:  # 940 lines
+frontend/src/mid-section-defect/App.vue:  # 941 lines
 
 frontend/src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
   imports:
@@ -1117,7 +1117,7 @@ frontend/src/mid-section-defect/components/DetailTable.vue:  # 177 lines
     - { name: formatCell, lines: 88-93 }
     - { name: getSuspectHits, lines: 95-114 }
 
-frontend/src/mid-section-defect/components/FilterBar.vue:  # 216 lines
+frontend/src/mid-section-defect/components/FilterBar.vue:  # 208 lines
   imports:
     - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 2 }
   functions:
@@ -4691,7 +4691,7 @@ src/mes_dashboard/routes/material_trace_routes.py:  # 273 lines
     - { name: api_material_trace_export, lines: 214-261 }  # @material_trace_bp.route('/api/material-trace/export', methods=['POST'])
     - { name: api_material_trace_filter_options, lines: 265-273 }  # @material_trace_bp.route('/api/material-trace/filter-options', methods=['GET'])
 
-src/mes_dashboard/routes/mid_section_defect_routes.py:  # 285 lines
+src/mes_dashboard/routes/mid_section_defect_routes.py:  # 287 lines
   imports:
     - { module: logging, items: [], line: 7 }
     - { module: flask, items: [Blueprint, request, Response], line: 9 }
@@ -4700,14 +4700,14 @@ src/mes_dashboard/routes/mid_section_defect_routes.py:  # 285 lines
     - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 18 }
     - { module: mes_dashboard.services.mid_section_defect_service, items: [resolve_analysis_trace_context, query_analysis, query_all_loss_reasons, query_station_options], line: 19 }
   functions:
-    - { name: _parse_common_params, lines: 58-66 }
-    - { name: _analysis_cache_key, lines: 69-85 }
-    - { name: _build_summary_payload, lines: 88-98 }
-    - { name: api_station_options, lines: 102-104 }  # @mid_section_defect_bp.route('/station-options', methods=['GET'])
-    - { name: api_analysis, lines: 109-148 }  # @mid_section_defect_bp.route('/analysis', methods=['GET'])
-    - { name: api_analysis_detail, lines: 153-226 }  # @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])
-    - { name: api_loss_reasons, lines: 230-237 }  # @mid_section_defect_bp.route('/loss-reasons', methods=['GET'])
-    - { name: api_export, lines: 242-285 }  # @mid_section_defect_bp.route('/export', methods=['GET'])
+    - { name: _parse_common_params, lines: 58-67 }
+    - { name: _analysis_cache_key, lines: 70-87 }
+    - { name: _build_summary_payload, lines: 90-100 }
+    - { name: api_station_options, lines: 104-106 }  # @mid_section_defect_bp.route('/station-options', methods=['GET'])
+    - { name: api_analysis, lines: 111-150 }  # @mid_section_defect_bp.route('/analysis', methods=['GET'])
+    - { name: api_analysis_detail, lines: 155-228 }  # @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])
+    - { name: api_loss_reasons, lines: 232-239 }  # @mid_section_defect_bp.route('/loss-reasons', methods=['GET'])
+    - { name: api_export, lines: 244-287 }  # @mid_section_defect_bp.route('/export', methods=['GET'])
 
 src/mes_dashboard/routes/production_history_routes.py:  # 479 lines
   imports:
@@ -5472,7 +5472,7 @@ src/mes_dashboard/services/downtime_analysis_cache.py:  # 143 lines
     - { name: load_downtime_events, lines: 85-97 }
     - { name: start_downtime_prewarm, lines: 105-143 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1264 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1267 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5487,28 +5487,28 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1264 lines
     - { name: _build_merged_row, lines: 205-223 }
     - { name: _bridge_jobid, lines: 230-324 }
     - { name: _compute_overlap_seconds, lines: 327-336 }
-    - { name: _enrich_event, lines: 339-378 }
-    - { name: _no_match_event, lines: 381-394 }
-    - { name: _add_empty_job_columns, lines: 397-406 }
-    - { name: _safe_str, lines: 409-414 }
-    - { name: _enrich_events_df, lines: 421-454 }
-    - { name: _ts_to_iso, lines: 457-466 }
-    - { name: make_downtime_query_id, lines: 473-478 }
-    - { name: get_filter_options, lines: 485-573 }
-    - { name: query_downtime_dataset, lines: 580-739 }
-    - { name: _apply_resource_filters, lines: 742-822 }
-    - { name: _empty_events_df, lines: 825-832 }
-    - { name: _build_response, lines: 839-852 }
-    - { name: _build_summary, lines: 855-881 }
-    - { name: _build_daily_trend, lines: 884-905 }
-    - { name: _build_big_category, lines: 908-927 }
-    - { name: _build_top_reasons, lines: 930-956 }
-    - { name: apply_view, lines: 963-1020 }
-    - { name: _build_equipment_detail_page, lines: 1023-1048 }
-    - { name: _build_equipment_detail, lines: 1051-1088 }
-    - { name: _build_event_detail_page, lines: 1091-1151 }
-    - { name: export_equipment_detail_csv, lines: 1159-1202 }
-    - { name: export_event_detail_csv, lines: 1205-1264 }
+    - { name: _enrich_event, lines: 339-379 }
+    - { name: _no_match_event, lines: 382-396 }
+    - { name: _add_empty_job_columns, lines: 399-408 }
+    - { name: _safe_str, lines: 411-416 }
+    - { name: _enrich_events_df, lines: 423-456 }
+    - { name: _ts_to_iso, lines: 459-468 }
+    - { name: make_downtime_query_id, lines: 475-480 }
+    - { name: get_filter_options, lines: 487-575 }
+    - { name: query_downtime_dataset, lines: 582-741 }
+    - { name: _apply_resource_filters, lines: 744-824 }
+    - { name: _empty_events_df, lines: 827-834 }
+    - { name: _build_response, lines: 841-854 }
+    - { name: _build_summary, lines: 857-883 }
+    - { name: _build_daily_trend, lines: 886-907 }
+    - { name: _build_big_category, lines: 910-929 }
+    - { name: _build_top_reasons, lines: 932-958 }
+    - { name: apply_view, lines: 965-1022 }
+    - { name: _build_equipment_detail_page, lines: 1025-1050 }
+    - { name: _build_equipment_detail, lines: 1053-1090 }
+    - { name: _build_event_detail_page, lines: 1093-1154 }
+    - { name: export_equipment_detail_csv, lines: 1162-1205 }
+    - { name: export_event_detail_csv, lines: 1208-1267 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -5973,7 +5973,7 @@ src/mes_dashboard/services/material_trace_service.py:  # 945 lines
     - { name: execute_to_spool, lines: 819-916 }
     - { name: rq_material_trace_job, lines: 919-945 }
 
-src/mes_dashboard/services/mid_section_defect_service.py:  # 3102 lines
+src/mes_dashboard/services/mid_section_defect_service.py:  # 3164 lines
   imports:
     - { module: csv, items: [], line: 35 }
     - { module: io, items: [], line: 36 }
@@ -5983,7 +5983,7 @@ src/mes_dashboard/services/mid_section_defect_service.py:  # 3102 lines
     - { module: collections, items: [defaultdict], line: 40 }
     - { module: concurrent.futures, items: [ThreadPoolExecutor], line: 41 }
     - { module: datetime, items: [datetime], line: 42 }
-    - { module: typing, items: [Optional, Dict, List, Any, Set, Tuple, Generator], line: 43 }
+    - { module: typing, items: [Optional, Dict, List, Any, Set, Tuple, Generator, Union], line: 43 }
     - { module: pandas, items: [], line: 45 }
     - { module: mes_dashboard.core.database, items: [read_sql_df], line: 47 }
     - { module: mes_dashboard.core.cache, items: [cache_get, cache_set, make_cache_key], line: 48 }
@@ -5992,79 +5992,82 @@ src/mes_dashboard/services/mid_section_defect_service.py:  # 3102 lines
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, get_async_job_status, is_async_available, update_job_progress], line: 58 }
     - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 65 }
     - { module: mes_dashboard.services.lineage_engine, items: [LineageEngine], line: 66 }
-    - { module: mes_dashboard.config.workcenter_groups, items: [WORKCENTER_GROUPS, get_group_order], line: 67 }
-    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DETECTION], line: 73 }
+    - { module: mes_dashboard.config.workcenter_groups, items: [WORKCENTER_GROUPS, get_group_order, get_workcenter_group], line: 67 }
+    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DETECTION], line: 89 }
   constants:
-    - { name: MAX_QUERY_DAYS, line: 72 }
-    - { name: FORWARD_PIPELINE_MAX_WORKERS, line: 77 }
-    - { name: MSD_COMPAT_QUEUE, line: 78 }
-    - { name: MSD_COMPAT_JOB_TIMEOUT_SECONDS, line: 80 }
-    - { name: MSD_COMPAT_JOB_TTL_SECONDS, line: 81 }
-    - { name: TOP_N, line: 85 }
-    - { name: DIMENSION_MAP, line: 89 }
-    - { name: FORWARD_DIMENSION_MAP, line: 96 }
-    - { name: CSV_COLUMNS_BACKWARD, line: 104 }
-    - { name: CSV_COLUMNS_FORWARD, line: 123 }
-    - { name: VALID_DIRECTIONS, line: 138 }
+    - { name: MAX_QUERY_DAYS, line: 88 }
+    - { name: FORWARD_PIPELINE_MAX_WORKERS, line: 93 }
+    - { name: MSD_COMPAT_QUEUE, line: 94 }
+    - { name: MSD_COMPAT_JOB_TIMEOUT_SECONDS, line: 96 }
+    - { name: MSD_COMPAT_JOB_TTL_SECONDS, line: 97 }
+    - { name: TOP_N, line: 101 }
+    - { name: DIMENSION_MAP, line: 105 }
+    - { name: FORWARD_DIMENSION_MAP, line: 112 }
+    - { name: CSV_COLUMNS_BACKWARD, line: 120 }
+    - { name: CSV_COLUMNS_FORWARD, line: 139 }
+    - { name: VALID_DIRECTIONS, line: 154 }
   functions:
-    - { name: _make_detection_spool_query_id, lines: 141-153 }
-    - { name: resolve_analysis_trace_context, lines: 156-206 }
-    - { name: _load_analysis_from_spool, lines: 209-236 }
-    - { name: _empty_pending_result, lines: 239-248 }
-    - { name: _compat_job_id, lines: 251-252 }
-    - { name: ensure_analysis_background_job, lines: 255-299 }
-    - { name: query_analysis, lines: 306-393 }
-    - { name: parse_loss_reasons_param, lines: 396-429 }
-    - { name: resolve_msd_seeds_at_station, lines: 441-499 }
-    - { name: resolve_trace_seed_lots, lines: 502-541 }
-    - { name: build_trace_aggregation_from_events, lines: 544-721 }
-    - { name: _build_trace_aggregation_container_mode, lines: 724-893 }
-    - { name: query_analysis_detail, lines: 896-935 }
-    - { name: query_all_loss_reasons, lines: 938-953 }
-    - { name: export_csv, lines: 956-1002 }
-    - { name: query_station_options, lines: 1005-1017 }
-    - { name: _collect_forward_tracked_cids, lines: 1020-1039 }
-    - { name: _write_msd_lineage_stage_spool, lines: 1042-1112 }
-    - { name: _write_msd_detection_stage_spool, lines: 1115-1143 }
-    - { name: _execute_msd_compat_job, lines: 1146-1269 }
-    - { name: _safe_str, lines: 1276-1284 }
-    - { name: _safe_float, lines: 1287-1296 }
-    - { name: _safe_int, lines: 1299-1300 }
-    - { name: _empty_result, lines: 1303-1329 }
-    - { name: _validate_date_range, lines: 1336-1349 }
-    - { name: _validate_station, lines: 1352-1356 }
-    - { name: _validate_params, lines: 1359-1370 }
-    - { name: _build_station_filter, lines: 1377-1416 }
-    - { name: _fetch_station_detection_data, lines: 1423-1636 }
-    - { name: _build_expanded_detection_cids, lines: 1639-1663 }
-    - { name: _fetch_detection_by_container_ids, lines: 1666-1719 }
-    - { name: _run_backward_pipeline, lines: 1726-1806 }
-    - { name: _run_forward_pipeline, lines: 1813-1917 }
-    - { name: _resolve_full_genealogy, lines: 1924-1932 }
-    - { name: _log_genealogy_summary, lines: 1935-1946 }
-    - { name: _fetch_upstream_history, lines: 1953-1979 }
-    - { name: _fetch_downstream_rejects, lines: 1986-2025 }
-    - { name: _normalize_lineage_ancestors, lines: 2028-2065 }
-    - { name: _normalize_upstream_event_records, lines: 2068-2093 }
-    - { name: _normalize_materials_event_records, lines: 2096-2120 }
-    - { name: _normalize_downstream_event_records, lines: 2123-2147 }
-    - { name: _build_trace_quality_meta, lines: 2150-2172 }
-    - { name: _build_detection_lookup, lines: 2179-2221 }
-    - { name: _attribute_defects, lines: 2228-2327 }
-    - { name: _attribute_materials, lines: 2330-2390 }
-    - { name: _attribute_wafer_roots, lines: 2393-2440 }
-    - { name: _attribute_forward_defects, lines: 2447-2524 }
-    - { name: _build_kpi, lines: 2531-2576 }
-    - { name: _build_forward_kpi, lines: 2579-2605 }
-    - { name: _build_chart_data, lines: 2612-2669 }
-    - { name: _build_loss_reason_chart, lines: 2672-2707 }
-    - { name: _build_all_charts, lines: 2710-2758 }
-    - { name: _build_forward_charts, lines: 2761-2869 }
-    - { name: _build_daily_trend, lines: 2876-2923 }
-    - { name: _build_detail_table, lines: 2930-3030 }
-    - { name: _build_forward_detail_table, lines: 3033-3102 }
+    - { name: _normalize_station, lines: 74-80 }
+    - { name: _canon_station_key, lines: 83-85 }
+    - { name: _make_detection_spool_query_id, lines: 157-169 }
+    - { name: resolve_analysis_trace_context, lines: 172-222 }
+    - { name: _load_analysis_from_spool, lines: 225-255 }
+    - { name: _empty_pending_result, lines: 258-267 }
+    - { name: _compat_job_id, lines: 270-271 }
+    - { name: ensure_analysis_background_job, lines: 274-318 }
+    - { name: query_analysis, lines: 325-413 }
+    - { name: parse_loss_reasons_param, lines: 416-449 }
+    - { name: resolve_msd_seeds_at_station, lines: 461-520 }
+    - { name: resolve_trace_seed_lots, lines: 523-562 }
+    - { name: build_trace_aggregation_from_events, lines: 565-744 }
+    - { name: _build_trace_aggregation_container_mode, lines: 747-918 }
+    - { name: query_analysis_detail, lines: 921-960 }
+    - { name: query_all_loss_reasons, lines: 963-978 }
+    - { name: export_csv, lines: 981-1027 }
+    - { name: query_station_options, lines: 1030-1042 }
+    - { name: _collect_forward_tracked_cids, lines: 1045-1064 }
+    - { name: _write_msd_lineage_stage_spool, lines: 1067-1137 }
+    - { name: _write_msd_detection_stage_spool, lines: 1140-1168 }
+    - { name: _execute_msd_compat_job, lines: 1171-1294 }
+    - { name: _safe_str, lines: 1301-1309 }
+    - { name: _safe_float, lines: 1312-1321 }
+    - { name: _safe_int, lines: 1324-1325 }
+    - { name: _empty_result, lines: 1328-1354 }
+    - { name: _validate_date_range, lines: 1361-1374 }
+    - { name: _validate_station, lines: 1377-1383 }
+    - { name: _validate_params, lines: 1386-1397 }
+    - { name: _build_station_filter, lines: 1404-1445 }
+    - { name: _build_multi_station_filter, lines: 1448-1461 }
+    - { name: _fetch_station_detection_data, lines: 1468-1683 }
+    - { name: _build_expanded_detection_cids, lines: 1686-1710 }
+    - { name: _fetch_detection_by_container_ids, lines: 1713-1767 }
+    - { name: _run_backward_pipeline, lines: 1774-1856 }
+    - { name: _run_forward_pipeline, lines: 1863-1968 }
+    - { name: _resolve_full_genealogy, lines: 1975-1983 }
+    - { name: _log_genealogy_summary, lines: 1986-1997 }
+    - { name: _fetch_upstream_history, lines: 2004-2030 }
+    - { name: _fetch_downstream_rejects, lines: 2037-2076 }
+    - { name: _normalize_lineage_ancestors, lines: 2079-2116 }
+    - { name: _normalize_upstream_event_records, lines: 2119-2144 }
+    - { name: _normalize_materials_event_records, lines: 2147-2171 }
+    - { name: _normalize_downstream_event_records, lines: 2174-2198 }
+    - { name: _build_trace_quality_meta, lines: 2201-2223 }
+    - { name: _build_detection_lookup, lines: 2230-2275 }
+    - { name: _attribute_defects, lines: 2282-2389 }
+    - { name: _attribute_materials, lines: 2392-2452 }
+    - { name: _attribute_wafer_roots, lines: 2455-2502 }
+    - { name: _attribute_forward_defects, lines: 2509-2586 }
+    - { name: _build_kpi, lines: 2593-2638 }
+    - { name: _build_forward_kpi, lines: 2641-2667 }
+    - { name: _build_chart_data, lines: 2674-2731 }
+    - { name: _build_loss_reason_chart, lines: 2734-2769 }
+    - { name: _build_all_charts, lines: 2772-2820 }
+    - { name: _build_forward_charts, lines: 2823-2931 }
+    - { name: _build_daily_trend, lines: 2938-2985 }
+    - { name: _build_detail_table, lines: 2992-3092 }
+    - { name: _build_forward_detail_table, lines: 3095-3164 }
 
-src/mes_dashboard/services/msd_duckdb_runtime.py:  # 1617 lines
+src/mes_dashboard/services/msd_duckdb_runtime.py:  # 1668 lines
   imports:
     - { module: __future__, items: [annotations], line: 25 }
     - { module: logging, items: [], line: 27 }
@@ -6074,7 +6077,7 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 1617 lines
     - { name: SPOOL_NAMESPACE, line: 33 }
   classes:
     - name: MsdDuckdbRuntime
-      lines: 39-1617
+      lines: 39-1668
       methods:
         - { name: __init__, lines: 42-47 }
         - { name: _resolve_paths, lines: 49-68 }
@@ -6087,30 +6090,30 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 1617 lines
         - { name: _split_events_by_cid, lines: 173-206 }
         - { name: _build_backward_payload_from_spool, lines: 208-321 }
         - { name: _sort_detail_rows, lines: 324-345 }
-        - { name: get_summary, lines: 351-399 }
-        - { name: _compute_kpi, lines: 401-428 }
-        - { name: _compute_charts, lines: 430-456 }
-        - { name: _compute_daily_trend, lines: 458-482 }
-        - { name: _compute_attribution, lines: 484-510 }
-        - { name: get_summary_with_detection, lines: 516-608 }
-        - { name: _compute_kpi_from_detection, lines: 610-673 }
-        - { name: _compute_daily_trend_from_detection, lines: 675-709 }
-        - { name: _compute_attribution_from_detection, lines: 711-742 }
-        - { name: _compute_affected_machine_count, lines: 744-762 }
-        - { name: _compute_detection_machine_chart, lines: 764-798 }
-        - { name: _compute_wafer_root_chart, lines: 800-879 }
-        - { name: _compute_machine_chart, lines: 881-914 }
-        - { name: _compute_material_chart, lines: 916-949 }
-        - { name: _compute_loss_reason_chart, lines: 951-997 }
-        - { name: _compute_available_loss_reasons, lines: 999-1014 }
-        - { name: _compute_detail_total_count, lines: 1016-1038 }
-        - { name: _compute_workflow_chart, lines: 1040-1073 }
-        - { name: _compute_raw_machine_attribution, lines: 1075-1144 }
-        - { name: _compute_raw_materials_attribution, lines: 1146-1199 }
-        - { name: _to_pareto_items, lines: 1202-1219 }
-        - { name: get_detail, lines: 1225-1471 }
-        - { name: get_all_detail, lines: 1473-1514 }
-        - { name: export_csv, lines: 1520-1617 }
+        - { name: get_summary, lines: 351-412 }
+        - { name: _compute_kpi, lines: 414-446 }
+        - { name: _compute_charts, lines: 448-474 }
+        - { name: _compute_daily_trend, lines: 476-509 }
+        - { name: _compute_attribution, lines: 511-537 }
+        - { name: get_summary_with_detection, lines: 543-637 }
+        - { name: _compute_kpi_from_detection, lines: 639-702 }
+        - { name: _compute_daily_trend_from_detection, lines: 704-738 }
+        - { name: _compute_attribution_from_detection, lines: 740-771 }
+        - { name: _compute_affected_machine_count, lines: 773-791 }
+        - { name: _compute_detection_machine_chart, lines: 793-827 }
+        - { name: _compute_wafer_root_chart, lines: 829-908 }
+        - { name: _compute_machine_chart, lines: 910-952 }
+        - { name: _compute_material_chart, lines: 954-987 }
+        - { name: _compute_loss_reason_chart, lines: 989-1035 }
+        - { name: _compute_available_loss_reasons, lines: 1037-1052 }
+        - { name: _compute_detail_total_count, lines: 1054-1076 }
+        - { name: _compute_workflow_chart, lines: 1078-1111 }
+        - { name: _compute_raw_machine_attribution, lines: 1113-1189 }
+        - { name: _compute_raw_materials_attribution, lines: 1191-1244 }
+        - { name: _to_pareto_items, lines: 1247-1264 }
+        - { name: get_detail, lines: 1270-1522 }
+        - { name: get_all_detail, lines: 1524-1565 }
+        - { name: export_csv, lines: 1571-1668 }
 
 src/mes_dashboard/services/msd_lineage_job_service.py:  # 336 lines
   imports:
@@ -7058,7 +7061,7 @@ src/mes_dashboard/services/sql_fragments.py:  # 51 lines
     - { name: EQUIPMENT_STATUS_COLUMNS, line: 22 }
     - { name: EQUIPMENT_STATUS_SELECT_SQL, line: 47 }
 
-src/mes_dashboard/services/trace_job_service.py:  # 1669 lines
+src/mes_dashboard/services/trace_job_service.py:  # 1682 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: gc, items: [], line: 11 }
@@ -7099,17 +7102,17 @@ src/mes_dashboard/services/trace_job_service.py:  # 1669 lines
     - { name: _store_result_manifest, lines: 637-701 }
     - { name: _stream_spool_result_ndjson, lines: 704-795 }
     - { name: _update_meta, lines: 801-807 }
-    - { name: execute_trace_events_job, lines: 810-1128 }
-    - { name: _flatten_domain_records, lines: 1134-1144 }
-    - { name: _resolve_msd_lineage_payload, lines: 1147-1168 }
-    - { name: _expand_msd_container_ids, lines: 1171-1213 }
-    - { name: _write_msd_events_spool, lines: 1216-1268 }
-    - { name: _write_msd_events_spool_from_paths, lines: 1271-1394 }
-    - { name: _build_job_msd_aggregation, lines: 1397-1555 }
-    - { name: _trace_domain_spool_id, lines: 1561-1564 }
-    - { name: _write_trace_events_spool, lines: 1567-1597 }
-    - { name: make_general_trace_events_query_id, lines: 1600-1618 }
-    - { name: make_trace_query_id, lines: 1633-1669 }
+    - { name: execute_trace_events_job, lines: 810-1141 }
+    - { name: _flatten_domain_records, lines: 1147-1157 }
+    - { name: _resolve_msd_lineage_payload, lines: 1160-1181 }
+    - { name: _expand_msd_container_ids, lines: 1184-1226 }
+    - { name: _write_msd_events_spool, lines: 1229-1281 }
+    - { name: _write_msd_events_spool_from_paths, lines: 1284-1407 }
+    - { name: _build_job_msd_aggregation, lines: 1410-1568 }
+    - { name: _trace_domain_spool_id, lines: 1574-1577 }
+    - { name: _write_trace_events_spool, lines: 1580-1610 }
+    - { name: make_general_trace_events_query_id, lines: 1613-1631 }
+    - { name: make_trace_query_id, lines: 1646-1682 }
 
 src/mes_dashboard/services/trace_lineage_job_service.py:  # 292 lines
   imports:
@@ -13672,7 +13675,7 @@ tests/test_mid_section_defect_routes.py:  # 322 lines
     - { name: test_export_spool_miss_returns_410, lines: 282-300 }  # @patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
     - { name: test_export_spool_miss_does_not_dispatch_job, lines: 305-322 }  # @patch('mes_dashboard.services.msd_duckdb_runtime.MsdDuckdbRuntime')
 
-tests/test_mid_section_defect_service.py:  # 877 lines
+tests/test_mid_section_defect_service.py:  # 964 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
@@ -13680,18 +13683,18 @@ tests/test_mid_section_defect_service.py:  # 877 lines
     - { module: mes_dashboard.services.mid_section_defect_service, items: [_attribute_materials, _attribute_wafer_roots, _build_detail_table, _execute_msd_compat_job, _normalize_upstream_event_records, build_trace_aggregation_from_events, export_csv, query_analysis, query_analysis_detail, query_all_loss_reasons, query_station_options, resolve_msd_seeds_at_station], line: 10 }
   classes:
     - name: TestMsdEngineParallel
-      lines: 742-796
+      lines: 829-883
       methods:
-        - { name: _make_detection_env, lines: 745-770 }
-        - { name: test_default_parallel_is_1, lines: 772-783 }
-        - { name: test_parallel_2_passed_to_execute_plan, lines: 785-796 }
+        - { name: _make_detection_env, lines: 832-857 }
+        - { name: test_default_parallel_is_1, lines: 859-870 }
+        - { name: test_parallel_2_passed_to_execute_plan, lines: 872-883 }
     - name: TestMsdPartialFailure
-      lines: 803-877
+      lines: 890-964
       methods:
-        - { name: _setup_partial_failure_mocks, lines: 806-831 }
-        - { name: test_partial_failure_warning_logged, lines: 833-841 }
-        - { name: test_partial_failure_returned_in_meta, lines: 843-850 }
-        - { name: test_partial_failure_propagated_to_query_analysis, lines: 852-877 }
+        - { name: _setup_partial_failure_mocks, lines: 893-918 }
+        - { name: test_partial_failure_warning_logged, lines: 920-928 }
+        - { name: test_partial_failure_returned_in_meta, lines: 930-937 }
+        - { name: test_partial_failure_propagated_to_query_analysis, lines: 939-964 }
   functions:
     - { name: test_query_analysis_invalid_date_format_returns_error, lines: 26-30 }
     - { name: test_query_analysis_start_after_end_returns_error, lines: 33-37 }
@@ -13717,13 +13720,15 @@ tests/test_mid_section_defect_service.py:  # 877 lines
     - { name: test_attribute_wafer_roots_basic, lines: 514-526 }
     - { name: test_attribute_wafer_roots_self_root, lines: 529-539 }
     - { name: test_attribute_wafer_roots_multiple_roots, lines: 542-554 }
-    - { name: _make_detection_df, lines: 559-561 }
-    - { name: test_build_detail_table_structured_upstream_machines, lines: 564-595 }
-    - { name: test_build_detail_table_structured_upstream_materials, lines: 598-626 }
-    - { name: test_build_detail_table_wafer_root, lines: 629-647 }
-    - { name: test_build_detail_table_multiple_defect_reasons_expand_rows, lines: 650-673 }
-    - { name: test_build_detail_table_deduplicates_machines, lines: 676-696 }
-    - { name: test_export_csv_flattens_structured_fields, lines: 700-735 }  # @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
+    - { name: test_attribute_defects_filters_stations_at_or_after_detection_station, lines: 557-598 }
+    - { name: test_attribute_defects_multi_station_uses_per_lot_cutoff, lines: 601-641 }
+    - { name: _make_detection_df, lines: 646-648 }
+    - { name: test_build_detail_table_structured_upstream_machines, lines: 651-682 }
+    - { name: test_build_detail_table_structured_upstream_materials, lines: 685-713 }
+    - { name: test_build_detail_table_wafer_root, lines: 716-734 }
+    - { name: test_build_detail_table_multiple_defect_reasons_expand_rows, lines: 737-760 }
+    - { name: test_build_detail_table_deduplicates_machines, lines: 763-783 }
+    - { name: test_export_csv_flattens_structured_fields, lines: 787-822 }  # @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
 
 tests/test_modernization_policy_hardening.py:  # 178 lines
   imports:
@@ -13751,73 +13756,73 @@ tests/test_modernization_policy_hardening.py:  # 178 lines
     - { name: test_scope_matrix_loader_returns_defensive_copy, lines: 11-25 }
     - { name: test_scope_matrix_cache_refresh_requires_explicit_clear, lines: 28-45 }
 
-tests/test_msd_duckdb_parity.py:  # 414 lines
+tests/test_msd_duckdb_parity.py:  # 419 lines
   imports:
-    - { module: __future__, items: [annotations], line: 16 }
-    - { module: pathlib, items: [], line: 18 }
-    - { module: unittest.mock, items: [patch], line: 19 }
-    - { module: pandas, items: [], line: 21 }
-    - { module: pytest, items: [], line: 22 }
+    - { module: __future__, items: [annotations], line: 17 }
+    - { module: pathlib, items: [], line: 19 }
+    - { module: unittest.mock, items: [patch], line: 20 }
+    - { module: pandas, items: [], line: 22 }
+    - { module: pytest, items: [], line: 23 }
   constants:
-    - { name: SAMPLE_EVENTS, line: 29 }
-    - { name: SAMPLE_LINEAGE, line: 38 }
-    - { name: SAMPLE_DETECTION, line: 46 }
-    - { name: SAMPLE_BWD_LINEAGE, line: 54 }
-    - { name: SAMPLE_BWD_EVENTS, line: 61 }
+    - { name: SAMPLE_EVENTS, line: 30 }
+    - { name: SAMPLE_LINEAGE, line: 40 }
+    - { name: SAMPLE_DETECTION, line: 48 }
+    - { name: SAMPLE_BWD_LINEAGE, line: 56 }
+    - { name: SAMPLE_BWD_EVENTS, line: 63 }
   classes:
     - name: TestKpiParity
-      lines: 165-200
+      lines: 167-202
       methods:
-        - { name: test_kpi_lot_count_matches_distinct_containers, lines: 166-173 }
-        - { name: test_kpi_defect_qty_is_sum, lines: 175-181 }
-        - { name: test_kpi_defect_rate_matches_manual_calculation, lines: 183-191 }
-        - { name: test_kpi_keys_match_legacy_shape, lines: 193-200 }
+        - { name: test_kpi_lot_count_matches_distinct_containers, lines: 168-175 }
+        - { name: test_kpi_defect_qty_is_sum, lines: 177-183 }
+        - { name: test_kpi_defect_rate_matches_manual_calculation, lines: 185-193 }
+        - { name: test_kpi_keys_match_legacy_shape, lines: 195-202 }
     - name: TestChartsParity
-      lines: 207-231
+      lines: 209-233
       methods:
-        - { name: test_charts_by_station_present, lines: 208-214 }
-        - { name: test_charts_station_names_match_events, lines: 216-222 }
-        - { name: test_charts_defect_totals_match, lines: 224-231 }
+        - { name: test_charts_by_station_present, lines: 210-216 }
+        - { name: test_charts_station_names_match_events, lines: 218-224 }
+        - { name: test_charts_defect_totals_match, lines: 226-233 }
     - name: TestDailyTrendParity
-      lines: 238-260
+      lines: 240-262
       methods:
-        - { name: test_trend_dates_sorted, lines: 239-244 }
-        - { name: test_trend_covers_all_event_dates, lines: 246-252 }
-        - { name: test_trend_defect_sum_matches_kpi, lines: 254-260 }
+        - { name: test_trend_dates_sorted, lines: 241-246 }
+        - { name: test_trend_covers_all_event_dates, lines: 248-254 }
+        - { name: test_trend_defect_sum_matches_kpi, lines: 256-262 }
     - name: TestDetailParity
-      lines: 267-296
+      lines: 269-301
       methods:
-        - { name: test_detail_returns_none_for_forward, lines: 270-274 }
-        - { name: test_detail_returns_pagination_shape, lines: 276-285 }
-        - { name: test_detail_pagination_page_slicing, lines: 287-296 }
+        - { name: test_detail_returns_empty_for_forward, lines: 272-279 }
+        - { name: test_detail_returns_pagination_shape, lines: 281-290 }
+        - { name: test_detail_pagination_page_slicing, lines: 292-301 }
     - name: TestExportCsvParity
-      lines: 303-332
+      lines: 308-337
       methods:
-        - { name: test_export_yields_bytes, lines: 304-310 }
-        - { name: test_export_has_header_row, lines: 312-321 }
-        - { name: test_export_row_count_matches_events, lines: 323-332 }
+        - { name: test_export_yields_bytes, lines: 309-315 }
+        - { name: test_export_has_header_row, lines: 317-326 }
+        - { name: test_export_row_count_matches_events, lines: 328-337 }
     - name: TestIsAvailableParity
-      lines: 339-371
+      lines: 344-376
       methods:
-        - { name: test_is_available_returns_true_when_paths_set, lines: 340-348 }
-        - { name: test_is_available_returns_false_when_no_path, lines: 350-362 }
-        - { name: test_summary_returns_none_when_events_missing, lines: 364-371 }
+        - { name: test_is_available_returns_true_when_paths_set, lines: 345-353 }
+        - { name: test_is_available_returns_false_when_no_path, lines: 355-367 }
+        - { name: test_summary_returns_none_when_events_missing, lines: 369-376 }
     - name: TestBackwardSummary
-      lines: 378-414
+      lines: 383-419
       methods:
-        - { name: test_backward_summary_returns_all_chart_keys, lines: 379-386 }
-        - { name: test_backward_summary_has_attribution_keys, lines: 388-394 }
-        - { name: test_backward_wafer_root_uses_seed_root_name, lines: 396-404 }
-        - { name: test_backward_kpi_has_required_keys, lines: 406-414 }
+        - { name: test_backward_summary_returns_all_chart_keys, lines: 384-391 }
+        - { name: test_backward_summary_has_attribution_keys, lines: 393-399 }
+        - { name: test_backward_wafer_root_uses_seed_root_name, lines: 401-409 }
+        - { name: test_backward_kpi_has_required_keys, lines: 411-419 }
   functions:
-    - { name: _make_events_parquet, lines: 70-77 }
-    - { name: _make_lineage_parquet, lines: 80-84 }
-    - { name: _make_detection_parquet, lines: 87-98 }
-    - { name: _make_bwd_lineage_parquet, lines: 101-108 }
-    - { name: _make_bwd_events_parquet, lines: 111-122 }
-    - { name: spool_paths, lines: 126-128 }  # @pytest.fixture()
-    - { name: backward_spool_paths, lines: 132-138 }  # @pytest.fixture()
-    - { name: _runtime_with_paths, lines: 145-158 }
+    - { name: _make_events_parquet, lines: 72-79 }
+    - { name: _make_lineage_parquet, lines: 82-86 }
+    - { name: _make_detection_parquet, lines: 89-100 }
+    - { name: _make_bwd_lineage_parquet, lines: 103-110 }
+    - { name: _make_bwd_events_parquet, lines: 113-124 }
+    - { name: spool_paths, lines: 128-130 }  # @pytest.fixture()
+    - { name: backward_spool_paths, lines: 134-140 }  # @pytest.fixture()
+    - { name: _runtime_with_paths, lines: 147-160 }
 
 tests/test_msd_duckdb_runtime.py:  # 75 lines
   imports:
@@ -16624,7 +16629,7 @@ tests/test_template_integration.py:  # 411 lines
     - { name: _login_as_admin, lines: 16-18 }
     - { name: _get_response_and_html, lines: 21-26 }
 
-tests/test_trace_job_service.py:  # 701 lines
+tests/test_trace_job_service.py:  # 736 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -16657,6 +16662,7 @@ tests/test_trace_job_service.py:  # 701 lines
     - { name: test_flatten_domain_records, lines: 671-677 }
     - { name: test_resolve_msd_lineage_payload_from_query_id, lines: 681-691 }  # @patch('mes_dashboard.services.trace_lineage_job_service.load_trace_lineage_resul...
     - { name: test_expand_msd_container_ids_backward, lines: 694-701 }
+    - { name: test_detection_hash_matches_make_detection_spool_query_id_multi_station, lines: 704-736 }
 
 tests/test_trace_lineage_job_service.py:  # 114 lines
   imports:

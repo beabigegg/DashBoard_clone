@@ -61,7 +61,8 @@ def _parse_common_params():
     end_date = request.args.get('end_date')
     loss_reasons_str = request.args.get('loss_reasons', '')
     loss_reasons = [r.strip() for r in loss_reasons_str.split(',') if r.strip()] or None
-    station = request.args.get('station', '測試')
+    station_raw = request.args.get('station', '測試')
+    station = [s.strip() for s in station_raw.split(',') if s.strip()] or ['測試']
     direction = request.args.get('direction', 'backward')
     return start_date, end_date, loss_reasons, station, direction
 
@@ -69,17 +70,18 @@ def _parse_common_params():
 def _analysis_cache_key(
     start_date: str,
     end_date: str,
-    station: str,
+    station,
     direction: str,
     loss_reasons,
 ) -> str:
+    station_key = ','.join(sorted(station)) if isinstance(station, list) else str(station)
     return make_cache_key(
         "mid_section_defect",
         filters={
             "start_date": start_date,
             "end_date": end_date,
             "loss_reasons": sorted(loss_reasons) if loss_reasons else None,
-            "station": station,
+            "station": station_key,
             "direction": direction,
         },
     )
