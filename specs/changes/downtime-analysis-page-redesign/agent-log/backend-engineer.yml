@@ -1,0 +1,27 @@
+agent: backend-engineer
+change-id: downtime-analysis-page-redesign
+date: 2026-06-03
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_service.py:963-1005 (apply_view signature + filter logic), :1059 (_build_equipment_detail_page cap 200→1000)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/downtime_analysis_routes.py:231-270 (equipment-detail handler), :273-312 (event-detail handler)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_service.py::TestApplyViewFilter (8 tests, inserted before TestDowntimeMigration)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_routes.py::TestEquipmentDetailFilterRoute (5 tests), ::TestEventDetailFilterRoute (3 tests), ::TestFilterDataBoundary (5 tests)"
+  - type: test-output
+    pointer: "122 passed in 2.98s (0 failed, 0 errors)"
+  - type: contracts-touched
+    pointer: "contracts/CHANGELOG.md#api-1.14.0 — verified present, no edit needed"
+
+notes: |
+  TDD order followed: tests written first (16 failed), then IP-1+IP-2 implemented (all 21 pass).
+  Patch path for load_downtime_events corrected to mes_dashboard.services.downtime_analysis_cache
+  (it is imported inline inside apply_view, not at module level in the service).
+  equipment-detail page_size cap raised in BOTH the route handler (1000) and
+  _build_equipment_detail_page service guard (1000); event-detail stays at 200 per
+  data-shape-contract.md §3.12.6.
+  No Oracle SQL changes, no spool namespace change, no response shape change.

@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.13.1
-last-changed: 2026-05-29
+schema-version: 1.14.0
+last-changed: 2026-06-03
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -215,8 +215,8 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/options | required | — | success_response | 500 | route tests |
 | POST | /api/downtime-analysis/query | required | JSON body | success_response | 400/500 | route tests |
 | GET | /api/downtime-analysis/view | required | ?query_id=&granularity=&top_n= (granularity: day only; week/month planned) | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/equipment-detail | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/event-detail | required | ?query_id=&page=&page_size= | success_response | 400/410 | route tests |
+| GET | /api/downtime-analysis/equipment-detail | required | ?query_id= &page_size=(opt,max:1000,default:20) &big_category=(opt) &status_types=(opt,CSV:UDT,SDT,EGT) | success_response | 400/410 | route tests |
+| GET | /api/downtime-analysis/event-detail | required | ?query_id= &page= &page_size= &big_category=(opt) &status_types=(opt,CSV) &resource_id=(opt) | success_response | 400/410 | route tests |
 
 ## 5. Routing & Naming
 
@@ -347,8 +347,13 @@ breaking-change-policy: deprecate-2-minors
   - `GET /api/downtime-analysis/options` → `{workcenter_groups[], families[], resources[], package_groups[], big_categories[], reasons[]}`. 500 on cache unavailable.
   - `POST /api/downtime-analysis/query` — body: `{start_date, end_date, workcenter_groups?, families?, resource_ids?, package_groups?, big_categories?, status_types?}`; date range cap 730d (SYS-04); response: `{query_id, summary: DowntimeKpiShape, daily_trend: DailyTrendRow[], big_category: BigCategoryRow[], top_reasons: TopReasonRow[]}` (see data-shape-contract.md §3.12). 400 on invalid/missing dates; 500 on Oracle error.
   - `GET /api/downtime-analysis/view?query_id=&granularity=&top_n=` — granularity: `day` only (`week`/`month` planned; 400 on invalid value); `top_n` default 10; DuckDB regroup from spool; no Oracle re-query; 410 on spool miss.
-  - `GET /api/downtime-analysis/equipment-detail?query_id=` → `EquipmentDetailRow[]`; 410 on spool miss.
-  - `GET /api/downtime-analysis/event-detail?query_id=&page=&page_size=` → paginated `EventDetailRow[]` with nullable `JobEnrichment` (null when `match_source='none'`); page default 1, page_size default 50 max 200; 410 on spool miss.
+  - `GET /api/downtime-analysis/equipment-detail?query_id=&big_category=(opt)&status_types=(opt,CSV)` → `{equipment_detail: EquipmentDetailRow[]}`; response wrapper key is `equipment_detail`; optional filter params apply pandas `.isin()` narrow on in-memory `events_df` (no Oracle re-query); omitting all three returns pre-existing unfiltered response; 410 on spool miss.
+  - `GET /api/downtime-analysis/event-detail?query_id=&page=&page_size=&big_category=(opt)&status_types=(opt,CSV)&resource_id=(opt)` → `{events: paginated EventDetailRow[]}` with nullable `JobEnrichment` (null when `match_source='none'`); response wrapper key is `events`; page default 1, page_size default 50 max 200; `resource_id` enables Tier 3 lazy-load scoping; omitting all three filter params returns pre-existing unfiltered response; 410 on spool miss.
+- **downtime-analysis-page-redesign（2026-06-03）**: Additive optional filter params on two existing endpoints. No Oracle re-query; filtering in in-memory parquet spool. Response wrapper keys (`equipment_detail`, `events`) and per-row schemas unchanged.
+  - `GET /api/downtime-analysis/equipment-detail` gains `big_category` (string, opt) and `status_types` (string, opt, CSV e.g. `UDT,SDT`; parsed by `_csv_param()`).
+  - `GET /api/downtime-analysis/event-detail` gains `big_category`, `status_types`, and `resource_id` (string, opt; Tier 3 lazy-load scoping).
+  - Backward-compatible: omitting all params returns byte-for-byte identical unfiltered response.
+  - Consumers: `frontend/src/downtime-analysis/` only (StatusMachineJobTable.vue, MachineEventRows.vue).
   - Spool namespace `downtime_analysis_*`, cache key includes `DOWNTIME_BRIDGE_VERSION`. Additive; no existing endpoints changed.
 
 ## Breaking Change Policy

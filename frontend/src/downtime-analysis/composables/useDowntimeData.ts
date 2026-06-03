@@ -9,6 +9,7 @@ import type {
   EventDetailRow,
   Pagination,
   FilterOptions,
+  ChartFilter,
 } from '../types';
 
 const API_TIMEOUT = 360000;
@@ -324,6 +325,100 @@ export function useDowntimeData() {
     eventData.pagination = { page: 1, page_size: 20, total_rows: 0, total_pages: 0 };
   }
 
+  /**
+   * Load all equipment detail in a single full page (page_size=200).
+   * Accepts optional ChartFilter to narrow results by big_category / status_types.
+   * Overwrites equipmentData.rows and equipmentData.pagination.
+   */
+  async function loadAllEquipmentDetail(filter: ChartFilter): Promise<void> {
+    if (!queryId.value) return;
+
+    loading.equipment = true;
+    error.value = '';
+
+    try {
+      const params: Record<string, unknown> = {
+        query_id: queryId.value,
+        page_size: 200,
+      };
+      if (filter.big_category) {
+        params.big_category = filter.big_category;
+      }
+      if (filter.status_types && filter.status_types.length > 0) {
+        params.status_types = filter.status_types.join(',');
+      }
+
+      const response = await apiGet('/api/downtime-analysis/equipment-detail', {
+        timeout: API_TIMEOUT,
+        silent: true,
+        params,
+      });
+
+      const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      if (data) {
+        equipmentData.rows = Array.isArray(data.equipment_detail) ? (data.equipment_detail as EquipmentDetailRow[]) : [];
+        const pag = data.pagination as Partial<Pagination> | undefined;
+        equipmentData.pagination = {
+          page: Number(pag?.page ?? 1),
+          page_size: Number(pag?.page_size ?? 200),
+          total_rows: Number(pag?.total_rows ?? 0),
+          total_pages: Number(pag?.total_pages ?? 0),
+        };
+      }
+    } catch (err) {
+      const e = err as Error & { status?: number };
+      if (e?.status === 410 || e?.message === 'cache_expired') {
+        error.value = '快取已過期，請重新查詢';
+      } else {
+        error.value = e?.message || '載入設備明細失敗';
+      }
+    } finally {
+      loading.equipment = false;
+    }
+  }
+
+  /**
+   * Load events for a single machine+status combination (Tier 3 lazy-load).
+   * Returns the events array directly; does NOT overwrite global eventData.
+   * Throws an error with message '查詢已過期，請重新查詢' on 410.
+   */
+  async function loadMachineStatusEvents(
+    resourceId: string,
+    statusType: string,
+    filter: ChartFilter,
+  ): Promise<EventDetailRow[]> {
+    if (!queryId.value) return [];
+
+    const params: Record<string, unknown> = {
+      query_id: queryId.value,
+      resource_id: resourceId,
+      status_types: statusType,
+      page_size: 200,
+    };
+    if (filter.big_category) {
+      params.big_category = filter.big_category;
+    }
+
+    const response = await apiGet('/api/downtime-analysis/event-detail', {
+      timeout: API_TIMEOUT,
+      silent: true,
+      params,
+    });
+
+    const resp = response as Record<string, unknown>;
+    // Handle 410 cache_expired
+    if (resp?.success === false) {
+      const errObj = resp?.error as Record<string, unknown> | string | undefined;
+      const code = typeof errObj === 'object' ? errObj?.code : errObj;
+      if (code === 'cache_expired' || resp?.status === 410) {
+        throw new Error('查詢已過期，請重新查詢');
+      }
+    }
+
+    const data = resp?.data as Record<string, unknown> | undefined;
+    return Array.isArray(data?.events) ? (data!.events as EventDetailRow[]) : [];
+  }
+
   return {
     queryId,
     loading,
@@ -337,6 +432,8 @@ export function useDowntimeData() {
     applyView,
     loadEquipmentDetail,
     loadEventDetail,
+    loadAllEquipmentDetail,
+    loadMachineStatusEvents,
     exportEquipmentDetailCsv,
     exportEventDetailCsv,
     resetSummaryData,

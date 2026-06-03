@@ -11,9 +11,15 @@ use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]
 
 const props = withDefaults(defineProps<{
   rows: DailyTrendRow[];
+  selectedStatusTypes?: string[] | null;
 }>(), {
   rows: () => [],
+  selectedStatusTypes: null,
 });
+
+const emit = defineEmits<{
+  'click-status': [statusTypes: string[] | null];
+}>();
 
 const hasData = computed(() => props.rows.length > 0);
 
@@ -35,7 +41,17 @@ const chartOption = computed(() => {
         return `${date}<br/>${lines.join('<br/>')}`;
       },
     },
-    legend: { data: ['UDT', 'SDT', 'EGT'], top: 0, left: 'center' },
+    legend: {
+      data: ['UDT', 'SDT', 'EGT'],
+      top: 0,
+      left: 'center',
+      // A-1 fix: resync legend visual state from prop when chip is cleared externally
+      selected: {
+        UDT: !props.selectedStatusTypes || props.selectedStatusTypes.includes('UDT'),
+        SDT: !props.selectedStatusTypes || props.selectedStatusTypes.includes('SDT'),
+        EGT: !props.selectedStatusTypes || props.selectedStatusTypes.includes('EGT'),
+      },
+    },
     grid: { left: '3%', right: '4%', bottom: '3%', top: '40px', containLabel: true },
     xAxis: {
       type: 'category',
@@ -57,6 +73,21 @@ const chartOption = computed(() => {
     ],
   };
 });
+
+/**
+ * Legend select change: derive active status types from legend selection state.
+ * Emit null when all three are active (no filter), array otherwise.
+ */
+function handleLegendChange(params: unknown): void {
+  // TODO: type echarts callback
+  const p = params as { selected?: Record<string, boolean> } | null;
+  const selected = p?.selected;
+  if (!selected) return;
+  const active = Object.entries(selected)
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  emit('click-status', active.length === 3 ? null : active);
+}
 </script>
 
 <template>
@@ -72,6 +103,7 @@ const chartOption = computed(() => {
       autoresize
       role="img"
       aria-label="每日停機趨勢圖"
+      @legendselectchanged="handleLegendChange"
     />
   </div>
 </template>

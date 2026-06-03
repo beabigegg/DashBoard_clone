@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.12.3] — 2026-06-03
+### Changed
+- downtime-analysis-page-redesign: Added wrapper-key confirmation notes to §3.12.5 (`EquipmentDetailRow` → `data.equipment_detail`) and §3.12.6 (`EventDetailRow` → `data.events`). Additive prose clarification; no field added or removed. Ensures frontend composables resolve the correct JSON key and do not produce a silent empty table (AC-8).
+
+## [api 1.14.0] — 2026-06-03
+### Added
+- downtime-analysis-page-redesign: Additive optional filter params on two existing endpoints. `GET /api/downtime-analysis/equipment-detail` gains `big_category` (string, opt) and `status_types` (string, opt, CSV: `UDT,SDT,EGT`). `GET /api/downtime-analysis/event-detail` gains `big_category`, `status_types`, and `resource_id` (string, opt; Tier 3 lazy-load scoping). All three params apply pandas `.isin()` narrow on the in-memory parquet spool; no Oracle re-query. Omitting all params returns pre-existing unfiltered response (backward-compatible). Response wrapper keys (`equipment_detail`, `events`) and per-row schemas confirmed unchanged. `status_types` serialized as CSV consistent with `_csv_param()` convention. Consumers: `frontend/src/downtime-analysis/` only.
+
 ## [business 1.13.1] — 2026-06-01
 ### Changed
 - batch-rowcount-unification (contract accuracy fix): BQE-02 notation corrected from ambiguous tuple `(start_row, end_row)` to explicit dict `{"start_row": int, "end_row": int}` matching implementation. BQE-05 ceiling values corrected from hardcoded "production=3, development=2" to "code default: dev=2, prod=5 per settings.py" — the previous values confused configured ENGINE_PARALLEL with the DB_SLOW_POOL_SIZE default. No behavior change; descriptive accuracy only.

@@ -159,32 +159,6 @@
   margin-top: 6px;
 }
 
-/* View tabs */
-.theme-downtime-analysis .view-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
-  border-bottom: 2px solid theme('colors.stroke.soft');
-}
-
-.theme-downtime-analysis .view-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 8px 16px;
-  font-size: 14px;
-  cursor: pointer;
-  color: theme('colors.text.secondary');
-  margin-bottom: -2px;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.theme-downtime-analysis .view-tab.active {
-  color: theme('colors.brand.500');
-  border-bottom-color: theme('colors.brand.500');
-  font-weight: 600;
-}
-
 /* Section card */
 .theme-downtime-analysis .section-card {
   background: theme('colors.surface.card');
@@ -346,4 +320,235 @@
   text-align: center;
   color: theme('colors.text.muted');
   font-size: 14px;
+}
+
+/* ============================================================
+ * Chart filter chips (IP-9)
+ * ============================================================ */
+.theme-downtime-analysis .chart-filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.theme-downtime-analysis .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: theme('colors.surface.active');
+  border: 1px solid theme('colors.brand.400');
+  border-radius: 999px;
+  font-size: 12px;
+  color: theme('colors.token.h1d4ed8');
+}
+
+.theme-downtime-analysis .chip-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: theme('colors.token.h1d4ed8');
+  padding: 0;
+  line-height: 1;
+}
+
+/* ============================================================
+ * Three-tier expandable table (IP-9)
+ * ============================================================ */
+.theme-downtime-analysis .equipment-tier-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.theme-downtime-analysis .tier-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.theme-downtime-analysis .tier-table thead th {
+  background: theme('colors.token.hf8f9fa');
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 2px solid theme('colors.stroke.soft');
+  font-weight: 600;
+  color: theme('colors.text.subtle');
+  white-space: nowrap;
+}
+
+.theme-downtime-analysis .tier-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
+}
+
+.theme-downtime-analysis .expand-col {
+  width: 28px;
+}
+
+.theme-downtime-analysis .expand-toggle {
+  width: 28px;
+  text-align: center;
+  color: theme('colors.token.h6c757d');
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Tier 1 status group rows */
+.theme-downtime-analysis .status-group-row {
+  background: theme('colors.surface.hover');
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.theme-downtime-analysis .status-group-row:hover {
+  background: theme('colors.surface.active');
+}
+
+.theme-downtime-analysis .status-group-label {
+  font-weight: 600;
+}
+
+/* Tier 2 machine rows */
+.theme-downtime-analysis .machine-row {
+  cursor: pointer;
+}
+
+.theme-downtime-analysis .machine-row:hover {
+  background: theme('colors.surface.muted');
+}
+
+.theme-downtime-analysis .expand-machine-toggle {
+  padding-left: 20px;
+}
+
+/* Tier 3 events row */
+.theme-downtime-analysis .tier3-events-row {
+  background: theme('colors.token.hfafbfc');
+}
+
+.theme-downtime-analysis .tier3-events-cell {
+  padding: 0 12px;
+  overflow-x: auto;
+}
+
+/* Inner event table (Tier 3) */
+.theme-downtime-analysis .event-inner-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+.theme-downtime-analysis .event-inner-table thead th {
+  background: theme('colors.stroke.soft');
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid theme('colors.stroke.panel');
+  font-weight: 600;
+  white-space: nowrap;
+  color: theme('colors.token.h6c757d');
+}
+
+.theme-downtime-analysis .event-inner-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
+  color: theme('colors.text.primary');
+}
+
+.theme-downtime-analysis .event-inner-table tr:last-child td {
+  border-bottom: none;
+}
+
+.theme-downtime-analysis .event-inner-table tr:hover td {
+  background: theme('colors.surface.muted');
+}
+
+/* Loading/error/empty states for Tier 3 */
+.theme-downtime-analysis .machine-event-rows {
+  padding: 8px 0;
+}
+
+.theme-downtime-analysis .event-rows-loading,
+.theme-downtime-analysis .event-rows-error,
+.theme-downtime-analysis .event-rows-empty {
+  padding: 16px;
+  font-size: 12px;
+  color: theme('colors.token.h6c757d');
+  text-align: center;
+}
+
+.theme-downtime-analysis .event-rows-error {
+  color: theme('colors.state.danger');
+}
+
+/* Loading state for three-tier table */
+.theme-downtime-analysis .loading-state {
+  padding: 24px;
+  text-align: center;
+  color: theme('colors.text.muted');
+  font-size: 13px;
+}
+
+/* Export button (in tier-table toolbar) */
+.theme-downtime-analysis .export-btn {
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.secondary');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.theme-downtime-analysis .export-btn:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+}
+
+.theme-downtime-analysis .export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Status badge variants for tier table (UDT/SDT/EGT inline badges) */
+.theme-downtime-analysis .status-badge.badge-udt {
+  background: theme('colors.state.danger');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .status-badge.badge-sdt {
+  background: theme('colors.state.warning');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-downtime-analysis .status-badge.badge-egt {
+  background: theme('colors.state.info');
+  color: theme('colors.token.hffffff');
+}
+
+/* Match-source badge neutral variant */
+.theme-downtime-analysis .match-badge.badge-neutral {
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.secondary');
+}
+
+/* ============================================================
+ * Inline spinner for Tier 3 loading state (B-3 fix)
+ * @keyframes is global by CSS spec — use unique name spin-sm to avoid conflicts
+ * ============================================================ */
+.theme-downtime-analysis .loading-spinner-sm {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid theme('colors.stroke.soft');
+  border-top-color: theme('colors.token.h1d4ed8');
+  border-radius: 50%;
+  animation: spin-sm 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin-sm {
+  to { transform: rotate(360deg); }
 }

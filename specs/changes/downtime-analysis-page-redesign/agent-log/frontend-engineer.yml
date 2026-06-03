@@ -1,0 +1,45 @@
+agent: frontend-engineer
+change-id: downtime-analysis-page-redesign
+date: 2026-06-03
+status: complete
+
+summary: >
+  Implemented the full frontend redesign for downtime-analysis-page-redesign (IP-5 through IP-10).
+  Removed three-tab switcher, added single-page layout with three-tier expandable table,
+  chart cross-filter wiring (BigCategoryChart + DailyTrendChart), and Tier 3 lazy-load.
+  All tests pass (497/498), type-check clean, css:check 0 errors, build succeeds.
+
+implementation-notes:
+  - Test path deviation: test-plan.md specified frontend/tests/components/downtime-analysis/ but
+    vitest.config.js only covers tests/**/*.test.js (JS) and src/**/*.test.ts (TS). New TS tests
+    placed in src/downtime-analysis/components/__tests__/ per the working pattern for existing
+    downtime-analysis tests (css-scope.test.ts, formatDowntimeDate.test.ts etc).
+  - EquipmentDetail.vue and EventDetail.vue intentionally kept on disk per DQ-6; only un-imported
+    from App.vue.
+  - Tier 3 cache key is `${resource_id}|${status_type}` exactly as specified in design.md DQ-3.
+  - loadMachineStatusEvents resolves data.events wrapper key per data-shape-contract.md §3.12.6.
+  - loadAllEquipmentDetail sends page_size=200, forwards big_category and status_types (CSV).
+  - CSS: removed .view-tabs / .view-tab rules; added chart-filter-chips, tier-table, event-inner-table,
+    match-badge.badge-neutral scoped under .theme-downtime-analysis; all hex replaced with theme() tokens.
+
+gate-commands-run:
+  - npm run type-check: EXIT 0
+  - npm run css:check: 0 errors, 71 warnings (pre-existing)
+  - npm test: 50 files, 497 pass, 1 skipped
+  - npm run build: success in 12.80s
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/types.ts:104-128" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/composables/useDowntimeData.ts:327-430" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:1-200" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/components/MachineEventRows.vue:1-110" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/components/BigCategoryChart.vue:1-90" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/components/DailyTrendChart.vue:1-90" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/App.vue:1-250" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/style.css:163-533" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/downtime-analysis.spec.js:204-380" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/components/__tests__/StatusMachineJobTable.test.ts" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/components/__tests__/MachineEventRows.test.ts" }
+  - { type: components-affected, pointer: "StatusMachineJobTable (new), MachineEventRows (new), BigCategoryChart (edited), DailyTrendChart (edited), App.vue (restructured)" }
+  - { type: screenshot-paths, pointer: "n/a (Playwright E2E covers visual layout; no static screenshots generated)" }
+  - { type: accessibility-audit, pointer: "aria-label on expand rows, role=button on tier rows, aria-expanded set; status badges have semantic text" }

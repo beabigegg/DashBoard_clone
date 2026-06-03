@@ -868,6 +868,230 @@ class TestBridgeVersionCacheKey:
         assert DOWNTIME_BRIDGE_VERSION
 
 
+
+
+# ===========================================================================
+# TestApplyViewFilter — in-memory filter params on apply_view()  (IP-3)
+# ===========================================================================
+
+
+class TestApplyViewFilter:
+    """Verify that apply_view() filters events_df in-memory before reducers.
+
+    Fixtures must include 'category', 'status', and 'resource_id' columns
+    so a wrong/missing filter silently no-ops and fails the assertion.
+    """
+
+    def _make_events_df(self) -> pd.DataFrame:
+        """Minimal enriched events DataFrame with filter columns."""
+        return pd.DataFrame([
+            {
+                'event_id': 'E001',
+                'resource_id': 'HIST-001',
+                'status': 'UDT',
+                'reason': 'EE Repair',
+                'category': '維修',
+                'start_ts': '2026-05-01 08:00:00',
+                'end_ts': '2026-05-01 10:00:00',
+                'hours': 2.0,
+                'fragment_count': 1,
+                'match_source': 'none',
+                'match_ambiguous': False,
+                'job_order_name': None,
+                'job_model': None,
+                'symptom': None,
+                'cause': None,
+                'repair': None,
+                'handler': None,
+                'wait_min': None,
+                'repair_min': None,
+            },
+            {
+                'event_id': 'E002',
+                'resource_id': 'HIST-002',
+                'status': 'SDT',
+                'reason': 'Idle',
+                'category': '生產停頓',
+                'start_ts': '2026-05-01 12:00:00',
+                'end_ts': '2026-05-01 14:00:00',
+                'hours': 2.0,
+                'fragment_count': 1,
+                'match_source': 'none',
+                'match_ambiguous': False,
+                'job_order_name': None,
+                'job_model': None,
+                'symptom': None,
+                'cause': None,
+                'repair': None,
+                'handler': None,
+                'wait_min': None,
+                'repair_min': None,
+            },
+            {
+                'event_id': 'E003',
+                'resource_id': 'HIST-001',
+                'status': 'EGT',
+                'reason': 'PM',
+                'category': '維修',
+                'start_ts': '2026-05-02 08:00:00',
+                'end_ts': '2026-05-02 09:00:00',
+                'hours': 1.0,
+                'fragment_count': 1,
+                'match_source': 'none',
+                'match_ambiguous': False,
+                'job_order_name': None,
+                'job_model': None,
+                'symptom': None,
+                'cause': None,
+                'repair': None,
+                'handler': None,
+                'wait_min': None,
+                'repair_min': None,
+            },
+        ])
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_equipment_detail_filtered_by_big_category(self, mock_load):
+        """Only rows where category == '維修' should appear in equipment_detail."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='equipment_detail',
+            query_id='q1',
+            big_category='維修',
+        )
+
+        assert result is not None
+        rows = result['equipment_detail']
+        resource_ids = [r['resource_id'] for r in rows]
+        assert 'HIST-002' not in resource_ids
+        assert 'HIST-001' in resource_ids
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_equipment_detail_filtered_by_status_types_single(self, mock_load):
+        """Only UDT rows should appear when status_types=['UDT']."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='equipment_detail',
+            query_id='q1',
+            status_types=['UDT'],
+        )
+
+        assert result is not None
+        rows = result['equipment_detail']
+        resource_ids = [r['resource_id'] for r in rows]
+        assert 'HIST-002' not in resource_ids
+        hist001_row = next((r for r in rows if r['resource_id'] == 'HIST-001'), None)
+        assert hist001_row is not None
+        assert hist001_row['event_count'] == 1
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_equipment_detail_filtered_by_status_types_union(self, mock_load):
+        """status_types=['UDT','SDT'] should include both UDT and SDT rows."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='equipment_detail',
+            query_id='q1',
+            status_types=['UDT', 'SDT'],
+        )
+
+        assert result is not None
+        rows = result['equipment_detail']
+        resource_ids = [r['resource_id'] for r in rows]
+        assert 'HIST-001' in resource_ids
+        assert 'HIST-002' in resource_ids
+        hist001_row = next((r for r in rows if r['resource_id'] == 'HIST-001'), None)
+        assert hist001_row is not None
+        assert hist001_row['event_count'] == 1
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_event_detail_filtered_by_resource_id(self, mock_load):
+        """Only events for resource_id='HIST-001' should appear in event_detail."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='event_detail',
+            query_id='q1',
+            resource_id='HIST-001',
+        )
+
+        assert result is not None
+        rows = result['events']
+        for row in rows:
+            assert row['resource_id'] == 'HIST-001'
+        assert len(rows) == 2
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_combined_big_category_and_status_types(self, mock_load):
+        """Combined big_category='維修' AND status_types=['UDT'] must narrow correctly."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='event_detail',
+            query_id='q1',
+            big_category='維修',
+            status_types=['UDT'],
+        )
+
+        assert result is not None
+        rows = result['events']
+        assert len(rows) == 1
+        assert rows[0]['event_id'] == 'E001'
+        assert rows[0]['status'] == 'UDT'
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_omit_all_params_returns_unfiltered(self, mock_load):
+        """Omitting all filter params must return all rows (backward compat)."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='event_detail',
+            query_id='q1',
+        )
+
+        assert result is not None
+        rows = result['events']
+        assert len(rows) == 3
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_empty_big_category_string_is_no_op(self, mock_load):
+        """Passing big_category='' (empty string) must not filter anything."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='event_detail',
+            query_id='q1',
+            big_category='',
+        )
+
+        assert result is not None
+        rows = result['events']
+        assert len(rows) == 3
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    def test_equipment_detail_row_count_within_page_size_cap(self, mock_load):
+        """Equipment detail page_size cap is 1000 (raised from 200) per DQ-2."""
+        from mes_dashboard.services.downtime_analysis_service import apply_view
+        mock_load.return_value = self._make_events_df()
+
+        result = apply_view(
+            view_name='equipment_detail',
+            query_id='q1',
+            page_size=1000,
+        )
+
+        assert result is not None
+        assert result['pagination']['page_size'] == 1000
+
 # ===========================================================================
 # TestDowntimeMigration (BQE-07)
 # ===========================================================================

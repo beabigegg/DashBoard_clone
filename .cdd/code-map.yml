@@ -1,13 +1,13 @@
-# generated: 2026-06-03T00:26:33Z by cdd-kit 2.2.0
-# files: 822, src-lines: 229967, map-lines: 17582, compression: 13.1x
-# sources-digest: 1d6fe9a6f8180290b5b41edd146ffdf0d5258059be914113299d805c3c92b265
+# generated: 2026-06-03T03:48:08Z by cdd-kit 2.2.0
+# files: 827, src-lines: 231740, map-lines: 17672, compression: 13.1x
+# sources-digest: 680c54781ace0345c7b162bde6a7cbaeb88c08bc346dd0b3b58a52119d7c5ea9
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
 
 frontend/postcss.config.js:  # 6 lines
 
-frontend/scripts/css-governance-check.js:  # 362 lines
+frontend/scripts/css-governance-check.js:  # 374 lines
   imports:
     - { module: fs, items: [readFileSync, readdirSync, statSync], line: 15 }
     - { module: path, items: [join, relative], line: 16 }
@@ -17,19 +17,19 @@ frontend/scripts/css-governance-check.js:  # 362 lines
     - { name: SRC_DIR, line: 21 }
     - { name: EXEMPT_CSS, line: 24 }
     - { name: CHART_HEX_ALLOWED, line: 33 }
-    - { name: HEX_COLOR_RE, line: 47 }
-    - { name: SPACING_PX_RE, line: 48 }
-    - { name: CHART_IMPORT_RE, line: 49 }
+    - { name: HEX_COLOR_RE, line: 48 }
+    - { name: SPACING_PX_RE, line: 49 }
+    - { name: CHART_IMPORT_RE, line: 50 }
   functions:
-    - { name: walk, lines: 51-61 }
-    - { name: relPath, lines: 63-65 }
-    - { name: isExemptCss, lines: 67-70 }
-    - { name: classifyHexUsage, lines: 72-79 }
-    - { name: findUnscopedTopLevelRules, lines: 89-193 }
-    - { name: isFeatureCss, lines: 198-202 }
-    - { name: checkCssFile, lines: 204-261 }
-    - { name: checkVueFile, lines: 265-308 }
-    - { name: checkJsFile, lines: 310-335 }
+    - { name: walk, lines: 52-62 }
+    - { name: relPath, lines: 64-66 }
+    - { name: isExemptCss, lines: 68-71 }
+    - { name: classifyHexUsage, lines: 73-80 }
+    - { name: findUnscopedTopLevelRules, lines: 90-194 }
+    - { name: isFeatureCss, lines: 199-203 }
+    - { name: checkCssFile, lines: 205-272 }
+    - { name: checkVueFile, lines: 276-319 }
+    - { name: checkJsFile, lines: 321-346 }
 
 frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   imports:
@@ -725,7 +725,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 310 lines
+frontend/src/downtime-analysis/App.vue:  # 301 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -753,9 +753,9 @@ frontend/src/downtime-analysis/__tests__/useFilterState.test.ts:  # 161 lines
     - { module: vitest, items: [describe, it, expect, vi], line: 1 }
     - { module: '../composables/useFilterState', items: [useFilterState], line: 2 }
 
-frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 84 lines
+frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 103 lines
 
-frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 77 lines
+frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 109 lines
 
 frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 85 lines
 
@@ -765,7 +765,33 @@ frontend/src/downtime-analysis/components/FilterBar.vue:  # 233 lines
 
 frontend/src/downtime-analysis/components/KpiCards.vue:  # 70 lines
 
+frontend/src/downtime-analysis/components/MachineEventRows.vue:  # 115 lines
+
+frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 203 lines
+
 frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 44 lines
+
+frontend/src/downtime-analysis/components/__tests__/MachineEventRows.test.ts:  # 111 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 8 }
+    - { module: '@vue/test-utils', items: [mount], line: 9 }
+    - { module: vue, items: [nextTick], line: 10 }
+    - { module: '../MachineEventRows.vue', items: ['default:MachineEventRows'], line: 13 }
+    - { module: '../../types', items: [TierThreeEntry, EventDetailRow], line: 14 }
+  constants:
+    - { name: EVENTS_WRAPPER_KEY, line: 17 }
+  functions:
+    - { name: makeEventRow, lines: 21-36 }
+
+frontend/src/downtime-analysis/components/__tests__/StatusMachineJobTable.test.ts:  # 186 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 8 }
+    - { module: '@vue/test-utils', items: [mount], line: 9 }
+    - { module: vue, items: [nextTick], line: 10 }
+    - { module: '../StatusMachineJobTable.vue', items: ['default:StatusMachineJobTable'], line: 13 }
+    - { module: '../../types', items: [EquipmentDetailRow, ChartFilter, TierThreeEntry, DowntimeKpiShape], line: 14 }
+  functions:
+    - { name: makeEquipmentRow, lines: 16-30 }
 
 frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
   constants:
@@ -777,18 +803,18 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 344 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 441 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
-    - { module: '../types', items: [DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow, EquipmentDetailRow, EventDetailRow, Pagination, FilterOptions], line: 3 }
+    - { module: '../types', items: [DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow, EquipmentDetailRow, EventDetailRow, Pagination, FilterOptions, ChartFilter], line: 3 }
   constants:
-    - { name: API_TIMEOUT, line: 14 }
+    - { name: API_TIMEOUT, line: 15 }
   functions:
-    - { name: useDowntimeData, lines: 45-344 }
+    - { name: useDowntimeData, lines: 46-441 }
   interfaces:
-    - { name: SummaryData, lines: 16-21 }  # local
-    - { name: EventDetailData, lines: 23-26 }  # local
+    - { name: SummaryData, lines: 17-22 }  # local
+    - { name: EventDetailData, lines: 24-27 }  # local
 
 frontend/src/downtime-analysis/composables/useFilterState.ts:  # 104 lines
   imports:
@@ -810,7 +836,7 @@ frontend/src/downtime-analysis/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/downtime-analysis/types.ts:  # 103 lines
+frontend/src/downtime-analysis/types.ts:  # 123 lines
   interfaces:
     - { name: DowntimeKpiShape, lines: 1-8 }
     - { name: DailyTrendRow, lines: 10-16 }
@@ -822,6 +848,8 @@ frontend/src/downtime-analysis/types.ts:  # 103 lines
     - { name: Pagination, lines: 74-79 }
     - { name: FilterOptions, lines: 81-88 }
     - { name: FilterState, lines: 90-103 }
+    - { name: ChartFilter, lines: 109-112 }
+    - { name: TierThreeEntry, lines: 118-123 }
   types:
     - { name: MatchSource, lines: 58-58 }
 
@@ -1902,7 +1930,7 @@ frontend/src/shared-composables/useSortableTable.ts:  # 115 lines
     - { name: SortType, lines: 5-5 }
     - { name: DataRow, lines: 7-7 }
 
-frontend/src/shared-composables/useTraceProgress.ts:  # 531 lines
+frontend/src/shared-composables/useTraceProgress.ts:  # 564 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 1 }
     - { module: vue, items: [Ref], line: 2 }
@@ -1917,7 +1945,7 @@ frontend/src/shared-composables/useTraceProgress.ts:  # 531 lines
     - { name: normalizeSeedContainerIds, lines: 76-105 }
     - { name: collectAllContainerIds, lines: 107-152 }
     - { name: async consumeNDJSONStream, lines: 159-211 }
-    - { name: useTraceProgress, lines: 213-531 }
+    - { name: useTraceProgress, lines: 213-564 }
   interfaces:
     - { name: TraceProgressOptions, lines: 22-24 }
     - { name: StageError, lines: 26-29 }
@@ -1963,7 +1991,7 @@ frontend/src/shared-ui/components/LoadingOverlay.vue:  # 39 lines
 
 frontend/src/shared-ui/components/LoadingSpinner.vue:  # 51 lines
 
-frontend/src/shared-ui/components/MultiSelect.vue:  # 256 lines
+frontend/src/shared-ui/components/MultiSelect.vue:  # 359 lines
 
 frontend/src/shared-ui/components/PageHeader.vue:  # 88 lines
 
@@ -1981,16 +2009,19 @@ frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
 frontend/src/shared-ui/components/TimelineChart.vue:  # 566 lines
 
-frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 180 lines
+frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 199 lines
   imports:
-    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 11 }
-    - { module: '@vue/test-utils', items: [mount], line: 12 }
-    - { module: vue, items: [nextTick, defineComponent], line: 13 }
-    - { module: '../MultiSelect.vue', items: ['default:MultiSelect'], line: 14 }
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 15 }
+    - { module: '@vue/test-utils', items: [mount], line: 16 }
+    - { module: vue, items: [nextTick, defineComponent], line: 17 }
+    - { module: '../MultiSelect.vue', items: ['default:MultiSelect'], line: 18 }
   constants:
-    - { name: DEFAULT_OPTIONS, line: 25 }
+    - { name: DEFAULT_OPTIONS, line: 29 }
   functions:
-    - { name: mountSelect, lines: 27-37 }
+    - { name: mountSelect, lines: 31-41 }
+    - { name: getDropdown, lines: 44-46 }
+    - { name: getOptions, lines: 47-49 }
+    - { name: getCloseBtn, lines: 50-52 }
 
 frontend/src/shared-ui/index.ts:  # 22 lines
 
@@ -2568,7 +2599,7 @@ frontend/tests/playwright/data-boundary/resource-history-progress-malformed.spec
   functions:
     - { name: async setupResourceHistoryWithMalformedProgress, lines: 32-72 }
 
-frontend/tests/playwright/downtime-analysis.spec.js:  # 236 lines
+frontend/tests/playwright/downtime-analysis.spec.js:  # 408 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 14 }
   constants:
@@ -2577,6 +2608,8 @@ frontend/tests/playwright/downtime-analysis.spec.js:  # 236 lines
     - { name: MOCK_OPTIONS, line: 19 }
     - { name: MOCK_QUERY_RESULT, line: 32 }
     - { name: MOCK_EVENT_DETAIL_WITH_NONE, line: 61 }
+    - { name: MOCK_EQUIPMENT_DETAIL, line: 107 }
+    - { name: MOCK_EVENT_DETAIL_TIER3, line: 141 }
 
 frontend/tests/playwright/hold-history-flat-table.spec.js:  # 81 lines
   imports:
@@ -4449,7 +4482,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 382 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 399 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: datetime, items: [datetime], line: 19 }
@@ -4463,11 +4496,11 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 382 lines
     - { name: api_downtime_options, lines: 79-111 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
     - { name: api_downtime_query, lines: 120-171 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
     - { name: api_downtime_view, lines: 180-210 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 219-253 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 262-295 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 304-329 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 338-363 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 371-382 }
+    - { name: api_downtime_equipment_detail, lines: 219-263 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 272-312 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 321-346 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 355-380 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 388-399 }
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -4864,7 +4897,7 @@ src/mes_dashboard/routes/spool_routes.py:  # 107 lines
   functions:
     - { name: download_spool_parquet, lines: 32-107 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
 
-src/mes_dashboard/routes/trace_routes.py:  # 1024 lines
+src/mes_dashboard/routes/trace_routes.py:  # 1096 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: hashlib, items: [], line: 12 }
@@ -4915,14 +4948,16 @@ src/mes_dashboard/routes/trace_routes.py:  # 1024 lines
     - { name: _parse_lineage_roots, lines: 539-549 }
     - { name: _compact_msd_lineage_response, lines: 552-566 }
     - { name: _build_msd_aggregation, lines: 569-652 }
-    - { name: seed_resolve, lines: 657-716 }  # @trace_bp.route('/seed-resolve', methods=['POST'])
-    - { name: lineage, lines: 721-810 }  # @trace_bp.route('/lineage', methods=['POST'])
-    - { name: lineage_job_status, lines: 815-820 }  # @trace_bp.route('/lineage/job/<job_id>', methods=['GET'])
-    - { name: lineage_job_result, lines: 825-850 }  # @trace_bp.route('/lineage/job/<job_id>/result', methods=['GET'])
-    - { name: events, lines: 855-961 }  # @trace_bp.route('/events', methods=['POST'])
-    - { name: job_status, lines: 966-971 }  # @trace_bp.route('/job/<job_id>', methods=['GET'])
-    - { name: job_result, lines: 976-998 }  # @trace_bp.route('/job/<job_id>/result', methods=['GET'])
-    - { name: job_stream, lines: 1003-1024 }  # @trace_bp.route('/job/<job_id>/stream', methods=['GET'])
+    - { name: seed_resolve, lines: 657-750 }  # @trace_bp.route('/seed-resolve', methods=['POST'])
+    - { name: lineage, lines: 755-844 }  # @trace_bp.route('/lineage', methods=['POST'])
+    - { name: lineage_job_status, lines: 849-854 }  # @trace_bp.route('/lineage/job/<job_id>', methods=['GET'])
+    - { name: lineage_job_result, lines: 859-884 }  # @trace_bp.route('/lineage/job/<job_id>/result', methods=['GET'])
+    - { name: seed_job_status, lines: 889-895 }  # @trace_bp.route('/seed/job/<job_id>', methods=['GET'])
+    - { name: seed_job_result, lines: 900-922 }  # @trace_bp.route('/seed/job/<job_id>/result', methods=['GET'])
+    - { name: events, lines: 927-1033 }  # @trace_bp.route('/events', methods=['POST'])
+    - { name: job_status, lines: 1038-1043 }  # @trace_bp.route('/job/<job_id>', methods=['GET'])
+    - { name: job_result, lines: 1048-1070 }  # @trace_bp.route('/job/<job_id>/result', methods=['GET'])
+    - { name: job_stream, lines: 1075-1096 }  # @trace_bp.route('/job/<job_id>/stream', methods=['GET'])
 
 src/mes_dashboard/routes/user_auth_routes.py:  # 231 lines
   imports:
@@ -5437,7 +5472,7 @@ src/mes_dashboard/services/downtime_analysis_cache.py:  # 143 lines
     - { name: load_downtime_events, lines: 85-97 }
     - { name: start_downtime_prewarm, lines: 105-143 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1247 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1264 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5468,12 +5503,12 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1247 lines
     - { name: _build_daily_trend, lines: 884-905 }
     - { name: _build_big_category, lines: 908-927 }
     - { name: _build_top_reasons, lines: 930-956 }
-    - { name: apply_view, lines: 963-1003 }
-    - { name: _build_equipment_detail_page, lines: 1006-1031 }
-    - { name: _build_equipment_detail, lines: 1034-1071 }
-    - { name: _build_event_detail_page, lines: 1074-1134 }
-    - { name: export_equipment_detail_csv, lines: 1142-1185 }
-    - { name: export_event_detail_csv, lines: 1188-1247 }
+    - { name: apply_view, lines: 963-1020 }
+    - { name: _build_equipment_detail_page, lines: 1023-1048 }
+    - { name: _build_equipment_detail, lines: 1051-1088 }
+    - { name: _build_event_detail_page, lines: 1091-1151 }
+    - { name: export_equipment_detail_csv, lines: 1159-1202 }
+    - { name: export_event_detail_csv, lines: 1205-1264 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -6100,6 +6135,27 @@ src/mes_dashboard/services/msd_lineage_job_service.py:  # 336 lines
     - { name: _reconstruct_lineage_response, lines: 98-153 }
     - { name: _execute_msd_lineage_job, lines: 156-208 }
     - { name: _resolve_backward_lineage, lines: 211-336 }
+
+src/mes_dashboard/services/msd_seed_job_service.py:  # 166 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: json, items: [], line: 15 }
+    - { module: logging, items: [], line: 16 }
+    - { module: os, items: [], line: 17 }
+    - { module: uuid, items: [], line: 18 }
+    - { module: typing, items: [Any, Dict, Optional, Tuple], line: 19 }
+    - { module: mes_dashboard.core.redis_client, items: [get_control_redis_client, get_key], line: 21 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, _get_job_status, update_job_progress], line: 22 }
+  constants:
+    - { name: MSD_SEED_QUEUE, line: 31 }
+    - { name: MSD_SEED_JOB_TIMEOUT_SECONDS, line: 32 }
+    - { name: MSD_SEED_JOB_TTL_SECONDS, line: 33 }
+  functions:
+    - { name: _result_redis_key, lines: 38-39 }
+    - { name: enqueue_msd_seed_resolve, lines: 42-62 }
+    - { name: get_msd_seed_job_status, lines: 65-66 }
+    - { name: get_msd_seed_job_result, lines: 69-83 }
+    - { name: _execute_msd_seed_resolve_job, lines: 90-166 }
 
 src/mes_dashboard/services/navigation_contract.py:  # 279 lines
   imports:
@@ -11669,7 +11725,7 @@ tests/test_distributed_lock.py:  # 168 lines
     - { name: _lock_key, lines: 40-41 }
     - { name: _force_delete, lines: 44-48 }
 
-tests/test_downtime_analysis_routes.py:  # 297 lines
+tests/test_downtime_analysis_routes.py:  # 461 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: json, items: [], line: 12 }
@@ -11724,13 +11780,35 @@ tests/test_downtime_analysis_routes.py:  # 297 lines
         - { name: test_expired_returns_410, lines: 282-285 }
         - { name: test_missing_query_id_returns_400, lines: 287-289 }
         - { name: test_page_size_capped_at_200, lines: 293-297 }
+    - name: TestEquipmentDetailFilterRoute
+      lines: 310-358
+      methods:
+        - { name: test_big_category_forwarded, lines: 315-320 }
+        - { name: test_status_types_csv_forwarded, lines: 324-329 }
+        - { name: test_resource_id_forwarded, lines: 333-338 }
+        - { name: test_omit_filter_params_calls_service_without_filter_kwargs, lines: 342-349 }
+        - { name: test_page_size_cap_raised_to_1000, lines: 353-358 }
+    - name: TestEventDetailFilterRoute
+      lines: 366-394
+      methods:
+        - { name: test_big_category_forwarded, lines: 371-376 }
+        - { name: test_status_types_csv_forwarded, lines: 380-385 }
+        - { name: test_resource_id_forwarded, lines: 389-394 }
+    - name: TestFilterDataBoundary
+      lines: 402-461
+      methods:
+        - { name: test_equipment_detail_empty_big_category_returns_200, lines: 407-414 }
+        - { name: test_equipment_detail_invalid_status_types_returns_200, lines: 418-425 }
+        - { name: test_event_detail_missing_resource_id_returns_200, lines: 429-435 }
+        - { name: test_equipment_detail_response_has_equipment_detail_key, lines: 439-448 }
+        - { name: test_event_detail_response_has_events_key, lines: 452-461 }
   functions:
     - { name: app, lines: 22-26 }  # @pytest.fixture
     - { name: client, lines: 30-31 }  # @pytest.fixture
     - { name: _mock_query_result, lines: 34-44 }
     - { name: _mock_view_result, lines: 47-56 }
 
-tests/test_downtime_analysis_service.py:  # 1020 lines
+tests/test_downtime_analysis_service.py:  # 1244 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: hashlib, items: [], line: 17 }
@@ -11841,14 +11919,26 @@ tests/test_downtime_analysis_service.py:  # 1020 lines
         - { name: test_query_id_includes_bridge_version, lines: 835-845 }
         - { name: test_downtime_query_id_differs_from_resource_dataset_id, lines: 847-863 }
         - { name: test_bridge_version_constant_present, lines: 865-868 }
-    - name: TestDowntimeMigration
-      lines: 876-1020
+    - name: TestApplyViewFilter
+      lines: 878-1093
       methods:
-        - { name: _make_base_df, lines: 885-895 }
-        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 897-946 }
-        - { name: test_spool_namespace_unchanged, lines: 948-951 }
-        - { name: test_spool_column_schema_matches_previous_path, lines: 953-977 }
-        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 979-1020 }
+        - { name: _make_events_df, lines: 885-951 }
+        - { name: test_equipment_detail_filtered_by_big_category, lines: 954-969 }
+        - { name: test_equipment_detail_filtered_by_status_types_single, lines: 972-989 }
+        - { name: test_equipment_detail_filtered_by_status_types_union, lines: 992-1010 }
+        - { name: test_event_detail_filtered_by_resource_id, lines: 1013-1028 }
+        - { name: test_combined_big_category_and_status_types, lines: 1031-1047 }
+        - { name: test_omit_all_params_returns_unfiltered, lines: 1050-1062 }
+        - { name: test_empty_big_category_string_is_no_op, lines: 1065-1078 }
+        - { name: test_equipment_detail_row_count_within_page_size_cap, lines: 1081-1093 }
+    - name: TestDowntimeMigration
+      lines: 1100-1244
+      methods:
+        - { name: _make_base_df, lines: 1109-1119 }
+        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 1121-1170 }
+        - { name: test_spool_namespace_unchanged, lines: 1172-1175 }
+        - { name: test_spool_column_schema_matches_previous_path, lines: 1177-1201 }
+        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 1203-1244 }
   functions:
     - { name: _ts, lines: 41-43 }
     - { name: _shift_row, lines: 46-63 }

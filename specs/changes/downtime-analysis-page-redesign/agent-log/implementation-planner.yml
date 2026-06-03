@@ -1,0 +1,11 @@
+agent: implementation-planner
+change-id: downtime-analysis-page-redesign
+status: done
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/downtime-analysis-page-redesign/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-4), frontend-engineer (IP-5..IP-10)" }
+  - { type: scope-summary, pointer: "5 in-scope areas; 8 explicit non-goals (no new Oracle query, no spool/namespace change, retain shared-ui surface, keep EquipmentDetail/EventDetail on disk, no page-registry edits, no workflow edit)" }
+notes:
+  - "design.md present and filled (Architecture Review Required=yes satisfied); not modified."
+  - "CER-001 concern resolved: tests/test_downtime_analysis_service.py and tests/test_downtime_analysis_routes.py already exist on disk — no new backend test files needed, extend in place."
+  - "api-contract.md already at 1.14.0 with both endpoints + CHANGELOG entry; plan instructs verify-only, no contract authoring."

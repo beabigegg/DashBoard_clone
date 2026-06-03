@@ -1,0 +1,19 @@
+change-id: downtime-analysis-page-redesign
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-03T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "0, 1, 2" }
+  - { type: gate-promotions, pointer: "n/a (no tier promotions; all gates placed in correct tier on first pass)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow edits required; browser-install and playwright spec already present in .github/workflows/frontend-tests.yml:53-58)" }
+  - { type: required-status-checks, pointer: "pytest, npm run type-check, npm run css:check, npm run build, npx playwright test tests/playwright/downtime-analysis.spec.js, cdd-kit validate" }
+next-action: none
+notes: >
+  Task 2.6 (CI/CD contract) is confirmed satisfied. npx playwright install --with-deps chromium
+  (line 53-54) and npx playwright test tests/playwright/downtime-analysis.spec.js (line 57-58)
+  were already present in frontend-tests.yml before this review. No workflow file was modified.
+  type-check step has continue-on-error: true (informational in CI); enforced at Tier 0 locally.
+files-read:
+  - specs/changes/downtime-analysis-page-redesign/change-classification.md
+  - specs/changes/downtime-analysis-page-redesign/test-plan.md
+  - .github/workflows/frontend-tests.yml

@@ -11,9 +11,15 @@ use([CanvasRenderer, PieChart, TooltipComponent, LegendComponent]);
 
 const props = withDefaults(defineProps<{
   rows: BigCategoryRow[];
+  selectedCategory?: string | null;
 }>(), {
   rows: () => [],
+  selectedCategory: null,
 });
+
+const emit = defineEmits<{
+  'click-category': [category: string | null];
+}>();
 
 const hasData = computed(() => props.rows.length > 0);
 
@@ -21,6 +27,9 @@ const chartOption = computed(() => {
   const pieData = props.rows.map((r) => ({
     name: r.category,
     value: r.hours,
+    itemStyle: {
+      opacity: props.selectedCategory && r.category !== props.selectedCategory ? 0.4 : 1,
+    },
   }));
 
   return {
@@ -64,6 +73,15 @@ const chartOption = computed(() => {
     ],
   };
 });
+
+/** Toggle click: same slice clears, new slice selects */
+function handleChartClick(params: unknown): void {
+  // TODO: type echarts callback
+  const p = params as { name?: string } | null;
+  const name = p?.name;
+  if (!name) return;
+  emit('click-category', props.selectedCategory === name ? null : name);
+}
 </script>
 
 <template>
@@ -79,6 +97,7 @@ const chartOption = computed(() => {
       autoresize
       role="img"
       aria-label="停機類別分佈圖"
+      @click="handleChartClick"
     />
   </div>
 </template>

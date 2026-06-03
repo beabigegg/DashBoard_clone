@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.12.2
-last-changed: 2026-06-01
+schema-version: 1.12.3
+last-changed: 2026-06-03
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -785,6 +785,8 @@ Added by change `downtime-analysis-page`. All shapes wrapped in standard `succes
 | event_count | integer | no | Count of logical events |
 | top_reason | string | yes | OLDREASONNAME with highest hours; null if no events |
 
+**Response wrapper key:** `data.equipment_detail` (array). The route returns `success_response(equipment_detail=rows)`, not a bare array and not `data.rows`. Frontend composables must index `data.equipment_detail`. (AC-8; design.md DQ-1). When optional filter params (`big_category`, `status_types`) are applied, per-row schema is unchanged — only the row set is narrowed.
+
 #### 3.12.6 EventDetailRow (`GET /api/downtime-analysis/event-detail`)
 
 | field | type | nullable | notes |
@@ -802,6 +804,8 @@ Added by change `downtime-analysis-page`. All shapes wrapped in standard `succes
 | job | object\|null | yes | JobEnrichment sub-object; null when match_source='none'. Frontend MUST render all job-derived fields as `—` when null. |
 
 Paginated: `page` (default 1), `page_size` (default 50, max 200). Response includes `pagination: {page, page_size, total_rows, total_pages}`.
+
+**Response wrapper key:** `data.events` (array). The route returns `success_response(events=rows)`, not `data.rows` and not a bare array. Frontend composables must index `data.events`. (AC-8; design.md DQ-3). When optional filter params (`big_category`, `status_types`, `resource_id`) are applied, per-row schema is unchanged.
 
 #### 3.12.7 JobEnrichment (sub-object of EventDetailRow.job — null when match_source='none')
 

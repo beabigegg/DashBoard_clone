@@ -101,3 +101,23 @@ export interface FilterState {
   is_key: boolean;
   is_monitor: boolean;
 }
+
+/**
+ * Chart cross-filter state: narrowed by BigCategoryChart sector click
+ * and DailyTrendChart legend click. Distinct from FilterState (committed query params).
+ */
+export interface ChartFilter {
+  big_category: string | null;
+  status_types: string[] | null;
+}
+
+/**
+ * Per-machine Tier 3 lazy-load cache entry.
+ * Key: `${resource_id}|${status_type}` (e.g., "R-001|UDT")
+ */
+export interface TierThreeEntry {
+  rows: EventDetailRow[];
+  loading: boolean;
+  loaded: boolean;
+  error: string;
+}

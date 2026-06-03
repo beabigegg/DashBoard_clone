@@ -220,9 +220,12 @@ def api_downtime_equipment_detail():
     """API: Paginated per-equipment summary from spool.
 
     Query Parameters:
-        query_id:  str (required)
-        page:      int (default: 1)
-        page_size: int (default: 20, max: 200)
+        query_id:     str (required)
+        page:         int (default: 1)
+        page_size:    int (default: 20, max: 1000; raised from 200 for three-tier full-load — DQ-2)
+        big_category: str (optional; filter to machines with events in this category)
+        status_types: str (optional; CSV e.g. 'UDT,SDT'; filter by status type)
+        resource_id:  str (optional; filter to single machine for Tier 3 lazy-load)
 
     Returns:
         JSON { success, data: { equipment_detail: EquipmentDetailRow[], pagination: {...} } }
@@ -235,8 +238,12 @@ def api_downtime_equipment_detail():
     if not query_id:
         return validation_error("必須提供 query_id")
 
-    page_size = min(max(page_size, 1), 200)
+    page_size = min(max(page_size, 1), 1000)  # cap raised to 1000 (DQ-2)
     page = max(page, 1)
+
+    big_category = request.args.get('big_category', '').strip() or None
+    status_types = _csv_param(request.args.get('status_types', ''))
+    resource_id = request.args.get('resource_id', '').strip() or None
 
     # Build resource lookup for display names
     resource_lookup = _get_resource_lookup_safe()
@@ -247,6 +254,9 @@ def api_downtime_equipment_detail():
         page=page,
         page_size=page_size,
         resource_lookup=resource_lookup,
+        big_category=big_category,
+        status_types=status_types,
+        resource_id=resource_id,
     )
     if result is None:
         return cache_expired_error()
@@ -281,6 +291,10 @@ def api_downtime_event_detail():
     page_size = min(max(page_size, 1), 200)
     page = max(page, 1)
 
+    big_category = request.args.get('big_category', '').strip() or None
+    status_types = _csv_param(request.args.get('status_types', ''))
+    resource_id = request.args.get('resource_id', '').strip() or None
+
     resource_lookup = _get_resource_lookup_safe()
 
     result = apply_view(
@@ -289,6 +303,9 @@ def api_downtime_event_detail():
         page=page,
         page_size=page_size,
         resource_lookup=resource_lookup,
+        big_category=big_category,
+        status_types=status_types,
+        resource_id=resource_id,
     )
     if result is None:
         return cache_expired_error()

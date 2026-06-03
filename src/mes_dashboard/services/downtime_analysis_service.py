@@ -968,16 +968,33 @@ def apply_view(
     page: int = 1,
     page_size: int = 50,
     resource_lookup: Optional[Dict[str, Any]] = None,
+    big_category: Optional[str] = None,
+    status_types: Optional[List[str]] = None,
+    resource_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Serve a view from the spool without Oracle re-query.
 
     Returns None when spool is expired (→ route returns 410).
+
+    Optional filter params (in-memory pandas slice, no Oracle re-query):
+        big_category:  narrow by events_df['category'] == big_category
+        status_types:  narrow by events_df['status'].isin(status_types)
+        resource_id:   narrow by events_df['resource_id'] == resource_id
     """
     from mes_dashboard.services.downtime_analysis_cache import load_downtime_events
 
     events_df = load_downtime_events(query_id)
     if events_df is None:
         return None
+
+    # Apply in-memory filters BEFORE routing to view builders (DQ-1 / DQ-4).
+    # Omit-all path is byte-for-byte unchanged (falsy params are no-ops).
+    if big_category and not events_df.empty:
+        events_df = events_df[events_df['category'] == big_category]
+    if status_types and not events_df.empty:
+        events_df = events_df[events_df['status'].isin(status_types)]
+    if resource_id and not events_df.empty:
+        events_df = events_df[events_df['resource_id'] == resource_id]
 
     if view_name == 'summary':
         return {
@@ -1010,7 +1027,7 @@ def _build_equipment_detail_page(
     page_size: int = 20,
 ) -> Dict[str, Any]:
     """Build paginated EquipmentDetailRow list."""
-    page_size = min(max(int(page_size), 1), 200)
+    page_size = min(max(int(page_size), 1), 1000)  # cap raised to 1000 (DQ-2)
     page = max(int(page), 1)
 
     rows = _build_equipment_detail(df, resource_lookup)

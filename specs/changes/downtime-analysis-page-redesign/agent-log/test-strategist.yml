@@ -1,0 +1,25 @@
+agent: test-strategist
+change-id: downtime-analysis-page-redesign
+date: 2026-06-03
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/downtime-analysis-page-redesign/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_downtime_analysis_service.py::TestApplyViewFilter ↔ src/mes_dashboard/services/downtime_analysis_service.py::apply_view" }
+  - { type: tdd-pairs, pointer: "tests/test_downtime_analysis_routes.py::TestEquipmentDetailRoute ↔ src/mes_dashboard/routes/downtime_analysis_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/test_downtime_analysis_routes.py::TestFilterDataBoundary ↔ src/mes_dashboard/routes/downtime_analysis_routes.py" }
+  - { type: tdd-pairs, pointer: "frontend/tests/components/downtime-analysis/StatusMachineJobTable.test.ts ↔ frontend/src/downtime-analysis/components/StatusMachineJobTable.vue" }
+  - { type: tdd-pairs, pointer: "frontend/tests/components/downtime-analysis/MachineEventRows.test.ts ↔ frontend/src/downtime-analysis/components/MachineEventRows.vue" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/downtime-analysis.spec.js ↔ frontend/src/downtime-analysis/App.vue" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1), integration (Tier 1), e2e (Tier 1), data-boundary (Tier 1)" }
+  - { type: mapping-completeness, pointer: "all 8 AC mapped; AC-6 covered by css:check (Tier 0) + e2e class assertion; AC-7 covered by existing shared-ui tests with no new file needed" }
+
+notes: >
+  Two existing tests require attention: (1) test_downtime_analysis_routes.py
+  TestEquipmentDetailRoute / TestEventDetailRoute already exist — extend them,
+  do not create duplicate classes. (2) The Playwright test
+  view_toggle_chart_to_events_preserves_filter_state exercises the retired tab
+  switcher and must be retired or updated as part of AC-3 implementation.
+  AC-8 wrapper-key constants (equipment_detail / events) must be pinned in
+  MachineEventRows.test.ts so any backend rename is caught at test time rather
+  than as a silent empty table in production.

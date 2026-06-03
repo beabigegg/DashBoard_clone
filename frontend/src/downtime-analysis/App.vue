@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed } from 'vue';
+import { onMounted, ref, reactive } from 'vue';
 
 import { ensureMesApiAvailable } from '../core/api';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -10,12 +10,12 @@ import KpiCards from './components/KpiCards.vue';
 import DailyTrendChart from './components/DailyTrendChart.vue';
 import BigCategoryChart from './components/BigCategoryChart.vue';
 import TopReasonsTable from './components/TopReasonsTable.vue';
-import EquipmentDetail from './components/EquipmentDetail.vue';
-import EventDetail from './components/EventDetail.vue';
+import StatusMachineJobTable from './components/StatusMachineJobTable.vue';
+// EquipmentDetail and EventDetail are intentionally NOT imported (DQ-6: kept on disk for rollback)
 
 import { useFilterState } from './composables/useFilterState';
 import { useDowntimeData } from './composables/useDowntimeData';
-import type { FilterState } from './types';
+import type { FilterState, ChartFilter, TierThreeEntry } from './types';
 
 ensureMesApiAvailable();
 
@@ -31,24 +31,31 @@ const {
   error,
   summaryData,
   equipmentData,
-  eventData,
   filterOptions,
   loadOptions,
   executePrimaryQuery,
   applyView,
-  loadEquipmentDetail,
-  loadEventDetail,
+  loadAllEquipmentDetail,
+  loadMachineStatusEvents,
   exportEquipmentDetailCsv,
-  exportEventDetailCsv,
   resetSummaryData,
 } = useDowntimeData();
 
-/** Active view tab: 'charts' | 'equipment' | 'events' */
-const activeTab = ref<'charts' | 'equipment' | 'events'>('charts');
+/** Chart cross-filter state (distinct from committed FilterState) */
+const chartFilter = ref<ChartFilter>({ big_category: null, status_types: null });
+
+/** Tier 3 lazy-load cache: key = `${resource_id}|${status_type}` */
+const tierThreeCache = reactive<Record<string, TierThreeEntry>>({});
 
 const isInitialLoad = ref(true);
 const exportingEquipment = ref(false);
-const exportingEvents = ref(false);
+
+/** Clear the Tier 3 cache (on re-query or chartFilter change per DQ-3) */
+function clearTierThreeCache(): void {
+  for (const key of Object.keys(tierThreeCache)) {
+    delete tierThreeCache[key];
+  }
+}
 
 async function handleExportEquipment(): Promise<void> {
   exportingEquipment.value = true;
@@ -56,15 +63,6 @@ async function handleExportEquipment(): Promise<void> {
     await exportEquipmentDetailCsv();
   } finally {
     exportingEquipment.value = false;
-  }
-}
-
-async function handleExportEvents(): Promise<void> {
-  exportingEvents.value = true;
-  try {
-    await exportEventDetailCsv();
-  } finally {
-    exportingEvents.value = false;
   }
 }
 
@@ -104,12 +102,12 @@ async function runPrimaryQuery(): Promise<void> {
   if (!body.start_date || !body.end_date) {
     return;
   }
+  // Clear cross-filter and Tier 3 cache on re-query (DQ-3)
+  chartFilter.value = { big_category: null, status_types: null };
+  clearTierThreeCache();
+
   await executePrimaryQuery(body);
-  if (activeTab.value === 'equipment') {
-    await loadEquipmentDetail(1, 20);
-  } else if (activeTab.value === 'events') {
-    await loadEventDetail(1, 20);
-  }
+  await loadAllEquipmentDetail({ big_category: null, status_types: null });
 }
 
 /**
@@ -149,34 +147,41 @@ async function handleClear(): Promise<void> {
   await runPrimaryQuery();
 }
 
-async function handleTabChange(tab: 'charts' | 'equipment' | 'events'): Promise<void> {
-  if (tab === 'equipment' && equipmentData.rows.length === 0) {
-    await loadEquipmentDetail(1, 20);
-  } else if (tab === 'events' && eventData.rows.length === 0) {
-    await loadEventDetail(1, 20);
-  }
-  activeTab.value = tab;
-}
-
-async function handleEquipmentPageChange(page: number): Promise<void> {
-  await loadEquipmentDetail(page, equipmentData.pagination.page_size);
-}
-
-async function handlePageChange(page: number): Promise<void> {
-  await loadEventDetail(page, eventData.pagination.page_size);
-}
-
 async function handleGranularityChange(next: FilterState): Promise<void> {
   updateAll(next);
   syncDraftFromState();
-  if (activeTab.value === 'charts') {
-    await applyView(next.granularity, runPrimaryQuery);
-  }
+  await applyView(next.granularity, runPrimaryQuery);
 }
 
-const isChartTab = computed(() => activeTab.value === 'charts');
-const isEquipmentTab = computed(() => activeTab.value === 'equipment');
-const isEventsTab = computed(() => activeTab.value === 'events');
+/** BigCategoryChart sector click: toggle big_category filter, reload equipment, clear Tier 3 */
+async function handleCategoryClick(category: string | null): Promise<void> {
+  chartFilter.value.big_category = category;
+  clearTierThreeCache();
+  await loadAllEquipmentDetail(chartFilter.value);
+}
+
+/** DailyTrendChart legend click: toggle status_types filter, reload equipment, clear Tier 3 */
+async function handleStatusClick(statusTypes: string[] | null): Promise<void> {
+  chartFilter.value.status_types = statusTypes;
+  clearTierThreeCache();
+  await loadAllEquipmentDetail(chartFilter.value);
+}
+
+/** Tier 2 machine row expand: lazy-load events for this machine+status */
+async function handleExpandMachine(payload: { resourceId: string; statusType: string }): Promise<void> {
+  const { resourceId, statusType } = payload;
+  const key = `${resourceId}|${statusType}`;
+  const cached = tierThreeCache[key];
+  // Skip if already loaded or currently loading
+  if (cached?.loaded || cached?.loading) return;
+  tierThreeCache[key] = { rows: [], loading: true, loaded: false, error: '' };
+  try {
+    const rows = await loadMachineStatusEvents(resourceId, statusType, chartFilter.value);
+    tierThreeCache[key] = { rows, loading: false, loaded: true, error: '' };
+  } catch (e) {
+    tierThreeCache[key] = { rows: [], loading: false, loaded: false, error: String(e instanceof Error ? e.message : e) };
+  }
+}
 
 async function initPage(): Promise<void> {
   setDefaultDates();
@@ -222,84 +227,70 @@ onMounted(() => {
       <!-- KPI cards -->
       <KpiCards :summary="summaryData.summary" />
 
-      <!-- View tab buttons -->
-      <div class="view-tabs" role="tablist" aria-label="檢視模式">
-        <button
-          type="button"
-          role="tab"
-          class="view-tab"
-          :class="{ active: isChartTab }"
-          :aria-selected="isChartTab"
-          @click="handleTabChange('charts')"
-        >
-          圖表總覽
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="view-tab"
-          :class="{ active: isEquipmentTab }"
-          :aria-selected="isEquipmentTab"
-          @click="handleTabChange('equipment')"
-        >
-          設備明細
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="view-tab"
-          :class="{ active: isEventsTab }"
-          :aria-selected="isEventsTab"
-          @click="handleTabChange('events')"
-        >
-          事件明細
-        </button>
-      </div>
-
-      <!-- Charts tab -->
-      <div v-show="isChartTab" role="tabpanel" aria-label="圖表總覽">
-        <div class="section-card">
-          <div class="section-inner">
-            <div class="chart-grid">
-              <DailyTrendChart :rows="summaryData.daily_trend" />
-              <BigCategoryChart :rows="summaryData.big_category" />
-            </div>
-          </div>
-        </div>
-        <div class="section-card">
-          <div class="section-inner">
-            <TopReasonsTable :rows="summaryData.top_reasons" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Equipment detail tab -->
-      <div v-show="isEquipmentTab" role="tabpanel" aria-label="設備明細">
-        <div class="section-card">
-          <div class="section-inner">
-            <EquipmentDetail
-              :rows="equipmentData.rows"
-              :pagination="equipmentData.pagination"
-              :exporting="exportingEquipment"
-              @page-change="handleEquipmentPageChange"
-              @export="handleExportEquipment"
+      <!-- Charts section -->
+      <div class="section-card">
+        <div class="section-inner">
+          <div class="chart-grid">
+            <DailyTrendChart
+              :rows="summaryData.daily_trend"
+              :selected-status-types="chartFilter.status_types"
+              @click-status="handleStatusClick"
+            />
+            <BigCategoryChart
+              :rows="summaryData.big_category"
+              :selected-category="chartFilter.big_category"
+              @click-category="handleCategoryClick"
             />
           </div>
         </div>
       </div>
 
-      <!-- Events detail tab -->
-      <div v-show="isEventsTab" role="tabpanel" aria-label="事件明細">
-        <div class="section-card">
-          <div class="section-inner">
-            <EventDetail
-              :rows="eventData.rows"
-              :pagination="eventData.pagination"
-              :exporting="exportingEvents"
-              @page-change="handlePageChange"
-              @export="handleExportEvents"
-            />
-          </div>
+      <!-- Top reasons table -->
+      <div class="section-card">
+        <div class="section-inner">
+          <TopReasonsTable :rows="summaryData.top_reasons" />
+        </div>
+      </div>
+
+      <!-- Active chart filter chips -->
+      <div
+        v-if="chartFilter.big_category || chartFilter.status_types?.length"
+        class="chart-filter-chips"
+        aria-label="已套用的圖表篩選"
+      >
+        <span v-if="chartFilter.big_category" class="filter-chip">
+          類別：{{ chartFilter.big_category }}
+          <button
+            type="button"
+            class="chip-clear"
+            aria-label="清除類別篩選"
+            @click="handleCategoryClick(null)"
+          >×</button>
+        </span>
+        <span v-if="chartFilter.status_types?.length" class="filter-chip">
+          狀態：{{ chartFilter.status_types.join('/') }}
+          <button
+            type="button"
+            class="chip-clear"
+            aria-label="清除狀態篩選"
+            @click="handleStatusClick(null)"
+          >×</button>
+        </span>
+      </div>
+
+      <!-- Three-tier expandable equipment table -->
+      <div class="section-card">
+        <div class="section-inner">
+          <StatusMachineJobTable
+            :equipment-rows="equipmentData.rows"
+            :summary-data="summaryData.summary"
+            :tier-three-cache="tierThreeCache"
+            :chart-filter="chartFilter"
+            :loading="loading.equipment"
+            :exporting="exportingEquipment"
+            @expand-machine="handleExpandMachine"
+            @export="handleExportEquipment"
+          />
         </div>
       </div>
     </div>
