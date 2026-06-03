@@ -499,85 +499,11 @@
   font-size: 11px;
 }
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  border: 1px solid var(--resource-border);
-  border-radius: 8px;
-  background: theme('colors.token.hffffff');
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
-  overflow: hidden;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-search {
-  display: block;
-  width: 100%;
-  border: none;
-  border-bottom: 1px solid var(--resource-border);
-  padding: theme('spacing.token.p8') theme('spacing.token.p12');
-  font-size: 13px;
-  color: theme('colors.token.h1f2937');
-  outline: none;
-  background: theme('colors.token.hf8fafc');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-search::placeholder {
-  color: theme('colors.token.h94a3b8');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-options {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: theme('spacing.token.p8') 0;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: theme('spacing.token.p6') theme('spacing.token.p12');
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  color: theme('colors.token.h334155');
-  cursor: pointer;
-  text-align: left;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-option:hover {
-  background: theme('colors.token.hf8fafc');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-option input[type='checkbox'] {
-  margin: 0;
-  accent-color: theme('colors.brand.600');
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-empty {
-  padding: theme('spacing.token.p12');
-  text-align: center;
-  color: theme('colors.token.h94a3b8');
-  font-size: 13px;
-}
-
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .multi-select-actions {
-  display: flex;
-  gap: 8px;
-  padding: theme('spacing.token.p8') theme('spacing.token.p10');
-  border-top: 1px solid var(--resource-border);
-  background: theme('colors.token.hf8fafc');
-}
-
 @media (max-width: 640px) {
   :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .matrix-table th:first-child,
   :is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis) .matrix-table td:first-child {
     min-width: 220px;
   }
-
 }
 
 /* --- PageHeader keyframes (shared across resource & wip) --- */

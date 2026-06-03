@@ -5,15 +5,6 @@
   margin: 0 auto;
 }
 
-/* Allow MultiSelect dropdown to overflow SectionCard boundaries */
-.theme-job-query .job-query-page .shared-section-card:first-child {
-  overflow: visible;
-}
-
-.theme-job-query .job-query-page .shared-section-card:first-child > .shared-section-card-body {
-  overflow: visible;
-}
-
 .theme-job-query .job-query-title-row {
   display: flex;
   justify-content: space-between;

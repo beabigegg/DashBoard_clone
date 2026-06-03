@@ -6,9 +6,13 @@
  * AC-1: no emit while dropdown is open
  * AC-2: single emit on close (outside-click / Escape / blur)
  * Regression: update:modelValue still fires on every toggle (back-compat)
+ *
+ * Note: MultiSelect teleports its dropdown panel to <body>, so all
+ * `.multi-select-dropdown` / `.multi-select-option` lookups use
+ * `document.querySelector` instead of `wrapper.find`.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick, defineComponent } from 'vue';
 import MultiSelect from '../MultiSelect.vue';
@@ -36,19 +40,34 @@ function mountSelect(overrides: Record<string, unknown> = {}) {
   });
 }
 
+/** Helpers that query the teleported dropdown in <body> */
+function getDropdown() {
+  return document.querySelector('.multi-select-dropdown');
+}
+function getOptions() {
+  return document.querySelectorAll<HTMLElement>('.multi-select-option');
+}
+function getCloseBtn() {
+  return document.querySelector<HTMLElement>('.multi-select-actions button:last-child');
+}
+
+let _wrapper: ReturnType<typeof mountSelect> | null = null;
+
 describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filter)', () => {
-  beforeEach(() => {
-    // Clean up any leftover DOM from previous test's `attachTo: document.body`.
+  afterEach(() => {
+    // Unmount before clearing body so Vue's Teleport can clean up its anchor.
+    _wrapper?.unmount();
+    _wrapper = null;
     document.body.innerHTML = '';
   });
 
   it('emits dropdown-close once on outside-click with final selection', async () => {
-    const wrapper = mountSelect({ modelValue: ['Alpha'] });
+    const wrapper = (_wrapper = mountSelect({ modelValue: ['Alpha'] }));
 
     // Open the dropdown.
     await wrapper.find('.multi-select-trigger').trigger('click');
     await nextTick();
-    expect(wrapper.find('.multi-select-dropdown').exists()).toBe(true);
+    expect(getDropdown()).not.toBeNull();
 
     // Simulate outside-click: dispatch a click on document (outside rootRef).
     document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -62,15 +81,16 @@ describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filt
   });
 
   it('emits dropdown-close once on Escape with final selection', async () => {
-    const wrapper = mountSelect({ modelValue: ['Beta'] });
+    const wrapper = (_wrapper = mountSelect({ modelValue: ['Beta'] }));
 
     // Open the dropdown.
     await wrapper.find('.multi-select-trigger').trigger('click');
     await nextTick();
-    expect(wrapper.find('.multi-select-dropdown').exists()).toBe(true);
+    expect(getDropdown()).not.toBeNull();
 
-    // Press Escape on the dropdown container.
-    await wrapper.find('.multi-select-dropdown').trigger('keydown', { key: 'Escape' });
+    // Press Escape on the dropdown container (teleported to body).
+    const dropdown = getDropdown() as HTMLElement;
+    dropdown.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await nextTick();
     await nextTick();
 
@@ -90,13 +110,13 @@ describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filt
   });
 
   it('dropdown-close payload equals current model-value at close time', async () => {
-    const wrapper = mountSelect({ modelValue: ['Alpha', 'Gamma'] });
+    const wrapper = (_wrapper = mountSelect({ modelValue: ['Alpha', 'Gamma'] }));
 
     await wrapper.find('.multi-select-trigger').trigger('click');
     await nextTick();
 
-    // Close via the 「關閉」 footer button.
-    await wrapper.find('.multi-select-actions button:last-child').trigger('click');
+    // Close via the 「關閉」 footer button (teleported to body).
+    getCloseBtn()!.click();
     await nextTick();
     await nextTick();
 
@@ -106,26 +126,26 @@ describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filt
   });
 
   it('does not emit dropdown-close while dropdown is open across multiple toggles', async () => {
-    const wrapper = mountSelect({ modelValue: [] });
+    const wrapper = (_wrapper = mountSelect({ modelValue: [] }));
 
     // Open.
     await wrapper.find('.multi-select-trigger').trigger('click');
     await nextTick();
 
     // Toggle options multiple times while keeping the dropdown open.
-    const options = wrapper.findAll('.multi-select-option');
-    await options[0].trigger('click');
+    const options = getOptions();
+    options[0].click();
     await nextTick();
-    await options[1].trigger('click');
+    options[1].click();
     await nextTick();
-    await options[0].trigger('click');
+    options[0].click();
     await nextTick();
 
     // Dropdown is still open — no dropdown-close should have been emitted yet.
     expect(wrapper.emitted('dropdown-close')).toBeFalsy();
 
     // Now close it.
-    await wrapper.find('.multi-select-actions button:last-child').trigger('click');
+    getCloseBtn()!.click();
     await nextTick();
     await nextTick();
 
@@ -136,16 +156,16 @@ describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filt
   });
 
   it('still emits update:modelValue on every toggle (back-compat for unlisted consumers)', async () => {
-    const wrapper = mountSelect({ modelValue: [] });
+    const wrapper = (_wrapper = mountSelect({ modelValue: [] }));
 
     // Open.
     await wrapper.find('.multi-select-trigger').trigger('click');
     await nextTick();
 
-    const options = wrapper.findAll('.multi-select-option');
-    await options[0].trigger('click');
+    const options = getOptions();
+    options[0].click();
     await nextTick();
-    await options[1].trigger('click');
+    options[1].click();
     await nextTick();
 
     // update:modelValue fires for each toggle.
@@ -156,25 +176,24 @@ describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filt
 
   it('consumers without @dropdown-close listener see no behavioral change', async () => {
     // Mount without any listener for dropdown-close.
-    const wrapper = mountSelect({ modelValue: ['Gamma'] });
+    const wrapper = (_wrapper = mountSelect({ modelValue: ['Gamma'] }));
 
     // Open and close — should not throw and update:modelValue should still work.
     await wrapper.find('.multi-select-trigger').trigger('click');
     await nextTick();
 
-    const options = wrapper.findAll('.multi-select-option');
-    await options[0].trigger('click'); // toggle Alpha
+    const options = getOptions();
+    options[0].click(); // toggle Alpha
     await nextTick();
 
     // Close.
-    await wrapper.find('.multi-select-actions button:last-child').trigger('click');
+    getCloseBtn()!.click();
     await nextTick();
     await nextTick();
 
     // update:modelValue still fired (back-compat).
     expect(wrapper.emitted('update:modelValue')).toBeTruthy();
     // dropdown-close fired but no listener — component did not throw.
-    // (The emit is fired into the void; this is the desired behavior.)
     expect(wrapper.emitted('dropdown-close')).toBeTruthy();
   });
 });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { CSSProperties } from 'vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 
 interface NormalizedOption {
@@ -33,9 +34,24 @@ const emit = defineEmits<{
 }>();
 
 const rootRef = ref<HTMLElement | null>(null);
+const triggerRef = ref<HTMLButtonElement | null>(null);
+const dropdownRef = ref<HTMLElement | null>(null);
 const searchRef = ref<HTMLInputElement | null>(null);
 const isOpen = ref(false);
 const searchQuery = ref('');
+const dropdownStyle = ref<CSSProperties>({});
+
+function updateDropdownPosition() {
+  if (!triggerRef.value) return;
+  const rect = triggerRef.value.getBoundingClientRect();
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    zIndex: '9999',
+  };
+}
 
 const normalizedOptions = computed((): NormalizedOption[] => {
   return props.options.map((option) => {
@@ -112,14 +128,20 @@ function clearAll() {
 }
 
 function handleOutsideClick(event: MouseEvent) {
-  if (!isOpen.value || !rootRef.value) return;
-  if (!rootRef.value.contains(event.target as Node)) isOpen.value = false;
+  if (!isOpen.value) return;
+  const target = event.target as Node;
+  const inRoot = rootRef.value?.contains(target) ?? false;
+  const inDropdown = dropdownRef.value?.contains(target) ?? false;
+  if (!inRoot && !inDropdown) isOpen.value = false;
 }
 
 watch(isOpen, (open) => {
-  if (open && props.searchable) {
-    searchQuery.value = '';
-    requestAnimationFrame(() => searchRef.value?.focus());
+  if (open) {
+    updateDropdownPosition();
+    if (props.searchable) {
+      searchQuery.value = '';
+      requestAnimationFrame(() => searchRef.value?.focus());
+    }
   }
 });
 
@@ -139,6 +161,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
 <template>
   <div ref="rootRef" class="multi-select">
     <button
+      ref="triggerRef"
       type="button"
       class="multi-select-trigger"
       :disabled="disabled || loading"
@@ -157,41 +180,121 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
       </span>
     </button>
 
-    <div v-if="isOpen && !loading" class="multi-select-dropdown" @keydown.esc.stop="closeDropdown">
-      <input
-        v-if="searchable"
-        ref="searchRef"
-        v-model="searchQuery"
-        type="text"
-        class="multi-select-search"
-        placeholder="搜尋..."
-        @click.stop
-      />
+    <Teleport to="body">
+      <div
+        v-if="isOpen && !loading"
+        ref="dropdownRef"
+        class="multi-select-dropdown"
+        :style="dropdownStyle"
+        @keydown.esc.stop="closeDropdown"
+      >
+        <input
+          v-if="searchable"
+          ref="searchRef"
+          v-model="searchQuery"
+          type="text"
+          class="multi-select-search"
+          placeholder="搜尋..."
+          @click.stop
+        />
 
-      <div class="multi-select-options">
-        <button
-          v-for="option in displayedOptions"
-          :key="option.value"
-          type="button"
-          class="multi-select-option"
-          @click="toggleOption(option.value)"
-        >
-          <input type="checkbox" :checked="isSelected(option.value)" tabindex="-1" />
-          <span>{{ option.label }}</span>
-        </button>
-        <div v-if="displayedOptions.length === 0" class="multi-select-empty">
-          無符合結果
+        <div class="multi-select-options">
+          <button
+            v-for="option in displayedOptions"
+            :key="option.value"
+            type="button"
+            class="multi-select-option"
+            @click="toggleOption(option.value)"
+          >
+            <input type="checkbox" :checked="isSelected(option.value)" tabindex="-1" />
+            <span>{{ option.label }}</span>
+          </button>
+          <div v-if="displayedOptions.length === 0" class="multi-select-empty">
+            無符合結果
+          </div>
+        </div>
+
+        <div class="multi-select-actions">
+          <button type="button" class="ui-btn ui-btn--sm" @click="selectAll">全選</button>
+          <button type="button" class="ui-btn ui-btn--sm" @click="clearAll">清除</button>
+          <button type="button" class="ui-btn ui-btn--sm" @click="closeDropdown">關閉</button>
         </div>
       </div>
-
-      <div class="multi-select-actions">
-        <button type="button" class="ui-btn ui-btn--sm" @click="selectAll">全選</button>
-        <button type="button" class="ui-btn ui-btn--sm" @click="clearAll">清除</button>
-        <button type="button" class="ui-btn ui-btn--sm" @click="closeDropdown">關閉</button>
-      </div>
-    </div>
+    </Teleport>
   </div>
 </template>
+
+<!-- Dropdown is teleported to body, so its styles must be global (not scoped) -->
+<style>
+.multi-select-dropdown {
+  border: 1px solid theme('colors.token.hcbd5e1');
+  border-radius: 8px;
+  background: theme('colors.token.hffffff');
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.multi-select-search {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid theme('colors.token.he2e8f0');
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+  font-size: 13px;
+  color: theme('colors.token.h1f2937');
+  outline: none;
+  background: theme('colors.token.hf8fafc');
+  box-sizing: border-box;
+}
+
+.multi-select-search::placeholder {
+  color: theme('colors.token.h94a3b8');
+}
+
+.multi-select-options {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: theme('spacing.token.p8') 0;
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+  width: 100%;
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: theme('colors.token.h334155');
+  cursor: pointer;
+  text-align: left;
+}
+
+.multi-select-option:hover {
+  background: theme('colors.token.hf8fafc');
+}
+
+.multi-select-option input[type='checkbox'] {
+  margin: 0;
+  accent-color: theme('colors.brand.600');
+}
+
+.multi-select-empty {
+  padding: theme('spacing.token.p12');
+  text-align: center;
+  color: theme('colors.token.h94a3b8');
+  font-size: 13px;
+}
+
+.multi-select-actions {
+  display: flex;
+  gap: theme('spacing.token.p8');
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  border-top: 1px solid theme('colors.token.he2e8f0');
+  background: theme('colors.token.hf8fafc');
+}
+</style>
 
 <style scoped>
 .multi-select-spinner {

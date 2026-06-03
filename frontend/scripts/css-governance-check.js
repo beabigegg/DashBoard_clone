@@ -42,6 +42,7 @@ let hexErrors = 0;
 let hexExceptionWarnings = 0;
 let spacingWarnings = 0;
 let scopeErrors = 0;
+let dropdownScopeErrors = 0;
 
 // Valid CSS hex only (3/4/6/8 digits). Excludes HTML entities like &#10003; via negative lookbehind.
 const HEX_COLOR_RE = /(?<!&)#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/;
@@ -257,6 +258,16 @@ function checkCssFile(full) {
       warnings++;
       spacingWarnings++;
     }
+
+    // Rule 7: Scoped .multi-select-dropdown rules are dead code after Teleport migration.
+    // MultiSelect.vue teleports the dropdown panel to <body>, so any theme-scoped
+    // .multi-select-dropdown selector never matches. Styles for the dropdown panel
+    // must live in MultiSelect.vue's unscoped <style> block instead.
+    if (/\.multi-select-dropdown/.test(trimmed) && !trimmed.startsWith('//') && !trimmed.startsWith('*')) {
+      console.error(`[FAIL] ${rel}:${lineNo} — Scoped ".multi-select-dropdown" rule is dead code. MultiSelect teleports its dropdown to <body>; style it in shared-ui/components/MultiSelect.vue's global <style> block instead.`);
+      errors++;
+      dropdownScopeErrors++;
+    }
   });
 }
 
@@ -351,6 +362,7 @@ console.log(`- HEX violations: ${hexErrors}`);
 console.log(`- HEX chart-exception candidates: ${hexExceptionWarnings}`);
 console.log(`- Spacing px warnings: ${spacingWarnings}`);
 console.log(`- Unscoped feature-CSS rules: ${scopeErrors}`);
+console.log(`- Dead scoped .multi-select-dropdown rules: ${dropdownScopeErrors}`);
 
 if (errors > 0) {
   console.error('\nFAIL: Fix errors above before merging.');

@@ -75,7 +75,6 @@
   padding: theme('spacing.token.p16');
 }
 
-/* --- Filter query card: override ui-card overflow:hidden so the MultiSelect dropdown escapes --- */
 .theme-material-consumption .filter-query-card,
 .theme-material-consumption .filter-query-card .ui-card-body {
   overflow: visible;
@@ -467,80 +466,6 @@
   font-size: 11px;
 }
 
-.theme-material-consumption .multi-select-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  border: 1px solid theme('colors.stroke.soft');
-  border-radius: 8px;
-  background: theme('colors.surface.card');
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
-  overflow: hidden;
-}
-
-.theme-material-consumption .multi-select-search {
-  display: block;
-  width: 100%;
-  border: none;
-  border-bottom: 1px solid theme('colors.stroke.soft');
-  padding: theme('spacing.token.p8') theme('spacing.token.p12');
-  font-size: 13px;
-  color: theme('colors.text.primary');
-  outline: none;
-  background: theme('colors.surface.muted');
-}
-
-.theme-material-consumption .multi-select-search::placeholder {
-  color: theme('colors.text.subtle');
-}
-
-.theme-material-consumption .multi-select-options {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: theme('spacing.token.p8') 0;
-}
-
-.theme-material-consumption .multi-select-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: theme('spacing.token.p6') theme('spacing.token.p12');
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  color: theme('colors.text.primary');
-  cursor: pointer;
-  text-align: left;
-}
-
-.theme-material-consumption .multi-select-option:hover {
-  background: theme('colors.surface.hover');
-}
-
-.theme-material-consumption .multi-select-option input[type='checkbox'] {
-  margin: 0;
-  width: 14px;
-  height: 14px;
-  accent-color: theme('colors.brand.600');
-}
-
-.theme-material-consumption .multi-select-empty {
-  padding: theme('spacing.token.p12');
-  text-align: center;
-  color: theme('colors.text.subtle');
-  font-size: 13px;
-}
-
-.theme-material-consumption .multi-select-actions {
-  display: flex;
-  gap: 8px;
-  padding: theme('spacing.token.p8') theme('spacing.token.p10');
-  border-top: 1px solid theme('colors.stroke.soft');
-  background: theme('colors.surface.muted');
-}
 
 /* --- Pagination (BasePagination has no scoped styles; style from theme scope) --- */
 .theme-material-consumption .pagination {
