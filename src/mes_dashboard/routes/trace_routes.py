@@ -672,6 +672,40 @@ def seed_resolve():
     if cached is not None:
         return success_response(cached)
 
+    # Async path: long MSD date-range queries exceed openresty proxy_read_timeout.
+    # Route to the msd-analysis worker queue; frontend polls /seed/job/<id>.
+    if profile == PROFILE_MID_SECTION_DEFECT:
+        _mode = str(params.get("mode") or "date_range").strip()
+        if _mode == "date_range":
+            _sd, _ed = _extract_date_range(params)
+            if _sd and _ed:
+                from mes_dashboard.services.batch_query_engine import should_decompose_by_time
+                if should_decompose_by_time(_sd, _ed) and is_async_available():
+                    from mes_dashboard.core.permissions import get_owner_token
+                    from mes_dashboard.services.msd_seed_job_service import enqueue_msd_seed_resolve
+                    _job_id, _err = enqueue_msd_seed_resolve(
+                        seed_cache_key=seed_cache_key,
+                        params=params,
+                        owner=get_owner_token(),
+                    )
+                    if _job_id is not None:
+                        logger.info(
+                            "trace seed-resolve routed async job_id=%s profile=%s",
+                            _job_id, profile,
+                        )
+                        return success_response(
+                            {
+                                "stage": "seed-resolve",
+                                "async": True,
+                                "job_id": _job_id,
+                                "status_url": f"/api/trace/seed/job/{_job_id}",
+                            },
+                            status_code=202,
+                        )
+                    logger.warning(
+                        "trace seed-resolve async enqueue failed (%s); falling back to sync", _err,
+                    )
+
     request_cache_key = payload.get("cache_key")
     logger.info(
         "trace seed-resolve profile=%s correlation_cache_key=%s",
@@ -847,6 +881,44 @@ def lineage_job_result(job_id: str):
         or query_id.startswith("trace-lineage-mid-section-defect-")
     ):
         return success_response(_compact_msd_lineage_response(query_id, result))
+    return success_response(result)
+
+
+@trace_bp.route("/seed/job/<job_id>", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def seed_job_status(job_id: str):
+    """Return the current status of an async MSD seed-resolve job."""
+    from mes_dashboard.services.msd_seed_job_service import get_msd_seed_job_status
+    status = get_msd_seed_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+    return success_response(status)
+
+
+@trace_bp.route("/seed/job/<job_id>/result", methods=["GET"])
+@_TRACE_JOB_RATE_LIMIT
+def seed_job_result(job_id: str):
+    """Return the seed-resolve result of a completed async MSD seed job."""
+    from mes_dashboard.services.msd_seed_job_service import (
+        get_msd_seed_job_result,
+        get_msd_seed_job_status,
+    )
+    status = get_msd_seed_job_status(job_id)
+    if status is None:
+        return _error("JOB_NOT_FOUND", "job not found or expired", 404)
+    job_st = status.get("status", "")
+    if job_st == "failed":
+        return _error("JOB_FAILED", status.get("error") or "seed job failed", 500)
+    if job_st not in ("completed", "finished"):
+        return error_response(
+            "JOB_NOT_COMPLETE",
+            "job has not completed yet",
+            status_code=409,
+            meta={"job_status": job_st},
+        )
+    result = get_msd_seed_job_result(job_id)
+    if result is None:
+        return _error("JOB_RESULT_EXPIRED", "job result has expired", 404)
     return success_response(result)
 
 

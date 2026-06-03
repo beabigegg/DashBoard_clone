@@ -1234,7 +1234,13 @@ class MsdDuckdbRuntime:
         """Return paginated detail rows from detection+lineage+events spool via DuckDB."""
         self._resolve_paths()
         if direction != "backward":
-            return None
+            # Forward-direction per-lot detail is not yet implemented via DuckDB spool.
+            # Return an empty result so the route returns 200 instead of 410.
+            return {
+                "items": [],
+                "pagination": {"page": page, "per_page": per_page, "total": 0, "total_pages": 0},
+                "trace_query_id": self.trace_query_id,
+            }
         if not self._events_path:
             return None
         # Detection spool is required for proper detail (CONTAINERNAME, DEFECT_QTY, etc.)

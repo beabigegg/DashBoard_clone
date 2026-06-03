@@ -895,10 +895,18 @@ def execute_trace_events_job(
             # Compute detection spool hash (same key used in _fetch_station_detection_data)
             try:
                 from mes_dashboard.services.batch_query_engine import compute_query_hash as _cqh
+                _det_start = _msd_params.get("start_date") or ""
+                _det_end = _msd_params.get("end_date") or ""
+                if not _det_start or not _det_end:
+                    # Frontend sends date_range: [start, end] rather than start_date/end_date
+                    _dr = _msd_params.get("date_range")
+                    if isinstance(_dr, list) and len(_dr) == 2:
+                        _det_start = str(_dr[0] or "").strip()
+                        _det_end = str(_dr[1] or "").strip()
                 _msd_detection_hash: Optional[str] = _cqh({
                     "station": _msd_params.get("station") or "",
-                    "start_date": _msd_params.get("start_date") or "",
-                    "end_date": _msd_params.get("end_date") or "",
+                    "start_date": _det_start,
+                    "end_date": _det_end,
                 })
             except Exception as _hash_exc:
                 logger.warning("trace job MSD: could not compute detection_hash: %s", _hash_exc)

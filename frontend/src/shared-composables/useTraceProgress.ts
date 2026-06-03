@@ -285,7 +285,40 @@ export function useTraceProgress({ profile }: TraceProgressOptions = {}): TraceP
         { profile, params },
         { timeout: DEFAULT_STAGE_TIMEOUT_MS, signal: controller.signal },
       );
-      const seedPayload = unwrapEnvelope(seedRaw);
+      const seedEnvelope = unwrapEnvelope(seedRaw) as {
+        async?: boolean;
+        status_url?: string;
+        job_id?: string | null;
+        [key: string]: unknown;
+      } | null;
+
+      let seedPayload: unknown;
+      if (seedEnvelope?.async === true && seedEnvelope?.status_url) {
+        // Long date-range query was routed to the msd-analysis worker.
+        // Poll until done, then fetch the result.
+        job_progress.active = true;
+        job_progress.job_id = seedEnvelope.job_id ?? null;
+        job_progress.status = 'queued';
+
+        await pollJobUntilComplete(seedEnvelope.status_url, {
+          signal: controller.signal,
+          onProgress: (statusResp) => {
+            job_progress.status = statusResp.status;
+            job_progress.elapsed_seconds = statusResp.elapsed_seconds || 0;
+            job_progress.progress = statusResp.progress || '';
+          },
+        });
+
+        const seedResultRaw = await apiGet(`${seedEnvelope.status_url}/result`, {
+          timeout: DEFAULT_STAGE_TIMEOUT_MS,
+          signal: controller.signal,
+        });
+        seedPayload = unwrapEnvelope(seedResultRaw);
+        job_progress.active = false;
+      } else {
+        seedPayload = seedEnvelope;
+      }
+
       stage_results.seed = seedPayload;
       completed_stages.value = [...completed_stages.value, 'seed-resolve'];
 

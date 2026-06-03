@@ -267,11 +267,14 @@ class TestDailyTrendParity:
 class TestDetailParity:
     """Detail is only supported for backward direction (needs detection spool)."""
 
-    def test_detail_returns_none_for_forward(self, spool_paths):
+    def test_detail_returns_empty_for_forward(self, spool_paths):
+        # Forward direction is not yet implemented; should return empty result (not None/410)
         events_path, lineage_path = spool_paths
         rt = _runtime_with_paths("test-detail-fwd", events_path, lineage_path)
         detail = rt.get_detail(page=1, per_page=10, direction="forward")
-        assert detail is None
+        assert detail is not None
+        assert detail.get("items") == []
+        assert detail.get("pagination", {}).get("total") == 0
 
     def test_detail_returns_pagination_shape(self, backward_spool_paths):
         events_path, lineage_path, detection_path = backward_spool_paths
