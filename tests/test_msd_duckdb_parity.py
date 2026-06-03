@@ -6,7 +6,7 @@ structurally consistent with the legacy Oracle-path data shapes.  They use
 synthetic parquet spool files so no Oracle or Redis dependency is required.
 
 The fixture data uses the forward-path events schema
-(CONTAINERID, WORKCENTERNAME, REJECT_TOTAL_QTY, TRACKINQTY, TXNDATE) which is consumed
+(CONTAINERID, WORKCENTERNAME, REJECT_TOTAL_QTY, TRACKINQTY, TXNDATE, TRACKINTIMESTAMP) which is consumed
 by ``get_summary(direction="forward")``, matching the actual upstream_history /
 downstream_rejects spool column names.
 
@@ -28,12 +28,13 @@ import pytest
 # ---------------------------------------------------------------------------
 
 SAMPLE_EVENTS = [
-    # CONTAINERID, WORKCENTERNAME, REJECT_TOTAL_QTY, TRACKINQTY, TXNDATE
-    ("LOT001", "TEST-A", 5, 100, "2025-01-10"),
-    ("LOT001", "TEST-B", 3, 100, "2025-01-10"),
-    ("LOT002", "TEST-A", 2, 50,  "2025-01-11"),
-    ("LOT003", "TEST-A", 8, 200, "2025-01-12"),
-    ("LOT003", "TEST-C", 1, 200, "2025-01-12"),
+    # CONTAINERID, WORKCENTERNAME, REJECT_TOTAL_QTY, TRACKINQTY, TXNDATE, TRACKINTIMESTAMP
+    # All test records are "downstream" type: TXNDATE is set, TRACKINTIMESTAMP is NULL.
+    ("LOT001", "TEST-A", 5, 100, "2025-01-10", None),
+    ("LOT001", "TEST-B", 3, 100, "2025-01-10", None),
+    ("LOT002", "TEST-A", 2, 50,  "2025-01-11", None),
+    ("LOT003", "TEST-A", 8, 200, "2025-01-12", None),
+    ("LOT003", "TEST-C", 1, 200, "2025-01-12", None),
 ]
 
 SAMPLE_LINEAGE = [
@@ -71,7 +72,7 @@ SAMPLE_BWD_EVENTS = [
 def _make_events_parquet(tmp_path: pathlib.Path) -> pathlib.Path:
     df = pd.DataFrame(
         SAMPLE_EVENTS,
-        columns=["CONTAINERID", "WORKCENTERNAME", "REJECT_TOTAL_QTY", "TRACKINQTY", "TXNDATE"],
+        columns=["CONTAINERID", "WORKCENTERNAME", "REJECT_TOTAL_QTY", "TRACKINQTY", "TXNDATE", "TRACKINTIMESTAMP"],
     )
     path = tmp_path / "events.parquet"
     df.to_parquet(path, index=False)

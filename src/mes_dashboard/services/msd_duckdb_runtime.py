@@ -461,26 +461,35 @@ class MsdDuckdbRuntime:
             return []
 
     def _compute_daily_trend(self, conn) -> List[Dict[str, Any]]:
-        """Compute daily defect trend from events view."""
+        """Compute daily defect trend from events view.
+
+        The forward events spool merges two record types with different date fields:
+        - downstream rejects: have TXNDATE, REJECT_TOTAL_QTY; TRACKINQTY is NULL
+        - upstream history: have TRACKINTIMESTAMP, TRACKINQTY; TXNDATE is NULL
+
+        COALESCE(TXNDATE, TRACKINTIMESTAMP) lets both types map to a real date,
+        eliminating the NULL/"None" bucket that obscures the trend.
+        """
         try:
             rows = conn.execute(
                 """
                 SELECT
-                    CAST(TXNDATE AS DATE) AS txn_day,
+                    CAST(COALESCE(TXNDATE, TRACKINTIMESTAMP) AS DATE) AS txn_day,
                     SUM(REJECT_TOTAL_QTY) AS defect_qty,
                     SUM(TRACKINQTY) AS input_qty
                 FROM events
-                GROUP BY CAST(TXNDATE AS DATE)
-                ORDER BY txn_day
+                GROUP BY CAST(COALESCE(TXNDATE, TRACKINTIMESTAMP) AS DATE)
+                ORDER BY txn_day NULLS LAST
                 """
             ).fetchall()
             return [
                 {
-                    "date": str(r[0]),
+                    "date": str(r[0]) if r[0] is not None else None,
                     "defect_qty": int(r[1] or 0),
                     "input_qty": int(r[2] or 0),
                 }
                 for r in rows
+                if r[0] is not None
             ]
         except Exception as exc:
             logger.debug("_compute_daily_trend failed: %s", exc)
