@@ -399,14 +399,19 @@ class MsdDuckdbRuntime:
             return None
 
     def _compute_kpi(self, conn) -> Dict[str, Any]:
-        """Compute total defect count, lot count, and defect rate from events view."""
+        """Compute total defect count, lot count, and defect rate from events view.
+
+        Column names match the upstream_history / downstream_rejects spool schema
+        used by the forward-direction events job (CONTAINERID, REJECT_TOTAL_QTY,
+        TRACKINQTY) rather than the detection spool schema.
+        """
         try:
             row = conn.execute(
                 """
                 SELECT
-                    COUNT(DISTINCT CONTAINER_ID) AS lot_count,
-                    SUM(DEFECT_QTY) AS defect_qty,
-                    SUM(INPUT_QTY) AS input_qty
+                    COUNT(DISTINCT CONTAINERID) AS lot_count,
+                    SUM(REJECT_TOTAL_QTY) AS defect_qty,
+                    SUM(TRACKINQTY) AS input_qty
                 FROM events
                 """
             ).fetchone()
@@ -433,11 +438,11 @@ class MsdDuckdbRuntime:
             rows = conn.execute(
                 """
                 SELECT
-                    STATION_NAME,
-                    SUM(DEFECT_QTY) AS defect_qty,
-                    SUM(INPUT_QTY) AS input_qty
+                    WORKCENTERNAME,
+                    SUM(REJECT_TOTAL_QTY) AS defect_qty,
+                    SUM(TRACKINQTY) AS input_qty
                 FROM events
-                GROUP BY STATION_NAME
+                GROUP BY WORKCENTERNAME
                 ORDER BY defect_qty DESC
                 LIMIT 20
                 """
@@ -462,8 +467,8 @@ class MsdDuckdbRuntime:
                 """
                 SELECT
                     CAST(TXNDATE AS DATE) AS txn_day,
-                    SUM(DEFECT_QTY) AS defect_qty,
-                    SUM(INPUT_QTY) AS input_qty
+                    SUM(REJECT_TOTAL_QTY) AS defect_qty,
+                    SUM(TRACKINQTY) AS input_qty
                 FROM events
                 GROUP BY CAST(TXNDATE AS DATE)
                 ORDER BY txn_day
@@ -482,16 +487,16 @@ class MsdDuckdbRuntime:
             return []
 
     def _compute_attribution(self, conn) -> List[Dict[str, Any]]:
-        """Compute upstream attribution by joining events + lineage views."""
+        """Compute downstream attribution by joining events + lineage views."""
         try:
             rows = conn.execute(
                 """
                 SELECT
                     l.ANCESTOR_NAME,
-                    COUNT(DISTINCT e.CONTAINER_ID) AS lot_count,
-                    SUM(e.DEFECT_QTY) AS defect_qty
+                    COUNT(DISTINCT e.CONTAINERID) AS lot_count,
+                    SUM(e.REJECT_TOTAL_QTY) AS defect_qty
                 FROM events e
-                JOIN lineage l ON e.CONTAINER_ID = l.DESCENDANT_ID
+                JOIN lineage l ON e.CONTAINERID = l.DESCENDANT_ID
                 GROUP BY l.ANCESTOR_NAME
                 ORDER BY defect_qty DESC
                 LIMIT 20

@@ -6,8 +6,9 @@ structurally consistent with the legacy Oracle-path data shapes.  They use
 synthetic parquet spool files so no Oracle or Redis dependency is required.
 
 The fixture data uses the forward-path events schema
-(CONTAINER_ID, STATION_NAME, DEFECT_QTY, INPUT_QTY, TXNDATE) which is consumed
-by ``get_summary(direction="forward")``.
+(CONTAINERID, WORKCENTERNAME, REJECT_TOTAL_QTY, TRACKINQTY, TXNDATE) which is consumed
+by ``get_summary(direction="forward")``, matching the actual upstream_history /
+downstream_rejects spool column names.
 
 Backward-path tests (``get_summary_with_detection``) require a detection spool
 and are covered separately by :class:`TestBackwardSummary`.
@@ -27,7 +28,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 SAMPLE_EVENTS = [
-    # CONTAINER_ID, STATION_NAME, DEFECT_QTY, INPUT_QTY, TXNDATE
+    # CONTAINERID, WORKCENTERNAME, REJECT_TOTAL_QTY, TRACKINQTY, TXNDATE
     ("LOT001", "TEST-A", 5, 100, "2025-01-10"),
     ("LOT001", "TEST-B", 3, 100, "2025-01-10"),
     ("LOT002", "TEST-A", 2, 50,  "2025-01-11"),
@@ -70,7 +71,7 @@ SAMPLE_BWD_EVENTS = [
 def _make_events_parquet(tmp_path: pathlib.Path) -> pathlib.Path:
     df = pd.DataFrame(
         SAMPLE_EVENTS,
-        columns=["CONTAINER_ID", "STATION_NAME", "DEFECT_QTY", "INPUT_QTY", "TXNDATE"],
+        columns=["CONTAINERID", "WORKCENTERNAME", "REJECT_TOTAL_QTY", "TRACKINQTY", "TXNDATE"],
     )
     path = tmp_path / "events.parquet"
     df.to_parquet(path, index=False)
@@ -321,7 +322,7 @@ class TestExportCsvParity:
         assert len(lines) > 0
         header = lines[0]
         # Header must include column names from events parquet
-        assert "CONTAINER_ID" in header or "STATION_NAME" in header
+        assert "CONTAINERID" in header or "WORKCENTERNAME" in header
 
     def test_export_row_count_matches_events(self, spool_paths):
         events_path, lineage_path = spool_paths

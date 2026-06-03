@@ -26,13 +26,13 @@ class TestMsdFullChain:
     def msd_spool(self, tmp_path: pathlib.Path):
         events_df = pd.DataFrame(
             [
-                ("LOT-A", "LOT-A", "STATION-1", 10, 200, "2025-02-01", None, None, None),
-                ("LOT-A", "LOT-A", "STATION-2", 5, 200, "2025-02-01", None, None, None),
-                ("LOT-B", "LOT-B", "STATION-1", 3, 100, "2025-02-02", None, None, None),
+                ("LOT-A", "STATION-1", 10, 200, "2025-02-01", None, None, None),
+                ("LOT-A", "STATION-2", 5, 200, "2025-02-01", None, None, None),
+                ("LOT-B", "STATION-1", 3, 100, "2025-02-02", None, None, None),
             ],
             columns=[
-                "CONTAINER_ID", "CONTAINERID", "STATION_NAME",
-                "DEFECT_QTY", "INPUT_QTY", "TXNDATE",
+                "CONTAINERID", "WORKCENTERNAME",
+                "REJECT_TOTAL_QTY", "TRACKINQTY", "TXNDATE",
                 "EQUIPMENTID", "EQUIPMENTNAME", "WORKCENTER_GROUP",
             ],
         )
