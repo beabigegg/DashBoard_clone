@@ -43,3 +43,4 @@
 | ai-pipeline-upgrade | 2026 | 2026-05-29 | specs/archive/2026/ai-pipeline-upgrade/ |
 | downtime-analysis-page | 2026 | 2026-06-01 | specs/archive/2026/downtime-analysis-page/ |
 | batch-rowcount-unification | 2026 | 2026-06-01 | specs/archive/2026/batch-rowcount-unification/ |
+| downtime-analysis-page-redesign | 2026 | 2026-06-03 | specs/archive/2026/downtime-analysis-page-redesign/ |

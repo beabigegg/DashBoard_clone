@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 04741be7c9b2e5142357bbcb528e6e760b65a0cfa90f7603ee527829f49e2925
+inputs-digest: c2ce2809ff6146b5875bd93523afdaece4b4127fa09a964fd7e7d5095b32ddc8
 ---
 
 # Contracts Index
@@ -35,8 +35,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.13.1
-- last-changed: 2026-05-29
+- schema-version: 1.14.0
+- last-changed: 2026-06-03
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
 
@@ -48,8 +48,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Inventory
 - owner: application-team
 - surface: api
-- schema-version: 1.1.12
-- last-changed: 2026-05-29
+- schema-version: 1.1.13
+- last-changed: 2026-06-03
 - summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 
 
@@ -135,8 +135,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.12.2
-- last-changed: 2026-06-01
+- schema-version: 1.12.3
+- last-changed: 2026-06-03
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
 

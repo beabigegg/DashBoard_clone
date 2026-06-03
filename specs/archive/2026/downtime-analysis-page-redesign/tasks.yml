@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "all local Tier 1 gate commands pass (pytest, npm test, css:check, type-check, npm run build); CI runs identical commands per ci-gates.md" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "cdd-kit gate (non-strict) passes; cdd-validate passes" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly/manual gates defined for this change per ci-gates.md" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "Lesson A promoted: downtime_analysis_service function-body import patch path → CLAUDE.md §Downtime Analysis Service Architecture Notes. Lesson B rejected (page_size dual cap — one-off cold data)." }
