@@ -73,7 +73,7 @@ function matchSourceLabel(source: string): string {
           <th>結束時間</th>
           <th>時數(h)</th>
           <th>橋接來源</th>
-          <th>工單</th>
+          <th>JOB ID</th>
           <th>機型</th>
           <th>症狀</th>
           <th>原因碼</th>
@@ -100,7 +100,7 @@ function matchSourceLabel(source: string): string {
               {{ matchSourceLabel(event.match_source) }}
             </span>
           </td>
-          <td>{{ event.job?.job_order_name ?? '—' }}</td>
+          <td>{{ event.job?.job_id ?? '—' }}</td>
           <td>{{ event.job?.job_model ?? '—' }}</td>
           <td>{{ event.job?.symptom ?? '—' }}</td>
           <td>{{ event.job?.cause ?? '—' }}</td>

@@ -367,6 +367,7 @@ def _enrich_event(
 
     row['match_source'] = match_source
     row['match_ambiguous'] = match_ambiguous
+    row['job_id'] = _safe_str(job.get('JOBID'))
     row['job_order_name'] = _safe_str(job.get('JOBORDERNAME'))
     row['job_model'] = _safe_str(job.get('JOBMODELNAME'))
     row['symptom'] = _safe_str(job.get('SYMPTOMCODENAME'))
@@ -383,6 +384,7 @@ def _no_match_event(event: pd.Series) -> Dict[str, Any]:
     row = event.to_dict()
     row['match_source'] = 'none'
     row['match_ambiguous'] = False
+    row['job_id'] = None
     row['job_order_name'] = None
     row['job_model'] = None
     row['symptom'] = None
@@ -397,7 +399,7 @@ def _no_match_event(event: pd.Series) -> Dict[str, Any]:
 def _add_empty_job_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Add empty JOB enrichment columns to an event DataFrame."""
     df = df.copy()
-    for col in ('match_source', 'match_ambiguous', 'job_order_name', 'job_model',
+    for col in ('match_source', 'match_ambiguous', 'job_id', 'job_order_name', 'job_model',
                 'symptom', 'cause', 'repair', 'handler', 'wait_min', 'repair_min'):
         if col not in df.columns:
             df[col] = None if col != 'match_source' else 'none'
@@ -827,7 +829,7 @@ def _empty_events_df() -> pd.DataFrame:
         'event_id', 'resource_id', 'status', 'reason', 'category',
         'start_ts', 'end_ts', 'hours', 'fragment_count',
         'match_source', 'match_ambiguous',
-        'job_order_name', 'job_model', 'symptom', 'cause', 'repair',
+        'job_id', 'job_order_name', 'job_model', 'symptom', 'cause', 'repair',
         'handler', 'wait_min', 'repair_min',
     ])
 
@@ -1115,6 +1117,7 @@ def _build_event_detail_page(
             job_obj = None
         else:
             job_obj = {
+                'job_id': row.get('job_id'),
                 'job_order_name': row.get('job_order_name'),
                 'job_model': row.get('job_model'),
                 'symptom': row.get('symptom'),
@@ -1228,7 +1231,7 @@ def export_event_detail_csv(query_id: str) -> Optional[Generator[bytes, None, No
         writer.writerow([
             '設備名稱', '狀態', '原因', '類別',
             '開始時間', '結束時間', '時數 (h)', '橋接來源',
-            '工單名稱', '機型', '症狀', '原因碼', '修復', '待料 (min)', '維修 (min)', '負責人',
+            'JOB ID', '機型', '症狀', '原因碼', '修復', '待料 (min)', '維修 (min)', '負責人',
         ])
         yield buf.getvalue().encode('utf-8-sig')
 
@@ -1250,7 +1253,7 @@ def export_event_detail_csv(query_id: str) -> Optional[Generator[bytes, None, No
                 row.get('end_ts') or '',
                 row.get('hours', 0),
                 match_label,
-                row.get('job_order_name') or '' if ms != 'none' else '',
+                row.get('job_id') or '' if ms != 'none' else '',
                 row.get('job_model') or '' if ms != 'none' else '',
                 row.get('symptom') or '' if ms != 'none' else '',
                 row.get('cause') or '' if ms != 'none' else '',

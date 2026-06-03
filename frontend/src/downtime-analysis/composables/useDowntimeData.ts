@@ -326,7 +326,7 @@ export function useDowntimeData() {
   }
 
   /**
-   * Load all equipment detail in a single full page (page_size=200).
+   * Load all equipment detail in a single full page (page_size=1000, DQ-2).
    * Accepts optional ChartFilter to narrow results by big_category / status_types.
    * Overwrites equipmentData.rows and equipmentData.pagination.
    */
@@ -339,7 +339,7 @@ export function useDowntimeData() {
     try {
       const params: Record<string, unknown> = {
         query_id: queryId.value,
-        page_size: 200,
+        page_size: 1000,
       };
       if (filter.big_category) {
         params.big_category = filter.big_category;

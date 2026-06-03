@@ -44,6 +44,7 @@ export interface EquipmentDetailRow {
 }
 
 export interface JobEnrichment {
+  job_id: string | null;
   job_order_name: string | null;
   job_model: string | null;
   symptom: string | null;

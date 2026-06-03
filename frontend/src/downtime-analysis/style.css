@@ -423,6 +423,18 @@
   padding-left: 20px;
 }
 
+/* Indent Tier 2 machine name column to show hierarchy under status group */
+.theme-downtime-analysis .machine-row td:nth-child(2) {
+  padding-left: 28px;
+}
+
+.theme-downtime-analysis .top50-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: theme('colors.token.h6c757d');
+  margin-left: 4px;
+}
+
 /* Tier 3 events row */
 .theme-downtime-analysis .tier3-events-row {
   background: theme('colors.token.hfafbfc');

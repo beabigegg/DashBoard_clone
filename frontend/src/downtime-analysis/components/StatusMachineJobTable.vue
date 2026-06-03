@@ -44,11 +44,16 @@ const visibleGroups = computed((): StatusGroup[] => {
 });
 
 /** Machine rows belonging to a status group: non-zero hours, sorted DESC */
-function machinesForStatus(status: string): EquipmentDetailRow[] {
+function allMachinesForStatus(status: string): EquipmentDetailRow[] {
   const hoursKey = `${status.toLowerCase()}_hours` as keyof EquipmentDetailRow;
   return props.equipmentRows
     .filter((r) => ((r[hoursKey] as number) ?? 0) > 0)
     .sort((a, b) => ((b[hoursKey] as number) ?? 0) - ((a[hoursKey] as number) ?? 0));
+}
+
+/** Top 50 machines for this status (sorted by hours DESC) */
+function machinesForStatus(status: string): EquipmentDetailRow[] {
+  return allMachinesForStatus(status).slice(0, 50);
 }
 
 /** Total hours for the status group from KPI summary */
@@ -58,9 +63,9 @@ function groupHours(status: string): number {
   return (props.summaryData[key] as number) ?? 0;
 }
 
-/** Count of machines that have non-zero hours for this status */
+/** Total count of machines with non-zero hours (before top-50 cap) */
 function groupMachineCount(status: string): number {
-  return machinesForStatus(status).length;
+  return allMachinesForStatus(status).length;
 }
 
 /** Hours a specific machine has for a specific status */
@@ -145,10 +150,13 @@ function handleMachineEventMount(resourceId: string, statusType: string): void {
             <td class="expand-toggle">{{ expandedGroups.has(status) ? '▼' : '▶' }}</td>
             <td colspan="3" class="status-group-label">
               <span :class="['status-badge', `badge-${status.toLowerCase()}`]">{{ status }}</span>
-              {{ groupHours(status).toFixed(1) }}h
             </td>
             <td>{{ groupHours(status).toFixed(1) }}h</td>
-            <td colspan="2">{{ groupMachineCount(status) }} 台</td>
+            <td>
+              {{ groupMachineCount(status) }} 台
+              <span v-if="groupMachineCount(status) > 50" class="top50-note">（顯示前50）</span>
+            </td>
+            <td></td>
           </tr>
 
           <!-- Tier 2: Machine rows (when group expanded) -->

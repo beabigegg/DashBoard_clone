@@ -14,6 +14,7 @@ SELECT
     fragment_count,
     match_source,
     match_ambiguous,
+    job_id,
     job_order_name,
     job_model,
     symptom,
