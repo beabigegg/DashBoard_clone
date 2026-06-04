@@ -70,9 +70,19 @@ def _load_sql(name: str) -> str:
 # ============================================================
 
 
+# Bump when the spool's row semantics change so pre-existing cached spools are
+# orphaned (the redis spool pointer + parquet file outlive a gunicorn restart, so a
+# version token is the self-healing alternative to a manual post-deploy parquet purge).
+# v2: whole-range single-chunk query removed cross-chunk duplication of open holds.
+_QUERY_ID_SCHEMA = 2
+
+
 def _make_query_id(params: dict) -> str:
     """Deterministic hash from primary query params."""
-    canonical = json.dumps(params, sort_keys=True, ensure_ascii=False, default=str)
+    canonical = json.dumps(
+        {**params, "_schema": _QUERY_ID_SCHEMA},
+        sort_keys=True, ensure_ascii=False, default=str,
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
@@ -152,7 +162,6 @@ def execute_primary_query(
         from mes_dashboard.services.batch_query_engine import (
             _USE_ROW_COUNT_CHUNKING,
             decompose_by_row_count,
-            decompose_by_time_range,
             execute_plan,
             get_batch_progress,
             merge_chunks_to_spool,
@@ -198,8 +207,20 @@ def execute_primary_query(
                     total_rows, len(engine_chunks), query_id,
                 )
             else:
-                # --- Date-range chunking path (default, BQE-04) ---
-                engine_chunks = decompose_by_time_range(start_date, end_date)
+                # --- Whole-range single-chunk path (ADR-0003 style) ---
+                # base_facts.sql carries an `OR h.RELEASETXNDATE IS NULL` escape in
+                # BOTH AND-groups of its WHERE, so it returns ALL currently-open holds
+                # regardless of the date window. Splitting the range into N time-chunks
+                # would re-fetch those open holds in EVERY chunk, and merge_chunks_to_spool
+                # concatenates without dedup → the on_hold view counts them N times and
+                # the on-hold number balloons ~Nx once the range exceeds one 31-day grain.
+                # We therefore run base_facts ONCE over the full range (a single chunk).
+                # This keeps the open-hold "standing inventory" semantics intact while
+                # making the merged spool free of cross-chunk duplicates.
+                # Empirically cheap: ~1.9 s / ~52k rows for a 2-year range (hold/release
+                # events are sparse), so a single query stays well under the slow-pool
+                # call timeout. The frontend caps the selectable range as a guardrail.
+                engine_chunks = [{"chunk_start": start_date, "chunk_end": end_date}]
                 engine_hash = compute_query_hash(
                     {"start_date": start_date, "end_date": end_date}
                 )
@@ -218,7 +239,7 @@ def execute_primary_query(
                     return result if result is not None else pd.DataFrame()
 
                 logger.info(
-                    "Engine activated for hold: %d chunks (query_id=%s)",
+                    "Engine activated for hold: %d chunk(s), whole-range (query_id=%s)",
                     len(engine_chunks), query_id,
                 )
 

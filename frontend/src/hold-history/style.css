@@ -341,3 +341,10 @@
   background: theme('colors.accent.500');
   opacity: 0.4;
 }
+
+.theme-hold-history .filter-error {
+  flex-basis: 100%;
+  color: theme('colors.state.danger');
+  font-size: 12px;
+  margin-top: 6px;
+}

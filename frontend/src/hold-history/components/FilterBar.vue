@@ -28,6 +28,12 @@ const emit = defineEmits<{
 const localStartDate = ref(props.startDate);
 const localEndDate = ref(props.endDate);
 
+// Guardrail: cap the selectable range. base_facts.sql returns the full open-hold
+// standing inventory in a single Oracle query (~1.9s even at 2 years), so this is a
+// UX safety limit only — consistent with resource-history / downtime-analysis (兩年).
+const MAX_QUERY_DAYS = 730;
+const dateError = ref('');
+
 watch(() => props.startDate, (v) => { localStartDate.value = v; });
 watch(() => props.endDate, (v) => { localEndDate.value = v; });
 
@@ -36,7 +42,27 @@ const holdTypeModel = computed({
   set(nextValue) { emit('hold-type-change', nextValue || 'quality'); },
 });
 
+function validateRange(): string {
+  if (!localStartDate.value || !localEndDate.value) {
+    return '請先設定開始與結束日期';
+  }
+  const start = new Date(localStartDate.value);
+  const end = new Date(localEndDate.value);
+  const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return '結束日期必須大於起始日期';
+  if (diffDays > MAX_QUERY_DAYS) {
+    return `查詢範圍不可超過兩年（${MAX_QUERY_DAYS} 天），請改用較短區間`;
+  }
+  return '';
+}
+
 function handleApply(): void {
+  const err = validateRange();
+  if (err) {
+    dateError.value = err;
+    return;
+  }
+  dateError.value = '';
   emit('apply', {
     startDate: localStartDate.value,
     endDate: localEndDate.value,
@@ -45,6 +71,7 @@ function handleApply(): void {
 
 function setMode(newMode: string): void {
   if (newMode !== props.mode) {
+    dateError.value = '';
     emit('mode-change', newMode);
   }
 }
@@ -144,5 +171,9 @@ function setMode(newMode: string): void {
         <template v-else>查詢</template>
       </button>
     </div>
+
+    <p v-if="dateError && mode === 'range'" class="filter-error" role="alert" aria-live="polite">
+      {{ dateError }}
+    </p>
   </section>
 </template>

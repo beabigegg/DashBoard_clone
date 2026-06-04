@@ -1,6 +1,6 @@
-# generated: 2026-06-03T10:41:51Z by cdd-kit 2.2.0
-# files: 827, src-lines: 232000, map-lines: 17678, compression: 13.1x
-# sources-digest: f859d03d9cf0699d5542bbd349edd5b2f2ec76596c779a816d3fea3f5cd19275
+# generated: 2026-06-04T08:33:35Z by cdd-kit 2.2.1
+# files: 827, src-lines: 232080, map-lines: 17680, compression: 13.1x
+# sources-digest: 85b02352d62ba7f116bb283463b9c6dac86303f4d0cf993446202a8b10fb2a29
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -7061,7 +7061,7 @@ src/mes_dashboard/services/sql_fragments.py:  # 51 lines
     - { name: EQUIPMENT_STATUS_COLUMNS, line: 22 }
     - { name: EQUIPMENT_STATUS_SELECT_SQL, line: 47 }
 
-src/mes_dashboard/services/trace_job_service.py:  # 1682 lines
+src/mes_dashboard/services/trace_job_service.py:  # 1696 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: gc, items: [], line: 11 }
@@ -7108,11 +7108,11 @@ src/mes_dashboard/services/trace_job_service.py:  # 1682 lines
     - { name: _expand_msd_container_ids, lines: 1184-1226 }
     - { name: _write_msd_events_spool, lines: 1229-1281 }
     - { name: _write_msd_events_spool_from_paths, lines: 1284-1407 }
-    - { name: _build_job_msd_aggregation, lines: 1410-1568 }
-    - { name: _trace_domain_spool_id, lines: 1574-1577 }
-    - { name: _write_trace_events_spool, lines: 1580-1610 }
-    - { name: make_general_trace_events_query_id, lines: 1613-1631 }
-    - { name: make_trace_query_id, lines: 1646-1682 }
+    - { name: _build_job_msd_aggregation, lines: 1410-1582 }
+    - { name: _trace_domain_spool_id, lines: 1588-1591 }
+    - { name: _write_trace_events_spool, lines: 1594-1624 }
+    - { name: make_general_trace_events_query_id, lines: 1627-1645 }
+    - { name: make_trace_query_id, lines: 1660-1696 }
 
 src/mes_dashboard/services/trace_lineage_job_service.py:  # 292 lines
   imports:
@@ -16629,7 +16629,7 @@ tests/test_template_integration.py:  # 411 lines
     - { name: _login_as_admin, lines: 16-18 }
     - { name: _get_response_and_html, lines: 21-26 }
 
-tests/test_trace_job_service.py:  # 736 lines
+tests/test_trace_job_service.py:  # 802 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -16663,6 +16663,8 @@ tests/test_trace_job_service.py:  # 736 lines
     - { name: test_resolve_msd_lineage_payload_from_query_id, lines: 681-691 }  # @patch('mes_dashboard.services.trace_lineage_job_service.load_trace_lineage_resul...
     - { name: test_expand_msd_container_ids_backward, lines: 694-701 }
     - { name: test_detection_hash_matches_make_detection_spool_query_id_multi_station, lines: 704-736 }
+    - { name: test_build_job_msd_aggregation_passes_station_order_fallback_to_get_summary, lines: 739-768 }
+    - { name: test_build_job_msd_aggregation_passes_upstream_groups_to_get_summary_with_detection, lines: 771-802 }
 
 tests/test_trace_lineage_job_service.py:  # 114 lines
   imports:

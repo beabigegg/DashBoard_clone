@@ -13,14 +13,22 @@ class TestHoldEngineDecomposition:
     """hold-history with long date range triggers engine."""
 
     def test_long_range_triggers_engine(self, monkeypatch):
-        """90-day range → engine decomposition activated."""
+        """Long range → engine activated with a SINGLE whole-range chunk.
+
+        ③-b fix: hold runs base_facts ONCE over the full range (one chunk) instead of
+        decompose_by_time_range's 31-day chunks. Splitting would re-fetch every open
+        hold per chunk and merge without dedup, inflating the on-hold count ~Nx.
+        Pinned end-to-end in tests/test_hold_history_chunk_duplication.py.
+        """
         import mes_dashboard.services.batch_query_engine as engine_mod
 
         engine_calls = {"execute": 0, "merge": 0}
 
         def fake_execute_plan(chunks, query_fn, **kwargs):
             engine_calls["execute"] += 1
-            assert len(chunks) == 3  # 90 days / 31 = 3 chunks
+            assert len(chunks) == 1  # whole-range single chunk (no time splitting)
+            assert chunks[0]["chunk_start"] == "2025-01-01"
+            assert chunks[0]["chunk_end"] == "2025-03-31"
             return kwargs.get("query_hash", "fake_hash")
 
         def fake_merge_chunks_to_spool(prefix, qhash, **kwargs):
