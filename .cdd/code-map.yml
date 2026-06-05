@@ -1,6 +1,6 @@
-# generated: 2026-06-04T08:33:35Z by cdd-kit 2.2.1
-# files: 827, src-lines: 232080, map-lines: 17680, compression: 13.1x
-# sources-digest: 85b02352d62ba7f116bb283463b9c6dac86303f4d0cf993446202a8b10fb2a29
+# generated: 2026-06-05T12:25:48Z by cdd-kit 2.2.1
+# files: 831, src-lines: 233673, map-lines: 17789, compression: 13.1x
+# sources-digest: b9ee65e737eee903af33b7771e2d25699e89116a84127464a48851bb574d4064
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -876,7 +876,7 @@ frontend/src/hold-history/components/DetailTable.vue:  # 316 lines
 
 frontend/src/hold-history/components/DurationChart.vue:  # 130 lines
 
-frontend/src/hold-history/components/FilterBar.vue:  # 148 lines
+frontend/src/hold-history/components/FilterBar.vue:  # 179 lines
 
 frontend/src/hold-history/components/FilterIndicator.vue:  # 34 lines
 
@@ -2908,13 +2908,14 @@ frontend/vitest.config.js:  # 24 lines
     - { module: 'node:path', items: [resolve], line: 2 }
     - { module: '@vitejs/plugin-vue', items: ['default:vue'], line: 3 }
 
-gunicorn.conf.py:  # 90 lines
+gunicorn.conf.py:  # 155 lines
   imports:
     - { module: logging, items: [], line: 1 }
     - { module: os, items: [], line: 2 }
   functions:
-    - { name: on_starting, lines: 27-52 }
-    - { name: worker_exit, lines: 55-90 }
+    - { name: post_fork, lines: 37-89 }
+    - { name: on_starting, lines: 92-117 }
+    - { name: worker_exit, lines: 120-155 }
 
 scripts/capture_spool_snapshot.py:  # 204 lines
   imports:
@@ -3082,7 +3083,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1413 lines
+src/mes_dashboard/app.py:  # 1622 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3140,8 +3141,10 @@ src/mes_dashboard/app.py:  # 1413 lines
     - { name: _is_runtime_contract_enforced, lines: 514-519 }
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
-    - { name: create_app, lines: 569-1287 }
-    - { name: _register_error_handlers, lines: 1290-1413 }
+    - { name: _reinit_sqlite_handles, lines: 569-631 }
+    - { name: _start_per_worker_services, lines: 634-738 }
+    - { name: create_app, lines: 747-1496 }
+    - { name: _register_error_handlers, lines: 1499-1622 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -5591,7 +5594,7 @@ src/mes_dashboard/services/filter_cache.py:  # 637 lines
     - { name: _extract_workcenter_data_from_df, lines: 588-624 }
     - { name: init_cache, lines: 631-637 }
 
-src/mes_dashboard/services/hold_dataset_cache.py:  # 409 lines
+src/mes_dashboard/services/hold_dataset_cache.py:  # 430 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -5611,16 +5614,16 @@ src/mes_dashboard/services/hold_dataset_cache.py:  # 409 lines
     - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 38 }
   functions:
     - { name: _load_sql, lines: 57-65 }  # @lru_cache(maxsize=4)
-    - { name: _make_query_id, lines: 73-76 }
-    - { name: _has_cached_df, lines: 84-88 }
-    - { name: _store_query_dates, lines: 91-103 }
-    - { name: _get_query_dates, lines: 106-117 }
-    - { name: _store_df, lines: 120-123 }
-    - { name: execute_primary_query, lines: 131-292 }
-    - { name: apply_view, lines: 300-357 }
-    - { name: _empty_views, lines: 360-374 }
-    - { name: make_canonical_warmup_query_id, lines: 387-389 }
-    - { name: ensure_dataset_loaded, lines: 392-409 }
+    - { name: _make_query_id, lines: 80-86 }
+    - { name: _has_cached_df, lines: 94-98 }
+    - { name: _store_query_dates, lines: 101-113 }
+    - { name: _get_query_dates, lines: 116-127 }
+    - { name: _store_df, lines: 130-133 }
+    - { name: execute_primary_query, lines: 141-313 }
+    - { name: apply_view, lines: 321-378 }
+    - { name: _empty_views, lines: 381-395 }
+    - { name: make_canonical_warmup_query_id, lines: 408-410 }
+    - { name: ensure_dataset_loaded, lines: 413-430 }
 
 src/mes_dashboard/services/hold_history_service.py:  # 507 lines
   imports:
@@ -6763,7 +6766,7 @@ src/mes_dashboard/services/reject_query_job_service.py:  # 187 lines
     - { name: enqueue_reject_query, lines: 87-113 }
     - { name: execute_reject_query_job, lines: 120-187 }
 
-src/mes_dashboard/services/resource_cache.py:  # 1250 lines
+src/mes_dashboard/services/resource_cache.py:  # 1261 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
     - { module: io, items: [], line: 10 }
@@ -6833,22 +6836,22 @@ src/mes_dashboard/services/resource_cache.py:  # 1250 lines
     - { name: _load_package_group_lookup, lines: 709-745 }
     - { name: get_package_group_name, lines: 748-775 }
     - { name: get_package_groups, lines: 778-786 }
-    - { name: refresh_cache, lines: 793-841 }
-    - { name: init_cache, lines: 844-867 }
-    - { name: get_cache_status, lines: 870-906 }
-    - { name: get_resource_index_status, lines: 913-941 }
-    - { name: get_resource_index_snapshot, lines: 944-1018 }
-    - { name: get_all_resources, lines: 1021-1030 }
-    - { name: get_resource_by_id, lines: 1033-1057 }
-    - { name: get_resources_by_ids, lines: 1060-1079 }
-    - { name: get_resources_by_filter, lines: 1082-1170 }
-    - { name: get_distinct_values, lines: 1177-1197 }
-    - { name: get_resource_families, lines: 1200-1202 }
-    - { name: get_workcenters, lines: 1205-1207 }
-    - { name: get_departments, lines: 1210-1212 }
-    - { name: get_locations, lines: 1215-1217 }
-    - { name: get_vendors, lines: 1220-1222 }
-    - { name: get_resource_cascade_metadata, lines: 1225-1250 }
+    - { name: refresh_cache, lines: 793-852 }
+    - { name: init_cache, lines: 855-878 }
+    - { name: get_cache_status, lines: 881-917 }
+    - { name: get_resource_index_status, lines: 924-952 }
+    - { name: get_resource_index_snapshot, lines: 955-1029 }
+    - { name: get_all_resources, lines: 1032-1041 }
+    - { name: get_resource_by_id, lines: 1044-1068 }
+    - { name: get_resources_by_ids, lines: 1071-1090 }
+    - { name: get_resources_by_filter, lines: 1093-1181 }
+    - { name: get_distinct_values, lines: 1188-1208 }
+    - { name: get_resource_families, lines: 1211-1213 }
+    - { name: get_workcenters, lines: 1216-1218 }
+    - { name: get_departments, lines: 1221-1223 }
+    - { name: get_locations, lines: 1226-1228 }
+    - { name: get_vendors, lines: 1231-1233 }
+    - { name: get_resource_cascade_metadata, lines: 1236-1261 }
 
 src/mes_dashboard/services/resource_dataset_cache.py:  # 625 lines
   imports:
@@ -6886,28 +6889,29 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 625 lines
     - { name: make_canonical_oee_query_id, lines: 589-600 }
     - { name: ensure_dataset_loaded, lines: 603-625 }
 
-src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 332 lines
+src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 359 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
-    - { module: logging, items: [], line: 17 }
-    - { module: os, items: [], line: 18 }
-    - { module: threading, items: [], line: 19 }
-    - { module: time, items: [], line: 20 }
-    - { module: datetime, items: [date, timedelta], line: 21 }
-    - { module: pathlib, items: [Path], line: 22 }
-    - { module: typing, items: [List, Optional], line: 23 }
-    - { module: pandas, items: [], line: 25 }
+    - { module: fcntl, items: [], line: 17 }
+    - { module: logging, items: [], line: 18 }
+    - { module: os, items: [], line: 19 }
+    - { module: threading, items: [], line: 20 }
+    - { module: time, items: [], line: 21 }
+    - { module: datetime, items: [date, timedelta], line: 22 }
+    - { module: pathlib, items: [Path], line: 23 }
+    - { module: typing, items: [List, Optional], line: 24 }
+    - { module: pandas, items: [], line: 26 }
   functions:
-    - { name: _try_lock, lines: 47-57 }
-    - { name: _release_lock, lines: 60-64 }
-    - { name: _prewarm_dates, lines: 67-71 }
-    - { name: is_duckdb_warm, lines: 74-76 }
-    - { name: should_use_duckdb, lines: 79-101 }
-    - { name: query_base_from_duckdb, lines: 104-129 }
-    - { name: query_oee_from_duckdb, lines: 132-152 }
-    - { name: _try_reuse_existing, lines: 155-177 }
-    - { name: _load_and_save, lines: 180-290 }
-    - { name: start_duckdb_prewarm, lines: 293-332 }
+    - { name: _try_lock, lines: 56-76 }
+    - { name: _release_lock, lines: 79-91 }
+    - { name: _prewarm_dates, lines: 94-98 }
+    - { name: is_duckdb_warm, lines: 101-103 }
+    - { name: should_use_duckdb, lines: 106-128 }
+    - { name: query_base_from_duckdb, lines: 131-156 }
+    - { name: query_oee_from_duckdb, lines: 159-179 }
+    - { name: _try_reuse_existing, lines: 182-204 }
+    - { name: _load_and_save, lines: 207-317 }
+    - { name: start_duckdb_prewarm, lines: 320-359 }
 
 src/mes_dashboard/services/resource_history_service.py:  # 1026 lines
   imports:
@@ -8719,6 +8723,35 @@ tests/integration/test_oracle_error_path.py:  # 296 lines
     - { name: _assert_503_envelope, lines: 77-90 }
     - { name: _assert_500_generic, lines: 93-111 }
 
+tests/integration/test_preload_fork_safety.py:  # 290 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 20 }
+    - { module: glob, items: [], line: 22 }
+    - { module: os, items: [], line: 23 }
+    - { module: signal, items: [], line: 24 }
+    - { module: subprocess, items: [], line: 25 }
+    - { module: time, items: [], line: 26 }
+    - { module: pathlib, items: [Path], line: 27 }
+    - { module: typing, items: [List], line: 28 }
+    - { module: pytest, items: [], line: 30 }
+  functions:
+    - { name: local_redis, lines: 46-50 }  # @pytest.fixture()
+    - { name: _skip_if_no_harness, lines: 53-55 }
+    - { name: test_downtime_prewarm_runs_once_across_two_workers, lines: 65-81 }  # @pytest.mark.integration_real
+    - { name: test_material_consumption_warmup_runs_once_across_two_workers, lines: 86-92 }  # @pytest.mark.integration_real
+    - { name: test_resource_history_duckdb_prewarm_runs_once, lines: 97-109 }  # @pytest.mark.integration_real
+    - { name: test_resource_cache_init_runs_once, lines: 114-120 }  # @pytest.mark.integration_real
+    - { name: test_each_worker_has_distinct_oracle_engine_pool, lines: 130-140 }  # @pytest.mark.integration_real
+    - { name: test_concurrent_oracle_requests_no_cross_talk, lines: 145-152 }  # @pytest.mark.integration_real
+    - { name: test_each_worker_has_distinct_redis_pool, lines: 162-169 }  # @pytest.mark.integration_real
+    - { name: test_sqlite_no_wal_corruption_on_restart, lines: 179-185 }  # @pytest.mark.integration_real
+    - { name: test_all_background_threads_alive_post_fork, lines: 195-207 }  # @pytest.mark.integration_real
+    - { name: test_duckdb_prewarm_no_timeout_two_workers, lines: 217-223 }  # @pytest.mark.integration_real
+    - { name: test_duckdb_prewarm_completes_once, lines: 228-235 }  # @pytest.mark.integration_real
+    - { name: test_no_duplicate_parquet_files_on_two_worker_start, lines: 245-256 }  # @pytest.mark.integration_real
+    - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 266-276 }  # @pytest.mark.integration_real
+    - { name: test_worker_crash_respawn_fresh_connections, lines: 281-290 }  # @pytest.mark.integration_real
+
 tests/integration/test_race_conditions.py:  # 387 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
@@ -8886,7 +8919,7 @@ tests/integration/test_rowcount_flag_parity.py:  # 772 lines
     - { name: _extract_chunks_from_execute_plan_call, lines: 39-47 }
     - { name: _chunk_key_sets, lines: 50-52 }
 
-tests/integration/test_soak_workload.py:  # 847 lines
+tests/integration/test_soak_workload.py:  # 948 lines
   imports:
     - { module: __future__, items: [annotations], line: 75 }
     - { module: json, items: [], line: 77 }
@@ -8918,6 +8951,7 @@ tests/integration/test_soak_workload.py:  # 847 lines
     - { name: _check_rss_growth, lines: 673-736 }
     - { name: _check_circuit_breaker_transitions, lines: 742-781 }
     - { name: _check_rq_queue_depth, lines: 787-847 }
+    - { name: test_preload_workers_restart_loop_no_connection_leak, lines: 856-948 }  # @pytest.mark.soak
 
 tests/manual/test_job_owner_auth_live.py:  # 207 lines
   imports:
@@ -10743,25 +10777,35 @@ tests/test_api_integration.py:  # 300 lines
         - { name: test_api_returns_json_content_type, lines: 273-283 }
         - { name: test_table_api_returns_json_content_type, lines: 286-296 }
 
-tests/test_app_factory.py:  # 160 lines
+tests/test_app_factory.py:  # 282 lines
   imports:
     - { module: unittest, items: [], line: 1 }
     - { module: os, items: [], line: 2 }
-    - { module: mes_dashboard.app, items: [create_app], line: 4 }
-    - { module: mes_dashboard.core.database, items: [], line: 5 }
+    - { module: sys, items: [], line: 3 }
+    - { module: unittest, items: [mock], line: 4 }
+    - { module: mes_dashboard.app, items: [create_app], line: 6 }
+    - { module: mes_dashboard.core.database, items: [], line: 7 }
   classes:
     - name: AppFactoryTests
-      lines: 8-156
+      lines: 10-158
       methods:
-        - { name: setUp, lines: 9-10 }
-        - { name: test_create_app_default_config, lines: 12-19 }
-        - { name: test_create_app_production_config, lines: 21-39 }
-        - { name: test_create_app_independent_instances, lines: 41-45 }
-        - { name: test_routes_registered, lines: 47-78 }
-        - { name: test_portal_spa_flag_default_enabled, lines: 80-93 }
-        - { name: test_portal_spa_flag_disabled_via_env, lines: 95-110 }
-        - { name: test_portal_spa_flag_enabled_via_env, lines: 112-128 }
-        - { name: test_default_env_is_production_when_flask_env_missing, lines: 130-156 }
+        - { name: setUp, lines: 11-12 }
+        - { name: test_create_app_default_config, lines: 14-21 }
+        - { name: test_create_app_production_config, lines: 23-41 }
+        - { name: test_create_app_independent_instances, lines: 43-47 }
+        - { name: test_routes_registered, lines: 49-80 }
+        - { name: test_portal_spa_flag_default_enabled, lines: 82-95 }
+        - { name: test_portal_spa_flag_disabled_via_env, lines: 97-112 }
+        - { name: test_portal_spa_flag_enabled_via_env, lines: 114-130 }
+        - { name: test_default_env_is_production_when_flask_env_missing, lines: 132-158 }
+    - name: PostForkHookTests
+      lines: 161-278
+      methods:
+        - { name: test_post_fork_hook_registered_in_gunicorn_conf, lines: 164-196 }
+        - { name: test_post_fork_hook_callable_in_test_mode_no_crash, lines: 198-221 }
+        - { name: test_start_per_worker_services_does_not_crash_in_test_mode, lines: 223-244 }
+        - { name: test_reinit_sqlite_handles_does_not_crash_in_test_mode, lines: 246-255 }
+        - { name: test_api_contracts_unchanged_after_preload, lines: 257-278 }
 
 tests/test_async_job_timeout.py:  # 227 lines
   imports:
@@ -11329,7 +11373,7 @@ tests/test_cache_updater.py:  # 437 lines
         - { name: test_stop_cache_updater_noop_when_not_started, lines: 409-415 }
         - { name: test_stop_cache_updater_warns_when_thread_does_not_stop, lines: 417-437 }
 
-tests/test_cache_updater_lock_behavior.py:  # 111 lines
+tests/test_cache_updater_lock_behavior.py:  # 234 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: unittest.mock, items: [patch], line: 12 }
@@ -11347,6 +11391,13 @@ tests/test_cache_updater_lock_behavior.py:  # 111 lines
       lines: 81-111
       methods:
         - { name: test_container_filter_cache_lock_prevents_concurrent_oracle, lines: 84-111 }
+    - name: TestDuckdbPrewarmLockFcntl
+      lines: 121-234
+      methods:
+        - { name: test_duckdb_prewarm_lock_releases_on_fd_close, lines: 128-172 }
+        - { name: test_duckdb_prewarm_lock_prevents_concurrent_attempt, lines: 174-190 }
+        - { name: test_duckdb_prewarm_lock_releases_cleanly, lines: 192-210 }
+        - { name: test_duckdb_lock_fd_container_populated_on_acquire, lines: 212-234 }
   functions:
     - { name: updater, lines: 25-26 }  # @pytest.fixture()
     - { name: redis_unavailable, lines: 30-37 }  # @pytest.fixture()
@@ -12348,7 +12399,7 @@ tests/test_heavy_query_telemetry.py:  # 40 lines
     - { name: test_records_guard_memory_and_fallback_counters, lines: 17-26 }
     - { name: test_returns_route_and_reason_breakdowns, lines: 29-40 }
 
-tests/test_hold_dataset_cache.py:  # 384 lines
+tests/test_hold_dataset_cache.py:  # 392 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: pandas, items: [], line: 6 }
@@ -12356,43 +12407,67 @@ tests/test_hold_dataset_cache.py:  # 384 lines
     - { module: mes_dashboard.services, items: [cache_svc], line: 9 }
   classes:
     - name: TestHoldEngineDecomposition
-      lines: 12-87
+      lines: 12-95
       methods:
-        - { name: test_long_range_triggers_engine, lines: 15-55 }
-        - { name: test_short_range_skips_engine, lines: 57-87 }
+        - { name: test_long_range_triggers_engine, lines: 15-63 }
+        - { name: test_short_range_skips_engine, lines: 65-95 }
     - name: TestHoldViewSqlDateResolution
-      lines: 90-154
+      lines: 98-162
       methods:
-        - { name: test_apply_view_uses_cached_query_dates_for_sql_runtime, lines: 93-113 }
-        - { name: test_apply_view_explicit_dates_override_cached_dates, lines: 115-139 }
-        - { name: test_apply_view_sql_result_none_returns_none, lines: 141-154 }
+        - { name: test_apply_view_uses_cached_query_dates_for_sql_runtime, lines: 101-121 }
+        - { name: test_apply_view_explicit_dates_override_cached_dates, lines: 123-147 }
+        - { name: test_apply_view_sql_result_none_returns_none, lines: 149-162 }
     - name: TestHoldStoreDf
-      lines: 157-175
+      lines: 165-183
       methods:
-        - { name: test_store_df_calls_store_spooled_df, lines: 160-175 }
+        - { name: test_store_df_calls_store_spooled_df, lines: 168-183 }
     - name: TestHoldBootstrapFailureSemantics
-      lines: 178-238
+      lines: 186-246
       methods:
-        - { name: _make_hold_env, lines: 181-206 }
-        - { name: test_spool_created_apply_view_none_raises, lines: 208-216 }
-        - { name: test_no_spool_apply_view_none_returns_empty, lines: 218-227 }
-        - { name: test_cache_hit_apply_view_none_raises, lines: 229-238 }
+        - { name: _make_hold_env, lines: 189-214 }
+        - { name: test_spool_created_apply_view_none_raises, lines: 216-224 }
+        - { name: test_no_spool_apply_view_none_returns_empty, lines: 226-235 }
+        - { name: test_cache_hit_apply_view_none_raises, lines: 237-246 }
     - name: TestHoldEngineParallel
-      lines: 245-294
+      lines: 253-302
       methods:
-        - { name: _make_engine_env, lines: 248-272 }
-        - { name: test_default_parallel_is_1, lines: 274-283 }
-        - { name: test_parallel_2_passed_to_execute_plan, lines: 285-294 }
+        - { name: _make_engine_env, lines: 256-280 }
+        - { name: test_default_parallel_is_1, lines: 282-291 }
+        - { name: test_parallel_2_passed_to_execute_plan, lines: 293-302 }
     - name: TestHoldPartialFailure
-      lines: 301-343
+      lines: 309-351
       methods:
-        - { name: _make_engine_env, lines: 304-324 }
-        - { name: test_partial_failure_in_meta, lines: 326-335 }
-        - { name: test_no_partial_failure_no_meta_key, lines: 337-343 }
+        - { name: _make_engine_env, lines: 312-332 }
+        - { name: test_partial_failure_in_meta, lines: 334-343 }
+        - { name: test_no_partial_failure_no_meta_key, lines: 345-351 }
     - name: TestDurationPayloadShape
-      lines: 346-384
+      lines: 354-392
       methods:
-        - { name: test_apply_view_preserves_duration_new_fields, lines: 353-384 }
+        - { name: test_apply_view_preserves_duration_new_fields, lines: 361-392 }
+
+tests/test_hold_history_chunk_duplication.py:  # 196 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 32 }
+    - { module: datetime, items: [datetime, timedelta], line: 34 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 35 }
+    - { module: pandas, items: [], line: 37 }
+    - { module: mes_dashboard.core.redis_df_store, items: [], line: 39 }
+    - { module: mes_dashboard.services.batch_query_engine, items: [], line: 40 }
+    - { module: mes_dashboard.services, items: [cache_svc], line: 41 }
+  classes:
+    - name: TestHoldOnHoldNotDuplicatedAcrossChunks
+      lines: 168-196
+      methods:
+        - { name: test_open_holds_not_multiplied_by_chunk_count, lines: 171-178 }
+        - { name: test_on_hold_count_invariant_to_range_length, lines: 180-187 }
+        - { name: test_released_holds_are_not_inflated, lines: 189-196 }
+  functions:
+    - { name: _dt, lines: 51-52 }
+    - { name: _rows_to_df, lines: 71-95 }
+    - { name: _base_facts_emulator, lines: 98-114 }
+    - { name: _make_mock_redis, lines: 117-129 }
+    - { name: _run_pipeline, lines: 132-161 }
+    - { name: _on_hold_rows, lines: 164-165 }
 
 tests/test_hold_history_routes.py:  # 395 lines
   imports:
@@ -14263,6 +14338,21 @@ tests/test_portal_shell_wave_b_native_smoke.py:  # 283 lines
     - { name: test_query_tool_native_smoke_resolve_history_association, lines: 109-153 }
     - { name: test_reject_history_native_smoke_query_sections_and_export, lines: 156-283 }
 
+tests/test_post_fork_reinit.py:  # 163 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: os, items: [], line: 14 }
+    - { module: threading, items: [], line: 15 }
+    - { module: types, items: [], line: 16 }
+    - { module: unittest, items: [mock], line: 17 }
+    - { module: pytest, items: [], line: 19 }
+  functions:
+    - { name: test_close_redis_disposes_connection_pool, lines: 27-57 }
+    - { name: test_close_redis_handles_control_client_separately, lines: 60-81 }
+    - { name: test_sqlite_handles_reopen_per_worker, lines: 89-139 }
+    - { name: test_reinit_sqlite_handles_returns_early_in_test_mode, lines: 142-152 }
+    - { name: test_start_per_worker_services_returns_early_in_test_mode, lines: 155-163 }
+
 tests/test_production_history_async_routes.py:  # 215 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
@@ -15821,6 +15911,25 @@ tests/test_resource_cache.py:  # 773 lines
       methods:
         - { name: test_lru_eviction_prefers_recent_keys, lines: 752-767 }
         - { name: test_resource_process_cache_uses_bounded_config, lines: 769-773 }
+
+tests/test_resource_cache_version_check.py:  # 226 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 22 }
+    - { module: pytest, items: [], line: 24 }
+  classes:
+    - name: TestRefreshCacheForceTrue
+      lines: 41-181
+      methods:
+        - { name: test_refresh_cache_force_true_no_oracle_if_version_unchanged, lines: 45-78 }
+        - { name: test_refresh_cache_force_true_oracle_runs_when_redis_empty, lines: 84-116 }
+        - { name: test_refresh_cache_always_fetches_when_version_differs, lines: 122-151 }
+        - { name: test_refresh_cache_force_fetches_when_version_differs, lines: 153-181 }
+    - name: TestCacheUpdaterInitialCheckNoDoubleFetch
+      lines: 188-226
+      methods:
+        - { name: test_cache_updater_initial_check_no_double_fetch, lines: 192-226 }
+  functions:
+    - { name: _make_mock_df, lines: 31-34 }
 
 tests/test_resource_dataset_cache.py:  # 468 lines
   imports:

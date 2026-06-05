@@ -566,6 +566,184 @@ def _sanitize_nan(obj):
     return obj
 
 
+def _reinit_sqlite_handles() -> None:
+    """Close inherited (pre-fork) thread-local SQLite connections in each worker.
+
+    Called from post_fork() in gunicorn.conf.py.  After ``fork()``, the child
+    process inherits a raw copy of every open file descriptor from the master.
+    SQLite's thread-local connections are not fork-safe: two processes sharing
+    the same file descriptor for WAL writes produce undefined behaviour.
+
+    This function clears the thread-local ``connection`` attribute on each
+    SQLite-backed singleton so that the worker's next ``_get_connection()``
+    call opens a fresh fd (not the inherited one).
+
+    Guard: returns immediately when ``FLASK_TESTING`` is set so that test
+    suites — which import app.py but never fork — are not affected.
+
+    Design reference: implementation-plan.md IP-5.
+    """
+    if os.environ.get("FLASK_TESTING"):
+        return
+
+    _log = logging.getLogger("mes_dashboard.post_fork")
+
+    # log_store
+    try:
+        from mes_dashboard.core.log_store import get_log_store
+        store = get_log_store()
+        if hasattr(store, '_local') and hasattr(store._local, 'connection'):
+            try:
+                if store._local.connection is not None:
+                    store._local.connection.close()
+            except Exception:
+                pass
+            store._local.connection = None
+    except Exception as exc:
+        _log.warning("_reinit_sqlite_handles: log_store reset failed: %s", exc)
+
+    # login_session_store
+    try:
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        store_lss = get_login_session_store()
+        if hasattr(store_lss, '_local') and hasattr(store_lss._local, 'connection'):
+            try:
+                if store_lss._local.connection is not None:
+                    store_lss._local.connection.close()
+            except Exception:
+                pass
+            store_lss._local.connection = None
+    except Exception as exc:
+        _log.warning("_reinit_sqlite_handles: login_session_store reset failed: %s", exc)
+
+    # metrics_history
+    try:
+        from mes_dashboard.core.metrics_history import get_metrics_history_store
+        store_mh = get_metrics_history_store()
+        if hasattr(store_mh, '_local') and hasattr(store_mh._local, 'connection'):
+            try:
+                if store_mh._local.connection is not None:
+                    store_mh._local.connection.close()
+            except Exception:
+                pass
+            store_mh._local.connection = None
+    except Exception as exc:
+        _log.warning("_reinit_sqlite_handles: metrics_history reset failed: %s", exc)
+
+
+def _start_per_worker_services(worker=None) -> None:
+    """Start all per-worker background threads after post_fork.
+
+    Called from post_fork() in gunicorn.conf.py inside each gunicorn worker.
+    Threads do not survive fork(), so every background thread that ran in the
+    master (before preload_app fork) must be re-started here in the worker.
+
+    Prewarm calls (start_duckdb_prewarm, start_downtime_prewarm,
+    start_parts_cache_warmup) intentionally remain in create_app() — they
+    run ONCE in the master under preload_app=True and must NOT be called here.
+
+    Guard: returns immediately when ``FLASK_TESTING`` is set so that test
+    suites do not start real background threads.
+
+    Design reference: implementation-plan.md IP-4.
+    """
+    if os.environ.get("FLASK_TESTING"):
+        return
+
+    _log = logging.getLogger("mes_dashboard.post_fork")
+
+    # Warm up the Oracle engine pool for this worker (each worker gets its own
+    # pool after dispose_engine() in post_fork).
+    try:
+        get_engine()
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: get_engine failed: %s", exc)
+
+    # Keep-alive ping thread for Oracle connections.
+    try:
+        start_keepalive()
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: start_keepalive failed: %s", exc)
+
+    # Redis cache updater thread.
+    try:
+        start_cache_updater()
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: start_cache_updater failed: %s", exc)
+
+    # Resolve the Flask app instance (set by create_app() into _APP_INSTANCE).
+    # Using the module-level variable avoids circular imports (we are already
+    # inside mes_dashboard.app — referencing _APP_INSTANCE directly is safe).
+    _app = _APP_INSTANCE  # may be None before create_app() has completed
+
+    try:
+        init_realtime_equipment_cache(_app)
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: init_realtime_equipment_cache failed: %s", exc)
+
+    # Scrap-reason exclusion cache sync thread.
+    try:
+        init_scrap_reason_exclusion_cache(_app)
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: init_scrap_reason_exclusion_cache failed: %s", exc)
+
+    # Parquet spool cleanup worker.
+    try:
+        init_query_spool_cleanup(_app)
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: init_query_spool_cleanup failed: %s", exc)
+
+    # Anomaly detection scheduler.
+    try:
+        init_anomaly_detection_scheduler(_app)
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: init_anomaly_detection_scheduler failed: %s", exc)
+
+    # Metrics history collector thread.
+    try:
+        from mes_dashboard.core.metrics_history import start_metrics_history
+        start_metrics_history(_app)
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: start_metrics_history failed: %s", exc)
+
+    # RSS memory guard thread.
+    try:
+        from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard
+        start_worker_memory_guard()
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: start_worker_memory_guard failed: %s", exc)
+
+    # LoginSessionStore initialisation (creates the SQLite schema if missing).
+    try:
+        from mes_dashboard.core.login_session_store import get_login_session_store
+        get_login_session_store()
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: get_login_session_store failed: %s", exc)
+
+    # MySQL dual-layer sync (optional, controlled by MYSQL_OPS_ENABLED).
+    try:
+        from mes_dashboard.core.mysql_client import MYSQL_OPS_ENABLED
+        if MYSQL_OPS_ENABLED:
+            try:
+                from mes_dashboard.core.mysql_client import get_mysql_engine
+                get_mysql_engine()
+                from mes_dashboard.core.sync_worker import start_sync_worker
+                start_sync_worker()
+            except Exception as _mysql_exc:
+                _log.warning(
+                    "MySQL OPS init failed in post_fork (system continues in SQLite-only mode): %s",
+                    _mysql_exc,
+                )
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: MYSQL_OPS_ENABLED check failed: %s", exc)
+
+
+# Module-level reference to the Flask app instance, set in create_app() so that
+# _start_per_worker_services() (called from post_fork, which has no app argument)
+# can pass the correct Flask app to services that require an app context.
+_APP_INSTANCE: "Flask | None" = None
+
+
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask app instance."""
     app = Flask(__name__, template_folder="templates")
@@ -638,6 +816,37 @@ def create_app(config_name: str | None = None) -> Flask:
                 "spool_dir_check init failed (non-fatal): %s", _spool_chk_exc
             )
         if not is_testing_runtime:
+            # --------------------------------------------------------
+            # SINGLE-RUN prewarm tasks (run ONCE in the master under
+            # preload_app=True — must NOT be called from post_fork /
+            # _start_per_worker_services).
+            # --------------------------------------------------------
+
+            # Pre-warm resource-history DuckDB cache (single parquet file,
+            # guarded by fcntl.flock so concurrent pre-fork calls are safe).
+            from mes_dashboard.services.resource_history_duckdb_cache import start_duckdb_prewarm
+            start_duckdb_prewarm()
+
+            # Pre-warm downtime-analysis spool.
+            from mes_dashboard.services.downtime_analysis_cache import start_downtime_prewarm
+            start_downtime_prewarm()
+
+            # Pre-warm material-consumption parts list Redis cache.
+            from mes_dashboard.services.material_consumption_service import start_parts_cache_warmup
+            start_parts_cache_warmup()
+
+            # --------------------------------------------------------
+            # PER-WORKER services: also started here for the non-preload
+            # path (flask run / direct gunicorn without preload_app).
+            # Under preload_app=True, post_fork calls
+            # _start_per_worker_services() instead — these lines run in
+            # the master but threads die on fork(); the workers get a
+            # fresh set from post_fork.
+            #
+            # NOTE: if we did NOT set preload_app=True (or ran via
+            # ``flask run``), this block is the only startup path and
+            # must remain complete here.
+            # --------------------------------------------------------
             get_engine()
             start_keepalive()  # Keep database connections alive
             start_cache_updater()  # Start Redis cache updater
@@ -645,12 +854,6 @@ def create_app(config_name: str | None = None) -> Flask:
             init_scrap_reason_exclusion_cache(app)  # Start exclusion-policy cache sync
             init_query_spool_cleanup(app)  # Start parquet spool cleanup worker
             init_anomaly_detection_scheduler(app)  # Start anomaly detection scheduler
-            from mes_dashboard.services.resource_history_duckdb_cache import start_duckdb_prewarm
-            start_duckdb_prewarm()  # Pre-warm resource-history DuckDB cache for 3-month queries
-            from mes_dashboard.services.downtime_analysis_cache import start_downtime_prewarm
-            start_downtime_prewarm()  # Pre-warm downtime-analysis spool (DOWNTIME_ANALYSIS_PREWARM_DAYS days)
-            from mes_dashboard.services.material_consumption_service import start_parts_cache_warmup
-            start_parts_cache_warmup()  # Pre-warm material-consumption parts list Redis cache
             from mes_dashboard.core.metrics_history import start_metrics_history
             start_metrics_history(app)  # Start metrics history collector
             from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard
@@ -670,6 +873,12 @@ def create_app(config_name: str | None = None) -> Flask:
                         "MySQL OPS init failed (system continues in SQLite-only mode): %s",
                         _mysql_exc,
                     )
+    # Store a module-level reference so _start_per_worker_services() (called
+    # from post_fork with no app argument) can pass the correct Flask app to
+    # services that require an app context.
+    global _APP_INSTANCE
+    _APP_INSTANCE = app
+
     _register_shutdown_hooks(app)
 
     # Register API routes

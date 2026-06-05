@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.17
-last-changed: 2026-05-20
+schema-version: 1.3.18
+last-changed: 2026-06-05
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -32,6 +32,17 @@ breaking-change-policy: deprecate-2-minors
 | soak | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/integration/test_soak_workload.py --run-integration-real -m "soak"` | platform-team | soak report |
 
 ## Gate Compatibility Notes
+
+### preload_app fork-safety coverage (gunicorn-preload-workers)
+
+New Tier 3 multi-worker integration test (`tests/integration/test_preload_fork_safety.py`, markers: `integration_real` + `multi_worker`) asserts the following invariants after enabling `preload_app = True`:
+
+1. Each single-run prewarm task (downtime_analysis, material_consumption, resource_history DuckDB, resource_cache `init_cache()`) executes exactly once per gunicorn restart across N workers — Oracle call count is 1, not N.
+2. Each worker holds independent (non-inherited) DB engine pool, Redis pool, and SQLite handles after `post_fork` reinit — no OS file descriptor is shared across worker PIDs.
+3. No "timed out waiting for peer worker" log line appears (resource_history_duckdb_cache lock deadlock is resolved).
+4. No orphan background thread exists in the master process after fork.
+
+Covered by existing `nightly-integration` gate command (`pytest tests/integration/ --run-integration-real -m "integration_real or multi_worker" -x`) — no gate tier, command, or status change. Schema-version bump to 1.3.18 (patch — additive gate-compatibility note only).
 
 ### frontend-type-check scope expansion (Phase 1a — migrate-core-to-typescript)
 

@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.18] — 2026-06-05
+### Changed
+- gunicorn-preload-workers: Added Gate Compatibility Note for preload/fork-safety integration test coverage. New Tier 3 multi-worker test (`tests/integration/test_preload_fork_safety.py`, markers: `integration_real` + `multi_worker`) asserts: (1) each single-run prewarm (downtime_analysis, material_consumption, resource_history DuckDB, resource_cache init_cache) executes exactly once per gunicorn restart across N workers; (2) each worker holds independent (non-inherited) DB engine pool, Redis pool, and SQLite handles after post_fork reinit; (3) no resource_history duckdb-cache peer-wait timeout; (4) no orphan background thread in master after fork. Covered by existing nightly-integration gate command — no gate tier, command, or status change.
+
 ## [data 1.12.3] — 2026-06-03
 ### Changed
 - downtime-analysis-page-redesign: Added wrapper-key confirmation notes to §3.12.5 (`EquipmentDetailRow` → `data.equipment_detail`) and §3.12.6 (`EventDetailRow` → `data.events`). Additive prose clarification; no field added or removed. Ensures frontend composables resolve the correct JSON key and do not produce a silent empty table (AC-8).
