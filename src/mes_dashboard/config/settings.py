@@ -48,7 +48,9 @@ class Config:
     # gate defined in openspec harden-real-infra-test-coverage / 3.1.
     # Flask's ``Config.from_object()`` only copies UPPERCASE attributes, so
     # the key name is intentionally capitalised.
-    REGISTER_INTERNAL_METRICS = False
+    # Can also be enabled via env var for GunicornHarness-based integration
+    # tests that spawn a real gunicorn without FLASK_ENV=testing.
+    REGISTER_INTERNAL_METRICS = _bool_env("REGISTER_INTERNAL_METRICS", False)
 
     # Database pool defaults (can be overridden by env)
     DB_POOL_SIZE = _int_env("DB_POOL_SIZE", 5)

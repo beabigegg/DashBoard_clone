@@ -38,6 +38,7 @@ _EXPECTED_KEYS = frozenset({
     "worker_rss",
     "circuit_breaker",
     "rq",
+    "threads",  # added for GunicornHarness fork-safety tests (AC-5)
 })
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -192,10 +193,12 @@ def test_loopback_gate_blocks_non_loopback_remote_addr(testing_client, monkeypat
 # ---------------------------------------------------------------------------
 
 def test_all_gates_open_returns_seven_category_snapshot(testing_client, monkeypatch):
-    """Layer 1 + 2 + 3 all open → 200 with the stable seven-key contract.
+    """Layer 1 + 2 + 3 all open → 200 with the stable eight-key contract.
 
     This is the canary for the metrics shape the soak probe depends on —
     if any key disappears, the soak assertions can't target that category.
+    The eight categories are: pool, duckdb, redis, spool, worker_rss,
+    circuit_breaker, rq, threads (threads added for AC-5 fork-safety tests).
     """
     monkeypatch.setenv("INTERNAL_METRICS_ENABLED", "1")
     # Flask test_client defaults REMOTE_ADDR to 127.0.0.1, which satisfies

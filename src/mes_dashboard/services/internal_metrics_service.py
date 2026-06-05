@@ -40,6 +40,15 @@ def _collect_pool() -> Dict[str, Any]:
     except Exception as exc:  # engine not built yet / testing mode
         return {"error": f"pool_unavailable: {exc}"}
 
+    # engine_id: identity of the SQLAlchemy engine object in this worker.
+    # Used by GunicornHarness-based fork-safety tests (AC-2) to assert that
+    # each forked worker holds a distinct engine pool after post_fork dispose.
+    try:
+        from mes_dashboard.core import database as _db_module
+        engine_id = id(getattr(_db_module, "_ENGINE", None))
+    except Exception:
+        engine_id = None
+
     return {
         # Explicit checkout / checkin naming matches the soak scenario
         # "pool.checkout - pool.checkin" assertion vocabulary.
@@ -51,6 +60,7 @@ def _collect_pool() -> Dict[str, Any]:
         "saturation": float(status.get("saturation", 0.0)),
         "slow_query_active": int(status.get("slow_query_active", 0)),
         "slow_query_waiting": int(status.get("slow_query_waiting", 0)),
+        "engine_id": engine_id,
     }
 
 
@@ -142,6 +152,14 @@ def _collect_redis() -> Dict[str, Any]:
     if client is None:
         return {"enabled": True, "error": "redis_client_unavailable"}
 
+    # pool_id: identity of the Redis connection pool object in this worker.
+    # Used by GunicornHarness-based fork-safety tests (AC-3) to assert that
+    # each forked worker holds a distinct Redis pool after post_fork close_redis.
+    try:
+        pool_id = id(client.connection_pool)
+    except Exception:
+        pool_id = None
+
     by_ns: Dict[str, int] = {}
     total = 0
     for ns in _REDIS_NAMESPACE_PREFIXES:
@@ -162,7 +180,7 @@ def _collect_redis() -> Dict[str, Any]:
             by_ns[ns] = -1
             logger.debug("internal_metrics: redis scan %s failed: %s", ns, exc)
 
-    return {"enabled": True, "key_count": int(total), "by_namespace": by_ns}
+    return {"enabled": True, "key_count": int(total), "by_namespace": by_ns, "pool_id": pool_id}
 
 
 # ---------------------------------------------------------------------------
@@ -332,15 +350,40 @@ def _collect_rq() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# 8) Active thread names (this worker only)
+# ---------------------------------------------------------------------------
+
+def _collect_threads() -> Dict[str, Any]:
+    """Return sorted list of thread names alive in the current worker process.
+
+    Used by GunicornHarness-based fork-safety tests (AC-5) to assert that
+    every expected background thread (cache_updater, equipment-status-sync,
+    metrics-history-collector, worker-rss-guard, query-spool-cleanup,
+    anomaly-detection-scheduler, etc.) was started by post_fork.
+
+    Thread names are the ``name=`` kwarg set at threading.Thread creation time
+    by each subsystem; this collector enumerates them verbatim so tests can
+    match by substring.
+    """
+    import threading
+    return {"names": sorted(t.name for t in threading.enumerate())}
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def collect_internal_metrics() -> Dict[str, Any]:
-    """Build the seven-category metrics snapshot.
+    """Build the eight-category metrics snapshot.
 
     Keys (stable contract consumed by `/internal/metrics` and by the
     soak probe): ``pool``, ``duckdb``, ``redis``, ``spool``,
-    ``worker_rss``, ``circuit_breaker``, ``rq``.
+    ``worker_rss``, ``circuit_breaker``, ``rq``, ``threads``.
+
+    The ``threads`` category was added for GunicornHarness fork-safety
+    tests (AC-5): it lists all thread names alive in this worker process
+    so integration tests can assert the expected per-worker background
+    threads (cache_updater, equipment-sync, etc.) are running post-fork.
     """
     return {
         "pool": _collect_pool(),
@@ -350,6 +393,7 @@ def collect_internal_metrics() -> Dict[str, Any]:
         "worker_rss": _collect_worker_rss(),
         "circuit_breaker": _collect_circuit_breaker(),
         "rq": _collect_rq(),
+        "threads": _collect_threads(),
     }
 
 

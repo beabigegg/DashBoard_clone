@@ -20,7 +20,9 @@ WorkerBarrier
 
 from __future__ import annotations
 
+import atexit
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -30,6 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import redis as redis_lib
+import requests
 
 try:
     from rq import Worker as _RQWorker
@@ -315,4 +318,313 @@ class MultiWorkerHarness:
         raise RuntimeError(
             f"Workers failed to register within {timeout}s. "
             f"Logs: {self.worker_logs}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# GunicornHarness — single master + N forked workers (preload_app=True)
+# ---------------------------------------------------------------------------
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+GUNICORN_STARTUP_TIMEOUT = 120  # prewarm can take 30-60s
+
+# Module-level registry for atexit cleanup — separate from conftest _SPAWNED_PROCS
+# because conftest.py is not importable as a regular module.
+_GHN_SPAWNED_PROCS: List[subprocess.Popen] = []
+
+
+def _ghn_atexit_cleanup() -> None:
+    """Kill any surviving GunicornHarness processes on interpreter exit."""
+    for proc in list(_GHN_SPAWNED_PROCS):
+        try:
+            if proc.poll() is None:
+                proc.kill()
+        except Exception:
+            pass
+
+
+atexit.register(_ghn_atexit_cleanup)
+
+
+def _find_free_port_ghn() -> int:
+    """Find an unused TCP port on loopback by binding to port 0."""
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _pid_alive_ghn(pid: int) -> bool:
+    """Return True if a process with *pid* is alive (signal 0 test)."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Process exists but we lack permission to signal it.
+        return True
+
+
+class GunicornHarness:
+    """Spawn a single gunicorn master with N forked workers (preload_app=True).
+
+    Unlike ``MultiWorkerHarness`` (which manages RQ workers), this harness
+    tests the gunicorn fork lifecycle: preload_app prewarm runs once in the
+    master; post_fork reinit runs in each worker.  The harness captures all
+    stdout+stderr (gunicorn merges them via ``--access-logfile -``) into an
+    in-memory log and exposes helpers for log inspection and per-worker
+    metrics collection via ``/internal/metrics``.
+
+    Environment variables injected into the subprocess:
+    - ``REGISTER_INTERNAL_METRICS=true``  — enables Layer 1 blueprint gate
+    - ``INTERNAL_METRICS_ENABLED=1``      — enables Layer 2 env gate
+    - ``GUNICORN_BIND``                   — determined at start() time
+    - ``GUNICORN_WORKERS``                — set to ``self.workers``
+    - ``FLASK_TESTING`` / ``PYTEST_CURRENT_TEST`` stripped to avoid
+      TestingConfig being selected (which sets DB_POOL_SIZE=1, etc.)
+
+    Usage::
+
+        with GunicornHarness() as h:
+            h.wait_for_log("resource_history DuckDB prewarm complete")
+            assert h.log_count("prewarm complete") == 1
+            metrics = h.collect_per_worker_metrics()
+    """
+
+    def __init__(self, port: int = 0, workers: int = 2) -> None:
+        self.workers = workers
+        self._port = port       # 0 = auto-find a free port
+        self._proc: Optional[subprocess.Popen] = None
+        self._log_lines: List[str] = []
+        self._log_lock = threading.Lock()
+        self._ready_event = threading.Event()
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def port(self) -> int:
+        return self._port
+
+    @property
+    def base_url(self) -> str:
+        return f"http://127.0.0.1:{self._port}"
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def start(self) -> "GunicornHarness":
+        if self._port == 0:
+            self._port = _find_free_port_ghn()
+
+        env = os.environ.copy()
+        # Strip pytest/testing markers so gunicorn uses production config
+        # (real Oracle pools, real Redis).
+        # Strip all pytest/testing markers so gunicorn uses production config
+        # (real Oracle pools, real Redis, real prewarm — not testing short-circuit).
+        env.pop("FLASK_TESTING", None)
+        env.pop("PYTEST_CURRENT_TEST", None)
+        env.pop("FLASK_ENV", None)          # removes testing→TestingConfig guard
+        env["REDIS_ENABLED"] = "true"       # pytest conftest sets false by default
+        env.setdefault("REDIS_URL", "redis://localhost:6379/0")
+        env.setdefault("REDIS_CONTROL_URL", env["REDIS_URL"])
+        # Enable the internal-metrics blueprint via env (Layer 1 + 2 gates).
+        env["REGISTER_INTERNAL_METRICS"] = "true"
+        env["INTERNAL_METRICS_ENABLED"] = "1"
+        # Gunicorn process model overrides.
+        env["GUNICORN_BIND"] = f"0.0.0.0:{self._port}"
+        env["GUNICORN_WORKERS"] = str(self.workers)
+        env["GUNICORN_THREADS"] = "2"
+        env["GUNICORN_TIMEOUT"] = "360"
+        # Add src/ to PYTHONPATH so gunicorn can import mes_dashboard directly.
+        _src_path = str(PROJECT_ROOT / "src")
+        existing_pp = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{_src_path}:{existing_pp}" if existing_pp else _src_path
+
+        import shutil
+        gunicorn_bin = shutil.which("gunicorn") or str(
+            Path(sys.executable).parent / "gunicorn"
+        )
+        self._proc = subprocess.Popen(
+            [
+                gunicorn_bin,
+                "-c", "gunicorn.conf.py",
+                "mes_dashboard:create_app()",
+            ],
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # merge stderr into stdout for unified log
+            text=True,
+        )
+        _GHN_SPAWNED_PROCS.append(self._proc)
+
+        # Start background thread to drain the combined stdout stream.
+        reader = threading.Thread(target=self._read_logs, daemon=True)
+        reader.start()
+
+        # Block until gunicorn emits "Listening at:" (all workers booted).
+        if not self._ready_event.wait(timeout=GUNICORN_STARTUP_TIMEOUT):
+            self.stop()
+            with self._log_lock:
+                last_lines = "".join(self._log_lines[-20:])
+            raise TimeoutError(
+                f"Gunicorn did not start within {GUNICORN_STARTUP_TIMEOUT}s.\n"
+                f"Last 20 log lines:\n{last_lines}"
+            )
+        return self
+
+    def _read_logs(self) -> None:
+        """Drain gunicorn's combined stdout/stderr into self._log_lines."""
+        assert self._proc is not None
+        try:
+            for line in self._proc.stdout:  # type: ignore[union-attr]
+                with self._log_lock:
+                    self._log_lines.append(line)
+                # Gunicorn emits "Listening at: http://0.0.0.0:<port> (<pid>)"
+                # once the arbiter is ready and all workers have booted.
+                if "Listening at:" in line and not self._ready_event.is_set():
+                    self._ready_event.set()
+        except Exception:
+            pass
+        finally:
+            # EOF — unblock any pending wait_for_log calls.
+            self._ready_event.set()
+
+    def stop(self) -> None:
+        if self._proc is not None and self._proc.poll() is None:
+            self._proc.send_signal(signal.SIGTERM)
+            try:
+                self._proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+        try:
+            _GHN_SPAWNED_PROCS.remove(self._proc)
+        except (ValueError, AttributeError):
+            pass
+
+    def __enter__(self) -> "GunicornHarness":
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.stop()
+
+    # ------------------------------------------------------------------
+    # Log helpers
+    # ------------------------------------------------------------------
+
+    def log_count(self, pattern: str) -> int:
+        """Return the number of log lines that contain *pattern*."""
+        with self._log_lock:
+            return sum(1 for line in self._log_lines if pattern in line)
+
+    def log_contains(self, pattern: str) -> bool:
+        """Return True if any log line contains *pattern*."""
+        with self._log_lock:
+            return any(pattern in line for line in self._log_lines)
+
+    @property
+    def full_log(self) -> str:
+        """Combined log as a single string (thread-safe snapshot)."""
+        with self._log_lock:
+            return "".join(self._log_lines)
+
+    def wait_for_log(self, pattern: str, timeout: float = 120.0) -> bool:
+        """Block until *pattern* appears in captured logs or *timeout* elapses.
+
+        Returns True if found, False on timeout.
+        """
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.log_contains(pattern):
+                return True
+            time.sleep(0.5)
+        return False
+
+    # ------------------------------------------------------------------
+    # HTTP helpers
+    # ------------------------------------------------------------------
+
+    def get(self, path: str, **kwargs: object) -> requests.Response:
+        """Issue a GET request to the running gunicorn instance."""
+        return requests.get(f"{self.base_url}{path}", timeout=30, **kwargs)
+
+    def collect_per_worker_metrics(
+        self,
+        target_workers: Optional[int] = None,
+        timeout: float = 30.0,
+    ) -> List[Dict]:
+        """Hit ``/internal/metrics`` repeatedly until data from all workers is seen.
+
+        Gunicorn round-robins requests across workers, so multiple calls are
+        needed to sample each worker.  Returns a list of ``data`` dicts, one
+        per distinct PID.
+
+        The response envelope shape is ``{"status": "success", "data": {...}}``
+        (from ``success_response()``); this method indexes into ``data``.
+        """
+        n = target_workers if target_workers is not None else self.workers
+        seen: Dict[int, Dict] = {}
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and len(seen) < n:
+            try:
+                resp = self.get("/internal/metrics")
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    pid = data.get("worker_rss", {}).get("pid")
+                    if pid is not None and pid not in seen:
+                        seen[pid] = data
+            except Exception:
+                pass
+            time.sleep(0.15)
+        return list(seen.values())
+
+    # ------------------------------------------------------------------
+    # Worker PID control (for AC-9 crash + respawn tests)
+    # ------------------------------------------------------------------
+
+    def worker_pids(self) -> List[int]:
+        """Parse all worker PIDs seen in gunicorn's boot log (may include dead ones)."""
+        pids: List[int] = []
+        with self._log_lock:
+            for line in self._log_lines:
+                m = re.search(r"Booting worker with pid: (\d+)", line)
+                if m:
+                    pids.append(int(m.group(1)))
+        # Preserve insertion order, deduplicate.
+        return list(dict.fromkeys(pids))
+
+    def worker_pids_alive(self) -> List[int]:
+        """Return the subset of known worker PIDs that are still alive."""
+        return [p for p in self.worker_pids() if _pid_alive_ghn(p)]
+
+    def kill_worker(self, pid: int) -> None:
+        """Send SIGKILL to the gunicorn worker with *pid*."""
+        os.kill(pid, signal.SIGKILL)
+
+    def wait_for_respawn(
+        self,
+        old_pids: List[int],
+        timeout: float = 30.0,
+    ) -> List[int]:
+        """Block until at least one PID not in *old_pids* appears in the boot log
+        and is alive.
+
+        Returns the list of newly-seen PIDs.  Raises ``TimeoutError`` if none
+        appear within *timeout* seconds.
+        """
+        old_set = set(old_pids)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            new = set(self.worker_pids_alive()) - old_set
+            if new:
+                return list(new)
+            time.sleep(0.5)
+        raise TimeoutError(
+            f"No new worker appeared within {timeout}s "
+            f"(old pids={old_pids}, current alive={self.worker_pids_alive()})"
         )
