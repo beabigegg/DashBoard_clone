@@ -1,0 +1,10 @@
+agent: implementation-planner
+change-id: gunicorn-preload-workers
+status: done
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/gunicorn-preload-workers/implementation-plan.md" }
+  - { type: owner-map, pointer: "bug-fix-engineer (IP-1, IP-2, IP-7); backend-engineer (IP-3..IP-6, IP-8)" }
+  - { type: scope-summary, pointer: "in: preload_app+post_fork, app.py init-phase split, AC-6/AC-7 fixes, 5 test files, CI gate; out: API/data/business/UI/env changes, worker_exit, L2 filter caches" }
+notes:
+  - "design.md present and fully filled (D1-D6); not a scaffold — clear to plan."
+  - "Code anchors verified via Grep (Read blocked by graph-first hook; no Bash for cdd-kit index): resource_cache.py refresh_cache:793/guard:820/init_cache:844-863; cache_updater.py _worker:110-117/_check_resource_update:308; resource_history_duckdb_cache.py _try_lock:47/O_EXCL:51/start_duckdb_prewarm:293/peer-wait:318-322/.tmp rename:242,281; gunicorn.conf.py workers:7/on_starting:27/worker_exit:55/no preload_app; app.py startup block 640-667 under is_testing_runtime guard."
