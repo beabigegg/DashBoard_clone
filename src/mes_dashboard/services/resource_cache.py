@@ -821,6 +821,17 @@ def refresh_cache(force: bool = False) -> bool:
             logger.debug(f"Resource cache version unchanged ({oracle_version}), skipping")
             return False
 
+        # AC-7: even with force=True, skip Oracle fetch when Redis already holds
+        # the correct version AND the data key exists.  This prevents every
+        # gunicorn worker from independently re-querying Oracle at startup when
+        # one worker has already populated Redis.
+        if force and redis_version == oracle_version and _redis_data_available():
+            logger.debug(
+                "Resource cache version current (force=True, Redis already populated),"
+                " skipping Oracle fetch"
+            )
+            return False
+
         logger.info(f"Resource cache version changed: {redis_version} -> {oracle_version}")
 
         # Load and sync

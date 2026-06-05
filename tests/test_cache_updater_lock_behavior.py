@@ -109,3 +109,126 @@ class TestContainerFilterCacheLockBehavior:
             assert third is True
         finally:
             cache_mod._release_lock()
+
+
+# ============================================================
+# Change: gunicorn-preload-workers
+# AC-6 -- resource_history_duckdb_cache file-lock deadlock
+# Replace O_CREAT|O_EXCL sentinel with fcntl.flock so lock
+# auto-releases when the holding process dies.
+# ============================================================
+
+class TestDuckdbPrewarmLockFcntl:
+    """fcntl.flock-based lock on resource_history_duckdb_cache.
+
+    These tests FAIL before the fix (O_CREAT|O_EXCL) and PASS after
+    (fcntl.LOCK_EX|LOCK_NB).
+    """
+
+    def test_duckdb_prewarm_lock_releases_on_fd_close(self, tmp_path, monkeypatch):
+        """AC-6.1: After acquiring and then closing the fd without an explicit
+        _release_lock() call, _try_lock() must succeed again.
+
+        With O_CREAT|O_EXCL the sentinel file lingers -> _try_lock() returns False
+        (deadlock). With fcntl.flock the kernel releases the lock when the fd is
+        closed -> _try_lock() returns True (auto-release on process death).
+        """
+        import mes_dashboard.services.resource_history_duckdb_cache as duck_mod
+
+        lock_path = tmp_path / "resource_history.duckdb.loading"
+        monkeypatch.setattr(duck_mod, "_LOCK_PATH", lock_path)
+
+        # Worker 1 acquires the lock.
+        first = duck_mod._try_lock()
+        assert first is True, "First _try_lock() must succeed"
+
+        # Simulate process death: close the fd held internally without calling
+        # _release_lock().  With fcntl.flock the OS releases the lock.
+        assert hasattr(duck_mod, "_LOCK_FD"), (
+            "_LOCK_FD must exist after fix -- the fd reference that keeps flock alive"
+        )
+        fd_ref = duck_mod._LOCK_FD[0]
+        if fd_ref is not None:
+            try:
+                fd_ref.close()
+            except Exception:
+                pass
+            duck_mod._LOCK_FD[0] = None
+
+        # Remove the lock file left behind (flock releases kernel lock on close,
+        # but file still exists on disk; the winner must clean it up or the next
+        # _try_lock must handle an uncontested open).
+        if lock_path.exists():
+            lock_path.unlink(missing_ok=True)
+
+        # Worker 2 (or restarted Worker 1) must now acquire the lock.
+        second = duck_mod._try_lock()
+        try:
+            assert second is True, (
+                "After simulated fd close (process death), _try_lock() must "
+                "return True. Got False -- lock was not released automatically."
+            )
+        finally:
+            duck_mod._release_lock()
+
+    def test_duckdb_prewarm_lock_prevents_concurrent_attempt(self, tmp_path, monkeypatch):
+        """AC-6.2: While the lock is held, a second _try_lock() returns False."""
+        import mes_dashboard.services.resource_history_duckdb_cache as duck_mod
+
+        lock_path = tmp_path / "resource_history.duckdb.loading"
+        monkeypatch.setattr(duck_mod, "_LOCK_PATH", lock_path)
+
+        first = duck_mod._try_lock()
+        try:
+            assert first is True
+            second = duck_mod._try_lock()
+            assert second is False, (
+                "_try_lock() must return False when lock is already held. "
+                "Got True -- concurrent acquisition should be blocked."
+            )
+        finally:
+            duck_mod._release_lock()
+
+    def test_duckdb_prewarm_lock_releases_cleanly(self, tmp_path, monkeypatch):
+        """AC-6.3: After _release_lock(), a fresh _try_lock() succeeds."""
+        import mes_dashboard.services.resource_history_duckdb_cache as duck_mod
+
+        lock_path = tmp_path / "resource_history.duckdb.loading"
+        monkeypatch.setattr(duck_mod, "_LOCK_PATH", lock_path)
+
+        duck_mod._try_lock()
+        duck_mod._release_lock()
+
+        # After explicit release, a new worker can acquire.
+        third = duck_mod._try_lock()
+        try:
+            assert third is True, (
+                "After _release_lock(), _try_lock() must return True. "
+                "Got False -- lock was not released properly."
+            )
+        finally:
+            duck_mod._release_lock()
+
+    def test_duckdb_lock_fd_container_populated_on_acquire(self, tmp_path, monkeypatch):
+        """AC-6.4: After _try_lock() succeeds, _LOCK_FD[0] must be a non-None
+        file object (the fd reference that keeps the flock alive).
+
+        With O_CREAT|O_EXCL there is no fd reference -- this attribute won't
+        exist, causing the test to fail before the fix.
+        """
+        import mes_dashboard.services.resource_history_duckdb_cache as duck_mod
+
+        lock_path = tmp_path / "resource_history.duckdb.loading"
+        monkeypatch.setattr(duck_mod, "_LOCK_PATH", lock_path)
+
+        duck_mod._try_lock()
+        try:
+            assert hasattr(duck_mod, "_LOCK_FD"), (
+                "_LOCK_FD must exist in resource_history_duckdb_cache after fix."
+            )
+            assert duck_mod._LOCK_FD[0] is not None, (
+                "_LOCK_FD[0] must be a non-None fd reference after _try_lock() "
+                "succeeds. Got None -- fcntl.flock fd is not being stored."
+            )
+        finally:
+            duck_mod._release_lock()

@@ -14,6 +14,7 @@ Tables stored in DuckDB file:
 
 from __future__ import annotations
 
+import fcntl
 import logging
 import os
 import threading
@@ -41,23 +42,49 @@ _duckdb_ready: bool = False
 _prewarm_cache_end: Optional[date] = None  # inclusive end date loaded into DuckDB
 
 # File-based lock so multiple gunicorn workers don't all hit Oracle simultaneously.
+# AC-6 fix: use fcntl.flock instead of O_CREAT|O_EXCL so the lock auto-releases
+# when the holding process dies (kernel releases flock on fd close / process exit).
+# The sentinel file is still used as the lock target so the peer-wait loop can
+# check _try_reuse_existing() without changing its polling logic.
 _LOCK_PATH = _DUCKDB_PATH.with_suffix(".duckdb.loading")
+
+# Mutable container holding the open fd that keeps the flock alive.
+# Must not be GC'd while the lock is held.
+_LOCK_FD: list = [None]
 
 
 def _try_lock() -> bool:
-    """Create lock file exclusively; returns True if this process got the lock."""
+    """Acquire an exclusive flock on the lock file; returns True if acquired.
+
+    Uses fcntl.LOCK_EX|LOCK_NB so:
+    - The lock is non-blocking: returns False immediately if another process
+      holds it (no 90s deadlock on LOCK_EX alone).
+    - The kernel auto-releases the lock when the fd is closed or the process
+      exits, eliminating the stale-sentinel-file deadlock from O_CREAT|O_EXCL.
+    """
     try:
         _DUCKDB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(str(_LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.close(fd)
+        fd = open(str(_LOCK_PATH), "w")
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _LOCK_FD[0] = fd  # keep reference alive so kernel holds the lock
         return True
-    except FileExistsError:
+    except BlockingIOError:
+        # Another process holds the lock
         return False
     except OSError:
-        return True  # Can't create lock — proceed anyway to avoid silent skip
+        # Cannot create or lock file — proceed anyway to avoid silent skip
+        return True
 
 
 def _release_lock() -> None:
+    fd = _LOCK_FD[0]
+    if fd is not None:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            fd.close()
+        except Exception:
+            pass
+        _LOCK_FD[0] = None
     try:
         _LOCK_PATH.unlink(missing_ok=True)
     except Exception:
