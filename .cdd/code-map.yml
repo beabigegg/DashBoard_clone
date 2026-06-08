@@ -1,6 +1,6 @@
-# generated: 2026-06-08T02:56:16Z by cdd-kit 2.2.1
-# files: 831, src-lines: 234332, map-lines: 17832, compression: 13.1x
-# sources-digest: acbcd6148e372f8004171a44f5baae8b4f9156fcf466d28ec987d0b571cf2b68
+# generated: 2026-06-08T07:38:42Z by cdd-kit 2.2.1
+# files: 831, src-lines: 234311, map-lines: 17832, compression: 13.1x
+# sources-digest: c3493bafd382284dfcb9a0353bfd1801b08aebfa6421ba1b938af5f549ea7134
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -403,7 +403,7 @@ frontend/src/anomaly-overview/main.js:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/core/api.ts:  # 394 lines
+frontend/src/core/api.ts:  # 401 lines
   imports:
     - { module: './types.js', items: [ApiResponse], line: 3 }
   constants:
@@ -419,13 +419,13 @@ frontend/src/core/api.ts:  # 394 lines
     - { name: _buildDedupKey, lines: 190-194 }
     - { name: async parseResponsePayload, lines: 196-209 }
     - { name: async _fetchJsonRaw, lines: 211-249 }
-    - { name: async fetchJson, lines: 251-277 }
-    - { name: async apiGet, lines: 279-287 }
-    - { name: async apiPost, lines: 289-317 }
-    - { name: async apiUpload, lines: 319-341 }
-    - { name: _inFlightSize, lines: 346-348 }
-    - { name: _clearInFlight, lines: 353-355 }
-    - { name: ensureMesApiAvailable, lines: 357-394 }
+    - { name: async fetchJson, lines: 251-284 }
+    - { name: async apiGet, lines: 286-294 }
+    - { name: async apiPost, lines: 296-324 }
+    - { name: async apiUpload, lines: 326-348 }
+    - { name: _inFlightSize, lines: 353-355 }
+    - { name: _clearInFlight, lines: 360-362 }
+    - { name: ensureMesApiAvailable, lines: 364-401 }
   interfaces:
     - { name: FetchOptions, lines: 32-39 }
     - { name: MesApiBridge, lines: 42-46 }  # local
@@ -5476,7 +5476,7 @@ src/mes_dashboard/services/downtime_analysis_cache.py:  # 143 lines
     - { name: load_downtime_events, lines: 85-97 }
     - { name: start_downtime_prewarm, lines: 105-143 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1267 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1239 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5487,32 +5487,32 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1267 lines
     - { module: mes_dashboard.config.constants, items: [DOWNTIME_BRIDGE_VERSION], line: 22 }
   functions:
     - { name: _map_big_category, lines: 60-87 }
-    - { name: _merge_cross_shift_events, lines: 97-202 }
-    - { name: _build_merged_row, lines: 205-223 }
-    - { name: _bridge_jobid, lines: 230-324 }
-    - { name: _compute_overlap_seconds, lines: 327-336 }
-    - { name: _enrich_event, lines: 339-379 }
-    - { name: _no_match_event, lines: 382-396 }
-    - { name: _add_empty_job_columns, lines: 399-408 }
-    - { name: _safe_str, lines: 411-416 }
-    - { name: _enrich_events_df, lines: 423-456 }
-    - { name: _ts_to_iso, lines: 459-468 }
-    - { name: make_downtime_query_id, lines: 475-480 }
-    - { name: get_filter_options, lines: 487-575 }
-    - { name: query_downtime_dataset, lines: 582-741 }
-    - { name: _apply_resource_filters, lines: 744-824 }
-    - { name: _empty_events_df, lines: 827-834 }
-    - { name: _build_response, lines: 841-854 }
-    - { name: _build_summary, lines: 857-883 }
-    - { name: _build_daily_trend, lines: 886-907 }
-    - { name: _build_big_category, lines: 910-929 }
-    - { name: _build_top_reasons, lines: 932-958 }
-    - { name: apply_view, lines: 965-1022 }
-    - { name: _build_equipment_detail_page, lines: 1025-1050 }
-    - { name: _build_equipment_detail, lines: 1053-1090 }
-    - { name: _build_event_detail_page, lines: 1093-1154 }
-    - { name: export_equipment_detail_csv, lines: 1162-1205 }
-    - { name: export_event_detail_csv, lines: 1208-1267 }
+    - { name: _merge_cross_shift_events, lines: 97-164 }
+    - { name: _build_merged_row, lines: 167-185 }
+    - { name: _bridge_jobid, lines: 192-290 }
+    - { name: _compute_overlap_seconds, lines: 293-302 }
+    - { name: _enrich_event, lines: 305-345 }
+    - { name: _no_match_event, lines: 348-362 }
+    - { name: _add_empty_job_columns, lines: 365-374 }
+    - { name: _safe_str, lines: 377-382 }
+    - { name: _enrich_events_df, lines: 389-422 }
+    - { name: _ts_to_iso, lines: 425-434 }
+    - { name: make_downtime_query_id, lines: 441-446 }
+    - { name: get_filter_options, lines: 453-541 }
+    - { name: query_downtime_dataset, lines: 548-707 }
+    - { name: _apply_resource_filters, lines: 710-796 }
+    - { name: _empty_events_df, lines: 799-806 }
+    - { name: _build_response, lines: 813-826 }
+    - { name: _build_summary, lines: 829-855 }
+    - { name: _build_daily_trend, lines: 858-879 }
+    - { name: _build_big_category, lines: 882-901 }
+    - { name: _build_top_reasons, lines: 904-930 }
+    - { name: apply_view, lines: 937-994 }
+    - { name: _build_equipment_detail_page, lines: 997-1022 }
+    - { name: _build_equipment_detail, lines: 1025-1062 }
+    - { name: _build_event_detail_page, lines: 1065-1126 }
+    - { name: export_equipment_detail_csv, lines: 1134-1177 }
+    - { name: export_event_detail_csv, lines: 1180-1239 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:

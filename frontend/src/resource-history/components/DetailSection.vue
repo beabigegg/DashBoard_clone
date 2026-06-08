@@ -6,10 +6,12 @@ import HierarchyTable from '../../resource-shared/components/HierarchyTable.vue'
 
 const props = withDefaults(defineProps<{
   detailData?: unknown[];
+  detailByDate?: unknown[];
   expandedState?: Record<string, boolean>;
   loading?: boolean;
 }>(), {
   detailData: () => [],
+  detailByDate: () => [],
   expandedState: () => ({}),
   loading: false,
 });
@@ -82,7 +84,45 @@ function enrichWithKpi(hours: HourBucket): Record<string, unknown> {
   };
 }
 
-function buildHierarchy(data: unknown[]): HierarchyNode[] {
+function buildDateChildMap(detailByDate: unknown[]): Map<string, HierarchyNode[]> {
+  const map = new Map<string, HierarchyNode[]>();
+  (detailByDate || []).forEach((rawItem) => {
+    const item = rawItem as Record<string, unknown>;
+    const wc = String(item.workcenter || 'UNKNOWN');
+    const fam = String(item.family || 'UNKNOWN');
+    const res = String(item.resource || '');
+    const key = `${normalizeKey(wc)}||${normalizeKey(fam)}||${normalizeKey(res)}`;
+    const date = String(item.date || '');
+    const prd = Number(item.prd_hours || 0);
+    const sby = Number(item.sby_hours || 0);
+    const udt = Number(item.udt_hours || 0);
+    const sdt = Number(item.sdt_hours || 0);
+    const egt = Number(item.egt_hours || 0);
+    const nst = Number(item.nst_hours || 0);
+    const dateNode: HierarchyNode = {
+      id: `date_${normalizeKey(wc)}_${normalizeKey(fam)}_${normalizeKey(res)}_${normalizeKey(date)}`,
+      level: 3,
+      name: date,
+      metrics: enrichWithKpi({
+        prd_hours: prd,
+        sby_hours: sby,
+        udt_hours: udt,
+        sdt_hours: sdt,
+        egt_hours: egt,
+        nst_hours: nst,
+        trackout_qty: 0,
+        ng_qty: 0,
+        machine_count: 1,
+      }),
+    };
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(dateNode);
+  });
+  return map;
+}
+
+function buildHierarchy(data: unknown[], detailByDate: unknown[]): HierarchyNode[] {
+  const dateChildMap = buildDateChildMap(detailByDate);
   const wcMap = new Map<string, HierarchyNode>();
 
   (data || []).forEach((rawItem, index) => {
@@ -136,11 +176,15 @@ function buildHierarchy(data: unknown[]): HierarchyNode[] {
       machine_count: Number(item.machine_count || 1),
     });
 
+    const resKey = `${normalizeKey(workcenter)}||${normalizeKey(family)}||${normalizeKey(resourceName)}`;
+    const dateChildren = dateChildMap.get(resKey) || [];
+
     familyNode.children!.push({
       id: `res_${normalizeKey(workcenter)}_${normalizeKey(family)}_${normalizeKey(resourceName)}_${index}`,
       level: 2,
       name: resourceName,
       metrics: resourceMetrics,
+      children: dateChildren,
     });
 
     mergeHours(familyNode.metrics as HourBucket, resourceMetrics);
@@ -179,7 +223,7 @@ function formatHourPct(hours: unknown, pct: unknown): string {
   return `${Number(hours || 0).toFixed(1)}h (${Number(pct || 0).toFixed(1)}%)`;
 }
 
-const hierarchy = computed(() => buildHierarchy(props.detailData));
+const hierarchy = computed(() => buildHierarchy(props.detailData, props.detailByDate));
 
 const columns = computed(() => {
   return [
@@ -268,6 +312,11 @@ function handleToggleAll(expand: boolean): void {
     rowIds.push(wcNode.id);
     wcNode.children!.forEach((familyNode) => {
       rowIds.push(familyNode.id);
+      familyNode.children!.forEach((resNode) => {
+        if (resNode.children && resNode.children.length > 0) {
+          rowIds.push(resNode.id);
+        }
+      });
     });
   });
 

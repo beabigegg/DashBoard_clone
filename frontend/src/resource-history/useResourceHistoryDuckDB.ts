@@ -108,6 +108,29 @@ interface DetailItem {
   machine_count: number;
 }
 
+interface DetailByDateItem {
+  historyid: string;
+  workcenter: string;
+  workcenter_seq: number;
+  family: string;
+  resource: string;
+  date: string;
+  ou_pct: number;
+  availability_pct: number;
+  prd_hours: number;
+  prd_pct: number;
+  sby_hours: number;
+  sby_pct: number;
+  udt_hours: number;
+  udt_pct: number;
+  sdt_hours: number;
+  sdt_pct: number;
+  egt_hours: number;
+  egt_pct: number;
+  nst_hours: number;
+  nst_pct: number;
+}
+
 interface SummaryResult {
   kpi: LocalKpi;
   trend: TrendItem[];
@@ -125,6 +148,7 @@ interface DetailResult {
 interface ComputeViewResult {
   summary: SummaryResult;
   detail: DetailResult;
+  detailByDate: DetailByDateItem[];
 }
 
 interface ComputeViewOptions {
@@ -299,7 +323,7 @@ async function queryByHistoryId(client: DuckDBClient): Promise<unknown[]> {
 }
 
 async function queryByHistoryIdAndDate(client: DuckDBClient, granularity: string): Promise<unknown[]> {
-  // Used for heatmap: HISTORYID × period → hours
+  // Used for heatmap and date-level detail: HISTORYID × period → hours
   const period = datePeriod(granularity);
   const sql = `
     SELECT
@@ -309,7 +333,9 @@ async function queryByHistoryIdAndDate(client: DuckDBClient, granularity: string
       SUM(COALESCE(${qid('SBY_HOURS')}, 0)) AS sby_hours,
       SUM(COALESCE(${qid('UDT_HOURS')}, 0)) AS udt_hours,
       SUM(COALESCE(${qid('SDT_HOURS')}, 0)) AS sdt_hours,
-      SUM(COALESCE(${qid('EGT_HOURS')}, 0)) AS egt_hours
+      SUM(COALESCE(${qid('EGT_HOURS')}, 0)) AS egt_hours,
+      SUM(COALESCE(${qid('NST_HOURS')}, 0)) AS nst_hours,
+      SUM(COALESCE(${qid('TOTAL_HOURS')}, 0)) AS total_hours
     FROM ${TABLE_NAME}
     GROUP BY ${qid('HISTORYID')}, 2
     ORDER BY ${qid('HISTORYID')}, 2
@@ -429,6 +455,45 @@ function deriveDetail(byHistoryRows: unknown[], resourceMetadata: ResourceMetada
   return { data, total: data.length, truncated: false, max_records: null };
 }
 
+function deriveDetailByDate(heatmapRows: unknown[], resourceMetadata: ResourceMetadataMap): DetailByDateItem[] {
+  const data: DetailByDateItem[] = [];
+  for (const rawRow of heatmapRows) {
+    const row = rawRow as Record<string, unknown>;
+    const meta = resourceMetadata[String(row.historyid || '')] || {};
+    if (!meta.workcenter) continue;
+    const prd = sf(row.prd_hours);
+    const sby = sf(row.sby_hours);
+    const udt = sf(row.udt_hours);
+    const sdt = sf(row.sdt_hours);
+    const egt = sf(row.egt_hours);
+    const nst = sf(row.nst_hours);
+    const total = sf(row.total_hours);
+    data.push({
+      historyid: String(row.historyid || ''),
+      workcenter: String(meta.workcenter),
+      workcenter_seq: Number(meta.workcenter_seq ?? 999),
+      family: String(meta.family || ''),
+      resource: String(meta.resource || ''),
+      date: String(row.period || ''),
+      ou_pct: calcOuPct(prd, sby, udt, sdt, egt),
+      availability_pct: calcAvailPct(prd, sby, udt, sdt, egt, nst),
+      prd_hours: Math.round(prd * 10) / 10,
+      prd_pct: statusPct(prd, total),
+      sby_hours: Math.round(sby * 10) / 10,
+      sby_pct: statusPct(sby, total),
+      udt_hours: Math.round(udt * 10) / 10,
+      udt_pct: statusPct(udt, total),
+      sdt_hours: Math.round(sdt * 10) / 10,
+      sdt_pct: statusPct(sdt, total),
+      egt_hours: Math.round(egt * 10) / 10,
+      egt_pct: statusPct(egt, total),
+      nst_hours: Math.round(nst * 10) / 10,
+      nst_pct: statusPct(nst, total),
+    });
+  }
+  return data;
+}
+
 // ── Main composable ───────────────────────────────────────────────────────────
 
 export function useResourceHistoryDuckDB() {
@@ -488,8 +553,9 @@ export function useResourceHistoryDuckDB() {
     };
 
     const detail = deriveDetail(byHistoryResult, _resourceMetadata);
+    const detailByDate = deriveDetailByDate(heatmapResult, _resourceMetadata);
 
-    return { summary, detail };
+    return { summary, detail, detailByDate };
   }
 
   /** Tear down local mode and release DuckDB resources. */

@@ -14,7 +14,6 @@ import {
 } from '../core/resource-history-filters';
 import type { ResourceFilterSnapshot, ResourceItem } from '../core/resource-history-filters';
 import { replaceRuntimeHistory } from '../core/shell-navigation';
-import { postExport } from '../core/post-export';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB';
 
@@ -91,6 +90,7 @@ const summaryData = ref<{
   workcenter_comparison: [],
 });
 const detailData = ref<unknown[]>([]);
+const detailByDateData = ref<unknown[]>([]);
 const hierarchyState = reactive<Record<string, boolean>>({});
 
 const loading = reactive({
@@ -475,6 +475,8 @@ function applyViewResult(result: Record<string, unknown>): void {
 
   const detail = (result.detail || {}) as Record<string, unknown>;
   detailData.value = Array.isArray(detail.data) ? detail.data : [];
+  const detailByDate = (result.detail_by_date || {}) as Record<string, unknown>;
+  detailByDateData.value = Array.isArray(detailByDate.data) ? detailByDate.data : [];
   resetHierarchyState();
 
   if (detail.truncated) {
@@ -595,6 +597,9 @@ async function refreshView() {
         const result = await duckdb.computeView({
           granularity: String(committedFilters.granularity || 'day'),
         });
+        if (Array.isArray(result.detailByDate)) {
+          detailByDateData.value = result.detailByDate;
+        }
         applyViewResult(result as unknown as Record<string, unknown>);
         return;
       } catch (localErr) {
@@ -680,21 +685,54 @@ function handleToggleAllRows({ expand, rowIds }: { expand: boolean; rowIds?: str
   });
 }
 
-async function exportCsv(): Promise<void> {
-  if (!committedFilters.startDate || !committedFilters.endDate) {
-    queryError.value = '請先設定查詢條件';
+function exportCsv(): void {
+  const rows = detailByDateData.value as Record<string, unknown>[];
+  if (!rows.length) {
+    queryError.value = '無資料可匯出，請先執行查詢';
     return;
   }
 
-  exportMessage.value = 'CSV 匯出中...';
-  const queryParams = buildResourceHistoryQueryParams(committedFilters);
-  const filename = `resource_history_${committedFilters.startDate}_to_${committedFilters.endDate}.csv`;
-  try {
-    await postExport('/api/resource/history/export', queryParams, filename);
-  } catch (err) {
-    queryError.value = (err as Error)?.message || 'CSV 匯出失敗';
-    exportMessage.value = '';
+  const headers = ['工站', '型號', '設備', '日期', 'OU%', 'AVAIL%', 'PRD(h)', 'PRD%', 'SBY(h)', 'SBY%', 'UDT(h)', 'UDT%', 'SDT(h)', 'SDT%', 'EGT(h)', 'EGT%', 'NST(h)', 'NST%'];
+  const lines: string[] = [headers.join(',')];
+
+  for (const row of rows) {
+    const cells = [
+      row.workcenter,
+      row.family,
+      row.resource,
+      row.date,
+      row.ou_pct,
+      row.availability_pct,
+      row.prd_hours,
+      row.prd_pct,
+      row.sby_hours,
+      row.sby_pct,
+      row.udt_hours,
+      row.udt_pct,
+      row.sdt_hours,
+      row.sdt_pct,
+      row.egt_hours,
+      row.egt_pct,
+      row.nst_hours,
+      row.nst_pct,
+    ].map((v) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    });
+    lines.push(cells.join(','));
   }
+
+  const bom = '﻿';
+  const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const filename = `resource_history_${committedFilters.startDate}_to_${committedFilters.endDate}.csv`;
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 async function initPage(): Promise<void> {
@@ -776,6 +814,7 @@ onMounted(() => {
       <div class="ui-table-wrap" :class="{ 'is-loading': loading.querying }">
         <DetailSection
           :detail-data="detailData"
+          :detail-by-date="detailByDateData"
           :expanded-state="hierarchyState"
           :loading="loading.querying"
           @toggle-row="handleToggleRow"

@@ -100,6 +100,9 @@ function getIndentClass(level: number): string {
   if (level === 2) {
     return 'indent-2';
   }
+  if (level === 3) {
+    return 'indent-3';
+  }
   return '';
 }
 
@@ -321,30 +324,81 @@ function handleToggleAll(expand: boolean): void {
                     getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1)
                   )"
                 >
-                  <tr
+                  <template
                     v-for="(resource, resourceIndex) in getNodeChildren(family)"
                     :key="getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2)"
-                    :class="getRowClasses(resource, 2)"
-                    @click="handleRowClick(resource)"
                   >
-                    <td>
-                      <span class="row-name">
-                        <span class="expand-placeholder"></span>
-                        <span>{{ getNodeLabel(resource) }}</span>
-                      </span>
-                    </td>
-                    <td
-                      v-for="column in resolvedColumns"
-                      :key="`r-${getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2)}-${column.key}`"
-                      :class="getCellClasses(resource, column, getCellDisplay(resource, column))"
-                      @click.stop="handleCellClick(resource, column)"
+                    <tr
+                      :class="getRowClasses(resource, 2)"
+                      @click="handleRowClick(resource)"
                     >
-                      <template v-for="cell in [getCellDisplay(resource, column)]" :key="`rc-${column.key}`">
-                        <span v-if="cell.badgeClass" :class="cell.badgeClass">{{ cell.text }}</span>
-                        <template v-else>{{ cell.text }}</template>
-                      </template>
-                    </td>
-                  </tr>
+                      <td>
+                        <span class="row-name">
+                          <button
+                            v-if="hasChildren(resource)"
+                            type="button"
+                            class="expand-btn"
+                            :class="{
+                              expanded: isExpanded(
+                                resource,
+                                getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2)
+                              ),
+                            }"
+                            @click.stop="handleToggleRow(
+                              getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2)
+                            )"
+                          >
+                            ▶
+                          </button>
+                          <span v-else class="expand-placeholder"></span>
+                          <span>{{ getNodeLabel(resource) }}</span>
+                        </span>
+                      </td>
+                      <td
+                        v-for="column in resolvedColumns"
+                        :key="`r-${getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2)}-${column.key}`"
+                        :class="getCellClasses(resource, column, getCellDisplay(resource, column))"
+                        @click.stop="handleCellClick(resource, column)"
+                      >
+                        <template v-for="cell in [getCellDisplay(resource, column)]" :key="`rc-${column.key}`">
+                          <span v-if="cell.badgeClass" :class="cell.badgeClass">{{ cell.text }}</span>
+                          <template v-else>{{ cell.text }}</template>
+                        </template>
+                      </td>
+                    </tr>
+
+                    <template
+                      v-if="isExpanded(
+                        resource,
+                        getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2)
+                      )"
+                    >
+                      <tr
+                        v-for="(dateNode, dateIndex) in getNodeChildren(resource)"
+                        :key="getNodeId(dateNode, getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2), dateIndex, 3)"
+                        :class="getRowClasses(dateNode, 3)"
+                        @click="handleRowClick(dateNode)"
+                      >
+                        <td>
+                          <span class="row-name">
+                            <span class="expand-placeholder"></span>
+                            <span>{{ getNodeLabel(dateNode) }}</span>
+                          </span>
+                        </td>
+                        <td
+                          v-for="column in resolvedColumns"
+                          :key="`d-${getNodeId(dateNode, getNodeId(resource, getNodeId(family, getNodeId(group, 'root', groupIndex, 0), familyIndex, 1), resourceIndex, 2), dateIndex, 3)}-${column.key}`"
+                          :class="getCellClasses(dateNode, column, getCellDisplay(dateNode, column))"
+                          @click.stop="handleCellClick(dateNode, column)"
+                        >
+                          <template v-for="cell in [getCellDisplay(dateNode, column)]" :key="`dc-${column.key}`">
+                            <span v-if="cell.badgeClass" :class="cell.badgeClass">{{ cell.text }}</span>
+                            <template v-else>{{ cell.text }}</template>
+                          </template>
+                        </td>
+                      </tr>
+                    </template>
+                  </template>
                 </template>
               </template>
             </template>

@@ -229,6 +229,7 @@ def execute_primary_query(
                 "query_id": query_id,
                 "summary": _empty_summary(),
                 "detail": _empty_detail(),
+                "detail_by_date": _empty_detail_by_date(),
             }
 
         # Try DuckDB cache for recent queries (end_date in [today-90d, yesterday])
@@ -480,6 +481,7 @@ def execute_primary_query(
             "query_id": query_id,
             "summary": _empty_summary(),
             "detail": _empty_detail(),
+            "detail_by_date": _empty_detail_by_date(),
         }
     if _partial_failure_meta:
         result.setdefault("_meta", {})["partial_failure"] = _partial_failure_meta
@@ -532,6 +534,10 @@ def _empty_summary() -> Dict[str, Any]:
 
 def _empty_detail() -> Dict[str, Any]:
     return {"data": [], "total": 0, "truncated": False, "max_records": None}
+
+
+def _empty_detail_by_date() -> Dict[str, Any]:
+    return {"data": [], "total": 0}
 
 
 def _empty_kpi() -> Dict[str, Any]:

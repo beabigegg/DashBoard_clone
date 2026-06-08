@@ -486,6 +486,69 @@ def _query_detail(conn: Any) -> Dict[str, Any]:
     }
 
 
+def _query_detail_by_date(conn: Any, *, granularity: str = "day") -> Dict[str, Any]:
+    """Compute per-resource per-period metrics for date-level drill-down."""
+    bucket_expr = _granularity_bucket_expr(granularity)
+    sql = f"""
+        SELECT
+            s.historyid, s.workcenter, s.workcenter_seq, s.family, s.resource,
+            s.period, s.prd, s.sby, s.udt, s.sdt, s.egt, s.nst, s.total
+        FROM (
+            SELECT
+                CAST(s."HISTORYID" AS VARCHAR) AS historyid,
+                d.WC_GROUP AS workcenter,
+                d.WC_SEQ AS workcenter_seq,
+                d.FAMILY AS family,
+                d.RESOURCE AS resource,
+                {bucket_expr} AS period,
+                COALESCE(SUM(s."PRD_HOURS"), 0) AS prd,
+                COALESCE(SUM(s."SBY_HOURS"), 0) AS sby,
+                COALESCE(SUM(s."UDT_HOURS"), 0) AS udt,
+                COALESCE(SUM(s."SDT_HOURS"), 0) AS sdt,
+                COALESCE(SUM(s."EGT_HOURS"), 0) AS egt,
+                COALESCE(SUM(s."NST_HOURS"), 0) AS nst,
+                COALESCE(SUM(s."TOTAL_HOURS"), 0) AS total
+            FROM resource_src s
+            JOIN resource_dim d ON CAST(s."HISTORYID" AS VARCHAR) = d.HISTORYID
+            GROUP BY CAST(s."HISTORYID" AS VARCHAR), d.WC_GROUP, d.WC_SEQ, d.FAMILY, d.RESOURCE, {bucket_expr}
+        ) s
+        ORDER BY s.workcenter_seq, s.family, s.resource, s.period
+    """
+    rows = _fetch_dict_rows(conn, sql)
+    data: List[Dict[str, Any]] = []
+    for r in rows:
+        prd = _sf(r.get("prd"))
+        sby = _sf(r.get("sby"))
+        udt = _sf(r.get("udt"))
+        sdt = _sf(r.get("sdt"))
+        egt = _sf(r.get("egt"))
+        nst = _sf(r.get("nst"))
+        total = _sf(r.get("total"))
+        data.append({
+            "historyid": str(r.get("historyid") or ""),
+            "workcenter": str(r.get("workcenter") or ""),
+            "workcenter_seq": int(r.get("workcenter_seq") or 999),
+            "family": str(r.get("family") or ""),
+            "resource": str(r.get("resource") or ""),
+            "date": str(r.get("period") or ""),
+            "ou_pct": _calc_ou_pct(prd, sby, udt, sdt, egt),
+            "availability_pct": _calc_avail_pct(prd, sby, udt, sdt, egt, nst),
+            "prd_hours": round(prd, 1),
+            "prd_pct": _status_pct(prd, total),
+            "sby_hours": round(sby, 1),
+            "sby_pct": _status_pct(sby, total),
+            "udt_hours": round(udt, 1),
+            "udt_pct": _status_pct(udt, total),
+            "sdt_hours": round(sdt, 1),
+            "sdt_pct": _status_pct(sdt, total),
+            "egt_hours": round(egt, 1),
+            "egt_pct": _status_pct(egt, total),
+            "nst_hours": round(nst, 1),
+            "nst_pct": _status_pct(nst, total),
+        })
+    return {"data": data, "total": len(data)}
+
+
 # ── Empty fallbacks ───────────────────────────────────────────────────────────
 
 def _empty_kpi() -> Dict[str, Any]:
@@ -563,6 +626,7 @@ def try_compute_view_from_spool(
         heatmap_items = _query_heatmap(conn, granularity=granularity)
         comparison_items = _query_workcenter_comparison(conn)
         detail = _query_detail(conn)
+        detail_by_date = _query_detail_by_date(conn, granularity=granularity)
 
         latency_s = round(time.time() - started_at, 3)
         logger.info(
@@ -579,6 +643,7 @@ def try_compute_view_from_spool(
                 "workcenter_comparison": comparison_items,
             },
             "detail": detail,
+            "detail_by_date": detail_by_date,
         }
         meta = {"view_sql_latency_s": latency_s}
         return result, meta
@@ -714,6 +779,7 @@ def try_compute_query_from_canonical_spool(
         heatmap_items = _query_heatmap(conn, granularity=granularity)
         comparison_items = _query_workcenter_comparison(conn)
         detail = _query_detail(conn)
+        detail_by_date = _query_detail_by_date(conn, granularity=granularity)
 
         latency_s = round(time.time() - started_at, 3)
         logger.info(
@@ -730,6 +796,7 @@ def try_compute_query_from_canonical_spool(
                 "workcenter_comparison": comparison_items,
             },
             "detail": detail,
+            "detail_by_date": detail_by_date,
         }
         return result, {"canonical_spool_latency_s": latency_s}
 

@@ -221,6 +221,7 @@ export default {
           p40: '40px',
           p48: '48px',
           p50: '50px',
+          p72: '72px',
           p80: '80px',
         },
       },
