@@ -13,6 +13,7 @@ import os
 import socket
 import sqlite3
 import threading
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -228,7 +229,10 @@ class MetricsHistoryStore:
             raise
 
     def _generate_sync_id(self, rowid: int) -> str:
-        return f"{_HOSTNAME}_metrics_snapshots_{rowid}"
+        # Include a UUID fragment to prevent INSERT IGNORE collisions after DB
+        # rebuild (rowids restart from small values but MySQL still has old rows
+        # with matching hostname+rowid sync_ids from before the rebuild).
+        return f"{_HOSTNAME}_metrics_snapshots_{rowid}_{uuid.uuid4().hex[:8]}"
 
     def write_snapshot(self, data: Dict[str, Any]) -> bool:
         if not self._initialized:

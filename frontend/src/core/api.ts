@@ -257,6 +257,13 @@ async function fetchJson(url: string, options: FetchOptions = {}): Promise<unkno
     ...fetchOptions
   } = options;
 
+  // Always signal JSON-accept so the backend returns JSON 401 instead of a 302
+  // redirect (which fetch silently follows, returning HTML as an empty response).
+  fetchOptions.headers = {
+    Accept: 'application/json',
+    ...(fetchOptions.headers as Record<string, string> | undefined ?? {}),
+  };
+
   const requestUrl = buildUrlWithParams(url, params);
   const dedupKey = noDedup
     ? null

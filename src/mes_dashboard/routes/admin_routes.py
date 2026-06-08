@@ -715,8 +715,18 @@ def api_performance_history():
 def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
     """Query aggregated metrics from MySQL. Returns [] on any error."""
     try:
+        from datetime import datetime, timedelta
+
         from mes_dashboard.core.mysql_client import get_mysql_connection
         from sqlalchemy import text
+
+        # Use a Python-computed local-time cutoff instead of DATE_SUB(NOW(), ...)
+        # because NOW() on MySQL may be in UTC while stored ts values are local
+        # time (Python datetime.now().isoformat()) — mixing them causes the window
+        # to span many hours instead of the intended minutes.
+        cutoff_ts = (datetime.now() - timedelta(minutes=minutes)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
         sql = text(f"""
             SELECT
@@ -752,13 +762,13 @@ def _query_mysql_metrics(minutes: int = 30, bucket_seconds: int = 30) -> list:
                 COUNT(DISTINCT worker_pid) AS worker_count,
                 ROUND(MAX(redis_used_memory) / 1048576.0, 2) AS redis_used_memory_mb
             FROM dashboard_metrics_snapshots
-            WHERE ts >= DATE_SUB(NOW(), INTERVAL :minutes MINUTE)
+            WHERE ts >= :cutoff_ts
             GROUP BY FLOOR(UNIX_TIMESTAMP(ts) / {bucket_seconds})
             ORDER BY MIN(ts) ASC
         """)
 
         with get_mysql_connection() as conn:
-            result = conn.execute(sql, {"minutes": minutes})
+            result = conn.execute(sql, {"cutoff_ts": cutoff_ts})
             keys = result.keys()
             rows = []
             for row in result.fetchall():

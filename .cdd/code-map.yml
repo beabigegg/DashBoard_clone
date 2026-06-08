@@ -1,6 +1,6 @@
-# generated: 2026-06-08T01:51:51Z by cdd-kit 2.2.1
-# files: 831, src-lines: 234239, map-lines: 17822, compression: 13.1x
-# sources-digest: 4a964ee9b6e056d8ecdab45bccafc600dd12c342ca6c53f6194c8e5ab7349648
+# generated: 2026-06-08T02:56:16Z by cdd-kit 2.2.1
+# files: 831, src-lines: 234332, map-lines: 17832, compression: 13.1x
+# sources-digest: acbcd6148e372f8004171a44f5baae8b4f9156fcf466d28ec987d0b571cf2b68
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3753,7 +3753,7 @@ src/mes_dashboard/core/metrics.py:  # 231 lines
     - { name: get_metrics_summary, lines: 205-222 }
     - { name: record_query_latency, lines: 225-231 }
 
-src/mes_dashboard/core/metrics_history.py:  # 782 lines
+src/mes_dashboard/core/metrics_history.py:  # 786 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -3761,51 +3761,52 @@ src/mes_dashboard/core/metrics_history.py:  # 782 lines
     - { module: socket, items: [], line: 13 }
     - { module: sqlite3, items: [], line: 14 }
     - { module: threading, items: [], line: 15 }
-    - { module: contextlib, items: [contextmanager], line: 16 }
-    - { module: datetime, items: [datetime, timedelta], line: 17 }
-    - { module: pathlib, items: [Path], line: 18 }
-    - { module: typing, items: [Any, Dict, Generator, List, Optional], line: 19 }
+    - { module: uuid, items: [], line: 16 }
+    - { module: contextlib, items: [contextmanager], line: 17 }
+    - { module: datetime, items: [datetime, timedelta], line: 18 }
+    - { module: pathlib, items: [Path], line: 19 }
+    - { module: typing, items: [Any, Dict, Generator, List, Optional], line: 20 }
   constants:
-    - { name: METRICS_HISTORY_PATH, line: 27 }
-    - { name: METRICS_HISTORY_INTERVAL, line: 31 }
-    - { name: METRICS_HISTORY_RETENTION_DAYS, line: 32 }
-    - { name: METRICS_HISTORY_MAX_ROWS, line: 33 }
-    - { name: ARCHIVE_LOG_DIR, line: 35 }
-    - { name: ARCHIVE_LOG_KEEP_COUNT, line: 36 }
-    - { name: CREATE_TABLE_SQL, line: 42 }
-    - { name: CREATE_INDEX_SQL, line: 104 }
-    - { name: CREATE_INDEX_SYNCED_SQL, line: 107 }
-    - { name: COLUMNS, line: 113 }
+    - { name: METRICS_HISTORY_PATH, line: 28 }
+    - { name: METRICS_HISTORY_INTERVAL, line: 32 }
+    - { name: METRICS_HISTORY_RETENTION_DAYS, line: 33 }
+    - { name: METRICS_HISTORY_MAX_ROWS, line: 34 }
+    - { name: ARCHIVE_LOG_DIR, line: 36 }
+    - { name: ARCHIVE_LOG_KEEP_COUNT, line: 37 }
+    - { name: CREATE_TABLE_SQL, line: 43 }
+    - { name: CREATE_INDEX_SQL, line: 105 }
+    - { name: CREATE_INDEX_SYNCED_SQL, line: 108 }
+    - { name: COLUMNS, line: 114 }
   classes:
     - name: MetricsHistoryStore
-      lines: 176-499
+      lines: 177-503
       methods:
-        - { name: __init__, lines: 179-183 }
-        - { name: initialize, lines: 185-206 }
-        - { name: _get_connection, lines: 209-228 }
-        - { name: _generate_sync_id, lines: 230-231 }
-        - { name: write_snapshot, lines: 233-310 }
-        - { name: query_snapshots, lines: 312-325 }
-        - { name: query_snapshots_aggregated, lines: 327-391 }
-        - { name: cleanup, lines: 393-427 }
-        - { name: get_unsynced, lines: 429-442 }
-        - { name: mark_synced, lines: 444-458 }
-        - { name: cleanup_synced, lines: 460-479 }
-        - { name: purge, lines: 481-499 }
+        - { name: __init__, lines: 180-184 }
+        - { name: initialize, lines: 186-207 }
+        - { name: _get_connection, lines: 210-229 }
+        - { name: _generate_sync_id, lines: 231-235 }
+        - { name: write_snapshot, lines: 237-314 }
+        - { name: query_snapshots, lines: 316-329 }
+        - { name: query_snapshots_aggregated, lines: 331-395 }
+        - { name: cleanup, lines: 397-431 }
+        - { name: get_unsynced, lines: 433-446 }
+        - { name: mark_synced, lines: 448-462 }
+        - { name: cleanup_synced, lines: 464-483 }
+        - { name: purge, lines: 485-503 }
     - name: MetricsHistoryCollector
-      lines: 506-752
+      lines: 510-756
       methods:
-        - { name: __init__, lines: 509-520 }
-        - { name: start, lines: 522-532 }
-        - { name: stop, lines: 534-538 }
-        - { name: _run, lines: 540-553 }
-        - { name: _reset_route_cache_hit_miss_counts, lines: 555-594 }
-        - { name: _collect_snapshot, lines: 596-752 }
+        - { name: __init__, lines: 513-524 }
+        - { name: start, lines: 526-536 }
+        - { name: stop, lines: 538-542 }
+        - { name: _run, lines: 544-557 }
+        - { name: _reset_route_cache_hit_miss_counts, lines: 559-598 }
+        - { name: _collect_snapshot, lines: 600-756 }
   functions:
-    - { name: cleanup_archive_logs, lines: 140-169 }
-    - { name: get_metrics_history_store, lines: 763-768 }
-    - { name: start_metrics_history, lines: 771-775 }
-    - { name: stop_metrics_history, lines: 778-782 }
+    - { name: cleanup_archive_logs, lines: 141-170 }
+    - { name: get_metrics_history_store, lines: 767-772 }
+    - { name: start_metrics_history, lines: 775-779 }
+    - { name: stop_metrics_history, lines: 782-786 }
 
 src/mes_dashboard/core/modernization_policy.py:  # 167 lines
   imports:
@@ -4376,7 +4377,7 @@ src/mes_dashboard/routes/__init__.py:  # 82 lines
   functions:
     - { name: register_routes, lines: 32-55 }
 
-src/mes_dashboard/routes/admin_routes.py:  # 1495 lines
+src/mes_dashboard/routes/admin_routes.py:  # 1505 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -4413,31 +4414,31 @@ src/mes_dashboard/routes/admin_routes.py:  # 1495 lines
     - { name: _collect_redis_namespace_memory, lines: 421-465 }
     - { name: api_performance_detail, lines: 470-677 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
     - { name: api_performance_history, lines: 682-712 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
-    - { name: _query_mysql_metrics, lines: 715-776 }
-    - { name: api_performance_history_purge, lines: 781-787 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
-    - { name: api_storage_info, lines: 792-862 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
-    - { name: api_log_files_cleanup, lines: 867-915 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
-    - { name: api_logs_cleanup, lines: 920-971 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
-    - { name: _get_restart_state, lines: 978-980 }
-    - { name: _iso_from_epoch, lines: 983-986 }
-    - { name: _check_restart_cooldown, lines: 989-998 }
-    - { name: _get_restart_history, lines: 1001-1004 }
-    - { name: _get_restart_churn_summary, lines: 1007-1010 }
-    - { name: _get_restart_policy_state, lines: 1013-1033 }
-    - { name: _build_restart_alerts, lines: 1036-1054 }
-    - { name: _log_restart_audit, lines: 1057-1064 }
-    - { name: api_worker_restart, lines: 1069-1194 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
-    - { name: api_worker_status, lines: 1199-1291 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
-    - { name: user_usage_kpi, lines: 1300-1302 }  # @admin_bp.route('/user-usage-kpi')
-    - { name: api_user_usage_kpi, lines: 1307-1326 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
-    - { name: pages, lines: 1335-1359 }  # @admin_bp.route('/pages')
-    - { name: api_get_pages, lines: 1364-1366 }  # @admin_bp.route('/api/pages', methods=['GET'])
-    - { name: api_get_drawers, lines: 1371-1373 }  # @admin_bp.route('/api/drawers', methods=['GET'])
-    - { name: api_create_drawer, lines: 1378-1395 }  # @admin_bp.route('/api/drawers', methods=['POST'])
-    - { name: api_update_drawer, lines: 1400-1427 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['PUT'])
-    - { name: api_delete_drawer, lines: 1432-1444 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['DELETE'])
-    - { name: api_update_page, lines: 1449-1482 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
-    - { name: recalculate_anomaly_detection, lines: 1487-1495 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
+    - { name: _query_mysql_metrics, lines: 715-786 }
+    - { name: api_performance_history_purge, lines: 791-797 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
+    - { name: api_storage_info, lines: 802-872 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
+    - { name: api_log_files_cleanup, lines: 877-925 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
+    - { name: api_logs_cleanup, lines: 930-981 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
+    - { name: _get_restart_state, lines: 988-990 }
+    - { name: _iso_from_epoch, lines: 993-996 }
+    - { name: _check_restart_cooldown, lines: 999-1008 }
+    - { name: _get_restart_history, lines: 1011-1014 }
+    - { name: _get_restart_churn_summary, lines: 1017-1020 }
+    - { name: _get_restart_policy_state, lines: 1023-1043 }
+    - { name: _build_restart_alerts, lines: 1046-1064 }
+    - { name: _log_restart_audit, lines: 1067-1074 }
+    - { name: api_worker_restart, lines: 1079-1204 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
+    - { name: api_worker_status, lines: 1209-1301 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
+    - { name: user_usage_kpi, lines: 1310-1312 }  # @admin_bp.route('/user-usage-kpi')
+    - { name: api_user_usage_kpi, lines: 1317-1336 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
+    - { name: pages, lines: 1345-1369 }  # @admin_bp.route('/pages')
+    - { name: api_get_pages, lines: 1374-1376 }  # @admin_bp.route('/api/pages', methods=['GET'])
+    - { name: api_get_drawers, lines: 1381-1383 }  # @admin_bp.route('/api/drawers', methods=['GET'])
+    - { name: api_create_drawer, lines: 1388-1405 }  # @admin_bp.route('/api/drawers', methods=['POST'])
+    - { name: api_update_drawer, lines: 1410-1437 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['PUT'])
+    - { name: api_delete_drawer, lines: 1442-1454 }  # @admin_bp.route('/api/drawers/<drawer_id>', methods=['DELETE'])
+    - { name: api_update_page, lines: 1459-1492 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
+    - { name: recalculate_anomaly_detection, lines: 1497-1505 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
 
 src/mes_dashboard/routes/ai_routes.py:  # 75 lines
   imports:
@@ -6569,7 +6570,7 @@ src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1047 lines
     - { name: try_compute_view_from_spool, lines: 626-892 }
     - { name: try_iter_export_rows_from_spool, lines: 895-1047 }
 
-src/mes_dashboard/services/reject_dataset_cache.py:  # 2031 lines
+src/mes_dashboard/services/reject_dataset_cache.py:  # 2034 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6608,38 +6609,38 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 2031 lines
     - { name: _clear_partial_failure_flag, lines: 219-226 }
     - { name: _query_lock_key, lines: 229-230 }
     - { name: _acquire_query_lock, lines: 233-249 }
-    - { name: _release_query_lock, lines: 252-266 }
-    - { name: _is_query_lock_active, lines: 269-277 }
-    - { name: _wait_for_inflight_query_result, lines: 280-295 }
-    - { name: _has_cached_df, lines: 304-309 }
-    - { name: _store_df, lines: 312-316 }
-    - { name: _optimize_groupby_dtypes, lines: 319-336 }
-    - { name: _store_query_result, lines: 339-376 }
-    - { name: _df_memory_mb, lines: 379-381 }
-    - { name: _enforce_interactive_memory_guard, lines: 384-394 }
-    - { name: _maybe_collect_after_interactive_compute, lines: 397-399 }
-    - { name: _read_sql_with_caller, lines: 402-408 }
-    - { name: resolve_containers, lines: 423-470 }
-    - { name: _execute_and_spool, lines: 478-793 }
-    - { name: execute_primary_query, lines: 801-1230 }
-    - { name: ensure_dataset_loaded, lines: 1233-1270 }
-    - { name: _apply_policy_filters, lines: 1273-1321 }
-    - { name: apply_view, lines: 1329-1382 }
-    - { name: _apply_supplementary_filters, lines: 1385-1424 }
-    - { name: _normalize_pareto_values, lines: 1427-1436 }
-    - { name: _apply_pareto_selection_filter, lines: 1439-1486 }
-    - { name: _paginate_detail, lines: 1489-1581 }
-    - { name: _extract_available_filters, lines: 1584-1590 }
-    - { name: _project_pareto_guard_frame, lines: 1611-1628 }
-    - { name: _normalize_metric_mode, lines: 1631-1635 }
-    - { name: _normalize_pareto_scope, lines: 1638-1642 }
-    - { name: _normalize_pareto_display_scope, lines: 1645-1649 }
-    - { name: _normalize_pareto_selections, lines: 1652-1665 }
-    - { name: _build_dimension_pareto_items, lines: 1668-1733 }
-    - { name: _apply_cross_filter, lines: 1736-1763 }
-    - { name: compute_dimension_pareto, lines: 1766-1874 }
-    - { name: compute_batch_pareto, lines: 1877-1970 }
-    - { name: export_csv_from_cache, lines: 1978-2031 }
+    - { name: _release_query_lock, lines: 261-269 }
+    - { name: _is_query_lock_active, lines: 272-280 }
+    - { name: _wait_for_inflight_query_result, lines: 283-298 }
+    - { name: _has_cached_df, lines: 307-312 }
+    - { name: _store_df, lines: 315-319 }
+    - { name: _optimize_groupby_dtypes, lines: 322-339 }
+    - { name: _store_query_result, lines: 342-379 }
+    - { name: _df_memory_mb, lines: 382-384 }
+    - { name: _enforce_interactive_memory_guard, lines: 387-397 }
+    - { name: _maybe_collect_after_interactive_compute, lines: 400-402 }
+    - { name: _read_sql_with_caller, lines: 405-411 }
+    - { name: resolve_containers, lines: 426-473 }
+    - { name: _execute_and_spool, lines: 481-796 }
+    - { name: execute_primary_query, lines: 804-1233 }
+    - { name: ensure_dataset_loaded, lines: 1236-1273 }
+    - { name: _apply_policy_filters, lines: 1276-1324 }
+    - { name: apply_view, lines: 1332-1385 }
+    - { name: _apply_supplementary_filters, lines: 1388-1427 }
+    - { name: _normalize_pareto_values, lines: 1430-1439 }
+    - { name: _apply_pareto_selection_filter, lines: 1442-1489 }
+    - { name: _paginate_detail, lines: 1492-1584 }
+    - { name: _extract_available_filters, lines: 1587-1593 }
+    - { name: _project_pareto_guard_frame, lines: 1614-1631 }
+    - { name: _normalize_metric_mode, lines: 1634-1638 }
+    - { name: _normalize_pareto_scope, lines: 1641-1645 }
+    - { name: _normalize_pareto_display_scope, lines: 1648-1652 }
+    - { name: _normalize_pareto_selections, lines: 1655-1668 }
+    - { name: _build_dimension_pareto_items, lines: 1671-1736 }
+    - { name: _apply_cross_filter, lines: 1739-1766 }
+    - { name: compute_dimension_pareto, lines: 1769-1877 }
+    - { name: compute_batch_pareto, lines: 1880-1973 }
+    - { name: export_csv_from_cache, lines: 1981-2034 }
 
 src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
   imports:
@@ -15511,7 +15512,7 @@ tests/test_reject_cache_sql_runtime.py:  # 136 lines
         - { name: test_spool_miss_value, lines: 132-133 }
         - { name: test_runtime_error_value, lines: 135-136 }
 
-tests/test_reject_dataset_cache.py:  # 1653 lines
+tests/test_reject_dataset_cache.py:  # 1729 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -15543,6 +15544,15 @@ tests/test_reject_dataset_cache.py:  # 1653 lines
         - { name: test_partial_failure_loaded_into_response_meta, lines: 1620-1634 }
         - { name: test_no_partial_failure_meta_not_updated, lines: 1636-1643 }
         - { name: test_logger_warning_on_partial_failure, lines: 1645-1653 }
+    - name: TestReleaseQueryLockAtomic
+      lines: 1660-1729
+      methods:
+        - { name: _make_client, lines: 1663-1664 }
+        - { name: test_calls_eval_not_get_delete, lines: 1666-1678 }
+        - { name: test_eval_passes_key_and_owner, lines: 1680-1693 }
+        - { name: test_no_op_when_redis_unavailable, lines: 1695-1700 }
+        - { name: test_warning_logged_on_eval_exception, lines: 1702-1715 }
+        - { name: test_does_not_delete_foreign_owner, lines: 1717-1729 }
   functions:
     - { name: test_compute_dimension_pareto_applies_policy_filters_before_grouping, lines: 17-74 }
     - { name: _build_detail_filter_df, lines: 77-144 }
