@@ -280,6 +280,14 @@
     background: theme('colors.stroke.soft');
   }
 
+  .ui-btn--icon {
+    padding: theme('spacing.token.p6');
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
   /* === Shared Page Header (gradient) === */
   .ui-page-header {
     display: flex;
