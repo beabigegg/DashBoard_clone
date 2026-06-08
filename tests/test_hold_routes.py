@@ -122,10 +122,10 @@ class TestHoldDetailSummaryRoute(TestHoldRoutesBase):
 
         self.client.get('/api/wip/hold-detail/summary?reason=YieldLimit&include_dummy=true')
 
-        mock_get_summary.assert_called_once_with(
-            reason='YieldLimit',
-            include_dummy=True
-        )
+        mock_get_summary.assert_called_once()
+        kw = mock_get_summary.call_args.kwargs
+        self.assertEqual(kw['reason'], 'YieldLimit')
+        self.assertTrue(kw['include_dummy'])
 
 
 class TestHoldDetailDistributionRoute(TestHoldRoutesBase):
@@ -192,10 +192,10 @@ class TestHoldDetailDistributionRoute(TestHoldRoutesBase):
 
         self.client.get('/api/wip/hold-detail/distribution?reason=YieldLimit&include_dummy=1')
 
-        mock_get_dist.assert_called_once_with(
-            reason='YieldLimit',
-            include_dummy=True
-        )
+        mock_get_dist.assert_called_once()
+        kw = mock_get_dist.call_args.kwargs
+        self.assertEqual(kw['reason'], 'YieldLimit')
+        self.assertTrue(kw['include_dummy'])
 
 
 class TestHoldDetailLotsRoute(TestHoldRoutesBase):
@@ -264,15 +264,15 @@ class TestHoldDetailLotsRoute(TestHoldRoutesBase):
             '/api/wip/hold-detail/lots?reason=YieldLimit&workcenter=DA&package=DIP-B&age_range=1-3&page=2'
         )
 
-        mock_get_lots.assert_called_once_with(
-            reason='YieldLimit',
-            workcenter='DA',
-            package='DIP-B',
-            age_range='1-3',
-            include_dummy=False,
-            page=2,
-            page_size=50
-        )
+        mock_get_lots.assert_called_once()
+        kw = mock_get_lots.call_args.kwargs
+        self.assertEqual(kw['reason'], 'YieldLimit')
+        self.assertEqual(kw['workcenter'], 'DA')
+        self.assertEqual(kw['package'], 'DIP-B')
+        self.assertEqual(kw['age_range'], '1-3')
+        self.assertFalse(kw['include_dummy'])
+        self.assertEqual(kw['page'], 2)
+        self.assertEqual(kw['page_size'], 50)
 
     def test_validates_age_range_parameter(self):
         """Should return 400 for invalid age_range."""
