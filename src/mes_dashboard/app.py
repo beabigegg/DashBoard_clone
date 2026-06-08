@@ -699,6 +699,13 @@ def _start_per_worker_services(worker=None) -> None:
     except Exception as exc:
         _log.warning("_start_per_worker_services: init_anomaly_detection_scheduler failed: %s", exc)
 
+    # Spool warmup scheduler (leader-elected via Redis lock; safe to call from every worker).
+    try:
+        from mes_dashboard.core.spool_warmup_scheduler import init_warmup_scheduler
+        init_warmup_scheduler(_app)
+    except Exception as exc:
+        _log.warning("_start_per_worker_services: init_warmup_scheduler failed: %s", exc)
+
     # Metrics history collector thread.
     try:
         from mes_dashboard.core.metrics_history import start_metrics_history
@@ -854,6 +861,8 @@ def create_app(config_name: str | None = None) -> Flask:
             init_scrap_reason_exclusion_cache(app)  # Start exclusion-policy cache sync
             init_query_spool_cleanup(app)  # Start parquet spool cleanup worker
             init_anomaly_detection_scheduler(app)  # Start anomaly detection scheduler
+            from mes_dashboard.core.spool_warmup_scheduler import init_warmup_scheduler
+            init_warmup_scheduler(app)  # Start spool warmup scheduler (leader-elected)
             from mes_dashboard.core.metrics_history import start_metrics_history
             start_metrics_history(app)  # Start metrics history collector
             from mes_dashboard.core.worker_memory_guard import start_worker_memory_guard

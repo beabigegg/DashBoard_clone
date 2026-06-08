@@ -537,11 +537,14 @@ def _execute_and_spool(
     if mode == "date_range" and start_date and end_date and should_decompose_by_time(start_date, end_date):
         if _USE_ROW_COUNT_CHUNKING:
             # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
+            # where_clause="" because {{ WHERE_CLAUSE }} lives after "FROM base b" (outer scope,
+            # b.* columns only). The date filter uses r.TXNDATE (inner CTE alias) and must go in
+            # {{ BASE_WHERE }} via base_where — _DEFAULT_BASE_WHERE covers date_range mode.
             count_sql_template = _prepare_sql(
                 "count_query",
-                where_clause=base_where,
+                where_clause="",
                 base_variant="lot",
-                base_where="",
+                base_where=base_where,
             )
             _count_df = _read_sql_with_caller(
                 count_sql_template,
@@ -592,11 +595,13 @@ def _execute_and_spool(
 
             if "start_row" in chunk:
                 # Row-count paged chunk (USE_ROW_COUNT_CHUNKING=true)
+                # Same alias-scope rule as count_query: date filter via base_where (CTE inner),
+                # where_clause="" (outer scope only accepts b.* column filters).
                 paged_sql = _prepare_sql(
                     "list_paged",
-                    where_clause=base_where,
+                    where_clause="",
                     base_variant="lot",
-                    base_where="",
+                    base_where=base_where,
                 )
                 chunk_params = dict(base_params)
                 chunk_params["start_row"] = chunk["start_row"]
@@ -994,11 +999,12 @@ def execute_primary_query(
         if mode == "date_range" and should_decompose_by_time(start_date, end_date):
             if _USE_ROW_COUNT_CHUNKING:
                 # Row-count branch: count first, then paged chunks
+                # Same alias-scope rule: date filter via base_where (CTE inner r.* alias).
                 _count_sql_exec = _prepare_sql(
                     "count_query",
-                    where_clause=base_where,
+                    where_clause="",
                     base_variant="lot",
-                    base_where="",
+                    base_where=base_where,
                 )
                 _count_df_exec = _read_sql_with_caller(
                     _count_sql_exec, base_params,
@@ -1051,7 +1057,24 @@ def execute_primary_query(
                 chunk_where_parts: List[str] = []
                 chunk_params: Dict[str, Any] = {}
 
-                if "chunk_start" in chunk:
+                if "start_row" in chunk:
+                    # Row-count paged chunk (USE_ROW_COUNT_CHUNKING=true)
+                    paged_sql = _prepare_sql(
+                        "list_paged",
+                        where_clause="",
+                        base_variant="lot",
+                        base_where=base_where,
+                    )
+                    chunk_params = dict(base_params)
+                    chunk_params["start_row"] = chunk["start_row"]
+                    chunk_params["end_row"] = chunk["end_row"]
+                    chunk_df = _read_sql_with_caller(
+                        paged_sql,
+                        chunk_params,
+                        "reject_dataset_cache:execute_paged_chunk",
+                    )
+                    return chunk_df if chunk_df is not None else pd.DataFrame()
+                elif "chunk_start" in chunk:
                     # Time-range chunk
                     chunk_where_parts.append(
                         "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
