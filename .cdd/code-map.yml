@@ -1,6 +1,6 @@
-# generated: 2026-06-08T08:32:44Z by cdd-kit 2.2.1
-# files: 831, src-lines: 234593, map-lines: 17836, compression: 13.2x
-# sources-digest: 0c4df7b2c9edd14aeb3b5185c4393871653a372ad8f55cbea5428115c1c4479a
+# generated: 2026-06-08T12:37:19Z by cdd-kit 2.2.1
+# files: 833, src-lines: 235342, map-lines: 17850, compression: 13.2x
+# sources-digest: a8d2a11dab1fc82851d4475ea3c7fc1722358330b3c0e7aaeceaa57fa59e6dad
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -564,7 +564,19 @@ frontend/src/core/field-contracts.ts:  # 40 lines
   interfaces:
     - { name: FieldContract, lines: 7-12 }
 
-frontend/src/core/index.ts:  # 207 lines
+frontend/src/core/hold-navigation-state.ts:  # 99 lines
+  constants:
+    - { name: STORAGE_KEY, line: 5 }
+  functions:
+    - { name: storeHoldNavigationState, lines: 37-65 }
+    - { name: loadHoldNavigationState, lines: 67-78 }
+    - { name: peekHoldNavigationState, lines: 81-91 }
+    - { name: clearHoldNavigationState, lines: 93-99 }
+  interfaces:
+    - { name: HoldNavigationState, lines: 7-23 }
+    - { name: HoldPanelFilters, lines: 25-35 }
+
+frontend/src/core/index.ts:  # 215 lines
 
 frontend/src/core/pending-jobs-registry.ts:  # 105 lines
   imports:
@@ -853,7 +865,7 @@ frontend/src/downtime-analysis/types.ts:  # 124 lines
   types:
     - { name: MatchSource, lines: 59-59 }
 
-frontend/src/hold-detail/App.vue:  # 493 lines
+frontend/src/hold-detail/App.vue:  # 557 lines
 
 frontend/src/hold-detail/components/AgeDistribution.vue:  # 63 lines
 
@@ -941,7 +953,7 @@ frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
     - { name: BaseConditionParams, lines: 191-196 }  # local
     - { name: QueryListParams, lines: 381-387 }  # local
 
-frontend/src/hold-overview/App.vue:  # 958 lines
+frontend/src/hold-overview/App.vue:  # 1003 lines
 
 frontend/src/hold-overview/components/FilterBar.vue:  # 103 lines
 
@@ -2027,9 +2039,9 @@ frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 199 lines
 
 frontend/src/shared-ui/index.ts:  # 22 lines
 
-frontend/src/wip-detail/App.vue:  # 598 lines
+frontend/src/wip-detail/App.vue:  # 592 lines
 
-frontend/src/wip-detail/components/FilterPanel.vue:  # 163 lines
+frontend/src/wip-detail/components/FilterPanel.vue:  # 206 lines
 
 frontend/src/wip-detail/components/LotDetailPanel.vue:  # 198 lines
 
@@ -2044,13 +2056,15 @@ frontend/src/wip-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-frontend/src/wip-overview/App.vue:  # 563 lines
+frontend/src/wip-overview/App.vue:  # 575 lines
 
-frontend/src/wip-overview/components/FilterPanel.vue:  # 164 lines
+frontend/src/wip-overview/components/FilterPanel.vue:  # 206 lines
 
-frontend/src/wip-overview/components/MatrixTable.vue:  # 134 lines
+frontend/src/wip-overview/components/MatrixTable.vue:  # 185 lines
 
 frontend/src/wip-overview/components/StatusCards.vue:  # 59 lines
+
+frontend/src/wip-overview/components/WipDistributionCharts.vue:  # 244 lines
 
 frontend/src/wip-overview/main.ts:  # 8 lines
   imports:
@@ -2217,11 +2231,11 @@ frontend/tests/components/DateRangePicker.test.js:  # 68 lines
   functions:
     - { name: isRangeExceeded, lines: 29-36 }
 
-frontend/tests/components/FilterPanel.test.js:  # 198 lines
+frontend/tests/components/FilterPanel.test.js:  # 215 lines
   imports:
-    - { module: vitest, items: [describe, it, expect, vi], line: 16 }
-    - { module: '@vue/test-utils', items: [shallowMount], line: 17 }
-    - { module: '../../src/wip-overview/components/FilterPanel.vue', items: ['default:FilterPanel'], line: 18 }
+    - { module: vitest, items: [describe, it, expect, vi], line: 20 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 21 }
+    - { module: '../../src/wip-overview/components/FilterPanel.vue', items: ['default:FilterPanel'], line: 22 }
 
 frontend/tests/components/HoldMatrix.test.js:  # 125 lines
   imports:
@@ -4577,7 +4591,7 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 350 lines
     - { name: api_hold_history_config, lines: 272-277 }  # @hold_history_bp.route('/api/hold-history/config')
     - { name: api_hold_history_today_snapshot, lines: 287-350 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
-src/mes_dashboard/routes/hold_overview_routes.py:  # 283 lines
+src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
   imports:
     - { module: os, items: [], line: 4 }
     - { module: typing, items: [Optional], line: 5 }
@@ -4594,12 +4608,12 @@ src/mes_dashboard/routes/hold_overview_routes.py:  # 283 lines
     - { name: _parse_reason_list, lines: 67-80 }
     - { name: _parse_hold_type, lines: 83-95 }
     - { name: hold_overview_page, lines: 99-117 }  # @hold_overview_bp.route('/hold-overview')
-    - { name: api_hold_overview_summary, lines: 121-158 }  # @hold_overview_bp.route('/api/hold-overview/summary', methods=['GET', 'POST'])
-    - { name: api_hold_overview_matrix, lines: 163-197 }  # @hold_overview_bp.route('/api/hold-overview/matrix', methods=['GET', 'POST'])
-    - { name: api_hold_overview_treemap, lines: 201-222 }  # @hold_overview_bp.route('/api/hold-overview/treemap', methods=['GET', 'POST'])
-    - { name: api_hold_overview_lots, lines: 227-283 }  # @hold_overview_bp.route('/api/hold-overview/lots', methods=['GET', 'POST'])
+    - { name: api_hold_overview_summary, lines: 121-160 }  # @hold_overview_bp.route('/api/hold-overview/summary', methods=['GET', 'POST'])
+    - { name: api_hold_overview_matrix, lines: 165-201 }  # @hold_overview_bp.route('/api/hold-overview/matrix', methods=['GET', 'POST'])
+    - { name: api_hold_overview_treemap, lines: 205-226 }  # @hold_overview_bp.route('/api/hold-overview/treemap', methods=['GET', 'POST'])
+    - { name: api_hold_overview_lots, lines: 231-287 }  # @hold_overview_bp.route('/api/hold-overview/lots', methods=['GET', 'POST'])
 
-src/mes_dashboard/routes/hold_routes.py:  # 186 lines
+src/mes_dashboard/routes/hold_routes.py:  # 247 lines
   imports:
     - { module: html, items: [], line: 7 }
     - { module: os, items: [], line: 8 }
@@ -4611,9 +4625,9 @@ src/mes_dashboard/routes/hold_routes.py:  # 186 lines
     - { module: mes_dashboard.services.wip_service, items: [get_hold_detail_summary, get_hold_detail_distribution, get_hold_detail_lots], line: 19 }
   functions:
     - { name: hold_detail_page, lines: 42-78 }  # @hold_bp.route('/hold-detail')
-    - { name: api_hold_detail_summary, lines: 86-108 }  # @hold_bp.route('/api/wip/hold-detail/summary')
-    - { name: api_hold_detail_distribution, lines: 112-134 }  # @hold_bp.route('/api/wip/hold-detail/distribution')
-    - { name: api_hold_detail_lots, lines: 139-186 }  # @hold_bp.route('/api/wip/hold-detail/lots')
+    - { name: api_hold_detail_summary, lines: 86-126 }  # @hold_bp.route('/api/wip/hold-detail/summary')
+    - { name: api_hold_detail_distribution, lines: 130-170 }  # @hold_bp.route('/api/wip/hold-detail/distribution')
+    - { name: api_hold_detail_lots, lines: 175-247 }  # @hold_bp.route('/api/wip/hold-detail/lots')
 
 src/mes_dashboard/routes/internal_routes.py:  # 74 lines
   imports:
@@ -7168,7 +7182,7 @@ src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
     - { name: _safe_int, lines: 412-419 }
     - { name: _compute_duration_buckets, lines: 422-434 }
 
-src/mes_dashboard/services/wip_service.py:  # 4107 lines
+src/mes_dashboard/services/wip_service.py:  # 4179 lines
   imports:
     - { module: logging, items: [], line: 10 }
     - { module: threading, items: [], line: 11 }
@@ -7183,7 +7197,7 @@ src/mes_dashboard/services/wip_service.py:  # 4107 lines
     - { module: mes_dashboard.sql.filters, items: [CommonFilters, NON_QUALITY_HOLD_REASONS], line: 30 }
   constants:
     - { name: WIP_VIEW, line: 146 }
-    - { name: LOT_DETAIL_FIELD_LABELS, line: 3820 }
+    - { name: LOT_DETAIL_FIELD_LABELS, line: 3892 }
   functions:
     - { name: _safe_value, lines: 52-59 }
     - { name: _build_base_conditions_builder, lines: 62-99 }
@@ -7245,17 +7259,17 @@ src/mes_dashboard/services/wip_service.py:  # 4107 lines
     - { name: _search_packages_from_oracle, lines: 2714-2752 }
     - { name: search_types, lines: 2755-2824 }
     - { name: _search_types_from_oracle, lines: 2827-2865 }
-    - { name: get_hold_detail_summary, lines: 2872-2987 }
-    - { name: _get_hold_detail_summary_from_oracle, lines: 2990-3058 }
-    - { name: get_hold_detail_distribution, lines: 3061-3198 }
-    - { name: _get_hold_detail_distribution_from_oracle, lines: 3201-3341 }
-    - { name: get_hold_detail_lots, lines: 3344-3521 }
-    - { name: _get_hold_detail_lots_from_oracle, lines: 3524-3669 }
-    - { name: get_hold_overview_treemap, lines: 3676-3751 }
-    - { name: _get_hold_overview_treemap_from_oracle, lines: 3754-3812 }
-    - { name: get_lot_detail, lines: 3878-3912 }
-    - { name: _get_lot_detail_from_oracle, lines: 3915-3995 }
-    - { name: _build_lot_detail_response, lines: 3998-4107 }
+    - { name: get_hold_detail_summary, lines: 2872-2991 }
+    - { name: _get_hold_detail_summary_from_oracle, lines: 2994-3065 }
+    - { name: get_hold_detail_distribution, lines: 3068-3246 }
+    - { name: _get_hold_detail_distribution_from_oracle, lines: 3249-3413 }
+    - { name: get_hold_detail_lots, lines: 3416-3593 }
+    - { name: _get_hold_detail_lots_from_oracle, lines: 3596-3741 }
+    - { name: get_hold_overview_treemap, lines: 3748-3823 }
+    - { name: _get_hold_overview_treemap_from_oracle, lines: 3826-3884 }
+    - { name: get_lot_detail, lines: 3950-3984 }
+    - { name: _get_lot_detail_from_oracle, lines: 3987-4067 }
+    - { name: _build_lot_detail_response, lines: 4070-4179 }
 
 src/mes_dashboard/services/yield_alert_contracts.py:  # 84 lines
   imports:
@@ -12715,7 +12729,7 @@ tests/test_hold_history_sql_runtime.py:  # 226 lines
         - { name: test_day_map_initialized_with_repeat_quality, lines: 208-215 }
         - { name: test_repeat_quality_accumulates_from_batch, lines: 217-226 }
 
-tests/test_hold_overview_routes.py:  # 429 lines
+tests/test_hold_overview_routes.py:  # 414 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: unittest, items: [], line: 5 }
@@ -12733,49 +12747,49 @@ tests/test_hold_overview_routes.py:  # 429 lines
         - { name: test_hold_overview_page_includes_vite_entry, lines: 26-29 }
         - { name: test_hold_overview_page_redirects_without_admin, lines: 32-35 }
     - name: TestHoldOverviewSummaryRoute
-      lines: 38-110
+      lines: 38-100
       methods:
-        - { name: test_summary_defaults_to_quality, lines: 42-69 }
-        - { name: test_summary_hold_type_all_maps_to_none, lines: 72-96 }
-        - { name: test_summary_invalid_hold_type, lines: 98-102 }
-        - { name: test_summary_failure_returns_500, lines: 105-110 }
+        - { name: test_summary_defaults_to_quality, lines: 42-64 }
+        - { name: test_summary_hold_type_all_maps_to_none, lines: 67-86 }
+        - { name: test_summary_invalid_hold_type, lines: 88-92 }
+        - { name: test_summary_failure_returns_500, lines: 95-100 }
     - name: TestHoldOverviewMatrixRoute
-      lines: 113-156
+      lines: 103-141
       methods:
-        - { name: test_matrix_passes_hold_filters, lines: 117-142 }
-        - { name: test_matrix_invalid_hold_type, lines: 144-146 }
-        - { name: test_matrix_rate_limited_returns_429, lines: 150-156 }
+        - { name: test_matrix_passes_hold_filters, lines: 107-127 }
+        - { name: test_matrix_invalid_hold_type, lines: 129-131 }
+        - { name: test_matrix_rate_limited_returns_429, lines: 135-141 }
     - name: TestHoldOverviewTreemapRoute
-      lines: 159-184
+      lines: 144-169
       methods:
-        - { name: test_treemap_passes_filters, lines: 163-176 }
-        - { name: test_treemap_failure_returns_500, lines: 179-184 }
+        - { name: test_treemap_passes_filters, lines: 148-161 }
+        - { name: test_treemap_failure_returns_500, lines: 164-169 }
     - name: TestHoldOverviewLotsRoute
-      lines: 187-257
+      lines: 172-242
       methods:
-        - { name: test_lots_passes_all_filters_and_caps_per_page, lines: 191-222 }
-        - { name: test_lots_handles_page_less_than_one, lines: 225-235 }
-        - { name: test_lots_invalid_age_range, lines: 237-241 }
-        - { name: test_lots_invalid_hold_type, lines: 243-247 }
-        - { name: test_lots_rate_limited_returns_429, lines: 251-257 }
+        - { name: test_lots_passes_all_filters_and_caps_per_page, lines: 176-207 }
+        - { name: test_lots_handles_page_less_than_one, lines: 210-220 }
+        - { name: test_lots_invalid_age_range, lines: 222-226 }
+        - { name: test_lots_invalid_hold_type, lines: 228-232 }
+        - { name: test_lots_rate_limited_returns_429, lines: 236-242 }
     - name: TestHoldOverviewTreemapEdgeCases
-      lines: 260-336
+      lines: 245-321
       methods:
-        - { name: test_treemap_3_level_nesting, lines: 264-293 }
-        - { name: test_treemap_leaf_without_children, lines: 296-311 }
-        - { name: test_treemap_post_json_reasons, lines: 314-326 }
-        - { name: test_treemap_get_legacy_compat, lines: 329-336 }
+        - { name: test_treemap_3_level_nesting, lines: 249-278 }
+        - { name: test_treemap_leaf_without_children, lines: 281-296 }
+        - { name: test_treemap_post_json_reasons, lines: 299-311 }
+        - { name: test_treemap_get_legacy_compat, lines: 314-321 }
     - name: TestHoldOverviewNonIndexedFilterForwarding
-      lines: 339-404
+      lines: 324-389
       methods:
-        - { name: test_summary_forwards_workflow_bop_pj_function, lines: 349-361 }
-        - { name: test_matrix_forwards_workflow_bop_pj_function, lines: 364-376 }
-        - { name: test_lots_forwards_workflow_bop_pj_function, lines: 379-392 }
-        - { name: test_summary_forwards_multi_value_csv, lines: 395-404 }
+        - { name: test_summary_forwards_workflow_bop_pj_function, lines: 334-346 }
+        - { name: test_matrix_forwards_workflow_bop_pj_function, lines: 349-361 }
+        - { name: test_lots_forwards_workflow_bop_pj_function, lines: 364-377 }
+        - { name: test_summary_forwards_multi_value_csv, lines: 380-389 }
     - name: TestHoldOverviewSummaryPostCompat
-      lines: 407-429
+      lines: 392-414
       methods:
-        - { name: test_summary_post_json_body, lines: 411-429 }
+        - { name: test_summary_post_json_body, lines: 396-414 }
 
 tests/test_hold_routes.py:  # 411 lines
   imports:
@@ -17122,7 +17136,7 @@ tests/test_watchdog_logging.py:  # 69 lines
     - { name: test_attach_sqlite_log_handler_disabled_skips_factory, lines: 40-53 }
     - { name: test_attach_sqlite_log_handler_handles_handler_errors, lines: 56-69 }
 
-tests/test_wip_hold_pages_integration.py:  # 441 lines
+tests/test_wip_hold_pages_integration.py:  # 449 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -17137,12 +17151,12 @@ tests/test_wip_hold_pages_integration.py:  # 441 lines
     - { name: test_wip_overview_post_avoids_url_length_limit, lines: 108-195 }
     - { name: test_wip_detail_post_avoids_url_length_limit, lines: 198-239 }
     - { name: test_wip_overview_get_still_works_after_post_support, lines: 242-267 }
-    - { name: test_hold_detail_api_contract_flow, lines: 270-320 }
-    - { name: test_wip_hold_post_avoids_url_length_limit, lines: 328-352 }
-    - { name: test_hold_overview_endpoints_accept_post, lines: 355-394 }
-    - { name: test_hold_overview_reason_list_coercion, lines: 397-410 }
-    - { name: test_hold_overview_lots_post_pagination, lines: 413-428 }
-    - { name: test_max_content_length_rejects_oversized_body, lines: 431-441 }
+    - { name: test_hold_detail_api_contract_flow, lines: 270-328 }
+    - { name: test_wip_hold_post_avoids_url_length_limit, lines: 336-360 }
+    - { name: test_hold_overview_endpoints_accept_post, lines: 363-402 }
+    - { name: test_hold_overview_reason_list_coercion, lines: 405-418 }
+    - { name: test_hold_overview_lots_post_pagination, lines: 421-436 }
+    - { name: test_max_content_length_rejects_oversized_body, lines: 439-449 }
 
 tests/test_wip_routes.py:  # 788 lines
   imports:
