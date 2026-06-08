@@ -10,7 +10,6 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SkeletonLoader from '../shared-ui/components/SkeletonLoader.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
@@ -802,26 +801,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard hold-overview-page theme-hold-overview">
-    <PageHeader
-      title="Hold 即時概況"
-      :last-update="lastUpdate"
-      :refreshing="refreshing"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      @refresh="manualRefresh"
-    >
-      <template #header-left />
-      <template #header-left-after>
-        <span class="hold-type-badge">{{ holdTypeLabel }}</span>
-      </template>
-    </PageHeader>
-
     <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
 
     <FilterPanel
       :filters="filters"
       :options="filterOptions"
       :loading="refreshing"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
       @apply="applyFilters"
       @clear="clearAllFilters"
       @draft-change="onFilterDraftChange"

@@ -1,18 +1,69 @@
 @import '../wip-shared/styles.css';
 @import '../resource-shared/styles.css';
 
-.theme-hold-detail .hold-detail-page .header h1 {
-  font-size: 24px;
+/* ── Compact page nav ─────────────────────────────────────────────────────── */
+
+.theme-hold-detail .hold-detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: theme('spacing.token.p14');
+  flex-wrap: wrap;
+}
+
+.theme-hold-detail .hold-detail-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.theme-hold-detail .hold-detail-back-btn {
+  flex-shrink: 0;
+}
+
+.theme-hold-detail .hold-detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.theme-hold-detail .hold-detail-reason {
+  font-family: monospace;
+  color: var(--primary);
 }
 
 .theme-hold-detail .hold-type-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: theme('spacing.token.p4') theme('spacing.token.p10');
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.2);
-  color: theme('colors.token.hffffff');
+}
+
+.theme-hold-detail .hold-type-badge.quality {
+  background: theme('colors.token.hfee2e2');
+  color: theme('colors.token.h991b1b');
+}
+
+.theme-hold-detail .hold-type-badge.non-quality {
+  background: theme('colors.token.hfff7ed');
+  color: theme('colors.token.h9a3412');
+}
+
+.theme-hold-detail .hold-detail-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.theme-hold-detail .hold-detail-last-update {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .theme-hold-detail .hold-summary-row {

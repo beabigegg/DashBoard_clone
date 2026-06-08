@@ -9,7 +9,6 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import DataTable from '../shared-ui/components/DataTable.vue';
@@ -425,26 +424,28 @@ onMounted(() => {
 
 <template>
   <div class="dashboard hold-detail-page theme-hold-detail">
-    <PageHeader
-      :title="`Hold Detail: ${reason}`"
-      :last-update="lastUpdate"
-      :refreshing="refreshing"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      :style="headerStyle"
-      @refresh="manualRefresh"
-    >
-      <template #header-left>
+    <div class="hold-detail-nav">
+      <div class="hold-detail-nav-left">
         <a
           :href="backToOverviewHref"
-          class="ui-btn ui-btn--ghost btn-back"
+          class="ui-btn ui-btn--ghost ui-btn--sm hold-detail-back-btn"
           @click.prevent="goBackToOverview"
         >&larr; Hold Overview</a>
-      </template>
-      <template #header-left-after>
-        <span class="hold-type-badge">{{ holdTypeLabel }}</span>
-      </template>
-    </PageHeader>
+        <h1 class="hold-detail-title">Hold Detail: <span class="hold-detail-reason">{{ reason }}</span></h1>
+        <span class="hold-type-badge" :class="holdType">{{ holdTypeLabel }}</span>
+      </div>
+      <div class="hold-detail-nav-right">
+        <span v-if="refreshing" class="refresh-indicator active"></span>
+        <span v-else-if="refreshSuccess" class="refresh-success active">&#10003;</span>
+        <span class="hold-detail-last-update">更新: {{ lastUpdate }}</span>
+        <button
+          type="button"
+          class="ui-btn ui-btn--ghost ui-btn--sm"
+          :disabled="refreshing"
+          @click="manualRefresh"
+        >&#8635; 更新</button>
+      </div>
+    </div>
 
     <ErrorBanner :message="loadError" :dismissible="false" />
 
