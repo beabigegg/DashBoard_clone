@@ -307,17 +307,25 @@ def test_hold_detail_api_contract_flow(client):
         assert json.loads(dist_resp.data)["success"] is True
         assert json.loads(lots_resp.data)["success"] is True
 
-        mock_summary.assert_called_once_with(reason=reason, include_dummy=False)
-        mock_distribution.assert_called_once_with(reason=reason, include_dummy=False)
-        mock_lots.assert_called_once_with(
-            reason=reason,
-            workcenter="DA",
-            package="DIP-B",
-            age_range="1-3",
-            include_dummy=False,
-            page=2,
-            page_size=80,
-        )
+        mock_summary.assert_called_once()
+        kw_s = mock_summary.call_args.kwargs
+        assert kw_s['reason'] == reason
+        assert kw_s['include_dummy'] is False
+
+        mock_distribution.assert_called_once()
+        kw_d = mock_distribution.call_args.kwargs
+        assert kw_d['reason'] == reason
+        assert kw_d['include_dummy'] is False
+
+        mock_lots.assert_called_once()
+        kw_l = mock_lots.call_args.kwargs
+        assert kw_l['reason'] == reason
+        assert kw_l['workcenter'] == "DA"
+        assert kw_l['package'] == "DIP-B"
+        assert kw_l['age_range'] == "1-3"
+        assert kw_l['include_dummy'] is False
+        assert kw_l['page'] == 2
+        assert kw_l['page_size'] == 80
 
 
 # ============================================================

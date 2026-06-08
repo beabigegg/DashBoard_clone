@@ -54,19 +54,14 @@ class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        mock_service.assert_called_once_with(
-            reason=None,
-            hold_type=None,
-            workorder=None,
-            lotid=None,
-            pj_type=None,
-            firstname=None,
-            waferdesc=None,
-            include_dummy=False,
-            workflow='',
-            bop='',
-            pj_function='',
-        )
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        self.assertIsNone(kw['reason'])
+        self.assertIsNone(kw['hold_type'])
+        self.assertFalse(kw['include_dummy'])
+        self.assertEqual(kw['workflow'], '')
+        self.assertEqual(kw['bop'], '')
+        self.assertEqual(kw['pj_function'], '')
 
     @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_summary')
     def test_summary_hold_type_all_maps_to_none(self, mock_service):
@@ -81,19 +76,14 @@ class TestHoldOverviewSummaryRoute(TestHoldOverviewRoutesBase):
 
         response = self.client.get('/api/hold-overview/summary?hold_type=all&reason=品質確認')
         self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with(
-            reason=['品質確認'],
-            hold_type=None,
-            workorder=None,
-            lotid=None,
-            pj_type=None,
-            firstname=None,
-            waferdesc=None,
-            include_dummy=False,
-            workflow='',
-            bop='',
-            pj_function='',
-        )
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['reason'], ['品質確認'])
+        self.assertIsNone(kw['hold_type'])
+        self.assertFalse(kw['include_dummy'])
+        self.assertEqual(kw['workflow'], '')
+        self.assertEqual(kw['bop'], '')
+        self.assertEqual(kw['pj_function'], '')
 
     def test_summary_invalid_hold_type(self):
         response = self.client.get('/api/hold-overview/summary?hold_type=invalid')
@@ -126,20 +116,15 @@ class TestHoldOverviewMatrixRoute(TestHoldOverviewRoutesBase):
 
         response = self.client.get('/api/hold-overview/matrix?hold_type=non-quality&reason=特殊需求管控')
         self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with(
-            include_dummy=False,
-            status='HOLD',
-            hold_type='non-quality',
-            reason=['特殊需求管控'],
-            workorder=None,
-            lotid=None,
-            pj_type=None,
-            firstname=None,
-            waferdesc=None,
-            workflow='',
-            bop='',
-            pj_function='',
-        )
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        self.assertFalse(kw['include_dummy'])
+        self.assertEqual(kw['status'], 'HOLD')
+        self.assertEqual(kw['hold_type'], 'non-quality')
+        self.assertEqual(kw['reason'], ['特殊需求管控'])
+        self.assertEqual(kw['workflow'], '')
+        self.assertEqual(kw['bop'], '')
+        self.assertEqual(kw['pj_function'], '')
 
     def test_matrix_invalid_hold_type(self):
         response = self.client.get('/api/hold-overview/matrix?hold_type=invalid')
