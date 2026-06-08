@@ -249,19 +249,22 @@ def _acquire_query_lock(query_id: str, owner: str) -> bool:
         return True
 
 
+_RELEASE_LOCK_SCRIPT = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+else
+    return 0
+end
+"""
+
+
 def _release_query_lock(query_id: str, owner: str) -> None:
     client = get_redis_client()
     if client is None:
         return
     key = get_key(_query_lock_key(query_id))
     try:
-        current = client.get(key)
-        if current is None:
-            return
-        if isinstance(current, bytes):
-            current = current.decode("utf-8", errors="ignore")
-        if str(current) == str(owner):
-            client.delete(key)
+        client.eval(_RELEASE_LOCK_SCRIPT, 1, key, owner)
     except Exception as exc:
         logger.warning("Query lock release failed (query_id=%s): %s", query_id, exc)
 

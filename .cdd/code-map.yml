@@ -1,6 +1,6 @@
-# generated: 2026-06-05T12:25:48Z by cdd-kit 2.2.1
-# files: 831, src-lines: 233673, map-lines: 17789, compression: 13.1x
-# sources-digest: b9ee65e737eee903af33b7771e2d25699e89116a84127464a48851bb574d4064
+# generated: 2026-06-08T01:51:51Z by cdd-kit 2.2.1
+# files: 831, src-lines: 234239, map-lines: 17822, compression: 13.1x
+# sources-digest: 4a964ee9b6e056d8ecdab45bccafc600dd12c342ca6c53f6194c8e5ab7349648
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3083,7 +3083,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1622 lines
+src/mes_dashboard/app.py:  # 1631 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3142,9 +3142,9 @@ src/mes_dashboard/app.py:  # 1622 lines
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
-    - { name: _start_per_worker_services, lines: 634-738 }
-    - { name: create_app, lines: 747-1496 }
-    - { name: _register_error_handlers, lines: 1499-1622 }
+    - { name: _start_per_worker_services, lines: 634-745 }
+    - { name: create_app, lines: 754-1505 }
+    - { name: _register_error_handlers, lines: 1508-1631 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -3220,26 +3220,26 @@ src/mes_dashboard/config/field_contracts.py:  # 40 lines
     - { name: get_export_headers, lines: 33-35 }
     - { name: get_export_api_keys, lines: 38-40 }
 
-src/mes_dashboard/config/settings.py:  # 187 lines
+src/mes_dashboard/config/settings.py:  # 189 lines
   imports:
     - { module: __future__, items: [annotations], line: 3 }
     - { module: os, items: [], line: 5 }
     - { module: typing, items: [Type], line: 6 }
   classes:
     - name: Config
-      lines: 37-109
+      lines: 37-111
     - name: DevelopmentConfig
-      lines: 112-131
+      lines: 114-133
     - name: ProductionConfig
-      lines: 134-152
+      lines: 136-154
     - name: TestingConfig
-      lines: 155-177
+      lines: 157-179
   functions:
     - { name: _int_env, lines: 9-13 }
     - { name: _float_env, lines: 16-20 }
     - { name: _bool_env, lines: 23-27 }
     - { name: _csv_env, lines: 30-34 }
-    - { name: get_config, lines: 180-187 }
+    - { name: get_config, lines: 182-189 }
 
 src/mes_dashboard/config/tables.py:  # 171 lines
   constants:
@@ -5742,7 +5742,7 @@ src/mes_dashboard/services/hold_today_snapshot_service.py:  # 476 lines
     - { name: _make_query_id, lines: 407-410 }
     - { name: execute_today_snapshot, lines: 413-476 }
 
-src/mes_dashboard/services/internal_metrics_service.py:  # 356 lines
+src/mes_dashboard/services/internal_metrics_service.py:  # 400 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: logging, items: [], line: 18 }
@@ -5750,14 +5750,15 @@ src/mes_dashboard/services/internal_metrics_service.py:  # 356 lines
     - { module: pathlib, items: [Path], line: 20 }
     - { module: typing, items: [Any, Dict], line: 21 }
   functions:
-    - { name: _collect_pool, lines: 30-54 }
-    - { name: _collect_duckdb, lines: 61-103 }
-    - { name: _collect_redis, lines: 123-165 }
-    - { name: _collect_spool, lines: 172-221 }
-    - { name: _collect_worker_rss, lines: 228-249 }
-    - { name: _collect_circuit_breaker, lines: 256-266 }
-    - { name: _collect_rq, lines: 276-331 }
-    - { name: collect_internal_metrics, lines: 338-353 }
+    - { name: _collect_pool, lines: 30-64 }
+    - { name: _collect_duckdb, lines: 71-113 }
+    - { name: _collect_redis, lines: 133-183 }
+    - { name: _collect_spool, lines: 190-239 }
+    - { name: _collect_worker_rss, lines: 246-267 }
+    - { name: _collect_circuit_breaker, lines: 274-284 }
+    - { name: _collect_rq, lines: 294-349 }
+    - { name: _collect_threads, lines: 356-369 }
+    - { name: collect_internal_metrics, lines: 376-397 }
 
 src/mes_dashboard/services/job_query_service.py:  # 557 lines
   imports:
@@ -6568,7 +6569,7 @@ src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1047 lines
     - { name: try_compute_view_from_spool, lines: 626-892 }
     - { name: try_iter_export_rows_from_spool, lines: 895-1047 }
 
-src/mes_dashboard/services/reject_dataset_cache.py:  # 2008 lines
+src/mes_dashboard/services/reject_dataset_cache.py:  # 2031 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6619,26 +6620,26 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 2008 lines
     - { name: _maybe_collect_after_interactive_compute, lines: 397-399 }
     - { name: _read_sql_with_caller, lines: 402-408 }
     - { name: resolve_containers, lines: 423-470 }
-    - { name: _execute_and_spool, lines: 478-788 }
-    - { name: execute_primary_query, lines: 796-1207 }
-    - { name: ensure_dataset_loaded, lines: 1210-1247 }
-    - { name: _apply_policy_filters, lines: 1250-1298 }
-    - { name: apply_view, lines: 1306-1359 }
-    - { name: _apply_supplementary_filters, lines: 1362-1401 }
-    - { name: _normalize_pareto_values, lines: 1404-1413 }
-    - { name: _apply_pareto_selection_filter, lines: 1416-1463 }
-    - { name: _paginate_detail, lines: 1466-1558 }
-    - { name: _extract_available_filters, lines: 1561-1567 }
-    - { name: _project_pareto_guard_frame, lines: 1588-1605 }
-    - { name: _normalize_metric_mode, lines: 1608-1612 }
-    - { name: _normalize_pareto_scope, lines: 1615-1619 }
-    - { name: _normalize_pareto_display_scope, lines: 1622-1626 }
-    - { name: _normalize_pareto_selections, lines: 1629-1642 }
-    - { name: _build_dimension_pareto_items, lines: 1645-1710 }
-    - { name: _apply_cross_filter, lines: 1713-1740 }
-    - { name: compute_dimension_pareto, lines: 1743-1851 }
-    - { name: compute_batch_pareto, lines: 1854-1947 }
-    - { name: export_csv_from_cache, lines: 1955-2008 }
+    - { name: _execute_and_spool, lines: 478-793 }
+    - { name: execute_primary_query, lines: 801-1230 }
+    - { name: ensure_dataset_loaded, lines: 1233-1270 }
+    - { name: _apply_policy_filters, lines: 1273-1321 }
+    - { name: apply_view, lines: 1329-1382 }
+    - { name: _apply_supplementary_filters, lines: 1385-1424 }
+    - { name: _normalize_pareto_values, lines: 1427-1436 }
+    - { name: _apply_pareto_selection_filter, lines: 1439-1486 }
+    - { name: _paginate_detail, lines: 1489-1581 }
+    - { name: _extract_available_filters, lines: 1584-1590 }
+    - { name: _project_pareto_guard_frame, lines: 1611-1628 }
+    - { name: _normalize_metric_mode, lines: 1631-1635 }
+    - { name: _normalize_pareto_scope, lines: 1638-1642 }
+    - { name: _normalize_pareto_display_scope, lines: 1645-1649 }
+    - { name: _normalize_pareto_selections, lines: 1652-1665 }
+    - { name: _build_dimension_pareto_items, lines: 1668-1733 }
+    - { name: _apply_cross_filter, lines: 1736-1763 }
+    - { name: compute_dimension_pareto, lines: 1766-1874 }
+    - { name: compute_batch_pareto, lines: 1877-1970 }
+    - { name: export_csv_from_cache, lines: 1978-2031 }
 
 src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
   imports:
@@ -8525,38 +8526,68 @@ tests/integration/_metrics_probe.py:  # 236 lines
     - { name: drain_stream, lines: 198-204 }
     - { name: _detect_gate_hint, lines: 216-236 }
 
-tests/integration/_multi_worker_harness.py:  # 318 lines
+tests/integration/_multi_worker_harness.py:  # 630 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
-    - { module: os, items: [], line: 23 }
-    - { module: signal, items: [], line: 24 }
-    - { module: subprocess, items: [], line: 25 }
-    - { module: sys, items: [], line: 26 }
-    - { module: threading, items: [], line: 27 }
-    - { module: time, items: [], line: 28 }
-    - { module: pathlib, items: [Path], line: 29 }
-    - { module: typing, items: [Dict, List, Optional], line: 30 }
-    - { module: redis, items: [], line: 32 }
+    - { module: atexit, items: [], line: 23 }
+    - { module: os, items: [], line: 24 }
+    - { module: re, items: [], line: 25 }
+    - { module: signal, items: [], line: 26 }
+    - { module: subprocess, items: [], line: 27 }
+    - { module: sys, items: [], line: 28 }
+    - { module: threading, items: [], line: 29 }
+    - { module: time, items: [], line: 30 }
+    - { module: pathlib, items: [Path], line: 31 }
+    - { module: typing, items: [Dict, List, Optional], line: 32 }
+    - { module: redis, items: [], line: 34 }
+    - { module: requests, items: [], line: 35 }
+  constants:
+    - { name: PROJECT_ROOT, line: 328 }
+    - { name: GUNICORN_STARTUP_TIMEOUT, line: 329 }
   classes:
     - name: WorkerBarrier
-      lines: 77-118
+      lines: 80-121
       methods:
-        - { name: __init__, lines: 84-86 }
-        - { name: _r, lines: 88-90 }
-        - { name: wait, lines: 92-118 }
+        - { name: __init__, lines: 87-89 }
+        - { name: _r, lines: 91-93 }
+        - { name: wait, lines: 95-121 }
     - name: MultiWorkerHarness
-      lines: 140-318
+      lines: 143-321
       methods:
-        - { name: __init__, lines: 155-173 }
-        - { name: start, lines: 179-228 }
-        - { name: stop, lines: 230-253 }
-        - { name: worker_logs, lines: 256-265 }
-        - { name: __enter__, lines: 267-269 }
-        - { name: __exit__, lines: 271-272 }
-        - { name: _connect, lines: 278-288 }
-        - { name: _wait_for_workers, lines: 290-318 }
+        - { name: __init__, lines: 158-176 }
+        - { name: start, lines: 182-231 }
+        - { name: stop, lines: 233-256 }
+        - { name: worker_logs, lines: 259-268 }
+        - { name: __enter__, lines: 270-272 }
+        - { name: __exit__, lines: 274-275 }
+        - { name: _connect, lines: 281-291 }
+        - { name: _wait_for_workers, lines: 293-321 }
+    - name: GunicornHarness
+      lines: 369-630
+      methods:
+        - { name: __init__, lines: 395-401 }
+        - { name: port, lines: 408-409 }
+        - { name: base_url, lines: 412-413 }
+        - { name: start, lines: 419-478 }
+        - { name: _read_logs, lines: 480-495 }
+        - { name: stop, lines: 497-507 }
+        - { name: __enter__, lines: 509-511 }
+        - { name: __exit__, lines: 513-514 }
+        - { name: log_count, lines: 520-523 }
+        - { name: log_contains, lines: 525-528 }
+        - { name: full_log, lines: 531-534 }
+        - { name: wait_for_log, lines: 536-546 }
+        - { name: get, lines: 552-554 }
+        - { name: collect_per_worker_metrics, lines: 556-584 }
+        - { name: worker_pids, lines: 590-599 }
+        - { name: worker_pids_alive, lines: 601-603 }
+        - { name: kill_worker, lines: 605-607 }
+        - { name: wait_for_respawn, lines: 609-630 }
   functions:
-    - { name: _capture_lines, lines: 126-132 }
+    - { name: _capture_lines, lines: 129-135 }
+    - { name: _ghn_atexit_cleanup, lines: 336-343 }
+    - { name: _find_free_port_ghn, lines: 349-354 }
+    - { name: _pid_alive_ghn, lines: 357-366 }
 
 tests/integration/_multi_worker_jobs.py:  # 196 lines
   imports:
@@ -8723,34 +8754,36 @@ tests/integration/test_oracle_error_path.py:  # 296 lines
     - { name: _assert_503_envelope, lines: 77-90 }
     - { name: _assert_500_generic, lines: 93-111 }
 
-tests/integration/test_preload_fork_safety.py:  # 290 lines
+tests/integration/test_preload_fork_safety.py:  # 463 lines
   imports:
     - { module: __future__, items: [annotations], line: 20 }
-    - { module: glob, items: [], line: 22 }
+    - { module: concurrent.futures, items: [], line: 22 }
     - { module: os, items: [], line: 23 }
-    - { module: signal, items: [], line: 24 }
-    - { module: subprocess, items: [], line: 25 }
-    - { module: time, items: [], line: 26 }
-    - { module: pathlib, items: [Path], line: 27 }
-    - { module: typing, items: [List], line: 28 }
-    - { module: pytest, items: [], line: 30 }
+    - { module: time, items: [], line: 24 }
+    - { module: pathlib, items: [Path], line: 25 }
+    - { module: typing, items: [List], line: 26 }
+    - { module: pytest, items: [], line: 28 }
+    - { module: tests.integration._multi_worker_harness, items: [GunicornHarness], line: 30 }
+  constants:
+    - { name: PROJECT_ROOT, line: 32 }
+    - { name: EXPECTED_THREAD_SUBSTRINGS, line: 276 }
   functions:
-    - { name: local_redis, lines: 46-50 }  # @pytest.fixture()
-    - { name: _skip_if_no_harness, lines: 53-55 }
-    - { name: test_downtime_prewarm_runs_once_across_two_workers, lines: 65-81 }  # @pytest.mark.integration_real
-    - { name: test_material_consumption_warmup_runs_once_across_two_workers, lines: 86-92 }  # @pytest.mark.integration_real
-    - { name: test_resource_history_duckdb_prewarm_runs_once, lines: 97-109 }  # @pytest.mark.integration_real
-    - { name: test_resource_cache_init_runs_once, lines: 114-120 }  # @pytest.mark.integration_real
-    - { name: test_each_worker_has_distinct_oracle_engine_pool, lines: 130-140 }  # @pytest.mark.integration_real
-    - { name: test_concurrent_oracle_requests_no_cross_talk, lines: 145-152 }  # @pytest.mark.integration_real
-    - { name: test_each_worker_has_distinct_redis_pool, lines: 162-169 }  # @pytest.mark.integration_real
-    - { name: test_sqlite_no_wal_corruption_on_restart, lines: 179-185 }  # @pytest.mark.integration_real
-    - { name: test_all_background_threads_alive_post_fork, lines: 195-207 }  # @pytest.mark.integration_real
-    - { name: test_duckdb_prewarm_no_timeout_two_workers, lines: 217-223 }  # @pytest.mark.integration_real
-    - { name: test_duckdb_prewarm_completes_once, lines: 228-235 }  # @pytest.mark.integration_real
-    - { name: test_no_duplicate_parquet_files_on_two_worker_start, lines: 245-256 }  # @pytest.mark.integration_real
-    - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 266-276 }  # @pytest.mark.integration_real
-    - { name: test_worker_crash_respawn_fresh_connections, lines: 281-290 }  # @pytest.mark.integration_real
+    - { name: shared_harness, lines: 40-53 }  # @pytest.fixture(scope='module')
+    - { name: fresh_harness, lines: 57-65 }  # @pytest.fixture()
+    - { name: test_downtime_prewarm_runs_once_across_two_workers, lines: 75-88 }  # @pytest.mark.integration_real
+    - { name: test_material_consumption_warmup_runs_once_across_two_workers, lines: 93-99 }  # @pytest.mark.integration_real
+    - { name: test_resource_history_duckdb_prewarm_runs_once, lines: 104-129 }  # @pytest.mark.integration_real
+    - { name: test_resource_cache_init_runs_once, lines: 134-146 }  # @pytest.mark.integration_real
+    - { name: test_each_worker_has_distinct_oracle_engine_pool, lines: 156-175 }  # @pytest.mark.integration_real
+    - { name: test_concurrent_oracle_requests_no_cross_talk, lines: 180-206 }  # @pytest.mark.integration_real
+    - { name: test_each_worker_has_distinct_redis_pool, lines: 216-231 }  # @pytest.mark.integration_real
+    - { name: test_sqlite_no_wal_corruption_on_restart, lines: 241-261 }  # @pytest.mark.integration_real
+    - { name: test_all_background_threads_alive_post_fork, lines: 287-310 }  # @pytest.mark.integration_real
+    - { name: test_duckdb_prewarm_no_timeout_two_workers, lines: 320-331 }  # @pytest.mark.integration_real
+    - { name: test_duckdb_prewarm_completes_once, lines: 336-350 }  # @pytest.mark.integration_real
+    - { name: test_no_duplicate_parquet_files_on_two_worker_start, lines: 360-379 }  # @pytest.mark.integration_real
+    - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 389-417 }  # @pytest.mark.integration_real
+    - { name: test_worker_crash_respawn_fresh_connections, lines: 422-463 }  # @pytest.mark.integration_real
 
 tests/integration/test_race_conditions.py:  # 387 lines
   imports:
@@ -9231,7 +9264,7 @@ tests/routes/test_fuzz_routes.py:  # 702 lines
     - { name: test_mc_query_over_20_parts_rejected, lines: 660-666 }
     - { name: test_mc_detail_rejects_malicious_material_parts, lines: 670-702 }  # @pytest.mark.parametrize('payload', MALICIOUS_INPUTS)
 
-tests/routes/test_internal_routes.py:  # 259 lines
+tests/routes/test_internal_routes.py:  # 262 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: json, items: [], line: 23 }
@@ -9242,14 +9275,14 @@ tests/routes/test_internal_routes.py:  # 259 lines
     - { module: typing, items: [Any, Dict], line: 28 }
     - { module: pytest, items: [], line: 30 }
   functions:
-    - { name: _run_in_subprocess, lines: 46-88 }
-    - { name: testing_client, lines: 96-107 }  # @pytest.fixture(scope='module')
-    - { name: test_flag_false_omits_internal_metrics_from_url_map, lines: 114-137 }
-    - { name: test_env_gate_blocks_when_env_var_unset, lines: 144-151 }
-    - { name: test_env_gate_blocks_when_env_var_is_zero, lines: 158-164 }
-    - { name: test_loopback_gate_blocks_non_loopback_remote_addr, lines: 171-187 }
-    - { name: test_all_gates_open_returns_seven_category_snapshot, lines: 194-220 }
-    - { name: test_production_factory_does_not_import_internal_routes_module, lines: 227-259 }
+    - { name: _run_in_subprocess, lines: 47-89 }
+    - { name: testing_client, lines: 97-108 }  # @pytest.fixture(scope='module')
+    - { name: test_flag_false_omits_internal_metrics_from_url_map, lines: 115-138 }
+    - { name: test_env_gate_blocks_when_env_var_unset, lines: 145-152 }
+    - { name: test_env_gate_blocks_when_env_var_is_zero, lines: 159-165 }
+    - { name: test_loopback_gate_blocks_non_loopback_remote_addr, lines: 172-188 }
+    - { name: test_all_gates_open_returns_seven_category_snapshot, lines: 195-223 }
+    - { name: test_production_factory_does_not_import_internal_routes_module, lines: 230-262 }
 
 tests/stress/__init__.py:  # 2 lines
 

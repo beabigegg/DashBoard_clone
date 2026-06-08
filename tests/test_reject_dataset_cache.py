@@ -1651,3 +1651,79 @@ class TestRejectPartialFailureMeta:
         src = inspect.getsource(reject_svc)
         assert "logger.warning" in src
         assert "partial failure" in src.lower()
+
+
+# ============================================================
+# _release_query_lock — atomic Lua check-and-delete
+# ============================================================
+
+class TestReleaseQueryLockAtomic:
+    """_release_query_lock must use atomic Lua script, not GET → check → DELETE."""
+
+    def _make_client(self):
+        return MagicMock()
+
+    def test_calls_eval_not_get_delete(self, monkeypatch):
+        """release uses client.eval (Lua), never client.get or client.delete directly."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+
+        client = self._make_client()
+        monkeypatch.setattr(svc, "get_redis_client", lambda: client)
+        monkeypatch.setattr(svc, "get_key", lambda k: k)
+
+        svc._release_query_lock("q1", "owner-abc")
+
+        client.eval.assert_called_once()
+        client.get.assert_not_called()
+        client.delete.assert_not_called()
+
+    def test_eval_passes_key_and_owner(self, monkeypatch):
+        """eval is called with the correct key and owner as ARGV[1]."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+
+        client = self._make_client()
+        monkeypatch.setattr(svc, "get_redis_client", lambda: client)
+        monkeypatch.setattr(svc, "get_key", lambda k: f"ns:{k}")
+
+        svc._release_query_lock("q1", "pid:uuid-xyz")
+
+        _script, numkeys, key, owner = client.eval.call_args.args
+        assert numkeys == 1
+        assert "q1" in key
+        assert owner == "pid:uuid-xyz"
+
+    def test_no_op_when_redis_unavailable(self, monkeypatch):
+        """Returns silently when Redis client is None (no crash)."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+
+        monkeypatch.setattr(svc, "get_redis_client", lambda: None)
+        svc._release_query_lock("q1", "owner-abc")  # must not raise
+
+    def test_warning_logged_on_eval_exception(self, monkeypatch, caplog):
+        """Logs a warning when eval raises, instead of propagating the exception."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+        import logging
+
+        client = self._make_client()
+        client.eval.side_effect = Exception("NOSCRIPT")
+        monkeypatch.setattr(svc, "get_redis_client", lambda: client)
+        monkeypatch.setattr(svc, "get_key", lambda k: k)
+
+        with caplog.at_level(logging.WARNING):
+            svc._release_query_lock("q1", "owner-abc")  # must not raise
+
+        assert any("query lock release failed" in r.message.lower() for r in caplog.records)
+
+    def test_does_not_delete_foreign_owner(self, monkeypatch):
+        """Lua script returns 0 (no delete) when stored owner != caller owner."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+
+        # Simulate Lua returning 0 (owner mismatch — no deletion)
+        client = self._make_client()
+        client.eval.return_value = 0
+        monkeypatch.setattr(svc, "get_redis_client", lambda: client)
+        monkeypatch.setattr(svc, "get_key", lambda k: k)
+
+        # Should complete without error regardless of return value
+        svc._release_query_lock("q1", "wrong-owner")
+        client.eval.assert_called_once()
