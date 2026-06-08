@@ -5,12 +5,13 @@
   gap: 10px;
 }
 
-.theme-resource .filter-meta {
+.theme-resource .resource-meta-bar {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
   min-height: 18px;
+  margin-bottom: 4px;
 }
 
 .theme-resource .filters-last-update {

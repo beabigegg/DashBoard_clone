@@ -550,6 +550,11 @@ onMounted(() => {
 <template>
   <div class="resource-page theme-resource">
     <div class="dashboard">
+      <div class="resource-meta-bar">
+        <span v-if="loading.refreshing" class="refresh-indicator active"></span>
+        <span v-if="lastUpdate !== '--'" class="filters-last-update">更新: {{ lastUpdate }}</span>
+      </div>
+
       <FilterBar
         :workcenter-groups="workcenterGroups"
         :selected-groups="filterState.groups"
@@ -561,8 +566,6 @@ onMounted(() => {
         :package-groups="packageGroups"
         :selected-package-groups="filterState.packageGroups"
         :loading="loading.options || loading.refreshing"
-        :last-update="lastUpdate"
-        :refreshing="loading.refreshing"
         @change-groups="updateGroups"
         @change-flags="updateFlags"
         @change-families="updateFamilies"

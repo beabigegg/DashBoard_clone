@@ -23,8 +23,6 @@ const props = withDefaults(defineProps<{
   packageGroups?: string[];
   selectedPackageGroups?: string[];
   loading?: boolean;
-  lastUpdate?: string;
-  refreshing?: boolean;
 }>(), {
   workcenterGroups: () => [],
   selectedGroups: () => [],
@@ -36,8 +34,6 @@ const props = withDefaults(defineProps<{
   packageGroups: () => [],
   selectedPackageGroups: () => [],
   loading: false,
-  lastUpdate: '',
-  refreshing: false,
 });
 
 const emit = defineEmits<{
@@ -60,11 +56,6 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
 <template>
   <section class="section-card">
     <div class="filters-panel">
-      <div class="filter-meta">
-        <span v-if="refreshing" class="refresh-indicator active"></span>
-        <span v-if="lastUpdate" class="filters-last-update">更新: {{ lastUpdate }}</span>
-      </div>
-
       <div class="filter-row">
         <div class="filter-block">
           <label>工站群組</label>
