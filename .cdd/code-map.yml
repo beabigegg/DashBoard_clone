@@ -1,6 +1,6 @@
-# generated: 2026-06-08T12:37:19Z by cdd-kit 2.2.1
-# files: 833, src-lines: 235342, map-lines: 17850, compression: 13.2x
-# sources-digest: a8d2a11dab1fc82851d4475ea3c7fc1722358330b3c0e7aaeceaa57fa59e6dad
+# generated: 2026-06-08T12:47:24Z by cdd-kit 2.2.1
+# files: 833, src-lines: 235307, map-lines: 17850, compression: 13.2x
+# sources-digest: 50816a6b9b58e60888c5c2601ee9ef07db49b15176aeda6d462fc61616633519
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1431,7 +1431,7 @@ frontend/src/production-history/main.ts:  # 7 lines
     - { module: '../resource-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/qc-gate/App.vue:  # 160 lines
+frontend/src/qc-gate/App.vue:  # 125 lines
 
 frontend/src/qc-gate/components/LotTable.vue:  # 119 lines
 

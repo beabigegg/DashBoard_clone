@@ -94,8 +94,6 @@ import EquipmentGrid from './components/EquipmentGrid.vue';
 import FilterBar from './components/FilterBar.vue';
 import FloatingTooltip from './components/FloatingTooltip.vue';
 import MatrixSection from './components/MatrixSection.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
-
 ensureMesApiAvailable();
 
 const API_TIMEOUT = 60000;
@@ -166,13 +164,6 @@ const loading = reactive<LoadingState>({
   refreshing: false,
   options: false,
 });
-
-const refreshSuccess = ref(false);
-const refreshError = ref(false);
-
-const cacheLevel = ref('loading');
-const cacheText = ref('檢查中...');
-const lastUpdate = ref('--');
 
 const summaryError = ref('');
 const equipmentError = ref('');
@@ -338,46 +329,6 @@ async function loadEquipment() {
   resetHierarchyState();
 }
 
-async function checkCacheStatus() {
-  try {
-    const healthRaw = await apiGet('/health', {
-      timeout: 15000,
-      retries: 0,
-      silent: true,
-    });
-    const health = healthRaw as {
-      resource_cache?: { enabled?: boolean; loaded?: boolean; count?: number };
-      equipment_status_cache?: { updated_at?: string };
-    } | null | undefined;
-
-    const resourceCache = health?.resource_cache || {};
-    const equipmentCache = health?.equipment_status_cache || {};
-
-    if (resourceCache.enabled && resourceCache.loaded) {
-      cacheLevel.value = 'ok';
-      cacheText.value = `快取正常 (${Number(resourceCache.count || 0)} 筆)`;
-    } else if (resourceCache.enabled) {
-      cacheLevel.value = 'loading';
-      cacheText.value = '快取載入中...';
-    } else {
-      cacheLevel.value = 'error';
-      cacheText.value = '快取未啟用';
-    }
-
-    if (equipmentCache.updated_at) {
-      const d = new Date(equipmentCache.updated_at);
-      const pad = (n: number): string => String(n).padStart(2, '0');
-      lastUpdate.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    } else {
-      lastUpdate.value = '--';
-    }
-  } catch {
-    cacheLevel.value = 'error';
-    cacheText.value = '無法連線';
-    lastUpdate.value = '--';
-  }
-}
-
 function buildSingleFilterLabel(filter: MatrixFilter): string {
   const parts = [filter.workcenter_group];
   if (filter.family) {
@@ -505,14 +456,10 @@ async function loadData(showOverlay = false): Promise<void> {
   }
 
   loading.refreshing = true;
-  refreshError.value = false;
   summaryError.value = '';
   equipmentError.value = '';
 
   const [summaryResult, equipmentResult] = await Promise.allSettled([loadSummary(), loadEquipment()]);
-  await checkCacheStatus();
-
-  const hasFailed = summaryResult.status === 'rejected' || equipmentResult.status === 'rejected';
 
   if (summaryResult.status === 'rejected') {
     summaryError.value = summaryResult.reason?.message || '摘要資料載入失敗';
@@ -521,13 +468,6 @@ async function loadData(showOverlay = false): Promise<void> {
   if (equipmentResult.status === 'rejected') {
     equipmentError.value = equipmentResult.reason?.message || '設備資料載入失敗';
     allEquipment.value = [];
-  }
-
-  if (hasFailed) {
-    refreshError.value = true;
-  } else {
-    refreshSuccess.value = true;
-    setTimeout(() => { refreshSuccess.value = false; }, 1500);
   }
 
   loading.refreshing = false;
@@ -566,17 +506,12 @@ function updatePackageGroups(groups: string[]): void {
   updateField('packageGroups', groups || []);
 }
 
-const { resetAutoRefresh, triggerRefresh } = useAutoRefresh({
+const { resetAutoRefresh } = useAutoRefresh({
   onRefresh: () => loadData(false),
   intervalMs: 5 * 60 * 1000,
   autoStart: true,
   refreshOnVisible: true,
 });
-
-async function handleManualRefresh() {
-  closeTooltip();
-  await triggerRefresh({ force: true, resetTimer: true });
-}
 
 async function initPage(): Promise<void> {
   try {
@@ -595,14 +530,6 @@ onMounted(() => {
 <template>
   <div class="resource-page theme-resource">
     <div class="dashboard">
-      <PageHeader
-        title="設備即時概況"
-        :last-update="lastUpdate"
-        :refreshing="loading.refreshing"
-        :refresh-success="refreshSuccess"
-        :refresh-error="refreshError"
-        @refresh="handleManualRefresh"
-      />
       <FilterBar
         :workcenter-groups="workcenterGroups"
         :selected-groups="filterState.groups"
