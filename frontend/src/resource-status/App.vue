@@ -165,6 +165,8 @@ const loading = reactive<LoadingState>({
   options: false,
 });
 
+const lastUpdate = ref('--');
+
 const summaryError = ref('');
 const equipmentError = ref('');
 
@@ -329,6 +331,23 @@ async function loadEquipment() {
   resetHierarchyState();
 }
 
+async function checkCacheStatus(): Promise<void> {
+  try {
+    const healthRaw = await apiGet('/health', { timeout: 15000, retries: 0, silent: true });
+    const health = healthRaw as { equipment_status_cache?: { updated_at?: string } } | null | undefined;
+    const updated = health?.equipment_status_cache?.updated_at;
+    if (updated) {
+      const d = new Date(updated);
+      const pad = (n: number): string => String(n).padStart(2, '0');
+      lastUpdate.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    } else {
+      lastUpdate.value = '--';
+    }
+  } catch {
+    lastUpdate.value = '--';
+  }
+}
+
 function buildSingleFilterLabel(filter: MatrixFilter): string {
   const parts = [filter.workcenter_group];
   if (filter.family) {
@@ -460,6 +479,7 @@ async function loadData(showOverlay = false): Promise<void> {
   equipmentError.value = '';
 
   const [summaryResult, equipmentResult] = await Promise.allSettled([loadSummary(), loadEquipment()]);
+  void checkCacheStatus();
 
   if (summaryResult.status === 'rejected') {
     summaryError.value = summaryResult.reason?.message || '摘要資料載入失敗';
@@ -541,6 +561,8 @@ onMounted(() => {
         :package-groups="packageGroups"
         :selected-package-groups="filterState.packageGroups"
         :loading="loading.options || loading.refreshing"
+        :last-update="lastUpdate"
+        :refreshing="loading.refreshing"
         @change-groups="updateGroups"
         @change-flags="updateFlags"
         @change-families="updateFamilies"

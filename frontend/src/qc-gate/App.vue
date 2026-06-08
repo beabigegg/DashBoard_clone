@@ -19,6 +19,7 @@ const {
   refreshing,
   errorMessage,
   allLots,
+  cacheTime,
 } = useQcGateData();
 
 const activeFilter = ref<ActiveFilter | null>(null);
@@ -31,6 +32,14 @@ const BUCKET_LABELS: Record<string, string> = {
 };
 
 const hasStations = computed<boolean>(() => stations.value.length > 0);
+
+const formattedCacheTime = computed<string>(() => {
+  if (!cacheTime.value) return '--';
+  const d = new Date(cacheTime.value);
+  if (Number.isNaN(d.getTime())) return String(cacheTime.value);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+});
 
 const filteredLots = computed(() => {
   if (!activeFilter.value) {
@@ -81,6 +90,11 @@ function clearFilter(): void {
 <template>
   <div class="qc-gate-page theme-qc-gate">
     <ErrorBanner :message="errorMessage" :dismissible="false" />
+
+    <div class="qc-meta-bar">
+      <span v-if="refreshing" class="refresh-indicator active"></span>
+      <span v-if="formattedCacheTime !== '--'" class="filters-last-update">更新: {{ formattedCacheTime }}</span>
+    </div>
 
     <main class="qc-gate-content">
       <SectionCard variant="elevated" :class="{ 'is-refreshing': refreshing }">
