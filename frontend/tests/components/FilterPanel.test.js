@@ -11,6 +11,10 @@
  *
  * The component uses MultiSelect children for each filter field.
  * Uses shallowMount to avoid needing full MultiSelect rendering.
+ *
+ * Note: the apply button was removed — filters apply immediately on each
+ * MultiSelect update:model-value. The clear button is only rendered when
+ * activeFilterCount > 0 (i.e. props.filters has at least one non-empty field).
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -28,6 +32,9 @@ const emptyFilters = {
   bop: [],
   pjFunction: [],
 };
+
+// Has one active filter so activeFilterCount > 0 and the clear button renders
+const filtersWithOneActive = { ...emptyFilters, package: ['PKG-A'] };
 
 describe('FilterPanel', () => {
   it('renders without crash when options is undefined', () => {
@@ -95,32 +102,44 @@ describe('FilterPanel', () => {
     expect(labels[8]).toBe('Wafer Type');
   });
 
+  it('clear button is hidden when no filters are active', () => {
+    const wrapper = shallowMount(FilterPanel, {
+      props: { filters: emptyFilters, options: {} },
+    });
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('清除'));
+    expect(clearBtn).toBeUndefined();
+  });
+
+  it('clear button is visible when at least one filter is active', () => {
+    const wrapper = shallowMount(FilterPanel, {
+      props: { filters: filtersWithOneActive, options: {} },
+    });
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('清除'));
+    expect(clearBtn).toBeTruthy();
+  });
+
   it('emits clear when 清除篩選 button is clicked', async () => {
     const wrapper = shallowMount(FilterPanel, {
       props: {
-        filters: emptyFilters,
+        filters: filtersWithOneActive,
         options: {},
       },
     });
-    const buttons = wrapper.findAll('button');
-    const clearBtn = buttons.find((b) => b.text().includes('清除'));
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('清除'));
     expect(clearBtn).toBeTruthy();
     await clearBtn.trigger('click');
     expect(wrapper.emitted('clear')).toBeTruthy();
     expect(wrapper.emitted('clear').length).toBe(1);
   });
 
-  it('emits apply when 套用篩選 button is clicked', async () => {
+  it('emits apply when a MultiSelect value changes (instant apply, no button needed)', async () => {
     const wrapper = shallowMount(FilterPanel, {
-      props: {
-        filters: emptyFilters,
-        options: {},
-      },
+      props: { filters: emptyFilters, options: {} },
     });
-    const buttons = wrapper.findAll('button');
-    const applyBtn = buttons.find((b) => b.text().includes('套用'));
-    expect(applyBtn).toBeTruthy();
-    await applyBtn.trigger('click');
+    // MultiSelect stub emits update:model-value — parent handler calls applyFilters()
+    const multiSelects = wrapper.findAllComponents({ name: 'MultiSelect' });
+    expect(multiSelects.length).toBe(9);
+    await multiSelects[0].vm.$emit('update:model-value', ['WO001']);
     expect(wrapper.emitted('apply')).toBeTruthy();
     expect(wrapper.emitted('apply').length).toBe(1);
   });
@@ -132,10 +151,11 @@ describe('FilterPanel', () => {
         options: {},
       },
     });
-    const buttons = wrapper.findAll('button');
-    const applyBtn = buttons.find((b) => b.text().includes('套用'));
-    await applyBtn.trigger('click');
-    const payload = wrapper.emitted('apply')[0][0];
+    const multiSelects = wrapper.findAllComponents({ name: 'MultiSelect' });
+    await multiSelects[0].vm.$emit('update:model-value', ['WO001']);
+    const emittedApply = wrapper.emitted('apply');
+    expect(emittedApply).toBeTruthy();
+    const payload = emittedApply[0][0];
     expect(payload).toHaveProperty('workflow');
     expect(payload).toHaveProperty('bop');
     expect(payload).toHaveProperty('pjFunction');
@@ -144,12 +164,11 @@ describe('FilterPanel', () => {
   it('emits draft-change along with clear event', async () => {
     const wrapper = shallowMount(FilterPanel, {
       props: {
-        filters: emptyFilters,
+        filters: filtersWithOneActive,
         options: {},
       },
     });
-    const buttons = wrapper.findAll('button');
-    const clearBtn = buttons.find((b) => b.text().includes('清除'));
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('清除'));
     await clearBtn.trigger('click');
     expect(wrapper.emitted('draft-change')).toBeTruthy();
   });
@@ -161,8 +180,7 @@ describe('FilterPanel', () => {
         options: {},
       },
     });
-    const buttons = wrapper.findAll('button');
-    const clearBtn = buttons.find((b) => b.text().includes('清除'));
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('清除'));
     await clearBtn.trigger('click');
     // draft-change emitted with cleared values
     const draftPayload = wrapper.emitted('draft-change')[0][0];
@@ -171,18 +189,17 @@ describe('FilterPanel', () => {
     expect(draftPayload.pjFunction).toEqual([]);
   });
 
-  it('buttons are disabled when loading=true', () => {
+  it('clear button is disabled when loading=true', () => {
     const wrapper = shallowMount(FilterPanel, {
       props: {
-        filters: emptyFilters,
+        filters: filtersWithOneActive,
         options: {},
         loading: true,
       },
     });
-    const buttons = wrapper.findAll('button');
-    buttons.forEach((btn) => {
-      expect(btn.attributes('disabled')).toBeDefined();
-    });
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('清除'));
+    expect(clearBtn).toBeTruthy();
+    expect(clearBtn.attributes('disabled')).toBeDefined();
   });
 
   it('initializes draft from filters prop (string comma-separated)', () => {
