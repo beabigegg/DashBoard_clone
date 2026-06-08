@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { apiGet, apiPost } from '../core/api';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
 import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-navigation';
+import { storeHoldNavigationState, loadHoldNavigationState } from '../core/hold-navigation-state';
 import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
@@ -124,7 +125,7 @@ const filters = reactive<{
 // --- useFilterOrchestrator for holdType + reason (FilterBar) ---
 const orchestrator = useFilterOrchestrator({
   fields: {
-    holdType: { trigger: 'immediate', initial: 'all' },
+    holdType: { trigger: 'immediate', initial: 'quality' },
     reason: { trigger: 'immediate', initial: [] },
   },
   dependencies: [
@@ -616,7 +617,32 @@ function navigateToHoldDetail(reason: string) {
   if (!reason) {
     return;
   }
-  navigateToRuntimeRoute(`/hold-detail?reason=${encodeURIComponent(reason)}`);
+  storeHoldNavigationState(
+    (orchestrator.committed.holdType as string) || 'quality',
+    (orchestrator.committed.reason as string[]) || [],
+    matrixFilter.value?.workcenter ?? null,
+    matrixFilter.value?.package ?? null,
+    {
+      workorder: filters.workorder,
+      lotid: filters.lotid,
+      package: filters.package,
+      type: filters.type,
+      firstname: filters.firstname,
+      waferdesc: filters.waferdesc,
+      workflow: filters.workflow,
+      bop: filters.bop,
+      pjFunction: filters.pjFunction,
+    },
+  );
+  const urlParams = new URLSearchParams();
+  urlParams.set('reason', reason);
+  if (matrixFilter.value?.workcenter) {
+    urlParams.set('workcenter', matrixFilter.value.workcenter);
+  }
+  if (matrixFilter.value?.package) {
+    urlParams.set('package', matrixFilter.value.package);
+  }
+  navigateToRuntimeRoute(`/hold-detail?${urlParams.toString()}`);
 }
 
 function handleFilterChange(next: { holdType?: string; reason?: string[] }) {
@@ -744,8 +770,33 @@ async function manualRefresh() {
 }
 
 async function initializePage() {
-  const initialHoldType = normalizeHoldType(getUrlParam('hold_type') || 'all');
-  const initialReason = parseCsvParam('reason');
+  // Prefer sessionStorage state (returning from hold-detail), fall back to URL params
+  const navState = loadHoldNavigationState();
+
+  let initialHoldType: string;
+  let initialReason: string[];
+
+  if (navState) {
+    initialHoldType = normalizeHoldType(navState.holdType || 'quality');
+    initialReason = navState.reason || [];
+    if (navState.workcenter || navState.matrixPackage) {
+      matrixFilter.value = {
+        workcenter: navState.workcenter || null,
+        package: navState.matrixPackage || null,
+      };
+    }
+  } else {
+    initialHoldType = normalizeHoldType(getUrlParam('hold_type') || 'quality');
+    initialReason = parseCsvParam('reason');
+    const workcenter = getUrlParam('workcenter');
+    const matrixPkg = getUrlParam('matrix_package');
+    if (workcenter || matrixPkg) {
+      matrixFilter.value = {
+        workcenter: workcenter || null,
+        package: matrixPkg || null,
+      };
+    }
+  }
 
   // Set orchestrator committed state directly (no fetch triggered during init)
   orchestrator.committed.holdType = initialHoldType;
@@ -753,25 +804,31 @@ async function initializePage() {
   orchestrator.committed.reason = initialReason;
   orchestrator.draft.reason = initialReason;
 
-  updateFilters({
-    workorder: parseCsvParam('workorder'),
-    lotid: parseCsvParam('lotid'),
-    package: parseCsvParam('package'),
-    type: parseCsvParam('type'),
-    firstname: parseCsvParam('firstname'),
-    waferdesc: parseCsvParam('waferdesc'),
-    workflow: parseCsvParam('workflow'),
-    bop: parseCsvParam('bop'),
-    pjFunction: parseCsvParam('pj_function'),
-  });
-
-  const workcenter = getUrlParam('workcenter');
-  const matrixPkg = getUrlParam('matrix_package');
-  if (workcenter || matrixPkg) {
-    matrixFilter.value = {
-      workcenter: workcenter || null,
-      package: matrixPkg || null,
-    };
+  if (navState) {
+    // Restore FilterPanel state from sessionStorage (panel filters not in URL on return)
+    updateFilters({
+      workorder: navState.workorder || [],
+      lotid: navState.lotid || [],
+      package: navState.package || [],
+      type: navState.type || [],
+      firstname: navState.firstname || [],
+      waferdesc: navState.waferdesc || [],
+      workflow: navState.workflow || [],
+      bop: navState.bop || [],
+      pjFunction: navState.pjFunction || [],
+    });
+  } else {
+    updateFilters({
+      workorder: parseCsvParam('workorder'),
+      lotid: parseCsvParam('lotid'),
+      package: parseCsvParam('package'),
+      type: parseCsvParam('type'),
+      firstname: parseCsvParam('firstname'),
+      waferdesc: parseCsvParam('waferdesc'),
+      workflow: parseCsvParam('workflow'),
+      bop: parseCsvParam('bop'),
+      pjFunction: parseCsvParam('pj_function'),
+    });
   }
 
   const parsedPage = Number.parseInt(getUrlParam('page'), 10);

@@ -2874,6 +2874,7 @@ def get_hold_detail_summary(
     hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
+    package: Optional[str] = None,
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
@@ -2907,6 +2908,7 @@ def get_hold_detail_summary(
                 include_dummy=include_dummy,
                 workorder=workorder,
                 lotid=lotid,
+                package=package,
                 pj_type=pj_type,
                 firstname=firstname,
                 waferdesc=waferdesc,
@@ -2919,6 +2921,7 @@ def get_hold_detail_summary(
                     hold_type=hold_type,
                     workorder=workorder,
                     lotid=lotid,
+                    package=package,
                     pj_type=pj_type,
                     firstname=firstname,
                     waferdesc=waferdesc,
@@ -2977,6 +2980,7 @@ def get_hold_detail_summary(
         hold_type=hold_type,
         workorder=workorder,
         lotid=lotid,
+        package=package,
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
@@ -2992,6 +2996,7 @@ def _get_hold_detail_summary_from_oracle(
     hold_type: Optional[str] = None,
     workorder: Optional[str] = None,
     lotid: Optional[str] = None,
+    package: Optional[str] = None,
     pj_type: Optional[str] = None,
     firstname: Optional[str] = None,
     waferdesc: Optional[str] = None,
@@ -3013,6 +3018,8 @@ def _get_hold_detail_summary_from_oracle(
             builder.add_like_condition("WORKORDER", workorder)
         if lotid:
             builder.add_like_condition("LOTID", lotid)
+        if package:
+            _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
         if pj_type:
             builder.add_param_condition("PJ_TYPE", pj_type)
         if firstname:
@@ -3060,7 +3067,16 @@ def _get_hold_detail_summary_from_oracle(
 
 def get_hold_detail_distribution(
     reason: str,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get distribution statistics for a specific hold reason.
 
@@ -3079,10 +3095,30 @@ def get_hold_detail_distribution(
         try:
             df = _select_with_snapshot_indexes(
                 include_dummy=include_dummy,
+                workorder=workorder,
+                lotid=lotid,
+                package=package,
+                pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
                 status='HOLD',
             )
             if df is None:
-                return _get_hold_detail_distribution_from_oracle(reason, include_dummy)
+                return _get_hold_detail_distribution_from_oracle(
+                    reason=reason,
+                    include_dummy=include_dummy,
+                    workorder=workorder,
+                    lotid=lotid,
+                    package=package,
+                    pj_type=pj_type,
+                    firstname=firstname,
+                    waferdesc=waferdesc,
+                    workflow=workflow,
+                    bop=bop,
+                    pj_function=pj_function,
+                )
+
+            df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
 
             # Filter for HOLD status with matching reason
             df = df[df['HOLDREASONNAME'] == reason]
@@ -3195,12 +3231,33 @@ def get_hold_detail_distribution(
             logger.warning(f"Cache-based hold detail distribution failed, falling back to Oracle: {exc}")
 
     # Fallback to Oracle direct query
-    return _get_hold_detail_distribution_from_oracle(reason, include_dummy)
+    return _get_hold_detail_distribution_from_oracle(
+        reason=reason,
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
+    )
 
 
 def _get_hold_detail_distribution_from_oracle(
     reason: str,
-    include_dummy: bool = False
+    include_dummy: bool = False,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail distribution directly from Oracle (fallback)."""
     try:
@@ -3208,6 +3265,21 @@ def _get_hold_detail_distribution_from_oracle(
         builder.add_param_condition("STATUS", "HOLD")
         builder.add_condition("CURRENTHOLDCOUNT > 0")
         builder.add_param_condition("HOLDREASONNAME", reason)
+        if workorder:
+            builder.add_like_condition("WORKORDER", workorder)
+        if lotid:
+            builder.add_like_condition("LOTID", lotid)
+        if package:
+            _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        if pj_type:
+            builder.add_param_condition("PJ_TYPE", pj_type)
+        if firstname:
+            builder.add_param_condition("FIRSTNAME", firstname)
+        if waferdesc:
+            builder.add_param_condition("WAFERDESC", waferdesc)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
         where_clause, params = builder.build_where_only()
 
         # Get total for percentage calculation

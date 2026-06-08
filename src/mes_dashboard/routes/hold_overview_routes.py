@@ -132,6 +132,7 @@ def api_hold_overview_summary():
     reason = _parse_reason_list(args=args)
     workorder = args.get('workorder', '').strip() or None
     lotid = args.get('lotid', '').strip() or None
+    package = args.get('package', '').strip() or None
     pj_type = args.get('type', '').strip() or None
     firstname = args.get('firstname', '').strip() or None
     waferdesc = args.get('waferdesc', '').strip() or None
@@ -145,6 +146,7 @@ def api_hold_overview_summary():
         hold_type=hold_type,
         workorder=workorder,
         lotid=lotid,
+        package=package,
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,
@@ -170,6 +172,7 @@ def api_hold_overview_matrix():
     reason = _parse_reason_list(args=args)
     workorder = args.get('workorder', '').strip() or None
     lotid = args.get('lotid', '').strip() or None
+    package = args.get('package', '').strip() or None
     pj_type = args.get('type', '').strip() or None
     firstname = args.get('firstname', '').strip() or None
     waferdesc = args.get('waferdesc', '').strip() or None
@@ -185,6 +188,7 @@ def api_hold_overview_matrix():
         reason=reason,
         workorder=workorder,
         lotid=lotid,
+        package=package,
         pj_type=pj_type,
         firstname=firstname,
         waferdesc=waferdesc,

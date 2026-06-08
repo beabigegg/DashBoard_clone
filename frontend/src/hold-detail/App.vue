@@ -4,6 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { apiGet } from '../core/api';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
 import { navigateToRuntimeRoute, replaceRuntimeHistory, toRuntimeRoute } from '../core/shell-navigation';
+import { peekHoldNavigationState } from '../core/hold-navigation-state';
 import { NON_QUALITY_HOLD_REASON_SET } from '../wip-shared/constants';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
@@ -53,6 +54,23 @@ interface LotsResult {
 
 const API_TIMEOUT = 60000;
 const reason = ref('');
+
+// FilterPanel filters carried over from hold-overview via sessionStorage
+const carriedFilters = reactive({
+  workorder: '',
+  lotid: '',
+  package: '',
+  type: '',
+  firstname: '',
+  waferdesc: '',
+  workflow: '',
+  bop: '',
+  pjFunction: '',
+});
+
+function serializeCsv(arr: string[]): string {
+  return arr.filter(Boolean).join(',');
+}
 
 const summary = ref<HoldDetailSummary | null>(null);
 const distribution = ref<DistributionData | null>(null);
@@ -107,9 +125,23 @@ function goBackToOverview() {
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
+function buildCarriedParams(): Record<string, string> {
+  const p: Record<string, string> = {};
+  if (carriedFilters.workorder) p.workorder = carriedFilters.workorder;
+  if (carriedFilters.lotid) p.lotid = carriedFilters.lotid;
+  if (carriedFilters.package) p.package_filter = carriedFilters.package;
+  if (carriedFilters.type) p.type = carriedFilters.type;
+  if (carriedFilters.firstname) p.firstname = carriedFilters.firstname;
+  if (carriedFilters.waferdesc) p.waferdesc = carriedFilters.waferdesc;
+  if (carriedFilters.workflow) p.workflow = carriedFilters.workflow;
+  if (carriedFilters.bop) p.bop = carriedFilters.bop;
+  if (carriedFilters.pjFunction) p.pj_function = carriedFilters.pjFunction;
+  return p;
+}
+
 async function fetchSummary(signal: AbortSignal): Promise<HoldDetailSummary> {
   const result = await apiGet('/api/wip/hold-detail/summary', {
-    params: { reason: reason.value },
+    params: { reason: reason.value, ...buildCarriedParams() },
     timeout: API_TIMEOUT,
     signal,
   });
@@ -118,7 +150,7 @@ async function fetchSummary(signal: AbortSignal): Promise<HoldDetailSummary> {
 
 async function fetchDistribution(signal: AbortSignal): Promise<DistributionData> {
   const result = await apiGet('/api/wip/hold-detail/distribution', {
-    params: { reason: reason.value },
+    params: { reason: reason.value, ...buildCarriedParams() },
     timeout: API_TIMEOUT,
     signal,
   });
@@ -130,6 +162,7 @@ async function fetchLots(signal: AbortSignal): Promise<LotsResult> {
     reason: reason.value,
     page: page.value,
     per_page: pagination.value.perPage || 20,
+    ...buildCarriedParams(),
   };
 
   if (orchestrator.committed.workcenter) {
@@ -181,6 +214,22 @@ const filterText = computed(() => {
 });
 
 const hasActiveFilters = computed(() => Boolean(filterText.value));
+
+const carriedFilterText = computed(() => {
+  const parts: string[] = [];
+  if (carriedFilters.package) parts.push(`Package=${carriedFilters.package}`);
+  if (carriedFilters.workorder) parts.push(`WorkOrder=${carriedFilters.workorder}`);
+  if (carriedFilters.lotid) parts.push(`LotID=${carriedFilters.lotid}`);
+  if (carriedFilters.type) parts.push(`Type=${carriedFilters.type}`);
+  if (carriedFilters.firstname) parts.push(`Firstname=${carriedFilters.firstname}`);
+  if (carriedFilters.waferdesc) parts.push(`Wafer=${carriedFilters.waferdesc}`);
+  if (carriedFilters.workflow) parts.push(`Workflow=${carriedFilters.workflow}`);
+  if (carriedFilters.bop) parts.push(`BOP=${carriedFilters.bop}`);
+  if (carriedFilters.pjFunction) parts.push(`PJ=${carriedFilters.pjFunction}`);
+  return parts.join(' · ');
+});
+
+const hasCarriedFilters = computed(() => Boolean(carriedFilterText.value));
 
 // Template-safe accessors for orchestrator.committed (typed as Record<string, unknown>)
 const committedAgeRange = computed<string | undefined>(() => {
@@ -413,6 +462,20 @@ onMounted(() => {
     page.value = parsedPage;
   }
 
+  // Restore FilterPanel filters carried over from hold-overview (one-shot from sessionStorage)
+  const navState = peekHoldNavigationState();
+  if (navState) {
+    carriedFilters.workorder = serializeCsv(navState.workorder || []);
+    carriedFilters.lotid = serializeCsv(navState.lotid || []);
+    carriedFilters.package = serializeCsv(navState.package || []);
+    carriedFilters.type = serializeCsv(navState.type || []);
+    carriedFilters.firstname = serializeCsv(navState.firstname || []);
+    carriedFilters.waferdesc = serializeCsv(navState.waferdesc || []);
+    carriedFilters.workflow = serializeCsv(navState.workflow || []);
+    carriedFilters.bop = serializeCsv(navState.bop || []);
+    carriedFilters.pjFunction = serializeCsv(navState.pjFunction || []);
+  }
+
   if (!reason.value) {
     navigateToRuntimeRoute('/hold-overview', { replace: true });
     return;
@@ -428,23 +491,23 @@ onMounted(() => {
       <div class="hold-detail-nav-left">
         <a
           :href="backToOverviewHref"
-          class="ui-btn ui-btn--ghost ui-btn--sm hold-detail-back-btn"
+          class="ui-btn ui-btn--ghost ui-btn--sm ui-btn--icon hold-detail-back-btn"
+          aria-label="返回 Hold Overview"
           @click.prevent="goBackToOverview"
-        >&larr; Hold Overview</a>
-        <h1 class="hold-detail-title">Hold Detail: <span class="hold-detail-reason">{{ reason }}</span></h1>
+        ><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></a>
+        <h1 class="hold-detail-title">Hold Reason: <span class="hold-detail-reason">{{ reason }}</span></h1>
         <span class="hold-type-badge" :class="holdType">{{ holdTypeLabel }}</span>
       </div>
       <div class="hold-detail-nav-right">
         <span v-if="refreshing" class="refresh-indicator active"></span>
         <span v-else-if="refreshSuccess" class="refresh-success active">&#10003;</span>
         <span class="hold-detail-last-update">更新: {{ lastUpdate }}</span>
-        <button
-          type="button"
-          class="ui-btn ui-btn--ghost ui-btn--sm"
-          :disabled="refreshing"
-          @click="manualRefresh"
-        >&#8635; 更新</button>
       </div>
+    </div>
+
+    <div v-if="hasCarriedFilters" class="hold-detail-carried-filters">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      <span>篩選條件（來自 Overview）：{{ carriedFilterText }}</span>
     </div>
 
     <ErrorBanner :message="loadError" :dismissible="false" />

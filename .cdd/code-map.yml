@@ -1,6 +1,6 @@
-# generated: 2026-06-08T07:38:42Z by cdd-kit 2.2.1
-# files: 831, src-lines: 234311, map-lines: 17832, compression: 13.1x
-# sources-digest: c3493bafd382284dfcb9a0353bfd1801b08aebfa6421ba1b938af5f549ea7134
+# generated: 2026-06-08T08:32:44Z by cdd-kit 2.2.1
+# files: 831, src-lines: 234593, map-lines: 17836, compression: 13.2x
+# sources-digest: 0c4df7b2c9edd14aeb3b5185c4393871653a372ad8f55cbea5428115c1c4479a
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1712,11 +1712,11 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
   types:
     - { name: ParetoSelections, lines: 139-139 }
 
-frontend/src/resource-history/App.vue:  # 790 lines
+frontend/src/resource-history/App.vue:  # 829 lines
 
 frontend/src/resource-history/components/ComparisonChart.vue:  # 97 lines
 
-frontend/src/resource-history/components/DetailSection.vue:  # 300 lines
+frontend/src/resource-history/components/DetailSection.vue:  # 349 lines
 
 frontend/src/resource-history/components/FilterBar.vue:  # 176 lines
 
@@ -1736,7 +1736,7 @@ frontend/src/resource-history/main.ts:  # 9 lines
     - { module: './style.css', items: [], line: 5 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
 
-frontend/src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
+frontend/src/resource-history/useResourceHistoryDuckDB.ts:  # 581 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 15 }
@@ -1744,22 +1744,23 @@ frontend/src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
   constants:
     - { name: TABLE_NAME, line: 18 }
   functions:
-    - { name: qid, lines: 136-138 }
-    - { name: granularityExpr, lines: 140-152 }
-    - { name: sf, lines: 158-161 }
-    - { name: calcOuPct, lines: 163-166 }
-    - { name: calcAvailPct, lines: 168-172 }
-    - { name: statusPct, lines: 174-176 }
-    - { name: buildKpiFromRow, lines: 178-207 }
-    - { name: emptyKpi, lines: 209-222 }
-    - { name: async queryKpi, lines: 226-241 }
-    - { name: async queryTrend, lines: 243-281 }
-    - { name: async queryByHistoryId, lines: 283-299 }
-    - { name: async queryByHistoryIdAndDate, lines: 301-318 }
-    - { name: deriveHeatmap, lines: 322-358 }
-    - { name: deriveComparison, lines: 360-383 }
-    - { name: deriveDetail, lines: 385-430 }
-    - { name: useResourceHistoryDuckDB, lines: 434-515 }
+    - { name: qid, lines: 160-162 }
+    - { name: granularityExpr, lines: 164-176 }
+    - { name: sf, lines: 182-185 }
+    - { name: calcOuPct, lines: 187-190 }
+    - { name: calcAvailPct, lines: 192-196 }
+    - { name: statusPct, lines: 198-200 }
+    - { name: buildKpiFromRow, lines: 202-231 }
+    - { name: emptyKpi, lines: 233-246 }
+    - { name: async queryKpi, lines: 250-265 }
+    - { name: async queryTrend, lines: 267-305 }
+    - { name: async queryByHistoryId, lines: 307-323 }
+    - { name: async queryByHistoryIdAndDate, lines: 325-344 }
+    - { name: deriveHeatmap, lines: 348-384 }
+    - { name: deriveComparison, lines: 386-409 }
+    - { name: deriveDetail, lines: 411-456 }
+    - { name: deriveDetailByDate, lines: 458-495 }
+    - { name: useResourceHistoryDuckDB, lines: 499-581 }
   interfaces:
     - { name: ResourceMeta, lines: 22-27 }  # local
     - { name: LocalKpi, lines: 33-53 }  # local
@@ -1767,14 +1768,15 @@ frontend/src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
     - { name: HeatmapItem, lines: 69-76 }  # local
     - { name: ComparisonItem, lines: 78-83 }  # local
     - { name: DetailItem, lines: 85-109 }  # local
-    - { name: SummaryResult, lines: 111-116 }  # local
-    - { name: DetailResult, lines: 118-123 }  # local
-    - { name: ComputeViewResult, lines: 125-128 }  # local
-    - { name: ComputeViewOptions, lines: 130-132 }  # local
+    - { name: DetailByDateItem, lines: 111-132 }  # local
+    - { name: SummaryResult, lines: 134-139 }  # local
+    - { name: DetailResult, lines: 141-146 }  # local
+    - { name: ComputeViewResult, lines: 148-152 }  # local
+    - { name: ComputeViewOptions, lines: 154-156 }  # local
   types:
     - { name: ResourceMetadataMap, lines: 29-29 }  # local
 
-frontend/src/resource-shared/components/HierarchyTable.vue:  # 362 lines
+frontend/src/resource-shared/components/HierarchyTable.vue:  # 416 lines
 
 frontend/src/resource-shared/components/MultiSelect.vue:  # 193 lines
 
@@ -2174,7 +2176,7 @@ frontend/src/yield-alert-center/utils.ts:  # 52 lines
     - { name: toQueryParams, lines: 21-38 }
     - { name: buildDrilldownNotice, lines: 40-52 }
 
-frontend/tailwind.config.js:  # 257 lines
+frontend/tailwind.config.js:  # 258 lines
 
 frontend/tests/abort/production-history-abort.test.js:  # 209 lines
   imports:
@@ -6855,7 +6857,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1261 lines
     - { name: get_vendors, lines: 1231-1233 }
     - { name: get_resource_cascade_metadata, lines: 1236-1261 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 625 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 631 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6882,14 +6884,15 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 625 lines
     - { name: _get_resource_lookup, lines: 117-128 }
     - { name: _get_workcenter_mapping, lines: 131-138 }
     - { name: _get_filtered_resources_and_lookup, lines: 141-169 }
-    - { name: execute_primary_query, lines: 177-486 }
-    - { name: apply_view, lines: 494-521 }
-    - { name: _empty_summary, lines: 524-530 }
-    - { name: _empty_detail, lines: 533-534 }
-    - { name: _empty_kpi, lines: 537-558 }
-    - { name: make_canonical_base_query_id, lines: 575-586 }
-    - { name: make_canonical_oee_query_id, lines: 589-600 }
-    - { name: ensure_dataset_loaded, lines: 603-625 }
+    - { name: execute_primary_query, lines: 177-488 }
+    - { name: apply_view, lines: 496-523 }
+    - { name: _empty_summary, lines: 526-532 }
+    - { name: _empty_detail, lines: 535-536 }
+    - { name: _empty_detail_by_date, lines: 539-540 }
+    - { name: _empty_kpi, lines: 543-564 }
+    - { name: make_canonical_base_query_id, lines: 581-592 }
+    - { name: make_canonical_oee_query_id, lines: 595-606 }
+    - { name: ensure_dataset_loaded, lines: 609-631 }
 
 src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 359 lines
   imports:
@@ -6952,7 +6955,7 @@ src/mes_dashboard/services/resource_history_service.py:  # 1026 lines
     - { name: _build_comparison_from_raw_df, lines: 878-950 }
     - { name: _build_detail_from_raw_df, lines: 953-1024 }
 
-src/mes_dashboard/services/resource_history_sql_runtime.py:  # 750 lines
+src/mes_dashboard/services/resource_history_sql_runtime.py:  # 817 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -6985,9 +6988,10 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 750 lines
     - { name: _query_heatmap, lines: 303-363 }
     - { name: _query_workcenter_comparison, lines: 368-400 }
     - { name: _query_detail, lines: 405-486 }
-    - { name: _empty_kpi, lines: 491-503 }
-    - { name: try_compute_view_from_spool, lines: 508-599 }
-    - { name: try_compute_query_from_canonical_spool, lines: 604-750 }
+    - { name: _query_detail_by_date, lines: 489-549 }
+    - { name: _empty_kpi, lines: 554-566 }
+    - { name: try_compute_view_from_spool, lines: 571-664 }
+    - { name: try_compute_query_from_canonical_spool, lines: 669-817 }
 
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:

@@ -97,11 +97,29 @@ def api_hold_detail_summary():
     if not reason:
         return validation_error('缺少必要參數: reason')
 
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package_filter', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
+    workflow = request.args.get('workflow', '').strip() or ''
+    bop = request.args.get('bop', '').strip() or ''
+    pj_function = request.args.get('pj_function', '').strip() or ''
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_hold_detail_summary(
         reason=reason,
-        include_dummy=include_dummy
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+        include_dummy=include_dummy,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)
@@ -123,11 +141,29 @@ def api_hold_detail_distribution():
     if not reason:
         return validation_error('缺少必要參數: reason')
 
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    package = request.args.get('package_filter', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
+    workflow = request.args.get('workflow', '').strip() or ''
+    bop = request.args.get('bop', '').strip() or ''
+    pj_function = request.args.get('pj_function', '').strip() or ''
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
 
     result = get_hold_detail_distribution(
         reason=reason,
-        include_dummy=include_dummy
+        include_dummy=include_dummy,
+        workorder=workorder,
+        lotid=lotid,
+        package=package,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
     )
     if result is not None:
         return success_response(result)
@@ -157,6 +193,15 @@ def api_hold_detail_lots():
 
     workcenter = request.args.get('workcenter', '').strip() or None
     package = request.args.get('package', '').strip() or None
+    package_filter = request.args.get('package_filter', '').strip() or None
+    workorder = request.args.get('workorder', '').strip() or None
+    lotid = request.args.get('lotid', '').strip() or None
+    pj_type = request.args.get('type', '').strip() or None
+    firstname = request.args.get('firstname', '').strip() or None
+    waferdesc = request.args.get('waferdesc', '').strip() or None
+    workflow = request.args.get('workflow', '').strip() or ''
+    bop = request.args.get('bop', '').strip() or ''
+    pj_function = request.args.get('pj_function', '').strip() or ''
     age_range = request.args.get('age_range', '').strip() or None
     include_dummy = parse_bool_query(request.args.get('include_dummy'))
     page = request.args.get('page', 1, type=int)
@@ -172,10 +217,26 @@ def api_hold_detail_lots():
     if age_range and age_range not in ('0-1', '1-3', '3-7', '7+'):
         return validation_error('Invalid age_range. Use 0-1, 1-3, 3-7, or 7+')
 
+    # package_filter is the overview FilterPanel carry-over (CSV); package is the distribution-table click (single)
+    # Intersection: if both set, distribution click must be within the carried filter set
+    if package and package_filter:
+        filter_set = {v.strip() for v in package_filter.split(',') if v.strip()}
+        effective_package = package if package in filter_set else package_filter
+    else:
+        effective_package = package_filter or package
+
     result = get_hold_detail_lots(
         reason=reason,
         workcenter=workcenter,
-        package=package,
+        package=effective_package,
+        workorder=workorder,
+        lotid=lotid,
+        pj_type=pj_type,
+        firstname=firstname,
+        waferdesc=waferdesc,
+        workflow=workflow,
+        bop=bop,
+        pj_function=pj_function,
         age_range=age_range,
         include_dummy=include_dummy,
         page=page,

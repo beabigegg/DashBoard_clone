@@ -144,6 +144,14 @@ export {
 } from './wip-navigation-state.js';
 export type { WipNavigationFilters, WipNavigationState } from './wip-navigation-state.js';
 
+export {
+  storeHoldNavigationState,
+  loadHoldNavigationState,
+  peekHoldNavigationState,
+  clearHoldNavigationState,
+} from './hold-navigation-state.js';
+export type { HoldNavigationState, HoldPanelFilters } from './hold-navigation-state.js';
+
 // Reject history filters
 export {
   PRIMARY_QUERY_MAX_DAYS,
