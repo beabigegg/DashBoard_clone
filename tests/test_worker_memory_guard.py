@@ -167,7 +167,7 @@ class TestGuardGraduatedResponse:
         guard = self._make_guard(1000)
         with patch(
             "mes_dashboard.core.worker_memory_guard._current_rss_mb",
-            side_effect=[960.0, 960.0],  # stays high after eviction
+            return_value=960.0,  # stays high after eviction
         ):
             with patch(
                 "mes_dashboard.core.cache.emergency_clear_all_process_caches",
