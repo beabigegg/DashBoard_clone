@@ -10,7 +10,6 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import LotDetailPanel from './components/LotDetailPanel.vue';
@@ -550,18 +549,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard wip-detail-page theme-wip-detail">
-    <PageHeader
-      :title="pageTitle"
-      :last-update="lastUpdate"
-      :refreshing="refreshing"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      @refresh="manualRefresh"
-    >
-      <template #header-left>
-        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="navigateBack">&larr; Overview</button>
-      </template>
-    </PageHeader>
+    <div class="detail-page-nav">
+      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm detail-back-btn" @click="navigateBack">&larr; Overview</button>
+      <h1 class="detail-page-title">{{ pageTitle }}</h1>
+    </div>
 
     <ErrorBanner :message="errorMessage" :dismissible="false" />
 
@@ -569,6 +560,9 @@ onBeforeUnmount(() => {
       :filters="filters"
       :options="filterOptions"
       :loading="refreshing"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
       @apply="applyFilters"
       @clear="clearFilters"
       @draft-change="onFilterDraftChange"

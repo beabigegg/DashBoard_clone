@@ -1,20 +1,115 @@
 @import '../wip-shared/styles.css';
 @import '../resource-shared/styles.css';
 
-.theme-wip-detail .wip-detail-page .header h1 {
-  font-size: 24px;
+/* ── Compact page nav (replaces PageHeader) ───────────────────────────── */
+
+.theme-wip-detail .detail-page-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: theme('spacing.token.p14');
 }
 
-.theme-wip-detail .filters {
+.theme-wip-detail .detail-page-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.theme-wip-detail .detail-back-btn {
+  flex-shrink: 0;
+}
+
+/* ── Filter collapse ───────────────────────────────────────────────────── */
+
+.theme-wip-detail .filters-section {
   background: var(--card-bg);
-  padding: theme('spacing.token.p16') theme('spacing.shell');
   border-radius: 10px;
   margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.theme-wip-detail .filters-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: theme('spacing.token.p10') theme('spacing.token.p20');
+  cursor: pointer;
+  user-select: none;
+  gap: 12px;
+}
+
+.theme-wip-detail .filters-toggle:hover {
+  background: var(--surface-hover, rgba(0,0,0,0.02));
+}
+
+.theme-wip-detail .filters-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-wip-detail .filters-toggle-icon {
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.theme-wip-detail .filters-toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.theme-wip-detail .filters-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.theme-wip-detail .filters-active-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary, theme('colors.brand.500'));
+  color: theme('colors.token.hffffff');
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.theme-wip-detail .filters-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-wip-detail .filters-last-update {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.theme-wip-detail .filters-clear-btn {
+  font-size: 12px;
+  padding: 2px 10px;
+  line-height: 1.6;
+}
+
+.theme-wip-detail .filters-body {
+  border-top: 1px solid var(--border);
+  padding: theme('spacing.token.p16') theme('spacing.token.p20');
+}
+
+.theme-wip-detail .filters-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
   gap: theme('spacing.nav') 16px;
   align-items: start;
+  margin-bottom: 12px;
 }
 
 .theme-wip-detail .filter-group {
@@ -31,18 +126,20 @@
 }
 
 .theme-wip-detail .filters-actions {
-  grid-column: 1 / -1;
   display: inline-flex;
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
+  width: 100%;
 }
+
+/* ── Summary cards → Lot table gap ────────────────────────────────────── */
 
 .theme-wip-detail .detail-summary-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.theme-wip-detail .wip-detail-page .summary-card-group {
+.theme-wip-detail .summary-card-group {
   margin-bottom: theme('spacing.token.p28');
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 
@@ -13,6 +13,18 @@ const props = defineProps({
     default: () => ({}),
   },
   loading: {
+    type: Boolean,
+    default: false,
+  },
+  lastUpdate: {
+    type: String,
+    default: '',
+  },
+  refreshing: {
+    type: Boolean,
+    default: false,
+  },
+  refreshSuccess: {
     type: Boolean,
     default: false,
   },
@@ -137,28 +149,58 @@ function setDraftField(key: string, value: string[]): void {
   (draft as Record<string, string[]>)[key] = value;
 }
 
+const collapsed = ref(true);
+
+const activeFilterCount = computed(() => {
+  const filterKeys = ['workorder', 'lotid', 'package', 'type', 'firstname', 'waferdesc', 'workflow', 'bop', 'pjFunction'] as const;
+  return filterKeys.filter((key) => (props.filters as Record<string, string[]>)[key]?.length > 0).length;
+});
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value;
+}
 </script>
 
 <template>
-  <section class="filters">
-    <div v-for="field in fields" :key="field.key" class="filter-group">
-      <label>{{ field.label }}</label>
-      <MultiSelect
-        :model-value="getDraftField(field.key)"
-        :options="getOptions(field)"
-        :disabled="loading"
-        :placeholder="field.placeholder"
-        searchable
-        @update:model-value="
-          setDraftField(field.key, $event);
-          notifyDraftChange();
-        "
-      />
+  <section class="filters-section">
+    <div class="filters-toggle" role="button" tabindex="0" @click="toggleCollapse" @keydown.enter="toggleCollapse" @keydown.space.prevent="toggleCollapse">
+      <div class="filters-toggle-left">
+        <span class="filters-toggle-icon" :class="{ expanded: !collapsed }">&#9654;</span>
+        <span class="filters-toggle-label">篩選條件</span>
+        <span v-if="activeFilterCount > 0" class="filters-active-badge">{{ activeFilterCount }}</span>
+      </div>
+      <div class="filters-toggle-right">
+        <button
+          v-if="activeFilterCount > 0"
+          type="button"
+          class="ui-btn ui-btn--ghost ui-btn--sm filters-clear-btn"
+          :disabled="loading"
+          @click.stop="clearFilters"
+        >清除篩選</button>
+        <span v-if="refreshing" class="refresh-indicator active"></span>
+        <span v-else-if="refreshSuccess" class="refresh-success active">&#10003;</span>
+        <span v-if="lastUpdate" class="filters-last-update">更新: {{ lastUpdate }}</span>
+      </div>
     </div>
 
-    <div class="filters-actions">
-      <button type="button" class="ui-btn ui-btn--primary" :disabled="loading" @click="applyFilters">套用篩選</button>
-      <button type="button" class="ui-btn ui-btn--ghost" :disabled="loading" @click="clearFilters">清除篩選</button>
+    <div v-show="!collapsed" class="filters-body">
+      <div class="filters-grid">
+        <div v-for="field in fields" :key="field.key" class="filter-group">
+          <label>{{ field.label }}</label>
+          <MultiSelect
+            :model-value="getDraftField(field.key)"
+            :options="getOptions(field)"
+            :disabled="loading"
+            :placeholder="field.placeholder"
+            searchable
+            @update:model-value="
+              setDraftField(field.key, $event);
+              notifyDraftChange();
+              applyFilters();
+            "
+          />
+        </div>
+      </div>
     </div>
   </section>
 </template>

@@ -12,13 +12,12 @@ import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrat
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
 import StatusCards from './components/StatusCards.vue';
+import WipDistributionCharts from './components/WipDistributionCharts.vue';
 
 // ── Local type aliases ──────────────────────────────────────────────────────
 interface WipOverviewSummary {
@@ -121,6 +120,10 @@ const filters = reactive<{
 
 // Active matrix filter: { workcenter, package } for cell click, { workcenter } for row click
 const activeMatrixFilter = ref<{ workcenter?: string | null; package?: string | null } | null>(null);
+
+// Cross-filter state: set by chart interactions, drives matrix highlight + chart cross-context
+const chartSelectedPackage = ref<string | null>(null);
+const chartSelectedStation = ref<string | null>(null);
 
 // unwrapApiResult imported from ../core/unwrap-api-result.js (as unwrapApiData)
 
@@ -402,6 +405,8 @@ function clearFilters() {
   });
   activeStatusFilter.value = null;
   activeMatrixFilter.value = null;
+  chartSelectedPackage.value = null;
+  chartSelectedStation.value = null;
   filterOrchestrator.resetAll();
   updateUrlState();
   void loadFilterOptions(filters);
@@ -504,21 +509,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard wip-overview-page theme-wip-overview">
-    <PageHeader
-      title="WIP 即時概況"
-      :last-update="lastUpdate"
-      :refreshing="refreshing"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      @refresh="manualRefresh"
-    />
-
     <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
 
     <FilterPanel
       :filters="filters"
       :options="filterOptions"
       :loading="refreshing"
+      :last-update="lastUpdate"
+      :refreshing="refreshing"
+      :refresh-success="refreshSuccess"
       @apply="applyFilters"
       @clear="clearFilters"
       @draft-change="onFilterDraftChange"
@@ -551,12 +550,25 @@ onBeforeUnmount(() => {
           <div class="card-title ui-card-title">{{ matrixTitle }}</div>
         </div>
         <div class="card-body ui-card-body matrix-container ui-table-wrap" :class="{ 'is-loading': refreshing }">
-          <MatrixTable :data="matrix ?? undefined" :active-filter="activeMatrixFilter ?? undefined" @drilldown="navigateToDetail" />
+          <MatrixTable
+            :data="matrix ?? undefined"
+            :active-filter="activeMatrixFilter ?? undefined"
+            :highlighted-package="chartSelectedPackage ?? undefined"
+            :highlighted-station="chartSelectedStation ?? undefined"
+            @drilldown="navigateToDetail"
+          />
           <EmptyState v-if="!refreshing && !matrix" type="no-data" />
         </div>
       </section>
-
     </section>
+
+    <WipDistributionCharts
+      :data="matrix ?? null"
+      :selected-package="chartSelectedPackage"
+      :selected-station="chartSelectedStation"
+      @select-package="chartSelectedPackage = $event"
+      @select-station="chartSelectedStation = $event"
+    />
   </div>
 
   <LoadingOverlay v-if="loading" tier="page" />

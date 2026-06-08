@@ -2,21 +2,95 @@
 @import '../resource-shared/styles.css';
 @import '../wip-shared/pareto-styles.css';
 
-.theme-wip-overview .wip-overview-page .header h1 {
-  font-size: 24px;
-}
+/* ── Filter collapse ───────────────────────────────────────────────────── */
 
-
-.theme-wip-overview .filters {
+.theme-wip-overview .filters-section {
   background: var(--card-bg);
-  padding: theme('spacing.token.p16') theme('spacing.token.p20');
   border-radius: 10px;
   margin-bottom: theme('spacing.token.p16');
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.theme-wip-overview .filters-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: theme('spacing.token.p10') theme('spacing.token.p20');
+  cursor: pointer;
+  user-select: none;
+  gap: 12px;
+}
+
+.theme-wip-overview .filters-toggle:hover {
+  background: var(--surface-hover, rgba(0,0,0,0.02));
+}
+
+.theme-wip-overview .filters-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-wip-overview .filters-toggle-icon {
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.theme-wip-overview .filters-toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.theme-wip-overview .filters-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.theme-wip-overview .filters-active-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary, theme('colors.brand.500'));
+  color: theme('colors.token.hffffff');
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.theme-wip-overview .filters-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-wip-overview .filters-last-update {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.theme-wip-overview .filters-clear-btn {
+  font-size: 12px;
+  padding: 2px 10px;
+  line-height: 1.6;
+}
+
+.theme-wip-overview .filters-body {
+  border-top: 1px solid var(--border);
+  padding: theme('spacing.token.p16') theme('spacing.token.p20');
+}
+
+.theme-wip-overview .filters-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
   gap: 14px 16px;
   align-items: start;
+  margin-bottom: 12px;
 }
 
 .theme-wip-overview .filter-group {
@@ -33,11 +107,11 @@
 }
 
 .theme-wip-overview .filters-actions {
-  grid-column: 1 / -1;
   display: inline-flex;
   gap: 10px;
   align-items: center;
   justify-content: flex-end;
+  width: 100%;
 }
 
 .theme-wip-overview .overview-summary-row {
@@ -204,10 +278,12 @@
   font-size: 12px;
 }
 
-.theme-wip-overview .matrix-table th,
-.theme-wip-overview .matrix-table td {
+/* Combined selector (.wip-overview-page is on the same root element as .theme-wip-overview)
+   — specificity 0,3,1 beats resource-shared :is() rule at 0,2,1, stable across bundle load order */
+.theme-wip-overview.wip-overview-page .matrix-table th,
+.theme-wip-overview.wip-overview-page .matrix-table td {
   padding: theme('spacing.token.p8') theme('spacing.token.p10');
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -272,7 +348,7 @@
 }
 
 @media (max-width: 1000px) {
-  .theme-wip-overview .filters {
+  .theme-wip-overview .filters-grid {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
@@ -282,7 +358,7 @@
 }
 
 @media (max-width: 768px) {
-  .theme-wip-overview .filters {
+  .theme-wip-overview .filters-grid {
     grid-template-columns: 1fr;
   }
 
@@ -292,6 +368,74 @@
 
   .theme-wip-overview .overview-summary-row,
   .theme-wip-overview .wip-status-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Cross-filter visual feedback ─────────────────────────────────────── */
+
+.theme-wip-overview .matrix-table.cross-filtering td.cross-dim,
+.theme-wip-overview .matrix-table.cross-filtering th.cross-dim {
+  opacity: 0.25;
+  transition: opacity 0.15s ease;
+}
+
+.theme-wip-overview .matrix-table.cross-filtering tr.cross-dim-row td {
+  opacity: 0.25;
+  transition: opacity 0.15s ease;
+}
+
+.theme-wip-overview .matrix-table.cross-filtering th.cross-highlight {
+  background: theme('colors.brand.100');
+  font-weight: 700;
+}
+
+.theme-wip-overview .matrix-table.cross-filtering tr.cross-highlight-row td {
+  background: theme('colors.brand.50');
+}
+
+/* Chart card header with clear button */
+.theme-wip-overview .wip-chart-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.theme-wip-overview .wip-chart-clear-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  opacity: 0.7;
+}
+
+.theme-wip-overview .wip-chart-clear-btn:hover {
+  opacity: 1;
+}
+
+.theme-wip-overview .wip-chart-body {
+  padding: theme('spacing.token.p10');
+}
+
+.theme-wip-overview .wip-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.theme-wip-overview .wip-chart-card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.theme-wip-overview .wip-echarts {
+  width: 100%;
+  min-height: 200px;
+}
+
+@media (max-width: 900px) {
+  .theme-wip-overview .wip-charts-row {
     grid-template-columns: 1fr;
   }
 }

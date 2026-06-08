@@ -10,6 +10,14 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  highlightedPackage: {
+    type: String,
+    default: null,
+  },
+  highlightedStation: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['drilldown']);
@@ -55,6 +63,24 @@ function isCellActive(workcenter: string, pkg: string): boolean {
   return Boolean(filter && filter.workcenter === workcenter && filter.package === pkg);
 }
 
+// Cross-filter dimming
+const hasCrossFilter = computed(() => !!props.highlightedPackage || !!props.highlightedStation);
+
+function isRowDimmed(workcenter: string): boolean {
+  if (!props.highlightedStation) return false;
+  return workcenter !== props.highlightedStation;
+}
+
+function isColDimmed(pkg: string): boolean {
+  if (!props.highlightedPackage) return false;
+  return pkg !== props.highlightedPackage;
+}
+
+// A cell is dimmed if its row OR its column is dimmed (cross-filter AND logic)
+function isCellDimmed(workcenter: string, pkg: string): boolean {
+  return isRowDimmed(workcenter) || isColDimmed(pkg);
+}
+
 function onWorkcenterClick(workcenter: string): void {
   const target: MatrixFilterObj = { workcenter, package: null };
   if (isSameFilter(target)) {
@@ -87,16 +113,31 @@ function getMatrixValue(workcenter: string, pkg: string): number {
 
 <template>
   <div v-if="workcenters.length === 0" class="placeholder">No data available</div>
-  <table v-else class="matrix-table">
+  <table v-else class="matrix-table" :class="{ 'cross-filtering': hasCrossFilter }">
     <thead>
       <tr>
         <th>Workcenter</th>
-        <th v-for="pkg in packages" :key="pkg">{{ pkg }}</th>
+        <th
+          v-for="pkg in packages"
+          :key="pkg"
+          :class="{
+            'cross-highlight': highlightedPackage === pkg,
+            'cross-dim': hasCrossFilter && isColDimmed(pkg),
+          }"
+        >{{ pkg }}</th>
         <th class="total-col">Total</th>
       </tr>
     </thead>
     <tbody>
-      <tr v-for="workcenter in workcenters" :key="workcenter" :class="{ active: isRowActive(workcenter) }">
+      <tr
+        v-for="workcenter in workcenters"
+        :key="workcenter"
+        :class="{
+          active: isRowActive(workcenter),
+          'cross-highlight-row': highlightedStation === workcenter,
+          'cross-dim-row': hasCrossFilter && isRowDimmed(workcenter),
+        }"
+      >
         <td
           class="clickable row-name"
           :class="{ active: isRowActive(workcenter) }"
@@ -108,14 +149,20 @@ function getMatrixValue(workcenter: string, pkg: string): number {
           v-for="pkg in packages"
           :key="`${workcenter}-${pkg}`"
           class="clickable"
-          :class="{ active: isCellActive(workcenter, pkg) }"
+          :class="{
+            active: isCellActive(workcenter, pkg),
+            'cross-dim': hasCrossFilter && isCellDimmed(workcenter, pkg),
+          }"
           @click="onCellClick(workcenter, pkg)"
         >
           {{ formatNumber(getMatrixValue(workcenter, pkg)) }}
         </td>
         <td
           class="total-col clickable"
-          :class="{ active: isRowActive(workcenter) }"
+          :class="{
+            active: isRowActive(workcenter),
+            'cross-dim': hasCrossFilter && isRowDimmed(workcenter),
+          }"
           @click="onWorkcenterClick(workcenter)"
         >
           {{ formatNumber(data?.workcenter_totals?.[workcenter]) }}
@@ -124,7 +171,11 @@ function getMatrixValue(workcenter: string, pkg: string): number {
 
       <tr class="total-row">
         <td>Total</td>
-        <td v-for="pkg in packages" :key="`total-${pkg}`">
+        <td
+          v-for="pkg in packages"
+          :key="`total-${pkg}`"
+          :class="{ 'cross-dim': hasCrossFilter && isColDimmed(pkg) }"
+        >
           {{ formatNumber(data?.package_totals?.[pkg]) }}
         </td>
         <td class="total-col">{{ formatNumber(data?.grand_total) }}</td>
