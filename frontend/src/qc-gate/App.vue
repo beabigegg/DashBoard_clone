@@ -3,7 +3,6 @@ import { computed, ref } from 'vue';
 
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import QcGateChart from './components/QcGateChart.vue';
 import LotTable from './components/LotTable.vue';
@@ -16,14 +15,11 @@ interface ActiveFilter {
 
 const {
   stations,
-  cacheTime,
   loading,
   refreshing,
-  refreshSuccess,
-  refreshError,
   errorMessage,
   allLots,
-  refreshNow,
+  cacheTime,
 } = useQcGateData();
 
 const activeFilter = ref<ActiveFilter | null>(null);
@@ -37,8 +33,12 @@ const BUCKET_LABELS: Record<string, string> = {
 
 const hasStations = computed<boolean>(() => stations.value.length > 0);
 
-const totalLots = computed<number>(() => {
-  return stations.value.reduce((sum, station) => sum + Number(station.total || 0), 0);
+const formattedCacheTime = computed<string>(() => {
+  if (!cacheTime.value) return '--';
+  const d = new Date(cacheTime.value);
+  if (Number.isNaN(d.getTime())) return String(cacheTime.value);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 });
 
 const filteredLots = computed(() => {
@@ -53,20 +53,6 @@ const filteredLots = computed(() => {
       lot.bucket === filter.bucket
     );
   });
-});
-
-const formattedCacheTime = computed<string>(() => {
-  if (!cacheTime.value) {
-    return '--';
-  }
-
-  const d = new Date(cacheTime.value);
-  if (Number.isNaN(d.getTime())) {
-    return String(cacheTime.value);
-  }
-
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 });
 
 const activeFilterLabel = computed<string>(() => {
@@ -99,23 +85,16 @@ function clearFilter(): void {
   activeFilter.value = null;
 }
 
-function handleManualRefresh(): void {
-  void refreshNow();
-}
 </script>
 
 <template>
   <div class="qc-gate-page theme-qc-gate">
-    <PageHeader
-      title="QC-GATE 狀態"
-      :last-update="formattedCacheTime"
-      :refreshing="loading || refreshing"
-      :refresh-success="refreshSuccess"
-      :refresh-error="refreshError"
-      @refresh="handleManualRefresh"
-    />
-
     <ErrorBanner :message="errorMessage" :dismissible="false" />
+
+    <div class="qc-meta-bar">
+      <span v-if="refreshing" class="refresh-indicator active"></span>
+      <span v-if="formattedCacheTime !== '--'" class="filters-last-update">更新: {{ formattedCacheTime }}</span>
+    </div>
 
     <main class="qc-gate-content">
       <SectionCard variant="elevated" :class="{ 'is-refreshing': refreshing }">
