@@ -97,109 +97,71 @@ _MERGE_GAP_SECONDS = 60  # contiguity tolerance
 def _merge_cross_shift_events(df: pd.DataFrame) -> pd.DataFrame:
     """Merge cross-shift fragments into logical events (DA-02).
 
-    Sort by (HISTORYID, OLDSTATUSNAME, OLDREASONNAME, OLDLASTSTATUSCHANGEDATE).
-    Walk rows; start new run when gap between prev.LASTSTATUSCHANGEDATE and
-    cur.OLDLASTSTATUSCHANGEDATE > 60 seconds.
-    Aggregate: hours=SUM(HOURS), event_start=MIN(OLDLASTSTATUSCHANGEDATE),
-               event_end=MAX(LASTSTATUSCHANGEDATE), fragment_count=COUNT(*).
-
-    Defensive float coercion on HOURS to avoid string-concat bug.
+    Vectorized: sort → detect run breaks via shifted key/gap comparison →
+    cumsum run_id → groupby aggregate.  O(N log N), no Python row loop.
     """
     if df.empty:
-        return df.iloc[0:0].copy()  # return empty DataFrame with same columns
+        return df.iloc[0:0].copy()
 
-    # Defensive coerce HOURS to float
     df = df.copy()
     df['HOURS'] = pd.to_numeric(df['HOURS'], errors='coerce').fillna(0.0)
 
-    # Ensure datetime columns are actual datetime (not string)
     for col in ('OLDLASTSTATUSCHANGEDATE', 'LASTSTATUSCHANGEDATE'):
         if col in df.columns and df[col].dtype == object:
             df[col] = pd.to_datetime(df[col], errors='coerce')
 
-    # Sort by merge key
     df = df.sort_values(
         ['HISTORYID', 'OLDSTATUSNAME', 'OLDREASONNAME', 'OLDLASTSTATUSCHANGEDATE'],
         na_position='last',
     ).reset_index(drop=True)
 
-    merged_rows: List[Dict[str, Any]] = []
-    group_key: Optional[Tuple] = None
-    run_hours = 0.0
-    run_start: Optional[Any] = None
-    run_end: Optional[Any] = None
-    run_count = 0
-    prev_end: Optional[Any] = None
-    pending_jobid: Optional[Any] = None
+    # Normalised key columns for break detection (strip + null→'')
+    _sentinel = '\x00'
+    _h = df['HISTORYID'].astype(str).str.strip()
+    _s = df['OLDSTATUSNAME'].astype(str).str.strip()
+    _r = df['OLDREASONNAME'].fillna('').astype(str).str.strip()
 
-    for _, row in df.iterrows():
-        cur_key = (
-            str(row['HISTORYID']).strip(),
-            str(row['OLDSTATUSNAME']).strip(),
-            str(row['OLDREASONNAME']).strip() if pd.notna(row.get('OLDREASONNAME')) else '',
+    key_changed = (
+        (_h != _h.shift(fill_value=_sentinel))
+        | (_s != _s.shift(fill_value=_sentinel))
+        | (_r != _r.shift(fill_value=_sentinel))
+    )
+
+    prev_end = df['LASTSTATUSCHANGEDATE'].shift(1)
+    gap_secs = (df['OLDLASTSTATUSCHANGEDATE'] - prev_end).dt.total_seconds()
+    gap_break = gap_secs.isna() | (gap_secs > _MERGE_GAP_SECONDS)
+
+    new_run = key_changed | gap_break
+    new_run.iloc[0] = True
+    df['_run_id'] = new_run.cumsum()
+
+    # Store normalised key values so groupby first() returns stripped output
+    df['_h'] = _h
+    df['_s'] = _s
+
+    def _first_nonnull(s: pd.Series) -> Any:
+        valid = s.dropna()
+        return valid.iloc[0] if len(valid) else None
+
+    result = (
+        df.groupby('_run_id', sort=False)
+        .agg(
+            HISTORYID=('_h', 'first'),
+            OLDSTATUSNAME=('_s', 'first'),
+            OLDREASONNAME=('OLDREASONNAME', _first_nonnull),
+            event_start=('OLDLASTSTATUSCHANGEDATE', 'min'),
+            event_end=('LASTSTATUSCHANGEDATE', 'max'),
+            hours=('HOURS', 'sum'),
+            fragment_count=('HISTORYID', 'count'),
+            JOBID=('JOBID', _first_nonnull),
         )
-        cur_start = row['OLDLASTSTATUSCHANGEDATE']
-        cur_end = row['LASTSTATUSCHANGEDATE']
-        cur_hours = float(row['HOURS'])
-        cur_jobid = row.get('JOBID')
+        .reset_index(drop=True)
+    )
 
-        # Check contiguity
-        new_run = False
-        if group_key is None:
-            new_run = True
-        elif cur_key != group_key:
-            new_run = True
-        else:
-            # Same key — check gap
-            if prev_end is not None and cur_start is not None:
-                try:
-                    gap = (cur_start - prev_end).total_seconds()
-                    if gap > _MERGE_GAP_SECONDS:
-                        new_run = True
-                except Exception:
-                    new_run = True
-            else:
-                new_run = True
-
-        if new_run:
-            # Flush previous run
-            if group_key is not None:
-                merged_rows.append(_build_merged_row(
-                    group_key, run_start, run_end, run_hours, run_count, pending_jobid,
-                ))
-            # Start new run
-            group_key = cur_key
-            run_hours = cur_hours
-            run_start = cur_start
-            run_end = cur_end
-            run_count = 1
-            pending_jobid = cur_jobid
-        else:
-            run_hours += cur_hours
-            if run_start is None or (cur_start is not None and cur_start < run_start):
-                run_start = cur_start
-            if run_end is None or (cur_end is not None and cur_end > run_end):
-                run_end = cur_end
-            run_count += 1
-            # Prefer non-null JOBID
-            if pending_jobid is None and cur_jobid is not None:
-                pending_jobid = cur_jobid
-
-        prev_end = cur_end
-
-    # Flush last run
-    if group_key is not None:
-        merged_rows.append(_build_merged_row(
-            group_key, run_start, run_end, run_hours, run_count, pending_jobid,
-        ))
-
-    if not merged_rows:
-        return pd.DataFrame(columns=[
-            'HISTORYID', 'OLDSTATUSNAME', 'OLDREASONNAME',
-            'event_start', 'event_end', 'hours', 'fragment_count', 'JOBID',
-        ])
-
-    return pd.DataFrame(merged_rows)
+    result['hours'] = result['hours'].round(6)
+    # Empty-string OLDREASONNAME → None (preserves original semantics)
+    result['OLDREASONNAME'] = result['OLDREASONNAME'].replace('', None)
+    return result
 
 
 def _build_merged_row(
@@ -254,6 +216,15 @@ def _bridge_jobid(events_df: pd.DataFrame, jobs_df: pd.DataFrame) -> pd.DataFram
                 jobs_df = jobs_df.copy()
                 jobs_df[col] = pd.to_datetime(jobs_df[col], errors='coerce')
 
+    # Pre-process jobs_df once for Path B overlap matching (avoids O(N) copies inside loop)
+    if not jobs_df.empty:
+        jobs_df_working = jobs_df.copy()
+        jobs_df_working['_RESOURCEID_stripped'] = (
+            jobs_df_working['RESOURCEID'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
+        )
+    else:
+        jobs_df_working = jobs_df
+
     results = []
     for _, event in events_df.iterrows():
         jobid = event.get('JOBID')
@@ -278,11 +249,6 @@ def _bridge_jobid(events_df: pd.DataFrame, jobs_df: pd.DataFrame) -> pd.DataFram
                 results.append(_no_match_event(event))
                 continue
 
-            # Strip RESOURCEID for comparison
-            jobs_df_working = jobs_df.copy()
-            jobs_df_working['_RESOURCEID_stripped'] = (
-                jobs_df_working['RESOURCEID'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
-            )
             candidates = jobs_df_working[
                 (jobs_df_working['_RESOURCEID_stripped'] == hist_id) &
                 (jobs_df_working['COMPLETEDATE'] > e_start) &
@@ -770,7 +736,13 @@ def _apply_resource_filters(
         # Baseline: only HISTORYIDs recognised by resource_cache (enforces global
         # exclusion rules regardless of user filter selection).
         base_ids = {str(r.get('RESOURCEID', '')).strip() for r in resources if r.get('RESOURCEID')}
-        df = df[df['HISTORYID'].apply(lambda x: str(x).strip()).isin(base_ids)]
+        if not base_ids:
+            logger.warning(
+                "_apply_resource_filters: resource cache empty — skipping baseline ID filter "
+                "(returning all %d rows unfiltered)", len(df)
+            )
+        else:
+            df = df[df['HISTORYID'].apply(lambda x: str(x).strip()).isin(base_ids)]
 
         if df.empty:
             return df

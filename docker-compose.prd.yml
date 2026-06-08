@@ -1,8 +1,9 @@
-# Docker DEV 部署
-# 使用：docker compose up -d
-# 環境設定：.env.dev（Docker DEV 完整設定，含機密，不進 git）
+# Docker PRD 部署
+# 使用：docker compose -f docker-compose.prd.yml up -d
+# 環境設定：.env.prd（Docker PRD 完整設定，含機密，不進 git）
 #
-# PRD 部署請改用：docker compose -f docker-compose.prd.yml up -d
+# 硬體需求：4+ cores, 12-16GB RAM（建議 16GB）, SSD 50GB+
+# 容量：50 人使用 / 10-12 人同時在線
 
 services:
   mes-dashboard-app:
@@ -10,7 +11,7 @@ services:
     container_name: mes-dashboard-app
     restart: unless-stopped
     env_file:
-      - .env.dev
+      - .env.prd
     ports:
       - "8080:8080"
     volumes:
@@ -26,7 +27,7 @@ services:
     image: redis:7-alpine
     container_name: mes-dashboard-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 768mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:

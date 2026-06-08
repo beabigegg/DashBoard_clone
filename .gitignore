@@ -39,6 +39,8 @@ logs/
 
 # Local config (credentials)
 .env
+.env.dev
+.env.prd
 
 # AI/LLM tools
 .claude/
