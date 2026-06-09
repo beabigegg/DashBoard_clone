@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 165
-visible-files: 846
-omitted-dirs: 59
+visible-dirs: 176
+visible-files: 857
+omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -53,6 +53,7 @@ DashBoard_vite/
 |       \-- stress-tests.yml
 |-- .hypothesis/
 |   |-- constants/
+|   |   |-- 003dc30e458ea11d
 |   |   |-- 00731426b90af740
 |   |   |-- 00e4935d1440a2ca
 |   |   |-- 0199bae5456ba1ac
@@ -63,6 +64,7 @@ DashBoard_vite/
 |   |   |-- 04e26e6472111f2c
 |   |   |-- 04f75a340f5aee98
 |   |   |-- 06e37be44b7c2558
+|   |   |-- 08fea481e286d665
 |   |   |-- 09af02b32eace3be
 |   |   |-- 0ac8c61031ebb16b
 |   |   |-- 0bb0d7320a5cea09
@@ -70,6 +72,7 @@ DashBoard_vite/
 |   |   |-- 0e749cfd569a40b7
 |   |   |-- 0f2d4ac438e36262
 |   |   |-- 0fb4599ed66628f4
+|   |   |-- 0fe1e1a4cd35a9e8
 |   |   |-- 1131d28f548032e7
 |   |   |-- 11326b1300e7c559
 |   |   |-- 11d2c913de0cba90
@@ -85,6 +88,7 @@ DashBoard_vite/
 |   |   |-- 22775c7be38c0fc8
 |   |   |-- 2487e0dd67ee4005
 |   |   |-- 2513622121cc3cd3
+|   |   |-- 252e65ed0ede4ad2
 |   |   |-- 253e6c94fab987bc
 |   |   |-- 25d84cf88b9bff0e
 |   |   |-- 25db02c884e47e34
@@ -99,11 +103,7 @@ DashBoard_vite/
 |   |   |-- 2fb614e1df1ae85f
 |   |   |-- 314c411df6192c80
 |   |   |-- 327c52ae13744797
-|   |   |-- 3399b41644e40c25
-|   |   |-- 3453e8fac951ce5c
-|   |   |-- 37d084e6562ef65a
-|   |   |-- 392d6328bece7db8
-|   |   \-- ... (151 more entries truncated; cap=50)
+|   |   \-- ... (163 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -234,6 +234,7 @@ DashBoard_vite/
 |   |   |   |-- duckdb-client.ts
 |   |   |   |-- endpoint-schemas.ts
 |   |   |   |-- field-contracts.ts
+|   |   |   |-- hold-navigation-state.ts
 |   |   |   |-- index.ts
 |   |   |   |-- pending-jobs-registry.ts
 |   |   |   |-- post-export.ts
@@ -387,6 +388,8 @@ DashBoard_vite/
 |   |   |-- resource-status/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
 |   |   |   |-- index.html
 |   |   |   |-- main.ts
@@ -399,6 +402,7 @@ DashBoard_vite/
 |   |   |   |-- useAutocomplete.ts
 |   |   |   |-- useAutoRefresh.ts
 |   |   |   |-- useFilterOrchestrator.ts
+|   |   |   |-- usePageUpdateBadge.ts
 |   |   |   |-- usePaginationState.ts
 |   |   |   |-- useQueryState.ts
 |   |   |   |-- useRequestGuard.ts
@@ -527,6 +531,9 @@ DashBoard_vite/
 |   |   |   |-- App.url-state.test.js
 |   |   |   |-- EquipmentRejectsTable.test.js
 |   |   |   \-- useLotDetail.pagination.test.js
+|   |   |-- resource-status/
+|   |   |   |-- App.cross-filter.test.ts
+|   |   |   \-- useCrossFilter.test.ts
 |   |   |-- shared-composables/
 |   |   |   |-- useAsyncJobPolling.test.js
 |   |   |   |-- useAutoRefresh.test.js
@@ -555,57 +562,57 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260603_152534.log
-|   |   |-- access_20260603_172418.log
-|   |   |-- access_20260603_180940.log
-|   |   |-- access_20260603_183313.log
-|   |   |-- access_20260603_185357.log
-|   |   |-- access_20260604_172108.log
-|   |   |-- access_20260604_172435.log
-|   |   |-- access_20260604_173558.log
-|   |   |-- access_20260605_190831.log
-|   |   |-- access_20260605_203928.log
-|   |   |-- error_20260603_152534.log
-|   |   |-- error_20260603_172418.log
-|   |   |-- error_20260603_180940.log
-|   |   |-- error_20260603_183313.log
-|   |   |-- error_20260603_185357.log
-|   |   |-- error_20260604_172108.log
-|   |   |-- error_20260604_172435.log
-|   |   |-- error_20260604_173558.log
-|   |   |-- error_20260605_190831.log
-|   |   |-- error_20260605_203928.log
-|   |   |-- rq_msd_worker_20260603_152534.log
-|   |   |-- rq_msd_worker_20260603_172418.log
-|   |   |-- rq_msd_worker_20260603_180940.log
-|   |   |-- rq_msd_worker_20260603_183313.log
-|   |   |-- rq_msd_worker_20260603_185357.log
-|   |   |-- rq_msd_worker_20260604_172108.log
-|   |   |-- rq_msd_worker_20260604_172435.log
-|   |   |-- rq_msd_worker_20260604_173558.log
-|   |   |-- rq_msd_worker_20260605_190831.log
-|   |   |-- rq_msd_worker_20260605_203928.log
-|   |   |-- rq_prod_hist_worker_20260603_152534.log
-|   |   |-- rq_prod_hist_worker_20260603_172418.log
-|   |   |-- rq_prod_hist_worker_20260603_180940.log
-|   |   |-- rq_prod_hist_worker_20260603_183313.log
-|   |   |-- rq_prod_hist_worker_20260603_185357.log
-|   |   |-- rq_prod_hist_worker_20260604_172108.log
-|   |   |-- rq_prod_hist_worker_20260604_172435.log
-|   |   |-- rq_prod_hist_worker_20260604_173558.log
-|   |   |-- rq_prod_hist_worker_20260605_190831.log
-|   |   |-- rq_prod_hist_worker_20260605_203928.log
-|   |   |-- rq_reject_worker_20260603_152534.log
-|   |   |-- rq_reject_worker_20260603_172418.log
-|   |   |-- rq_reject_worker_20260603_180940.log
-|   |   |-- rq_reject_worker_20260603_183313.log
-|   |   |-- rq_reject_worker_20260603_185357.log
-|   |   |-- rq_reject_worker_20260604_172108.log
-|   |   |-- rq_reject_worker_20260604_172435.log
-|   |   |-- rq_reject_worker_20260604_173558.log
-|   |   |-- rq_reject_worker_20260605_190831.log
-|   |   |-- rq_reject_worker_20260605_203928.log
-|   |   \-- ... (30 more entries truncated; cap=50)
+|   |   |-- access_20260609_102547.log
+|   |   |-- access_20260609_104020.log
+|   |   |-- access_20260609_104943.log
+|   |   |-- access_20260609_110615.log
+|   |   |-- access_20260609_114448.log
+|   |   |-- access_20260609_124200.log
+|   |   |-- access_20260609_131727.log
+|   |   |-- access_20260609_135315.log
+|   |   |-- access_20260609_135628.log
+|   |   |-- access_20260609_162725.log
+|   |   |-- error_20260609_105105.log
+|   |   |-- error_20260609_105747.log
+|   |   |-- error_20260609_110615.log
+|   |   |-- error_20260609_114448.log
+|   |   |-- error_20260609_114633.log
+|   |   |-- error_20260609_124200.log
+|   |   |-- error_20260609_131727.log
+|   |   |-- error_20260609_135315.log
+|   |   |-- error_20260609_135628.log
+|   |   |-- error_20260609_162725.log
+|   |   |-- rq_msd_worker_20260609_105105.log
+|   |   |-- rq_msd_worker_20260609_105747.log
+|   |   |-- rq_msd_worker_20260609_110615.log
+|   |   |-- rq_msd_worker_20260609_114448.log
+|   |   |-- rq_msd_worker_20260609_114633.log
+|   |   |-- rq_msd_worker_20260609_124200.log
+|   |   |-- rq_msd_worker_20260609_131727.log
+|   |   |-- rq_msd_worker_20260609_135315.log
+|   |   |-- rq_msd_worker_20260609_135628.log
+|   |   |-- rq_msd_worker_20260609_162725.log
+|   |   |-- rq_prod_hist_worker_20260609_105105.log
+|   |   |-- rq_prod_hist_worker_20260609_105747.log
+|   |   |-- rq_prod_hist_worker_20260609_110615.log
+|   |   |-- rq_prod_hist_worker_20260609_114448.log
+|   |   |-- rq_prod_hist_worker_20260609_114633.log
+|   |   |-- rq_prod_hist_worker_20260609_124200.log
+|   |   |-- rq_prod_hist_worker_20260609_131727.log
+|   |   |-- rq_prod_hist_worker_20260609_135315.log
+|   |   |-- rq_prod_hist_worker_20260609_135628.log
+|   |   |-- rq_prod_hist_worker_20260609_162725.log
+|   |   |-- rq_reject_worker_20260609_105105.log
+|   |   |-- rq_reject_worker_20260609_105747.log
+|   |   |-- rq_reject_worker_20260609_110615.log
+|   |   |-- rq_reject_worker_20260609_114448.log
+|   |   |-- rq_reject_worker_20260609_114633.log
+|   |   |-- rq_reject_worker_20260609_124200.log
+|   |   |-- rq_reject_worker_20260609_131727.log
+|   |   |-- rq_reject_worker_20260609_135315.log
+|   |   |-- rq_reject_worker_20260609_135628.log
+|   |   |-- rq_reject_worker_20260609_162725.log
+|   |   \-- ... (40 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -620,6 +627,7 @@ DashBoard_vite/
 |   |-- rq_msd_worker.log
 |   |-- rq_prod_hist_worker.log
 |   |-- rq_reject_worker.log
+|   |-- rq_warmup_worker.log
 |   |-- rq_worker.log
 |   |-- rq_yield_alert_worker.log
 |   |-- startup.log
@@ -1017,8 +1025,30 @@ DashBoard_vite/
 |   \-- ... (163 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- anomaly_reject_dataset/
+|   |   |   \-- 858f092b53042f96.parquet
+|   |   |-- anomaly_resource_dataset/
+|   |   |   \-- daa76e309ed12ee6.parquet
+|   |   |-- anomaly_yield_dataset/
+|   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- downtime_analysis_events/
-|   |   |   \-- 81b038e23f2de450.parquet
+|   |   |   \-- 3988694961c6cf38.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- 7fd73b382ffa7f1a.parquet
+|   |   |-- reject_dataset/
+|   |   |   \-- 4a852d187ea51a2e.parquet
+|   |   |-- resource_dataset/
+|   |   |   |-- 48284f41b8866512.parquet
+|   |   |   |-- b42069ee2c991376.parquet
+|   |   |   \-- ed3f090bc1b044e8.parquet
+|   |   |-- resource_oee/
+|   |   |   |-- 48284f41b8866512.parquet
+|   |   |   |-- b42069ee2c991376.parquet
+|   |   |   \-- ed3f090bc1b044e8.parquet
+|   |   |-- yield_alert_dataset/
+|   |   |   \-- 478230f8ec3a5718.parquet
 |   |   |-- probe_100077.json
 |   |   |-- probe_100130.json
 |   |   |-- probe_100921.json
@@ -1059,16 +1089,7 @@ DashBoard_vite/
 |   |   |-- probe_112201.json
 |   |   |-- probe_112498.json
 |   |   |-- probe_112650.json
-|   |   |-- probe_112651.json
-|   |   |-- probe_113602.json
-|   |   |-- probe_113603.json
-|   |   |-- probe_113666.json
-|   |   |-- probe_113869.json
-|   |   |-- probe_116133.json
-|   |   |-- probe_116787.json
-|   |   |-- probe_116823.json
-|   |   |-- probe_117915.json
-|   |   \-- ... (781 more entries truncated; cap=50)
+|   |   \-- ... (848 more entries truncated; cap=50)
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb
@@ -1076,6 +1097,7 @@ DashBoard_vite/
 |   |-- rq_prod_hist_worker.pid
 |   |-- rq_reject_worker.pid
 |   |-- rq_trace_worker.pid
+|   |-- rq_warmup_worker.pid
 |   |-- rq_yield_alert_worker.pid
 |   \-- worker_watchdog.pid
 |-- tools/
@@ -1086,13 +1108,14 @@ DashBoard_vite/
 |-- .coverage
 |-- .dockerignore
 |-- .env
-|-- .env.development
+|-- .env.dev
 |-- .env.example
-|-- .env.production
+|-- .env.prd
 |-- .gitignore
 |-- AGENTS.md
 |-- Check.md
 |-- CLAUDE.md
+|-- docker-compose.prd.yml
 |-- docker-compose.test.yml
 |-- docker-compose.yml
 |-- Dockerfile

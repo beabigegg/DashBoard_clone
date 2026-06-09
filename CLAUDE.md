@@ -101,6 +101,10 @@ This repository follows the Contract-Driven Delivery workflow.
 - **SFC-paired tests**: `frontend/vitest.config.js` `include` already lists `src/**/*.test.ts`. Tests placed next to SFCs (e.g., `src/shared-ui/components/__tests__/*.test.ts`) are covered by this glob — no config change needed when adding new SFC-paired tests.
 - **echarts callback parameters** (`params` in formatter/tooltip) lack precise types — annotate with `// TODO: type echarts callback` rather than `any`.
 
+## Vue-ECharts Notes
+
+- **`vue-echarts` click events must be bound via `@click` on `<VChart>`, not imperative `echartsInstance.on('click')`**: The `vue-echarts` wrapper forwards all native ECharts events as Vue events carrying `params.name`/`params.data`. `@click` in the template requires no `onMounted`/`onUnmounted` cleanup — the wrapper disposes the instance on unmount, eliminating leak risk. Imperative `chart.on(...)` and ECharts `select` mode are rejected alternatives: the former requires manual lifecycle boilerplate the wrapper already handles; the latter couples visual state to ECharts internals rather than the composable. Evidence: `resource-status-cross-filter` — design.md D4.
+
 ## Shared UI Component Notes
 
 - **`frontend/src/shared-ui/components/MultiSelect.vue` is shared by 12 feature apps** (hold-overview, job-query, mid-section-defect, production-history, query-tool, reject-history, resource-history, resource-shared, resource-status, wip-detail, wip-overview, yield-alert-center). Any change to its emit/prop surface must be **additive** (optional events/props that unmounted consumers ignore). Before modifying any `frontend/src/shared-ui/components/` file, grep all consumer apps for usage. Evidence: `fix-prod-history-multiselect-filter` — added `dropdown-close` as optional event so untouched consumers were no-ops.

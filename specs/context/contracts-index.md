@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 44e3f5b9ca21b6f80b244c3c33a8ae8e09b6cc2965ef2259b0118a71166fdf3d
+inputs-digest: 0acf03dab8acd68b292712b723630e2e4ec9e0b5f3c7e6b43de3fb21c32404fd
 ---
 
 # Contracts Index
@@ -72,7 +72,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.13.1
+- schema-version: 1.14.0
 - last-changed: 2026-06-01
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
@@ -98,7 +98,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CSS / UI Contract — MES Dashboard
 - owner: application-team
 - surface: ui
-- schema-version: 1.6.0
+- schema-version: 1.7.0
 - last-changed: 2026-05-21
 - breaking-change-policy: deprecate-2-minors
 - summary: UI token policy, component styling rules, and visual review constraints.
