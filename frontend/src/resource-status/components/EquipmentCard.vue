@@ -7,6 +7,7 @@ interface LotItem {
   RUNCARDLOTID?: string;
   LOTTRACKINQTY_PCS?: number | null;
   LOTTRACKINTIME?: string | null;
+  BOP?: string | null;
 }
 
 interface EquipmentItem {
@@ -66,6 +67,12 @@ const statusLabel = computed<string>(() => getStatusDisplay(props.equipment.EQUI
 const lotCount = computed<number>(() => Number(props.equipment.LOT_COUNT || 0));
 const hasJob = computed<boolean>(() => Boolean(props.equipment.JOBORDER));
 
+const bopDisplay = computed<string>(() => {
+  const lots = props.equipment.LOT_DETAILS ?? [];
+  const unique = [...new Set(lots.map(l => l.BOP).filter((b): b is string => Boolean(b)))];
+  return unique.join(', ');
+});
+
 function emitLot(event: MouseEvent): void {
   event.stopPropagation();
   emit('show-lot', {
@@ -112,6 +119,10 @@ function emitJob(event: MouseEvent): void {
       <span v-if="equipment.PACKAGEGROUPNAME" class="eq-info-item">
         <span class="label">Package</span>
         <span class="value">{{ equipment.PACKAGEGROUPNAME }}</span>
+      </span>
+      <span v-if="bopDisplay" class="eq-info-item">
+        <span class="label">BOP</span>
+        <span class="value">{{ bopDisplay }}</span>
       </span>
     </div>
 
