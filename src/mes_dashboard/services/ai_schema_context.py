@@ -152,17 +152,30 @@ JOBMODEL          VARCHAR2(40)  -- 工單機型
 JOBSTAGE          VARCHAR2(40)  -- 目前加工製程階段
 JOBID             CHAR(16)      -- 維修工單 ID（關聯 DW_MES_JOB，非生產工單）
 JOBSTATUS         VARCHAR2(40)  -- 維修工單狀態
+CREATEDATE        DATE          -- 維修工單建立時間
+CREATEUSERNAME    VARCHAR2(40)  -- 建立人員姓名
+CREATEUSER        VARCHAR2(255) -- 建立人員帳號
+TECHNICIANUSERNAME VARCHAR2(40) -- 技術員姓名
+TECHNICIANUSER    VARCHAR2(255) -- 技術員帳號
+SYMPTOMCODE       VARCHAR2(40)  -- 症狀碼
+CAUSECODE         VARCHAR2(40)  -- 原因碼
+REPAIRCODE        VARCHAR2(40)  -- 維修碼
 RUNCARDLOTID      VARCHAR2(40)  -- 目前加工中的批次 Lot ID
 Package           VARCHAR2(40)  -- 封裝型號（如 SOD-323HE）⚠ 混合大小寫，SQL 中必須寫 "Package"
 PACKAGE_LF        VARCHAR2(4000)-- 封裝 + LeadFrame 詳細資訊
-SPEC              VARCHAR2(40)  -- 製程規格名稱
-TYPE              VARCHAR2(40)  -- 產品 TYPE 分類
 Function          VARCHAR2(40)  -- 產品 FUNCTION 分類 ⚠ 混合大小寫，SQL 中必須寫 "Function"
+TYPE              VARCHAR2(40)  -- 產品 TYPE 分類
+BOP               VARCHAR2(40)  -- Bill of Process（製程 BOP 名稱）
 WAFERLOTID        VARCHAR2(40)  -- Wafer LOT ID（晶圓批號）
 WAFERPN           VARCHAR2(40)  -- Wafer 料號
+WAFERLOTID_PREFIX VARCHAR2(160) -- Wafer LOT ID 前綴（比 WAFERLOTID 更完整）
+SPEC              VARCHAR2(40)  -- 製程規格名稱
+LFOPTIONID        VARCHAR2(4000)-- LeadFrame Option ID 詳細
 WIREDESCRIPTION   VARCHAR2(4000)-- 線材描述（金線/銀線/銅線規格）
+WAFERMIL          VARCHAR2(3062)-- Die Size 規格（mil），如 "11/*11mil"
 LOTTRACKINQTY_PCS NUMBER        -- Track-In 數量（pcs）
-LOTTRACKINTIME    DATE          -- Track-In 時間（批次進站時刻）""",
+LOTTRACKINTIME    DATE          -- Track-In 時間（批次進站時刻）
+LOTTRACKINEMPLOYEE VARCHAR2(255)-- Track-In 操作員帳號""",
 
     # ── 批次歷史 ─────────────────────────────────────────────────────────
     "DWH.DW_MES_CONTAINER": """-- 批次主檔（約 5,300,000 筆，所有歷史批次）

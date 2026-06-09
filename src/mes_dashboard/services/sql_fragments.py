@@ -42,6 +42,19 @@ EQUIPMENT_STATUS_COLUMNS: tuple[str, ...] = (
     "LOTTRACKINQTY_PCS",
     "LOTTRACKINTIME",
     "LOTTRACKINEMPLOYEE",
+    # Per-lot product/material fields from the view
+    '"Package"',        # mixed-case column; Oracle returns it as "Package"
+    "PACKAGE_LF",
+    "SPEC",
+    "TYPE",
+    '"Function"',       # mixed-case column; Oracle returns it as "Function"
+    "BOP",
+    "WAFERLOTID",
+    "WAFERPN",
+    "WAFERLOTID_PREFIX",
+    "LFOPTIONID",
+    "WIREDESCRIPTION",
+    "WAFERMIL",
 )
 
 EQUIPMENT_STATUS_SELECT_SQL = (

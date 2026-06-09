@@ -266,11 +266,29 @@ def _aggregate_by_resourceid(records: list[dict[str, Any]]) -> list[dict[str, An
                 seen_lots.add(lot_id)
                 trackin_time = r.get('LOTTRACKINTIME')
                 trackin_employee = r.get('LOTTRACKINEMPLOYEE')
+
+                def _opt(key: str):
+                    v = r.get(key)
+                    return v if _is_valid_value(v) else None
+
                 lot_details.append({
                     'RUNCARDLOTID': lot_id,
                     'LOTTRACKINQTY_PCS': qty if _is_valid_value(qty) else None,
                     'LOTTRACKINTIME': trackin_time if _is_valid_value(trackin_time) else None,
                     'LOTTRACKINEMPLOYEE': trackin_employee if _is_valid_value(trackin_employee) else None,
+                    # Product/material fields from DW_MES_EQUIPMENTSTATUS_WIP_V
+                    'PACKAGE': _opt('Package'),              # short package name (mixed-case col)
+                    'PACKAGE_LF': _opt('PACKAGE_LF'),        # full Package + LeadFrame detail
+                    'SPEC': _opt('SPEC'),
+                    'TYPE': _opt('TYPE'),
+                    'FUNCTION': _opt('Function'),             # mixed-case col
+                    'BOP': _opt('BOP'),
+                    'WAFERLOTID': _opt('WAFERLOTID'),
+                    'WAFERPN': _opt('WAFERPN'),
+                    'WAFERLOTID_PREFIX': _opt('WAFERLOTID_PREFIX'),
+                    'LFOPTIONID': _opt('LFOPTIONID'),
+                    'WIREDESCRIPTION': _opt('WIREDESCRIPTION'),
+                    'WAFERMIL': _opt('WAFERMIL'),
                 })
 
         # Find latest trackin time

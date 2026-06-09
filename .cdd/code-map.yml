@@ -1,6 +1,6 @@
-# generated: 2026-06-09T08:15:42Z by cdd-kit 2.2.1
-# files: 841, src-lines: 236931, map-lines: 17914, compression: 13.2x
-# sources-digest: d2c9e3fa4aa685f58ab20605bc62770922d298c0fe8c18f928c61a66678062e9
+# generated: 2026-06-09T09:27:29Z by cdd-kit 2.2.1
+# files: 841, src-lines: 236933, map-lines: 17914, compression: 13.2x
+# sources-digest: 3b4e156857c6bb01acfac95a801644facc3aae7a6947f724851d31c09d630cea
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1181,7 +1181,7 @@ frontend/src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/portal-shell/App.vue:  # 385 lines
+frontend/src/portal-shell/App.vue:  # 386 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
     - { module: lucide-vue-next, items: [Activity, AlertCircle, BarChart2, Briefcase, ChevronRight, Circle, Clock, Cpu, GitBranch, Layers, LayoutDashboard, LogOut, Monitor, Package, Search, Settings, TrendingDown, User], line: 4 }
@@ -3163,7 +3163,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1631 lines
+src/mes_dashboard/app.py:  # 1632 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3223,8 +3223,8 @@ src/mes_dashboard/app.py:  # 1631 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-745 }
-    - { name: create_app, lines: 754-1505 }
-    - { name: _register_error_handlers, lines: 1508-1631 }
+    - { name: create_app, lines: 754-1506 }
+    - { name: _register_error_handlers, lines: 1509-1632 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
