@@ -13,22 +13,14 @@ export function serializeSidebarCollapsedPreference(collapsed) {
   return collapsed ? 'true' : 'false';
 }
 
-export function buildSidebarUiState({ isMobile, sidebarCollapsed, sidebarMobileOpen }) {
-  const mobile = Boolean(isMobile);
-  const desktopCollapsed = !mobile && Boolean(sidebarCollapsed);
-  const mobileOpen = mobile && Boolean(sidebarMobileOpen);
-  const sidebarVisible = mobile ? mobileOpen : !desktopCollapsed;
-
+export function buildSidebarUiState({ sidebarOpen }) {
+  const open = Boolean(sidebarOpen);
   return {
-    shellClass: {
-      'sidebar-collapsed': desktopCollapsed,
-    },
+    shellClass: {},
     sidebarClass: {
-      'sidebar--collapsed': desktopCollapsed,
-      'sidebar--mobile-open': mobileOpen,
-      'sidebar--mobile-closed': mobile && !mobileOpen,
+      'sidebar--open': open,
     },
-    sidebarVisible,
-    ariaExpanded: sidebarVisible ? 'true' : 'false',
+    sidebarVisible: open,
+    ariaExpanded: open ? 'true' : 'false',
   };
 }

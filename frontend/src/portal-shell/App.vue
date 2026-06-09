@@ -1,7 +1,26 @@
 <script setup>
 import './ai-chat.css';
 
-import { ChevronRight } from 'lucide-vue-next';
+import {
+  Activity,
+  AlertCircle,
+  BarChart2,
+  Briefcase,
+  ChevronRight,
+  Circle,
+  Clock,
+  Cpu,
+  GitBranch,
+  Layers,
+  LayoutDashboard,
+  LogOut,
+  Monitor,
+  Package,
+  Search,
+  Settings,
+  TrendingDown,
+  User,
+} from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -15,13 +34,7 @@ import HealthStatus from './components/HealthStatus.vue';
 import { onlineCount, useAuth } from './composables/useAuth.js';
 import { consumeNavigationNotice, setAuthState, syncNavigationRoutes } from './router.js';
 import { normalizeRoutePath } from './routeContracts.js';
-import {
-  SIDEBAR_STORAGE_KEY,
-  buildSidebarUiState,
-  isMobileViewport,
-  parseSidebarCollapsedPreference,
-  serializeSidebarCollapsedPreference,
-} from './sidebarState.js';
+import { buildSidebarUiState } from './sidebarState.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -37,14 +50,36 @@ const adminLinks = ref({
   logout: null,
   dashboard: '/admin/dashboard',
 });
-const sidebarCollapsed = ref(false);
-const sidebarMobileOpen = ref(false);
-const isMobile = ref(false);
+const sidebarOpen = ref(false);
 const aiEnabled = ref(false);
 const updateBadge = provideUpdateBadge();
 
 function toShellPath(targetRoute) {
   return normalizeRoutePath(targetRoute);
+}
+
+const userInitial = computed(() => {
+  const name = adminDisplayName.value;
+  if (!name) return '?';
+  return name.charAt(0).toUpperCase();
+});
+
+function getPageIcon(routePath) {
+  const r = String(routePath).toLowerCase();
+  if (r.includes('wip')) return LayoutDashboard;
+  if (r.includes('hold')) return AlertCircle;
+  if (r.includes('yield') || r.includes('alert-center')) return TrendingDown;
+  if (r.includes('resource/status') || r.includes('resource-status')) return Monitor;
+  if (r.includes('resource')) return Cpu;
+  if (r.includes('query')) return Search;
+  if (r.includes('job')) return Briefcase;
+  if (r.includes('trace')) return GitBranch;
+  if (r.includes('material') || r.includes('consumption')) return Package;
+  if (r.includes('downtime') || r.includes('analysis')) return BarChart2;
+  if (r.includes('production') || r.includes('spc')) return Activity;
+  if (r.includes('reject') || r.includes('history')) return Clock;
+  if (r.includes('defect') || r.includes('mid')) return Layers;
+  return Circle;
 }
 
 function isPortalShellRootPath() {
@@ -74,62 +109,19 @@ async function handleLogout() {
 }
 
 const sidebarUiState = computed(() =>
-  buildSidebarUiState({
-    isMobile: isMobile.value,
-    sidebarCollapsed: sidebarCollapsed.value,
-    sidebarMobileOpen: sidebarMobileOpen.value,
-  }),
+  buildSidebarUiState({ sidebarOpen: sidebarOpen.value }),
 );
 
-const sidebarToggleLabel = computed(() => {
-  if (isMobile.value) {
-    return sidebarMobileOpen.value ? '關閉側邊欄' : '開啟側邊欄';
-  }
-  return sidebarCollapsed.value ? '展開側邊欄' : '收合側邊欄';
-});
+const sidebarToggleLabel = computed(() =>
+  sidebarOpen.value ? '關閉選單' : '開啟選單',
+);
 
-function restoreSidebarPreference() {
-  try {
-    const stored = window.sessionStorage.getItem(SIDEBAR_STORAGE_KEY);
-    sidebarCollapsed.value = parseSidebarCollapsedPreference(stored);
-  } catch {
-    sidebarCollapsed.value = false;
-  }
-}
-
-function persistSidebarPreference() {
-  try {
-    window.sessionStorage.setItem(
-      SIDEBAR_STORAGE_KEY,
-      serializeSidebarCollapsedPreference(sidebarCollapsed.value),
-    );
-  } catch {
-    // Keep UI behavior deterministic even if storage is unavailable.
-  }
-}
-
-function checkViewport() {
-  isMobile.value = isMobileViewport(window.innerWidth);
-  if (!isMobile.value) {
-    sidebarMobileOpen.value = false;
-  }
-}
-
-function closeMobileSidebar() {
-  sidebarMobileOpen.value = false;
+function closeSidebar() {
+  sidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  if (isMobile.value) {
-    sidebarMobileOpen.value = !sidebarMobileOpen.value;
-    return;
-  }
-  sidebarCollapsed.value = !sidebarCollapsed.value;
-  persistSidebarPreference();
-}
-
-function handleViewportResize() {
-  checkViewport();
+  sidebarOpen.value = !sidebarOpen.value;
 }
 
 function handleGlobalKeydown(event) {
@@ -137,7 +129,7 @@ function handleGlobalKeydown(event) {
     if (aiEnabled.value && aiChat.isOpen.value) {
       aiChat.togglePanel();
     }
-    closeMobileSidebar();
+    closeSidebar();
   }
 }
 
@@ -205,9 +197,6 @@ async function loadNavigation() {
 }
 
 onMounted(() => {
-  restoreSidebarPreference();
-  checkViewport();
-  window.addEventListener('resize', handleViewportResize, { passive: true });
   window.addEventListener('keydown', handleGlobalKeydown);
   if (!isLoginPage.value) {
     void loadNavigation();
@@ -234,14 +223,13 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleViewportResize);
   window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
 watch(
   () => route.fullPath,
   () => {
-    closeMobileSidebar();
+    closeSidebar();
     navigationNotice.value = consumeNavigationNotice();
   },
   { immediate: true },
@@ -291,37 +279,67 @@ watch(isLoginPage, (isLogin, wasLogin) => {
           <span>{{ onlineCount }}</span>
         </div>
         <HealthStatus />
-        <div class="admin-entry">
-          <span v-if="adminDisplayName" class="admin-name">{{ adminDisplayName }}</span>
-          <a v-if="adminLinks?.pages?.dashboard" :href="adminLinks.pages.dashboard" class="admin-link">管理後台</a>
-          <a v-if="adminLinks?.pages?.login" :href="adminLinks.pages.login" class="admin-link">管理員登入</a>
-          <button type="button" class="admin-link" @click="handleLogout">登出</button>
-        </div>
       </div>
     </header>
 
     <Transition name="overlay-fade">
-      <div v-if="isMobile && sidebarMobileOpen" class="sidebar-overlay" @click="closeMobileSidebar" />
+      <div v-if="sidebarOpen" class="sidebar-overlay" @click="closeSidebar" />
     </Transition>
 
     <main id="main-content" class="shell-main">
       <aside class="sidebar" :class="sidebarUiState.sidebarClass" role="navigation" aria-label="主選單">
-        <div v-if="loading" class="muted">載入導覽中...</div>
-        <div v-else-if="errorMessage" class="error">{{ errorMessage }}</div>
-        <template v-else>
-          <section v-for="drawer in drawers" :key="drawer.id" class="drawer">
-            <h2 class="drawer-title">{{ drawer.name }}</h2>
-            <RouterLink
-              v-for="page in drawer.pages"
-              :key="page.route"
-              class="drawer-link"
-              active-class="active"
-              :to="toShellPath(page.route)"
+        <nav class="sidebar-nav">
+          <div v-if="loading" class="muted">載入導覽中...</div>
+          <div v-else-if="errorMessage" class="error">{{ errorMessage }}</div>
+          <template v-else>
+            <section v-for="drawer in drawers" :key="drawer.id" class="drawer">
+              <h2 class="drawer-title">{{ drawer.name }}</h2>
+              <RouterLink
+                v-for="page in drawer.pages"
+                :key="page.route"
+                class="drawer-link"
+                active-class="active"
+                :to="toShellPath(page.route)"
+                :title="page.name"
+              >
+                <component :is="getPageIcon(page.route)" class="drawer-link-icon" :size="16" aria-hidden="true" />
+                <span class="drawer-link-label">{{ page.name }}</span>
+              </RouterLink>
+            </section>
+          </template>
+        </nav>
+        <div class="sidebar-footer">
+          <div v-if="adminDisplayName" class="sidebar-user">
+            <div class="sidebar-user-avatar" :title="adminDisplayName">{{ userInitial }}</div>
+            <div class="sidebar-user-details">
+              <span class="sidebar-user-name">{{ adminDisplayName }}</span>
+            </div>
+          </div>
+          <div class="sidebar-actions">
+            <a
+              v-if="adminLinks?.pages?.dashboard"
+              :href="adminLinks.pages.dashboard"
+              class="sidebar-action-link"
+              title="管理後台"
             >
-              <span>{{ page.name }}</span>
-            </RouterLink>
-          </section>
-        </template>
+              <Settings class="sidebar-action-icon" :size="15" aria-hidden="true" />
+              <span class="sidebar-action-label">管理後台</span>
+            </a>
+            <a
+              v-if="adminLinks?.pages?.login"
+              :href="adminLinks.pages.login"
+              class="sidebar-action-link"
+              title="管理員登入"
+            >
+              <User class="sidebar-action-icon" :size="15" aria-hidden="true" />
+              <span class="sidebar-action-label">管理員登入</span>
+            </a>
+            <button type="button" class="sidebar-action-link" title="登出" @click="handleLogout">
+              <LogOut class="sidebar-action-icon" :size="15" aria-hidden="true" />
+              <span class="sidebar-action-label">登出</span>
+            </button>
+          </div>
+        </div>
       </aside>
 
       <section class="shell-content">
