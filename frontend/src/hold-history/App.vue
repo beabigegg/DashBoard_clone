@@ -11,7 +11,6 @@ import { useHoldHistoryDuckDB } from './useHoldHistoryDuckDB';
 import { useAutoRefresh } from './useAutoRefresh';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 
 import DailyTrend from './components/DailyTrend.vue';
@@ -1024,17 +1023,6 @@ onMounted(async () => {
 
 <template>
   <div class="dashboard hold-history-page theme-hold-history">
-    <PageHeader
-      title="Hold 歷史績效"
-      :show-refresh="false"
-    >
-      <template #header-left />
-      <template #header-left-after>
-        <span class="hold-type-badge">{{ holdTypeLabel }}</span>
-        <span v-if="staleLabel" class="stale-indicator" aria-live="polite">{{ staleLabel }}</span>
-      </template>
-    </PageHeader>
-
     <ErrorBanner :message="errorMessage || todayError || currentError" :dismissible="false" />
 
     <FilterBar
@@ -1049,7 +1037,9 @@ onMounted(async () => {
       @mode-change="handleModeChange"
     />
 
-    <SummaryCards :summary="summary" :mode="mode" />
+    <div class="hold-history-summary-row">
+      <SummaryCards :summary="summary" :mode="mode" />
+    </div>
 
     <!-- DailyTrend hidden in today mode -->
     <DailyTrend v-if="mode === 'range'" :days="selectedTrendDays" />

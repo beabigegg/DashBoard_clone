@@ -7,7 +7,7 @@ const RANGE_FUTURE_HOLD_TOOLTIP =
   '有標註 FUTURE HOLD 備註的 Hold 總量（PJMES043 原廠邏輯）。lot release 後 MES 可能清除備註，導致歷史數值衰減。'
 
 const RANGE_REPEAT_QUALITY_TOOLTIP =
-  '同 LOT ID 因相同品質原因的重複 HOLD 總量（RN > 1，值不隨時間衰減）'
+  '同一 Lot 因相同品質原因被重複 Hold 的數量，不因 lot release 衰減'
 
 // ── Today mode tooltips ──────────────────────────────────────────────────────
 const TODAY_ON_HOLD_LOTS_TOOLTIP =
@@ -17,7 +17,7 @@ const TODAY_ON_HOLD_QTY_TOOLTIP =
   '班次結束時仍在 Hold 的總 QTY'
 
 const TODAY_REPEAT_QUALITY_TOOLTIP =
-  '當日班次內同 LOT ID 相同品質原因的重複 HOLD 總量'
+  '同一 Lot 因相同品質原因被重複 Hold 的數量，不因 lot release 衰減'
 
 const TODAY_AVG_HOURS_TOOLTIP =
   '班次結束時仍在 Hold 的 lot 之平均時長，時長計算至 07:30 當日（班次結束點）'
@@ -30,7 +30,7 @@ const CURRENT_ON_HOLD_QTY_TOOLTIP =
   '目前真實未釋放的所有 QTY 加總'
 
 const CURRENT_REPEAT_QUALITY_TOOLTIP =
-  '本班次內同 LOT ID 相同品質原因的重複 HOLD 總量'
+  '同一 Lot 因相同品質原因被重複 Hold 的數量，不因 lot release 衰減'
 
 const CURRENT_AVG_HOURS_TOOLTIP =
   '目前仍在 Hold 的 lot 之平均時長，以 SYSDATE 即時計算'
@@ -68,11 +68,10 @@ const props = withDefaults(defineProps<Props>(), {
         accent="success"
       />
       <SummaryCard
-        label="累計 Future Hold"
+        label="累計 FH"
         :value="summary.futureHoldQty ?? 0"
         format="number"
         accent="warning"
-        :tooltip="RANGE_FUTURE_HOLD_TOOLTIP"
       />
       <SummaryCard
         label="品質重複 HOLD"

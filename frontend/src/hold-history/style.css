@@ -138,12 +138,20 @@
  * Range mode uses 9 columns, today/current mode uses 8. We only keep
  * container-query rules here so the card labels/values stay responsive.
  */
+.theme-hold-history .hold-history-summary-row {
+  margin-bottom: theme('spacing.token.p14');
+}
+
 .theme-hold-history .hold-history-summary-row .summary-card {
   container-type: inline-size;
 }
 
 .theme-hold-history .hold-history-summary-row .summary-value {
   font-size: clamp(14px, 12cqi, 28px);
+}
+
+.theme-hold-history .data-table-td {
+  white-space: nowrap;
 }
 
 .theme-hold-history .summary-card {

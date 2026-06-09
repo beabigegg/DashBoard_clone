@@ -58,7 +58,7 @@ const chartOption = computed(() => {
     },
     grid: {
       left: 8,
-      right: 8,
+      right: 140,
       top: 14,
       bottom: 24,
       containLabel: true,

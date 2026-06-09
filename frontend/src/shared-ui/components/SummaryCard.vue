@@ -85,7 +85,6 @@ function handleClick() {
     <div class="summary-card__body">
       <div class="summary-card__label" :title="label">
         {{ label }}
-        <span v-if="tooltip" class="summary-card__tooltip-icon" :aria-label="tooltip">?</span>
       </div>
       <div
         class="summary-card__value"
@@ -155,22 +154,6 @@ function handleClick() {
   color: theme('colors.text.muted');
 }
 
-.summary-card__tooltip-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 1px solid theme('colors.text.muted');
-  font-size: 9px;
-  font-weight: 700;
-  color: theme('colors.text.muted');
-  cursor: help;
-  margin-left: 3px;
-  vertical-align: middle;
-  line-height: 1;
-}
 
 /* Clickable state */
 .summary-card--clickable {
