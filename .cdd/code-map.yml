@@ -1,6 +1,6 @@
-# generated: 2026-06-08T12:47:24Z by cdd-kit 2.2.1
-# files: 833, src-lines: 235307, map-lines: 17850, compression: 13.2x
-# sources-digest: 50816a6b9b58e60888c5c2601ee9ef07db49b15176aeda6d462fc61616633519
+# generated: 2026-06-09T00:03:17Z by cdd-kit 2.2.1
+# files: 833, src-lines: 235277, map-lines: 17850, compression: 13.2x
+# sources-digest: d83ab4b80856d331b4351625e3b479567486b4f2ad731c0654c0b8f9402a0d35
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1431,7 +1431,7 @@ frontend/src/production-history/main.ts:  # 7 lines
     - { module: '../resource-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/qc-gate/App.vue:  # 125 lines
+frontend/src/qc-gate/App.vue:  # 139 lines
 
 frontend/src/qc-gate/components/LotTable.vue:  # 119 lines
 
@@ -1806,13 +1806,13 @@ frontend/src/resource-shared/constants.ts:  # 79 lines
 
 frontend/src/resource-shared/index.ts:  # 13 lines
 
-frontend/src/resource-status/App.vue:  # 695 lines
+frontend/src/resource-status/App.vue:  # 647 lines
 
 frontend/src/resource-status/components/EquipmentCard.vue:  # 125 lines
 
 frontend/src/resource-status/components/EquipmentGrid.vue:  # 84 lines
 
-frontend/src/resource-status/components/FilterBar.vue:  # 135 lines
+frontend/src/resource-status/components/FilterBar.vue:  # 139 lines
 
 frontend/src/resource-status/components/FloatingTooltip.vue:  # 360 lines
 

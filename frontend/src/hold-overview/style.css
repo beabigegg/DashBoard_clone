@@ -145,6 +145,10 @@
   padding: 0;
 }
 
+.theme-hold-overview .data-table-td {
+  white-space: nowrap;
+}
+
 .theme-hold-overview .filter-bar {
   display: flex;
   align-items: flex-end;
