@@ -318,6 +318,7 @@ watch(isLoginPage, (isLogin, wasLogin) => {
             <div class="sidebar-user-avatar" :title="adminDisplayName">{{ userInitial }}</div>
             <div class="sidebar-user-details">
               <span class="sidebar-user-name">{{ adminDisplayName }}</span>
+              <span v-if="adminUser?.department" class="sidebar-user-dept">{{ adminUser.department }}</span>
             </div>
           </div>
           <div class="sidebar-actions">

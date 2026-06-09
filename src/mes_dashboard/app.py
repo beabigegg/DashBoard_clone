@@ -1103,12 +1103,13 @@ def create_app(config_name: str | None = None) -> Flask:
         nav_logger = logging.getLogger("mes_dashboard.portal_navigation")
         admin = is_admin_logged_in()
         admin_user_payload = None
-        if admin:
+        if is_user_logged_in():
             raw_user = session.get("user") or {}
             admin_user_payload = {
                 "displayName": raw_user.get("displayName"),
                 "username": raw_user.get("username"),
                 "mail": raw_user.get("mail"),
+                "department": raw_user.get("department"),
             }
         source = get_navigation_config()
         drawers: list[dict] = []
