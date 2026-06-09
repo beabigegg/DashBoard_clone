@@ -224,6 +224,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
+  document.body.style.overflow = '';
+});
+
+watch(sidebarOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : '';
 });
 
 watch(
