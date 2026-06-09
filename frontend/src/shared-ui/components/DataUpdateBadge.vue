@@ -39,10 +39,10 @@ withDefaults(defineProps<Props>(), {
   gap: 6px;
   padding: 3px 10px 3px 8px;
   border-radius: 9999px;
-  border: 1px solid var(--border, #e2e8f0);
-  background: var(--surface-card, #f8fafc);
+  border: 1px solid var(--border, var(--color-token-he2e8f0));
+  background: var(--surface-card, var(--color-token-hf8fafc));
   font-size: 11px;
-  color: var(--muted, #64748b);
+  color: var(--muted, var(--color-token-h64748b));
   white-space: nowrap;
   user-select: none;
   transition: border-color 0.3s ease, background 0.3s ease;
@@ -50,19 +50,19 @@ withDefaults(defineProps<Props>(), {
 }
 
 .data-update-badge--refreshing {
-  border-color: #86efac;
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: var(--color-token-h86efac);
+  background: var(--color-token-hf0fdf4);
+  color: var(--color-token-h15803d);
 }
 
 .data-update-badge--success {
-  border-color: #86efac;
+  border-color: var(--color-token-h86efac);
   animation: badge-success-fade 1.8s ease-out forwards;
 }
 
 .data-update-badge--error {
-  border-color: #fca5a5;
-  color: #b91c1c;
+  border-color: var(--color-token-hfca5a5);
+  color: var(--color-token-hb91c1c);
 }
 
 /* Dot wrapper */
@@ -79,7 +79,7 @@ withDefaults(defineProps<Props>(), {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #cbd5e1;
+  background: var(--color-token-hcbd5e1);
   transition: background 0.3s ease;
 }
 
@@ -94,23 +94,23 @@ withDefaults(defineProps<Props>(), {
 
 /* Refreshing: pulsing dot + expanding ring */
 .data-update-badge--refreshing .data-update-badge__dot::before {
-  background: #22c55e;
+  background: var(--color-token-h22c55e);
   animation: badge-dot-pulse 1.4s ease-in-out infinite;
 }
 
 .data-update-badge--refreshing .data-update-badge__dot-ring {
-  background: #22c55e;
+  background: var(--color-token-h22c55e);
   animation: badge-ripple 1.4s ease-out infinite;
 }
 
 /* Success: solid green */
 .data-update-badge--success .data-update-badge__dot::before {
-  background: #22c55e;
+  background: var(--color-token-h22c55e);
 }
 
 /* Error: red */
 .data-update-badge--error .data-update-badge__dot::before {
-  background: #ef4444;
+  background: var(--color-token-hef4444);
 }
 
 .data-update-badge__text {
@@ -132,7 +132,7 @@ withDefaults(defineProps<Props>(), {
 }
 
 @keyframes badge-success-fade {
-  0%, 60% { border-color: #86efac; }
-  100%     { border-color: var(--border, #e2e8f0); }
+  0%, 60% { border-color: var(--color-token-h86efac); }
+  100%     { border-color: var(--border, var(--color-token-he2e8f0)); }
 }
 </style>

@@ -125,6 +125,7 @@ export default {
           heef2ff: '#eef2ff',
           heef4fb: '#eef4fb',
           hef4444: '#ef4444',
+          h86efac: '#86efac',
           heff6ff: '#eff6ff',
           hf0f0f0: '#f0f0f0',
           hf0f2ff: '#f0f2ff',
