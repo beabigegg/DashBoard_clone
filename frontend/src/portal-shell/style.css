@@ -306,6 +306,10 @@
   padding: theme('spacing.token.p16');
 }
 
+.sidebar-is-open .shell-content {
+  overflow: hidden;
+}
+
 .shell-content .resource-page,
 .shell-content .dashboard,
 .shell-content .qc-gate-page,

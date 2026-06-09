@@ -16,7 +16,7 @@ export function serializeSidebarCollapsedPreference(collapsed) {
 export function buildSidebarUiState({ sidebarOpen }) {
   const open = Boolean(sidebarOpen);
   return {
-    shellClass: {},
+    shellClass: { 'sidebar-is-open': open },
     sidebarClass: {
       'sidebar--open': open,
     },

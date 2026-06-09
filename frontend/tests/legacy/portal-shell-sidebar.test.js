@@ -32,11 +32,11 @@ test('buildSidebarUiState open: sidebar--open present, ariaExpanded true', () =>
   assert.equal(state.ariaExpanded, 'true');
 });
 
-test('buildSidebarUiState shellClass is always empty (no layout shift)', () => {
+test('buildSidebarUiState shellClass sets sidebar-is-open for scroll lock', () => {
   const closed = buildSidebarUiState({ sidebarOpen: false });
   const open = buildSidebarUiState({ sidebarOpen: true });
-  assert.deepEqual(closed.shellClass, {});
-  assert.deepEqual(open.shellClass, {});
+  assert.equal(closed.shellClass['sidebar-is-open'], false);
+  assert.equal(open.shellClass['sidebar-is-open'], true);
 });
 
 test('sidebar collapsed preference serializes and parses as expected', () => {
