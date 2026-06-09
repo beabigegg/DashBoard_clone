@@ -45,8 +45,8 @@ test('QC Gate keeps linked chart-table interaction guards', () => {
   assert.match(source, /activeFilter\.value = null/);
 });
 
-test('resource tooltip lifecycle keeps resize listener cleanup', () => {
+test('resource tooltip lifecycle keeps keydown listener cleanup', () => {
   const source = readSource('src/resource-status/components/FloatingTooltip.vue');
-  assert.match(source, /window\.addEventListener\('resize', positionTooltip\)/);
-  assert.match(source, /window\.removeEventListener\('resize', positionTooltip\)/);
+  assert.match(source, /document\.addEventListener\('keydown', handleEscapeKey\)/);
+  assert.match(source, /document\.removeEventListener\('keydown', handleEscapeKey\)/);
 });
