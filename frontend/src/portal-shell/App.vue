@@ -6,6 +6,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useAiChat } from '../shared-composables/useAiChat.js';
+import { provideUpdateBadge } from '../shared-composables/usePageUpdateBadge.js';
+import DataUpdateBadge from '../shared-ui/components/DataUpdateBadge.vue';
 import AiChatPanel from '../shared-ui/components/AiChatPanel.vue';
 import AiChatTrigger from '../shared-ui/components/AiChatTrigger.vue';
 import AnomalyIndicator from './components/AnomalyIndicator.vue';
@@ -39,6 +41,7 @@ const sidebarCollapsed = ref(false);
 const sidebarMobileOpen = ref(false);
 const isMobile = ref(false);
 const aiEnabled = ref(false);
+const updateBadge = provideUpdateBadge();
 
 function toShellPath(targetRoute) {
   return normalizeRoutePath(targetRoute);
@@ -324,9 +327,18 @@ watch(isLoginPage, (isLogin, wasLogin) => {
       <section class="shell-content">
         <div v-if="navigationNotice" class="notice-banner">{{ navigationNotice }}</div>
         <div class="breadcrumb">
-          <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>
-          <ChevronRight v-if="breadcrumb.drawerName" :size="14" class="breadcrumb-separator" />
-          <span>{{ breadcrumb.title }}</span>
+          <div class="breadcrumb-nav">
+            <span v-if="breadcrumb.drawerName">{{ breadcrumb.drawerName }}</span>
+            <ChevronRight v-if="breadcrumb.drawerName" :size="14" class="breadcrumb-separator" />
+            <span>{{ breadcrumb.title }}</span>
+          </div>
+          <DataUpdateBadge
+            v-if="updateBadge.updateTime !== '--'"
+            :update-time="updateBadge.updateTime"
+            :refreshing="updateBadge.refreshing"
+            :refresh-success="updateBadge.refreshSuccess"
+            :refresh-error="updateBadge.refreshError"
+          />
         </div>
         <RouterView />
       </section>

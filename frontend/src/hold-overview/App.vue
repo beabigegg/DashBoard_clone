@@ -7,6 +7,7 @@ import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-nav
 import { storeHoldNavigationState, loadHoldNavigationState } from '../core/hold-navigation-state';
 import { buildWipOverviewQueryParams, splitHoldByType } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -207,6 +208,8 @@ function handleLotPageChange(nextPage: number) {
 const lastUpdate = computed(() => {
   return summary.value?.dataUpdateDate ?? '--';
 });
+
+bindUpdateBadge({ updateTime: lastUpdate, refreshing, refreshSuccess });
 
 const reasonOptions = computed(() => {
   const source = summary.value || {};

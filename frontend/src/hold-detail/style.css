@@ -75,10 +75,6 @@
   flex-wrap: wrap;
 }
 
-.theme-hold-detail .hold-detail-last-update {
-  font-size: 11px;
-  color: var(--muted);
-}
 
 .theme-hold-detail .hold-summary-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));

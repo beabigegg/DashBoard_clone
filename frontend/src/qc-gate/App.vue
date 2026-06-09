@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
@@ -40,6 +41,8 @@ const formattedCacheTime = computed<string>(() => {
   const pad = (n: number): string => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 });
+
+bindUpdateBadge({ updateTime: formattedCacheTime, refreshing });
 
 const filteredLots = computed(() => {
   if (!activeFilter.value) {
@@ -91,10 +94,6 @@ function clearFilter(): void {
   <div class="qc-gate-page theme-qc-gate">
     <ErrorBanner :message="errorMessage" :dismissible="false" />
 
-    <div class="qc-meta-bar">
-      <span v-if="refreshing" class="refresh-indicator active"></span>
-      <span v-if="formattedCacheTime !== '--'" class="filters-last-update">更新: {{ formattedCacheTime }}</span>
-    </div>
 
     <main class="qc-gate-content">
       <SectionCard variant="elevated" :class="{ 'is-refreshing': refreshing }">

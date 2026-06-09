@@ -10,6 +10,7 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import DataTable from '../shared-ui/components/DataTable.vue';
@@ -118,6 +119,7 @@ const orchestrator = useFilterOrchestrator({
 const lastUpdate = computed(() => {
   return summary.value?.dataUpdateDate ?? '--';
 });
+bindUpdateBadge({ updateTime: lastUpdate, refreshing, refreshSuccess });
 
 function goBackToOverview() {
   navigateToRuntimeRoute('/hold-overview');
@@ -498,11 +500,7 @@ onMounted(() => {
         <h1 class="hold-detail-title">Hold Reason: <span class="hold-detail-reason">{{ reason }}</span></h1>
         <span class="hold-type-badge" :class="holdType">{{ holdTypeLabel }}</span>
       </div>
-      <div class="hold-detail-nav-right">
-        <span v-if="refreshing" class="refresh-indicator active"></span>
-        <span v-else-if="refreshSuccess" class="refresh-success active">&#10003;</span>
-        <span class="hold-detail-last-update">更新: {{ lastUpdate }}</span>
-      </div>
+
     </div>
 
     <div v-if="hasCarriedFilters" class="hold-detail-carried-filters">

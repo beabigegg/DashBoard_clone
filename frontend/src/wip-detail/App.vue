@@ -7,6 +7,7 @@ import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-nav
 import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state';
 import { buildWipDetailQueryParams, buildWipOverviewQueryParams } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -342,6 +343,7 @@ const pageTitle = computed(() => {
 const lastUpdate = computed(() => {
   return detailData.value?.sys_date ?? '--';
 });
+bindUpdateBadge({ updateTime: lastUpdate, refreshing, refreshSuccess });
 
 const summary = computed(() => detailData.value?.summary || null);
 const tableData = computed(() => ({

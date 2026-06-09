@@ -69,10 +69,6 @@
   gap: 8px;
 }
 
-.theme-wip-overview .filters-last-update {
-  font-size: 11px;
-  color: var(--muted);
-}
 
 .theme-wip-overview .filters-clear-btn {
   font-size: 12px;

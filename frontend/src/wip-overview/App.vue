@@ -7,6 +7,7 @@ import { navigateToRuntimeRoute, replaceRuntimeHistory } from '../core/shell-nav
 import { storeWipNavigationState, loadWipNavigationState } from '../core/wip-navigation-state';
 import { buildWipOverviewQueryParams } from '../core/wip-derive';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 
 import EmptyState from '../shared-ui/components/EmptyState.vue';
@@ -69,6 +70,7 @@ const activeStatusFilter = ref<string | null>(null);
 const loading = ref(true);
 const refreshing = ref(false);
 const refreshSuccess = ref(false);
+
 const refreshError = ref(false);
 const errorMessage = ref('');
 let filterOptionsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -231,6 +233,8 @@ function onFilterDraftChange(nextDraftFilters: typeof filters): void {
 const lastUpdate = computed(() => {
   return summary.value?.dataUpdateDate ?? '--';
 });
+
+bindUpdateBadge({ updateTime: lastUpdate, refreshing, refreshSuccess });
 
 const matrixTitle = computed(() => {
   const base = 'Workcenter x Package Matrix (QTY)';

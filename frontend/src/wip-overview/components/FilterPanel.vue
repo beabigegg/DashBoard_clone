@@ -177,9 +177,7 @@ function toggleCollapse() {
           :disabled="loading"
           @click.stop="clearFilters"
         >清除篩選</button>
-        <span v-if="refreshing" class="refresh-indicator active"></span>
-        <span v-else-if="refreshSuccess" class="refresh-success active">&#10003;</span>
-        <span v-if="lastUpdate" class="filters-last-update">更新: {{ lastUpdate }}</span>
+
       </div>
     </div>
 

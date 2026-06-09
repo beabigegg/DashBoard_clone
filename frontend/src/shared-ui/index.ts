@@ -15,6 +15,7 @@ export { default as MultiSelect } from './components/MultiSelect.vue';
 export { default as PageHeader } from './components/PageHeader.vue';
 export { default as PaginationControl } from './components/PaginationControl.vue';
 export { default as SectionCard } from './components/SectionCard.vue';
+export { default as DataUpdateBadge } from './components/DataUpdateBadge.vue';
 export { default as SkeletonLoader } from './components/SkeletonLoader.vue';
 export { default as StatusBadge } from './components/StatusBadge.vue';
 export { default as SummaryCardGroup } from './components/SummaryCardGroup.vue';

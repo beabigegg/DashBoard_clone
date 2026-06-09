@@ -4,6 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { apiGet, ensureMesApiAvailable } from '../core/api';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
+import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants';
 
@@ -166,6 +167,8 @@ const loading = reactive<LoadingState>({
 });
 
 const lastUpdate = ref('--');
+
+bindUpdateBadge({ updateTime: lastUpdate, refreshing: () => loading.refreshing });
 
 const summaryError = ref('');
 const equipmentError = ref('');
@@ -550,10 +553,6 @@ onMounted(() => {
 <template>
   <div class="resource-page theme-resource">
     <div class="dashboard">
-      <div class="resource-meta-bar">
-        <span v-if="loading.refreshing" class="refresh-indicator active"></span>
-        <span v-if="lastUpdate !== '--'" class="filters-last-update">更新: {{ lastUpdate }}</span>
-      </div>
 
       <FilterBar
         :workcenter-groups="workcenterGroups"
