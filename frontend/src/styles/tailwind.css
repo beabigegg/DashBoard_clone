@@ -87,7 +87,14 @@
     --color-token-hf8f9fa: theme('colors.token.hf8f9fa');
     --color-token-hf8fafc: theme('colors.token.hf8fafc');
     --color-token-hf97316: theme('colors.token.hf97316');
+    --color-token-hfef3c7: theme('colors.token.hfef3c7');
+    --color-token-hfee2e2: theme('colors.token.hfee2e2');
     --color-token-hffffff: theme('colors.token.hffffff');
+    --color-token-hdcfce7: theme('colors.token.hdcfce7');
+    --color-token-heab308: theme('colors.token.heab308');
+    --color-token-h166534: theme('colors.token.h166534');
+    --color-token-h92400e: theme('colors.token.h92400e');
+    --color-token-h991b1b: theme('colors.token.h991b1b');
     --motion-fast: 150ms;
     --motion-normal: 200ms;
     --motion-slow: 300ms;

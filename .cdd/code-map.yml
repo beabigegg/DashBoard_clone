@@ -1,6 +1,6 @@
-# generated: 2026-06-09T00:03:17Z by cdd-kit 2.2.1
-# files: 833, src-lines: 235277, map-lines: 17850, compression: 13.2x
-# sources-digest: d83ab4b80856d331b4351625e3b479567486b4f2ad731c0654c0b8f9402a0d35
+# generated: 2026-06-09T01:47:43Z by cdd-kit 2.2.1
+# files: 835, src-lines: 235488, map-lines: 17867, compression: 13.2x
+# sources-digest: acd7e493ebfe5acbb288c2b187581b24955ab5f9c2268436d0bebe4f95b333fd
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -865,7 +865,7 @@ frontend/src/downtime-analysis/types.ts:  # 124 lines
   types:
     - { name: MatchSource, lines: 59-59 }
 
-frontend/src/hold-detail/App.vue:  # 557 lines
+frontend/src/hold-detail/App.vue:  # 555 lines
 
 frontend/src/hold-detail/components/AgeDistribution.vue:  # 63 lines
 
@@ -953,7 +953,7 @@ frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
     - { name: BaseConditionParams, lines: 191-196 }  # local
     - { name: QueryListParams, lines: 381-387 }  # local
 
-frontend/src/hold-overview/App.vue:  # 1003 lines
+frontend/src/hold-overview/App.vue:  # 1006 lines
 
 frontend/src/hold-overview/components/FilterBar.vue:  # 103 lines
 
@@ -1181,33 +1181,35 @@ frontend/src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/portal-shell/App.vue:  # 350 lines
+frontend/src/portal-shell/App.vue:  # 362 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
     - { module: lucide-vue-next, items: [ChevronRight], line: 4 }
     - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 5 }
     - { module: vue-router, items: [useRoute, useRouter], line: 6 }
     - { module: '../shared-composables/useAiChat.js', items: [useAiChat], line: 8 }
-    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 9 }
-    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 10 }
-    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 11 }
-    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 12 }
-    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 13 }
-    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 14 }
-    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 15 }
-    - { module: './sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, isMobileViewport, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 16 }
+    - { module: '../shared-composables/usePageUpdateBadge.js', items: [provideUpdateBadge], line: 9 }
+    - { module: '../shared-ui/components/DataUpdateBadge.vue', items: ['default:DataUpdateBadge'], line: 10 }
+    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 11 }
+    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 12 }
+    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 13 }
+    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 14 }
+    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 15 }
+    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 16 }
+    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 17 }
+    - { module: './sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, isMobileViewport, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 18 }
   functions:
-    - { name: toShellPath, lines: 43-45 }
-    - { name: isPortalShellRootPath, lines: 47-50 }
-    - { name: async handleLogout, lines: 68-71 }
-    - { name: restoreSidebarPreference, lines: 88-95 }
-    - { name: persistSidebarPreference, lines: 97-106 }
-    - { name: checkViewport, lines: 108-113 }
-    - { name: closeMobileSidebar, lines: 115-117 }
-    - { name: toggleSidebar, lines: 119-126 }
-    - { name: handleViewportResize, lines: 128-130 }
-    - { name: handleGlobalKeydown, lines: 132-139 }
-    - { name: async loadNavigation, lines: 141-202 }
+    - { name: toShellPath, lines: 46-48 }
+    - { name: isPortalShellRootPath, lines: 50-53 }
+    - { name: async handleLogout, lines: 71-74 }
+    - { name: restoreSidebarPreference, lines: 91-98 }
+    - { name: persistSidebarPreference, lines: 100-109 }
+    - { name: checkViewport, lines: 111-116 }
+    - { name: closeMobileSidebar, lines: 118-120 }
+    - { name: toggleSidebar, lines: 122-129 }
+    - { name: handleViewportResize, lines: 131-133 }
+    - { name: handleGlobalKeydown, lines: 135-142 }
+    - { name: async loadNavigation, lines: 144-205 }
 
 frontend/src/portal-shell/components/AnomalyIndicator.vue:  # 58 lines
   imports:
@@ -1431,7 +1433,7 @@ frontend/src/production-history/main.ts:  # 7 lines
     - { module: '../resource-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/qc-gate/App.vue:  # 139 lines
+frontend/src/qc-gate/App.vue:  # 138 lines
 
 frontend/src/qc-gate/components/LotTable.vue:  # 119 lines
 
@@ -1806,7 +1808,7 @@ frontend/src/resource-shared/constants.ts:  # 79 lines
 
 frontend/src/resource-shared/index.ts:  # 13 lines
 
-frontend/src/resource-status/App.vue:  # 647 lines
+frontend/src/resource-status/App.vue:  # 646 lines
 
 frontend/src/resource-status/components/EquipmentCard.vue:  # 125 lines
 
@@ -1904,6 +1906,19 @@ frontend/src/shared-composables/useFilterOrchestrator.ts:  # 229 lines
     - { name: FieldTrigger, lines: 5-5 }
     - { name: DependencyAction, lines: 6-6 }
 
+frontend/src/shared-composables/usePageUpdateBadge.ts:  # 59 lines
+  imports:
+    - { module: vue, items: [InjectionKey, inject, onUnmounted, provide, reactive, watch, WatchSource], line: 1 }
+  constants:
+    - { name: UPDATE_BADGE_KEY, line: 17 }
+  functions:
+    - { name: provideUpdateBadge, lines: 19-28 }
+    - { name: useUpdateBadge, lines: 30-32 }
+    - { name: bindUpdateBadge, lines: 38-59 }
+  interfaces:
+    - { name: UpdateBadgeState, lines: 3-8 }  # local
+    - { name: BindOptions, lines: 10-15 }  # local
+
 frontend/src/shared-composables/usePaginationState.ts:  # 66 lines
   imports:
     - { module: vue, items: [computed, ref], line: 1 }
@@ -1995,6 +2010,8 @@ frontend/src/shared-ui/components/DataTable.vue:  # 369 lines
 
 frontend/src/shared-ui/components/DataTableColumn.vue:  # 46 lines
 
+frontend/src/shared-ui/components/DataUpdateBadge.vue:  # 138 lines
+
 frontend/src/shared-ui/components/EmptyState.vue:  # 54 lines
 
 frontend/src/shared-ui/components/ErrorBanner.vue:  # 78 lines
@@ -2037,11 +2054,11 @@ frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 199 lines
     - { name: getOptions, lines: 47-49 }
     - { name: getCloseBtn, lines: 50-52 }
 
-frontend/src/shared-ui/index.ts:  # 22 lines
+frontend/src/shared-ui/index.ts:  # 23 lines
 
-frontend/src/wip-detail/App.vue:  # 592 lines
+frontend/src/wip-detail/App.vue:  # 594 lines
 
-frontend/src/wip-detail/components/FilterPanel.vue:  # 206 lines
+frontend/src/wip-detail/components/FilterPanel.vue:  # 204 lines
 
 frontend/src/wip-detail/components/LotDetailPanel.vue:  # 198 lines
 
@@ -2056,9 +2073,9 @@ frontend/src/wip-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-frontend/src/wip-overview/App.vue:  # 575 lines
+frontend/src/wip-overview/App.vue:  # 579 lines
 
-frontend/src/wip-overview/components/FilterPanel.vue:  # 206 lines
+frontend/src/wip-overview/components/FilterPanel.vue:  # 204 lines
 
 frontend/src/wip-overview/components/MatrixTable.vue:  # 185 lines
 

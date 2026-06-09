@@ -94,7 +94,10 @@ import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import EquipmentGrid from './components/EquipmentGrid.vue';
 import FilterBar from './components/FilterBar.vue';
 import FloatingTooltip from './components/FloatingTooltip.vue';
+import MaintenanceAlerts from './components/MaintenanceAlerts.vue';
 import MatrixSection from './components/MatrixSection.vue';
+import OuHeatmap from './components/OuHeatmap.vue';
+import WorkcenterOuRings from './components/WorkcenterOuRings.vue';
 ensureMesApiAvailable();
 
 const API_TIMEOUT = 60000;
@@ -615,6 +618,13 @@ onMounted(() => {
       </SummaryCardGroup>
 
       <ErrorBanner :message="equipmentError" @dismiss="equipmentError = ''" />
+
+      <WorkcenterOuRings :equipment="allEquipment" />
+
+      <OuHeatmap :equipment="allEquipment" />
+
+      <MaintenanceAlerts :equipment="allEquipment" :last-update="lastUpdate" @show-job="openJobTooltip" />
+
       <MatrixSection
         :equipment="allEquipment"
         :expanded-state="hierarchyState"
@@ -625,6 +635,7 @@ onMounted(() => {
       />
 
       <EquipmentGrid
+        v-if="matrixFilter.length > 0 || summaryStatusFilter !== null"
         :equipment="displayedEquipment"
         :active-filter-text="activeFilterText"
         @clear-filter="clearAllEquipmentFilters"
