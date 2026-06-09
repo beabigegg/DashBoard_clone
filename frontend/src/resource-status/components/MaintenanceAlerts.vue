@@ -20,11 +20,17 @@ interface EquipmentItem {
 const props = defineProps<{
   equipment: EquipmentItem[];
   lastUpdate: string;
+  selectedId?: string | null;
 }>();
 
 const emit = defineEmits<{
   'show-job': [{ x: number; y: number; equipment: EquipmentItem }];
+  'alert-select': [payload: { source: 'alerts'; resourceId: string } | null];
 }>();
+
+function handleAlertRowClick(eq: EquipmentItem): void {
+  emit('alert-select', { source: 'alerts', resourceId: eq.RESOURCEID });
+}
 
 function handleJobClick(event: MouseEvent, eq: EquipmentItem): void {
   if (!eq.JOBORDER?.trim()) return;
@@ -109,7 +115,14 @@ function jobStatusLabel(status: string): string {
         v-for="(item, idx) in top10"
         :key="item.eq.RESOURCEID + item.eq.JOBORDER"
         class="alert-card"
+        :class="{ 'is-selected': selectedId === item.eq.RESOURCEID }"
         :style="{ borderLeftColor: RANK_COLORS[idx] }"
+        tabindex="0"
+        role="button"
+        :aria-pressed="selectedId === item.eq.RESOURCEID"
+        @click="handleAlertRowClick(item.eq)"
+        @keydown.enter.prevent="handleAlertRowClick(item.eq)"
+        @keydown.space.prevent="handleAlertRowClick(item.eq)"
       >
         <div class="alert-header">
           <span class="rank-badge" :style="{ background: RANK_COLORS[idx] }">{{ idx + 1 }}</span>

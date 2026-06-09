@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.6.0
+schema-version: 1.7.0
 last-changed: 2026-05-21
 breaking-change-policy: deprecate-2-minors
 ---
@@ -121,6 +121,8 @@ Added by `resource-status-package-group`.
 | MatrixSection | Package expandable dimension | Must be scoped under `.theme-resource`. New dimension column follows the same CSS class pattern as existing expandable dimensions; no new authored class names required unless existing ones cannot cover the Package column. |
 
 All new CSS rules (if any) added to `frontend/src/resource-status/style.css` must be scoped under `.theme-resource` and must pass `npm run css:check` Rule 6. No new `.css` source file is created by this change; `css-inventory.md` does not require an update.
+
+**Cross-filter selection-highlight and clear-control styles** (added by `resource-status-cross-filter`): `.cross-filter-clear-btn`, `.cross-filter-clear-btn-wrap`, `td.is-selected`, `.alert-card.is-selected` are all scoped under `.theme-resource`. No `<Teleport>` is used; Rule 4.4 wrapper requirement does not apply.
 
 ## Known Global Rule Interactions
 

@@ -1,0 +1,17 @@
+agent: ci-cd-gatekeeper
+change-id: resource-status-cross-filter
+timestamp: "2026-06-09T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (frontend-unit, css-governance, frontend-legacy required); 2 (frontend-type-check informational)" }
+  - { type: gate-promotions, pointer: "none — all gates already existed in frontend-tests.yml" }
+  - { type: workflow-files-changed, pointer: "none — existing .github/workflows/frontend-tests.yml sufficient" }
+  - { type: required-status-checks, pointer: "frontend-unit (npm test), css-governance (npm run css:check), frontend-legacy (npm run test:legacy)" }
+next-action: none
+notes: >
+  All three Tier 1 gates are already wired in .github/workflows/frontend-tests.yml
+  (frontend-unit-tests job). New test files useCrossFilter.test.ts and
+  App.cross-filter.test.ts are discovered automatically by the existing
+  src/**/*.test.ts Vitest glob — no config change needed. No Playwright step
+  added because E2E spec is explicitly deferred in test-plan.md §Out of Scope.
+  ci-gates.md kept to 60 lines.

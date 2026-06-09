@@ -10,9 +10,23 @@ interface EquipmentItem {
   PACKAGEGROUPNAME: string | null;
 }
 
+interface HeatmapCellSelection {
+  group: string;
+  packageGroupName: string;
+}
+
 const props = defineProps<{
   equipment: EquipmentItem[];
+  selectedCell?: HeatmapCellSelection | null;
 }>();
+
+const emit = defineEmits<{
+  'cell-select': [payload: { source: 'heatmap'; group: string; packageGroupName: string } | null];
+}>();
+
+function handleCellClick(group: string, pkg: string): void {
+  emit('cell-select', { source: 'heatmap', group, packageGroupName: pkg });
+}
 
 const TIER_STYLE: Record<string, { background: string; color: string }> = {
   high:   { background: 'var(--color-token-hdcfce7)', color: 'var(--color-token-h166534)' },
@@ -103,7 +117,14 @@ const heatmap = computed<{ rows: HeatmapRow[]; cols: string[] }>(() => {
               v-for="(cell, ci) in row.cells"
               :key="heatmap.cols[ci]"
               class="heatmap-cell"
+              :class="{ 'is-selected': selectedCell?.group === row.group && selectedCell?.packageGroupName === heatmap.cols[ci] }"
               :style="cell.style"
+              tabindex="0"
+              role="button"
+              :aria-pressed="selectedCell?.group === row.group && selectedCell?.packageGroupName === heatmap.cols[ci]"
+              @click="handleCellClick(row.group, heatmap.cols[ci])"
+              @keydown.enter.prevent="handleCellClick(row.group, heatmap.cols[ci])"
+              @keydown.space.prevent="handleCellClick(row.group, heatmap.cols[ci])"
             >
               {{ cell.label }}
             </td>

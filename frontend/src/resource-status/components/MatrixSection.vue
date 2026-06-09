@@ -118,10 +118,12 @@ const props = withDefaults(defineProps<{
   equipment?: EquipmentItem[];
   expandedState?: Record<string, boolean>;
   matrixFilter?: MatrixFilter[];
+  activeSelection?: MatrixFilter | null;
 }>(), {
   equipment: () => [],
   expandedState: () => ({}),
   matrixFilter: () => [],
+  activeSelection: null,
 });
 
 const emit = defineEmits<{

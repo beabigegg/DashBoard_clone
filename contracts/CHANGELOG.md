@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.14.0] — 2026-06-09
+### Added
+- resource-status-cross-filter: Added RS-CF-01 cross-filter intersection semantics for the resource-status page. Each chart contributes at most one selection dimension; AND-intersection across all active selections. Exclude-self: the input for each chart's option rendering omits that chart's own predicate. Re-click toggles off. ESC clears and returns focus to trigger. All filtering is client-side; `/api/resource/status` payload unchanged.
+
+## [css 1.7.0] — 2026-06-09
+### Added
+- resource-status-cross-filter: Cross-filter selection-highlight and clear-control styles (`.cross-filter-clear-btn`, `.cross-filter-clear-btn-wrap`, `td.is-selected`, `.alert-card.is-selected`) added to `frontend/src/resource-status/style.css`, all scoped under `.theme-resource`. Passes `npm run css:check` Rule 6 with zero unscoped top-level rules.
+
 ## [ci 1.3.18] — 2026-06-05
 ### Changed
 - gunicorn-preload-workers: Added Gate Compatibility Note for preload/fork-safety integration test coverage. New Tier 3 multi-worker test (`tests/integration/test_preload_fork_safety.py`, markers: `integration_real` + `multi_worker`) asserts: (1) each single-run prewarm (downtime_analysis, material_consumption, resource_history DuckDB, resource_cache init_cache) executes exactly once per gunicorn restart across N workers; (2) each worker holds independent (non-inherited) DB engine pool, Redis pool, and SQLite handles after post_fork reinit; (3) no resource_history duckdb-cache peer-wait timeout; (4) no orphan background thread in master after fork. Covered by existing nightly-integration gate command — no gate tier, command, or status change.

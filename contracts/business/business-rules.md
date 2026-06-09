@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.13.1
+schema-version: 1.14.0
 last-changed: 2026-06-01
 breaking-change-policy: deprecate-2-minors
 ---
@@ -109,6 +109,7 @@ breaking-change-policy: deprecate-2-minors
 | RES-01 | Resource status categories | `/by_status`、`/by_workcenter`、`/workcenter_status_matrix` 提供設備稼動率三種視角；`/status`、`/status/summary`、`/status/matrix` 提供即時設備狀態 | route tests |
 | RES-02 | Detail rate limit | `POST /api/resource/detail` 有 `_RESOURCE_DETAIL_RATE_LIMIT`；`/status` 相關端點有 `_RESOURCE_STATUS_RATE_LIMIT` | route tests |
 | RES-03 | NaN cleanup | resource service 對回傳數值執行 `_clean_nan_values`（NaN → null），避免 JSON 序列化失敗 | unit tests |
+| RS-CF-01 | Cross-filter intersection semantics | Cross-filter selections on the resource-status page use AND-intersection semantics. Each chart (WorkcenterOuRings, OuHeatmap, MatrixSection, MaintenanceAlerts, SummaryCardGroup) contributes at most one selection dimension. The input for each chart's option rendering excludes that chart's own selection (exclude-self): selecting A narrows B but does not narrow A's own option set. Re-clicking an active selection toggles it off. ESC key clears the active selection and returns focus to the trigger element. All filtering is client-side; `/api/resource/status` payload is unchanged. | `useCrossFilter.test.ts`, `App.cross-filter.test.ts` |
 
 ## Resource History Rules
 

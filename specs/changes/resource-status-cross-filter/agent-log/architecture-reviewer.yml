@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "none (frontend-only client-side state, bounded by existing matrixFilter[] precedent; no boundary/persistence/consistency/trust change)" }
+  - { type: affected-areas, pointer: "frontend/src/resource-status (App.vue + 4 charts + new useCrossFilter composable + style.css)" }
+  - { type: decision-summary, pointer: "AND-intersection cross-filter; unify matrixFilter+summaryStatusFilter into useCrossFilter; vue-echarts @click binding; Phase 2 dim deferred" }
+  - { type: risks-noted, pointer: "3 medium (exclude-self reducer, heatmap package null-trim, legacy test coupling), 0 high" }

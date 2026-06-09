@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api';
 import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
@@ -7,6 +7,8 @@ import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants';
+import { useCrossFilter } from './composables/useCrossFilter';
+import type { CrossFilterSource } from './composables/useCrossFilter';
 
 // --- Domain Interfaces ---
 
@@ -159,9 +161,54 @@ const {
 // Cast committed to typed FilterState for property access throughout the component
 const filterState = _filterStateRaw as unknown as FilterState;
 
-const matrixFilter = ref<MatrixFilter[]>([]);
-const summaryStatusFilter = ref<string | null>(null);
 const hierarchyState = reactive<Record<string, boolean>>({});
+
+const {
+  activeSelections,
+  filteredEquipment,
+  hasActiveSelections,
+  addSelection,
+  removeSelection,
+  clearAll: clearAllCrossFilter,
+  getInputForChart,
+} = useCrossFilter(allEquipment);
+
+// Focus-return: track the last element that triggered a cross-filter selection
+// so ESC and the clear-all button can return focus to a meaningful element.
+const lastClickedTrigger = ref<HTMLElement | null>(null);
+
+function captureLastTrigger(): void {
+  const active = document.activeElement;
+  if (active && active !== document.body) {
+    lastClickedTrigger.value = active as HTMLElement;
+  }
+}
+
+// Derive ring selection for highlight (first ring-source selection)
+const ringSelection = computed(() => {
+  const sel = activeSelections.value.find((s) => s.source === 'ring');
+  if (!sel) return null;
+  // Extract group+status from label — stored as { group, status } in meta
+  return (sel as { source: string; label: string; _meta?: { group: string; status: string } })._meta ?? null;
+});
+
+// Heatmap selected cell
+const heatmapSelectedCell = computed(() => {
+  const sel = activeSelections.value.find((s) => s.source === 'heatmap');
+  return (sel as { source: string; label: string; _meta?: { group: string; packageGroupName: string } } | undefined)?._meta ?? null;
+});
+
+// Alerts selected id
+const alertsSelectedId = computed(() => {
+  const sel = activeSelections.value.find((s) => s.source === 'alerts');
+  return (sel as { source: string; label: string; _meta?: { resourceId: string } } | undefined)?._meta?.resourceId ?? null;
+});
+
+// matrix active selection (for MatrixSection activeSelection prop)
+const matrixActiveSelection = computed<MatrixFilter | null>(() => {
+  const sel = activeSelections.value.find((s) => s.source === 'matrix');
+  return (sel as { source: string; label: string; _meta?: MatrixFilter } | undefined)?._meta ?? null;
+});
 
 const loading = reactive<LoadingState>({
   initial: true,
@@ -332,8 +379,7 @@ async function loadEquipment() {
   const data = unwrapApiResult(result, '載入設備資料失敗');
 
   allEquipment.value = Array.isArray(data) ? data : [];
-  matrixFilter.value = [];
-  summaryStatusFilter.value = null;
+  clearAllCrossFilter();
   resetHierarchyState();
 }
 
@@ -384,57 +430,170 @@ function matchSingleFilter(eq: EquipmentItem, filter: MatrixFilter): boolean {
   return normalizeStatus(eq.EQUIPMENTASSETSSTATUS) === filter.status;
 }
 
-const displayedEquipment = computed(() => {
-  const filters = matrixFilter.value;
-  return allEquipment.value.filter((eq) => {
-    if (filters.length > 0 && !filters.some((f) => matchSingleFilter(eq, f))) {
-      return false;
-    }
-    if (summaryStatusFilter.value && normalizeStatus(eq.EQUIPMENTASSETSSTATUS) !== summaryStatusFilter.value) {
-      return false;
-    }
-    return true;
-  });
-});
+// displayedEquipment replaced by useCrossFilter.filteredEquipment
 
 const activeFilterText = computed(() => {
-  const labels = [];
-
-  if (matrixFilter.value.length > 0) {
-    const parts = matrixFilter.value.map(buildSingleFilterLabel);
-    labels.push(`矩陣篩選: ${parts.join(' + ')}`);
-  }
-
-  if (summaryStatusFilter.value) {
-    labels.push(`卡片篩選: ${STATUS_DISPLAY_MAP[summaryStatusFilter.value] || summaryStatusFilter.value}`);
-  }
-
-  return labels.join(' | ');
+  return activeSelections.value.map((s) => s.label).join(' | ');
 });
 
 function applyMatrixFilter(nextFilter: MatrixFilter): void {
-  const entry = {
+  captureLastTrigger();
+  const entry: MatrixFilter = {
     workcenter_group: nextFilter.workcenter_group,
     status: nextFilter.status,
     family: nextFilter.family || null,
     resource: nextFilter.resource || null,
   };
-  const key = filterKey(entry);
-  const idx = matrixFilter.value.findIndex((f) => filterKey(f) === key);
-  if (idx >= 0) {
-    matrixFilter.value = matrixFilter.value.filter((_, i) => i !== idx);
-  } else {
-    matrixFilter.value = [...matrixFilter.value, entry];
+  const label = buildSingleFilterLabel(entry);
+  const existing = activeSelections.value.find((s) => s.source === 'matrix');
+  if (existing) {
+    const existingMeta = (existing as { source: string; label: string; _meta?: MatrixFilter })._meta;
+    if (
+      existingMeta &&
+      filterKey(existingMeta) === filterKey(entry)
+    ) {
+      removeSelection('matrix');
+      return;
+    }
   }
+  const sel = Object.assign(
+    {
+      source: 'matrix' as CrossFilterSource,
+      label: `矩陣篩選: ${label}`,
+      predicate: (row: { WORKCENTER_GROUP: string; RESOURCEFAMILYNAME?: string; RESOURCEID?: string; EQUIPMENTASSETSSTATUS: string }) =>
+        matchSingleFilter(row as Parameters<typeof matchSingleFilter>[0], entry),
+    },
+    { _meta: entry }
+  );
+  addSelection(sel);
 }
 
 function clearAllEquipmentFilters() {
-  matrixFilter.value = [];
-  summaryStatusFilter.value = null;
+  const trigger = lastClickedTrigger.value;
+  clearAllCrossFilter();
+  nextTick(() => {
+    trigger?.focus();
+  });
 }
 
 function toggleSummaryStatus(status: string): void {
-  summaryStatusFilter.value = summaryStatusFilter.value === status ? null : status;
+  captureLastTrigger();
+  const existing = activeSelections.value.find((s) => s.source === 'summary');
+  const existingMeta = (existing as { source: string; label: string; _meta?: { status: string } } | undefined)?._meta;
+  if (existingMeta?.status === status) {
+    removeSelection('summary');
+  } else {
+    const sel = Object.assign(
+      {
+        source: 'summary' as CrossFilterSource,
+        label: `卡片篩選: ${STATUS_DISPLAY_MAP[status] || status}`,
+        predicate: (row: { EQUIPMENTASSETSSTATUS: string }) =>
+          normalizeStatus(row.EQUIPMENTASSETSSTATUS) === status,
+      },
+      { _meta: { status } }
+    );
+    addSelection(sel);
+  }
+}
+
+
+function handleRingSelect(payload: { source: 'ring'; group: string; status: string } | null): void {
+  captureLastTrigger();
+  if (!payload) {
+    removeSelection('ring');
+    return;
+  }
+  const { group, status } = payload;
+  const existing = activeSelections.value.find((s) => s.source === 'ring');
+  const existingMeta = (existing as { _meta?: { group: string; status: string } } | undefined)?._meta;
+  if (existingMeta?.group === group && existingMeta?.status === status) {
+    removeSelection('ring');
+    return;
+  }
+  const label = `Ring: ${group} / ${status}`;
+  const sel = Object.assign(
+    {
+      source: 'ring' as CrossFilterSource,
+      label,
+      predicate: (row: { WORKCENTER_GROUP: string; EQUIPMENTASSETSSTATUS: string }) =>
+        (row.WORKCENTER_GROUP || 'UNKNOWN') === group && normalizeStatus(row.EQUIPMENTASSETSSTATUS) === status,
+    },
+    { _meta: { group, status } }
+  );
+  addSelection(sel);
+}
+
+function handleHeatmapSelect(payload: { source: 'heatmap'; group: string; packageGroupName: string } | null): void {
+  captureLastTrigger();
+  if (!payload) {
+    removeSelection('heatmap');
+    return;
+  }
+  const { group, packageGroupName } = payload;
+  const normPkg = packageGroupName?.trim() || '—';
+  const existing = activeSelections.value.find((s) => s.source === 'heatmap');
+  const existingMeta = (existing as { _meta?: { group: string; packageGroupName: string } } | undefined)?._meta;
+  if (existingMeta?.group === group && existingMeta?.packageGroupName === normPkg) {
+    removeSelection('heatmap');
+    return;
+  }
+  const label = `Heatmap: ${group} / ${normPkg}`;
+  const sel = Object.assign(
+    {
+      source: 'heatmap' as CrossFilterSource,
+      label,
+      predicate: (row: { WORKCENTER_GROUP: string; PACKAGEGROUPNAME?: string | null }) =>
+        (row.WORKCENTER_GROUP || 'UNKNOWN') === group && (row.PACKAGEGROUPNAME?.trim() || '—') === normPkg,
+    },
+    { _meta: { group, packageGroupName: normPkg } }
+  );
+  addSelection(sel);
+}
+
+function handleAlertSelect(payload: { source: 'alerts'; resourceId: string } | null): void {
+  captureLastTrigger();
+  if (!payload) {
+    removeSelection('alerts');
+    return;
+  }
+  const { resourceId } = payload;
+  const existing = activeSelections.value.find((s) => s.source === 'alerts');
+  const existingMeta = (existing as { _meta?: { resourceId: string } } | undefined)?._meta;
+  if (existingMeta?.resourceId === resourceId) {
+    removeSelection('alerts');
+    return;
+  }
+  const label = `告警: ${resourceId}`;
+  const sel = Object.assign(
+    {
+      source: 'alerts' as CrossFilterSource,
+      label,
+      predicate: (row: { RESOURCEID: string }) => row.RESOURCEID === resourceId,
+    },
+    { _meta: { resourceId } }
+  );
+  addSelection(sel);
+}
+
+function handleEscClear(event: KeyboardEvent): void {
+  // Capture trigger before clearing (button is v-if'd and will be removed from DOM)
+  const trigger = lastClickedTrigger.value;
+  clearAllCrossFilter();
+  nextTick(() => {
+    // Return focus to the last chart element that was clicked; fall back to
+    // the button itself if no prior chart interaction has occurred.
+    (trigger ?? (event.target as HTMLElement))?.focus();
+  });
+}
+
+function handleGlobalEsc(): void {
+  if (hasActiveSelections.value) {
+    const trigger = lastClickedTrigger.value;
+    clearAllCrossFilter();
+    nextTick(() => {
+      trigger?.focus();
+    });
+  }
 }
 
 function handleToggleRow(rowId: string): void {
@@ -554,7 +713,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="resource-page theme-resource">
+  <div class="resource-page theme-resource" @keydown.esc="handleGlobalEsc">
     <div class="dashboard">
 
       <FilterBar
@@ -602,7 +761,7 @@ onMounted(() => {
           format="number"
           :accent="STATUS_ACCENT_MAP[status] || 'neutral'"
           clickable
-          :active="summaryStatusFilter === status"
+          :active="activeSelections.some((s) => s.source === 'summary' && (s as any)._meta?.status === status)"
           @click="toggleSummaryStatus(status)"
         >
           <template #sub>{{ statusPctSub(status) }}</template>
@@ -619,24 +778,42 @@ onMounted(() => {
 
       <ErrorBanner :message="equipmentError" @dismiss="equipmentError = ''" />
 
-      <WorkcenterOuRings :equipment="allEquipment" />
+      <WorkcenterOuRings
+        :equipment="getInputForChart('ring').value"
+        :selection="ringSelection"
+        @chart-select="handleRingSelect"
+      />
 
-      <OuHeatmap :equipment="allEquipment" />
+      <OuHeatmap
+        :equipment="getInputForChart('heatmap').value"
+        :selected-cell="heatmapSelectedCell"
+        @cell-select="handleHeatmapSelect"
+      />
 
-      <MaintenanceAlerts :equipment="allEquipment" :last-update="lastUpdate" @show-job="openJobTooltip" />
+      <MaintenanceAlerts
+        :equipment="getInputForChart('alerts').value"
+        :last-update="lastUpdate"
+        :selected-id="alertsSelectedId"
+        @show-job="(p: { x: number; y: number; equipment: unknown }) => openJobTooltip(p as { x: number; y: number; equipment: EquipmentItem })"
+        @alert-select="handleAlertSelect"
+      />
 
       <MatrixSection
-        :equipment="allEquipment"
+        :equipment="getInputForChart('matrix').value"
         :expanded-state="hierarchyState"
-        :matrix-filter="matrixFilter"
+        :matrix-filter="[]"
+        :active-selection="matrixActiveSelection"
         @toggle-row="handleToggleRow"
         @toggle-all="handleToggleAllRows"
         @cell-filter="applyMatrixFilter"
       />
 
+      <div v-if="hasActiveSelections" class="cross-filter-clear-btn-wrap">
+        <button type="button" class="cross-filter-clear-btn" @click="clearAllEquipmentFilters" @keydown.esc.stop="handleEscClear($event)">清除全部篩選</button>
+      </div>
       <EquipmentGrid
-        v-if="matrixFilter.length > 0 || summaryStatusFilter !== null"
-        :equipment="displayedEquipment"
+        v-if="hasActiveSelections"
+        :equipment="filteredEquipment"
         :active-filter-text="activeFilterText"
         @clear-filter="clearAllEquipmentFilters"
         @show-lot="openLotTooltip"

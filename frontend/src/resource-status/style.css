@@ -520,6 +520,7 @@
   border: 1px solid var(--resource-border);
   transition: filter 0.15s;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .theme-resource .heatmap-cell:hover {
@@ -737,3 +738,47 @@
 }
 
 
+
+/* ── Cross-filter: clear-all button ─────────────────────────────────────── */
+
+.theme-resource .cross-filter-clear-btn-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0 0;
+}
+
+.theme-resource .cross-filter-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border-radius: 6px;
+  border: 1px solid var(--resource-border);
+  background: theme('colors.token.hfef3c7');
+  color: theme('colors.token.h92400e');
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.theme-resource .cross-filter-clear-btn:hover {
+  background: theme('colors.token.hfde68a');
+}
+
+/* ── Cross-filter: heatmap selected cell ─────────────────────────────────── */
+
+.theme-resource td.is-selected {
+  outline: 2px solid var(--resource-primary);
+  outline-offset: -2px;
+  z-index: 1;
+  position: relative;
+}
+
+/* ── Cross-filter: alert row selected ───────────────────────────────────── */
+
+.theme-resource .alert-card.is-selected {
+  background: theme('colors.token.heff6ff');
+  outline: 2px solid var(--resource-primary);
+  outline-offset: -2px;
+}

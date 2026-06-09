@@ -1,0 +1,17 @@
+agent: test-strategist
+change-id: resource-status-cross-filter
+date: 2026-06-09
+status: done
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/resource-status-cross-filter/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/resource-status/useCrossFilter.test.ts — frontend/src/resource-status/composables/useCrossFilter.ts" }
+  - { type: tdd-pairs, pointer: "frontend/tests/resource-status/App.cross-filter.test.ts — frontend/src/resource-status/App.vue" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), integration (Tier 1), regression (Tier 0), contract-lint (Tier 0)" }
+  - { type: mapping-completeness, pointer: "all 8 ACs mapped; 12 unit cases, 4 emit-wiring cases, 8 integration cases, 22 regression cases" }
+
+notes: >
+  Legacy test file (resource-status.test.js) contains no matrixFilter/summaryStatusFilter
+  assertions — only utility-function and component-render tests — so it can pass unmodified
+  after composable unification. Exclude-self and heatmap null-package boundary cases are the
+  two highest-risk novel test surfaces per design open-risks section.

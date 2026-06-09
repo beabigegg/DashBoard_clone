@@ -1,0 +1,10 @@
+agent: implementation-planner
+change-id: resource-status-cross-filter
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/resource-status-cross-filter/implementation-plan.md" }
+  - { type: owner-map, pointer: "frontend-engineer" }
+  - { type: scope-summary, pointer: "in: useCrossFilter.ts + unify matrixFilter/summaryStatusFilter in App.vue + wire 4 charts/SummaryCard/EquipmentGrid + .theme-resource CSS + 3 contract edits; out: Phase 2 dim effect, backend/API, FilterBar behavior, legacy test edits, E2E/CI" }
+notes:
+  - "Scope-root correction: CSS scope is .theme-resource (existing style.css + css-contract L113), NOT .theme-resource-status from the task brief. Flagged in plan Constraints + Known Risks."
+  - "TDD enforced: useCrossFilter.test.ts + App.cross-filter.test.ts authored RED before composable/wiring."
+  - "D2 unify targets named by line: matrixFilter L162, summaryStatusFilter L163, displayedEquipment L387, activeFilterText L400, applyMatrixFilter L423, clearAllEquipmentFilters L432, toggleSummaryStatus L437."

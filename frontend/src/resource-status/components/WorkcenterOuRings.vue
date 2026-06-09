@@ -17,9 +17,31 @@ interface EquipmentItem {
   EQUIPMENTASSETSSTATUS: string;
 }
 
+interface RingSelection {
+  group: string;
+  status: string;
+}
+
 const props = defineProps<{
   equipment: EquipmentItem[];
+  selection?: RingSelection | null;
 }>();
+
+const emit = defineEmits<{
+  'chart-select': [payload: { source: 'ring'; group: string; status: string } | null];
+}>();
+
+// STATUS_DISPLAY_MAP maps 'PRD' -> '生產' etc.; reverse-map for click
+const DISPLAY_TO_STATUS: Record<string, string> = Object.fromEntries(
+  Object.entries(STATUS_DISPLAY_MAP).map(([k, v]) => [v, k])
+);
+
+function handleChartClick(group: string, params: { name?: string }): void {
+  const displayName = params.name || '';
+  const status = DISPLAY_TO_STATUS[displayName] || displayName;
+  if (!status || !group) return;
+  emit('chart-select', { source: 'ring', group, status });
+}
 
 const CHART_COLORS: Record<string, string> = {
   PRD: '#22c55e',
@@ -72,11 +94,17 @@ const rings = computed<RingData[]>(() => {
 });
 
 function ringOption(ring: RingData) {
-  const data = MATRIX_STATUS_COLUMNS.filter((s) => (ring.counts[s] ?? 0) > 0).map((s) => ({
-    value: ring.counts[s],
-    name: STATUS_DISPLAY_MAP[s] || s,
-    itemStyle: { color: CHART_COLORS[s] ?? '#94a3b8' },
-  }));
+  const isGroupSelected = props.selection?.group === ring.group;
+
+  const data = MATRIX_STATUS_COLUMNS.filter((s) => (ring.counts[s] ?? 0) > 0).map((s) => {
+    const displayName = STATUS_DISPLAY_MAP[s] || s;
+    const isSegmentSelected = isGroupSelected && props.selection?.status === s;
+    const itemStyle: Record<string, unknown> = { color: CHART_COLORS[s] ?? '#94a3b8' };
+    if (isGroupSelected) {
+      itemStyle.opacity = isSegmentSelected ? 1.0 : 0.4;
+    }
+    return { value: ring.counts[s], name: displayName, itemStyle };
+  });
 
   return {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 台 ({d}%)' },
@@ -101,7 +129,7 @@ function ringOption(ring: RingData) {
     <div v-else class="rings-strip">
       <div v-for="ring in rings" :key="ring.group" class="ring-card">
         <div class="ring-chart-wrap">
-          <VChart :option="ringOption(ring)" autoresize class="ring-chart" />
+          <VChart :option="ringOption(ring)" autoresize class="ring-chart" @click="(params: { name?: string }) => handleChartClick(ring.group, params)" />
           <div class="ring-center" :style="{ color: OU_TEXT_COLORS[ring.ouClass] }">
             <span class="ring-pct">{{ ring.ouPct.toFixed(1) }}%</span>
             <span class="ring-ou-label">OU</span>

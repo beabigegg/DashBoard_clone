@@ -1,6 +1,6 @@
-# generated: 2026-06-09T01:47:43Z by cdd-kit 2.2.1
-# files: 835, src-lines: 235488, map-lines: 17867, compression: 13.2x
-# sources-digest: acd7e493ebfe5acbb288c2b187581b24955ab5f9c2268436d0bebe4f95b333fd
+# generated: 2026-06-09T08:15:42Z by cdd-kit 2.2.1
+# files: 841, src-lines: 236931, map-lines: 17914, compression: 13.2x
+# sources-digest: d2c9e3fa4aa685f58ab20605bc62770922d298c0fe8c18f928c61a66678062e9
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1181,35 +1181,32 @@ frontend/src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/portal-shell/App.vue:  # 362 lines
+frontend/src/portal-shell/App.vue:  # 385 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
-    - { module: lucide-vue-next, items: [ChevronRight], line: 4 }
-    - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 5 }
-    - { module: vue-router, items: [useRoute, useRouter], line: 6 }
-    - { module: '../shared-composables/useAiChat.js', items: [useAiChat], line: 8 }
-    - { module: '../shared-composables/usePageUpdateBadge.js', items: [provideUpdateBadge], line: 9 }
-    - { module: '../shared-ui/components/DataUpdateBadge.vue', items: ['default:DataUpdateBadge'], line: 10 }
-    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 11 }
-    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 12 }
-    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 13 }
-    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 14 }
-    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 15 }
-    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 16 }
-    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 17 }
-    - { module: './sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, isMobileViewport, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 18 }
+    - { module: lucide-vue-next, items: [Activity, AlertCircle, BarChart2, Briefcase, ChevronRight, Circle, Clock, Cpu, GitBranch, Layers, LayoutDashboard, LogOut, Monitor, Package, Search, Settings, TrendingDown, User], line: 4 }
+    - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 24 }
+    - { module: vue-router, items: [useRoute, useRouter], line: 25 }
+    - { module: '../shared-composables/useAiChat.js', items: [useAiChat], line: 27 }
+    - { module: '../shared-composables/usePageUpdateBadge.js', items: [provideUpdateBadge], line: 28 }
+    - { module: '../shared-ui/components/DataUpdateBadge.vue', items: ['default:DataUpdateBadge'], line: 29 }
+    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 30 }
+    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 31 }
+    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 32 }
+    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 33 }
+    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 34 }
+    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 35 }
+    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 36 }
+    - { module: './sidebarState.js', items: [buildSidebarUiState], line: 37 }
   functions:
-    - { name: toShellPath, lines: 46-48 }
-    - { name: isPortalShellRootPath, lines: 50-53 }
-    - { name: async handleLogout, lines: 71-74 }
-    - { name: restoreSidebarPreference, lines: 91-98 }
-    - { name: persistSidebarPreference, lines: 100-109 }
-    - { name: checkViewport, lines: 111-116 }
-    - { name: closeMobileSidebar, lines: 118-120 }
-    - { name: toggleSidebar, lines: 122-129 }
-    - { name: handleViewportResize, lines: 131-133 }
-    - { name: handleGlobalKeydown, lines: 135-142 }
-    - { name: async loadNavigation, lines: 144-205 }
+    - { name: toShellPath, lines: 57-59 }
+    - { name: getPageIcon, lines: 67-83 }
+    - { name: isPortalShellRootPath, lines: 85-88 }
+    - { name: async handleLogout, lines: 106-109 }
+    - { name: closeSidebar, lines: 119-121 }
+    - { name: toggleSidebar, lines: 123-125 }
+    - { name: handleGlobalKeydown, lines: 127-134 }
+    - { name: async loadNavigation, lines: 136-197 }
 
 frontend/src/portal-shell/components/AnomalyIndicator.vue:  # 58 lines
   imports:
@@ -1323,7 +1320,7 @@ frontend/src/portal-shell/router.js:  # 151 lines
     - { name: consumeNavigationNotice, lines: 100-104 }
     - { name: setAuthState, lines: 110-113 }
 
-frontend/src/portal-shell/sidebarState.js:  # 34 lines
+frontend/src/portal-shell/sidebarState.js:  # 26 lines
   constants:
     - { name: SIDEBAR_STORAGE_KEY, line: 1 }
     - { name: MOBILE_BREAKPOINT, line: 2 }
@@ -1331,7 +1328,7 @@ frontend/src/portal-shell/sidebarState.js:  # 34 lines
     - { name: isMobileViewport, lines: 4-6 }
     - { name: parseSidebarCollapsedPreference, lines: 8-10 }
     - { name: serializeSidebarCollapsedPreference, lines: 12-14 }
-    - { name: buildSidebarUiState, lines: 16-34 }
+    - { name: buildSidebarUiState, lines: 16-26 }
 
 frontend/src/portal-shell/views/LoginPage.vue:  # 288 lines
   imports:
@@ -1808,7 +1805,7 @@ frontend/src/resource-shared/constants.ts:  # 79 lines
 
 frontend/src/resource-shared/index.ts:  # 13 lines
 
-frontend/src/resource-status/App.vue:  # 646 lines
+frontend/src/resource-status/App.vue:  # 834 lines
 
 frontend/src/resource-status/components/EquipmentCard.vue:  # 125 lines
 
@@ -1818,9 +1815,26 @@ frontend/src/resource-status/components/FilterBar.vue:  # 139 lines
 
 frontend/src/resource-status/components/FloatingTooltip.vue:  # 360 lines
 
-frontend/src/resource-status/components/MatrixSection.vue:  # 474 lines
+frontend/src/resource-status/components/MaintenanceAlerts.vue:  # 159 lines
+
+frontend/src/resource-status/components/MatrixSection.vue:  # 476 lines
+
+frontend/src/resource-status/components/OuHeatmap.vue:  # 136 lines
 
 frontend/src/resource-status/components/StatusHeader.vue:  # 45 lines
+
+frontend/src/resource-status/components/WorkcenterOuRings.vue:  # 151 lines
+
+frontend/src/resource-status/composables/useCrossFilter.ts:  # 92 lines
+  imports:
+    - { module: vue, items: [computed, ref, ComputedRef, Ref], line: 1 }
+  functions:
+    - { name: useCrossFilter, lines: 43-92 }
+  interfaces:
+    - { name: CrossFilterSelection, lines: 7-14 }
+    - { name: UseCrossFilterReturn, lines: 18-41 }
+  types:
+    - { name: CrossFilterSource, lines: 5-5 }
 
 frontend/src/resource-status/main.ts:  # 7 lines
   imports:
@@ -2207,7 +2221,7 @@ frontend/src/yield-alert-center/utils.ts:  # 52 lines
     - { name: toQueryParams, lines: 21-38 }
     - { name: buildDrilldownNotice, lines: 40-52 }
 
-frontend/tailwind.config.js:  # 258 lines
+frontend/tailwind.config.js:  # 259 lines
 
 frontend/tests/abort/production-history-abort.test.js:  # 209 lines
   imports:
@@ -2446,7 +2460,7 @@ frontend/tests/legacy/portal-shell-route-query.test.js:  # 29 lines
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
     - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 4 }
 
-frontend/tests/legacy/portal-shell-sidebar.test.js:  # 96 lines
+frontend/tests/legacy/portal-shell-sidebar.test.js:  # 76 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
@@ -2843,6 +2857,39 @@ frontend/tests/query-tool/useLotDetail.pagination.test.js:  # 90 lines
     - { module: '../../src/query-tool/composables/useLotDetail.js', items: [useLotDetail], line: 3 }
   functions:
     - { name: setupWindowMesApi, lines: 5-16 }
+
+frontend/tests/resource-status/App.cross-filter.test.ts:  # 450 lines
+  imports:
+    - { module: vitest, items: [beforeEach, describe, it, expect, vi], line: 2 }
+    - { module: vue, items: [defineComponent, nextTick, ref], line: 3 }
+    - { module: '@vue/test-utils', items: [mount, shallowMount], line: 4 }
+  constants:
+    - { name: EQUIPMENT_LIST, line: 138 }
+  functions:
+    - { name: FilterBarStub, lines: 34-37 }
+    - { name: ErrorBannerStub, lines: 39-43 }
+    - { name: SummaryCardGroupStub, lines: 45-48 }
+    - { name: SummaryCardStub, lines: 50-55 }
+    - { name: WorkcenterOuRingsStub, lines: 57-62 }
+    - { name: OuHeatmapStub, lines: 64-69 }
+    - { name: MaintenanceAlertsStub, lines: 71-76 }
+    - { name: MatrixSectionStub, lines: 78-83 }
+    - { name: EquipmentGridStub, lines: 85-90 }
+    - { name: FloatingTooltipStub, lines: 92-97 }
+    - { name: LoadingOverlayStub, lines: 99-103 }
+    - { name: makeEq, lines: 107-136 }
+    - { name: buildApiResponses, lines: 146-168 }
+    - { name: async mountApp, lines: 170-199 }
+
+frontend/tests/resource-status/useCrossFilter.test.ts:  # 269 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: vue, items: [ref], line: 3 }
+    - { module: '../../src/resource-status/composables/useCrossFilter', items: [useCrossFilter], line: 5 }
+  constants:
+    - { name: FIXTURE_EQUIPMENT, line: 40 }
+  functions:
+    - { name: makeEq, lines: 9-38 }
 
 frontend/tests/schema-guard.test.js:  # 157 lines
   imports:
