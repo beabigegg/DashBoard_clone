@@ -434,6 +434,29 @@ def _query_duration(
 
 # ── Task 4.5: List SQL ────────────────────────────────────────────────────────
 
+# Whitelist maps frontend camelCase key → DuckDB column name; prevents SQL injection.
+_SORT_COL_WHITELIST: Dict[str, str] = {
+    "lotId": "LOT_ID",
+    "workorder": "PJ_WORKORDER",
+    "product": "PRODUCTNAME",
+    "package": "PACKAGE",
+    "workcenter": "WORKCENTERNAME",
+    "holdReason": "HOLDREASONNAME",
+    "qty": "QTY",
+    "holdDate": "HOLDTXNDATE",
+    "holdEmp": "HOLDEMP",
+    "holdComment": "HOLDCOMMENTS",
+    "releaseDate": "RELEASETXNDATE",
+    "releaseEmp": "RELEASEEMP",
+    "releaseComment": "RELEASECOMMENTS",
+    "holdHours": "HOLD_HOURS",
+    "ncr": "NCRID",
+    "futureHoldComment": "FUTUREHOLDCOMMENTS",
+}
+_DEFAULT_SORT_COL = "holdDate"
+_DEFAULT_SORT_DIR = "desc"
+
+
 def _query_list(
     conn: Any,
     *,
@@ -445,8 +468,10 @@ def _query_list(
     per_page: int = 50,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    sort_col: str = _DEFAULT_SORT_COL,
+    sort_dir: str = _DEFAULT_SORT_DIR,
 ) -> Dict[str, Any]:
-    """Paginated hold list: filter by hold_type + reason, sorted by HOLDTXNDATE DESC.
+    """Paginated hold list: filter by hold_type + reason.
 
     When per_page <= 0 (export mode), all matching rows are returned without
     LIMIT/OFFSET and pagination metadata reflects a single page of all rows.
@@ -455,6 +480,10 @@ def _query_list(
     if not export_mode:
         page = max(int(page), 1)
         per_page = min(max(int(per_page), 1), 200)
+
+    _col = _SORT_COL_WHITELIST.get(sort_col or _DEFAULT_SORT_COL, "HOLDTXNDATE")
+    _dir = "ASC" if str(sort_dir or _DEFAULT_SORT_DIR).lower() == "asc" else "DESC"
+    _order_by = f'ORDER BY "{_col}" {_dir} NULLS LAST'
 
     type_clause = _build_hold_type_clause(hold_type)
     record_clause = _build_record_type_clause(record_type, start_date, end_date)
@@ -513,7 +542,7 @@ def _query_list(
                 {_package_col}
             FROM hold_src
             {where_sql}
-            ORDER BY "HOLDTXNDATE" DESC NULLS LAST
+            {_order_by}
         """
         page_rows = _fetch_dict_rows(conn, page_sql, params)
         page = 1
@@ -545,7 +574,7 @@ def _query_list(
                 {_package_col}
             FROM hold_src
             {where_sql}
-            ORDER BY "HOLDTXNDATE" DESC NULLS LAST
+            {_order_by}
             LIMIT ? OFFSET ?
         """
         page_rows = _fetch_dict_rows(conn, page_sql, params + [per_page, offset])
@@ -667,6 +696,8 @@ def try_compute_view_from_spool(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     export_mode: bool = False,
+    sort_col: str = _DEFAULT_SORT_COL,
+    sort_dir: str = _DEFAULT_SORT_DIR,
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """Try to compute the full view result via DuckDB over the Parquet spool.
 
@@ -736,6 +767,8 @@ def try_compute_view_from_spool(
             per_page=0 if export_mode else per_page,
             start_date=resolved_start,
             end_date=resolved_end,
+            sort_col=sort_col,
+            sort_dir=sort_dir,
         )
 
         latency_s = round(time.time() - started_at, 3)

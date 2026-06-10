@@ -241,6 +241,11 @@ def api_hold_history_view():
     export_mode = request.args.get('export', '0') == '1'
     per_page = max(1, min(per_page or 50, 200))
 
+    raw_sort_col = request.args.get('sort_col', '').strip() or 'holdDate'
+    raw_sort_dir = request.args.get('sort_dir', '').strip().lower()
+    if raw_sort_dir not in ('asc', 'desc'):
+        raw_sort_dir = 'desc'
+
     try:
         result = apply_view(
             query_id=query_id,
@@ -251,6 +256,8 @@ def api_hold_history_view():
             page=page,
             per_page=per_page,
             export_mode=export_mode,
+            sort_col=raw_sort_col,
+            sort_dir=raw_sort_dir,
         )
     except Exception as exc:
         logger.error("Hold history view failed: %s", exc)
@@ -328,6 +335,11 @@ def api_hold_history_today_snapshot():
     export_mode = bool(body.get('export'))
     per_page = max(1, min(per_page, 200))
 
+    raw_sort_col_snap = str(body.get('sort_col', '') or '').strip() or 'holdDate'
+    raw_sort_dir_snap = str(body.get('sort_dir', '') or '').strip().lower()
+    if raw_sort_dir_snap not in ('asc', 'desc'):
+        raw_sort_dir_snap = 'desc'
+
     try:
         result = execute_today_snapshot(
             snapshot_mode=raw_snapshot_mode,
@@ -338,6 +350,8 @@ def api_hold_history_today_snapshot():
             page=page,
             per_page=per_page,
             export_mode=export_mode,
+            sort_col=raw_sort_col_snap,
+            sort_dir=raw_sort_dir_snap,
         )
         return success_response(result)
     except (DatabaseCircuitOpenError, DatabasePoolExhaustedError) as exc:

@@ -37,6 +37,7 @@ interface Props {
   paginating?: boolean;
   exporting?: boolean;
   errorMessage?: string;
+  serverSort?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -46,12 +47,14 @@ const props = withDefaults(defineProps<Props>(), {
   paginating: false,
   exporting: false,
   errorMessage: '',
+  serverSort: false,
 });
 
 const emit = defineEmits<{
   'prev-page': [];
   'next-page': [];
   export: [];
+  sort: [payload: { key: string; direction: string }];
 }>();
 
 const pageSummary = computed(() => {
@@ -244,7 +247,9 @@ onUnmounted(() => {
           :data="(items as Record<string, unknown>[])"
           :loading="loading || paginating"
           :pagination="tablePagination"
+          :server-sort="serverSort"
           @page-change="handlePageChange"
+          @sort="emit('sort', $event)"
         >
           <DataTableColumn columnKey="lotId" label="Lot ID" :sortable="true" />
           <DataTableColumn columnKey="workorder" label="WorkOrder" :sortable="true" />

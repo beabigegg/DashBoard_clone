@@ -120,6 +120,8 @@ export interface ComputeViewParams {
   durationRange?: string | null;
   page?: number;
   perPage?: number;
+  sortCol?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -378,18 +380,40 @@ async function queryDuration(
 
 // ── Paginated list query ──────────────────────────────────────────────────────
 
+// Column whitelist: frontend camelCase → DuckDB column name
+const SORT_COL_WHITELIST: Record<string, string> = {
+  lotId: 'LOT_ID',
+  workorder: 'PJ_WORKORDER',
+  product: 'PRODUCTNAME',
+  package: 'PACKAGE',
+  workcenter: 'WORKCENTERNAME',
+  holdReason: 'HOLDREASONNAME',
+  qty: 'QTY',
+  holdDate: 'HOLDTXNDATE',
+  holdEmp: 'HOLDEMP',
+  holdComment: 'HOLDCOMMENTS',
+  releaseDate: 'RELEASETXNDATE',
+  releaseEmp: 'RELEASEEMP',
+  releaseComment: 'RELEASECOMMENTS',
+  holdHours: 'HOLD_HOURS',
+  ncr: 'NCRID',
+  futureHoldComment: 'FUTUREHOLDCOMMENTS',
+};
+
 interface QueryListParams {
   reason?: string | null;
   durationRange?: string | null;
   page: number;
   perPage: number;
   wcMapping: Record<string, string>;
+  sortCol?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 async function queryList(
   client: DuckDBClient,
   baseConditions: string[],
-  { reason, durationRange, page, perPage, wcMapping }: QueryListParams,
+  { reason, durationRange, page, perPage, wcMapping, sortCol, sortDir }: QueryListParams,
 ): Promise<ListResult> {
   const listConditions = [...baseConditions];
 
@@ -415,7 +439,7 @@ async function queryList(
         ${qid('RELEASECOMMENTS')}, ${qid('HOLD_HOURS')}, ${qid('NCRID')}, ${qid('FUTUREHOLDCOMMENTS')}
       FROM ${TABLE_NAME}
       ${where}
-      ORDER BY ${qid('HOLDTXNDATE')} DESC
+      ORDER BY ${qid(SORT_COL_WHITELIST[sortCol ?? ''] ?? 'HOLDTXNDATE')} ${(sortDir ?? 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC'}
       LIMIT ${pp} OFFSET ${offset}
     `),
   ]);
@@ -511,6 +535,8 @@ export function useHoldHistoryDuckDB() {
     durationRange = null,
     page = 1,
     perPage = 20,
+    sortCol,
+    sortDir,
   }: ComputeViewParams): Promise<ComputeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
 
@@ -530,6 +556,8 @@ export function useHoldHistoryDuckDB() {
         page,
         perPage,
         wcMapping: _wcMapping,
+        sortCol,
+        sortDir,
       }),
     ]);
 

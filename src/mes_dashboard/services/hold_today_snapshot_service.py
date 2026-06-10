@@ -125,8 +125,9 @@ def _format_datetime(value: Any) -> Optional[str]:
 
 
 def _cache_key(snapshot_mode: str, hold_type: str, record_type: str, reason: Optional[str],
-               duration_range: Optional[str], page: int, per_page: int) -> str:
-    parts = f'{snapshot_mode}:{hold_type}:{record_type}:{reason or ""}:{duration_range or ""}:{page}:{per_page}'
+               duration_range: Optional[str], page: int, per_page: int,
+               sort_col: Optional[str] = None, sort_dir: Optional[str] = None) -> str:
+    parts = f'{snapshot_mode}:{hold_type}:{record_type}:{reason or ""}:{duration_range or ""}:{page}:{per_page}:{sort_col or "holdDate"}:{sort_dir or "desc"}'
     digest = hashlib.md5(parts.encode()).hexdigest()[:12]
     return get_key(f'{_CACHE_NAMESPACE}:{digest}')
 
@@ -361,6 +362,26 @@ def _build_duration(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
+_SNAPSHOT_SORT_COL_MAP: Dict[str, str] = {
+    'lotId': 'LOT_ID',
+    'workorder': 'PJ_WORKORDER',
+    'product': 'PRODUCTNAME',
+    'package': 'PACKAGE',
+    'workcenter': 'WORKCENTERNAME',
+    'holdReason': 'HOLDREASONNAME',
+    'qty': 'QTY',
+    'holdDate': 'HOLDTXNDATE',
+    'holdEmp': 'HOLDEMP',
+    'holdComment': 'HOLDCOMMENTS',
+    'releaseDate': 'RELEASETXNDATE',
+    'releaseEmp': 'RELEASEEMP',
+    'releaseComment': 'RELEASECOMMENTS',
+    'holdHours': 'HOLD_HOURS',
+    'ncr': 'NCRID',
+    'futureHoldComment': 'FUTUREHOLDCOMMENTS',
+}
+
+
 def _build_list(df: pd.DataFrame, page: int, per_page: int) -> Dict[str, Any]:
     total = len(df)
     if per_page <= 0:
@@ -419,6 +440,8 @@ def execute_today_snapshot(
     page: int = 1,
     per_page: int = 50,
     export_mode: bool = False,
+    sort_col: str = 'holdDate',
+    sort_dir: str = 'desc',
 ) -> Dict[str, Any]:
     """Return a snapshot for 當日 or 現況 mode.
 
@@ -438,7 +461,7 @@ def execute_today_snapshot(
     else:
         per_page_eff = max(1, min(int(per_page or 50), 200))
     if not export_mode:
-        cache_key = _cache_key(sm, ht, record_type, reason, duration_range, page, per_page_eff)
+        cache_key = _cache_key(sm, ht, record_type, reason, duration_range, page, per_page_eff, sort_col, sort_dir)
         cached = _get_cache(cache_key)
         if cached is not None:
             return cached
@@ -461,6 +484,15 @@ def execute_today_snapshot(
 
     df_filtered = _apply_reason_filter(df_filtered, reason)
     df_filtered = _apply_duration_filter(df_filtered, duration_range)
+
+    # Apply server-side sort before pagination
+    _sort_pd_col = _SNAPSHOT_SORT_COL_MAP.get(sort_col or 'holdDate', 'HOLDTXNDATE')
+    if not df_filtered.empty and _sort_pd_col in df_filtered.columns:
+        df_filtered = df_filtered.sort_values(
+            by=_sort_pd_col,
+            ascending=(str(sort_dir or 'desc').lower() == 'asc'),
+            na_position='last',
+        )
 
     result: Dict[str, Any] = {
         'query_id': _make_query_id(sm, ht),

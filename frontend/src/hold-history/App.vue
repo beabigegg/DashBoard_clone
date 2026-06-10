@@ -67,6 +67,8 @@ const detailData = ref({
 });
 
 const page = ref(1);
+const sortCol = ref('holdDate');
+const sortDir = ref<'asc' | 'desc'>('desc');
 const initialLoading = ref(true);
 const paginationLoading = ref(false);
 const refreshSuccess = ref(false);
@@ -258,6 +260,8 @@ async function executeTodaySnapshot({ silent = false } = {}): Promise<void> {
       record_type: todayRecordType.value,
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
+      sort_col: sortCol.value,
+      sort_dir: sortDir.value,
     };
     if (committed.reasonFilter) body.reason = committed.reasonFilter;
     if (committed.durationFilter) body.duration_range = committed.durationFilter;
@@ -292,6 +296,8 @@ async function executeCurrentSnapshot({ silent = false } = {}): Promise<void> {
       record_type: currentRecordType.value,
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
+      sort_col: sortCol.value,
+      sort_dir: sortDir.value,
     };
     if (committed.reasonFilter) body.reason = committed.reasonFilter;
     if (committed.durationFilter) body.duration_range = committed.durationFilter;
@@ -405,6 +411,8 @@ async function refreshView({ listOnly = false } = {}): Promise<void> {
           durationRange: committed.durationFilter || null,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
+          sortCol: sortCol.value,
+          sortDir: sortDir.value,
         });
         applyViewResult(result as unknown as Record<string, unknown>, { listOnly });
         return;
@@ -420,6 +428,8 @@ async function refreshView({ listOnly = false } = {}): Promise<void> {
       record_type: recordTypeCsv(),
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
+      sort_col: sortCol.value,
+      sort_dir: sortDir.value,
     };
 
     if (committed.reasonFilter) params.reason = committed.reasonFilter;
@@ -467,6 +477,8 @@ async function refreshViewPage(): Promise<void> {
           durationRange: committed.durationFilter || null,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
+          sortCol: sortCol.value,
+          sortDir: sortDir.value,
         });
         detailData.value = normalizeListPayload(result.list as unknown as Record<string, unknown>);
         return;
@@ -482,6 +494,8 @@ async function refreshViewPage(): Promise<void> {
       record_type: recordTypeCsv(),
       page: page.value,
       per_page: DEFAULT_PER_PAGE,
+      sort_col: sortCol.value,
+      sort_dir: sortDir.value,
     };
 
     if (committed.reasonFilter) params.reason = committed.reasonFilter;
@@ -812,6 +826,20 @@ function clearDurationFilter() {
   }
 }
 
+function handleSort(payload: { key: string; direction: string }): void {
+  sortCol.value = payload.key;
+  sortDir.value = payload.direction as 'asc' | 'desc';
+  page.value = 1;
+  updateUrlState();
+  if (mode.value === 'today') {
+    void executeTodaySnapshot();
+  } else if (mode.value === 'current') {
+    void executeCurrentSnapshot();
+  } else {
+    void refreshViewPage();
+  }
+}
+
 function prevPage() {
   if (paginationLoading.value || page.value <= 1) return;
   page.value -= 1;
@@ -1088,9 +1116,11 @@ onMounted(async () => {
         :paginating="paginationLoading"
         :exporting="exportLoading"
         :error-message="errorMessage || todayError || currentError"
+        :server-sort="true"
         @prev-page="prevPage"
         @next-page="nextPage"
         @export="handleExport"
+        @sort="handleSort"
       />
     </div>
   </div>
