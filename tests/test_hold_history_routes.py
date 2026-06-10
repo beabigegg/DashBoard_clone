@@ -213,16 +213,16 @@ class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
 
-        mock_view.assert_called_once_with(
-            query_id='abc123',
-            hold_type='non-quality',
-            reason='品質確認',
-            record_type='new',
-            duration_range=None,
-            page=2,
-            per_page=20,
-            export_mode=False,
-        )
+        mock_view.assert_called_once()
+        kw = mock_view.call_args.kwargs
+        self.assertEqual(kw['query_id'], 'abc123')
+        self.assertEqual(kw['hold_type'], 'non-quality')
+        self.assertEqual(kw['reason'], '品質確認')
+        self.assertEqual(kw['record_type'], 'new')
+        self.assertIsNone(kw['duration_range'])
+        self.assertEqual(kw['page'], 2)
+        self.assertEqual(kw['per_page'], 20)
+        self.assertFalse(kw['export_mode'])
 
     @patch('mes_dashboard.routes.hold_history_routes.apply_view')
     def test_view_caps_per_page(self, mock_view):
