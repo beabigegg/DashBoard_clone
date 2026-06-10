@@ -1,0 +1,17 @@
+change-id: resource-history-cache-fix
+agent: test-strategist
+timestamp: "2026-06-10T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/resource-history-cache-fix/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_resource_dataset_cache.py ↔ src/mes_dashboard/services/resource_dataset_cache.py" }
+  - { type: tdd-pairs, pointer: "tests/test_resource_history_sql_runtime.py ↔ src/mes_dashboard/services/resource_history_sql_runtime.py" }
+  - { type: tdd-pairs, pointer: "tests/test_env_contract.py ↔ src/mes_dashboard/services/resource_dataset_cache.py (RESOURCE_VIEW_CACHE_TTL constant)" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1), integration (Tier 1), resilience (Tier 0)" }
+  - { type: mapping-completeness, pointer: "all AC-1 through AC-8 covered; env-default contract test added for RESOURCE_VIEW_CACHE_TTL=300" }
+next-action: none
+notes: >
+  5 tests must fail before implementation (TDD anchors listed in plan).
+  Existing test_resource_cache_version_check.py::test_refresh_cache_always_fetches_when_version_differs
+  is a regression guard — no new test needed there, just verify it still passes.
+  Route error-swallow removal (D3) covered by extending existing test_query_bootstrap_render_failure_returns_500.

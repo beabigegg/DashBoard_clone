@@ -1,0 +1,14 @@
+change-id: resource-history-cache-fix
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-10T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 2" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow changes required; existing backend-tests.yml and contract-driven-gates.yml are sufficient)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, contract-and-fast-tests" }
+next-action: none
+notes: >
+  RESOURCE_VIEW_CACHE_TTL has a safe default (300); no CI env injection needed.
+  Post-deploy and post-rollback parquet cleanup commands documented in Rollback Policy.
+  real-infra-smoke retained as Tier 2 informational (existing policy from backend-tests.yml).

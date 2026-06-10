@@ -4,9 +4,9 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 176
-visible-files: 857
+visible-files: 796
 omitted-dirs: 60
-truncated-dirs: 5
+truncated-dirs: 3
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -160,7 +160,8 @@ DashBoard_vite/
 |   |   |-- 0001-material-consumption-summary-spool-granularity-key.md
 |   |   |-- 0002-downtime-analysis-spool-namespace.md
 |   |   |-- 0003-downtime-rowcount-chunking-exclusion.md
-|   |   \-- 0004-gunicorn-preload-app-fork-safety.md
+|   |   |-- 0004-gunicorn-preload-app-fork-safety.md
+|   |   \-- 0005-resource-history-canonical-spool-key.md
 |   |-- migration/
 |   |   |-- full-modernization-architecture-blueprint/
 |   |   |   |-- asset_readiness_manifest.json
@@ -562,57 +563,32 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260609_102547.log
-|   |   |-- access_20260609_104020.log
-|   |   |-- access_20260609_104943.log
-|   |   |-- access_20260609_110615.log
-|   |   |-- access_20260609_114448.log
-|   |   |-- access_20260609_124200.log
-|   |   |-- access_20260609_131727.log
-|   |   |-- access_20260609_135315.log
-|   |   |-- access_20260609_135628.log
-|   |   |-- access_20260609_162725.log
-|   |   |-- error_20260609_105105.log
-|   |   |-- error_20260609_105747.log
-|   |   |-- error_20260609_110615.log
-|   |   |-- error_20260609_114448.log
-|   |   |-- error_20260609_114633.log
-|   |   |-- error_20260609_124200.log
-|   |   |-- error_20260609_131727.log
-|   |   |-- error_20260609_135315.log
-|   |   |-- error_20260609_135628.log
-|   |   |-- error_20260609_162725.log
-|   |   |-- rq_msd_worker_20260609_105105.log
-|   |   |-- rq_msd_worker_20260609_105747.log
-|   |   |-- rq_msd_worker_20260609_110615.log
-|   |   |-- rq_msd_worker_20260609_114448.log
-|   |   |-- rq_msd_worker_20260609_114633.log
-|   |   |-- rq_msd_worker_20260609_124200.log
-|   |   |-- rq_msd_worker_20260609_131727.log
-|   |   |-- rq_msd_worker_20260609_135315.log
-|   |   |-- rq_msd_worker_20260609_135628.log
-|   |   |-- rq_msd_worker_20260609_162725.log
-|   |   |-- rq_prod_hist_worker_20260609_105105.log
-|   |   |-- rq_prod_hist_worker_20260609_105747.log
-|   |   |-- rq_prod_hist_worker_20260609_110615.log
-|   |   |-- rq_prod_hist_worker_20260609_114448.log
-|   |   |-- rq_prod_hist_worker_20260609_114633.log
-|   |   |-- rq_prod_hist_worker_20260609_124200.log
-|   |   |-- rq_prod_hist_worker_20260609_131727.log
-|   |   |-- rq_prod_hist_worker_20260609_135315.log
-|   |   |-- rq_prod_hist_worker_20260609_135628.log
-|   |   |-- rq_prod_hist_worker_20260609_162725.log
-|   |   |-- rq_reject_worker_20260609_105105.log
-|   |   |-- rq_reject_worker_20260609_105747.log
-|   |   |-- rq_reject_worker_20260609_110615.log
-|   |   |-- rq_reject_worker_20260609_114448.log
-|   |   |-- rq_reject_worker_20260609_114633.log
-|   |   |-- rq_reject_worker_20260609_124200.log
-|   |   |-- rq_reject_worker_20260609_131727.log
-|   |   |-- rq_reject_worker_20260609_135315.log
-|   |   |-- rq_reject_worker_20260609_135628.log
-|   |   |-- rq_reject_worker_20260609_162725.log
-|   |   \-- ... (40 more entries truncated; cap=50)
+|   |   |-- access_20260610_170524.log
+|   |   |-- access_20260610_172242.log
+|   |   |-- error_20260610_122615.log
+|   |   |-- error_20260610_170524.log
+|   |   |-- error_20260610_172242.log
+|   |   |-- rq_msd_worker_20260610_122615.log
+|   |   |-- rq_msd_worker_20260610_170524.log
+|   |   |-- rq_msd_worker_20260610_172242.log
+|   |   |-- rq_prod_hist_worker_20260610_122615.log
+|   |   |-- rq_prod_hist_worker_20260610_170524.log
+|   |   |-- rq_prod_hist_worker_20260610_172242.log
+|   |   |-- rq_reject_worker_20260610_122615.log
+|   |   |-- rq_reject_worker_20260610_170524.log
+|   |   |-- rq_reject_worker_20260610_172242.log
+|   |   |-- rq_warmup_worker_20260610_122615.log
+|   |   |-- rq_warmup_worker_20260610_170524.log
+|   |   |-- rq_warmup_worker_20260610_172242.log
+|   |   |-- rq_worker_20260610_122615.log
+|   |   |-- rq_worker_20260610_170524.log
+|   |   |-- rq_worker_20260610_172242.log
+|   |   |-- rq_yield_alert_worker_20260610_122615.log
+|   |   |-- rq_yield_alert_worker_20260610_170524.log
+|   |   |-- rq_yield_alert_worker_20260610_172242.log
+|   |   |-- watchdog_20260610_122615.log
+|   |   |-- watchdog_20260610_170524.log
+|   |   \-- watchdog_20260610_172242.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1034,64 +1010,25 @@ DashBoard_vite/
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- downtime_analysis_events/
-|   |   |   \-- 3988694961c6cf38.parquet
+|   |   |   |-- 1e369d9681d9fee2.parquet
+|   |   |   \-- fde3d45577db72fa.parquet
 |   |   |-- hold_dataset/
-|   |   |   \-- 7fd73b382ffa7f1a.parquet
+|   |   |   \-- 0fff9d37f176e65b.parquet
 |   |   |-- reject_dataset/
-|   |   |   \-- 4a852d187ea51a2e.parquet
+|   |   |   \-- 6dc6bdd16b5bba1b.parquet
 |   |   |-- resource_dataset/
-|   |   |   |-- 48284f41b8866512.parquet
-|   |   |   |-- b42069ee2c991376.parquet
-|   |   |   \-- ed3f090bc1b044e8.parquet
+|   |   |   |-- 3a4a6e62fb852a85.parquet
+|   |   |   |-- 704e8c899af238e4.parquet
+|   |   |   \-- d22a0e51d194c7ac.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- 48284f41b8866512.parquet
-|   |   |   |-- b42069ee2c991376.parquet
-|   |   |   \-- ed3f090bc1b044e8.parquet
+|   |   |   |-- 704e8c899af238e4.parquet
+|   |   |   |-- a9c3dd3d349ed35e.parquet
+|   |   |   \-- d22a0e51d194c7ac.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- 478230f8ec3a5718.parquet
-|   |   |-- probe_100077.json
-|   |   |-- probe_100130.json
-|   |   |-- probe_100921.json
-|   |   |-- probe_100922.json
-|   |   |-- probe_102819.json
-|   |   |-- probe_102820.json
-|   |   |-- probe_103949.json
-|   |   |-- probe_103950.json
-|   |   |-- probe_104066.json
-|   |   |-- probe_104103.json
-|   |   |-- probe_104148.json
-|   |   |-- probe_104219.json
-|   |   |-- probe_104755.json
-|   |   |-- probe_104756.json
-|   |   |-- probe_105427.json
-|   |   |-- probe_105796.json
-|   |   |-- probe_105797.json
-|   |   |-- probe_107068.json
-|   |   |-- probe_107069.json
-|   |   |-- probe_107450.json
-|   |   |-- probe_107453.json
-|   |   |-- probe_107593.json
-|   |   |-- probe_108245.json
-|   |   |-- probe_108246.json
-|   |   |-- probe_108255.json
-|   |   |-- probe_108256.json
-|   |   |-- probe_109089.json
-|   |   |-- probe_109090.json
-|   |   |-- probe_109468.json
-|   |   |-- probe_109469.json
-|   |   |-- probe_109596.json
-|   |   |-- probe_109597.json
-|   |   |-- probe_10985.json
-|   |   |-- probe_10990.json
-|   |   |-- probe_110595.json
-|   |   |-- probe_110745.json
-|   |   |-- probe_110747.json
-|   |   |-- probe_112201.json
-|   |   |-- probe_112498.json
-|   |   |-- probe_112650.json
-|   |   \-- ... (848 more entries truncated; cap=50)
+|   |   |   \-- f71b80f006c3da13.parquet
+|   |   |-- probe_50079.json
+|   |   \-- probe_52537.json
 |   |-- gunicorn.pid
-|   |-- mes_dashboard_restart_state.json
 |   |-- resource_history.duckdb
 |   |-- rq_msd_worker.pid
 |   |-- rq_prod_hist_worker.pid

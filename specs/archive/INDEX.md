@@ -46,3 +46,4 @@
 | downtime-analysis-page-redesign | 2026 | 2026-06-03 | specs/archive/2026/downtime-analysis-page-redesign/ |
 | gunicorn-preload-workers | 2026 | 2026-06-05 | specs/archive/2026/gunicorn-preload-workers/ |
 | resource-status-cross-filter | 2026 | 2026-06-09 | specs/archive/2026/resource-status-cross-filter/ |
+| resource-history-cache-fix | 2026 | 2026-06-10 | specs/archive/2026/resource-history-cache-fix/ |

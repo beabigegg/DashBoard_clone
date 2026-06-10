@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0005-resource-history-canonical-spool-key.md" }
+  - { type: affected-areas, pointer: "resource-history caching, warmup, spool key strategy" }
+  - { type: decision-summary, pointer: "canonical spool key = date-range only; remove granularity+filters; warmup writes canonical key; remove except-pass swallow" }
+  - { type: risks-noted, pointer: "3 medium, 0 high" }

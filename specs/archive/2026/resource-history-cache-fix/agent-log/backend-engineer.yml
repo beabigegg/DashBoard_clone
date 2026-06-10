@@ -1,0 +1,52 @@
+agent: backend-engineer
+change-id: resource-history-cache-fix
+timestamp: 2026-06-10T00:00:00Z
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_dataset_cache.py:36-46 (IP-1: +_RESOURCE_VIEW_CACHE_TTL, +_view_result_cache; IP-1: schema version 1→2; IP-2: +_query_and_store_canonical_dataset, rewired ensure_dataset_loaded; IP-3: empty-filter co-write in direct path; IP-6: view-result cache in apply_view)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_dataset_cache.py:635-761 (canonical key builders: granularity removed from make_canonical_base_query_id + make_canonical_oee_query_id)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_history_sql_runtime.py:706,716 (IP-4: granularity arg removed from canonical key lookup calls)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/resource_history_routes.py:198-231 (IP-5: removed inner try/except Exception: pass swallow around canonical path)"
+  - type: files-changed
+    pointer: "contracts/env/env-contract.md:6,86 (IP-7: schema-version 1.0.4→1.0.5; added RESOURCE_VIEW_CACHE_TTL row+prose)"
+  - type: files-changed
+    pointer: "contracts/env/env.schema.json (IP-7: added RESOURCE_VIEW_CACHE_TTL property)"
+  - type: files-changed
+    pointer: "contracts/CHANGELOG.md (IP-7: ## [env 1.0.5], IP-9: ## [business 1.15.0])"
+  - type: files-changed
+    pointer: "contracts/business/business-rules.md:121 (IP-9: added RH-05 + RH-06; bumped schema-version 1.14.0→1.15.0)"
+  - type: tests-added
+    pointer: "tests/test_resource_dataset_cache.py::TestCanonicalKeyParity::{test_ensure_dataset_loaded_writes_canonical_key,test_execute_primary_query_empty_filter_co_writes_canonical_key,test_empty_filter_detection_non_empty_does_not_co_write}"
+  - type: tests-added
+    pointer: "tests/test_resource_dataset_cache.py::TestCanonicalSpoolHit::test_ensure_dataset_loaded_produces_canonical_hit"
+  - type: tests-added
+    pointer: "tests/test_resource_dataset_cache.py::TestWarmCacheFilterSwitch::test_filter_switch_on_warm_cache_no_oracle_call"
+  - type: tests-added
+    pointer: "tests/test_resource_dataset_cache.py::TestSchemaVersionInvalidation::test_schema_version_bump_invalidates_stale_spool"
+  - type: tests-added
+    pointer: "tests/test_resource_dataset_cache.py::{TestRedisDownFallback,TestStaleParquetFallback,TestOracleFallbackPath}"
+  - type: tests-added
+    pointer: "tests/test_resource_dataset_cache.py::TestViewResultCache::{test_apply_view_result_cached_within_ttl,test_apply_view_result_recomputed_after_ttl_expiry,test_resource_view_cache_ttl_zero_disables_cache,test_apply_view_caches_all_six_structures_atomically}"
+  - type: tests-added
+    pointer: "tests/test_resource_history_sql_runtime.py::TestCanonicalKeyGranularity::{test_day_week_month_year_produce_identical_canonical_key,test_canonical_key_excludes_granularity}"
+  - type: tests-added
+    pointer: "tests/test_env_contract.py::TestResourceViewCacheTTLDefault::{test_resource_view_cache_ttl_default_equals_300,test_resource_view_cache_ttl_documented_in_contract}"
+  - type: test-output
+    pointer: "114 passed (gate: tests/test_resource_dataset_cache.py + test_resource_cache_version_check.py + test_resource_history_routes.py + test_resource_history_sql_runtime.py + test_resource_cache.py)"
+  - type: test-output
+    pointer: "12 passed (gate: tests/test_env_contract.py)"
+  - type: test-output
+    pointer: "cdd-kit validate: All validations passed"
+  - type: contracts-touched
+    pointer: "contracts/env/env-contract.md (schema-version 1.0.4→1.0.5; RESOURCE_VIEW_CACHE_TTL added)"
+  - type: contracts-touched
+    pointer: "contracts/env/env.schema.json (RESOURCE_VIEW_CACHE_TTL property added)"
+  - type: contracts-touched
+    pointer: "contracts/CHANGELOG.md (## [env 1.0.5], ## [business 1.15.0] entries added)"
+  - type: contracts-touched
+    pointer: "contracts/business/business-rules.md (schema-version 1.14.0→1.15.0; RH-05, RH-06 added)"
