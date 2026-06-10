@@ -65,14 +65,16 @@ class TestShouldUseDuckdb:
 
 class TestQueryFunctionsWhenNotReady:
     def test_query_base_returns_empty_when_not_ready(self):
-        from mes_dashboard.services.downtime_analysis_duckdb_cache import query_base_from_duckdb
-        df = query_base_from_duckdb("2026-01-01", "2026-03-31")
-        assert df.empty
+        from mes_dashboard.services import downtime_analysis_duckdb_cache as m
+        with patch.object(m, "_duckdb_ready", False):
+            df = m.query_base_from_duckdb("2026-01-01", "2026-03-31")
+            assert df.empty
 
     def test_query_job_returns_empty_when_not_ready(self):
-        from mes_dashboard.services.downtime_analysis_duckdb_cache import query_job_from_duckdb
-        df = query_job_from_duckdb("2026-01-01", "2026-03-31")
-        assert df.empty
+        from mes_dashboard.services import downtime_analysis_duckdb_cache as m
+        with patch.object(m, "_duckdb_ready", False):
+            df = m.query_job_from_duckdb("2026-01-01", "2026-03-31")
+            assert df.empty
 
 
 class TestStartDuckdbPrewarm:

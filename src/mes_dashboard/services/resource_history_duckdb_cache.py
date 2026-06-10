@@ -113,7 +113,14 @@ def should_use_duckdb(end_date: str, start_date: Optional[str] = None) -> bool:
     the cache window means DuckDB can only return partial data, so Oracle is used.
     """
     if not _duckdb_ready:
-        return False
+        # Lazy worker init: threads don't survive gunicorn preload_app fork, so
+        # _duckdb_ready is always False in forked workers.  Once the master's
+        # prewarm thread writes the file, the first request to each worker
+        # discovers it here and marks this worker ready.
+        if _DUCKDB_PATH.exists():
+            _try_reuse_existing()
+        if not _duckdb_ready:
+            return False
     try:
         ed = date.fromisoformat(end_date)
         cache_start, cache_end, _, _ = _prewarm_dates()

@@ -95,7 +95,14 @@ def should_use_duckdb(end_date: str, start_date: Optional[str] = None) -> bool:
     Queries older than the window fall back to Oracle.
     """
     if not _duckdb_ready:
-        return False
+        # Lazy worker init: threads don't survive gunicorn preload_app fork, so
+        # _duckdb_ready is always False in forked workers.  Once the master's
+        # prewarm thread writes the file, the first request to each worker
+        # discovers it here and marks this worker ready.
+        if _DUCKDB_PATH.exists():
+            _try_reuse_existing()
+        if not _duckdb_ready:
+            return False
     try:
         ed = date.fromisoformat(end_date)
         cache_start, cache_end = _prewarm_dates()

@@ -48,14 +48,16 @@ class TestShouldUseDuckdb:
 
 class TestQueryFunctionsWhenNotReady:
     def test_query_base_returns_empty_when_not_ready(self):
-        from mes_dashboard.services.resource_history_duckdb_cache import query_base_from_duckdb
-        df = query_base_from_duckdb(["RES001"], "2026-01-01", "2026-03-31")
-        assert df.empty
+        from mes_dashboard.services import resource_history_duckdb_cache as m
+        with patch.object(m, "_duckdb_ready", False):
+            df = m.query_base_from_duckdb(["RES001"], "2026-01-01", "2026-03-31")
+            assert df.empty
 
     def test_query_oee_returns_empty_when_not_ready(self):
-        from mes_dashboard.services.resource_history_duckdb_cache import query_oee_from_duckdb
-        df = query_oee_from_duckdb("2026-01-01", "2026-03-31")
-        assert df.empty
+        from mes_dashboard.services import resource_history_duckdb_cache as m
+        with patch.object(m, "_duckdb_ready", False):
+            df = m.query_oee_from_duckdb("2026-01-01", "2026-03-31")
+            assert df.empty
 
     def test_query_base_returns_empty_for_empty_hist_ids(self):
         from mes_dashboard.services import resource_history_duckdb_cache as m
