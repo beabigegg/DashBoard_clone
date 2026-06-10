@@ -131,6 +131,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: theme('spacing.token.p14');
 }
 
 /*
