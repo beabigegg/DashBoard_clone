@@ -93,7 +93,7 @@ function handleStatusCardClick(status: string): void {
       format="number"
       accent="neutral"
     >
-      <template #sub>邏輯事件 (次)</template>
+      <template #sub>次</template>
     </SummaryCard>
 
     <SummaryCard

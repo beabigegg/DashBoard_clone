@@ -411,26 +411,26 @@ class TestBigCategoryMapping:
     def test_pd_pm_maps_to_保養(self):
         assert _map_big_category('PD_PM', 'SDT') == '保養'
 
-    def test_change_type_maps_to_換型換線(self):
-        assert _map_big_category('Change Type', 'SDT') == '換型換線'
+    def test_change_type_maps_to_改機換料(self):
+        assert _map_big_category('Change Type', 'SDT') == '改機換料'
 
-    def test_change_package_maps_to_換型換線(self):
-        assert _map_big_category('Change Package', 'SDT') == '換型換線'
+    def test_change_package_maps_to_改機換料(self):
+        assert _map_big_category('Change Package', 'SDT') == '改機換料'
 
-    def test_re_layout_maps_to_換型換線(self):
-        assert _map_big_category('Re Layout', 'SDT') == '換型換線'
+    def test_re_layout_maps_to_改機換料(self):
+        assert _map_big_category('Re Layout', 'SDT') == '改機換料'
 
-    def test_change_marking_code_maps_to_換型換線(self):
-        assert _map_big_category('Change Marking Code', 'SDT') == '換型換線'
+    def test_change_marking_code_maps_to_改機換料(self):
+        assert _map_big_category('Change Marking Code', 'SDT') == '改機換料'
 
-    def test_change_model_maps_to_換型換線(self):
-        assert _map_big_category('Change Model', 'SDT') == '換型換線'
+    def test_change_model_maps_to_改機換料(self):
+        assert _map_big_category('Change Model', 'SDT') == '改機換料'
 
-    def test_change_tool_maps_to_換刀清模(self):
-        assert _map_big_category('Change Tool/Consumables', 'SDT') == '換刀清模'
+    def test_change_tool_maps_to_治工具更換與模具清潔(self):
+        assert _map_big_category('Change Tool/Consumables', 'SDT') == '治工具更換與模具清潔'
 
-    def test_clean_mold_maps_to_換刀清模(self):
-        assert _map_big_category('Clean Mold', 'SDT') == '換刀清模'
+    def test_clean_mold_maps_to_治工具更換與模具清潔(self):
+        assert _map_big_category('Clean Mold', 'SDT') == '治工具更換與模具清潔'
 
     def test_qc_inspection_maps_to_檢查(self):
         assert _map_big_category('Prod_QC_Inspection', 'SDT') == '檢查'
@@ -483,7 +483,7 @@ class TestBigCategoryMapping:
         categories = set(_BIG_CATEGORY_MAP.values())
         # EGT → 工程 is handled by status check, not the map
         # Map covers: 維修, 保養, 換型換線, 換刀清模, 檢查, 待料待指示
-        for cat in ('維修', '保養', '換型換線', '換刀清模', '檢查', '待料待指示'):
+        for cat in ('維修', '保養', '改機換料', '治工具更換與模具清潔', '檢查', '待料待指示'):
             assert cat in categories, f"Category '{cat}' missing from _BIG_CATEGORY_MAP"
 
 

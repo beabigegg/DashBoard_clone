@@ -36,13 +36,13 @@ _BIG_CATEGORY_MAP: Dict[str, str] = {
     'EE_PM': '保養',
     'MF_PM': '保養',
     'PD_PM': '保養',
-    'Change Type': '換型換線',
-    'Change Package': '換型換線',
-    'Re Layout': '換型換線',
-    'Change Marking Code': '換型換線',
-    'Change Model': '換型換線',
-    'Change Tool/Consumables': '換刀清模',
-    'Clean Mold': '換刀清模',
+    'Change Type': '改機換料',
+    'Change Package': '改機換料',
+    'Re Layout': '改機換料',
+    'Change Marking Code': '改機換料',
+    'Change Model': '改機換料',
+    'Change Tool/Consumables': '治工具更換與模具清潔',
+    'Clean Mold': '治工具更換與模具清潔',
     'Prod_QC_Inspection': '檢查',
     'Prod_PD_inspection': '檢查',
     'Wait For Instructions': '待料待指示',
@@ -525,7 +525,7 @@ def get_filter_options(
         })
 
         # Big categories and reasons from taxonomy
-        big_cats = ['維修', '保養', '換型換線', '換刀清模', '檢查', '待料待指示', '工程', '其他/未分類']
+        big_cats = ['維修', '保養', '改機換料', '治工具更換與模具清潔', '檢查', '待料待指示', '工程', '其他/未分類']
         reasons = sorted(_BIG_CATEGORY_MAP.keys())
 
         return {
