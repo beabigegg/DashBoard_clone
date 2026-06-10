@@ -205,12 +205,6 @@ onMounted(() => {
 <template>
   <div class="theme-downtime-analysis">
     <div class="dashboard">
-      <!-- Page header -->
-      <header class="header-gradient downtime-header">
-        <h1>設備停機分析</h1>
-        <p class="header-subtitle">停機時數 UDT / SDT / EGT 趨勢 · 大類別分析 · 原因排行 · 設備明細 · 事件詳情</p>
-      </header>
-
       <!-- Filter bar -->
       <FilterBar
         :state="draftFilters"
@@ -224,8 +218,14 @@ onMounted(() => {
       <!-- Error banner -->
       <ErrorBanner :message="error" :dismissible="false" />
 
-      <!-- KPI cards -->
-      <KpiCards :summary="summaryData.summary" />
+      <!-- KPI cards (clickable: UDT/SDT/EGT toggle chart cross-filter) -->
+      <div class="kpi-section">
+        <KpiCards
+          :summary="summaryData.summary"
+          :selected-status-types="chartFilter.status_types"
+          @click-status="handleStatusClick"
+        />
+      </div>
 
       <!-- Charts section -->
       <div class="section-card">

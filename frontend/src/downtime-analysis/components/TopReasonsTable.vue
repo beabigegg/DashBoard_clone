@@ -18,6 +18,7 @@ defineProps<{
           <tr>
             <th scope="col">#</th>
             <th scope="col">停機原因</th>
+            <th scope="col">停機類別</th>
             <th scope="col">狀態</th>
             <th scope="col">時數 (h)</th>
             <th scope="col">事件數</th>
@@ -28,6 +29,10 @@ defineProps<{
           <tr v-for="(row, idx) in rows" :key="row.reason + row.status">
             <td>{{ idx + 1 }}</td>
             <td>{{ row.reason || '(未填寫)' }}</td>
+            <td>
+              <span v-if="row.big_category" class="category-tag">{{ row.big_category }}</span>
+              <span v-else class="category-tag category-tag--empty">—</span>
+            </td>
             <td>
               <span class="status-badge" :class="`status-${row.status.toLowerCase()}`">
                 {{ row.status }}

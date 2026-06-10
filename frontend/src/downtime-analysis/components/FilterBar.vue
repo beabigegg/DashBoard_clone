@@ -10,23 +10,16 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  /** Emitted only when the user clicks the "查詢" submit button. */
   (e: 'filter-change', state: FilterState): void;
-  /** Emitted for any intermediate state change (date, dropdown, granularity) — does NOT trigger a query. */
   (e: 'update-state', patch: Partial<FilterState>): void;
   (e: 'clear'): void;
 }>();
 
 const MAX_QUERY_DAYS = 730;
-
 const dateError = ref('');
 
-const STATUS_TYPE_OPTIONS: string[] = ['UDT', 'SDT', 'EGT'];
-
 function validateDates(): string {
-  if (!props.state.start_date || !props.state.end_date) {
-    return '請先設定開始與結束日期';
-  }
+  if (!props.state.start_date || !props.state.end_date) return '請先設定開始與結束日期';
   const start = new Date(props.state.start_date);
   const end = new Date(props.state.end_date);
   const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
@@ -37,10 +30,7 @@ function validateDates(): string {
 
 function handleSubmit(): void {
   const err = validateDates();
-  if (err) {
-    dateError.value = err;
-    return;
-  }
+  if (err) { dateError.value = err; return; }
   dateError.value = '';
   emit('filter-change', { ...props.state });
 }
@@ -50,19 +40,14 @@ function handleClear(): void {
   emit('clear');
 }
 
-/** Fix 2: date inputs only update draft state — no query fired. */
 function handleStartDate(e: Event): void {
-  const val = (e.target as HTMLInputElement).value;
-  emit('update-state', { start_date: val });
+  emit('update-state', { start_date: (e.target as HTMLInputElement).value });
 }
 
-/** Fix 2: date inputs only update draft state — no query fired. */
 function handleEndDate(e: Event): void {
-  const val = (e.target as HTMLInputElement).value;
-  emit('update-state', { end_date: val });
+  emit('update-state', { end_date: (e.target as HTMLInputElement).value });
 }
 
-/** Granularity change updates draft state only; query fires on submit. */
 function handleGranularity(g: string): void {
   emit('update-state', { granularity: g });
 }
@@ -77,157 +62,152 @@ const isDisabled = computed(() => props.loading);
 </script>
 
 <template>
-  <div class="downtime-filter-bar">
-    <div class="filter-row">
-      <!-- Date range -->
-      <div class="filter-field">
-        <label for="downtime-start-date">開始日期</label>
-        <input
-          id="downtime-start-date"
-          type="date"
-          :value="state.start_date"
-          :disabled="isDisabled"
-          aria-label="開始日期"
-          @change="handleStartDate"
-        />
-      </div>
-      <div class="filter-field">
-        <label for="downtime-end-date">結束日期</label>
-        <input
-          id="downtime-end-date"
-          type="date"
-          :value="state.end_date"
-          :disabled="isDisabled"
-          aria-label="結束日期"
-          @change="handleEndDate"
-        />
+  <section class="section-card">
+    <div class="section-inner filter-rows">
+      <!-- Row 1: 日期區間 & 粒度 -->
+      <div class="filter-row">
+        <div class="filter-field">
+          <label for="downtime-start-date">開始日期</label>
+          <input
+            id="downtime-start-date"
+            type="date"
+            :value="state.start_date"
+            :disabled="isDisabled"
+            aria-label="開始日期"
+            @change="handleStartDate"
+          />
+        </div>
+        <div class="filter-field">
+          <label for="downtime-end-date">結束日期</label>
+          <input
+            id="downtime-end-date"
+            type="date"
+            :value="state.end_date"
+            :disabled="isDisabled"
+            aria-label="結束日期"
+            @change="handleEndDate"
+          />
+        </div>
+        <div class="filter-field">
+          <label>時間粒度</label>
+          <div class="granularity-btns" role="group" aria-label="時間粒度">
+            <button
+              v-for="g in granularityOptions"
+              :key="g.value"
+              type="button"
+              class="granularity-btn"
+              :class="{ active: state.granularity === g.value }"
+              :aria-pressed="state.granularity === g.value"
+              :disabled="isDisabled"
+              @click="handleGranularity(g.value)"
+            >
+              {{ g.label }}
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Granularity -->
-      <div class="filter-field">
-        <label>時間粒度</label>
-        <div class="granularity-btns" role="group" aria-label="時間粒度">
-          <button
-            v-for="g in granularityOptions"
-            :key="g.value"
-            type="button"
-            class="granularity-btn"
-            :class="{ active: state.granularity === g.value }"
-            :aria-pressed="state.granularity === g.value"
+      <!-- Row 2: 工站群組 & 型號 & 機台 & 封裝群組 -->
+      <div class="filter-row">
+        <div class="filter-field">
+          <label>工站群組</label>
+          <MultiSelect
+            :model-value="state.workcenter_groups"
+            :options="options.workcenter_groups"
             :disabled="isDisabled"
-            @click="handleGranularity(g.value)"
+            placeholder="全部站點"
+            @update:model-value="emit('update-state', { workcenter_groups: $event })"
+          />
+        </div>
+        <div class="filter-field">
+          <label>設備型號</label>
+          <MultiSelect
+            :model-value="state.families"
+            :options="options.families"
+            :disabled="isDisabled"
+            placeholder="全部型號"
+            @update:model-value="emit('update-state', { families: $event })"
+          />
+        </div>
+        <div class="filter-field">
+          <label>設備</label>
+          <MultiSelect
+            :model-value="state.resource_ids"
+            :options="options.resources"
+            :disabled="isDisabled"
+            placeholder="全部設備"
+            searchable
+            @update:model-value="emit('update-state', { resource_ids: $event })"
+          />
+        </div>
+        <div class="filter-field">
+          <label>封裝群組</label>
+          <MultiSelect
+            :model-value="state.package_groups"
+            :options="options.package_groups"
+            :disabled="isDisabled"
+            placeholder="全部封裝群組"
+            @update:model-value="emit('update-state', { package_groups: $event })"
+          />
+        </div>
+      </div>
+
+      <!-- Row 3: 設備類型 checkboxes + 查詢/清除 -->
+      <div class="filter-row">
+        <div class="checkbox-row">
+          <label class="checkbox-pill">
+            <input
+              type="checkbox"
+              :checked="state.is_production"
+              :disabled="isDisabled"
+              @change="emit('update-state', { is_production: ($event.target as HTMLInputElement).checked })"
+            />
+            生產設備
+          </label>
+          <label class="checkbox-pill">
+            <input
+              type="checkbox"
+              :checked="state.is_key"
+              :disabled="isDisabled"
+              @change="emit('update-state', { is_key: ($event.target as HTMLInputElement).checked })"
+            />
+            重點設備
+          </label>
+          <label class="checkbox-pill">
+            <input
+              type="checkbox"
+              :checked="state.is_monitor"
+              :disabled="isDisabled"
+              @change="emit('update-state', { is_monitor: ($event.target as HTMLInputElement).checked })"
+            />
+            監控設備
+          </label>
+        </div>
+        <div class="filter-actions">
+          <button
+            type="button"
+            class="ui-btn ui-btn--primary"
+            :disabled="isDisabled"
+            aria-label="查詢"
+            @click="handleSubmit"
           >
-            {{ g.label }}
+            {{ loading ? '查詢中...' : '查詢' }}
+          </button>
+          <button
+            type="button"
+            class="ui-btn ui-btn--ghost"
+            :disabled="isDisabled"
+            aria-label="清除篩選"
+            @click="handleClear"
+          >
+            清除條件
           </button>
         </div>
       </div>
 
-      <!-- Fix 1: Workcenter Groups MultiSelect -->
-      <div class="filter-field">
-        <label>工站群組</label>
-        <MultiSelect
-          :model-value="state.workcenter_groups"
-          :options="options.workcenter_groups"
-          :disabled="isDisabled"
-          placeholder="全部站點"
-          @update:model-value="emit('update-state', { workcenter_groups: $event })"
-        />
-      </div>
-
-      <!-- Fix 1: Equipment Family MultiSelect -->
-      <div class="filter-field">
-        <label>設備型號</label>
-        <MultiSelect
-          :model-value="state.families"
-          :options="options.families"
-          :disabled="isDisabled"
-          placeholder="全部型號"
-          @update:model-value="emit('update-state', { families: $event })"
-        />
-      </div>
-
-      <!-- Fix 1: Equipment (Resource) MultiSelect -->
-      <div class="filter-field">
-        <label>設備</label>
-        <MultiSelect
-          :model-value="state.resource_ids"
-          :options="options.resources"
-          :disabled="isDisabled"
-          placeholder="全部設備"
-          searchable
-          @update:model-value="emit('update-state', { resource_ids: $event })"
-        />
-      </div>
-
-      <!-- Fix 1: Status Type MultiSelect (UDT / SDT / EGT) -->
-      <div class="filter-field">
-        <label>停機類型</label>
-        <MultiSelect
-          :model-value="state.status_types"
-          :options="STATUS_TYPE_OPTIONS"
-          :disabled="isDisabled"
-          placeholder="全部類型"
-          @update:model-value="emit('update-state', { status_types: $event })"
-        />
-      </div>
-
-      <!-- Equipment type checkboxes -->
-      <div class="checkbox-row">
-        <label class="checkbox-pill">
-          <input
-            type="checkbox"
-            :checked="state.is_production"
-            :disabled="isDisabled"
-            @change="emit('update-state', { is_production: ($event.target as HTMLInputElement).checked })"
-          />
-          生產設備
-        </label>
-        <label class="checkbox-pill">
-          <input
-            type="checkbox"
-            :checked="state.is_key"
-            :disabled="isDisabled"
-            @change="emit('update-state', { is_key: ($event.target as HTMLInputElement).checked })"
-          />
-          重點設備
-        </label>
-        <label class="checkbox-pill">
-          <input
-            type="checkbox"
-            :checked="state.is_monitor"
-            :disabled="isDisabled"
-            @change="emit('update-state', { is_monitor: ($event.target as HTMLInputElement).checked })"
-          />
-          監控設備
-        </label>
-      </div>
-
-      <!-- Actions -->
-      <div class="filter-actions">
-        <button
-          type="button"
-          class="btn-query"
-          :disabled="isDisabled"
-          aria-label="查詢"
-          @click="handleSubmit"
-        >
-          {{ loading ? '查詢中...' : '查詢' }}
-        </button>
-        <button
-          type="button"
-          class="btn-clear"
-          :disabled="isDisabled"
-          aria-label="清除篩選"
-          @click="handleClear"
-        >
-          清除
-        </button>
-      </div>
+      <p v-if="dateError" class="date-error" role="alert" aria-live="polite">
+        {{ dateError }}
+      </p>
     </div>
-
-    <!-- Validation error -->
-    <p v-if="dateError" class="date-error" role="alert" aria-live="polite">
-      {{ dateError }}
-    </p>
-  </div>
+  </section>
 </template>

@@ -918,9 +918,12 @@ def _build_top_reasons(df: pd.DataFrame, top_n: int = 10) -> List[Dict[str, Any]
         h = float(grp['hours'].sum())
         cnt = len(grp)
         avg = round(h / cnt * 60.0, 2) if cnt > 0 else 0.0
+        # _map_big_category is deterministic for (reason, status), so first value is representative
+        big_category = str(grp['category'].iloc[0]) if 'category' in grp.columns and len(grp) > 0 else ''
         rows.append({
             'reason': reason,
             'status': status,
+            'big_category': big_category,
             'hours': round(h, 4),
             'event_count': cnt,
             'avg_min': avg,

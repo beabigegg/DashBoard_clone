@@ -25,6 +25,7 @@ export interface BigCategoryRow {
 export interface TopReasonRow {
   reason: string;
   status: string;
+  big_category?: string;
   hours: number;
   event_count: number;
   avg_min: number;
