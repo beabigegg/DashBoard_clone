@@ -20,9 +20,6 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
-import time
-from datetime import date, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -39,8 +36,6 @@ logger = logging.getLogger("mes_dashboard.downtime_analysis_cache")
 # ── TTL ──────────────────────────────────────────────────────────────────────
 _CACHE_TTL = int(os.getenv("DOWNTIME_ANALYSIS_CACHE_TTL", str(CACHE_TTL_DATASET)))
 
-# ── Pre-warm config ───────────────────────────────────────────────────────────
-_PREWARM_DAYS: int = int(os.getenv("DOWNTIME_ANALYSIS_PREWARM_DAYS", "30"))
 
 # ── Redis / spool namespaces ──────────────────────────────────────────────────
 _EVENTS_NAMESPACE = "downtime_analysis_events"
@@ -103,41 +98,10 @@ def load_downtime_events(query_id: str) -> Optional[pd.DataFrame]:
 
 
 def start_downtime_prewarm() -> None:
-    """Start downtime-analysis pre-warm as a daemon background thread (15s startup delay).
+    """Start downtime-analysis DuckDB pre-warm. Delegates to downtime_analysis_duckdb_cache.
 
-    Fires query_downtime_dataset for [today-DOWNTIME_ANALYSIS_PREWARM_DAYS, yesterday]
-    with no filters so the broadest spool is ready before the first user request.
-    Disabled when DOWNTIME_ANALYSIS_PREWARM_DAYS=0.
+    The DuckDB cache loads 3 months of raw Oracle data and serves queries within that
+    window without hitting Oracle.  Disabled when DOWNTIME_ANALYSIS_PREWARM_MONTHS=0.
     """
-    if _PREWARM_DAYS <= 0:
-        logger.info("downtime_analysis prewarm disabled (DOWNTIME_ANALYSIS_PREWARM_DAYS=0)")
-        return
-
-    try:
-        from mes_dashboard.core.redis_client import REDIS_ENABLED
-        if not REDIS_ENABLED:
-            logger.info("downtime_analysis prewarm skipped (Redis disabled)")
-            return
-    except Exception:
-        return
-
-    def _run() -> None:
-        time.sleep(15)
-        try:
-            end = date.today() - timedelta(days=1)
-            start = end - timedelta(days=_PREWARM_DAYS - 1)
-            from mes_dashboard.services.downtime_analysis_service import query_downtime_dataset
-            logger.info(
-                "downtime_analysis prewarm: querying %s → %s (%d days)",
-                start.isoformat(), end.isoformat(), _PREWARM_DAYS,
-            )
-            query_downtime_dataset(
-                start_date=start.isoformat(),
-                end_date=end.isoformat(),
-            )
-            logger.info("downtime_analysis prewarm complete")
-        except Exception as exc:
-            logger.warning("downtime_analysis prewarm failed: %s", exc)
-
-    threading.Thread(target=_run, daemon=True, name="downtime-analysis-prewarm").start()
-    logger.info("downtime_analysis prewarm background thread started")
+    from mes_dashboard.services.downtime_analysis_duckdb_cache import start_duckdb_prewarm
+    start_duckdb_prewarm()

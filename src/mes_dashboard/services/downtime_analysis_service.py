@@ -610,73 +610,98 @@ def query_downtime_dataset(
         if events_df is not None and not events_df.empty:
             return _build_response(query_id, events_df)
 
-    # --- BatchQueryEngine path (BQE-07) ---
-    # ADR-0003: whole-dataset single chunk only; no row-count chunking ever.
-    sql_dir = Path(__file__).resolve().parent.parent / 'sql' / 'downtime_analysis'
-    base_sql = (sql_dir / 'base_events.sql').read_text(encoding='utf-8')
-    job_sql = (sql_dir / 'job_bridge.sql').read_text(encoding='utf-8')
+    # --- Data acquisition: DuckDB fast path or Oracle+BQE fallback ---
+    _ddb_base: Optional[pd.DataFrame] = None
+    _ddb_job: Optional[pd.DataFrame] = None
+    try:
+        from mes_dashboard.services.downtime_analysis_duckdb_cache import (
+            should_use_duckdb as _should_use_duckdb,
+            query_base_from_duckdb as _qbase,
+            query_job_from_duckdb as _qjob,
+        )
+        if _should_use_duckdb(end_date, start_date):
+            _ddb_base = _qbase(start_date, end_date)
+            _ddb_job = _qjob(start_date, end_date)
+            logger.debug(
+                "downtime_analysis: DuckDB path — %d base_events, %d job_data",
+                len(_ddb_base), len(_ddb_job),
+            )
+    except Exception as _ddb_exc:
+        logger.debug(
+            "downtime_analysis: DuckDB path unavailable, falling back to Oracle: %s", _ddb_exc
+        )
 
-    base_params = {'start_date': start_date, 'end_date': end_date}
-
-    # Single whole-dataset chunk covering the entire date range (ADR-0003).
-    whole_dataset_chunk = [{'start_date': start_date, 'end_date': end_date}]
-    engine_hash = _compute_query_hash({
-        'downtime_base_events': True,
-        'start_date': start_date,
-        'end_date': end_date,
-    })
-
-    def _run_base_chunk(chunk, max_rows_per_chunk=None):
-        params = {
-            'start_date': chunk['start_date'],
-            'end_date': chunk['end_date'],
-        }
-        result = _read_sql_df(base_sql, params, caller='downtime_analysis:base_events')
-        return result if result is not None else pd.DataFrame()
-
-    execute_plan(
-        whole_dataset_chunk,
-        _run_base_chunk,
-        parallel=1,  # whole-dataset single chunk; parallel=1 per ADR-0003
-        query_hash=engine_hash,
-        cache_prefix='downtime_analysis',
-    )
-
-    _spool_dir = QUERY_SPOOL_DIR / 'downtime_analysis'
-    tmp_path, _total_rows = merge_chunks_to_spool(
-        'downtime_analysis',
-        engine_hash,
-        spool_dir=_spool_dir,
-    )
-
-    # Assemble base_df from the spool (post-merge stage for ADR-0003 reductions)
-    if tmp_path is not None and tmp_path.exists():
-        base_df = pd.read_parquet(str(tmp_path))
-        try:
-            tmp_path.unlink()  # clean up temp spool; final events go to store_downtime_events
-        except Exception:
-            pass
+    if _ddb_base is not None:
+        base_df = _ddb_base
+        job_df = _ddb_job if _ddb_job is not None else pd.DataFrame()
     else:
-        base_df = pd.DataFrame()
+        # --- BatchQueryEngine path (BQE-07) ---
+        # ADR-0003: whole-dataset single chunk only; no row-count chunking ever.
+        sql_dir = Path(__file__).resolve().parent.parent / 'sql' / 'downtime_analysis'
+        base_sql = (sql_dir / 'base_events.sql').read_text(encoding='utf-8')
+        job_sql = (sql_dir / 'job_bridge.sql').read_text(encoding='utf-8')
 
-    # Build RESOURCEID IN filter from base_events HISTORYIDs so job_bridge only
-    # scans equipment that actually has downtime records in this date range.
-    if not base_df.empty:
-        from mes_dashboard.sql.builder import QueryBuilder as _QB
-        hist_ids = sorted({str(x).strip() for x in base_df['HISTORYID'].dropna() if str(x).strip()})
-        _jb_builder = _QB()
-        _jb_builder.add_in_condition('j.RESOURCEID', hist_ids)
-        resource_filter_sql = _jb_builder.get_conditions_sql() or '1=1'
-        job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', resource_filter_sql)
-        job_params = {**base_params, **_jb_builder.params}
-    else:
-        job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', '1=0')
-        job_params = base_params
+        base_params = {'start_date': start_date, 'end_date': end_date}
 
-    # Also read job bridge data (still via direct read_sql_df — not chunked)
-    job_df = _read_sql_df(job_sql_rendered, job_params, caller='downtime_analysis:job_bridge')
-    if job_df is None:
-        job_df = pd.DataFrame()
+        # Single whole-dataset chunk covering the entire date range (ADR-0003).
+        whole_dataset_chunk = [{'start_date': start_date, 'end_date': end_date}]
+        engine_hash = _compute_query_hash({
+            'downtime_base_events': True,
+            'start_date': start_date,
+            'end_date': end_date,
+        })
+
+        def _run_base_chunk(chunk, max_rows_per_chunk=None):
+            params = {
+                'start_date': chunk['start_date'],
+                'end_date': chunk['end_date'],
+            }
+            result = _read_sql_df(base_sql, params, caller='downtime_analysis:base_events')
+            return result if result is not None else pd.DataFrame()
+
+        execute_plan(
+            whole_dataset_chunk,
+            _run_base_chunk,
+            parallel=1,  # whole-dataset single chunk; parallel=1 per ADR-0003
+            query_hash=engine_hash,
+            cache_prefix='downtime_analysis',
+        )
+
+        _spool_dir = QUERY_SPOOL_DIR / 'downtime_analysis'
+        tmp_path, _total_rows = merge_chunks_to_spool(
+            'downtime_analysis',
+            engine_hash,
+            spool_dir=_spool_dir,
+        )
+
+        # Assemble base_df from the spool (post-merge stage for ADR-0003 reductions)
+        if tmp_path is not None and tmp_path.exists():
+            base_df = pd.read_parquet(str(tmp_path))
+            try:
+                tmp_path.unlink()  # clean up temp spool; final events go to store_downtime_events
+            except Exception:
+                pass
+        else:
+            base_df = pd.DataFrame()
+
+        # Build RESOURCEID IN filter from base_events HISTORYIDs so job_bridge only
+        # scans equipment that actually has downtime records in this date range.
+        if not base_df.empty:
+            from mes_dashboard.sql.builder import QueryBuilder as _QB
+            hist_ids = sorted({str(x).strip() for x in base_df['HISTORYID'].dropna() if str(x).strip()})
+            _jb_builder = _QB()
+            _jb_builder.add_in_condition('j.RESOURCEID', hist_ids)
+            resource_filter_sql = _jb_builder.get_conditions_sql() or '1=1'
+            job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', resource_filter_sql)
+            job_params = {**base_params, **_jb_builder.params}
+        else:
+            job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', '1=0')
+            job_params = base_params
+
+        # Also read job bridge data (still via direct read_sql_df — not chunked)
+        job_df = _read_sql_df(job_sql_rendered, job_params, caller='downtime_analysis:job_bridge')
+        if job_df is None:
+            job_df = pd.DataFrame()
 
     # Apply resource filters (workcenter/family/resource_id/package_group/flags)
     if not base_df.empty:
