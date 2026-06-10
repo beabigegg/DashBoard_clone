@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.14.0
+schema-version: 1.15.0
 last-changed: 2026-06-01
 breaking-change-policy: deprecate-2-minors
 ---
@@ -119,6 +119,8 @@ breaking-change-policy: deprecate-2-minors
 | RH-02 | Local compute flag | `RESOURCE_HISTORY_LOCAL_COMPUTE_ENABLED` env（預設 `true`）；`false` 時 `/page` endpoint 回重導向至舊路徑 | unit tests |
 | RH-03 | Metadata injection | `_inject_resource_spool_info` 與 `_inject_resource_metadata` 自動將 spool info 與設備 metadata 注入 response | unit tests |
 | RH-04 | Date validation | `start_date` / `end_date` 必需；無效日期格式或超過 730d → 400 `VALIDATION_ERROR` | route tests |
+| RH-05 | Canonical spool key excludes granularity and filters | The canonical spool key for resource-history (`make_canonical_base_query_id` / `make_canonical_oee_query_id`) hashes only the date range and schema version — not `granularity` or any filter parameter. One parquet file serves all four granularities (day/week/month/year) and all filter combinations via DuckDB view-time bucketing and JOIN-based filtering. This is the warm-dataset key used by the warmup job (`ensure_dataset_loaded`) and the canonical read path (`try_compute_query_from_canonical_spool`). | unit + integration tests |
+| RH-06 | View-result cache TTL staleness window | `apply_view()` caches the full computed result dict for `RESOURCE_VIEW_CACHE_TTL` seconds (default 300 s). Derived numbers (KPI, trend, heatmap, detail) may be up to 5 minutes stale within an already-warm dataset. This is acceptable for a reporting surface. Set `RESOURCE_VIEW_CACHE_TTL=0` to disable the cache and always recompute from spool. Cache is atomic: all structures are cached or none (no partial state). | unit tests |
 
 ## Production-History Rules
 

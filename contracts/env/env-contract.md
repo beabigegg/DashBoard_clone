@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.4
-last-changed: 2026-06-01
+schema-version: 1.0.5
+last-changed: 2026-06-10
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -84,6 +84,7 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | RESOURCE_HISTORY_HISTORICAL_TTL | cache | all | no | no | 86400 | 86400 | application-team | positive integer (seconds); minimum 3600 | yes | uses default 86400 |
+| RESOURCE_VIEW_CACHE_TTL | cache | all | no | no | 300 | 300 | application-team | non-negative integer (seconds); 0 disables view-result cache | yes | uses default 300 |
 | RESOURCE_HISTORY_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables DuckDB prewarm | yes | uses default 3 |
 | DOWNTIME_ANALYSIS_PREWARM_DAYS | cache | all | no | no | 30 | 30 | application-team | non-negative integer; 0 disables prewarm | yes | uses default 30 |
 | RESOURCE_HISTORY_DUCKDB_PATH | storage | all | no | no | tmp/resource_history.duckdb | /var/lib/mes/resource_history.duckdb | application-team | file path (relative resolved to CWD; use absolute for Docker) | yes | uses default path |
@@ -92,6 +93,7 @@ breaking-change-policy: deprecate-2-minors
 - `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to load into the persistent DuckDB cache at startup. Background thread starts 10s after worker boot; `0` disables entirely. Default 3 months (~25s Oracle load time, ~15MB DuckDB file). Added by change `resource-history-perf`.
 - `DOWNTIME_ANALYSIS_PREWARM_DAYS`: Number of days of downtime-analysis data to pre-load into the spool at startup. Background thread starts 15s after worker boot; `0` disables entirely. Default 30 days. Added by change `downtime-analysis-page`.
 - `RESOURCE_HISTORY_DUCKDB_PATH`: Path to the persistent DuckDB file that caches the last N months of base_facts + oee_facts. Relative paths resolve against CWD (same as QUERY_SPOOL_DIR). For Docker set to an absolute path on a named volume. File is ~15MB; atomically replaced on each daily refresh. Added by change `resource-history-perf`.
+- `RESOURCE_VIEW_CACHE_TTL`: TTL in seconds for the view-result cache in `apply_view()`. Derived numbers (KPI, trend, heatmap, etc.) may be up to this many seconds stale within an already-warm dataset. Set to `0` to disable the view-result cache and always recompute from spool. Default 300 s (5 min). Added by change `resource-history-cache-fix`.
 
 ## Batch Query Engine — Row-Count Chunking
 

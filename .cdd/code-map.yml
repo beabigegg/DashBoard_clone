@@ -1,6 +1,6 @@
-# generated: 2026-06-10T02:08:30Z by cdd-kit 2.2.1
-# files: 841, src-lines: 237153, map-lines: 17915, compression: 13.2x
-# sources-digest: 1f0e7d09c33ff4aed6820ce4bcab4baa39456bc3a351cda26b2213eacedd0533
+# generated: 2026-06-10T04:14:21Z by cdd-kit 2.2.1
+# files: 841, src-lines: 237900, map-lines: 17963, compression: 13.2x
+# sources-digest: c5ad23e4a27bdad49e8a872a409e7b9e46f20854bc5bb56485da821ba6e480a5
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1724,15 +1724,15 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
   types:
     - { name: ParetoSelections, lines: 139-139 }
 
-frontend/src/resource-history/App.vue:  # 829 lines
+frontend/src/resource-history/App.vue:  # 825 lines
 
-frontend/src/resource-history/components/ComparisonChart.vue:  # 97 lines
+frontend/src/resource-history/components/ComparisonChart.vue:  # 105 lines
 
 frontend/src/resource-history/components/DetailSection.vue:  # 349 lines
 
-frontend/src/resource-history/components/FilterBar.vue:  # 176 lines
+frontend/src/resource-history/components/FilterBar.vue:  # 183 lines
 
-frontend/src/resource-history/components/HeatmapChart.vue:  # 161 lines
+frontend/src/resource-history/components/HeatmapChart.vue:  # 170 lines
 
 frontend/src/resource-history/components/KpiCards.vue:  # 96 lines
 
@@ -4916,7 +4916,7 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
     - { name: api_reject_history_view, lines: 832-910 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
     - { name: api_reject_history_export_cached, lines: 914-992 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
-src/mes_dashboard/routes/resource_history_routes.py:  # 390 lines
+src/mes_dashboard/routes/resource_history_routes.py:  # 389 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: datetime, items: [datetime], line: 9 }
@@ -4936,10 +4936,10 @@ src/mes_dashboard/routes/resource_history_routes.py:  # 390 lines
     - { name: _validate_dates, lines: 135-143 }
     - { name: _parse_resource_filters, lines: 146-156 }
     - { name: _bool_param, lines: 159-165 }
-    - { name: api_resource_history_query, lines: 169-231 }  # @resource_history_bp.route('/query', methods=['POST'])
-    - { name: api_resource_history_view, lines: 235-256 }  # @resource_history_bp.route('/view', methods=['GET'])
-    - { name: api_resource_history_query_progress, lines: 265-309 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
-    - { name: api_resource_history_export, lines: 317-390 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
+    - { name: api_resource_history_query, lines: 169-230 }  # @resource_history_bp.route('/query', methods=['POST'])
+    - { name: api_resource_history_view, lines: 234-255 }  # @resource_history_bp.route('/view', methods=['GET'])
+    - { name: api_resource_history_query_progress, lines: 264-308 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
+    - { name: api_resource_history_export, lines: 316-389 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/resource_routes.py:  # 475 lines
   imports:
@@ -6936,7 +6936,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1261 lines
     - { name: get_vendors, lines: 1231-1233 }
     - { name: get_resource_cascade_metadata, lines: 1236-1261 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 631 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 759 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6948,30 +6948,31 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 631 lines
     - { module: pathlib, items: [Path], line: 20 }
     - { module: typing, items: [Any, Dict, List, Optional], line: 21 }
     - { module: pandas, items: [], line: 23 }
-    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 25 }
+    - { module: mes_dashboard.core.cache, items: [MemoryTTLCache, ProcessLevelCache, register_process_cache], line: 25 }
     - { module: mes_dashboard.core.database, items: [read_sql_df], line: 26 }
     - { module: mes_dashboard.core.query_spool_store, items: [QUERY_SPOOL_DIR, get_spool_file_path, register_spool_file, store_spooled_df], line: 27 }
     - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 36 }
   functions:
-    - { name: _get_cache_ttl, lines: 47-54 }
-    - { name: _load_sql, lines: 68-70 }  # @lru_cache(maxsize=4)
-    - { name: _make_query_id, lines: 78-81 }
-    - { name: _has_cached_df, lines: 89-93 }
-    - { name: _store_df, lines: 96-99 }
-    - { name: _has_cached_oee_df, lines: 102-104 }
-    - { name: _store_oee_df, lines: 107-109 }
-    - { name: _get_resource_lookup, lines: 117-128 }
-    - { name: _get_workcenter_mapping, lines: 131-138 }
-    - { name: _get_filtered_resources_and_lookup, lines: 141-169 }
-    - { name: execute_primary_query, lines: 177-488 }
-    - { name: apply_view, lines: 496-523 }
-    - { name: _empty_summary, lines: 526-532 }
-    - { name: _empty_detail, lines: 535-536 }
-    - { name: _empty_detail_by_date, lines: 539-540 }
-    - { name: _empty_kpi, lines: 543-564 }
-    - { name: make_canonical_base_query_id, lines: 581-592 }
-    - { name: make_canonical_oee_query_id, lines: 595-606 }
-    - { name: ensure_dataset_loaded, lines: 609-631 }
+    - { name: _get_cache_ttl, lines: 49-56 }
+    - { name: _load_sql, lines: 70-72 }  # @lru_cache(maxsize=4)
+    - { name: _make_query_id, lines: 80-83 }
+    - { name: _has_cached_df, lines: 91-95 }
+    - { name: _store_df, lines: 98-101 }
+    - { name: _has_cached_oee_df, lines: 104-106 }
+    - { name: _store_oee_df, lines: 109-111 }
+    - { name: _get_resource_lookup, lines: 119-130 }
+    - { name: _get_workcenter_mapping, lines: 133-140 }
+    - { name: _get_filtered_resources_and_lookup, lines: 143-171 }
+    - { name: execute_primary_query, lines: 179-528 }
+    - { name: apply_view, lines: 536-577 }
+    - { name: _empty_summary, lines: 580-586 }
+    - { name: _empty_detail, lines: 589-590 }
+    - { name: _empty_detail_by_date, lines: 593-594 }
+    - { name: _empty_kpi, lines: 597-618 }
+    - { name: make_canonical_base_query_id, lines: 635-646 }
+    - { name: make_canonical_oee_query_id, lines: 649-660 }
+    - { name: _query_and_store_canonical_dataset, lines: 663-731 }
+    - { name: ensure_dataset_loaded, lines: 734-759 }
 
 src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 359 lines
   imports:
@@ -7034,7 +7035,7 @@ src/mes_dashboard/services/resource_history_service.py:  # 1026 lines
     - { name: _build_comparison_from_raw_df, lines: 878-950 }
     - { name: _build_detail_from_raw_df, lines: 953-1024 }
 
-src/mes_dashboard/services/resource_history_sql_runtime.py:  # 817 lines
+src/mes_dashboard/services/resource_history_sql_runtime.py:  # 816 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -7065,12 +7066,12 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 817 lines
     - { name: _query_kpi, lines: 170-232 }
     - { name: _query_trend, lines: 237-298 }
     - { name: _query_heatmap, lines: 303-363 }
-    - { name: _query_workcenter_comparison, lines: 368-400 }
-    - { name: _query_detail, lines: 405-486 }
-    - { name: _query_detail_by_date, lines: 489-549 }
-    - { name: _empty_kpi, lines: 554-566 }
-    - { name: try_compute_view_from_spool, lines: 571-664 }
-    - { name: try_compute_query_from_canonical_spool, lines: 669-817 }
+    - { name: _query_workcenter_comparison, lines: 368-399 }
+    - { name: _query_detail, lines: 404-485 }
+    - { name: _query_detail_by_date, lines: 488-548 }
+    - { name: _empty_kpi, lines: 553-565 }
+    - { name: try_compute_view_from_spool, lines: 570-663 }
+    - { name: try_compute_query_from_canonical_spool, lines: 668-816 }
 
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:
@@ -12151,7 +12152,7 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
 
-tests/test_env_contract.py:  # 108 lines
+tests/test_env_contract.py:  # 141 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pathlib, items: [Path], line: 9 }
@@ -12174,6 +12175,11 @@ tests/test_env_contract.py:  # 108 lines
         - { name: test_hold_engine_parallel_default_is_positive_integer, lines: 85-96 }
         - { name: test_job_engine_parallel_default_is_positive_integer, lines: 98-102 }
         - { name: test_msd_engine_parallel_default_is_positive_integer, lines: 104-108 }
+    - name: TestResourceViewCacheTTLDefault
+      lines: 115-141
+      methods:
+        - { name: test_resource_view_cache_ttl_default_equals_300, lines: 118-134 }
+        - { name: test_resource_view_cache_ttl_documented_in_contract, lines: 136-141 }
 
 tests/test_event_fetcher.py:  # 413 lines
   imports:
@@ -16057,7 +16063,7 @@ tests/test_resource_cache_version_check.py:  # 226 lines
   functions:
     - { name: _make_mock_df, lines: 31-34 }
 
-tests/test_resource_dataset_cache.py:  # 468 lines
+tests/test_resource_dataset_cache.py:  # 982 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: importlib, items: [], line: 6 }
@@ -16105,6 +16111,43 @@ tests/test_resource_dataset_cache.py:  # 468 lines
         - { name: test_oee_partial_failure_in_meta, lines: 438-447 }
         - { name: test_no_partial_failure_no_meta_key, lines: 449-455 }
         - { name: test_partial_failure_warning_logged, lines: 457-468 }
+    - name: TestCanonicalKeyParity
+      lines: 476-648
+      methods:
+        - { name: test_ensure_dataset_loaded_writes_canonical_key, lines: 479-533 }
+        - { name: test_execute_primary_query_empty_filter_co_writes_canonical_key, lines: 535-590 }
+        - { name: test_empty_filter_detection_non_empty_does_not_co_write, lines: 592-648 }
+    - name: TestCanonicalSpoolHit
+      lines: 651-702
+      methods:
+        - { name: test_ensure_dataset_loaded_produces_canonical_hit, lines: 654-702 }
+    - name: TestWarmCacheFilterSwitch
+      lines: 705-736
+      methods:
+        - { name: test_filter_switch_on_warm_cache_no_oracle_call, lines: 708-736 }
+    - name: TestSchemaVersionInvalidation
+      lines: 739-757
+      methods:
+        - { name: test_schema_version_bump_invalidates_stale_spool, lines: 742-757 }
+    - name: TestRedisDownFallback
+      lines: 760-806
+      methods:
+        - { name: test_redis_down_falls_back_to_oracle_no_binder_exception, lines: 763-806 }
+    - name: TestStaleParquetFallback
+      lines: 809-828
+      methods:
+        - { name: test_stale_parquet_schema_mismatch_falls_back_to_oracle, lines: 812-828 }
+    - name: TestViewResultCache
+      lines: 831-938
+      methods:
+        - { name: test_apply_view_result_cached_within_ttl, lines: 834-861 }
+        - { name: test_apply_view_result_recomputed_after_ttl_expiry, lines: 863-883 }
+        - { name: test_resource_view_cache_ttl_zero_disables_cache, lines: 885-907 }
+        - { name: test_apply_view_caches_all_six_structures_atomically, lines: 909-938 }
+    - name: TestOracleFallbackPath
+      lines: 941-982
+      methods:
+        - { name: test_oracle_fallback_used_when_canonical_miss, lines: 944-982 }
 
 tests/test_resource_history_duckdb_cache.py:  # 83 lines
   imports:
@@ -16301,7 +16344,7 @@ tests/test_resource_history_sql_parity.py:  # 204 lines
     - { name: _write_parquet, lines: 77-81 }
     - { name: _run_duckdb_view, lines: 84-114 }
 
-tests/test_resource_history_sql_runtime.py:  # 87 lines
+tests/test_resource_history_sql_runtime.py:  # 141 lines
   imports:
     - { module: sys, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -16339,6 +16382,11 @@ tests/test_resource_history_sql_runtime.py:  # 87 lines
       methods:
         - { name: test_primary_namespace, lines: 83-84 }
         - { name: test_oee_namespace, lines: 86-87 }
+    - name: TestCanonicalKeyGranularity
+      lines: 95-141
+      methods:
+        - { name: test_day_week_month_year_produce_identical_canonical_key, lines: 98-118 }
+        - { name: test_canonical_key_excludes_granularity, lines: 120-141 }
 
 tests/test_resource_routes.py:  # 219 lines
   imports:

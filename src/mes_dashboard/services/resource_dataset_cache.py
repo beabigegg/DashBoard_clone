@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
+from mes_dashboard.core.cache import MemoryTTLCache, ProcessLevelCache, register_process_cache
 from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.core.query_spool_store import (
     QUERY_SPOOL_DIR,
@@ -40,8 +40,10 @@ _CACHE_MAX_SIZE = 1
 _RESOURCE_ENGINE_PARALLEL = max(1, int(os.getenv("RESOURCE_ENGINE_PARALLEL", "1")))
 _REDIS_NAMESPACE = "resource_dataset"
 _OEE_REDIS_NAMESPACE = "resource_oee"
+_RESOURCE_VIEW_CACHE_TTL = int(os.getenv("RESOURCE_VIEW_CACHE_TTL", "300"))
 
 _dataset_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=_CACHE_MAX_SIZE)
+_view_result_cache = MemoryTTLCache(max_size=256)
 
 
 def _get_cache_ttl(end_date: str) -> int:
@@ -459,17 +461,55 @@ def execute_primary_query(
                     if not _oee_spool_available:
                         futures["oee"] = executor.submit(_query_oee_direct)
 
+                _co_write_base_df: Optional[pd.DataFrame] = None
+                _co_write_oee_df: Optional[pd.DataFrame] = None
+
                 if "base" in futures:
                     df = futures["base"].result()
                     if not df.empty:
                         _store_df(query_id, df, end_date)
                         _spool_available = True
+                        _co_write_base_df = df
 
                 if "oee" in futures:
                     oee_df = futures["oee"].result()
                     if not oee_df.empty:
                         _store_oee_df(query_id, oee_df, end_date)
                         _oee_spool_available = True
+                        _co_write_oee_df = oee_df
+
+                # IP-3: If filters are empty, also write spool under canonical keys
+                # so the canonical read path (System B) can find the data.
+                # Empty-filter detection: all lists empty AND all bool flags False.
+                _filters_empty = (
+                    not workcenter_groups and not families and not resource_ids
+                    and not is_production and not is_key and not is_monitor
+                    and not package_groups
+                )
+                if _filters_empty:
+                    _canonical_base_key = make_canonical_base_query_id(start_date, end_date)
+                    _canonical_oee_key = make_canonical_oee_query_id(start_date, end_date)
+                    _co_ttl = _get_cache_ttl(end_date)
+                    if _co_write_base_df is not None and not _co_write_base_df.empty:
+                        # store_spooled_df writes parquet + Redis metadata in one call
+                        _co_base_ok = store_spooled_df(
+                            _REDIS_NAMESPACE, _canonical_base_key,
+                            _co_write_base_df, ttl_seconds=_co_ttl,
+                        )
+                        if _co_base_ok:
+                            _dataset_cache.set(_canonical_base_key, True)
+                            logger.info(
+                                "Canonical base co-write (direct path): key=%s", _canonical_base_key
+                            )
+                    if _co_write_oee_df is not None and not _co_write_oee_df.empty:
+                        _co_oee_ok = store_spooled_df(
+                            _OEE_REDIS_NAMESPACE, _canonical_oee_key,
+                            _co_write_oee_df, ttl_seconds=_co_ttl,
+                        )
+                        if _co_oee_ok:
+                            logger.info(
+                                "Canonical OEE co-write (direct path): key=%s", _canonical_oee_key
+                            )
 
     result = apply_view(query_id=query_id, granularity=granularity)
     if result is None:
@@ -502,7 +542,18 @@ def apply_view(
 
     DuckDB SQL runtime is the sole compute path. Spool miss or runtime error
     returns None (cache_expired).
+
+    IP-6: View-result cache (TTL controlled by ``RESOURCE_VIEW_CACHE_TTL``).
+    When TTL > 0, the full result dict is cached in ``_view_result_cache`` for
+    ``_RESOURCE_VIEW_CACHE_TTL`` seconds so repeat granularity/filter switches
+    skip DuckDB recompute. Set TTL=0 to disable.
     """
+    if _RESOURCE_VIEW_CACHE_TTL > 0:
+        _view_cache_key = f"{query_id}:{granularity}"
+        _cached = _view_result_cache.get(_view_cache_key)
+        if _cached is not None:
+            return _cached
+
     try:
         from mes_dashboard.services.resource_history_sql_runtime import (
             try_compute_view_from_spool,
@@ -512,7 +563,10 @@ def apply_view(
             granularity=granularity,
         )
         if sql_result is not None:
-            return {**sql_result, "_meta": sql_meta}
+            result = {**sql_result, "_meta": sql_meta}
+            if _RESOURCE_VIEW_CACHE_TTL > 0:
+                _view_result_cache.set(_view_cache_key, result, _RESOURCE_VIEW_CACHE_TTL)
+            return result
         fallback_reason = sql_meta.get("view_sql_fallback_reason", "unknown")
         logger.debug(
             "resource apply_view: SQL runtime no result (reason=%s query_id=%s)",
@@ -575,42 +629,117 @@ def _empty_kpi() -> Dict[str, Any]:
 #
 # This function is the stable key used for warmup and spool reuse.
 # Full spool pipeline migration is completed in task 7.2.
-_CANONICAL_BASE_SCHEMA_VERSION = 1
+_CANONICAL_BASE_SCHEMA_VERSION = 2
 
 
-def make_canonical_base_query_id(start_date: str, end_date: str, granularity: str = "day") -> str:
+def make_canonical_base_query_id(start_date: str, end_date: str) -> str:
     """Return the canonical spool key for the resource base dataset.
 
-    Uses only the date range and granularity — filter dimensions are resolved
+    Uses only the date range — filter dimensions and granularity are resolved
     at view time by the DuckDB / SQL runtime, not baked into the spool key.
+    One parquet file serves all four granularity views (day/week/month/year).
     """
     return _make_query_id({
         "canonical_schema_version": _CANONICAL_BASE_SCHEMA_VERSION,
         "start_date": start_date,
         "end_date": end_date,
-        "granularity": granularity,
     })
 
 
-def make_canonical_oee_query_id(start_date: str, end_date: str, granularity: str = "day") -> str:
+def make_canonical_oee_query_id(start_date: str, end_date: str) -> str:
     """Return the canonical spool key for the OEE dataset.
 
-    Same key strategy as base dataset — date_range + granularity only.
+    Same key strategy as base dataset — date range only, no granularity.
+    One parquet file serves all four granularity views (day/week/month/year).
     """
     return _make_query_id({
         "canonical_schema_version": _CANONICAL_BASE_SCHEMA_VERSION,
         "start_date": start_date,
         "end_date": end_date,
-        "granularity": granularity,
         "_oee": True,
     })
+
+
+def _query_and_store_canonical_dataset(start_date: str, end_date: str) -> None:
+    """Query Oracle unfiltered and store base + OEE under canonical keys.
+
+    Writes spool files directly under ``make_canonical_base_query_id`` and
+    ``make_canonical_oee_query_id`` so the canonical read path (System B) can
+    find them.  Does NOT go through the filter-inclusive key (System A).
+
+    Called exclusively by ``ensure_dataset_loaded``.
+    """
+    # Build SQL with no HISTORYID restriction (all resources)
+    base_sql = _load_sql("base_facts")
+    # No historyid filter → full dataset
+    base_sql = base_sql.replace("{{ HISTORYID_FILTER }}", "1=1")
+    oee_sql = _load_sql("oee_facts")
+
+    reject_start = (date.fromisoformat(start_date) - timedelta(days=30)).isoformat()
+    reject_end = (date.fromisoformat(end_date) + timedelta(days=30)).isoformat()
+
+    base_params = {"start_date": start_date, "end_date": end_date}
+    oee_params = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "reject_start": reject_start,
+        "reject_end": reject_end,
+    }
+
+    ttl = _get_cache_ttl(end_date)
+    canonical_base_key = make_canonical_base_query_id(start_date, end_date)
+    canonical_oee_key = make_canonical_oee_query_id(start_date, end_date)
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _fetch_base():
+        df = read_sql_df(
+            base_sql, base_params,
+            caller="resource_dataset_cache:_query_and_store_canonical_dataset:base",
+        )
+        return df if df is not None else pd.DataFrame()
+
+    def _fetch_oee():
+        df = read_sql_df(
+            oee_sql, oee_params,
+            caller="resource_dataset_cache:_query_and_store_canonical_dataset:oee",
+        )
+        return df if df is not None else pd.DataFrame()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        fut_base = executor.submit(_fetch_base)
+        fut_oee = executor.submit(_fetch_oee)
+        base_df = fut_base.result()
+        oee_df = fut_oee.result()
+
+    if not base_df.empty:
+        # store_spooled_df writes parquet + Redis metadata pointer in one call
+        _base_ok = store_spooled_df(_REDIS_NAMESPACE, canonical_base_key, base_df, ttl_seconds=ttl)
+        if _base_ok:
+            _dataset_cache.set(canonical_base_key, True)
+            logger.info(
+                "Canonical base dataset stored: key=%s rows=%d",
+                canonical_base_key, len(base_df),
+            )
+
+    if not oee_df.empty:
+        _oee_ok = store_spooled_df(_OEE_REDIS_NAMESPACE, canonical_oee_key, oee_df, ttl_seconds=ttl)
+        if _oee_ok:
+            logger.info(
+                "Canonical OEE dataset stored: key=%s rows=%d",
+                canonical_oee_key, len(oee_df),
+            )
 
 
 def ensure_dataset_loaded() -> Dict[str, Any]:
     """Ensure the canonical resource base dataset exists in cache.
 
-    Called by the warmup scheduler (task 3.3) after canonical base dataset
-    design is complete.  Uses the last 90 days as the default warmup window.
+    Called by the warmup scheduler after canonical base dataset design is complete.
+    Uses the last 90 days as the default warmup window.
+
+    Writes spool under the canonical key (System B) via
+    ``_query_and_store_canonical_dataset`` so the canonical read path
+    ``try_compute_query_from_canonical_spool`` can find it.
     """
     end_dt = date.today()
     start_dt = end_dt - timedelta(days=89)
@@ -621,10 +750,9 @@ def ensure_dataset_loaded() -> Dict[str, Any]:
     if _has_cached_df(base_query_id):
         return {"query_id": base_query_id, "cache_hit": True, "start_date": start_date, "end_date": end_date}
 
-    # Full base dataset: no filter restrictions, all resources
-    result = execute_primary_query(start_date=start_date, end_date=end_date)
+    _query_and_store_canonical_dataset(start_date, end_date)
     return {
-        "query_id": result.get("query_id", base_query_id),
+        "query_id": base_query_id,
         "cache_hit": False,
         "start_date": start_date,
         "end_date": end_date,

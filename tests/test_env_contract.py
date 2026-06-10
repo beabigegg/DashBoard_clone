@@ -106,3 +106,36 @@ class TestEngineDefaultsMatchContract:
         from mes_dashboard.services.mid_section_defect_service import _MSD_ENGINE_PARALLEL
         assert isinstance(_MSD_ENGINE_PARALLEL, int)
         assert _MSD_ENGINE_PARALLEL >= 1
+
+
+# ---------------------------------------------------------------------------
+# resource-history-cache-fix: RESOURCE_VIEW_CACHE_TTL default
+# ---------------------------------------------------------------------------
+
+class TestResourceViewCacheTTLDefault:
+    """RESOURCE_VIEW_CACHE_TTL module-level constant must default to 300."""
+
+    def test_resource_view_cache_ttl_default_equals_300(self):
+        """_RESOURCE_VIEW_CACHE_TTL must be 300 when env var is not set.
+
+        This test FAILS before IP-6 is implemented because the constant does not exist yet.
+        Import directly; do NOT use monkeypatch.setenv (constant is frozen at import time).
+        """
+        import os
+        saved = os.environ.pop("RESOURCE_VIEW_CACHE_TTL", None)
+        try:
+            from mes_dashboard.services.resource_dataset_cache import _RESOURCE_VIEW_CACHE_TTL
+            if saved is None:
+                assert _RESOURCE_VIEW_CACHE_TTL == 300, (
+                    f"Expected default 300 (env-contract.md), got {_RESOURCE_VIEW_CACHE_TTL}"
+                )
+        finally:
+            if saved is not None:
+                os.environ["RESOURCE_VIEW_CACHE_TTL"] = saved
+
+    def test_resource_view_cache_ttl_documented_in_contract(self):
+        """RESOURCE_VIEW_CACHE_TTL must appear in env-contract.md."""
+        content = _CONTRACT_PATH.read_text(encoding="utf-8")
+        assert "RESOURCE_VIEW_CACHE_TTL" in content, (
+            "RESOURCE_VIEW_CACHE_TTL must be documented in env-contract.md"
+        )

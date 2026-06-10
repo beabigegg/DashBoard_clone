@@ -36,6 +36,14 @@ a corresponding entry below.
 ### Added
 - batch-rowcount-unification: Added "Batch Query Engine Rules" group BQE-01..BQE-07. BQE-01: row-count chunking parity (flag=true path produces identical row set to date-range path; spool column schema identical). BQE-02: decompose_by_row_count correctness (inclusive ranges covering 1..total_rows; four edge cases). BQE-03: deterministic ORDER BY key per service (seven authoritative keys guaranteeing tie-breaking pagination). BQE-04: flag-off fallback guarantee (USE_ROW_COUNT_CHUNKING=false preserves existing behavior; spool TTL/cleanup/memory-guard unaffected). BQE-05: DB_SLOW_POOL_SIZE ceiling (HOLD/JOB/MSD ENGINE_PARALLEL must not exceed pool size). BQE-06: count-vs-paged consistency (completeness guarantee applies to non-concurrent reads; concurrent insert/delete mid-query is documented limitation). BQE-07: downtime_analysis_service migration to BatchQueryEngine; spool schema and namespace unchanged. Additive; no existing rules changed.
 
+## [business 1.15.0] — 2026-06-10
+### Added
+- resource-history-cache-fix: Added RH-05 (canonical spool key excludes granularity and filters; one parquet serves all four granularities via DuckDB view-time bucketing) and RH-06 (view-result cache TTL default 300 s; derived numbers may be up to 5 min stale on warm dataset; TTL=0 disables; cache is atomic). Additive; no existing rules changed.
+
+## [env 1.0.5] — 2026-06-10
+### Added
+- resource-history-cache-fix: Added `RESOURCE_VIEW_CACHE_TTL` (optional, non-negative integer, default 300 seconds; controls view-result cache TTL in `apply_view()`; 0 disables; restart required). Added to "Cache Tuning — Resource History" table in env-contract.md. Additive; no existing defaults or semantics changed.
+
 ## [env 1.0.4] — 2026-06-01
 ### Added
 - batch-rowcount-unification: Added missing `BATCH_QUERY_ROWS_PER_CHUNK` (optional, int, default 50000; controls ROW_NUMBER() paged window size when USE_ROW_COUNT_CHUNKING=true; must be ≥ 1; restart required) to the "Batch Query Engine — Row-Count Chunking" table in env-contract.md. The variable was implemented in batch_query_engine.py but omitted from the contract table in 1.0.3. Additive; no existing defaults or semantics changed.

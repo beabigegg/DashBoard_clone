@@ -366,7 +366,7 @@ def _query_heatmap(conn: Any, *, granularity: str) -> List[Dict[str, Any]]:
 # ── Task 3.5: Workcenter comparison SQL ───────────────────────────────────────
 
 def _query_workcenter_comparison(conn: Any) -> List[Dict[str, Any]]:
-    """Compute per-workcenter aggregated metrics, sorted by OU% DESC, LIMIT 15."""
+    """Compute per-workcenter aggregated metrics, sorted by OU% DESC."""
     sql = """
         SELECT
             d.WC_GROUP AS workcenter,
@@ -381,7 +381,6 @@ def _query_workcenter_comparison(conn: Any) -> List[Dict[str, Any]]:
         WHERE d.WC_GROUP <> ''
         GROUP BY d.WC_GROUP
         ORDER BY prd / NULLIF(prd + sby + udt + sdt + egt, 0) DESC NULLS LAST
-        LIMIT 15
     """
     rows = _fetch_dict_rows(conn, sql)
     items: List[Dict[str, Any]] = []
@@ -704,18 +703,61 @@ def try_compute_query_from_canonical_spool(
         make_canonical_base_query_id,
         make_canonical_oee_query_id,
     )
-    canonical_query_id = make_canonical_base_query_id(start_date, end_date, granularity)
-    parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, canonical_query_id)
-    if not parquet_path:
-        from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
-        record_spool_miss("resource_history", canonical_query_id)
-        return None, {"canonical_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+
+    # ── Resolve spool: warmup superset first, then exact match ──────────────
+    # If the requested date range is a subset of the current warmup window
+    # [today-89d, today], reuse the warmup canonical spool and add a DuckDB
+    # WHERE clause to filter to the requested rows only.
+    from datetime import date as _dt, timedelta as _td
+    _today = _dt.today()
+    _warmup_start = (_today - _td(days=89)).strftime("%Y-%m-%d")
+    _warmup_end = _today.strftime("%Y-%m-%d")
+
+    parquet_path = None
+    oee_parquet_path = None
+    canonical_query_id = None
+    _base_date_filter = ""
+    _oee_date_filter = ""
+
+    if (
+        _warmup_start <= start_date
+        and end_date <= _warmup_end
+        and (start_date != _warmup_start or end_date != _warmup_end)
+    ):
+        _wm_base_key = make_canonical_base_query_id(_warmup_start, _warmup_end)
+        _wm_path = get_spool_file_path(_SPOOL_NAMESPACE, _wm_base_key)
+        if _wm_path:
+            canonical_query_id = _wm_base_key
+            parquet_path = _wm_path
+            _wm_oee_key = make_canonical_oee_query_id(_warmup_start, _warmup_end)
+            oee_parquet_path = get_spool_file_path(_OEE_SPOOL_NAMESPACE, _wm_oee_key)
+            _base_date_filter = (
+                f' WHERE "DATA_DATE" >= \'{start_date}\' AND "DATA_DATE" <= \'{end_date}\'' 
+            )
+            _oee_date_filter = (
+                f' WHERE "SHIFT_DATE" >= \'{start_date}\' AND "SHIFT_DATE" <= \'{end_date}\'' 
+            )
+            logger.info(
+                "try_compute_query_from_canonical_spool: warmup superset hit "
+                "(req=[%s, %s] warmup=[%s, %s])",
+                start_date, end_date, _warmup_start, _warmup_end,
+            )
+
+    # Exact-match path (fallback, also handles the full warmup range itself)
+    if parquet_path is None:
+        canonical_query_id = make_canonical_base_query_id(start_date, end_date)
+        parquet_path = get_spool_file_path(_SPOOL_NAMESPACE, canonical_query_id)
+        if not parquet_path:
+            from mes_dashboard.core.heavy_query_telemetry import record_spool_miss
+            record_spool_miss("resource_history", canonical_query_id)
+            return None, {"canonical_fallback_reason": SQL_FALLBACK_SPOOL_MISS}
+        oee_parquet_path = get_spool_file_path(
+            _OEE_SPOOL_NAMESPACE,
+            make_canonical_oee_query_id(start_date, end_date),
+        )
 
     from mes_dashboard.core.heavy_query_telemetry import record_spool_hit
     record_spool_hit("resource_history", canonical_query_id)
-
-    canonical_oee_query_id = make_canonical_oee_query_id(start_date, end_date, granularity)
-    oee_parquet_path = get_spool_file_path(_OEE_SPOOL_NAMESPACE, canonical_oee_query_id)
 
     try:
         from mes_dashboard.services.resource_history_service import (
@@ -750,7 +792,7 @@ def try_compute_query_from_canonical_spool(
         # only the filtered subset without any code changes.
         conn.execute(
             "CREATE TEMP VIEW resource_all AS "
-            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)})"
+            f"SELECT * FROM read_parquet({_sql_str_literal(parquet_path)}){_base_date_filter}"
         )
         _build_resource_lookup_table(conn, resource_lookup, wc_mapping)
         conn.execute(
@@ -763,7 +805,7 @@ def try_compute_query_from_canonical_spool(
         if oee_parquet_path:
             conn.execute(
                 "CREATE TEMP VIEW oee_all AS "
-                f"SELECT * FROM read_parquet({_sql_str_literal(oee_parquet_path)})"
+                f"SELECT * FROM read_parquet({_sql_str_literal(oee_parquet_path)}){_oee_date_filter}"
             )
             conn.execute(
                 "CREATE TEMP VIEW oee_src AS "

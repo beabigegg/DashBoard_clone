@@ -196,28 +196,27 @@ def api_resource_history_query():
     filters = _parse_resource_filters(body)
 
     try:
-        # ── Task 7.2: Try canonical base spool first (DuckDB filter at view time)
-        try:
-            from mes_dashboard.services.resource_history_sql_runtime import (
-                try_compute_query_from_canonical_spool,
-            )
-            canonical_result, _canonical_meta = try_compute_query_from_canonical_spool(
-                start_date=start_date,
-                end_date=end_date,
-                granularity=granularity,
-                workcenter_groups=filters.get("workcenter_groups"),
-                families=filters.get("families"),
-                resource_ids=filters.get("resource_ids"),
-                is_production=filters.get("is_production", False),
-                is_key=filters.get("is_key", False),
-                is_monitor=filters.get("is_monitor", False),
-                package_groups=filters.get("package_groups"),
-            )
-            if canonical_result is not None:
-                _inject_resource_spool_info(canonical_result, canonical_result.get("query_id", ""))
-                return success_response(canonical_result)
-        except Exception:
-            pass  # Best-effort; fall through to Oracle path
+        # Try canonical base spool first (DuckDB filter at view time).
+        # SPOOL_MISS returns (None, meta) — falls through to Oracle path.
+        # A genuine runtime error now propagates (IP-5: removed except Exception: pass).
+        from mes_dashboard.services.resource_history_sql_runtime import (
+            try_compute_query_from_canonical_spool,
+        )
+        canonical_result, _canonical_meta = try_compute_query_from_canonical_spool(
+            start_date=start_date,
+            end_date=end_date,
+            granularity=granularity,
+            workcenter_groups=filters.get("workcenter_groups"),
+            families=filters.get("families"),
+            resource_ids=filters.get("resource_ids"),
+            is_production=filters.get("is_production", False),
+            is_key=filters.get("is_key", False),
+            is_monitor=filters.get("is_monitor", False),
+            package_groups=filters.get("package_groups"),
+        )
+        if canonical_result is not None:
+            _inject_resource_spool_info(canonical_result, canonical_result.get("query_id", ""))
+            return success_response(canonical_result)
 
         result = execute_primary_query(
             start_date=start_date,
