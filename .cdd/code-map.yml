@@ -1,6 +1,6 @@
-# generated: 2026-06-09T09:27:29Z by cdd-kit 2.2.1
-# files: 841, src-lines: 236933, map-lines: 17914, compression: 13.2x
-# sources-digest: 3b4e156857c6bb01acfac95a801644facc3aae7a6947f724851d31c09d630cea
+# generated: 2026-06-10T02:08:30Z by cdd-kit 2.2.1
+# files: 841, src-lines: 237153, map-lines: 17915, compression: 13.2x
+# sources-digest: 1f0e7d09c33ff4aed6820ce4bcab4baa39456bc3a351cda26b2213eacedd0533
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -880,11 +880,11 @@ frontend/src/hold-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-frontend/src/hold-history/App.vue:  # 1109 lines
+frontend/src/hold-history/App.vue:  # 1129 lines
 
 frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
 
-frontend/src/hold-history/components/DetailTable.vue:  # 316 lines
+frontend/src/hold-history/components/DetailTable.vue:  # 321 lines
 
 frontend/src/hold-history/components/DurationChart.vue:  # 130 lines
 
@@ -896,7 +896,7 @@ frontend/src/hold-history/components/ReasonPareto.vue:  # 155 lines
 
 frontend/src/hold-history/components/RecordTypeFilter.vue:  # 87 lines
 
-frontend/src/hold-history/components/SummaryCards.vue:  # 248 lines
+frontend/src/hold-history/components/SummaryCards.vue:  # 247 lines
 
 frontend/src/hold-history/main.ts:  # 9 lines
   imports:
@@ -916,27 +916,28 @@ frontend/src/hold-history/useAutoRefresh.ts:  # 107 lines
     - { name: UseAutoRefreshOptions, lines: 17-20 }
     - { name: UseAutoRefreshReturn, lines: 22-28 }
 
-frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
+frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 587 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer, DuckDBClient], line: 15 }
   constants:
-    - { name: TABLE_NAME, line: 127 }
+    - { name: TABLE_NAME, line: 129 }
+    - { name: SORT_COL_WHITELIST, line: 384 }
   functions:
-    - { name: qs, lines: 131-133 }
-    - { name: qid, lines: 135-137 }
-    - { name: sf, lines: 139-142 }
-    - { name: toRows, lines: 145-147 }
-    - { name: buildRecordTypeConditions, lines: 151-174 }
-    - { name: buildHoldTypeCondition, lines: 176-180 }
-    - { name: buildDurationCondition, lines: 182-189 }
-    - { name: buildBaseConditions, lines: 198-205 }
-    - { name: buildWhere, lines: 207-209 }
-    - { name: async queryTrend, lines: 213-267 }
-    - { name: async queryReasonPareto, lines: 271-303 }
-    - { name: async queryDuration, lines: 307-377 }
-    - { name: async queryList, lines: 389-462 }
-    - { name: useHoldHistoryDuckDB, lines: 466-559 }
+    - { name: qs, lines: 133-135 }
+    - { name: qid, lines: 137-139 }
+    - { name: sf, lines: 141-144 }
+    - { name: toRows, lines: 147-149 }
+    - { name: buildRecordTypeConditions, lines: 153-176 }
+    - { name: buildHoldTypeCondition, lines: 178-182 }
+    - { name: buildDurationCondition, lines: 184-191 }
+    - { name: buildBaseConditions, lines: 200-207 }
+    - { name: buildWhere, lines: 209-211 }
+    - { name: async queryTrend, lines: 215-269 }
+    - { name: async queryReasonPareto, lines: 273-305 }
+    - { name: async queryDuration, lines: 309-379 }
+    - { name: async queryList, lines: 413-486 }
+    - { name: useHoldHistoryDuckDB, lines: 490-587 }
   interfaces:
     - { name: TrendDayMetrics, lines: 20-26 }
     - { name: TrendDay, lines: 29-34 }
@@ -949,9 +950,9 @@ frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
     - { name: HoldListItem, lines: 81-97 }
     - { name: ListResult, lines: 100-103 }
     - { name: ComputeViewResult, lines: 106-111 }
-    - { name: ComputeViewParams, lines: 114-123 }
-    - { name: BaseConditionParams, lines: 191-196 }  # local
-    - { name: QueryListParams, lines: 381-387 }  # local
+    - { name: ComputeViewParams, lines: 114-125 }
+    - { name: BaseConditionParams, lines: 193-198 }  # local
+    - { name: QueryListParams, lines: 403-411 }  # local
 
 frontend/src/hold-overview/App.vue:  # 1006 lines
 
@@ -1807,13 +1808,13 @@ frontend/src/resource-shared/index.ts:  # 13 lines
 
 frontend/src/resource-status/App.vue:  # 834 lines
 
-frontend/src/resource-status/components/EquipmentCard.vue:  # 125 lines
+frontend/src/resource-status/components/EquipmentCard.vue:  # 136 lines
 
 frontend/src/resource-status/components/EquipmentGrid.vue:  # 84 lines
 
 frontend/src/resource-status/components/FilterBar.vue:  # 139 lines
 
-frontend/src/resource-status/components/FloatingTooltip.vue:  # 360 lines
+frontend/src/resource-status/components/FloatingTooltip.vue:  # 407 lines
 
 frontend/src/resource-status/components/MaintenanceAlerts.vue:  # 159 lines
 
@@ -2048,7 +2049,7 @@ frontend/src/shared-ui/components/SkeletonLoader.vue:  # 153 lines
 
 frontend/src/shared-ui/components/StatusBadge.vue:  # 57 lines
 
-frontend/src/shared-ui/components/SummaryCard.vue:  # 228 lines
+frontend/src/shared-ui/components/SummaryCard.vue:  # 211 lines
 
 frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
@@ -4628,7 +4629,7 @@ src/mes_dashboard/routes/health_routes.py:  # 863 lines
     - { name: deep_health_check, lines: 631-837 }  # @health_bp.route('/health/deep', methods=['GET'])
     - { name: frontend_shell_health_check, lines: 841-863 }  # @health_bp.route('/health/frontend-shell', methods=['GET'])
 
-src/mes_dashboard/routes/hold_history_routes.py:  # 350 lines
+src/mes_dashboard/routes/hold_history_routes.py:  # 364 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -4651,9 +4652,9 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 350 lines
     - { name: _normalize_record_type, lines: 139-147 }
     - { name: hold_history_page, lines: 156-174 }  # @hold_history_bp.route('/hold-history')
     - { name: api_hold_history_query, lines: 184-212 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
-    - { name: api_hold_history_view, lines: 222-263 }  # @hold_history_bp.route('/api/hold-history/view')
-    - { name: api_hold_history_config, lines: 272-277 }  # @hold_history_bp.route('/api/hold-history/config')
-    - { name: api_hold_history_today_snapshot, lines: 287-350 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+    - { name: api_hold_history_view, lines: 222-270 }  # @hold_history_bp.route('/api/hold-history/view')
+    - { name: api_hold_history_config, lines: 279-284 }  # @hold_history_bp.route('/api/hold-history/config')
+    - { name: api_hold_history_today_snapshot, lines: 294-364 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
 src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
   imports:
@@ -5271,16 +5272,16 @@ src/mes_dashboard/services/ai_query_understanding.py:  # 681 lines
     - { name: _intent_label, lines: 655-667 }
     - { name: _target_type_label, lines: 670-681 }
 
-src/mes_dashboard/services/ai_schema_context.py:  # 879 lines
+src/mes_dashboard/services/ai_schema_context.py:  # 892 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
   constants:
     - { name: TABLE_DOMAINS, line: 14 }
     - { name: TABLE_SCHEMAS, line: 118 }
-    - { name: SQL_EXAMPLES, line: 462 }
+    - { name: SQL_EXAMPLES, line: 475 }
   functions:
-    - { name: get_schemas_for_domains, lines: 857-869 }
-    - { name: get_examples_for_domains, lines: 872-879 }
+    - { name: get_schemas_for_domains, lines: 870-882 }
+    - { name: get_examples_for_domains, lines: 885-892 }
 
 src/mes_dashboard/services/ai_tool_definitions.py:  # 95 lines
   imports:
@@ -5675,7 +5676,7 @@ src/mes_dashboard/services/filter_cache.py:  # 637 lines
     - { name: _extract_workcenter_data_from_df, lines: 588-624 }
     - { name: init_cache, lines: 631-637 }
 
-src/mes_dashboard/services/hold_dataset_cache.py:  # 430 lines
+src/mes_dashboard/services/hold_dataset_cache.py:  # 434 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -5701,10 +5702,10 @@ src/mes_dashboard/services/hold_dataset_cache.py:  # 430 lines
     - { name: _get_query_dates, lines: 116-127 }
     - { name: _store_df, lines: 130-133 }
     - { name: execute_primary_query, lines: 141-313 }
-    - { name: apply_view, lines: 321-378 }
-    - { name: _empty_views, lines: 381-395 }
-    - { name: make_canonical_warmup_query_id, lines: 408-410 }
-    - { name: ensure_dataset_loaded, lines: 413-430 }
+    - { name: apply_view, lines: 321-382 }
+    - { name: _empty_views, lines: 385-399 }
+    - { name: make_canonical_warmup_query_id, lines: 412-414 }
+    - { name: ensure_dataset_loaded, lines: 417-434 }
 
 src/mes_dashboard/services/hold_history_service.py:  # 507 lines
   imports:
@@ -5749,7 +5750,7 @@ src/mes_dashboard/services/hold_history_service.py:  # 507 lines
     - { name: get_hold_history_duration, lines: 384-431 }
     - { name: get_hold_history_list, lines: 434-507 }
 
-src/mes_dashboard/services/hold_history_sql_runtime.py:  # 770 lines
+src/mes_dashboard/services/hold_history_sql_runtime.py:  # 803 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -5777,13 +5778,13 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 770 lines
     - { name: _query_trend, lines: 135-281 }
     - { name: _query_reason_pareto, lines: 286-337 }
     - { name: _query_duration, lines: 342-432 }
-    - { name: _query_list, lines: 437-603 }
-    - { name: _build_hold_type_clause, lines: 608-612 }
-    - { name: _build_record_type_clause, lines: 615-639 }
-    - { name: _build_duration_clause, lines: 642-653 }
-    - { name: try_compute_view_from_spool, lines: 658-770 }
+    - { name: _query_list, lines: 460-632 }
+    - { name: _build_hold_type_clause, lines: 637-641 }
+    - { name: _build_record_type_clause, lines: 644-668 }
+    - { name: _build_duration_clause, lines: 671-682 }
+    - { name: try_compute_view_from_spool, lines: 687-803 }
 
-src/mes_dashboard/services/hold_today_snapshot_service.py:  # 476 lines
+src/mes_dashboard/services/hold_today_snapshot_service.py:  # 508 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: hashlib, items: [], line: 6 }
@@ -5807,21 +5808,21 @@ src/mes_dashboard/services/hold_today_snapshot_service.py:  # 476 lines
     - { name: _safe_float, lines: 85-96 }
     - { name: _clean_text, lines: 99-108 }
     - { name: _format_datetime, lines: 111-124 }
-    - { name: _cache_key, lines: 127-131 }
-    - { name: _get_cache, lines: 134-145 }
-    - { name: _set_cache, lines: 148-155 }
-    - { name: _apply_record_type_filter_today, lines: 158-179 }
-    - { name: _apply_record_type_filter_current, lines: 182-202 }
-    - { name: _apply_reason_filter, lines: 205-208 }
-    - { name: _apply_duration_filter, lines: 211-220 }
-    - { name: _repeat_quality_qty, lines: 223-231 }
-    - { name: _build_today_summary, lines: 234-267 }
-    - { name: _build_current_summary, lines: 270-299 }
-    - { name: _build_reason_pareto, lines: 302-323 }
-    - { name: _build_duration, lines: 326-361 }
-    - { name: _build_list, lines: 364-404 }
-    - { name: _make_query_id, lines: 407-410 }
-    - { name: execute_today_snapshot, lines: 413-476 }
+    - { name: _cache_key, lines: 127-132 }
+    - { name: _get_cache, lines: 135-146 }
+    - { name: _set_cache, lines: 149-156 }
+    - { name: _apply_record_type_filter_today, lines: 159-180 }
+    - { name: _apply_record_type_filter_current, lines: 183-203 }
+    - { name: _apply_reason_filter, lines: 206-209 }
+    - { name: _apply_duration_filter, lines: 212-221 }
+    - { name: _repeat_quality_qty, lines: 224-232 }
+    - { name: _build_today_summary, lines: 235-268 }
+    - { name: _build_current_summary, lines: 271-300 }
+    - { name: _build_reason_pareto, lines: 303-324 }
+    - { name: _build_duration, lines: 327-362 }
+    - { name: _build_list, lines: 385-425 }
+    - { name: _make_query_id, lines: 428-431 }
+    - { name: execute_today_snapshot, lines: 434-508 }
 
 src/mes_dashboard/services/internal_metrics_service.py:  # 400 lines
   imports:
@@ -6538,7 +6539,7 @@ src/mes_dashboard/services/query_tool_sql_runtime.py:  # 404 lines
     - { name: _append_reject_policy_conditions, lines: 219-285 }
     - { name: try_compute_page_from_spool, lines: 288-404 }
 
-src/mes_dashboard/services/realtime_equipment_cache.py:  # 813 lines
+src/mes_dashboard/services/realtime_equipment_cache.py:  # 831 lines
   imports:
     - { module: json, items: [], line: 8 }
     - { module: logging, items: [], line: 9 }
@@ -6577,19 +6578,19 @@ src/mes_dashboard/services/realtime_equipment_cache.py:  # 813 lines
     - { name: _load_equipment_status_from_oracle, lines: 147-176 }
     - { name: _classify_status, lines: 183-194 }
     - { name: _is_valid_value, lines: 197-216 }
-    - { name: _aggregate_by_resourceid, lines: 219-315 }
-    - { name: _save_to_redis, lines: 322-380 }
-    - { name: _invalidate_equipment_status_lookup, lines: 387-392 }
-    - { name: get_equipment_status_lookup, lines: 395-414 }
-    - { name: get_all_equipment_status, lines: 416-471 }
-    - { name: get_equipment_status_by_id, lines: 474-523 }
-    - { name: get_equipment_status_by_ids, lines: 526-578 }
-    - { name: get_equipment_status_cache_status, lines: 581-656 }
-    - { name: refresh_equipment_status_cache, lines: 663-727 }
-    - { name: _sync_worker, lines: 730-744 }
-    - { name: _start_equipment_status_sync_worker, lines: 747-766 }
-    - { name: stop_equipment_status_sync_worker, lines: 769-779 }
-    - { name: init_realtime_equipment_cache, lines: 786-813 }
+    - { name: _aggregate_by_resourceid, lines: 219-333 }
+    - { name: _save_to_redis, lines: 340-398 }
+    - { name: _invalidate_equipment_status_lookup, lines: 405-410 }
+    - { name: get_equipment_status_lookup, lines: 413-432 }
+    - { name: get_all_equipment_status, lines: 434-489 }
+    - { name: get_equipment_status_by_id, lines: 492-541 }
+    - { name: get_equipment_status_by_ids, lines: 544-596 }
+    - { name: get_equipment_status_cache_status, lines: 599-674 }
+    - { name: refresh_equipment_status_cache, lines: 681-745 }
+    - { name: _sync_worker, lines: 748-762 }
+    - { name: _start_equipment_status_sync_worker, lines: 765-784 }
+    - { name: stop_equipment_status_sync_worker, lines: 787-797 }
+    - { name: init_realtime_equipment_cache, lines: 804-831 }
 
 src/mes_dashboard/services/reason_filter_cache.py:  # 161 lines
   imports:
@@ -7138,7 +7139,7 @@ src/mes_dashboard/services/scrap_reason_exclusion_cache.py:  # 236 lines
     - { name: init_scrap_reason_exclusion_cache, lines: 210-227 }
     - { name: stop_scrap_reason_exclusion_cache_worker, lines: 230-236 }
 
-src/mes_dashboard/services/sql_fragments.py:  # 51 lines
+src/mes_dashboard/services/sql_fragments.py:  # 64 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
   constants:
@@ -7147,7 +7148,7 @@ src/mes_dashboard/services/sql_fragments.py:  # 51 lines
     - { name: RESOURCE_VERSION_SELECT_TEMPLATE, line: 17 }
     - { name: EQUIPMENT_STATUS_VIEW, line: 21 }
     - { name: EQUIPMENT_STATUS_COLUMNS, line: 22 }
-    - { name: EQUIPMENT_STATUS_SELECT_SQL, line: 47 }
+    - { name: EQUIPMENT_STATUS_SELECT_SQL, line: 60 }
 
 src/mes_dashboard/services/trace_job_service.py:  # 1696 lines
   imports:

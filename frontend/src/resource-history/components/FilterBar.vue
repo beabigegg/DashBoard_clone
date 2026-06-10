@@ -52,7 +52,8 @@ function updateFilters(patch: Record<string, unknown>): void {
 
 <template>
   <section class="section-card">
-    <div class="section-inner">
+    <div class="section-inner filter-rows">
+      <!-- Row 1: 日期區間 & 粒度 -->
       <div class="filter-row">
         <div class="filter-field">
           <label for="history-start-date">開始</label>
@@ -92,7 +93,10 @@ function updateFilters(patch: Record<string, unknown>): void {
             </button>
           </div>
         </div>
+      </div>
 
+      <!-- Row 2: 工站群組 & 型號 & 機台 & 封裝群組 -->
+      <div class="filter-row">
         <div class="filter-field">
           <label>工站群組</label>
           <MultiSelect
@@ -137,7 +141,10 @@ function updateFilters(patch: Record<string, unknown>): void {
             @update:model-value="updateFilters({ packageGroups: $event })"
           />
         </div>
+      </div>
 
+      <!-- Row 3: 生產設備 & 重點設備 & 監控設備 + 按鈕 -->
+      <div class="filter-row">
         <div class="checkbox-row">
           <label class="checkbox-pill">
             <input

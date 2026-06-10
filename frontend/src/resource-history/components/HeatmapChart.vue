@@ -61,6 +61,14 @@ const parsedHeatmap = computed(() => {
   };
 });
 
+const ROW_HEIGHT = 36;
+const GRID_OVERHEAD = 120; // top:20 + bottom:100 (visualMap legend)
+
+const chartBodyHeight = computed(() => {
+  const rows = parsedHeatmap.value.workcenters.length;
+  return Math.min(Math.max(280, rows * ROW_HEIGHT + GRID_OVERHEAD), 900);
+});
+
 const chartOption = computed(() => {
   const payload = parsedHeatmap.value;
 
@@ -97,6 +105,7 @@ const chartOption = computed(() => {
     yAxis: {
       type: 'category',
       data: payload.workcenters,
+      inverse: true,
       splitArea: { show: true },
       axisLabel: {
         fontSize: 10,
@@ -136,10 +145,10 @@ const chartOption = computed(() => {
         <option v-for="opt in metricOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </select>
     </div>
-    <div v-if="hasData" class="chart-body" role="img" aria-label="設備稼動率熱力圖">
+    <div v-if="hasData" class="chart-body" :style="{ height: chartBodyHeight + 'px' }" role="img" aria-label="設備稼動率熱力圖">
       <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
-    <div v-else class="chart-no-data">No data</div>
+    <div v-else class="chart-no-data" :style="{ height: chartBodyHeight + 'px' }">No data</div>
   </article>
 </template>
 

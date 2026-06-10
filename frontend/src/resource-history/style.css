@@ -1,5 +1,7 @@
-.theme-resource-history .history-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+.theme-resource-history .filter-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .theme-resource-history .filter-row {
@@ -103,12 +105,16 @@
   border-bottom: 1px solid theme('colors.token.heef2f7');
 }
 
+.theme-resource-history .charts-section {
+  margin-top: 16px;
+}
+
 .theme-resource-history .chart-body {
-  height: 320px;
+  height: 420px;
 }
 
 .theme-resource-history .chart-no-data {
-  height: 320px;
+  height: 420px;
   display: flex;
   align-items: center;
   justify-content: center;

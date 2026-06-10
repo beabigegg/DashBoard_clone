@@ -762,10 +762,6 @@ onMounted(() => {
 <template>
   <div class="resource-page theme-resource-history">
     <div class="dashboard">
-      <header class="header-gradient history-header">
-        <h1>設備歷史績效</h1>
-      </header>
-
       <FilterBar
         :filters="draftFilters"
         :options="filterBarOptions"
@@ -800,7 +796,7 @@ onMounted(() => {
 
       <KpiCards :kpi="summaryData.kpi" />
 
-      <section class="section-card">
+      <section class="section-card charts-section">
         <div class="section-inner">
           <div class="chart-grid">
             <TrendChart :trend="summaryData.trend || []" />

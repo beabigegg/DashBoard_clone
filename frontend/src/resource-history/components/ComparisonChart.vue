@@ -17,11 +17,19 @@ const props = withDefaults(defineProps<{
 
 const rankedData = computed(() => {
   return [...(props.comparison || [])]
-    .sort((left, right) => Number(right.ou_pct || 0) - Number(left.ou_pct || 0))
-    .slice(0, 15);
+    .filter((item) => item.ou_pct != null && item.ou_pct !== '')
+    .sort((left, right) => Number(right.ou_pct || 0) - Number(left.ou_pct || 0));
 });
 
 const hasData = computed(() => rankedData.value.length > 0);
+
+const ROW_HEIGHT = 36;
+const GRID_OVERHEAD = 44; // top:20 + bottom:24
+
+const chartBodyHeight = computed(() => {
+  const rows = rankedData.value.length;
+  return Math.min(Math.max(280, rows * ROW_HEIGHT + GRID_OVERHEAD), 900);
+});
 
 const chartOption = computed(() => {
   const rows = rankedData.value;
@@ -88,10 +96,10 @@ const chartOption = computed(() => {
 
 <template>
   <article class="chart-card">
-    <h3 class="chart-title">Top 15 Workcenter OU%</h3>
-    <div v-if="hasData" class="chart-body" role="img" aria-label="設備稼動率比較圖">
+    <h3 class="chart-title">Workcenter OU%</h3>
+    <div v-if="hasData" class="chart-body" :style="{ height: chartBodyHeight + 'px' }" role="img" aria-label="設備稼動率比較圖">
       <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>
-    <div v-else class="chart-no-data">No data</div>
+    <div v-else class="chart-no-data" :style="{ height: chartBodyHeight + 'px' }">No data</div>
   </article>
 </template>
