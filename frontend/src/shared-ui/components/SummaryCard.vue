@@ -204,8 +204,8 @@ function handleClick() {
 .summary-card[data-accent="neutral"] { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary'); }
 .summary-card[data-accent="prd"]     { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d'); }
 .summary-card[data-accent="sby"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
-.summary-card[data-accent="udt"]     { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309'); }
-.summary-card[data-accent="sdt"]     { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c'); }
-.summary-card[data-accent="egt"]     { --accent-bar: theme('colors.token.h8b5cf6'); --accent-text: theme('colors.token.h6d28d9'); }
+.summary-card[data-accent="udt"]     { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c'); }
+.summary-card[data-accent="sdt"]     { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309'); }
+.summary-card[data-accent="egt"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
 .summary-card[data-accent="nst"]     { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary'); }
 </style>

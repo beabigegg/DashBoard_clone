@@ -6,6 +6,7 @@ import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 import type { DailyTrendRow } from '../types';
+import { STATUS_COLORS } from '../constants';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 
@@ -67,9 +68,9 @@ const chartOption = computed(() => {
       nameTextStyle: { fontSize: 11 },
     },
     series: [
-      { name: 'UDT', type: 'bar', stack: 'total', data: udtData },
-      { name: 'SDT', type: 'bar', stack: 'total', data: sdtData },
-      { name: 'EGT', type: 'bar', stack: 'total', data: egtData },
+      { name: 'UDT', type: 'bar', stack: 'total', data: udtData, itemStyle: { color: STATUS_COLORS.UDT } },
+      { name: 'SDT', type: 'bar', stack: 'total', data: sdtData, itemStyle: { color: STATUS_COLORS.SDT } },
+      { name: 'EGT', type: 'bar', stack: 'total', data: egtData, itemStyle: { color: STATUS_COLORS.EGT } },
     ],
   };
 });
