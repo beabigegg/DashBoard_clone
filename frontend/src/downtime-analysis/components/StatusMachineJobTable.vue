@@ -74,6 +74,12 @@ function machineStatusHours(machine: EquipmentDetailRow, status: string): number
   return (machine[key] as number) ?? 0;
 }
 
+/** Event count for a specific status on this machine */
+function machineStatusEventCount(machine: EquipmentDetailRow, status: string): number {
+  const key = `${status.toLowerCase()}_event_count` as keyof EquipmentDetailRow;
+  return (machine[key] as number) ?? 0;
+}
+
 function toggleGroup(status: string): void {
   if (expandedGroups.value.has(status)) {
     expandedGroups.value.delete(status);
@@ -181,7 +187,7 @@ function handleMachineEventMount(resourceId: string, statusType: string): void {
                 <td>{{ machine.workcenter ?? '—' }}</td>
                 <td>{{ machine.family ?? '—' }}</td>
                 <td>{{ machineStatusHours(machine, status).toFixed(2) }}h</td>
-                <td>{{ machine.event_count }}</td>
+                <td>{{ machineStatusEventCount(machine, status) }}</td>
                 <td>{{ machine.top_reason ?? '—' }}</td>
               </tr>
 

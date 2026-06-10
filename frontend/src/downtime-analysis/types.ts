@@ -41,6 +41,9 @@ export interface EquipmentDetailRow {
   egt_hours: number;
   total_hours: number;
   event_count: number;
+  udt_event_count: number;
+  sdt_event_count: number;
+  egt_event_count: number;
   top_reason: string | null;
 }
 

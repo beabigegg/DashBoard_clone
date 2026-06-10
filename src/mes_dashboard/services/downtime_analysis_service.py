@@ -1037,9 +1037,12 @@ def _build_equipment_detail(
     rows = []
     for rid, grp in grouped:
         res_info = resource_lookup.get(str(rid).strip(), {})
-        udt = float(grp.loc[grp['status'] == 'UDT', 'hours'].sum())
-        sdt = float(grp.loc[grp['status'] == 'SDT', 'hours'].sum())
-        egt = float(grp.loc[grp['status'] == 'EGT', 'hours'].sum())
+        udt_grp = grp.loc[grp['status'] == 'UDT']
+        sdt_grp = grp.loc[grp['status'] == 'SDT']
+        egt_grp = grp.loc[grp['status'] == 'EGT']
+        udt = float(udt_grp['hours'].sum())
+        sdt = float(sdt_grp['hours'].sum())
+        egt = float(egt_grp['hours'].sum())
         total = udt + sdt + egt
         cnt = len(grp)
         # top_reason: reason with highest hours
@@ -1059,6 +1062,9 @@ def _build_equipment_detail(
             'egt_hours': round(egt, 4),
             'total_hours': round(total, 4),
             'event_count': cnt,
+            'udt_event_count': len(udt_grp),
+            'sdt_event_count': len(sdt_grp),
+            'egt_event_count': len(egt_grp),
             'top_reason': top_reason,
         })
 

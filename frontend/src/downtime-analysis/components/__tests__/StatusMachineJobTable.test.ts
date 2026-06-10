@@ -24,6 +24,9 @@ function makeEquipmentRow(override: Partial<EquipmentDetailRow> = {}): Equipment
     egt_hours: 1.0,
     total_hours: 8.0,
     event_count: 3,
+    udt_event_count: 2,
+    sdt_event_count: 1,
+    egt_event_count: 0,
     top_reason: 'EE Repair',
     ...override,
   };
