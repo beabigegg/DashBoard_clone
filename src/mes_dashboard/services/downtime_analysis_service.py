@@ -33,21 +33,29 @@ logger = logging.getLogger("mes_dashboard.downtime_analysis_service")
 _BIG_CATEGORY_MAP: Dict[str, str] = {
     'EE Repair': '維修',
     'EAP Minor stoppage': '維修',
+    'Facilities related Down': '維修',
+    'Group Equipment Down': '維修',
+    'Test Run': '維修',
+    'FAC Repair': '維修',
     'EE_PM': '保養',
     'MF_PM': '保養',
     'PD_PM': '保養',
+    'Cmk inspection': '保養',
+    'Machine Calibration': '保養',
     'Change Type': '改機換料',
     'Change Package': '改機換料',
     'Re Layout': '改機換料',
     'Change Marking Code': '改機換料',
     'Change Model': '改機換料',
     'Change Tool/Consumables': '治工具更換與模具清潔',
+    'Change Tool/Consumables in process': '治工具更換與模具清潔',
     'Clean Mold': '治工具更換與模具清潔',
     'Prod_QC_Inspection': '檢查',
     'Prod_PD_inspection': '檢查',
     'Wait For Instructions': '待料待指示',
     'No Operator': '待料待指示',
     'No Raw Material': '待料待指示',
+    'Programing': '教讀程式',
 }
 
 # Prefix-based category rules (TMTT_* → 檢查)
@@ -525,7 +533,7 @@ def get_filter_options(
         })
 
         # Big categories and reasons from taxonomy
-        big_cats = ['維修', '保養', '改機換料', '治工具更換與模具清潔', '檢查', '待料待指示', '工程', '其他/未分類']
+        big_cats = ['維修', '保養', '改機換料', '治工具更換與模具清潔', '教讀程式', '檢查', '待料待指示', '工程', '其他/未分類']
         reasons = sorted(_BIG_CATEGORY_MAP.keys())
 
         return {

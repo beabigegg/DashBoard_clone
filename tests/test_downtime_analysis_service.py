@@ -478,12 +478,12 @@ class TestBigCategoryMapping:
         """Blank reason → '其他/未分類'."""
         assert _map_big_category('   ', 'UDT') == '其他/未分類'
 
-    def test_big_category_map_has_eight_buckets(self):
-        """Taxonomy must cover all 8 defined categories (DA-04)."""
+    def test_big_category_map_has_nine_buckets(self):
+        """Taxonomy must cover all 9 defined categories (DA-04)."""
         categories = set(_BIG_CATEGORY_MAP.values())
         # EGT → 工程 is handled by status check, not the map
-        # Map covers: 維修, 保養, 換型換線, 換刀清模, 檢查, 待料待指示
-        for cat in ('維修', '保養', '改機換料', '治工具更換與模具清潔', '檢查', '待料待指示'):
+        # Map covers: 維修, 保養, 改機換料, 治工具更換與模具清潔, 教讀程式, 檢查, 待料待指示
+        for cat in ('維修', '保養', '改機換料', '治工具更換與模具清潔', '教讀程式', '檢查', '待料待指示'):
             assert cat in categories, f"Category '{cat}' missing from _BIG_CATEGORY_MAP"
 
 
@@ -614,10 +614,10 @@ class TestFilterCrossNarrowing:
     @patch('mes_dashboard.services.resource_cache.get_all_resources')
     @patch('mes_dashboard.services.filter_cache.get_workcenter_mapping')
     @patch('mes_dashboard.services.resource_cache.get_package_group_name')
-    def test_big_categories_always_returns_all_eight(
+    def test_big_categories_always_returns_all_nine(
         self, mock_pg, mock_wc_map, mock_resources
     ):
-        """big_categories list always contains all 8 categories regardless of filters."""
+        """big_categories list always contains all 9 categories regardless of filters."""
         from mes_dashboard.services.downtime_analysis_service import get_filter_options
 
         mock_resources.return_value = []
@@ -625,7 +625,7 @@ class TestFilterCrossNarrowing:
         mock_pg.return_value = None
 
         opts = get_filter_options()
-        assert len(opts['big_categories']) == 8
+        assert len(opts['big_categories']) == 9
 
 
 # ===========================================================================
