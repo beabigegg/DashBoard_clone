@@ -326,6 +326,37 @@ export function useDowntimeData() {
   }
 
   /**
+   * Fetch filtered big_category and top_reasons from /view with optional status_types.
+   * Updates only summaryData.big_category and summaryData.top_reasons — not summary or daily_trend.
+   * Called when KPI card filter changes so BigCategoryChart and TopReasonsTable stay in sync.
+   */
+  async function loadChartFilterView(statusTypes: string[] | null): Promise<void> {
+    if (!queryId.value) return;
+    try {
+      const params: Record<string, unknown> = { query_id: queryId.value };
+      if (statusTypes && statusTypes.length > 0) {
+        params.status_types = statusTypes.join(',');
+      }
+      const response = await apiGet('/api/downtime-analysis/view', {
+        timeout: API_TIMEOUT,
+        silent: true,
+        params,
+      });
+      const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      if (data) {
+        if (Array.isArray(data.big_category)) {
+          summaryData.big_category = data.big_category as BigCategoryRow[];
+        }
+        if (Array.isArray(data.top_reasons)) {
+          summaryData.top_reasons = data.top_reasons as TopReasonRow[];
+        }
+      }
+    } catch {
+      // Non-fatal: chart filter view update fails silently
+    }
+  }
+
+  /**
    * Load all equipment detail in a single full page (page_size=1000, DQ-2).
    * Accepts optional ChartFilter to narrow results by big_category / status_types.
    * Overwrites equipmentData.rows and equipmentData.pagination.
@@ -433,6 +464,7 @@ export function useDowntimeData() {
     loadEquipmentDetail,
     loadEventDetail,
     loadAllEquipmentDetail,
+    loadChartFilterView,
     loadMachineStatusEvents,
     exportEquipmentDetailCsv,
     exportEventDetailCsv,

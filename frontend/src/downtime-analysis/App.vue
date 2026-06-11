@@ -36,6 +36,7 @@ const {
   executePrimaryQuery,
   applyView,
   loadAllEquipmentDetail,
+  loadChartFilterView,
   loadMachineStatusEvents,
   exportEquipmentDetailCsv,
   resetSummaryData,
@@ -160,11 +161,14 @@ async function handleCategoryClick(category: string | null): Promise<void> {
   await loadAllEquipmentDetail(chartFilter.value);
 }
 
-/** DailyTrendChart legend click: toggle status_types filter, reload equipment, clear Tier 3 */
+/** DailyTrendChart legend click: toggle status_types filter, reload equipment + chart views, clear Tier 3 */
 async function handleStatusClick(statusTypes: string[] | null): Promise<void> {
   chartFilter.value.status_types = statusTypes;
   clearTierThreeCache();
-  await loadAllEquipmentDetail(chartFilter.value);
+  await Promise.all([
+    loadAllEquipmentDetail(chartFilter.value),
+    loadChartFilterView(statusTypes),
+  ]);
 }
 
 /** Tier 2 machine row expand: lazy-load events for this machine+status */

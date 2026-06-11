@@ -1,6 +1,6 @@
-# generated: 2026-06-10T09:43:40Z by cdd-kit 2.2.1
-# files: 841, src-lines: 238109, map-lines: 17969, compression: 13.3x
-# sources-digest: 2834970cf0501cc2fe78df9d3b826511b66e3411282f1b27fc4a48b04143d89a
+# generated: 2026-06-11T11:57:40Z by cdd-kit 2.2.1
+# files: 844, src-lines: 238650, map-lines: 18028, compression: 13.2x
+# sources-digest: f781be2875465db86ed2b501538697797e529ff54aa0afa6fa746c9dcaef0dc9
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -767,21 +767,21 @@ frontend/src/downtime-analysis/__tests__/useFilterState.test.ts:  # 161 lines
 
 frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 103 lines
 
-frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 109 lines
+frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 110 lines
 
 frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 85 lines
 
 frontend/src/downtime-analysis/components/EventDetail.vue:  # 141 lines
 
-frontend/src/downtime-analysis/components/FilterBar.vue:  # 233 lines
+frontend/src/downtime-analysis/components/FilterBar.vue:  # 213 lines
 
-frontend/src/downtime-analysis/components/KpiCards.vue:  # 70 lines
+frontend/src/downtime-analysis/components/KpiCards.vue:  # 107 lines
 
 frontend/src/downtime-analysis/components/MachineEventRows.vue:  # 115 lines
 
-frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 211 lines
+frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 217 lines
 
-frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 44 lines
+frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 49 lines
 
 frontend/src/downtime-analysis/components/__tests__/MachineEventRows.test.ts:  # 111 lines
   imports:
@@ -795,7 +795,7 @@ frontend/src/downtime-analysis/components/__tests__/MachineEventRows.test.ts:  #
   functions:
     - { name: makeEventRow, lines: 21-36 }
 
-frontend/src/downtime-analysis/components/__tests__/StatusMachineJobTable.test.ts:  # 186 lines
+frontend/src/downtime-analysis/components/__tests__/StatusMachineJobTable.test.ts:  # 189 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi], line: 8 }
     - { module: '@vue/test-utils', items: [mount], line: 9 }
@@ -803,7 +803,7 @@ frontend/src/downtime-analysis/components/__tests__/StatusMachineJobTable.test.t
     - { module: '../StatusMachineJobTable.vue', items: ['default:StatusMachineJobTable'], line: 13 }
     - { module: '../../types', items: [EquipmentDetailRow, ChartFilter, TierThreeEntry, DowntimeKpiShape], line: 14 }
   functions:
-    - { name: makeEquipmentRow, lines: 16-30 }
+    - { name: makeEquipmentRow, lines: 16-33 }
 
 frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
   constants:
@@ -837,6 +837,10 @@ frontend/src/downtime-analysis/composables/useFilterState.ts:  # 104 lines
   functions:
     - { name: useFilterState, lines: 26-104 }
 
+frontend/src/downtime-analysis/constants.ts:  # 11 lines
+  constants:
+    - { name: STATUS_COLORS, line: 7 }
+
 frontend/src/downtime-analysis/formatDowntimeDate.ts:  # 50 lines
   functions:
     - { name: formatDowntimeDate, lines: 11-24 }
@@ -848,22 +852,22 @@ frontend/src/downtime-analysis/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/downtime-analysis/types.ts:  # 124 lines
+frontend/src/downtime-analysis/types.ts:  # 128 lines
   interfaces:
     - { name: DowntimeKpiShape, lines: 1-8 }
     - { name: DailyTrendRow, lines: 10-16 }
     - { name: BigCategoryRow, lines: 18-23 }
-    - { name: TopReasonRow, lines: 25-31 }
-    - { name: EquipmentDetailRow, lines: 33-44 }
-    - { name: JobEnrichment, lines: 46-57 }
-    - { name: EventDetailRow, lines: 61-73 }
-    - { name: Pagination, lines: 75-80 }
-    - { name: FilterOptions, lines: 82-89 }
-    - { name: FilterState, lines: 91-104 }
-    - { name: ChartFilter, lines: 110-113 }
-    - { name: TierThreeEntry, lines: 119-124 }
+    - { name: TopReasonRow, lines: 25-32 }
+    - { name: EquipmentDetailRow, lines: 34-48 }
+    - { name: JobEnrichment, lines: 50-61 }
+    - { name: EventDetailRow, lines: 65-77 }
+    - { name: Pagination, lines: 79-84 }
+    - { name: FilterOptions, lines: 86-93 }
+    - { name: FilterState, lines: 95-108 }
+    - { name: ChartFilter, lines: 114-117 }
+    - { name: TierThreeEntry, lines: 123-128 }
   types:
-    - { name: MatchSource, lines: 59-59 }
+    - { name: MatchSource, lines: 63-63 }
 
 frontend/src/hold-detail/App.vue:  # 555 lines
 
@@ -5538,26 +5542,47 @@ src/mes_dashboard/services/dashboard_service.py:  # 504 lines
     - { name: query_ou_trend, lines: 343-420 }
     - { name: query_utilization_heatmap, lines: 427-504 }
 
-src/mes_dashboard/services/downtime_analysis_cache.py:  # 143 lines
+src/mes_dashboard/services/downtime_analysis_cache.py:  # 107 lines
   imports:
     - { module: __future__, items: [annotations], line: 19 }
     - { module: logging, items: [], line: 21 }
     - { module: os, items: [], line: 22 }
-    - { module: threading, items: [], line: 23 }
-    - { module: time, items: [], line: 24 }
-    - { module: datetime, items: [date, timedelta], line: 25 }
+    - { module: typing, items: [Optional], line: 23 }
+    - { module: pandas, items: [], line: 25 }
+    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 27 }
+    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 28 }
+    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 29 }
+  functions:
+    - { name: has_downtime_events, lines: 58-62 }
+    - { name: store_downtime_events, lines: 65-77 }
+    - { name: load_downtime_events, lines: 80-92 }
+    - { name: start_downtime_prewarm, lines: 100-107 }
+
+src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 363 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 17 }
+    - { module: fcntl, items: [], line: 19 }
+    - { module: logging, items: [], line: 20 }
+    - { module: os, items: [], line: 21 }
+    - { module: threading, items: [], line: 22 }
+    - { module: time, items: [], line: 23 }
+    - { module: datetime, items: [date, timedelta], line: 24 }
+    - { module: pathlib, items: [Path], line: 25 }
     - { module: typing, items: [Optional], line: 26 }
     - { module: pandas, items: [], line: 28 }
-    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 30 }
-    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 31 }
-    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 32 }
   functions:
-    - { name: has_downtime_events, lines: 63-67 }
-    - { name: store_downtime_events, lines: 70-82 }
-    - { name: load_downtime_events, lines: 85-97 }
-    - { name: start_downtime_prewarm, lines: 105-143 }
+    - { name: _try_lock, lines: 50-60 }
+    - { name: _release_lock, lines: 63-75 }
+    - { name: _prewarm_dates, lines: 78-82 }
+    - { name: is_duckdb_warm, lines: 85-87 }
+    - { name: should_use_duckdb, lines: 90-117 }
+    - { name: query_base_from_duckdb, lines: 120-149 }
+    - { name: query_job_from_duckdb, lines: 152-182 }
+    - { name: _try_reuse_existing, lines: 185-205 }
+    - { name: _load_and_save, lines: 208-322 }
+    - { name: start_duckdb_prewarm, lines: 325-363 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1239 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1281 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5567,33 +5592,33 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1239 lines
     - { module: pandas, items: [], line: 20 }
     - { module: mes_dashboard.config.constants, items: [DOWNTIME_BRIDGE_VERSION], line: 22 }
   functions:
-    - { name: _map_big_category, lines: 60-87 }
-    - { name: _merge_cross_shift_events, lines: 97-164 }
-    - { name: _build_merged_row, lines: 167-185 }
-    - { name: _bridge_jobid, lines: 192-290 }
-    - { name: _compute_overlap_seconds, lines: 293-302 }
-    - { name: _enrich_event, lines: 305-345 }
-    - { name: _no_match_event, lines: 348-362 }
-    - { name: _add_empty_job_columns, lines: 365-374 }
-    - { name: _safe_str, lines: 377-382 }
-    - { name: _enrich_events_df, lines: 389-422 }
-    - { name: _ts_to_iso, lines: 425-434 }
-    - { name: make_downtime_query_id, lines: 441-446 }
-    - { name: get_filter_options, lines: 453-541 }
-    - { name: query_downtime_dataset, lines: 548-707 }
-    - { name: _apply_resource_filters, lines: 710-796 }
-    - { name: _empty_events_df, lines: 799-806 }
-    - { name: _build_response, lines: 813-826 }
-    - { name: _build_summary, lines: 829-855 }
-    - { name: _build_daily_trend, lines: 858-879 }
-    - { name: _build_big_category, lines: 882-901 }
-    - { name: _build_top_reasons, lines: 904-930 }
-    - { name: apply_view, lines: 937-994 }
-    - { name: _build_equipment_detail_page, lines: 997-1022 }
-    - { name: _build_equipment_detail, lines: 1025-1062 }
-    - { name: _build_event_detail_page, lines: 1065-1126 }
-    - { name: export_equipment_detail_csv, lines: 1134-1177 }
-    - { name: export_event_detail_csv, lines: 1180-1239 }
+    - { name: _map_big_category, lines: 68-95 }
+    - { name: _merge_cross_shift_events, lines: 105-172 }
+    - { name: _build_merged_row, lines: 175-193 }
+    - { name: _bridge_jobid, lines: 200-298 }
+    - { name: _compute_overlap_seconds, lines: 301-310 }
+    - { name: _enrich_event, lines: 313-353 }
+    - { name: _no_match_event, lines: 356-370 }
+    - { name: _add_empty_job_columns, lines: 373-382 }
+    - { name: _safe_str, lines: 385-390 }
+    - { name: _enrich_events_df, lines: 397-430 }
+    - { name: _ts_to_iso, lines: 433-442 }
+    - { name: make_downtime_query_id, lines: 449-454 }
+    - { name: get_filter_options, lines: 461-549 }
+    - { name: query_downtime_dataset, lines: 556-740 }
+    - { name: _apply_resource_filters, lines: 743-829 }
+    - { name: _empty_events_df, lines: 832-839 }
+    - { name: _build_response, lines: 846-859 }
+    - { name: _build_summary, lines: 862-888 }
+    - { name: _build_daily_trend, lines: 891-912 }
+    - { name: _build_big_category, lines: 915-934 }
+    - { name: _build_top_reasons, lines: 937-966 }
+    - { name: apply_view, lines: 973-1030 }
+    - { name: _build_equipment_detail_page, lines: 1033-1058 }
+    - { name: _build_equipment_detail, lines: 1061-1104 }
+    - { name: _build_event_detail_page, lines: 1107-1168 }
+    - { name: export_equipment_detail_csv, lines: 1176-1219 }
+    - { name: export_event_detail_csv, lines: 1222-1281 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -6974,7 +6999,7 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 759 lines
     - { name: _query_and_store_canonical_dataset, lines: 663-731 }
     - { name: ensure_dataset_loaded, lines: 734-759 }
 
-src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 359 lines
+src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 366 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: fcntl, items: [], line: 17 }
@@ -6991,12 +7016,12 @@ src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 359 lines
     - { name: _release_lock, lines: 79-91 }
     - { name: _prewarm_dates, lines: 94-98 }
     - { name: is_duckdb_warm, lines: 101-103 }
-    - { name: should_use_duckdb, lines: 106-128 }
-    - { name: query_base_from_duckdb, lines: 131-156 }
-    - { name: query_oee_from_duckdb, lines: 159-179 }
-    - { name: _try_reuse_existing, lines: 182-204 }
-    - { name: _load_and_save, lines: 207-317 }
-    - { name: start_duckdb_prewarm, lines: 320-359 }
+    - { name: should_use_duckdb, lines: 106-135 }
+    - { name: query_base_from_duckdb, lines: 138-163 }
+    - { name: query_oee_from_duckdb, lines: 166-186 }
+    - { name: _try_reuse_existing, lines: 189-211 }
+    - { name: _load_and_save, lines: 214-324 }
+    - { name: start_duckdb_prewarm, lines: 327-366 }
 
 src/mes_dashboard/services/resource_history_service.py:  # 1026 lines
   imports:
@@ -11897,6 +11922,40 @@ tests/test_distributed_lock.py:  # 168 lines
     - { name: _lock_key, lines: 40-41 }
     - { name: _force_delete, lines: 44-48 }
 
+tests/test_downtime_analysis_duckdb_cache.py:  # 116 lines
+  imports:
+    - { module: os, items: [], line: 10 }
+    - { module: sys, items: [], line: 11 }
+    - { module: datetime, items: [date, timedelta], line: 12 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 13 }
+    - { module: pytest, items: [], line: 15 }
+  classes:
+    - name: TestShouldUseDuckdb
+      lines: 20-63
+      methods:
+        - { name: test_returns_false_when_not_ready, lines: 21-23 }
+        - { name: test_returns_false_for_today_even_when_ready, lines: 25-28 }
+        - { name: test_returns_false_for_future_date, lines: 30-34 }
+        - { name: test_returns_true_for_yesterday_when_ready, lines: 36-40 }
+        - { name: test_returns_false_for_date_older_than_window, lines: 42-47 }
+        - { name: test_returns_false_when_start_date_before_window, lines: 49-55 }
+        - { name: test_returns_true_when_both_dates_inside_window, lines: 57-63 }
+    - name: TestQueryFunctionsWhenNotReady
+      lines: 66-77
+      methods:
+        - { name: test_query_base_returns_empty_when_not_ready, lines: 67-71 }
+        - { name: test_query_job_returns_empty_when_not_ready, lines: 73-77 }
+    - name: TestStartDuckdbPrewarm
+      lines: 80-105
+      methods:
+        - { name: test_disabled_when_prewarm_months_zero, lines: 81-86 }
+        - { name: test_starts_background_thread_when_enabled, lines: 88-96 }
+        - { name: test_skipped_when_redis_disabled, lines: 98-105 }
+    - name: TestStartDowntimePrewarmDelegates
+      lines: 108-116
+      methods:
+        - { name: test_delegates_to_duckdb_module, lines: 109-116 }
+
 tests/test_downtime_analysis_routes.py:  # 461 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
@@ -12033,13 +12092,13 @@ tests/test_downtime_analysis_service.py:  # 1244 lines
         - { name: test_ee_pm_maps_to_保養, lines: 405-406 }
         - { name: test_mf_pm_maps_to_保養, lines: 408-409 }
         - { name: test_pd_pm_maps_to_保養, lines: 411-412 }
-        - { name: test_change_type_maps_to_換型換線, lines: 414-415 }
-        - { name: test_change_package_maps_to_換型換線, lines: 417-418 }
-        - { name: test_re_layout_maps_to_換型換線, lines: 420-421 }
-        - { name: test_change_marking_code_maps_to_換型換線, lines: 423-424 }
-        - { name: test_change_model_maps_to_換型換線, lines: 426-427 }
-        - { name: test_change_tool_maps_to_換刀清模, lines: 429-430 }
-        - { name: test_clean_mold_maps_to_換刀清模, lines: 432-433 }
+        - { name: test_change_type_maps_to_改機換料, lines: 414-415 }
+        - { name: test_change_package_maps_to_改機換料, lines: 417-418 }
+        - { name: test_re_layout_maps_to_改機換料, lines: 420-421 }
+        - { name: test_change_marking_code_maps_to_改機換料, lines: 423-424 }
+        - { name: test_change_model_maps_to_改機換料, lines: 426-427 }
+        - { name: test_change_tool_maps_to_治工具更換與模具清潔, lines: 429-430 }
+        - { name: test_clean_mold_maps_to_治工具更換與模具清潔, lines: 432-433 }
         - { name: test_qc_inspection_maps_to_檢查, lines: 435-436 }
         - { name: test_pd_inspection_maps_to_檢查, lines: 438-439 }
         - { name: test_wait_for_instructions_maps_to_待料待指示, lines: 441-442 }
@@ -12052,7 +12111,7 @@ tests/test_downtime_analysis_service.py:  # 1244 lines
         - { name: test_unknown_reason_maps_to_其他, lines: 469-471 }
         - { name: test_none_reason_maps_to_其他_for_non_egt, lines: 473-475 }
         - { name: test_blank_reason_maps_to_其他, lines: 477-479 }
-        - { name: test_big_category_map_has_eight_buckets, lines: 481-487 }
+        - { name: test_big_category_map_has_nine_buckets, lines: 481-487 }
     - name: TestWaitRepairHours
       lines: 495-557
       methods:
@@ -12068,7 +12127,7 @@ tests/test_downtime_analysis_service.py:  # 1244 lines
       methods:
         - { name: test_workcenter_filter_narrows_resources, lines: 571-589 }
         - { name: test_unfiltered_returns_all_resources, lines: 594-612 }
-        - { name: test_big_categories_always_returns_all_eight, lines: 617-628 }
+        - { name: test_big_categories_always_returns_all_nine, lines: 617-628 }
     - name: TestResourceCacheBaselineFilter
       lines: 636-727
       methods:
@@ -16149,7 +16208,7 @@ tests/test_resource_dataset_cache.py:  # 982 lines
       methods:
         - { name: test_oracle_fallback_used_when_canonical_miss, lines: 944-982 }
 
-tests/test_resource_history_duckdb_cache.py:  # 83 lines
+tests/test_resource_history_duckdb_cache.py:  # 85 lines
   imports:
     - { module: os, items: [], line: 9 }
     - { module: sys, items: [], line: 10 }
@@ -16166,16 +16225,16 @@ tests/test_resource_history_duckdb_cache.py:  # 83 lines
         - { name: test_returns_true_for_yesterday_when_ready, lines: 35-39 }
         - { name: test_returns_false_for_date_older_than_window, lines: 41-46 }
     - name: TestQueryFunctionsWhenNotReady
-      lines: 49-64
+      lines: 49-66
       methods:
-        - { name: test_query_base_returns_empty_when_not_ready, lines: 50-53 }
-        - { name: test_query_oee_returns_empty_when_not_ready, lines: 55-58 }
-        - { name: test_query_base_returns_empty_for_empty_hist_ids, lines: 60-64 }
+        - { name: test_query_base_returns_empty_when_not_ready, lines: 50-54 }
+        - { name: test_query_oee_returns_empty_when_not_ready, lines: 56-60 }
+        - { name: test_query_base_returns_empty_for_empty_hist_ids, lines: 62-66 }
     - name: TestStartDuckdbPrewarm
-      lines: 67-83
+      lines: 69-85
       methods:
-        - { name: test_disabled_when_prewarm_months_zero, lines: 68-73 }
-        - { name: test_starts_background_thread_when_enabled, lines: 75-83 }
+        - { name: test_disabled_when_prewarm_months_zero, lines: 70-75 }
+        - { name: test_starts_background_thread_when_enabled, lines: 77-85 }
 
 tests/test_resource_history_routes.py:  # 497 lines
   imports:

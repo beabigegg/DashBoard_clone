@@ -181,9 +181,10 @@ def api_downtime_view():
     """API: Re-group spool for summary/trend/big-category/top-reasons view.
 
     Query Parameters:
-        query_id:    str (required)
-        granularity: str (day|week|month, default: day)
-        top_n:       int (default: 10)
+        query_id:     str (required)
+        granularity:  str (day|week|month, default: day)
+        top_n:        int (default: 10)
+        status_types: str (optional; CSV e.g. 'UDT,SDT'; filter big_category and top_reasons)
 
     Returns:
         JSON { success, data: { summary, daily_trend, big_category, top_reasons } }
@@ -192,6 +193,7 @@ def api_downtime_view():
     query_id = request.args.get('query_id', '').strip()
     granularity = request.args.get('granularity', 'day').strip()
     top_n = request.args.get('top_n', 10, type=int)
+    status_types = _csv_param(request.args.get('status_types', ''))
 
     if not query_id:
         return validation_error("必須提供 query_id")
@@ -204,6 +206,7 @@ def api_downtime_view():
         query_id=query_id,
         granularity=granularity,
         top_n=top_n,
+        status_types=status_types,
     )
     if result is None:
         return cache_expired_error()
