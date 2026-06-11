@@ -350,6 +350,11 @@ export function useDowntimeData() {
         if (Array.isArray(data.top_reasons)) {
           summaryData.top_reasons = data.top_reasons as TopReasonRow[];
         }
+        const s = data.summary as Partial<DowntimeKpiShape> | undefined;
+        if (s) {
+          if (s.event_count !== undefined) summaryData.summary.event_count = s.event_count;
+          if (s.avg_event_min !== undefined) summaryData.summary.avg_event_min = s.avg_event_min;
+        }
       }
     } catch {
       // Non-fatal: chart filter view update fails silently
