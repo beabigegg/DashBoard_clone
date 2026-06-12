@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import pandas as pd
@@ -63,6 +64,8 @@ _PREFIX_CATEGORIES: List[Tuple[str, str]] = [('TMTT_', '檢查')]
 
 # Freeze the map at module load time (dict is already immutable-equivalent via convention)
 _BIG_CATEGORY_MAP = {str(k).strip(): str(v).strip() for k, v in _BIG_CATEGORY_MAP.items()}
+
+_DOWNTIME_ENGINE_PARALLEL = max(1, int(os.getenv("DOWNTIME_ENGINE_PARALLEL", "3")))
 
 
 def _map_big_category(reason: Optional[str], status: str) -> str:
@@ -599,6 +602,7 @@ def query_downtime_dataset(
     )
     from mes_dashboard.services.batch_query_engine import (
         compute_query_hash as _compute_query_hash,
+        decompose_by_time_range as _decompose_date_range,
         execute_plan,
         merge_chunks_to_spool,
     )
@@ -651,15 +655,15 @@ def query_downtime_dataset(
         job_df = _ddb_job if _ddb_job is not None else pd.DataFrame()
     else:
         # --- BatchQueryEngine path (BQE-07) ---
-        # ADR-0003: whole-dataset single chunk only; no row-count chunking ever.
+        # ADR-0003: date-range chunking with parallel fetch; reductions run on fully assembled DataFrame.
         sql_dir = Path(__file__).resolve().parent.parent / 'sql' / 'downtime_analysis'
         base_sql = (sql_dir / 'base_events.sql').read_text(encoding='utf-8')
         job_sql = (sql_dir / 'job_bridge.sql').read_text(encoding='utf-8')
 
         base_params = {'start_date': start_date, 'end_date': end_date}
 
-        # Single whole-dataset chunk covering the entire date range (ADR-0003).
-        whole_dataset_chunk = [{'start_date': start_date, 'end_date': end_date}]
+        # Date-range chunks for parallel fetch; post-merge stage (ADR-0003) runs on assembled DataFrame.
+        whole_dataset_chunk = _decompose_date_range(start_date, end_date)
         engine_hash = _compute_query_hash({
             'downtime_base_events': True,
             'start_date': start_date,
@@ -668,8 +672,8 @@ def query_downtime_dataset(
 
         def _run_base_chunk(chunk, max_rows_per_chunk=None):
             params = {
-                'start_date': chunk['start_date'],
-                'end_date': chunk['end_date'],
+                'start_date': chunk['chunk_start'],
+                'end_date': chunk['chunk_end'],
             }
             result = _read_sql_df(base_sql, params, caller='downtime_analysis:base_events')
             return result if result is not None else pd.DataFrame()
@@ -677,7 +681,7 @@ def query_downtime_dataset(
         execute_plan(
             whole_dataset_chunk,
             _run_base_chunk,
-            parallel=1,  # whole-dataset single chunk; parallel=1 per ADR-0003
+            parallel=_DOWNTIME_ENGINE_PARALLEL,
             query_hash=engine_hash,
             cache_prefix='downtime_analysis',
         )
