@@ -383,7 +383,13 @@ def execute_primary_query(
                     len(engine_chunks), query_id,
                 )
 
-                if not _spool_available:
+                # --- Engine path: base + OEE execute_plan run in parallel ---
+                _base_engine_result: dict = {"spool_available": _spool_available, "partial_failure": None}
+                _oee_engine_result: dict = {"spool_available": _oee_spool_available, "partial_failure": None}
+
+                def _run_base_engine() -> None:
+                    if _spool_available:
+                        return
                     execute_plan(
                         engine_chunks, _run_base_chunk,
                         parallel=_RESOURCE_ENGINE_PARALLEL,
@@ -391,32 +397,30 @@ def execute_primary_query(
                         cache_prefix="resource",
                         chunk_ttl=_get_cache_ttl(end_date),
                     )
-                    _base_progress = get_batch_progress("resource", engine_hash) or {}
-                    if _base_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
-                        _base_failed = {
+                    _bp = get_batch_progress("resource", engine_hash) or {}
+                    if _bp.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                        _base_engine_result["partial_failure"] = {
                             "has_partial_failure": True,
-                            "failed_chunk_count": _base_progress.get("failed_chunk_count"),
-                            "failed_ranges": _base_progress.get("failed_ranges"),
+                            "failed_chunk_count": _bp.get("failed_chunk_count"),
+                            "failed_ranges": _bp.get("failed_ranges"),
                             "source": "base",
                         }
-                        _partial_failure_meta.update(_base_failed)
                         logger.warning(
                             "resource base partial failure (query_id=%s): failed_ranges=%s",
-                            query_id, _base_progress.get("failed_ranges"),
+                            query_id, _bp.get("failed_ranges"),
                         )
-                    spool_tmp_path, spool_row_count = merge_chunks_to_spool(
-                        "resource", engine_hash, spool_dir=QUERY_SPOOL_DIR,
-                    )
-                    if spool_tmp_path is not None:
+                    _tmp, _rows = merge_chunks_to_spool("resource", engine_hash, spool_dir=QUERY_SPOOL_DIR)
+                    if _tmp is not None:
                         register_spool_file(
-                            _REDIS_NAMESPACE, query_id,
-                            spool_tmp_path, spool_row_count,
+                            _REDIS_NAMESPACE, query_id, _tmp, _rows,
                             ttl_seconds=_get_cache_ttl(end_date),
                         )
                         _dataset_cache.set(query_id, True)
-                        _spool_available = True
+                        _base_engine_result["spool_available"] = True
 
-                if not _oee_spool_available:
+                def _run_oee_engine() -> None:
+                    if _oee_spool_available:
+                        return
                     oee_engine_hash = compute_query_hash({**query_id_input, "_oee": True})
                     # OEE always uses date-range chunks (not row-count chunks) because
                     # the OEE SQL uses chunk_start/chunk_end params, not start_row/end_row.
@@ -428,29 +432,41 @@ def execute_primary_query(
                         cache_prefix="resource_oee",
                         chunk_ttl=_get_cache_ttl(end_date),
                     )
-                    _oee_progress = get_batch_progress("resource_oee", oee_engine_hash) or {}
-                    if _oee_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
-                        _oee_failed = {
+                    _op = get_batch_progress("resource_oee", oee_engine_hash) or {}
+                    if _op.get("has_partial_failure") in (True, "True", "true", "1", 1):
+                        _oee_engine_result["partial_failure"] = {
                             "has_partial_failure": True,
-                            "failed_chunk_count": _oee_progress.get("failed_chunk_count"),
-                            "failed_ranges": _oee_progress.get("failed_ranges"),
+                            "failed_chunk_count": _op.get("failed_chunk_count"),
+                            "failed_ranges": _op.get("failed_ranges"),
                             "source": "oee",
                         }
-                        _partial_failure_meta.update(_oee_failed)
                         logger.warning(
                             "resource OEE partial failure (query_id=%s): failed_ranges=%s",
-                            query_id, _oee_progress.get("failed_ranges"),
+                            query_id, _op.get("failed_ranges"),
                         )
-                    oee_spool_tmp_path, oee_spool_row_count = merge_chunks_to_spool(
-                        "resource_oee", oee_engine_hash, spool_dir=QUERY_SPOOL_DIR,
-                    )
-                    if oee_spool_tmp_path is not None:
+                    _tmp, _rows = merge_chunks_to_spool("resource_oee", oee_engine_hash, spool_dir=QUERY_SPOOL_DIR)
+                    if _tmp is not None:
                         register_spool_file(
-                            _OEE_REDIS_NAMESPACE, query_id,
-                            oee_spool_tmp_path, oee_spool_row_count,
+                            _OEE_REDIS_NAMESPACE, query_id, _tmp, _rows,
                             ttl_seconds=_get_cache_ttl(end_date),
                         )
-                        _oee_spool_available = True
+                        _oee_engine_result["spool_available"] = True
+
+                with ThreadPoolExecutor(max_workers=2) as _eng_ex:
+                    _eng_futures = []
+                    if not _spool_available:
+                        _eng_futures.append(_eng_ex.submit(_run_base_engine))
+                    if not _oee_spool_available:
+                        _eng_futures.append(_eng_ex.submit(_run_oee_engine))
+                    for _f in _eng_futures:
+                        _f.result()
+
+                if _base_engine_result["partial_failure"]:
+                    _partial_failure_meta.update(_base_engine_result["partial_failure"])
+                if _oee_engine_result["partial_failure"]:
+                    _partial_failure_meta.update(_oee_engine_result["partial_failure"])
+                _spool_available = _base_engine_result["spool_available"]
+                _oee_spool_available = _oee_engine_result["spool_available"]
             else:
                 # --- Direct path (short query) — run base + OEE in parallel ---
                 futures = {}
