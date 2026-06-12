@@ -24,7 +24,6 @@ from typing import Optional
 
 import pandas as pd
 
-from mes_dashboard.config.constants import CACHE_TTL_DATASET
 from mes_dashboard.core.cache import ProcessLevelCache, register_process_cache
 from mes_dashboard.core.query_spool_store import (
     get_spool_file_path,
@@ -34,7 +33,7 @@ from mes_dashboard.core.query_spool_store import (
 logger = logging.getLogger("mes_dashboard.downtime_analysis_cache")
 
 # ── TTL ──────────────────────────────────────────────────────────────────────
-_CACHE_TTL = int(os.getenv("DOWNTIME_ANALYSIS_CACHE_TTL", str(CACHE_TTL_DATASET)))
+_CACHE_TTL = int(os.getenv("DOWNTIME_ANALYSIS_CACHE_TTL", "72000"))
 
 
 # ── Redis / spool namespaces ──────────────────────────────────────────────────

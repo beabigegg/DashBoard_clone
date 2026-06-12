@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.18
+schema-version: 1.3.19
 last-changed: 2026-06-05
 breaking-change-policy: deprecate-2-minors
 ---
@@ -32,6 +32,18 @@ breaking-change-policy: deprecate-2-minors
 | soak | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/integration/test_soak_workload.py --run-integration-real -m "soak"` | platform-team | soak report |
 
 ## Gate Compatibility Notes
+
+### RQ prewarm unification + spool TTL alignment (unify-duckdb-prewarm-rq)
+
+- **Tier 1 unit assertions** (covered by existing `unit-mock-integration` gate):
+  - `_WARMUP_JOBS` contains the downtime_analysis DuckDB prewarm entry (AC-3).
+  - `resource_dataset_cache._CACHE_TTL` resolves to 72000 (20h); `CACHE_TTL_DATASET` remains 7200 (2h) (AC-4).
+  - `downtime_analysis_cache._CACHE_TTL` resolves to 72000; `CACHE_TTL_DATASET` unchanged (AC-4).
+  - `RESOURCE_HISTORY_SPOOL_TTL` and `DOWNTIME_ANALYSIS_CACHE_TTL` documented defaults match `env-contract.md` (env-contract pin test pattern).
+- **Tier 3 multi-worker integration updates** (covered by existing `nightly-integration` gate): `tests/integration/test_preload_fork_safety.py` updated to assert: (1) no daemon-thread `start_duckdb_prewarm()` call on gunicorn startup for either service; (2) both services' prewarm RQ jobs appear in `_WARMUP_JOBS` and are enqueued; (3) Oracle prewarm call count is exactly 1 across N workers.
+- **No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1) and `nightly-integration` (Tier 3) gate commands.
+- **Deploy note**: operators must be aware that the implicit spool TTL for resource_history and downtime_analysis changes from 2h to 20h on deploy. No operator action required; the new defaults are intentional. Update ops monitoring for cache-freshness if tracking spool age.
+- **Schema-version bump to 1.3.19 (patch)**: additive gate-compatibility note only; gate tier, command, and status are unchanged.
 
 ### preload_app fork-safety coverage (gunicorn-preload-workers)
 

@@ -1,0 +1,50 @@
+agent: backend-engineer
+change-id: unify-duckdb-prewarm-rq
+date: 2026-06-12
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/core/spool_warmup_scheduler.py:115-170 (added _warmup_resource_history_duckdb_job, _warmup_downtime_analysis_duckdb_job, 2 _WARMUP_JOBS tuples)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_history_duckdb_cache.py:327-350 (replaced start_duckdb_prewarm daemon-thread wrapper with run_prewarm_job)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:351-392 (added run_prewarm_job; retained start_duckdb_prewarm as no-thread shim)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_dataset_cache.py:35 (_CACHE_TTL from CACHE_TTL_DATASET to int(os.getenv(RESOURCE_HISTORY_SPOOL_TTL, 72000)))"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_cache.py:37 (_CACHE_TTL default from str(CACHE_TTL_DATASET) to 72000)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/app.py:834-839 (removed start_duckdb_prewarm and start_downtime_prewarm calls and inline imports)"
+  - type: tests-added
+    pointer: "tests/test_app_startup.py::TestDaemonPrewarmRemovedFromApp (4 AST-based AC-1 absence tests)"
+  - type: tests-added
+    pointer: "tests/test_spool_warmup_scheduler.py::test_resource_history_duckdb_in_warmup_jobs, test_downtime_analysis_duckdb_in_warmup_jobs, test_warmup_jobs_total_count_after_duckdb_additions (AC-3)"
+  - type: tests-added
+    pointer: "tests/test_resource_history_duckdb_cache.py::TestResourceSpoolTtlDefault, TestRunPrewarmJobGate (AC-4, AC-2)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_duckdb_cache.py::TestDowntimeSpoolTtlDefault, TestDowntimeRunPrewarmJobGate (AC-4, AC-2)"
+  - type: tests-added
+    pointer: "tests/test_env_contract.py::TestDuckdbPrewarmTtlDefaults (5 AC-4 env pin tests)"
+  - type: tests-added
+    pointer: "tests/test_rq_warmup_resilience.py (AC-7: 11 tests across 3 classes)"
+  - type: tests-added
+    pointer: "tests/integration/test_preload_fork_safety.py: updated 6 tests + added test_rq_warmup_enqueued_for_resource_history_at_startup, test_rq_warmup_enqueued_for_downtime_analysis_at_startup, test_no_daemon_prewarm_thread_started_at_startup (AC-1/AC-6)"
+  - type: test-output
+    pointer: "73 passed in 0.50s (tests/test_app_startup.py + test_spool_warmup_scheduler.py + test_resource_history_duckdb_cache.py + test_downtime_analysis_duckdb_cache.py + test_env_contract.py + test_rq_warmup_resilience.py)"
+  - type: test-output
+    pointer: "Full Tier 1 gate: 1363 passed, 1 pre-existing failure (TestDowntimeMigration::test_uses_batch_query_engine_not_direct_oracle — present on base branch before this change)"
+  - type: contracts-touched
+    pointer: "n/a (contracts already written: RH-07/08, DA-07/08, env rows, CHANGELOG — no new contract prose added per IP-10)"
+
+notes: |
+  - CACHE_TTL_DATASET in config/constants.py remains 7200 (untouched).
+  - downtime_analysis_cache.py removed unused CACHE_TTL_DATASET import after default changed.
+  - resource_dataset_cache.py removed CACHE_TTL_DATASET import (now uses os.getenv directly).
+  - start_duckdb_prewarm in downtime_analysis_duckdb_cache retained as thin shim for
+    backward compat with existing TestStartDowntimePrewarmDelegates test; shim calls
+    run_prewarm_job() directly (no thread).
+  - Pre-existing ruff violations in duckdb_runtime.py, downtime_analysis_service.py,
+    production_history_service.py unchanged (62 lines before and after this change).
+  - Integration tests (IP-9) updated in-place; all marked integration_real so they
+    are deselected by -m "not integration_real" Tier 1 filter.

@@ -219,7 +219,7 @@ class TestWarmupSpoolHitRouteResponse:
         assert callable(getattr(resource_dataset_cache, "ensure_dataset_loaded", None))
 
     def test_warmup_jobs_cover_expected_reports(self):
-        """All 4 canonical warmup-eligible reports must be in _WARMUP_JOBS."""
+        """All 6 canonical warmup-eligible jobs must be in _WARMUP_JOBS."""
         from mes_dashboard.core.spool_warmup_scheduler import _WARMUP_JOBS
 
         job_fn_names = {fn.__name__ for _, fn in _WARMUP_JOBS}
@@ -227,6 +227,8 @@ class TestWarmupSpoolHitRouteResponse:
         assert "_warmup_yield_alert_dataset_job" in job_fn_names
         assert "_warmup_hold_dataset_job" in job_fn_names
         assert "_warmup_resource_dataset_job" in job_fn_names
+        assert "_warmup_resource_history_duckdb_job" in job_fn_names
+        assert "_warmup_downtime_analysis_duckdb_job" in job_fn_names
 
 
 # ===========================================================================
@@ -277,10 +279,10 @@ class TestProductionHistoryWarmupExclusion:
         docstring = spool_warmup_scheduler.__doc__ or ""
         assert "production" in docstring.lower()
 
-    def test_warmup_job_count_is_exactly_four(self):
-        """Exactly 4 warmup jobs: reject, yield-alert, hold, resource."""
+    def test_warmup_job_count_is_exactly_six(self):
+        """Exactly 6 warmup jobs: reject, yield-alert, hold, resource, resource-history-duckdb, downtime-duckdb."""
         from mes_dashboard.core.spool_warmup_scheduler import _WARMUP_JOBS
-        assert len(_WARMUP_JOBS) == 4
+        assert len(_WARMUP_JOBS) == 6
 
 
 # ===========================================================================

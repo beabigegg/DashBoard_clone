@@ -324,43 +324,26 @@ def _load_and_save() -> None:
     )
 
 
-def start_duckdb_prewarm() -> None:
-    """Start DuckDB pre-warm as a daemon background thread (10s startup delay).
+def run_prewarm_job() -> None:
+    """Execute the DuckDB prewarm body synchronously (called by the RQ warmup worker).
 
-    Safe to call from every gunicorn worker; reuses today's existing cache
-    file if present (idempotent). Disabled when RESOURCE_HISTORY_PREWARM_MONTHS=0.
+    Reuses today's existing cache file if present (idempotent).
+    If another worker holds the fcntl lock, this call returns immediately —
+    the peer will complete the load and the lazy-init path in should_use_duckdb()
+    will discover the file on the first user query.
+    Disabled when RESOURCE_HISTORY_PREWARM_MONTHS=0.
     """
     if _PREWARM_MONTHS <= 0:
         logger.info("resource_history DuckDB prewarm disabled (RESOURCE_HISTORY_PREWARM_MONTHS=0)")
         return
-
-    try:
-        from mes_dashboard.core.redis_client import REDIS_ENABLED
-        if not REDIS_ENABLED:
-            logger.info("resource_history DuckDB prewarm skipped (Redis disabled)")
-            return
-    except Exception:
+    if _try_reuse_existing():
         return
-
-    def _run() -> None:
-        time.sleep(10)
-        if _try_reuse_existing():
-            return
-        if not _try_lock():
-            # Another worker is already loading — wait up to 90s for it to finish.
-            logger.info("resource_history DuckDB prewarm: peer worker loading, waiting…")
-            for _ in range(18):
-                time.sleep(5)
-                if _try_reuse_existing():
-                    return
-            logger.warning("resource_history DuckDB prewarm: timed out waiting for peer worker")
-            return
-        try:
-            _load_and_save()
-        except Exception as exc:
-            logger.warning("resource_history DuckDB prewarm failed: %s", exc)
-        finally:
-            _release_lock()
-
-    threading.Thread(target=_run, daemon=True, name="resource-history-duckdb-prewarm").start()
-    logger.info("resource_history DuckDB prewarm background thread started")
+    if not _try_lock():
+        logger.info("resource_history DuckDB prewarm: peer worker holds lock, skipping this run")
+        return
+    try:
+        _load_and_save()
+    except Exception as exc:
+        logger.warning("resource_history DuckDB prewarm failed: %s", exc)
+    finally:
+        _release_lock()

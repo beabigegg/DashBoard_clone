@@ -47,9 +47,12 @@ def shared_harness():
     with GunicornHarness() as h:
         # Wait for the slowest single-run prewarm before any test asserts on
         # log counts, so counts are stable.
-        h.wait_for_log("resource_history DuckDB prewarm complete", timeout=120)
+        # resource-history and downtime DuckDB prewarms now run via RQ warmup
+        # worker (unify-duckdb-prewarm-rq); wait for the RQ enqueue log instead
+        # of the old daemon-thread sentinel.
+        h.wait_for_log("Enqueued warmup job: warmup-resource-history-duckdb", timeout=30)
+        h.wait_for_log("Enqueued warmup job: warmup-downtime-duckdb", timeout=30)
         h.wait_for_log("material_consumption parts list cache warmup complete", timeout=30)
-        h.wait_for_log("downtime_analysis prewarm", timeout=30)
         yield h
 
 
@@ -61,7 +64,8 @@ def fresh_harness():
     log counts and pool identity start from a known baseline.
     """
     with GunicornHarness() as h:
-        h.wait_for_log("resource_history DuckDB prewarm complete", timeout=120)
+        # Wait for the RQ warmup enqueue sentinel (unify-duckdb-prewarm-rq).
+        h.wait_for_log("Enqueued warmup job: warmup-resource-history-duckdb", timeout=30)
         yield h
 
 
@@ -72,18 +76,22 @@ def fresh_harness():
 
 @pytest.mark.integration_real
 @pytest.mark.multi_worker
-def test_downtime_prewarm_runs_once_across_two_workers(shared_harness):
-    """AC-1: downtime_analysis prewarm executes exactly once across 2 workers.
+def test_downtime_prewarm_enqueued_once_across_two_workers(shared_harness):
+    """AC-1/AC-6: downtime-analysis DuckDB prewarm is enqueued to RQ once at startup.
 
-    With preload_app=True the master calls start_downtime_prewarm() before
-    forking; neither worker should re-trigger the Oracle load.
+    Since unify-duckdb-prewarm-rq, the prewarm is handled by the RQ warmup
+    queue (not a daemon thread in app.py).  The RQ leader enqueues
+    'warmup-downtime-duckdb' exactly once per startup cycle.
     """
-    # The background thread emitting "downtime_analysis prewarm background
-    # thread started" is launched exactly once by start_downtime_prewarm()
-    # in the master.
-    started_count = shared_harness.log_count("downtime_analysis prewarm background thread started")
-    assert started_count == 1, (
-        f"Expected 1 downtime_analysis prewarm thread start, got {started_count}.\n"
+    enqueued_count = shared_harness.log_count("Enqueued warmup job: warmup-downtime-duckdb")
+    assert enqueued_count >= 1, (
+        f"Expected ≥1 'Enqueued warmup job: warmup-downtime-duckdb' log, got {enqueued_count}.\n"
+        "Check that _warmup_downtime_analysis_duckdb_job is in _WARMUP_JOBS.\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
+    )
+    # Confirm the old daemon-thread path is gone.
+    assert not shared_harness.log_contains("downtime_analysis DuckDB prewarm background thread started"), (
+        "Old daemon-thread sentinel appeared — daemon-thread path was not removed.\n"
         f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
     )
 
@@ -101,26 +109,23 @@ def test_material_consumption_warmup_runs_once_across_two_workers(shared_harness
 
 @pytest.mark.integration_real
 @pytest.mark.multi_worker
-def test_resource_history_duckdb_prewarm_runs_once(shared_harness):
-    """AC-1 + AC-6: DuckDB prewarm runs once and no timeout log appears.
+def test_resource_history_duckdb_prewarm_enqueued_once(shared_harness):
+    """AC-1 + AC-6: resource-history DuckDB prewarm is enqueued to RQ once at startup.
 
-    With preload_app=True there is only one writer (the master), so the
-    peer-wait loop must never emit 'timed out waiting for peer worker'.
+    Since unify-duckdb-prewarm-rq, the prewarm is handled by the RQ warmup
+    queue (not a daemon thread in app.py).  The RQ leader enqueues
+    'warmup-resource-history-duckdb' exactly once per startup cycle.
     """
-    # Prewarm logs "prewarm complete" after a fresh Oracle load, or
-    # "reusing today's cache" when an up-to-date DuckDB file already exists
-    # (e.g. the running production service has already written it today).
-    # Either message confirms the master ran start_duckdb_prewarm() exactly once.
-    thread_started = shared_harness.log_count("resource_history DuckDB prewarm background thread started")
-    prewarm_complete = shared_harness.log_count("resource_history DuckDB prewarm complete")
-    prewarm_reused = shared_harness.log_count("resource_history DuckDB prewarm: reusing today's cache")
-    assert thread_started == 1, (
-        f"Expected 1 prewarm thread-start log, got {thread_started}.\n"
+    enqueued_count = shared_harness.log_count("Enqueued warmup job: warmup-resource-history-duckdb")
+    assert enqueued_count >= 1, (
+        f"Expected ≥1 'Enqueued warmup job: warmup-resource-history-duckdb' log, "
+        f"got {enqueued_count}.\n"
+        "Check that _warmup_resource_history_duckdb_job is in _WARMUP_JOBS.\n"
         f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
     )
-    assert prewarm_complete + prewarm_reused == 1, (
-        f"Expected exactly 1 prewarm outcome (complete or reuse), got "
-        f"complete={prewarm_complete} reuse={prewarm_reused}.\n"
+    # Confirm the old daemon-thread path is gone.
+    assert not shared_harness.log_contains("resource_history DuckDB prewarm background thread started"), (
+        "Old daemon-thread sentinel appeared — daemon-thread path was not removed.\n"
         f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
     )
     assert not shared_harness.log_contains("timed out waiting for peer worker"), (
@@ -142,6 +147,66 @@ def test_resource_cache_init_runs_once(shared_harness):
     assert count <= 1, (
         f"Expected resource_cache Oracle load ≤1 time, got {count}.\n"
         "Workers must not re-trigger init_cache() — check post_fork vs create_app() split.\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# AC-1/AC-6: RQ enqueue assertions (unify-duckdb-prewarm-rq)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration_real
+@pytest.mark.multi_worker
+def test_rq_warmup_enqueued_for_resource_history_at_startup(shared_harness):
+    """AC-6: warmup-resource-history-duckdb must be enqueued to RQ at startup.
+
+    Added by unify-duckdb-prewarm-rq: the RQ leader logs 'Enqueued warmup job:
+    warmup-resource-history-duckdb' when init_warmup_scheduler() runs.
+    """
+    count = shared_harness.log_count("Enqueued warmup job: warmup-resource-history-duckdb")
+    assert count >= 1, (
+        f"'Enqueued warmup job: warmup-resource-history-duckdb' appeared {count} times "
+        f"(expected ≥1).\n"
+        "Check that _warmup_resource_history_duckdb_job is in _WARMUP_JOBS and "
+        "WARMUP_SCHEDULER_ENABLED is true.\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
+    )
+
+
+@pytest.mark.integration_real
+@pytest.mark.multi_worker
+def test_rq_warmup_enqueued_for_downtime_analysis_at_startup(shared_harness):
+    """AC-6: warmup-downtime-duckdb must be enqueued to RQ at startup.
+
+    Added by unify-duckdb-prewarm-rq: the RQ leader logs 'Enqueued warmup job:
+    warmup-downtime-duckdb' when init_warmup_scheduler() runs.
+    """
+    count = shared_harness.log_count("Enqueued warmup job: warmup-downtime-duckdb")
+    assert count >= 1, (
+        f"'Enqueued warmup job: warmup-downtime-duckdb' appeared {count} times "
+        f"(expected ≥1).\n"
+        "Check that _warmup_downtime_analysis_duckdb_job is in _WARMUP_JOBS and "
+        "WARMUP_SCHEDULER_ENABLED is true.\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
+    )
+
+
+@pytest.mark.integration_real
+@pytest.mark.multi_worker
+def test_no_daemon_prewarm_thread_started_at_startup(shared_harness):
+    """AC-1: old daemon-thread prewarm sentinels must NOT appear in gunicorn logs.
+
+    Since unify-duckdb-prewarm-rq, app.py no longer calls start_duckdb_prewarm()
+    or start_downtime_prewarm(); neither daemon thread should be started.
+    """
+    assert not shared_harness.log_contains("resource_history DuckDB prewarm background thread started"), (
+        "Old daemon-thread sentinel 'resource_history DuckDB prewarm background thread started' "
+        "appeared — start_duckdb_prewarm() call was not removed from app.py (IP-4).\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
+    )
+    assert not shared_harness.log_contains("downtime_analysis DuckDB prewarm background thread started"), (
+        "Old daemon-thread sentinel 'downtime_analysis DuckDB prewarm background thread started' "
+        "appeared — start_downtime_prewarm() call was not removed from app.py (IP-4).\n"
         f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
     )
 
@@ -333,19 +398,17 @@ def test_duckdb_prewarm_no_timeout_two_workers(shared_harness):
 
 @pytest.mark.integration_real
 @pytest.mark.multi_worker
-def test_duckdb_prewarm_completes_once(shared_harness):
-    """AC-6: DuckDB parquet file is present after 2-worker boot (written by master)."""
-    # resource_history stores its DuckDB cache at tmp/resource_history.duckdb
-    # (not under query_spool — it is a single-file DuckDB database, not parquet).
-    duckdb_file = PROJECT_ROOT / "tmp" / "resource_history.duckdb"
-    assert duckdb_file.exists(), (
-        f"Expected DuckDB file at {duckdb_file}, not found.\n"
-        "Check that start_duckdb_prewarm() ran in master and completed."
-    )
-    started = shared_harness.log_count("resource_history DuckDB prewarm background thread started")
-    assert started >= 1, (
-        f"'resource_history DuckDB prewarm background thread started' appeared {started} times "
-        f"(expected ≥1).\n"
+def test_duckdb_prewarm_enqueued_at_startup(shared_harness):
+    """AC-6: resource-history DuckDB prewarm is enqueued to the RQ warmup queue at startup.
+
+    Since unify-duckdb-prewarm-rq, the DuckDB prewarm runs in an RQ worker,
+    not a gunicorn daemon thread.  The gunicorn master logs the RQ enqueue
+    sentinel; the actual Oracle load runs in the RQ worker process.
+    """
+    enqueued = shared_harness.log_count("Enqueued warmup job: warmup-resource-history-duckdb")
+    assert enqueued >= 1, (
+        f"'Enqueued warmup job: warmup-resource-history-duckdb' appeared {enqueued} times "
+        f"(expected ≥1) — RQ warmup job not registered or leader lock not acquired.\n"
         f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
     )
 
@@ -357,25 +420,27 @@ def test_duckdb_prewarm_completes_once(shared_harness):
 
 @pytest.mark.integration_real
 @pytest.mark.multi_worker
-def test_no_duplicate_parquet_files_on_two_worker_start(shared_harness):
-    """AC-8: Starting 2 workers simultaneously must not produce duplicate parquet files.
+def test_no_duplicate_rq_enqueue_on_two_worker_start(shared_harness):
+    """AC-8: Starting 2 workers simultaneously must produce exactly one RQ enqueue per job.
 
-    With preload_app=True the master is the sole writer; both workers skip the
-    prewarm entirely (it already ran in the master before fork).  The log
-    'resource_history DuckDB prewarm complete' appearing exactly once is the
-    authoritative evidence that no worker retriggers the write.
+    Since unify-duckdb-prewarm-rq, the leader-lock prevents duplicate RQ enqueues.
+    The 'Warmup scheduler: enqueued N warmup jobs (leader)' log should appear
+    exactly once — only the winning leader enqueues.
     """
-    # "background thread started" is logged when start_duckdb_prewarm() is called.
-    # With preload_app=True the master calls it once; workers never call it.
-    # "prewarm complete" only appears after a full Oracle load; if the cache was
-    # already warm the thread exits via _try_reuse_existing() without logging
-    # "complete" — so we check the thread-start sentinel instead.
-    count = shared_harness.log_count("resource_history DuckDB prewarm background thread started")
-    assert count == 1, (
-        f"'resource_history DuckDB prewarm background thread started' appeared {count} times "
-        f"(expected 1) — workers may be re-triggering the master's prewarm.\n"
-        "Check that start_duckdb_prewarm() is in the single-run (master) path "
-        "of create_app(), not in _start_per_worker_services()."
+    # Each worker tries to acquire the Redis leader lock; only one succeeds.
+    # "Warmup scheduler: enqueued" is only logged by the leader.
+    enqueue_log_count = shared_harness.log_count("Warmup scheduler: enqueued")
+    assert enqueue_log_count == 1, (
+        f"'Warmup scheduler: enqueued' appeared {enqueue_log_count} times "
+        f"(expected 1 — only the leader should enqueue).\n"
+        "Check the leader-lock logic in spool_warmup_scheduler.run_warmup_cycle().\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
+    )
+    # The old daemon-thread path must not appear in any worker log.
+    assert not shared_harness.log_contains("resource_history DuckDB prewarm background thread started"), (
+        "Old daemon-thread sentinel 'resource_history DuckDB prewarm background thread started' "
+        "appeared — daemon-thread path was not fully removed (IP-4).\n"
+        f"Log (last 3000 chars):\n{shared_harness.full_log[-3000:]}"
     )
 
 
@@ -407,13 +472,20 @@ def test_worker_crash_respawn_no_master_prewarm_retrigger(fresh_harness):
     # "background thread started" is logged exactly once (by the master) whether
     # the Oracle load ran or the cache was reused.  A respawned worker must NOT
     # re-invoke start_duckdb_prewarm(), so the count must remain 1.
-    duckdb_count = fresh_harness.log_count("resource_history DuckDB prewarm background thread started")
-    assert duckdb_count == 1, (
-        f"'resource_history DuckDB prewarm background thread started' appeared {duckdb_count} times "
-        f"after worker respawn (expected 1).\n"
-        "A respawned worker triggered the master-only prewarm — check that "
-        "start_duckdb_prewarm() is absent from _start_per_worker_services() "
-        "and from the gunicorn post_fork hook."
+    # Since unify-duckdb-prewarm-rq, the DuckDB prewarm goes through the RQ
+    # warmup queue (not a daemon thread in app.py).  The RQ enqueue log
+    # must still appear exactly once (from the leader's initial warmup cycle).
+    rq_enqueue_count = fresh_harness.log_count("Enqueued warmup job: warmup-resource-history-duckdb")
+    assert rq_enqueue_count >= 1, (
+        f"'Enqueued warmup job: warmup-resource-history-duckdb' appeared {rq_enqueue_count} times "
+        f"after worker respawn (expected ≥1).\n"
+        "Check that the RQ warmup job is registered in _WARMUP_JOBS.\n"
+        f"Log (last 3000 chars):\n{fresh_harness.full_log[-3000:]}"
+    )
+    # The old daemon-thread sentinel must be absent.
+    assert not fresh_harness.log_contains("resource_history DuckDB prewarm background thread started"), (
+        "Old daemon-thread sentinel appeared after respawn — daemon path not removed (IP-4).\n"
+        f"Log (last 3000 chars):\n{fresh_harness.full_log[-3000:]}"
     )
 
 

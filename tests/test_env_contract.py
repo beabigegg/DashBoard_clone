@@ -139,3 +139,69 @@ class TestResourceViewCacheTTLDefault:
         assert "RESOURCE_VIEW_CACHE_TTL" in content, (
             "RESOURCE_VIEW_CACHE_TTL must be documented in env-contract.md"
         )
+
+
+# ---------------------------------------------------------------------------
+# unify-duckdb-prewarm-rq: per-service spool TTL defaults (AC-4)
+# ---------------------------------------------------------------------------
+
+class TestDuckdbPrewarmTtlDefaults:
+    """Module-level TTL constants must match the documented defaults in env-contract.md."""
+
+    def test_resource_history_spool_ttl_default_is_72000(self):
+        """resource_dataset_cache._CACHE_TTL must default to 72000 (env-contract.md RESOURCE_HISTORY_SPOOL_TTL).
+
+        This test FAILS before IP-5 is implemented.
+        Import directly; do NOT use monkeypatch.setenv (constant is frozen at import time).
+        """
+        import os
+        saved = os.environ.pop("RESOURCE_HISTORY_SPOOL_TTL", None)
+        try:
+            from mes_dashboard.services import resource_dataset_cache
+            if saved is None:
+                assert resource_dataset_cache._CACHE_TTL == 72000, (
+                    f"resource_dataset_cache._CACHE_TTL expected 72000, got "
+                    f"{resource_dataset_cache._CACHE_TTL}"
+                )
+        finally:
+            if saved is not None:
+                os.environ["RESOURCE_HISTORY_SPOOL_TTL"] = saved
+
+    def test_downtime_analysis_cache_ttl_default_is_72000(self):
+        """downtime_analysis_cache._CACHE_TTL must default to 72000 (env-contract.md DOWNTIME_ANALYSIS_CACHE_TTL).
+
+        This test FAILS before IP-6 is implemented.
+        """
+        import os
+        saved = os.environ.pop("DOWNTIME_ANALYSIS_CACHE_TTL", None)
+        try:
+            from mes_dashboard.services import downtime_analysis_cache
+            if saved is None:
+                assert downtime_analysis_cache._CACHE_TTL == 72000, (
+                    f"downtime_analysis_cache._CACHE_TTL expected 72000, got "
+                    f"{downtime_analysis_cache._CACHE_TTL}"
+                )
+        finally:
+            if saved is not None:
+                os.environ["DOWNTIME_ANALYSIS_CACHE_TTL"] = saved
+
+    def test_cache_ttl_dataset_unchanged_at_7200(self):
+        """CACHE_TTL_DATASET in config/constants.py must remain 7200 (unchanged by this change)."""
+        from mes_dashboard.config.constants import CACHE_TTL_DATASET
+        assert CACHE_TTL_DATASET == 7200, (
+            f"CACHE_TTL_DATASET expected 7200 (must not be changed), got {CACHE_TTL_DATASET}"
+        )
+
+    def test_resource_history_spool_ttl_documented_in_contract(self):
+        """RESOURCE_HISTORY_SPOOL_TTL must appear in env-contract.md."""
+        content = _CONTRACT_PATH.read_text(encoding="utf-8")
+        assert "RESOURCE_HISTORY_SPOOL_TTL" in content, (
+            "RESOURCE_HISTORY_SPOOL_TTL must be documented in env-contract.md"
+        )
+
+    def test_downtime_analysis_cache_ttl_documented_in_contract(self):
+        """DOWNTIME_ANALYSIS_CACHE_TTL must appear in env-contract.md."""
+        content = _CONTRACT_PATH.read_text(encoding="utf-8")
+        assert "DOWNTIME_ANALYSIS_CACHE_TTL" in content, (
+            "DOWNTIME_ANALYSIS_CACHE_TTL must be documented in env-contract.md"
+        )

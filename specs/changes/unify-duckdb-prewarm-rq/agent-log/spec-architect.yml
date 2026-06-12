@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0006-duckdb-prewarm-via-rq-queue.md" }
+  - { type: affected-areas, pointer: "spool-warmup-scheduler, app-startup, resource-history-cache, downtime-analysis-cache, env/business-contracts" }
+  - { type: decision-summary, pointer: "move 2 DuckDB prewarms from master daemon threads to RQ _WARMUP_JOBS; per-service 20h TTL overrides CACHE_TTL_DATASET" }
+  - { type: risks-noted, pointer: "0 high, 1 medium, 2 low" }

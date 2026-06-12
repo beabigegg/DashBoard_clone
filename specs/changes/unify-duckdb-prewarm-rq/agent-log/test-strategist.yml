@@ -1,0 +1,19 @@
+change-id: unify-duckdb-prewarm-rq
+agent: test-strategist
+timestamp: "2026-06-12T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/unify-duckdb-prewarm-rq/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_app_startup.py ↔ src/mes_dashboard/app.py" }
+  - { type: tdd-pairs, pointer: "tests/test_spool_warmup_scheduler.py ↔ src/mes_dashboard/core/spool_warmup_scheduler.py" }
+  - { type: tdd-pairs, pointer: "tests/test_rq_warmup_resilience.py ↔ src/mes_dashboard/services/resource_history_duckdb_cache.py + downtime_analysis_duckdb_cache.py" }
+  - { type: tdd-pairs, pointer: "tests/test_env_contract.py (extend) ↔ src/mes_dashboard/config/constants.py + contracts/env/env-contract.md" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_preload_fork_safety.py (extend) ↔ src/mes_dashboard/app.py + spool_warmup_scheduler.py" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1), integration (Tier 1), resilience (Tier 1)" }
+  - { type: mapping-completeness, pointer: "all 7 ACs covered; daily-refresh 24h soak boundary explicitly deferred to Tier 3 nightly" }
+next-action: none
+notes: >
+  Existing tests test_resource_history_duckdb_prewarm_runs_once and
+  test_downtime_prewarm_runs_once_across_two_workers must be updated in-place
+  (sentinel strings change from daemon-thread log to RQ enqueue log) rather
+  than duplicated. AC-1 absence test uses AST inspection, not mock.

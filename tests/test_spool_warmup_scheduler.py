@@ -162,3 +162,40 @@ def test_init_warmup_scheduler_starts_thread():
     assert mock_cycle.called
     assert sched._SCHEDULER_THREAD is not None
     assert sched._SCHEDULER_THREAD.is_alive()
+
+
+# ---------------------------------------------------------------------------
+# AC-3: new DuckDB prewarm entries in _WARMUP_JOBS (unify-duckdb-prewarm-rq)
+# ---------------------------------------------------------------------------
+
+def test_resource_history_duckdb_in_warmup_jobs():
+    """_WARMUP_JOBS must contain a resource-history DuckDB entry (AC-3)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_id_prefixes = [jid for jid, _ in sched._WARMUP_JOBS]
+    assert any("resource-history-duckdb" in prefix for prefix in job_id_prefixes), (
+        "No 'resource-history-duckdb' entry found in _WARMUP_JOBS prefixes: "
+        f"{job_id_prefixes!r}. Add it per IP-1."
+    )
+
+
+def test_downtime_analysis_duckdb_in_warmup_jobs():
+    """_WARMUP_JOBS must contain a downtime-analysis DuckDB entry (AC-3)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_id_prefixes = [jid for jid, _ in sched._WARMUP_JOBS]
+    assert any("downtime-duckdb" in prefix for prefix in job_id_prefixes), (
+        "No 'downtime-duckdb' entry found in _WARMUP_JOBS prefixes: "
+        f"{job_id_prefixes!r}. Add it per IP-1."
+    )
+
+
+def test_warmup_jobs_total_count_after_duckdb_additions():
+    """_WARMUP_JOBS must have exactly 6 entries after the two DuckDB additions."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    count = len(sched._WARMUP_JOBS)
+    assert count == 6, (
+        f"Expected 6 warmup jobs (4 existing + 2 DuckDB), got {count}: "
+        f"{[jid for jid, _ in sched._WARMUP_JOBS]!r}"
+    )

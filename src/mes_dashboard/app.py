@@ -638,9 +638,10 @@ def _start_per_worker_services(worker=None) -> None:
     Threads do not survive fork(), so every background thread that ran in the
     master (before preload_app fork) must be re-started here in the worker.
 
-    Prewarm calls (start_duckdb_prewarm, start_downtime_prewarm,
-    start_parts_cache_warmup) intentionally remain in create_app() — they
-    run ONCE in the master under preload_app=True and must NOT be called here.
+    Prewarm calls (start_parts_cache_warmup) intentionally remain in
+    create_app() — they run ONCE in the master under preload_app=True and
+    must NOT be called here.  DuckDB prewarms for resource-history and
+    downtime-analysis now go through the RQ warmup queue instead.
 
     Guard: returns immediately when ``FLASK_TESTING`` is set so that test
     suites do not start real background threads.
@@ -829,14 +830,9 @@ def create_app(config_name: str | None = None) -> Flask:
             # _start_per_worker_services).
             # --------------------------------------------------------
 
-            # Pre-warm resource-history DuckDB cache (single parquet file,
-            # guarded by fcntl.flock so concurrent pre-fork calls are safe).
-            from mes_dashboard.services.resource_history_duckdb_cache import start_duckdb_prewarm
-            start_duckdb_prewarm()
-
-            # Pre-warm downtime-analysis spool.
-            from mes_dashboard.services.downtime_analysis_cache import start_downtime_prewarm
-            start_downtime_prewarm()
+            # resource-history DuckDB prewarm and downtime-analysis DuckDB prewarm
+            # are now handled by the RQ warmup queue (_WARMUP_JOBS in
+            # spool_warmup_scheduler.py) — daemon-thread calls removed (unify-duckdb-prewarm-rq).
 
             # Pre-warm material-consumption parts list Redis cache.
             from mes_dashboard.services.material_consumption_service import start_parts_cache_warmup

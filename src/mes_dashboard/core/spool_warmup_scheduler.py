@@ -112,6 +112,36 @@ def _warmup_resource_dataset_job() -> None:
         logger.warning("Warmup [resource_dataset] failed: %s", exc)
 
 
+def _warmup_resource_history_duckdb_job() -> None:
+    """RQ worker function: run the resource-history DuckDB prewarm (daily refresh).
+
+    Previously handled by a daemon thread spawned in app.py startup.
+    Now runs via the RQ warmup queue so the prewarm executes in an RQ worker
+    process with a proper lifecycle, not a gunicorn daemon thread.
+    """
+    try:
+        from mes_dashboard.services.resource_history_duckdb_cache import run_prewarm_job
+        run_prewarm_job()
+        logger.info("Warmup [resource_history_duckdb] complete")
+    except Exception as exc:
+        logger.warning("Warmup [resource_history_duckdb] failed: %s", exc)
+
+
+def _warmup_downtime_analysis_duckdb_job() -> None:
+    """RQ worker function: run the downtime-analysis DuckDB prewarm (daily refresh).
+
+    Previously handled by a daemon thread spawned in app.py startup.
+    Now runs via the RQ warmup queue so the prewarm executes in an RQ worker
+    process with a proper lifecycle, not a gunicorn daemon thread.
+    """
+    try:
+        from mes_dashboard.services.downtime_analysis_duckdb_cache import run_prewarm_job
+        run_prewarm_job()
+        logger.info("Warmup [downtime_analysis_duckdb] complete")
+    except Exception as exc:
+        logger.warning("Warmup [downtime_analysis_duckdb] failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Warmup job registry
 # production-history is intentionally absent — it must NOT be added here.
@@ -123,8 +153,9 @@ _WARMUP_JOBS = [
     # resource-history canonical base dataset design is complete (task 2.2);
     # warmup enabled per task 3.3:
     ("warmup-resource-dataset", _warmup_resource_dataset_job),
-    # resource-history DuckDB pre-warm is handled by start_duckdb_prewarm()
-    # at startup (resource_history_duckdb_cache.py) — not via RQ warmup queue.
+    # DuckDB prewarms moved from gunicorn daemon threads to RQ (unify-duckdb-prewarm-rq):
+    ("warmup-resource-history-duckdb", _warmup_resource_history_duckdb_job),
+    ("warmup-downtime-duckdb", _warmup_downtime_analysis_duckdb_job),
     # production-history intentionally absent — do NOT add here (task 3.4).
 ]
 

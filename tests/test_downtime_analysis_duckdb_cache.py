@@ -78,31 +78,34 @@ class TestQueryFunctionsWhenNotReady:
 
 
 class TestStartDuckdbPrewarm:
+    """start_duckdb_prewarm() is retained as a shim that delegates to run_prewarm_job().
+
+    Updated for unify-duckdb-prewarm-rq: no longer spawns a daemon thread.
+    """
+
     def test_disabled_when_prewarm_months_zero(self):
         from mes_dashboard.services import downtime_analysis_duckdb_cache as m
         with patch.object(m, "_PREWARM_MONTHS", 0), \
-             patch("threading.Thread") as mock_thread:
-            m.start_duckdb_prewarm()
-            mock_thread.assert_not_called()
+             patch.object(m, "_try_reuse_existing") as mock_reuse, \
+             patch.object(m, "_load_and_save") as mock_load:
+            m.start_duckdb_prewarm()  # shim → run_prewarm_job()
+            mock_reuse.assert_not_called()
+            mock_load.assert_not_called()
 
-    def test_starts_background_thread_when_enabled(self):
+    def test_delegates_to_run_prewarm_job(self):
+        """start_duckdb_prewarm must call run_prewarm_job (no thread spawning)."""
         from mes_dashboard.services import downtime_analysis_duckdb_cache as m
-        import threading
-        with patch.object(m, "_PREWARM_MONTHS", 3), \
-             patch("mes_dashboard.core.redis_client.REDIS_ENABLED", True), \
-             patch.object(threading, "Thread") as mock_thread:
-            mock_thread.return_value = MagicMock()
+        with patch.object(m, "run_prewarm_job") as mock_run:
             m.start_duckdb_prewarm()
-            mock_thread.assert_called_once()
+            mock_run.assert_called_once()
 
-    def test_skipped_when_redis_disabled(self):
+    def test_skipped_load_when_already_warm_today(self):
         from mes_dashboard.services import downtime_analysis_duckdb_cache as m
-        import threading
         with patch.object(m, "_PREWARM_MONTHS", 3), \
-             patch("mes_dashboard.core.redis_client.REDIS_ENABLED", False), \
-             patch.object(threading, "Thread") as mock_thread:
-            m.start_duckdb_prewarm()
-            mock_thread.assert_not_called()
+             patch.object(m, "_try_reuse_existing", return_value=True), \
+             patch.object(m, "_load_and_save") as mock_load:
+            m.start_duckdb_prewarm()  # shim → run_prewarm_job()
+            mock_load.assert_not_called()
 
 
 class TestStartDowntimePrewarmDelegates:
@@ -114,3 +117,70 @@ class TestStartDowntimePrewarmDelegates:
             from mes_dashboard.services.downtime_analysis_cache import start_downtime_prewarm
             start_downtime_prewarm()
             mock_ddb_start.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# AC-4: TTL default must be 72000 (unify-duckdb-prewarm-rq)
+# ---------------------------------------------------------------------------
+
+class TestDowntimeSpoolTtlDefault:
+    def test_spool_ttl_default_is_72000(self):
+        """_CACHE_TTL in downtime_analysis_cache must default to 72000 (AC-4).
+
+        NOTE: The constant is module-level (frozen at import time).
+        Do NOT override with monkeypatch.setenv — use setattr.
+        This test FAILS before IP-6 is implemented.
+        """
+        import os
+        saved = os.environ.pop("DOWNTIME_ANALYSIS_CACHE_TTL", None)
+        try:
+            from mes_dashboard.services import downtime_analysis_cache
+            if saved is None:
+                assert downtime_analysis_cache._CACHE_TTL == 72000, (
+                    f"downtime_analysis_cache._CACHE_TTL expected 72000, got "
+                    f"{downtime_analysis_cache._CACHE_TTL}. "
+                    "Change default in downtime_analysis_cache.py line 37 per IP-6."
+                )
+        finally:
+            if saved is not None:
+                os.environ["DOWNTIME_ANALYSIS_CACHE_TTL"] = saved
+
+
+# ---------------------------------------------------------------------------
+# AC-2: loaded_at gate — today → skip reload; yesterday → fresh load
+# ---------------------------------------------------------------------------
+
+class TestDowntimeRunPrewarmJobGate:
+    """AC-2: run_prewarm_job() in downtime_analysis_duckdb_cache must honour loaded_at gate."""
+
+    def test_loaded_at_today_causes_refresh_skip(self):
+        """When _try_reuse_existing returns True (today's cache), Oracle load must not be called."""
+        from mes_dashboard.services import downtime_analysis_duckdb_cache as m
+        from unittest.mock import patch
+
+        with patch.object(m, "_try_reuse_existing", return_value=True) as mock_reuse, \
+             patch.object(m, "_try_lock") as mock_lock, \
+             patch.object(m, "_load_and_save") as mock_load:
+            m.run_prewarm_job()
+            mock_reuse.assert_called_once()
+            mock_load.assert_not_called()
+
+    def test_loaded_at_yesterday_triggers_fresh_load(self):
+        """When _try_reuse_existing returns False and lock is acquired, Oracle load must run."""
+        from mes_dashboard.services import downtime_analysis_duckdb_cache as m
+        from unittest.mock import patch
+
+        with patch.object(m, "_try_reuse_existing", return_value=False), \
+             patch.object(m, "_try_lock", return_value=True), \
+             patch.object(m, "_load_and_save") as mock_load, \
+             patch.object(m, "_release_lock"):
+            m.run_prewarm_job()
+            mock_load.assert_called_once()
+
+    def test_run_prewarm_job_exists_as_module_callable(self):
+        """run_prewarm_job must exist as a module-level callable (IP-3)."""
+        from mes_dashboard.services import downtime_analysis_duckdb_cache as m
+        assert callable(getattr(m, "run_prewarm_job", None)), (
+            "downtime_analysis_duckdb_cache.run_prewarm_job does not exist. "
+            "Expose the prewarm body as a module-level callable per IP-3."
+        )

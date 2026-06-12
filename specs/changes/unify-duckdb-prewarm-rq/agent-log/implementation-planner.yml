@@ -1,0 +1,13 @@
+agent: implementation-planner
+change-id: unify-duckdb-prewarm-rq
+status: done
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/unify-duckdb-prewarm-rq/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-9), contract-reviewer (IP-10)" }
+  - { type: scope-summary, pointer: "in: RQ warmup unification + 2 worker fns + per-service 20h TTL + daemon removal + tests; out: refresh frequency, window size, Oracle batch path, CACHE_TTL_DATASET, other dataset TTLs, parquet cleanup" }
+notes: >
+  Contracts (RH-07/08, DA-07/08, env rows, CHANGELOG, ci-gate assertions) were
+  already written before planning; plan references them by id/path and requires no
+  new contract prose. design.md present and complete (D1-D4). CER-001 in
+  context-manifest remains pending but is non-blocking: test-plan names the two
+  per-service cache test files explicitly under already-allowed tests/.

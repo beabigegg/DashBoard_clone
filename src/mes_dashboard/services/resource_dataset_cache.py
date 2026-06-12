@@ -33,8 +33,7 @@ from mes_dashboard.core.query_spool_store import (
 
 logger = logging.getLogger("mes_dashboard.resource_dataset_cache")
 
-from mes_dashboard.config.constants import CACHE_TTL_DATASET
-_CACHE_TTL = CACHE_TTL_DATASET
+_CACHE_TTL = int(os.getenv("RESOURCE_HISTORY_SPOOL_TTL", "72000"))
 _HISTORICAL_TTL = int(os.getenv("RESOURCE_HISTORY_HISTORICAL_TTL", "86400"))
 _CACHE_MAX_SIZE = 1
 _RESOURCE_ENGINE_PARALLEL = max(1, int(os.getenv("RESOURCE_ENGINE_PARALLEL", "1")))

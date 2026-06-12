@@ -1,6 +1,6 @@
-# generated: 2026-06-11T12:18:24Z by cdd-kit 2.2.1
-# files: 844, src-lines: 238694, map-lines: 18028, compression: 13.2x
-# sources-digest: b1bccf716298802946738218ae81427516d23028351f9c52f0076103c171901e
+# generated: 2026-06-12T02:49:50Z by cdd-kit 2.2.1
+# files: 846, src-lines: 239364, map-lines: 18111, compression: 13.2x
+# sources-digest: 97a503d5e27f549948bd13a5dfd699eb5530233e65dd9d8414324bc5691effd5
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -777,9 +777,9 @@ frontend/src/downtime-analysis/components/FilterBar.vue:  # 213 lines
 
 frontend/src/downtime-analysis/components/KpiCards.vue:  # 107 lines
 
-frontend/src/downtime-analysis/components/MachineEventRows.vue:  # 115 lines
+frontend/src/downtime-analysis/components/MachineEventRows.vue:  # 149 lines
 
-frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 217 lines
+frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 215 lines
 
 frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 49 lines
 
@@ -852,22 +852,22 @@ frontend/src/downtime-analysis/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/downtime-analysis/types.ts:  # 128 lines
+frontend/src/downtime-analysis/types.ts:  # 141 lines
   interfaces:
     - { name: DowntimeKpiShape, lines: 1-8 }
     - { name: DailyTrendRow, lines: 10-16 }
     - { name: BigCategoryRow, lines: 18-23 }
     - { name: TopReasonRow, lines: 25-32 }
     - { name: EquipmentDetailRow, lines: 34-48 }
-    - { name: JobEnrichment, lines: 50-61 }
-    - { name: EventDetailRow, lines: 65-77 }
-    - { name: Pagination, lines: 79-84 }
-    - { name: FilterOptions, lines: 86-93 }
-    - { name: FilterState, lines: 95-108 }
-    - { name: ChartFilter, lines: 114-117 }
-    - { name: TierThreeEntry, lines: 123-128 }
+    - { name: JobEnrichment, lines: 50-74 }
+    - { name: EventDetailRow, lines: 78-90 }
+    - { name: Pagination, lines: 92-97 }
+    - { name: FilterOptions, lines: 99-106 }
+    - { name: FilterState, lines: 108-121 }
+    - { name: ChartFilter, lines: 127-130 }
+    - { name: TierThreeEntry, lines: 136-141 }
   types:
-    - { name: MatchSource, lines: 63-63 }
+    - { name: MatchSource, lines: 76-76 }
 
 frontend/src/hold-detail/App.vue:  # 555 lines
 
@@ -3168,7 +3168,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1632 lines
+src/mes_dashboard/app.py:  # 1628 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3227,9 +3227,9 @@ src/mes_dashboard/app.py:  # 1632 lines
     - { name: _validate_runtime_contract, lines: 522-538 }
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
-    - { name: _start_per_worker_services, lines: 634-745 }
-    - { name: create_app, lines: 754-1506 }
-    - { name: _register_error_handlers, lines: 1509-1632 }
+    - { name: _start_per_worker_services, lines: 634-746 }
+    - { name: create_app, lines: 755-1502 }
+    - { name: _register_error_handlers, lines: 1505-1628 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4282,7 +4282,7 @@ src/mes_dashboard/core/spool_pipeline.py:  # 160 lines
         - { name: complete, lines: 145-153 }
         - { name: fail, lines: 155-160 }
 
-src/mes_dashboard/core/spool_warmup_scheduler.py:  # 260 lines
+src/mes_dashboard/core/spool_warmup_scheduler.py:  # 291 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: logging, items: [], line: 23 }
@@ -4303,11 +4303,13 @@ src/mes_dashboard/core/spool_warmup_scheduler.py:  # 260 lines
     - { name: _warmup_yield_alert_dataset_job, lines: 69-80 }
     - { name: _warmup_hold_dataset_job, lines: 83-94 }
     - { name: _warmup_resource_dataset_job, lines: 97-112 }
-    - { name: _enqueue_warmup_jobs, lines: 136-168 }
-    - { name: run_warmup_cycle, lines: 171-196 }
-    - { name: _scheduler_loop, lines: 207-218 }
-    - { name: init_warmup_scheduler, lines: 221-251 }
-    - { name: stop_warmup_scheduler, lines: 254-260 }
+    - { name: _warmup_resource_history_duckdb_job, lines: 115-127 }
+    - { name: _warmup_downtime_analysis_duckdb_job, lines: 130-142 }
+    - { name: _enqueue_warmup_jobs, lines: 167-199 }
+    - { name: run_warmup_cycle, lines: 202-227 }
+    - { name: _scheduler_loop, lines: 238-249 }
+    - { name: init_warmup_scheduler, lines: 252-282 }
+    - { name: stop_warmup_scheduler, lines: 285-291 }
 
 src/mes_dashboard/core/sync_worker.py:  # 588 lines
   imports:
@@ -5542,47 +5544,47 @@ src/mes_dashboard/services/dashboard_service.py:  # 504 lines
     - { name: query_ou_trend, lines: 343-420 }
     - { name: query_utilization_heatmap, lines: 427-504 }
 
-src/mes_dashboard/services/downtime_analysis_cache.py:  # 107 lines
+src/mes_dashboard/services/downtime_analysis_cache.py:  # 106 lines
   imports:
     - { module: __future__, items: [annotations], line: 19 }
     - { module: logging, items: [], line: 21 }
     - { module: os, items: [], line: 22 }
     - { module: typing, items: [Optional], line: 23 }
     - { module: pandas, items: [], line: 25 }
-    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 27 }
-    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 28 }
-    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 29 }
+    - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 27 }
+    - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 28 }
   functions:
-    - { name: has_downtime_events, lines: 58-62 }
-    - { name: store_downtime_events, lines: 65-77 }
-    - { name: load_downtime_events, lines: 80-92 }
-    - { name: start_downtime_prewarm, lines: 100-107 }
+    - { name: has_downtime_events, lines: 57-61 }
+    - { name: store_downtime_events, lines: 64-76 }
+    - { name: load_downtime_events, lines: 79-91 }
+    - { name: start_downtime_prewarm, lines: 99-106 }
 
-src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 363 lines
+src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 384 lines
   imports:
-    - { module: __future__, items: [annotations], line: 17 }
-    - { module: fcntl, items: [], line: 19 }
-    - { module: logging, items: [], line: 20 }
-    - { module: os, items: [], line: 21 }
-    - { module: threading, items: [], line: 22 }
-    - { module: time, items: [], line: 23 }
-    - { module: datetime, items: [date, timedelta], line: 24 }
-    - { module: pathlib, items: [Path], line: 25 }
-    - { module: typing, items: [Optional], line: 26 }
-    - { module: pandas, items: [], line: 28 }
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: fcntl, items: [], line: 20 }
+    - { module: logging, items: [], line: 21 }
+    - { module: os, items: [], line: 22 }
+    - { module: threading, items: [], line: 23 }
+    - { module: time, items: [], line: 24 }
+    - { module: datetime, items: [date, timedelta], line: 25 }
+    - { module: pathlib, items: [Path], line: 26 }
+    - { module: typing, items: [Optional], line: 27 }
+    - { module: pandas, items: [], line: 29 }
   functions:
-    - { name: _try_lock, lines: 50-60 }
-    - { name: _release_lock, lines: 63-75 }
-    - { name: _prewarm_dates, lines: 78-82 }
-    - { name: is_duckdb_warm, lines: 85-87 }
-    - { name: should_use_duckdb, lines: 90-117 }
-    - { name: query_base_from_duckdb, lines: 120-149 }
-    - { name: query_job_from_duckdb, lines: 152-182 }
-    - { name: _try_reuse_existing, lines: 185-205 }
-    - { name: _load_and_save, lines: 208-322 }
-    - { name: start_duckdb_prewarm, lines: 325-363 }
+    - { name: _try_lock, lines: 54-64 }
+    - { name: _release_lock, lines: 67-79 }
+    - { name: _prewarm_dates, lines: 82-86 }
+    - { name: is_duckdb_warm, lines: 89-91 }
+    - { name: should_use_duckdb, lines: 94-121 }
+    - { name: query_base_from_duckdb, lines: 124-153 }
+    - { name: query_job_from_duckdb, lines: 156-190 }
+    - { name: _try_reuse_existing, lines: 193-225 }
+    - { name: _load_and_save, lines: 228-348 }
+    - { name: run_prewarm_job, lines: 351-373 }
+    - { name: start_duckdb_prewarm, lines: 376-384 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1281 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1302 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5597,28 +5599,28 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1281 lines
     - { name: _build_merged_row, lines: 175-193 }
     - { name: _bridge_jobid, lines: 200-298 }
     - { name: _compute_overlap_seconds, lines: 301-310 }
-    - { name: _enrich_event, lines: 313-353 }
-    - { name: _no_match_event, lines: 356-370 }
-    - { name: _add_empty_job_columns, lines: 373-382 }
-    - { name: _safe_str, lines: 385-390 }
-    - { name: _enrich_events_df, lines: 397-430 }
-    - { name: _ts_to_iso, lines: 433-442 }
-    - { name: make_downtime_query_id, lines: 449-454 }
-    - { name: get_filter_options, lines: 461-549 }
-    - { name: query_downtime_dataset, lines: 556-740 }
-    - { name: _apply_resource_filters, lines: 743-829 }
-    - { name: _empty_events_df, lines: 832-839 }
-    - { name: _build_response, lines: 846-859 }
-    - { name: _build_summary, lines: 862-888 }
-    - { name: _build_daily_trend, lines: 891-912 }
-    - { name: _build_big_category, lines: 915-934 }
-    - { name: _build_top_reasons, lines: 937-966 }
-    - { name: apply_view, lines: 973-1030 }
-    - { name: _build_equipment_detail_page, lines: 1033-1058 }
-    - { name: _build_equipment_detail, lines: 1061-1104 }
-    - { name: _build_event_detail_page, lines: 1107-1168 }
-    - { name: export_equipment_detail_csv, lines: 1176-1219 }
-    - { name: export_event_detail_csv, lines: 1222-1281 }
+    - { name: _enrich_event, lines: 313-360 }
+    - { name: _no_match_event, lines: 363-383 }
+    - { name: _add_empty_job_columns, lines: 386-397 }
+    - { name: _safe_str, lines: 400-405 }
+    - { name: _enrich_events_df, lines: 412-445 }
+    - { name: _ts_to_iso, lines: 448-457 }
+    - { name: make_downtime_query_id, lines: 464-469 }
+    - { name: get_filter_options, lines: 476-564 }
+    - { name: query_downtime_dataset, lines: 571-755 }
+    - { name: _apply_resource_filters, lines: 758-844 }
+    - { name: _empty_events_df, lines: 847-854 }
+    - { name: _build_response, lines: 861-874 }
+    - { name: _build_summary, lines: 877-903 }
+    - { name: _build_daily_trend, lines: 906-927 }
+    - { name: _build_big_category, lines: 930-949 }
+    - { name: _build_top_reasons, lines: 952-981 }
+    - { name: apply_view, lines: 988-1045 }
+    - { name: _build_equipment_detail_page, lines: 1048-1073 }
+    - { name: _build_equipment_detail, lines: 1076-1119 }
+    - { name: _build_event_detail_page, lines: 1122-1189 }
+    - { name: export_equipment_detail_csv, lines: 1197-1240 }
+    - { name: export_event_detail_csv, lines: 1243-1302 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -6961,7 +6963,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1261 lines
     - { name: get_vendors, lines: 1231-1233 }
     - { name: get_resource_cascade_metadata, lines: 1236-1261 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 759 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 758 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6976,30 +6978,29 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 759 lines
     - { module: mes_dashboard.core.cache, items: [MemoryTTLCache, ProcessLevelCache, register_process_cache], line: 25 }
     - { module: mes_dashboard.core.database, items: [read_sql_df], line: 26 }
     - { module: mes_dashboard.core.query_spool_store, items: [QUERY_SPOOL_DIR, get_spool_file_path, register_spool_file, store_spooled_df], line: 27 }
-    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 36 }
   functions:
-    - { name: _get_cache_ttl, lines: 49-56 }
-    - { name: _load_sql, lines: 70-72 }  # @lru_cache(maxsize=4)
-    - { name: _make_query_id, lines: 80-83 }
-    - { name: _has_cached_df, lines: 91-95 }
-    - { name: _store_df, lines: 98-101 }
-    - { name: _has_cached_oee_df, lines: 104-106 }
-    - { name: _store_oee_df, lines: 109-111 }
-    - { name: _get_resource_lookup, lines: 119-130 }
-    - { name: _get_workcenter_mapping, lines: 133-140 }
-    - { name: _get_filtered_resources_and_lookup, lines: 143-171 }
-    - { name: execute_primary_query, lines: 179-528 }
-    - { name: apply_view, lines: 536-577 }
-    - { name: _empty_summary, lines: 580-586 }
-    - { name: _empty_detail, lines: 589-590 }
-    - { name: _empty_detail_by_date, lines: 593-594 }
-    - { name: _empty_kpi, lines: 597-618 }
-    - { name: make_canonical_base_query_id, lines: 635-646 }
-    - { name: make_canonical_oee_query_id, lines: 649-660 }
-    - { name: _query_and_store_canonical_dataset, lines: 663-731 }
-    - { name: ensure_dataset_loaded, lines: 734-759 }
+    - { name: _get_cache_ttl, lines: 48-55 }
+    - { name: _load_sql, lines: 69-71 }  # @lru_cache(maxsize=4)
+    - { name: _make_query_id, lines: 79-82 }
+    - { name: _has_cached_df, lines: 90-94 }
+    - { name: _store_df, lines: 97-100 }
+    - { name: _has_cached_oee_df, lines: 103-105 }
+    - { name: _store_oee_df, lines: 108-110 }
+    - { name: _get_resource_lookup, lines: 118-129 }
+    - { name: _get_workcenter_mapping, lines: 132-139 }
+    - { name: _get_filtered_resources_and_lookup, lines: 142-170 }
+    - { name: execute_primary_query, lines: 178-527 }
+    - { name: apply_view, lines: 535-576 }
+    - { name: _empty_summary, lines: 579-585 }
+    - { name: _empty_detail, lines: 588-589 }
+    - { name: _empty_detail_by_date, lines: 592-593 }
+    - { name: _empty_kpi, lines: 596-617 }
+    - { name: make_canonical_base_query_id, lines: 634-645 }
+    - { name: make_canonical_oee_query_id, lines: 648-659 }
+    - { name: _query_and_store_canonical_dataset, lines: 662-730 }
+    - { name: ensure_dataset_loaded, lines: 733-758 }
 
-src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 366 lines
+src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 349 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: fcntl, items: [], line: 17 }
@@ -7021,7 +7022,7 @@ src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 366 lines
     - { name: query_oee_from_duckdb, lines: 166-186 }
     - { name: _try_reuse_existing, lines: 189-211 }
     - { name: _load_and_save, lines: 214-324 }
-    - { name: start_duckdb_prewarm, lines: 327-366 }
+    - { name: run_prewarm_job, lines: 327-349 }
 
 src/mes_dashboard/services/resource_history_service.py:  # 1026 lines
   imports:
@@ -8864,7 +8865,7 @@ tests/integration/test_oracle_error_path.py:  # 296 lines
     - { name: _assert_503_envelope, lines: 77-90 }
     - { name: _assert_500_generic, lines: 93-111 }
 
-tests/integration/test_preload_fork_safety.py:  # 463 lines
+tests/integration/test_preload_fork_safety.py:  # 535 lines
   imports:
     - { module: __future__, items: [annotations], line: 20 }
     - { module: concurrent.futures, items: [], line: 22 }
@@ -8876,24 +8877,27 @@ tests/integration/test_preload_fork_safety.py:  # 463 lines
     - { module: tests.integration._multi_worker_harness, items: [GunicornHarness], line: 30 }
   constants:
     - { name: PROJECT_ROOT, line: 32 }
-    - { name: EXPECTED_THREAD_SUBSTRINGS, line: 276 }
+    - { name: EXPECTED_THREAD_SUBSTRINGS, line: 341 }
   functions:
-    - { name: shared_harness, lines: 40-53 }  # @pytest.fixture(scope='module')
-    - { name: fresh_harness, lines: 57-65 }  # @pytest.fixture()
-    - { name: test_downtime_prewarm_runs_once_across_two_workers, lines: 75-88 }  # @pytest.mark.integration_real
-    - { name: test_material_consumption_warmup_runs_once_across_two_workers, lines: 93-99 }  # @pytest.mark.integration_real
-    - { name: test_resource_history_duckdb_prewarm_runs_once, lines: 104-129 }  # @pytest.mark.integration_real
-    - { name: test_resource_cache_init_runs_once, lines: 134-146 }  # @pytest.mark.integration_real
-    - { name: test_each_worker_has_distinct_oracle_engine_pool, lines: 156-175 }  # @pytest.mark.integration_real
-    - { name: test_concurrent_oracle_requests_no_cross_talk, lines: 180-206 }  # @pytest.mark.integration_real
-    - { name: test_each_worker_has_distinct_redis_pool, lines: 216-231 }  # @pytest.mark.integration_real
-    - { name: test_sqlite_no_wal_corruption_on_restart, lines: 241-261 }  # @pytest.mark.integration_real
-    - { name: test_all_background_threads_alive_post_fork, lines: 287-310 }  # @pytest.mark.integration_real
-    - { name: test_duckdb_prewarm_no_timeout_two_workers, lines: 320-331 }  # @pytest.mark.integration_real
-    - { name: test_duckdb_prewarm_completes_once, lines: 336-350 }  # @pytest.mark.integration_real
-    - { name: test_no_duplicate_parquet_files_on_two_worker_start, lines: 360-379 }  # @pytest.mark.integration_real
-    - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 389-417 }  # @pytest.mark.integration_real
-    - { name: test_worker_crash_respawn_fresh_connections, lines: 422-463 }  # @pytest.mark.integration_real
+    - { name: shared_harness, lines: 40-56 }  # @pytest.fixture(scope='module')
+    - { name: fresh_harness, lines: 60-69 }  # @pytest.fixture()
+    - { name: test_downtime_prewarm_enqueued_once_across_two_workers, lines: 79-96 }  # @pytest.mark.integration_real
+    - { name: test_material_consumption_warmup_runs_once_across_two_workers, lines: 101-107 }  # @pytest.mark.integration_real
+    - { name: test_resource_history_duckdb_prewarm_enqueued_once, lines: 112-134 }  # @pytest.mark.integration_real
+    - { name: test_resource_cache_init_runs_once, lines: 139-151 }  # @pytest.mark.integration_real
+    - { name: test_rq_warmup_enqueued_for_resource_history_at_startup, lines: 160-173 }  # @pytest.mark.integration_real
+    - { name: test_rq_warmup_enqueued_for_downtime_analysis_at_startup, lines: 178-191 }  # @pytest.mark.integration_real
+    - { name: test_no_daemon_prewarm_thread_started_at_startup, lines: 196-211 }  # @pytest.mark.integration_real
+    - { name: test_each_worker_has_distinct_oracle_engine_pool, lines: 221-240 }  # @pytest.mark.integration_real
+    - { name: test_concurrent_oracle_requests_no_cross_talk, lines: 245-271 }  # @pytest.mark.integration_real
+    - { name: test_each_worker_has_distinct_redis_pool, lines: 281-296 }  # @pytest.mark.integration_real
+    - { name: test_sqlite_no_wal_corruption_on_restart, lines: 306-326 }  # @pytest.mark.integration_real
+    - { name: test_all_background_threads_alive_post_fork, lines: 352-375 }  # @pytest.mark.integration_real
+    - { name: test_duckdb_prewarm_no_timeout_two_workers, lines: 385-396 }  # @pytest.mark.integration_real
+    - { name: test_duckdb_prewarm_enqueued_at_startup, lines: 401-413 }  # @pytest.mark.integration_real
+    - { name: test_no_duplicate_rq_enqueue_on_two_worker_start, lines: 423-444 }  # @pytest.mark.integration_real
+    - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 454-489 }  # @pytest.mark.integration_real
+    - { name: test_worker_crash_respawn_fresh_connections, lines: 494-535 }  # @pytest.mark.integration_real
 
 tests/integration/test_race_conditions.py:  # 387 lines
   imports:
@@ -10950,6 +10954,24 @@ tests/test_app_factory.py:  # 282 lines
         - { name: test_reinit_sqlite_handles_does_not_crash_in_test_mode, lines: 246-255 }
         - { name: test_api_contracts_unchanged_after_preload, lines: 257-278 }
 
+tests/test_app_startup.py:  # 85 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 8 }
+    - { module: ast, items: [], line: 10 }
+    - { module: pathlib, items: [Path], line: 11 }
+    - { module: pytest, items: [], line: 13 }
+  classes:
+    - name: TestDaemonPrewarmRemovedFromApp
+      lines: 18-85
+      methods:
+        - { name: _parse_app, lines: 21-23 }
+        - { name: _all_call_names, lines: 25-35 }
+        - { name: _all_imported_names, lines: 37-49 }
+        - { name: test_start_duckdb_prewarm_not_called_in_app, lines: 51-58 }
+        - { name: test_start_downtime_prewarm_not_called_in_app, lines: 60-67 }
+        - { name: test_start_duckdb_prewarm_not_imported_in_app, lines: 69-76 }
+        - { name: test_start_downtime_prewarm_not_imported_in_app, lines: 78-85 }
+
 tests/test_async_job_timeout.py:  # 227 lines
   imports:
     - { module: time, items: [], line: 15 }
@@ -11922,7 +11944,7 @@ tests/test_distributed_lock.py:  # 168 lines
     - { name: _lock_key, lines: 40-41 }
     - { name: _force_delete, lines: 44-48 }
 
-tests/test_downtime_analysis_duckdb_cache.py:  # 116 lines
+tests/test_downtime_analysis_duckdb_cache.py:  # 186 lines
   imports:
     - { module: os, items: [], line: 10 }
     - { module: sys, items: [], line: 11 }
@@ -11946,15 +11968,25 @@ tests/test_downtime_analysis_duckdb_cache.py:  # 116 lines
         - { name: test_query_base_returns_empty_when_not_ready, lines: 67-71 }
         - { name: test_query_job_returns_empty_when_not_ready, lines: 73-77 }
     - name: TestStartDuckdbPrewarm
-      lines: 80-105
+      lines: 80-108
       methods:
-        - { name: test_disabled_when_prewarm_months_zero, lines: 81-86 }
-        - { name: test_starts_background_thread_when_enabled, lines: 88-96 }
-        - { name: test_skipped_when_redis_disabled, lines: 98-105 }
+        - { name: test_disabled_when_prewarm_months_zero, lines: 86-93 }
+        - { name: test_delegates_to_run_prewarm_job, lines: 95-100 }
+        - { name: test_skipped_load_when_already_warm_today, lines: 102-108 }
     - name: TestStartDowntimePrewarmDelegates
-      lines: 108-116
+      lines: 111-119
       methods:
-        - { name: test_delegates_to_duckdb_module, lines: 109-116 }
+        - { name: test_delegates_to_duckdb_module, lines: 112-119 }
+    - name: TestDowntimeSpoolTtlDefault
+      lines: 126-146
+      methods:
+        - { name: test_spool_ttl_default_is_72000, lines: 127-146 }
+    - name: TestDowntimeRunPrewarmJobGate
+      lines: 153-186
+      methods:
+        - { name: test_loaded_at_today_causes_refresh_skip, lines: 156-166 }
+        - { name: test_loaded_at_yesterday_triggers_fresh_load, lines: 168-178 }
+        - { name: test_run_prewarm_job_exists_as_module_callable, lines: 180-186 }
 
 tests/test_downtime_analysis_routes.py:  # 461 lines
   imports:
@@ -12211,7 +12243,7 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
 
-tests/test_env_contract.py:  # 141 lines
+tests/test_env_contract.py:  # 207 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pathlib, items: [Path], line: 9 }
@@ -12239,6 +12271,14 @@ tests/test_env_contract.py:  # 141 lines
       methods:
         - { name: test_resource_view_cache_ttl_default_equals_300, lines: 118-134 }
         - { name: test_resource_view_cache_ttl_documented_in_contract, lines: 136-141 }
+    - name: TestDuckdbPrewarmTtlDefaults
+      lines: 148-207
+      methods:
+        - { name: test_resource_history_spool_ttl_default_is_72000, lines: 151-168 }
+        - { name: test_downtime_analysis_cache_ttl_default_is_72000, lines: 170-186 }
+        - { name: test_cache_ttl_dataset_unchanged_at_7200, lines: 188-193 }
+        - { name: test_resource_history_spool_ttl_documented_in_contract, lines: 195-200 }
+        - { name: test_downtime_analysis_cache_ttl_documented_in_contract, lines: 202-207 }
 
 tests/test_event_fetcher.py:  # 413 lines
   imports:
@@ -16208,7 +16248,7 @@ tests/test_resource_dataset_cache.py:  # 982 lines
       methods:
         - { name: test_oracle_fallback_used_when_canonical_miss, lines: 944-982 }
 
-tests/test_resource_history_duckdb_cache.py:  # 85 lines
+tests/test_resource_history_duckdb_cache.py:  # 158 lines
   imports:
     - { module: os, items: [], line: 9 }
     - { module: sys, items: [], line: 10 }
@@ -16230,11 +16270,21 @@ tests/test_resource_history_duckdb_cache.py:  # 85 lines
         - { name: test_query_base_returns_empty_when_not_ready, lines: 50-54 }
         - { name: test_query_oee_returns_empty_when_not_ready, lines: 56-60 }
         - { name: test_query_base_returns_empty_for_empty_hist_ids, lines: 62-66 }
-    - name: TestStartDuckdbPrewarm
-      lines: 69-85
+    - name: TestRunPrewarmJobDisabledWhenMonthsZero
+      lines: 69-91
       methods:
-        - { name: test_disabled_when_prewarm_months_zero, lines: 70-75 }
-        - { name: test_starts_background_thread_when_enabled, lines: 77-85 }
+        - { name: test_disabled_when_prewarm_months_zero, lines: 76-83 }
+        - { name: test_skips_load_when_already_warm_today, lines: 85-91 }
+    - name: TestResourceSpoolTtlDefault
+      lines: 98-118
+      methods:
+        - { name: test_spool_ttl_default_is_72000, lines: 99-118 }
+    - name: TestRunPrewarmJobGate
+      lines: 125-158
+      methods:
+        - { name: test_loaded_at_today_causes_refresh_skip, lines: 128-138 }
+        - { name: test_loaded_at_yesterday_triggers_fresh_load, lines: 140-150 }
+        - { name: test_run_prewarm_job_exists_as_module_callable, lines: 152-158 }
 
 tests/test_resource_history_routes.py:  # 497 lines
   imports:
@@ -16560,6 +16610,36 @@ tests/test_rq_monitor_service.py:  # 224 lines
         - { name: test_aggregates_all_sections, lines: 198-212 }
         - { name: test_graceful_on_partial_failure, lines: 214-224 }
 
+tests/test_rq_warmup_resilience.py:  # 170 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 11 }
+    - { module: tempfile, items: [], line: 13 }
+    - { module: pathlib, items: [Path], line: 14 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  classes:
+    - name: TestResourceHistoryRqFallback
+      lines: 24-76
+      methods:
+        - { name: test_should_use_duckdb_returns_false_when_cache_not_ready, lines: 29-40 }
+        - { name: test_query_base_returns_empty_df_when_not_warm, lines: 42-48 }
+        - { name: test_query_oee_returns_empty_df_when_not_warm, lines: 50-56 }
+        - { name: test_run_prewarm_job_does_not_crash_on_lock_failure, lines: 58-66 }
+        - { name: test_run_prewarm_job_does_not_crash_on_load_exception, lines: 68-76 }
+    - name: TestDowntimeAnalysisRqFallback
+      lines: 83-126
+      methods:
+        - { name: test_should_use_duckdb_returns_false_when_cache_not_ready, lines: 88-96 }
+        - { name: test_query_base_returns_empty_df_when_not_warm, lines: 98-103 }
+        - { name: test_query_job_returns_empty_df_when_not_warm, lines: 105-110 }
+        - { name: test_run_prewarm_job_does_not_crash_on_lock_failure, lines: 112-118 }
+        - { name: test_run_prewarm_job_does_not_crash_on_load_exception, lines: 120-126 }
+    - name: TestParquetReadableAfterMetadataTtlExpiry
+      lines: 134-170
+      methods:
+        - { name: test_resource_history_lazy_init_discovers_existing_file, lines: 139-156 }
+        - { name: test_downtime_analysis_lazy_init_discovers_existing_file, lines: 158-170 }
+
 tests/test_rq_worker_crash_recovery.py:  # 159 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
@@ -16756,7 +16836,7 @@ tests/test_spool_routes.py:  # 109 lines
     - { name: test_valid_spool_streams_parquet, lines: 75-88 }
     - { name: test_allowed_namespaces_pass_namespace_validation, lines: 99-109 }  # @pytest.mark.parametrize('ns', ['yield_alert_dataset', 'reject_dataset', 'resourc...
 
-tests/test_spool_warmup_scheduler.py:  # 164 lines
+tests/test_spool_warmup_scheduler.py:  # 201 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: time, items: [], line: 14 }
@@ -16771,6 +16851,9 @@ tests/test_spool_warmup_scheduler.py:  # 164 lines
     - { name: test_run_warmup_cycle_returns_false_when_disabled, lines: 115-121 }
     - { name: test_enqueue_called_sequentially, lines: 128-144 }
     - { name: test_init_warmup_scheduler_starts_thread, lines: 151-164 }
+    - { name: test_resource_history_duckdb_in_warmup_jobs, lines: 171-179 }
+    - { name: test_downtime_analysis_duckdb_in_warmup_jobs, lines: 182-190 }
+    - { name: test_warmup_jobs_total_count_after_duckdb_additions, lines: 193-201 }
 
 tests/test_sql_builder.py:  # 237 lines
   imports:
@@ -17162,7 +17245,7 @@ tests/test_trace_spool_integration.py:  # 558 lines
     - { name: msd_lineage_full_parquet, lines: 129-141 }  # @pytest.fixture()
     - { name: test_msd_container_mode_worker_writes_real_stage_spools_consumable_by_duckdb, lines: 443-558 }
 
-tests/test_unified_spool_integration.py:  # 430 lines
+tests/test_unified_spool_integration.py:  # 432 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: pathlib, items: [], line: 11 }
@@ -17186,43 +17269,43 @@ tests/test_unified_spool_integration.py:  # 430 lines
         - { name: test_concurrent_workers_only_one_enqueues, lines: 156-181 }
         - { name: test_lock_released_after_enqueue, lines: 183-194 }
     - name: TestWarmupSpoolHitRouteResponse
-      lines: 201-229
+      lines: 201-231
       methods:
         - { name: test_reject_dataset_has_ensure_dataset_loaded, lines: 204-207 }
         - { name: test_yield_alert_dataset_has_ensure_dataset_loaded, lines: 209-211 }
         - { name: test_hold_dataset_has_ensure_dataset_loaded, lines: 213-215 }
         - { name: test_resource_dataset_has_ensure_dataset_loaded, lines: 217-219 }
-        - { name: test_warmup_jobs_cover_expected_reports, lines: 221-229 }
+        - { name: test_warmup_jobs_cover_expected_reports, lines: 221-231 }
     - name: TestRouteContractUnchanged
-      lines: 236-253
+      lines: 238-255
       methods:
-        - { name: test_resource_history_blueprint_exists, lines: 239-242 }
-        - { name: test_resource_dataset_cache_canonical_base_dataset, lines: 244-247 }
-        - { name: test_production_history_service_has_spool_identity, lines: 249-253 }
+        - { name: test_resource_history_blueprint_exists, lines: 241-244 }
+        - { name: test_resource_dataset_cache_canonical_base_dataset, lines: 246-249 }
+        - { name: test_production_history_service_has_spool_identity, lines: 251-255 }
     - name: TestProductionHistoryWarmupExclusion
-      lines: 260-283
+      lines: 262-285
       methods:
-        - { name: test_warmup_jobs_do_not_contain_production, lines: 263-272 }
-        - { name: test_scheduler_module_documents_exclusion, lines: 274-278 }
-        - { name: test_warmup_job_count_is_exactly_four, lines: 280-283 }
+        - { name: test_warmup_jobs_do_not_contain_production, lines: 265-274 }
+        - { name: test_scheduler_module_documents_exclusion, lines: 276-280 }
+        - { name: test_warmup_job_count_is_exactly_six, lines: 282-285 }
     - name: TestMaterialTraceAsyncPipeline
-      lines: 290-377
+      lines: 292-379
       methods:
-        - { name: test_execute_to_spool_idempotent, lines: 293-302 }
-        - { name: test_duckdb_runtime_pagination, lines: 304-333 }
-        - { name: test_duckdb_runtime_export_csv, lines: 335-358 }
-        - { name: test_rq_material_trace_job_function_exists, lines: 360-363 }
-        - { name: test_route_imports_spool_functions, lines: 365-368 }
-        - { name: test_canonical_query_hash_differs_by_mode, lines: 370-377 }
+        - { name: test_execute_to_spool_idempotent, lines: 295-304 }
+        - { name: test_duckdb_runtime_pagination, lines: 306-335 }
+        - { name: test_duckdb_runtime_export_csv, lines: 337-360 }
+        - { name: test_rq_material_trace_job_function_exists, lines: 362-365 }
+        - { name: test_route_imports_spool_functions, lines: 367-370 }
+        - { name: test_canonical_query_hash_differs_by_mode, lines: 372-379 }
     - name: TestGuardRetirementOrdering
-      lines: 384-430
+      lines: 386-432
       methods:
-        - { name: test_trace_events_legacy_guards_removed, lines: 392-397 }
-        - { name: test_lineage_max_seed_count_removed, lines: 399-404 }
-        - { name: test_lineage_rss_reject_removed, lines: 406-411 }
-        - { name: test_reject_query_rss_guard_removed, lines: 413-417 }
-        - { name: test_material_trace_row_guards_removed, lines: 419-425 }
-        - { name: test_event_fetcher_max_total_rows_present, lines: 427-430 }
+        - { name: test_trace_events_legacy_guards_removed, lines: 394-399 }
+        - { name: test_lineage_max_seed_count_removed, lines: 401-406 }
+        - { name: test_lineage_rss_reject_removed, lines: 408-413 }
+        - { name: test_reject_query_rss_guard_removed, lines: 415-419 }
+        - { name: test_material_trace_row_guards_removed, lines: 421-427 }
+        - { name: test_event_fetcher_max_total_rows_present, lines: 429-432 }
 
 tests/test_user_auth_routes.py:  # 222 lines
   imports:

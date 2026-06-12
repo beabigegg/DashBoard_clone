@@ -348,42 +348,37 @@ def _load_and_save() -> None:
     )
 
 
-def start_duckdb_prewarm() -> None:
-    """Start downtime-analysis DuckDB pre-warm as a daemon background thread (10s startup delay).
+def run_prewarm_job() -> None:
+    """Execute the DuckDB prewarm body synchronously (called by the RQ warmup worker).
 
-    Safe to call from every gunicorn worker; reuses today's existing cache file if present.
+    Reuses today's existing cache file if present (idempotent).
+    If another worker holds the fcntl lock, this call returns immediately —
+    the peer will complete the load and the lazy-init path in should_use_duckdb()
+    will discover the file on the first user query.
     Disabled when DOWNTIME_ANALYSIS_PREWARM_MONTHS=0.
     """
     if _PREWARM_MONTHS <= 0:
         logger.info("downtime_analysis DuckDB prewarm disabled (DOWNTIME_ANALYSIS_PREWARM_MONTHS=0)")
         return
-
-    try:
-        from mes_dashboard.core.redis_client import REDIS_ENABLED
-        if not REDIS_ENABLED:
-            logger.info("downtime_analysis DuckDB prewarm skipped (Redis disabled)")
-            return
-    except Exception:
+    if _try_reuse_existing():
         return
+    if not _try_lock():
+        logger.info("downtime_analysis DuckDB prewarm: peer worker holds lock, skipping this run")
+        return
+    try:
+        _load_and_save()
+    except Exception as exc:
+        logger.warning("downtime_analysis DuckDB prewarm failed: %s", exc)
+    finally:
+        _release_lock()
 
-    def _run() -> None:
-        time.sleep(10)
-        if _try_reuse_existing():
-            return
-        if not _try_lock():
-            logger.info("downtime_analysis DuckDB prewarm: peer worker loading, waiting…")
-            for _ in range(18):
-                time.sleep(5)
-                if _try_reuse_existing():
-                    return
-            logger.warning("downtime_analysis DuckDB prewarm: timed out waiting for peer worker")
-            return
-        try:
-            _load_and_save()
-        except Exception as exc:
-            logger.warning("downtime_analysis DuckDB prewarm failed: %s", exc)
-        finally:
-            _release_lock()
 
-    threading.Thread(target=_run, daemon=True, name="downtime-analysis-duckdb-prewarm").start()
-    logger.info("downtime_analysis DuckDB prewarm background thread started")
+def start_duckdb_prewarm() -> None:
+    """Retained for backward compatibility — delegates to run_prewarm_job().
+
+    Previously started a daemon background thread from app.py startup.
+    The daemon-thread path is retired; app.py no longer calls this function.
+    This shim is kept so that downtime_analysis_cache.start_downtime_prewarm()
+    can continue to call it without a name change (it delegates immediately).
+    """
+    run_prewarm_job()

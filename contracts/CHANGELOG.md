@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.16.0] — 2026-06-12
+### Added
+- unify-duckdb-prewarm-rq: Added RH-07 (resource_history spool TTL 20h via RESOURCE_HISTORY_SPOOL_TTL; CACHE_TTL_DATASET unchanged), RH-08 (resource_history prewarm via RQ job, not daemon thread; leader-lock; Oracle fallback on absent RQ worker), DA-07 (downtime_analysis spool TTL 20h via DOWNTIME_ANALYSIS_CACHE_TTL default 72000), DA-08 (downtime_analysis RQ prewarm registered in _WARMUP_JOBS; previously absent). Additive; no existing rules changed.
+
+## [env 1.0.6] — 2026-06-12
+### Added
+- unify-duckdb-prewarm-rq: Added `RESOURCE_HISTORY_SPOOL_TTL` (optional, positive int, default 72000 s; controls Redis spool metadata TTL for recent resource_history queries; overrides CACHE_TTL_DATASET for this service; minimum 3600; restart required). Added `DOWNTIME_ANALYSIS_CACHE_TTL` (same pattern; previously existed in code but undocumented). Additive; no existing defaults or semantics changed.
+
+## [ci 1.3.19] — 2026-06-12
+### Added
+- unify-duckdb-prewarm-rq: Added gate compatibility note for RQ prewarm unification. New Tier 1 unit assertions: _WARMUP_JOBS contains downtime_analysis entry (AC-3); per-service spool TTL resolves to 72000; CACHE_TTL_DATASET unchanged at 7200. Updated Tier 3 multi-worker assertions: no daemon-thread prewarm call on startup for either service; both jobs enqueued via RQ; Oracle call count = 1 per gunicorn restart. Covered by existing nightly-integration gate; no gate tier or command change.
+
 ## [business 1.14.0] — 2026-06-09
 ### Added
 - resource-status-cross-filter: Added RS-CF-01 cross-filter intersection semantics for the resource-status page. Each chart contributes at most one selection dimension; AND-intersection across all active selections. Exclude-self: the input for each chart's option rendering omits that chart's own predicate. Re-click toggles off. ESC clears and returns focus to trigger. All filtering is client-side; `/api/resource/status` payload unchanged.
