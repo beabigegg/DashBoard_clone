@@ -153,7 +153,7 @@ function handleMachineEventMount(resourceId: string, statusType: string): void {
             @keydown.enter.prevent="toggleGroup(status)"
             @keydown.space.prevent="toggleGroup(status)"
           >
-            <td class="expand-toggle">{{ expandedGroups.has(status) ? '▼' : '▶' }}</td>
+            <td class="expand-toggle"><span :class="['toggle-icon', { 'toggle-icon--open': expandedGroups.has(status) }]">▶</span></td>
             <td colspan="3" class="status-group-label">
               <span :class="['status-badge', `badge-${status.toLowerCase()}`]">{{ status }}</span>
             </td>
@@ -180,9 +180,7 @@ function handleMachineEventMount(resourceId: string, statusType: string): void {
                 @keydown.enter.prevent="toggleMachine(machine.resource_id, status)"
                 @keydown.space.prevent="toggleMachine(machine.resource_id, status)"
               >
-                <td class="expand-toggle expand-machine-toggle">
-                  {{ isMachineExpanded(machine.resource_id, status) ? '▼' : '▶' }}
-                </td>
+                <td class="expand-toggle expand-machine-toggle"><span :class="['toggle-icon', { 'toggle-icon--open': isMachineExpanded(machine.resource_id, status) }]">▶</span></td>
                 <td>{{ machine.resource_name ?? machine.resource_id }}</td>
                 <td>{{ machine.workcenter ?? '—' }}</td>
                 <td>{{ machine.family ?? '—' }}</td>

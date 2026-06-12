@@ -407,6 +407,17 @@
   color: theme('colors.token.h6c757d');
   cursor: pointer;
   user-select: none;
+  font-size: 11px;
+}
+
+.theme-downtime-analysis .expand-toggle .toggle-icon {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  transform: rotate(0deg);
+}
+
+.theme-downtime-analysis .expand-toggle .toggle-icon--open {
+  transform: rotate(90deg);
 }
 
 /* Tier 1 status group rows */
@@ -434,7 +445,7 @@
 }
 
 .theme-downtime-analysis .expand-machine-toggle {
-  text-indent: 14px;
+  padding-left: 14px;
 }
 
 /* Indent Tier 2 machine name column to show hierarchy under status group */
