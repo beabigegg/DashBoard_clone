@@ -191,7 +191,7 @@ class TestGuardGraduatedResponse:
 
         with patch(
             "mes_dashboard.core.worker_memory_guard._current_rss_mb",
-            side_effect=[960.0, 960.0],
+            return_value=960.0,
         ):
             with patch(
                 "mes_dashboard.core.cache.emergency_clear_all_process_caches",

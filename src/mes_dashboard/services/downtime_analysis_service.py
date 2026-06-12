@@ -705,7 +705,7 @@ def query_downtime_dataset(
             from mes_dashboard.sql.builder import QueryBuilder as _QB
             hist_ids = sorted({str(x).strip() for x in base_df['HISTORYID'].dropna() if str(x).strip()})
             _jb_builder = _QB()
-            _jb_builder.add_in_condition('j.RESOURCEID', hist_ids)
+            _jb_builder.add_in_condition('RESOURCEID', hist_ids)
             resource_filter_sql = _jb_builder.get_conditions_sql() or '1=1'
             job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', resource_filter_sql)
             job_params = {**base_params, **_jb_builder.params}

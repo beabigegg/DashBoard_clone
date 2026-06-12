@@ -1149,6 +1149,8 @@ class TestDowntimeMigration:
 
         with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events',
                    return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=False), \
              patch.object(bqe, 'execute_plan', side_effect=_fake_execute_plan), \
              patch.object(bqe, 'merge_chunks_to_spool', side_effect=_fake_merge), \
              patch('mes_dashboard.core.query_spool_store.register_spool_file',
@@ -1224,6 +1226,8 @@ class TestDowntimeMigration:
             return tmp, len(fake_df)
 
         with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
                    return_value=False), \
              patch.object(bqe, 'execute_plan', side_effect=_fake_execute_plan), \
              patch.object(bqe, 'merge_chunks_to_spool', side_effect=_fake_merge), \
