@@ -54,8 +54,21 @@ export interface JobEnrichment {
   symptom: string | null;
   cause: string | null;
   repair: string | null;
+  /** Legacy combined pre-repair wait (CREATE → FIRST_CLOCK). Use wait_assign_min + wait_ack_min for detail. */
   wait_min: number | null;
   repair_min: number | null;
+  /** CREATE → ASSIGNED (waiting for dispatch) */
+  wait_assign_min: number | null;
+  /** ASSIGNED → ACKNOWLEDGED (assigned but not yet accepted) */
+  wait_ack_min: number | null;
+  /** Duration inside inspection stage (QC/PD/EE/PE 驗機); null when no inspection */
+  inspect_min: number | null;
+  /** LAST_CLOCK → COMPLETE (post-repair close-out wait, includes inspection) */
+  close_wait_min: number | null;
+  /** ISO timestamp of CREATEDATE */
+  job_create_date: string | null;
+  /** ISO timestamp of COMPLETEDATE (null when job still open or cancelled without complete) */
+  job_complete_date: string | null;
   handler: string | null;
   match_ambiguous: boolean;
 }

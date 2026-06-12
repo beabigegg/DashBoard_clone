@@ -1,6 +1,6 @@
-# generated: 2026-06-11T11:57:40Z by cdd-kit 2.2.1
-# files: 844, src-lines: 238650, map-lines: 18028, compression: 13.2x
-# sources-digest: f781be2875465db86ed2b501538697797e529ff54aa0afa6fa746c9dcaef0dc9
+# generated: 2026-06-11T12:18:24Z by cdd-kit 2.2.1
+# files: 844, src-lines: 238694, map-lines: 18028, compression: 13.2x
+# sources-digest: b1bccf716298802946738218ae81427516d23028351f9c52f0076103c171901e
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -737,7 +737,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 301 lines
+frontend/src/downtime-analysis/App.vue:  # 305 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -815,7 +815,7 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 441 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 478 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
@@ -823,7 +823,7 @@ frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 441 lines
   constants:
     - { name: API_TIMEOUT, line: 15 }
   functions:
-    - { name: useDowntimeData, lines: 46-441 }
+    - { name: useDowntimeData, lines: 46-478 }
   interfaces:
     - { name: SummaryData, lines: 17-22 }  # local
     - { name: EventDetailData, lines: 24-27 }  # local
@@ -4571,7 +4571,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 399 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 402 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: datetime, items: [datetime], line: 19 }
@@ -4584,12 +4584,12 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 399 lines
     - { name: _csv_param, lines: 65-70 }
     - { name: api_downtime_options, lines: 79-111 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
     - { name: api_downtime_query, lines: 120-171 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 180-210 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 219-263 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 272-312 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 321-346 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 355-380 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 388-399 }
+    - { name: api_downtime_view, lines: 180-213 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 222-266 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 275-315 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 324-349 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 358-383 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 391-402 }
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:

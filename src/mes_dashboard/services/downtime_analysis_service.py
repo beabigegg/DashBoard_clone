@@ -319,25 +319,24 @@ def _enrich_event(
     """Build enriched event dict from event row + matched job row (DA-03, DA-05)."""
     row = event.to_dict()
 
-    # Wait/repair hours (DA-05)
     first_clock = job.get('FIRSTCLOCKONDATE')
     last_clock = job.get('LASTCLOCKOFFDATE')
     create_date = job.get('CREATEDATE')
+    complete_date = job.get('COMPLETEDATE')
+    assigned_date = job.get('ASSIGNED_DATE')
+    ack_date = job.get('ACK_DATE')
+    inspect_start = job.get('INSPECT_START')
+    inspect_end = job.get('INSPECT_END')
 
-    wait_min = None
-    repair_min = None
-
-    if first_clock is not None and pd.notna(first_clock) and create_date is not None and pd.notna(create_date):
-        try:
-            wait_min = round((first_clock - create_date).total_seconds() / 60.0, 2)
-        except Exception:
-            wait_min = None
-
-    if first_clock is not None and pd.notna(first_clock) and last_clock is not None and pd.notna(last_clock):
-        try:
-            repair_min = round((last_clock - first_clock).total_seconds() / 60.0, 2)
-        except Exception:
-            repair_min = None
+    def _min(t_end: Any, t_start: Any) -> Optional[float]:
+        if (t_end is not None and pd.notna(t_end)
+                and t_start is not None and pd.notna(t_start)):
+            try:
+                v = round((t_end - t_start).total_seconds() / 60.0, 2)
+                return v if v >= 0 else None
+            except Exception:
+                pass
+        return None
 
     row['match_source'] = match_source
     row['match_ambiguous'] = match_ambiguous
@@ -348,8 +347,16 @@ def _enrich_event(
     row['cause'] = _safe_str(job.get('CAUSECODENAME'))
     row['repair'] = _safe_str(job.get('REPAIRCODENAME'))
     row['handler'] = _safe_str(job.get('COMPLETE_FULLNAME'))
-    row['wait_min'] = wait_min
-    row['repair_min'] = repair_min
+    # Legacy combined wait (CREATE -> FIRST_CLOCK)
+    row['wait_min'] = _min(first_clock, create_date)
+    row['repair_min'] = _min(last_clock, first_clock)
+    # Detailed segments from JOBTXNHISTORY (None when DuckDB path or data missing)
+    row['wait_assign_min'] = _min(assigned_date, create_date)
+    row['wait_ack_min'] = _min(ack_date, assigned_date)
+    row['inspect_min'] = _min(inspect_end, inspect_start)
+    row['close_wait_min'] = _min(complete_date, last_clock)
+    row['job_create_date'] = _ts_to_iso(create_date)
+    row['job_complete_date'] = _ts_to_iso(complete_date)
     return row
 
 
@@ -367,6 +374,12 @@ def _no_match_event(event: pd.Series) -> Dict[str, Any]:
     row['handler'] = None
     row['wait_min'] = None
     row['repair_min'] = None
+    row['wait_assign_min'] = None
+    row['wait_ack_min'] = None
+    row['inspect_min'] = None
+    row['close_wait_min'] = None
+    row['job_create_date'] = None
+    row['job_complete_date'] = None
     return row
 
 
@@ -374,7 +387,9 @@ def _add_empty_job_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Add empty JOB enrichment columns to an event DataFrame."""
     df = df.copy()
     for col in ('match_source', 'match_ambiguous', 'job_id', 'job_order_name', 'job_model',
-                'symptom', 'cause', 'repair', 'handler', 'wait_min', 'repair_min'):
+                'symptom', 'cause', 'repair', 'handler', 'wait_min', 'repair_min',
+                'wait_assign_min', 'wait_ack_min', 'inspect_min', 'close_wait_min',
+                'job_create_date', 'job_complete_date'):
         if col not in df.columns:
             df[col] = None if col != 'match_source' else 'none'
     if 'match_ambiguous' in df.columns:
@@ -1139,6 +1154,12 @@ def _build_event_detail_page(
                 'repair': row.get('repair'),
                 'wait_min': row.get('wait_min'),
                 'repair_min': row.get('repair_min'),
+                'wait_assign_min': row.get('wait_assign_min'),
+                'wait_ack_min': row.get('wait_ack_min'),
+                'inspect_min': row.get('inspect_min'),
+                'close_wait_min': row.get('close_wait_min'),
+                'job_create_date': row.get('job_create_date'),
+                'job_complete_date': row.get('job_complete_date'),
                 'handler': row.get('handler'),
                 'match_ambiguous': bool(row.get('match_ambiguous', False)),
             }

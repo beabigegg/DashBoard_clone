@@ -10,8 +10,9 @@ Tables stored in DuckDB file:
                 OLDLASTSTATUSCHANGEDATE, LASTSTATUSCHANGEDATE, HOURS, JOBID
   job_data    — JOBID, RESOURCEID, CREATEDATE, COMPLETEDATE, SYMPTOMCODENAME,
                 CAUSECODENAME, REPAIRCODENAME, COMPLETE_FULLNAME,
-                FIRSTCLOCKONDATE, LASTCLOCKOFFDATE, JOBORDERNAME, JOBMODELNAME
-  prewarm_meta — loaded_at, start_date, end_date
+                FIRSTCLOCKONDATE, LASTCLOCKOFFDATE, JOBORDERNAME, JOBMODELNAME,
+                ASSIGNED_DATE, ACK_DATE, INSPECT_START, INSPECT_END
+  prewarm_meta — loaded_at, start_date, end_date, schema_version
 """
 
 from __future__ import annotations
@@ -30,6 +31,9 @@ import pandas as pd
 logger = logging.getLogger("mes_dashboard.downtime_analysis_duckdb_cache")
 
 _PREWARM_MONTHS: int = int(os.getenv("DOWNTIME_ANALYSIS_PREWARM_MONTHS", "3"))
+
+# Bump when job_data schema changes; forces cache rebuild on next startup.
+_SCHEMA_VERSION = "2"
 
 # DuckDB file path — resolved to absolute; same pattern as RESOURCE_HISTORY_DUCKDB_PATH.
 _DUCKDB_RAW_PATH = os.getenv("DOWNTIME_ANALYSIS_DUCKDB_PATH", "tmp/downtime_analysis.duckdb")
@@ -165,7 +169,8 @@ def query_job_from_duckdb(start_date: str, end_date: str) -> pd.DataFrame:
         df = conn.execute(f"""
             SELECT JOBID, RESOURCEID, CREATEDATE, COMPLETEDATE,
                    SYMPTOMCODENAME, CAUSECODENAME, REPAIRCODENAME, COMPLETE_FULLNAME,
-                   FIRSTCLOCKONDATE, LASTCLOCKOFFDATE, JOBORDERNAME, JOBMODELNAME
+                   FIRSTCLOCKONDATE, LASTCLOCKOFFDATE, JOBORDERNAME, JOBMODELNAME,
+                   ASSIGNED_DATE, ACK_DATE, INSPECT_START, INSPECT_END
             FROM job_data
             WHERE (COMPLETEDATE IS NULL
                    OR COMPLETEDATE >= '{start_date}'::DATE - INTERVAL '7 days')
@@ -173,7 +178,10 @@ def query_job_from_duckdb(start_date: str, end_date: str) -> pd.DataFrame:
         """).fetchdf()
         conn.close()
         if not df.empty:
-            for col in ("CREATEDATE", "COMPLETEDATE", "FIRSTCLOCKONDATE", "LASTCLOCKOFFDATE"):
+            for col in (
+                "CREATEDATE", "COMPLETEDATE", "FIRSTCLOCKONDATE", "LASTCLOCKOFFDATE",
+                "ASSIGNED_DATE", "ACK_DATE", "INSPECT_START", "INSPECT_END",
+            ):
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col])
         return df
@@ -183,16 +191,22 @@ def query_job_from_duckdb(start_date: str, end_date: str) -> pd.DataFrame:
 
 
 def _try_reuse_existing() -> bool:
-    """Return True and mark ready if an up-to-date DuckDB file already exists."""
+    """Return True and mark ready if an up-to-date DuckDB file already exists.
+
+    Also validates schema_version; returns False (triggers rebuild) when the
+    cached file predates a schema change.
+    """
     global _duckdb_ready
     if not _DUCKDB_PATH.exists():
         return False
     import duckdb
     try:
         conn = duckdb.connect(str(_DUCKDB_PATH), read_only=True)
-        row = conn.execute("SELECT loaded_at FROM prewarm_meta LIMIT 1").fetchone()
+        row = conn.execute(
+            "SELECT loaded_at, schema_version FROM prewarm_meta LIMIT 1"
+        ).fetchone()
         conn.close()
-        if row and row[0] == date.today().isoformat():
+        if row and row[0] == date.today().isoformat() and row[1] == _SCHEMA_VERSION:
             with _state_lock:
                 _duckdb_ready = True
             logger.info(
@@ -200,6 +214,12 @@ def _try_reuse_existing() -> bool:
                 _DUCKDB_PATH.stat().st_size / 1e6,
             )
             return True
+        if row and row[1] != _SCHEMA_VERSION:
+            logger.info(
+                "downtime_analysis DuckDB prewarm: schema version mismatch "
+                "(cached=%s, expected=%s) — will rebuild",
+                row[1], _SCHEMA_VERSION,
+            )
     except Exception as exc:
         logger.debug("downtime_analysis DuckDB existing cache unusable: %s", exc)
     return False
@@ -284,7 +304,11 @@ def _load_and_save() -> None:
                 FIRSTCLOCKONDATE::TIMESTAMP         AS FIRSTCLOCKONDATE,
                 LASTCLOCKOFFDATE::TIMESTAMP         AS LASTCLOCKOFFDATE,
                 CAST(JOBORDERNAME AS VARCHAR)       AS JOBORDERNAME,
-                CAST(JOBMODELNAME AS VARCHAR)       AS JOBMODELNAME
+                CAST(JOBMODELNAME AS VARCHAR)       AS JOBMODELNAME,
+                ASSIGNED_DATE::TIMESTAMP            AS ASSIGNED_DATE,
+                ACK_DATE::TIMESTAMP                 AS ACK_DATE,
+                INSPECT_START::TIMESTAMP            AS INSPECT_START,
+                INSPECT_END::TIMESTAMP              AS INSPECT_END
             FROM job_df
         """)
         conn.execute("CREATE INDEX idx_job_resourceid   ON job_data(RESOURCEID)")
@@ -297,14 +321,16 @@ def _load_and_save() -> None:
                 SYMPTOMCODENAME VARCHAR, CAUSECODENAME VARCHAR,
                 REPAIRCODENAME VARCHAR, COMPLETE_FULLNAME VARCHAR,
                 FIRSTCLOCKONDATE TIMESTAMP, LASTCLOCKOFFDATE TIMESTAMP,
-                JOBORDERNAME VARCHAR, JOBMODELNAME VARCHAR
+                JOBORDERNAME VARCHAR, JOBMODELNAME VARCHAR,
+                ASSIGNED_DATE TIMESTAMP, ACK_DATE TIMESTAMP,
+                INSPECT_START TIMESTAMP, INSPECT_END TIMESTAMP
             )
         """)
 
-    conn.execute("CREATE TABLE prewarm_meta (loaded_at VARCHAR, start_date VARCHAR, end_date VARCHAR)")
+    conn.execute("CREATE TABLE prewarm_meta (loaded_at VARCHAR, start_date VARCHAR, end_date VARCHAR, schema_version VARCHAR)")
     conn.execute(
-        "INSERT INTO prewarm_meta VALUES (?, ?, ?)",
-        [date.today().isoformat(), start.isoformat(), end.isoformat()],
+        "INSERT INTO prewarm_meta VALUES (?, ?, ?, ?)",
+        [date.today().isoformat(), start.isoformat(), end.isoformat(), _SCHEMA_VERSION],
     )
     conn.close()
 
