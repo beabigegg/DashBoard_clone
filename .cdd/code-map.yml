@@ -1,6 +1,6 @@
-# generated: 2026-06-13T02:58:12Z by cdd-kit 2.2.1
-# files: 850, src-lines: 244995, map-lines: 18321, compression: 13.4x
-# sources-digest: 6021f0cc13c0001ed3a54647e57ad4b31608ab6fdbeee70e1b75e850e8136045
+# generated: 2026-06-13T04:05:43Z by cdd-kit 3.1.0
+# files: 850, src-lines: 244999, map-lines: 18321, compression: 13.4x
+# sources-digest: 2ed22239697c5c1cdcd431a059f39e347581807a24c532cd715cb100464a0bc8
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -9125,7 +9125,7 @@ tests/integration/test_redis_timeout_fallback.py:  # 295 lines
   functions:
     - { name: _make_redis, lines: 31-38 }
 
-tests/integration/test_rowcount_flag_parity.py:  # 772 lines
+tests/integration/test_rowcount_flag_parity.py:  # 776 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
     - { module: pandas, items: [], line: 20 }
@@ -9159,17 +9159,17 @@ tests/integration/test_rowcount_flag_parity.py:  # 772 lines
         - { name: test_paged_chunks_are_1_based_inclusive_no_gap_no_overlap, lines: 528-541 }
         - { name: test_paged_and_date_range_chunk_keys_are_disjoint, lines: 543-554 }
     - name: TestSpoolLifecycle
-      lines: 561-678
+      lines: 561-682
       methods:
         - { name: test_production_history_cache_prefix_is_prod_hist_flag_true, lines: 567-600 }
         - { name: test_downtime_cache_prefix_is_downtime_analysis, lines: 602-628 }
         - { name: test_hold_cache_prefix_is_hold_flag_false, lines: 630-650 }
-        - { name: test_downtime_parallel_is_1_whole_dataset, lines: 652-678 }
+        - { name: test_downtime_parallel_is_configurable_date_range, lines: 652-682 }
     - name: TestPartialChunkFailure
-      lines: 685-772
+      lines: 689-776
       methods:
-        - { name: test_execute_plan_raises_skips_merge_chunks_to_spool, lines: 695-733 }
-        - { name: test_merge_chunks_returning_none_prevents_spool_registration, lines: 735-772 }
+        - { name: test_execute_plan_raises_skips_merge_chunks_to_spool, lines: 699-737 }
+        - { name: test_merge_chunks_returning_none_prevents_spool_registration, lines: 739-776 }
   functions:
     - { name: _make_count_df, lines: 29-31 }
     - { name: _make_chunk_df, lines: 34-36 }

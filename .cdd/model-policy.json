@@ -1,6 +1,6 @@
 {
   "provider": "claude",
-  "generated_at": "2026-06-03T00:26:30.626Z",
+  "generated_at": "2026-06-13T04:05:41.595Z",
   "schema-version": "0.2.0",
   "roles": {
     "backend-engineer": "sonnet",
@@ -20,7 +20,7 @@
     "stress-soak-engineer": "sonnet",
     "test-strategist": "sonnet",
     "ui-ux-reviewer": "sonnet",
-    "visual-reviewer": "haiku"
+    "visual-reviewer": "sonnet"
   },
   "_notes": "Roles map agent name -> model ID. Override per-project as needed. cdd-kit doctor warns when an installed agent's frontmatter `model:` does not match this policy."
 }
