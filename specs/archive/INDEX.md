@@ -47,3 +47,5 @@
 | gunicorn-preload-workers | 2026 | 2026-06-05 | specs/archive/2026/gunicorn-preload-workers/ |
 | resource-status-cross-filter | 2026 | 2026-06-09 | specs/archive/2026/resource-status-cross-filter/ |
 | resource-history-cache-fix | 2026 | 2026-06-10 | specs/archive/2026/resource-history-cache-fix/ |
+| downtime-browser-duckdb | 2026 | 2026-06-13 | specs/archive/2026/downtime-browser-duckdb/ |
+| unify-duckdb-prewarm-rq | 2026 | 2026-06-13 | specs/archive/2026/unify-duckdb-prewarm-rq/ |

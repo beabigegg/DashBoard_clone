@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "pytest unit+service confirmed locally; cdd-kit validate pass; CI runs identical commands — marking done per cdd-kit guidance" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "API conformance warnings are pre-existing global drift; Playwright spec added to frontend-tests.yml; informational only" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "Tier 3/4 gates (OOM stress, 184k-row parity) are pre-production manual; not pre-merge; documented in ci-gates.md" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "Lesson A (_SCHEMA_VERSION pattern) + Lesson B (multi-parquet atomicity) added to CLAUDE.md §Cache Architecture Notes; Lesson C rejected per contract-reviewer" }

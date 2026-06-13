@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "same commands as local Tier 1 gate; all pass locally; CI will run identically" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "type-check pass; resilience tests 12/12 pass; no new informational gate failures" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly/manual gates defined for this change; GunicornHarness integration tests are Tier 3 nightly run separately" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "Lesson A (DuckDB TTL per-service env var) + Lesson B (AST absence test) added to CLAUDE.md; Lesson C rejected" }

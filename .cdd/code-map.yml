@@ -1,6 +1,6 @@
-# generated: 2026-06-13T01:36:16Z by cdd-kit 2.2.1
-# files: 850, src-lines: 244941, map-lines: 18319, compression: 13.4x
-# sources-digest: def5aa2cc6070702045da1c8677a40720174860d30086e161445cfaa7ef4b685
+# generated: 2026-06-13T02:58:12Z by cdd-kit 2.2.1
+# files: 850, src-lines: 244995, map-lines: 18321, compression: 13.4x
+# sources-digest: 6021f0cc13c0001ed3a54647e57ad4b31608ab6fdbeee70e1b75e850e8136045
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -737,7 +737,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 534 lines
+frontend/src/downtime-analysis/App.vue:  # 535 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -836,7 +836,7 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 501 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 503 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
@@ -845,46 +845,47 @@ frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 501 lines
   constants:
     - { name: API_TIMEOUT, line: 16 }
   functions:
-    - { name: useDowntimeData, lines: 47-501 }
+    - { name: useDowntimeData, lines: 47-503 }
   interfaces:
     - { name: SummaryData, lines: 18-23 }  # local
     - { name: EventDetailData, lines: 25-28 }  # local
 
-frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1068 lines
+frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1090 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 27 }
     - { module: '../../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 28 }
     - { module: '../../core/duckdb-client', items: [DuckDBClient], line: 29 }
   constants:
-    - { name: MERGE_GAP_SECONDS, line: 148 }
-    - { name: CROSS_SHIFT_MERGE_SQL, line: 155 }
-    - { name: JOB_BRIDGE_SQL, line: 225 }
+    - { name: MERGE_GAP_SECONDS, line: 157 }
+    - { name: CROSS_SHIFT_MERGE_SQL, line: 164 }
+    - { name: JOB_BRIDGE_SQL, line: 234 }
   functions:
-    - { name: sf, lines: 431-434 }
-    - { name: nullableStr, lines: 436-441 }
-    - { name: nullableFloat, lines: 443-446 }
-    - { name: toIsoString, lines: 448-459 }
-    - { name: applyTaxonomyMapping, lines: 469-482 }
-    - { name: buildFilterClause, lines: 488-512 }
-    - { name: interpolateParams, lines: 520-529 }
-    - { name: rowsToCsv, lines: 533-547 }
-    - { name: downloadCsv, lines: 549-560 }
-    - { name: useDowntimeDuckDB, lines: 564-1068 }
+    - { name: sf, lines: 443-446 }
+    - { name: nullableStr, lines: 448-453 }
+    - { name: nullableFloat, lines: 455-458 }
+    - { name: toIsoString, lines: 460-471 }
+    - { name: applyTaxonomyMapping, lines: 481-494 }
+    - { name: buildFilterClause, lines: 500-524 }
+    - { name: interpolateParams, lines: 532-541 }
+    - { name: rowsToCsv, lines: 545-559 }
+    - { name: downloadCsv, lines: 561-572 }
+    - { name: useDowntimeDuckDB, lines: 576-1090 }
   interfaces:
     - { name: TaxonomyShape, lines: 33-38 }
     - { name: DowntimeFilters, lines: 40-45 }
     - { name: KpiResult, lines: 47-54 }
     - { name: DailyTrendRow, lines: 56-62 }
     - { name: BigCategoryRow, lines: 64-69 }
-    - { name: EquipmentDetailRow, lines: 71-78 }
-    - { name: EquipmentDetailResult, lines: 80-86 }
-    - { name: EventDetailJobEnrichment, lines: 88-105 }
-    - { name: EventDetailRow, lines: 107-118 }
-    - { name: EventDetailResult, lines: 120-126 }
-    - { name: TopReasonRow, lines: 128-133 }
+    - { name: ResourceLookupEntry, lines: 71-75 }
+    - { name: EquipmentDetailRow, lines: 77-87 }
+    - { name: EquipmentDetailResult, lines: 89-95 }
+    - { name: EventDetailJobEnrichment, lines: 97-114 }
+    - { name: EventDetailRow, lines: 116-127 }
+    - { name: EventDetailResult, lines: 129-135 }
+    - { name: TopReasonRow, lines: 137-142 }
   types:
-    - { name: ComposableState, lines: 135-135 }
-    - { name: DuckdbErrorKind, lines: 143-143 }
+    - { name: ComposableState, lines: 144-144 }
+    - { name: DuckdbErrorKind, lines: 152-152 }
 
 frontend/src/downtime-analysis/composables/useFilterState.ts:  # 104 lines
   imports:
@@ -5055,7 +5056,7 @@ src/mes_dashboard/routes/resource_routes.py:  # 475 lines
     - { name: api_resource_status_summary, lines: 390-431 }  # @resource_bp.route('/status/summary')
     - { name: api_resource_status_matrix, lines: 436-475 }  # @resource_bp.route('/status/matrix')
 
-src/mes_dashboard/routes/spool_routes.py:  # 107 lines
+src/mes_dashboard/routes/spool_routes.py:  # 109 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: re, items: [], line: 9 }
@@ -5064,7 +5065,7 @@ src/mes_dashboard/routes/spool_routes.py:  # 107 lines
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 14 }
     - { module: mes_dashboard.core.response, items: [validation_error], line: 15 }
   functions:
-    - { name: download_spool_parquet, lines: 32-107 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
+    - { name: download_spool_parquet, lines: 34-109 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
 
 src/mes_dashboard/routes/trace_routes.py:  # 1096 lines
   imports:
@@ -5668,7 +5669,7 @@ src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 384 lines
     - { name: run_prewarm_job, lines: 351-373 }
     - { name: start_duckdb_prewarm, lines: 376-384 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1815 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1840 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -5684,33 +5685,34 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1815 lines
     - { name: _merge_cross_shift_events_from_parquet, lines: 187-214 }
     - { name: _merge_cross_shift_events, lines: 217-284 }
     - { name: _build_merged_row, lines: 287-305 }
-    - { name: _bridge_jobid, lines: 312-537 }
-    - { name: _compute_overlap_seconds, lines: 540-549 }
-    - { name: _enrich_event, lines: 552-599 }
-    - { name: _no_match_event, lines: 602-622 }
-    - { name: _add_empty_job_columns, lines: 625-636 }
-    - { name: _safe_str, lines: 639-644 }
-    - { name: _enrich_events_df, lines: 651-684 }
-    - { name: _ts_to_iso, lines: 687-696 }
-    - { name: make_downtime_query_id, lines: 703-708 }
-    - { name: make_raw_spool_query_id, lines: 711-723 }
-    - { name: _build_taxonomy_json, lines: 731-752 }
-    - { name: query_downtime_dataset_raw, lines: 760-962 }
-    - { name: get_filter_options, lines: 969-1057 }
-    - { name: query_downtime_dataset, lines: 1064-1268 }
-    - { name: _apply_resource_filters, lines: 1271-1357 }
-    - { name: _empty_events_df, lines: 1360-1367 }
-    - { name: _build_response, lines: 1374-1387 }
-    - { name: _build_summary, lines: 1390-1416 }
-    - { name: _build_daily_trend, lines: 1419-1440 }
-    - { name: _build_big_category, lines: 1443-1462 }
-    - { name: _build_top_reasons, lines: 1465-1494 }
-    - { name: apply_view, lines: 1501-1558 }
-    - { name: _build_equipment_detail_page, lines: 1561-1586 }
-    - { name: _build_equipment_detail, lines: 1589-1632 }
-    - { name: _build_event_detail_page, lines: 1635-1702 }
-    - { name: export_equipment_detail_csv, lines: 1710-1753 }
-    - { name: export_event_detail_csv, lines: 1756-1815 }
+    - { name: _bridge_jobid, lines: 312-541 }
+    - { name: _compute_overlap_seconds, lines: 544-553 }
+    - { name: _enrich_event, lines: 556-603 }
+    - { name: _no_match_event, lines: 606-626 }
+    - { name: _add_empty_job_columns, lines: 629-640 }
+    - { name: _safe_str, lines: 643-648 }
+    - { name: _enrich_events_df, lines: 655-688 }
+    - { name: _ts_to_iso, lines: 691-700 }
+    - { name: make_downtime_query_id, lines: 707-712 }
+    - { name: make_raw_spool_query_id, lines: 715-727 }
+    - { name: _build_taxonomy_json, lines: 735-756 }
+    - { name: _build_resource_lookup, lines: 759-775 }
+    - { name: query_downtime_dataset_raw, lines: 783-987 }
+    - { name: get_filter_options, lines: 994-1082 }
+    - { name: query_downtime_dataset, lines: 1089-1293 }
+    - { name: _apply_resource_filters, lines: 1296-1382 }
+    - { name: _empty_events_df, lines: 1385-1392 }
+    - { name: _build_response, lines: 1399-1412 }
+    - { name: _build_summary, lines: 1415-1441 }
+    - { name: _build_daily_trend, lines: 1444-1465 }
+    - { name: _build_big_category, lines: 1468-1487 }
+    - { name: _build_top_reasons, lines: 1490-1519 }
+    - { name: apply_view, lines: 1526-1583 }
+    - { name: _build_equipment_detail_page, lines: 1586-1611 }
+    - { name: _build_equipment_detail, lines: 1614-1657 }
+    - { name: _build_event_detail_page, lines: 1660-1727 }
+    - { name: export_equipment_detail_csv, lines: 1735-1778 }
+    - { name: export_event_detail_csv, lines: 1781-1840 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -17027,7 +17029,7 @@ tests/test_spool_replay.py:  # 229 lines
     - { name: test_replay_snapshot_null_promotion_synthesis, lines: 137-202 }  # @pytest.mark.skipif(not _SNAPSHOTS, reason='no local spool snapshots captured')
     - { name: test_replay_snapshot_rejects_column_drift, lines: 207-229 }  # @pytest.mark.skipif(not _SNAPSHOTS, reason='no local spool snapshots captured')
 
-tests/test_spool_routes.py:  # 109 lines
+tests/test_spool_routes.py:  # 111 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: unittest.mock, items: [patch], line: 12 }
@@ -17042,7 +17044,7 @@ tests/test_spool_routes.py:  # 109 lines
     - { name: test_valid_namespace_but_missing_spool_returns_410, lines: 55-61 }
     - { name: test_valid_namespace_but_file_not_on_disk_returns_410, lines: 64-70 }
     - { name: test_valid_spool_streams_parquet, lines: 75-88 }
-    - { name: test_allowed_namespaces_pass_namespace_validation, lines: 99-109 }  # @pytest.mark.parametrize('ns', ['yield_alert_dataset', 'reject_dataset', 'resourc...
+    - { name: test_allowed_namespaces_pass_namespace_validation, lines: 101-111 }  # @pytest.mark.parametrize('ns', ['yield_alert_dataset', 'reject_dataset', 'resourc...
 
 tests/test_spool_warmup_scheduler.py:  # 201 lines
   imports:
