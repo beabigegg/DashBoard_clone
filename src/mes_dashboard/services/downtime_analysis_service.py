@@ -759,7 +759,7 @@ def _build_resource_lookup() -> Dict[str, Any]:
         resources = get_all_resources()
         lookup: Dict[str, Any] = {}
         for r in resources:
-            rid = str(r.get('HISTORYID', '') or '').strip()
+            rid = str(r.get('RESOURCEID', '') or '').strip()
             if rid:
                 lookup[rid] = {
                     'resource_name': str(r.get('RESOURCENAME', '') or '').strip() or None,
