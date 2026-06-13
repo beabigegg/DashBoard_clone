@@ -1,7 +1,7 @@
 # ADR 0005: resource-history canonical spool key excludes granularity and filters
 
 ## Status
-proposed
+accepted (shipped — `_CANONICAL_BASE_SCHEMA_VERSION = 2` live in `resource_dataset_cache.py`)
 
 ## Context
 `/api/resource/history/query` toggles day/week/month/year granularity and several

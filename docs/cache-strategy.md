@@ -1,7 +1,13 @@
 # 快取策略總覽
 
-> 調查日期：2026-05-29  
-> 專案：MES Dashboard (DashBoard_vite)
+> 調查日期：2026-05-29 ｜ 專案：MES Dashboard (DashBoard_vite)
+>
+> **⚠ 注意（2026-06-13 更新）：** 此文件為 2026-05-29 架構快照，操作參數（TTL、閾值）可能已與代碼漂移。  
+> 以下事項已知變更：  
+> - **DuckDB prewarm 機制**：resource-history 與 downtime-analysis 已改為 RQ warmup queue（ADR-0006），不再使用 master daemon threads；master 不再阻塞 ~25 秒  
+> - **per-service TTL**：`DOWNTIME_ANALYSIS_CACHE_TTL`、`RESOURCE_HISTORY_SPOOL_TTL`（預設 72000 s = 20 h）覆蓋全域 `CACHE_TTL_DATASET`（2h/3h），非文件中所列通用值  
+> - **canonical spool key**：resource-history 已改為 hash(schema_version + date-range)，排除 granularity 與 filters（ADR-0005）  
+> **授權參數請以 `contracts/env/env-contract.md` 及各 service 模組層級常數為準。**
 
 ---
 

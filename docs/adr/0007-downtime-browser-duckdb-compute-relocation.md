@@ -1,7 +1,9 @@
 # ADR 0007: Downtime Analysis compute relocated to browser DuckDB-WASM over raw spools
 
 ## Status
-proposed
+accepted (raw-spool layer shipped — `downtime_analysis_base_events` + `downtime_analysis_job_bridge` registered in `spool_routes._ALLOWED_NAMESPACES`; browser DuckDB-WASM path active)
+
+> **Rollback note:** Legacy server-side enriched path (`downtime_analysis_events` spool + `/view` / `/equipment-detail` / `/event-detail` routes) retained in-place as rollback target. Deprecation timeline TBD.
 
 ## Context
 The released `/downtime-analysis` page computes everything server-side: `execute_plan` pulls raw E10 fragments + jobs, then Python runs `_merge_cross_shift_events` (DA-02), `_bridge_jobid`, and `_enrich_events_df` (DA-04/DA-05) on the full ~184k-row frame. Those whole-dataset reductions repeatedly `df.copy()` and run a cross-product overlap join, doubling peak RSS and OOM-killing gunicorn workers under the 6 GB/no-swap profile. A 90-day `_MAX_ORACLE_DAYS` band-aid was deployed solely to bound the blast radius. ADR-0003 already establishes these reductions require the *full* dataset and are silent-corruption-prone if split.

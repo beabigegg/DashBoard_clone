@@ -1,7 +1,7 @@
 # ADR 0006: DuckDB Prewarm via RQ Warmup Queue (not master daemon threads)
 
 ## Status
-proposed
+accepted (shipped — `start_duckdb_prewarm()` / `start_downtime_prewarm()` removed from `app.py`; both services registered in `spool_warmup_scheduler._WARMUP_JOBS`)
 
 ## Context
 ADR-0004 established that single-run Oracle prewarm (resource-history DuckDB,
