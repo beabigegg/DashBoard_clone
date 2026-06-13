@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.8.1
+schema-version: 1.8.2
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -43,6 +43,7 @@ breaking-change-policy: deprecate-2-minors
 | 4.3 | 功能區塊所有樣式規則必須以主題根類別為父選擇器，防止洩漏 |
 | 4.4 | `<Teleport to="body">` 將 DOM 節點移出功能根元素，使 `.theme-<feature> .component` 子孫選擇器失效。必須在 Teleport 傳送內容的最外層包一個 `<div class="theme-<feature>">` wrapper（無額外 styling），為所有子孫 CSS 規則提供作用域祖先。切勿將 `theme-<feature>` 與元件類別寫在同一元素上（`.theme-x.component` 合併選擇器不符合現有 CSS 寫法）。Evidence: `FloatingTooltip.vue` fix, `resource-status-package-group`. |
 | 4.5 | `resource-shared/styles.css` 及其他使用 `:is(.theme-X, …)` 批次套用樣式的共用樣式檔，新增頁面時必須以批次工具（如 `sed`）將新主題類別加入所有 `:is()` 群組；遺漏的主題類別會造成 header/filter/section-card 樣式靜默失效（Rule 6 不會偵測此缺漏）。Evidence: `downtime-analysis-page` — batch-patched via sed in commit `1931d26`. |
+| 4.6 | 頁面同時掛載非同步工作進度元件（如 `AsyncQueryProgress.vue`）時，外層 `LoadingOverlay` 的 `v-if` 條件必須加上 `&& !asyncJobProgress.active`（或等效的 `!isAsyncActive` ref）。兩者同時渲染會造成全頁遮罩蓋住進度條。此規則適用於所有使用 HTTP 202 async dispatch 的頁面。Evidence: `downtime-rq-async` — fix in `downtime-analysis/App.vue:548`. |
 
 ## 基礎樣式
 

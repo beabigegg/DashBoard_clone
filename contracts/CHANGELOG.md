@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [css 1.8.2] — 2026-06-13
+### Added
+- downtime-rq-async: Added Rule 4.6 — `LoadingOverlay` must be suppressed (`v-if="... && !asyncJobProgress.active"`) when an async job progress component is active; rendering both simultaneously hides the progress bar. Applies to all pages using HTTP 202 async dispatch. Additive.
+
+## [env 1.0.9] — 2026-06-13
+### Added
+- downtime-rq-async: Added Worker env-var parity note to §Async Worker — Downtime Query: `mes-dashboard-downtime-worker.service` must export the same `DOWNTIME_*` and DuckDB env set as gunicorn; env-var drift silently breaks AC-3 parity. Additive.
+
 ## [ci 1.3.21] — 2026-06-13
 ### Added
 - downtime-rq-async: Added §downtime-rq-async Gate Compatibility Note — Tier 1/3 test coverage, deploy/rollback checklist, worker queue provisioning notes, parquet schema gate reminder, and pct milestone sequence assertion. No new gate tier or command. Additive.

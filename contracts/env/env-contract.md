@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.8
+schema-version: 1.0.9
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -118,6 +118,8 @@ breaking-change-policy: deprecate-2-minors
 - `DOWNTIME_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a downtime query is dispatched via RQ (when `DOWNTIME_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `30`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `downtime-rq-async`.
 - `DOWNTIME_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes downtime jobs to. Must match the `--queues` argument of the running downtime worker process. Default `"downtime-query"`. Added by change `downtime-rq-async`.
 - `DOWNTIME_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ downtime job may run before the worker kills it. Must be set above the worst-case Oracle fetch duration for a 730-day range (≈ 1200 s observed on large datasets; default 1800 s provides 50% headroom). Added by change `downtime-rq-async`.
+
+**Worker env-var parity:** The `mes-dashboard-downtime-worker.service` systemd unit MUST export the same `DOWNTIME_*` and DuckDB env set as gunicorn (at minimum: `DOWNTIME_BROWSER_DUCKDB`, `DOWNTIME_ASYNC_ENABLED`, `DOWNTIME_ANALYSIS_DUCKDB_PATH`, `DOWNTIME_ANALYSIS_CACHE_TTL`). Env-var drift between the worker unit and gunicorn silently changes which acquisition path runs (DuckDB prewarm vs Oracle fallback), breaking AC-3 parity. Validate via deploy-time env comparison or the CI parquet-schema gate (see `contracts/ci/ci-gate-contract.md §downtime-rq-async Gate Compatibility Note`). Added by change `downtime-rq-async`.
 
 ## Batch Query Engine — Row-Count Chunking
 

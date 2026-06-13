@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 59f419d3722225c336bf234c46c8ae68eac138af334378fd4ef7475da857a344
+inputs-digest: 503a23c90b17a3a485f3b54fd184e89d96e4aeccd7112caa5a106b6100d0b060
 ---
 
 # Contracts Index
@@ -98,7 +98,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CSS / UI Contract — MES Dashboard
 - owner: application-team
 - surface: ui
-- schema-version: 1.8.1
+- schema-version: 1.8.2
 - last-changed: 2026-06-13
 - breaking-change-policy: deprecate-2-minors
 - summary: UI token policy, component styling rules, and visual review constraints.
@@ -148,7 +148,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Env Contract — MES Dashboard
 - owner: platform-team
 - surface: runtime-config
-- schema-version: 1.0.8
+- schema-version: 1.0.9
 - last-changed: 2026-06-13
 - breaking-change-policy: deprecate-2-minors
 - summary: Environment variable inventory, secret handling, and deployment sync policy.

@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 179
-visible-files: 882
+visible-dirs: 169
+visible-files: 857
 omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -56,6 +56,7 @@ DashBoard_vite/
 |   |   |-- 003dc30e458ea11d
 |   |   |-- 00731426b90af740
 |   |   |-- 00e4935d1440a2ca
+|   |   |-- 010e00414068858a
 |   |   |-- 0199bae5456ba1ac
 |   |   |-- 01cb19e636d04082
 |   |   |-- 02bca2c9d2f8566d
@@ -67,6 +68,7 @@ DashBoard_vite/
 |   |   |-- 06e37be44b7c2558
 |   |   |-- 08fea481e286d665
 |   |   |-- 09af02b32eace3be
+|   |   |-- 0a24b457adbbced2
 |   |   |-- 0ac8c61031ebb16b
 |   |   |-- 0bb0d7320a5cea09
 |   |   |-- 0c14e8a6e0dfaa9a
@@ -82,6 +84,7 @@ DashBoard_vite/
 |   |   |-- 15a2721810beed32
 |   |   |-- 17a6952f61650689
 |   |   |-- 1968d36e3319a49f
+|   |   |-- 1ae1a5c44c5de27d
 |   |   |-- 1cc56ed5fc92eb40
 |   |   |-- 1fa576bc7d285941
 |   |   |-- 1fcb892092629696
@@ -100,10 +103,7 @@ DashBoard_vite/
 |   |   |-- 267688019eacc507
 |   |   |-- 27091f72d62819f4
 |   |   |-- 296b4f265252c452
-|   |   |-- 2b2923cb2e7b99f7
-|   |   |-- 2bfc933af50d6a1b
-|   |   |-- 2f2ae64af48e93fe
-|   |   \-- ... (184 more entries truncated; cap=50)
+|   |   \-- ... (198 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -149,6 +149,7 @@ DashBoard_vite/
 |   |-- page_status.json
 |   \-- table_schema_info.json
 |-- deploy/
+|   |-- mes-dashboard-downtime-worker.service
 |   |-- mes-dashboard-material-consumption-worker.service
 |   |-- mes-dashboard-msd-worker.service
 |   |-- mes-dashboard-reject-worker.service
@@ -631,15 +632,9 @@ DashBoard_vite/
 |   |   \-- ... (40 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
-|   |-- metrics_history.sqlite-shm
-|   |-- metrics_history.sqlite-wal
 |   |-- rq_msd_worker.log
 |   |-- rq_prod_hist_worker.log
 |   |-- rq_reject_worker.log
@@ -786,6 +781,7 @@ DashBoard_vite/
 |       |   |-- downtime_analysis_cache.py
 |       |   |-- downtime_analysis_duckdb_cache.py
 |       |   |-- downtime_analysis_service.py
+|       |   |-- downtime_query_job_service.py
 |       |   |-- event_fetcher.py
 |       |   |-- filter_cache.py
 |       |   |-- hold_dataset_cache.py
@@ -814,8 +810,7 @@ DashBoard_vite/
 |       |   |-- query_tool_sql_runtime.py
 |       |   |-- realtime_equipment_cache.py
 |       |   |-- reason_filter_cache.py
-|       |   |-- reject_cache_sql_runtime.py
-|       |   \-- ... (22 more entries truncated; cap=50)
+|       |   \-- ... (23 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -920,6 +915,7 @@ DashBoard_vite/
 |   |   |-- _multi_worker_jobs.py
 |   |   |-- _oracle_xe_fixture.py
 |   |   |-- conftest.py
+|   |   |-- test_downtime_rq_async.py
 |   |   |-- test_fixtures_smoke.py
 |   |   |-- test_multi_worker_concurrency.py
 |   |   |-- test_oracle_error_codes.py
@@ -1043,50 +1039,9 @@ DashBoard_vite/
 |   \-- ... (167 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
-|   |   |-- anomaly_hold_dataset/
-|   |   |   \-- 7c193f4e1ec6e300.parquet
-|   |   |-- anomaly_reject_dataset/
-|   |   |   \-- 858f092b53042f96.parquet
-|   |   |-- anomaly_resource_dataset/
-|   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- anomaly_yield_dataset/
-|   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- downtime_analysis_base_events/
-|   |   |   |-- 2a452309867f43e8.parquet
-|   |   |   |-- 2aecd815064890b3.parquet
-|   |   |   |-- 3d5237330daff4c2.parquet
-|   |   |   |-- ac4dcf1bdb20aafe.parquet
-|   |   |   |-- d042e04c6a75bcaf.parquet
-|   |   |   |-- e870a07e468bc638.parquet
-|   |   |   \-- ed95163a074095d0.parquet
-|   |   |-- downtime_analysis_events/
-|   |   |   \-- 48d1653548cedfd3.parquet
-|   |   |-- downtime_analysis_job_bridge/
-|   |   |   |-- 2a452309867f43e8.parquet
-|   |   |   |-- 2aecd815064890b3.parquet
-|   |   |   |-- 3d5237330daff4c2.parquet
-|   |   |   |-- ac4dcf1bdb20aafe.parquet
-|   |   |   |-- d042e04c6a75bcaf.parquet
-|   |   |   |-- e870a07e468bc638.parquet
-|   |   |   \-- ed95163a074095d0.parquet
-|   |   |-- hold_dataset/
-|   |   |   \-- 4b0b72731c47b53c.parquet
-|   |   |-- reject_dataset/
-|   |   |   \-- 6374b08b1cd19c5d.parquet
-|   |   |-- resource_dataset/
-|   |   |   |-- 38419ef20723994a.parquet
-|   |   |   |-- 7d2ee9025463aabc.parquet
-|   |   |   |-- 7f30e1c7e245056a.parquet
-|   |   |   |-- b42069ee2c991376.parquet
-|   |   |   \-- ed3f090bc1b044e8.parquet
-|   |   |-- resource_oee/
-|   |   |   |-- 2989d78eb41982cb.parquet
-|   |   |   |-- 43dc6676a902087d.parquet
-|   |   |   |-- 7f30e1c7e245056a.parquet
-|   |   |   |-- b42069ee2c991376.parquet
-|   |   |   \-- ed3f090bc1b044e8.parquet
-|   |   |-- yield_alert_dataset/
-|   |   |   \-- 64307a91256ebc7d.parquet
+|   |   |-- downtime_analysis/
+|   |   |-- msd-events/
+|   |   |   \-- tmpp2s0qs1k.parquet
 |   |   |-- probe_10707.json
 |   |   |-- probe_10745.json
 |   |   |-- probe_10829.json
@@ -1125,7 +1080,17 @@ DashBoard_vite/
 |   |   |-- probe_166780.json
 |   |   |-- probe_166786.json
 |   |   |-- probe_169446.json
-|   |   \-- ... (72 more entries truncated; cap=50)
+|   |   |-- probe_174363.json
+|   |   |-- probe_176417.json
+|   |   |-- probe_178062.json
+|   |   |-- probe_178272.json
+|   |   |-- probe_178455.json
+|   |   |-- probe_178621.json
+|   |   |-- probe_178739.json
+|   |   |-- probe_179781.json
+|   |   |-- probe_181537.json
+|   |   |-- probe_183181.json
+|   |   \-- ... (68 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   \-- resource_history.duckdb
 |-- tools/
