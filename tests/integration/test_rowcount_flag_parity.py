@@ -244,8 +244,8 @@ class TestFlagFalseRegression:
     def test_downtime_analysis_flag_false_uses_execute_plan(self, monkeypatch):
         """downtime_analysis_service must always call execute_plan (ADR-0003).
 
-        Downtime uses whole-dataset single chunk — no USE_ROW_COUNT_CHUNKING flag.
-        The chunk dict must contain start_date/end_date (not start_row/end_row).
+        Downtime uses date-range chunks (chunk_start/chunk_end) with parallel fetch.
+        ADR-0003 constraint: must NEVER use row-count chunks (start_row/end_row).
         """
         from mes_dashboard.services import downtime_analysis_service as das
 
@@ -274,11 +274,11 @@ class TestFlagFalseRegression:
             )
 
         mock_ep.assert_called_once()
-        # Downtime uses whole-dataset chunk: {start_date, end_date}
+        # ADR-0003: chunks must use date-range keys (chunk_start/chunk_end), never row-count keys
         chunks = _extract_chunks_from_execute_plan_call(mock_ep)
-        assert len(chunks) == 1, f"Downtime must use single whole-dataset chunk, got {len(chunks)}"
+        assert len(chunks) >= 1, f"Downtime must produce at least one date-range chunk, got {len(chunks)}"
         chunk_keys = set(chunks[0].keys())
-        assert "start_date" in chunk_keys, f"Expected start_date in downtime chunk, got {chunk_keys}"
+        assert "chunk_start" in chunk_keys, f"Expected chunk_start in downtime chunk, got {chunk_keys}"
         assert "start_row" not in chunk_keys, "Downtime must never use row-count chunks (ADR-0003)"
 
 
@@ -649,8 +649,12 @@ class TestSpoolLifecycle:
             f"hold cache_prefix must be 'hold', got {cache_prefix!r}"
         )
 
-    def test_downtime_parallel_is_1_whole_dataset(self, monkeypatch):
-        """downtime execute_plan must always use parallel=1 (ADR-0003)."""
+    def test_downtime_parallel_is_configurable_date_range(self, monkeypatch):
+        """downtime execute_plan uses _DOWNTIME_ENGINE_PARALLEL (date-range parallel fetch).
+
+        perf(downtime): date-range chunks are fetched in parallel (default=3).
+        ADR-0003 constraint is about row-count exclusion, not parallel value.
+        """
         from mes_dashboard.services import downtime_analysis_service as das
 
         monkeypatch.setattr(das, "_build_response", MagicMock(return_value={}))
@@ -673,8 +677,8 @@ class TestSpoolLifecycle:
 
         mock_ep.assert_called_once()
         parallel = mock_ep.call_args.kwargs.get("parallel")
-        assert parallel == 1, (
-            f"downtime parallel must be 1 per ADR-0003, got {parallel}"
+        assert parallel == das._DOWNTIME_ENGINE_PARALLEL, (
+            f"downtime parallel must match _DOWNTIME_ENGINE_PARALLEL={das._DOWNTIME_ENGINE_PARALLEL}, got {parallel}"
         )
 
 
