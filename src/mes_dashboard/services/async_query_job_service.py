@@ -18,6 +18,7 @@ import threading
 from typing import Any, Dict, Optional, Tuple
 
 from mes_dashboard.core.redis_client import get_control_redis_client, get_key, get_redis_client
+from mes_dashboard.services.job_registry import get_job_type_config
 try:
     from rq import Retry
 except Exception:  # pragma: no cover - optional dependency path
@@ -331,3 +332,47 @@ def complete_job(
 def get_failed_job_count() -> int:
     with _FAILED_JOB_LOCK:
         return int(_FAILED_JOB_COUNT)
+
+
+# ---------------------------------------------------------------------------
+# Dynamic dispatcher (IP-2 — job-registry-central)
+# ---------------------------------------------------------------------------
+
+def enqueue_job_dynamic(
+    job_type: str,
+    owner: str,
+    params: Dict[str, Any],
+    job_id: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Dispatch an async job by *job_type* string using the central registry.
+
+    Looks up the JobTypeConfig registered for *job_type* and delegates to
+    :func:`enqueue_job`.  Returns ``(None, error_message)`` when the job type
+    is not registered or the ``should_enqueue`` precondition is not met.
+
+    Args:
+        job_type: Registered job type identifier (e.g. ``"reject"``).
+        owner: Caller identity (username or anonymous token).
+        params: Arbitrary query parameters forwarded to the worker function as
+            kwargs alongside ``job_id``.
+        job_id: Optional caller-supplied job ID; auto-generated when omitted.
+
+    Returns:
+        ``(job_id, None)`` on success, ``(None, error_message)`` on failure.
+    """
+    config = get_job_type_config(job_type)
+    if config is None:
+        return None, f"Unknown job type: {job_type!r}"
+    if config.should_enqueue is not None and not config.should_enqueue(params):
+        return None, "enqueue precondition not met"
+    _job_id = job_id or f"{job_type}-{uuid.uuid4().hex[:12]}"
+    return enqueue_job(
+        queue_name=config.queue_name,
+        worker_fn=config.worker_fn,
+        owner=owner,
+        job_id=_job_id,
+        kwargs={"job_id": _job_id, **params},
+        prefix=job_type,
+        job_timeout=config.timeout_seconds,
+        result_ttl=config.ttl_seconds,
+    )

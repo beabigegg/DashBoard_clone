@@ -334,3 +334,15 @@ def _resolve_backward_lineage(
         len(seed_cids), len(rows),
     )
     return pd.DataFrame(rows, columns=["seed_cid", "ancestor_cid", "edge_type", "cid_name"])
+
+
+# ---------------------------------------------------------------------------
+# Central job registry — job-registry-central
+# ---------------------------------------------------------------------------
+from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
+
+register_job_type(JobTypeConfig(
+    job_type="msd-lineage",
+    queue_name="msd-analysis",
+    worker_fn=_execute_msd_lineage_job,
+))

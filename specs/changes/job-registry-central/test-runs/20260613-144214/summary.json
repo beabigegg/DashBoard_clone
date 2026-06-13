@@ -1,0 +1,15 @@
+{
+  "change_id": "job-registry-central",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_job_registry.py tests/test_async_query_job_service.py --collect-only -q",
+  "duration_ms": 4634,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/job-registry-central/test-runs/20260613-144214/summary.json",
+    "stdout": "specs/changes/job-registry-central/test-runs/20260613-144214/stdout.log",
+    "stderr": "specs/changes/job-registry-central/test-runs/20260613-144214/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -1,6 +1,6 @@
-# generated: 2026-06-13T06:10:08Z by cdd-kit 3.1.0
-# files: 852, src-lines: 245548, map-lines: 18337, compression: 13.4x
-# sources-digest: 765f62473c0f0c004771e01bc11fd5071f74b1af9390d0a34a9d64a212a151d4
+# generated: 2026-06-13T06:53:35Z by cdd-kit 3.1.0
+# files: 854, src-lines: 246005, map-lines: 18386, compression: 13.4x
+# sources-digest: 5b8aa9fbc0aac5885717f0116c7f1cecc8ece94d5b84f896d2feba36ed317572
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -5462,7 +5462,7 @@ src/mes_dashboard/services/anomaly_detection_sql_runtime.py:  # 1169 lines
     - { name: get_cached_summary, lines: 1153-1155 }
     - { name: get_cached_detail, lines: 1158-1169 }
 
-src/mes_dashboard/services/async_query_job_service.py:  # 333 lines
+src/mes_dashboard/services/async_query_job_service.py:  # 378 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -5472,19 +5472,21 @@ src/mes_dashboard/services/async_query_job_service.py:  # 333 lines
     - { module: threading, items: [], line: 17 }
     - { module: typing, items: [Any, Dict, Optional, Tuple], line: 18 }
     - { module: mes_dashboard.core.redis_client, items: [get_control_redis_client, get_key, get_redis_client], line: 20 }
+    - { module: mes_dashboard.services.job_registry, items: [get_job_type_config], line: 21 }
   constants:
-    - { name: ASYNC_JOB_DEFAULT_TTL_SECONDS, line: 31 }
-    - { name: ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS, line: 32 }
+    - { name: ASYNC_JOB_DEFAULT_TTL_SECONDS, line: 32 }
+    - { name: ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS, line: 33 }
   functions:
-    - { name: _check_rq_installed, lines: 45-53 }
-    - { name: is_async_available, lines: 56-102 }
-    - { name: _meta_key, lines: 109-110 }
-    - { name: _build_default_retry, lines: 113-116 }
-    - { name: enqueue_job, lines: 123-202 }
-    - { name: get_job_status, lines: 205-268 }
-    - { name: update_job_progress, lines: 271-280 }
-    - { name: complete_job, lines: 283-328 }
-    - { name: get_failed_job_count, lines: 331-333 }
+    - { name: _check_rq_installed, lines: 46-54 }
+    - { name: is_async_available, lines: 57-103 }
+    - { name: _meta_key, lines: 110-111 }
+    - { name: _build_default_retry, lines: 114-117 }
+    - { name: enqueue_job, lines: 124-203 }
+    - { name: get_job_status, lines: 206-269 }
+    - { name: update_job_progress, lines: 272-281 }
+    - { name: complete_job, lines: 284-329 }
+    - { name: get_failed_job_count, lines: 332-334 }
+    - { name: enqueue_job_dynamic, lines: 341-378 }
 
 src/mes_dashboard/services/auth_service.py:  # 212 lines
   imports:
@@ -5996,6 +5998,19 @@ src/mes_dashboard/services/job_query_service.py:  # 557 lines
     - { name: export_jobs_with_history, lines: 398-491 }
     - { name: get_export_data, lines: 494-557 }
 
+src/mes_dashboard/services/job_registry.py:  # 78 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 19 }
+    - { module: dataclasses, items: [dataclass, field], line: 21 }
+    - { module: typing, items: [Any, Callable, Dict, List, Optional], line: 22 }
+  classes:
+    - name: JobTypeConfig
+      lines: 26-45
+  functions:
+    - { name: register_job_type, lines: 59-65 }
+    - { name: get_job_type_config, lines: 68-73 }
+    - { name: list_registered_job_types, lines: 76-78 }
+
 src/mes_dashboard/services/lineage_engine.py:  # 853 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
@@ -6071,7 +6086,7 @@ src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 429 lines
     - { name: _query_trend, lines: 209-250 }
     - { name: _query_type_breakdown, lines: 253-292 }
 
-src/mes_dashboard/services/material_consumption_service.py:  # 677 lines
+src/mes_dashboard/services/material_consumption_service.py:  # 689 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -6084,6 +6099,7 @@ src/mes_dashboard/services/material_consumption_service.py:  # 677 lines
     - { module: mes_dashboard.core.redis_client, items: [REDIS_ENABLED, get_redis_client], line: 29 }
     - { module: mes_dashboard.services.batch_query_engine, items: [compute_query_hash], line: 30 }
     - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 31 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 683 }
   constants:
     - { name: MATERIAL_CONSUMPTION_QUEUE, line: 39 }
   classes:
@@ -6133,7 +6149,7 @@ src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 175 lines
         - { name: get_page, lines: 70-125 }
         - { name: export_csv, lines: 127-175 }
 
-src/mes_dashboard/services/material_trace_service.py:  # 945 lines
+src/mes_dashboard/services/material_trace_service.py:  # 957 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: csv, items: [], line: 6 }
@@ -6153,6 +6169,7 @@ src/mes_dashboard/services/material_trace_service.py:  # 945 lines
     - { module: mes_dashboard.services.filter_cache, items: [get_workcenter_mapping, get_workcenters_for_groups], line: 35 }
     - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 39 }
     - { module: mes_dashboard.config.constants, items: [CACHE_TTL_MATERIAL_TRACE], line: 49 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 951 }
   constants:
     - { name: MATERIAL_TRACE_QUEUE, line: 33 }
   functions:
@@ -6328,7 +6345,7 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 1668 lines
         - { name: get_all_detail, lines: 1524-1565 }
         - { name: export_csv, lines: 1571-1668 }
 
-src/mes_dashboard/services/msd_lineage_job_service.py:  # 336 lines
+src/mes_dashboard/services/msd_lineage_job_service.py:  # 348 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
     - { module: logging, items: [], line: 10 }
@@ -6340,6 +6357,7 @@ src/mes_dashboard/services/msd_lineage_job_service.py:  # 336 lines
     - { module: mes_dashboard.core.query_spool_store, items: [load_spooled_df, store_spooled_df], line: 18 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, _get_job_status, update_job_progress], line: 19 }
     - { module: mes_dashboard.services.lineage_engine, items: [ORACLE_IN_BATCH_SIZE, LineageEngine, MAX_SPLIT_DEPTH, _normalize_list, _safe_str], line: 25 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 342 }
   constants:
     - { name: MSD_LINEAGE_QUEUE, line: 35 }
     - { name: MSD_LINEAGE_JOB_TIMEOUT_SECONDS, line: 36 }
@@ -6352,7 +6370,7 @@ src/mes_dashboard/services/msd_lineage_job_service.py:  # 336 lines
     - { name: _execute_msd_lineage_job, lines: 156-208 }
     - { name: _resolve_backward_lineage, lines: 211-336 }
 
-src/mes_dashboard/services/msd_seed_job_service.py:  # 166 lines
+src/mes_dashboard/services/msd_seed_job_service.py:  # 178 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: json, items: [], line: 15 }
@@ -6362,6 +6380,7 @@ src/mes_dashboard/services/msd_seed_job_service.py:  # 166 lines
     - { module: typing, items: [Any, Dict, Optional, Tuple], line: 19 }
     - { module: mes_dashboard.core.redis_client, items: [get_control_redis_client, get_key], line: 21 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, _get_job_status, update_job_progress], line: 22 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 172 }
   constants:
     - { name: MSD_SEED_QUEUE, line: 31 }
     - { name: MSD_SEED_JOB_TIMEOUT_SECONDS, line: 32 }
@@ -6435,7 +6454,7 @@ src/mes_dashboard/services/page_registry.py:  # 504 lines
     - { name: is_api_public, lines: 480-494 }
     - { name: reload_cache, lines: 497-504 }
 
-src/mes_dashboard/services/production_history_job_service.py:  # 139 lines
+src/mes_dashboard/services/production_history_job_service.py:  # 151 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -6443,6 +6462,7 @@ src/mes_dashboard/services/production_history_job_service.py:  # 139 lines
     - { module: uuid, items: [], line: 15 }
     - { module: typing, items: [Any, Dict, Optional, Tuple], line: 16 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, update_job_progress], line: 23 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 145 }
   constants:
     - { name: PRODUCTION_HISTORY_ASYNC_ENABLED, line: 34 }
     - { name: PRODUCTION_HISTORY_WORKER_QUEUE, line: 38 }
@@ -6955,7 +6975,7 @@ src/mes_dashboard/services/reject_pareto_materialized.py:  # 807 lines
     - { name: try_materialized_dimension_pareto, lines: 727-778 }
     - { name: _meta, lines: 785-807 }
 
-src/mes_dashboard/services/reject_query_job_service.py:  # 187 lines
+src/mes_dashboard/services/reject_query_job_service.py:  # 199 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: logging, items: [], line: 14 }
@@ -6964,6 +6984,7 @@ src/mes_dashboard/services/reject_query_job_service.py:  # 187 lines
     - { module: datetime, items: [date], line: 17 }
     - { module: typing, items: [Any, Dict, Optional, Tuple], line: 18 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, is_async_available, update_job_progress], line: 23 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 193 }
   constants:
     - { name: REJECT_ASYNC_ENABLED, line: 35 }
     - { name: REJECT_ASYNC_DAY_THRESHOLD, line: 38 }
@@ -7330,7 +7351,7 @@ src/mes_dashboard/services/trace_job_service.py:  # 1696 lines
     - { name: make_general_trace_events_query_id, lines: 1627-1645 }
     - { name: make_trace_query_id, lines: 1660-1696 }
 
-src/mes_dashboard/services/trace_lineage_job_service.py:  # 292 lines
+src/mes_dashboard/services/trace_lineage_job_service.py:  # 304 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: hashlib, items: [], line: 6 }
@@ -7342,6 +7363,7 @@ src/mes_dashboard/services/trace_lineage_job_service.py:  # 292 lines
     - { module: typing, items: [Any, Dict, List, Optional, Tuple], line: 12 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, _get_job_status, update_job_progress], line: 15 }
     - { module: mes_dashboard.services.lineage_engine, items: [LineageEngine], line: 21 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 298 }
   constants:
     - { name: TRACE_LINEAGE_QUEUE, line: 25 }
     - { name: TRACE_LINEAGE_JOB_TIMEOUT_SECONDS, line: 29 }
@@ -7527,7 +7549,7 @@ src/mes_dashboard/services/yield_alert_dataset_cache.py:  # 986 lines
     - { name: _enrich_alerts_with_linkage, lines: 802-902 }
     - { name: apply_view, lines: 905-986 }
 
-src/mes_dashboard/services/yield_alert_job_service.py:  # 152 lines
+src/mes_dashboard/services/yield_alert_job_service.py:  # 164 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -7535,6 +7557,7 @@ src/mes_dashboard/services/yield_alert_job_service.py:  # 152 lines
     - { module: uuid, items: [], line: 15 }
     - { module: typing, items: [Any, Dict, Optional, Tuple], line: 16 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, update_job_progress], line: 23 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 158 }
   constants:
     - { name: YIELD_ALERT_ASYNC_ENABLED, line: 34 }
     - { name: YIELD_ALERT_WORKER_QUEUE, line: 38 }
@@ -13505,6 +13528,32 @@ tests/test_job_query_service.py:  # 294 lines
         - { name: _make_engine_env, lines: 264-273 }
         - { name: test_partial_failure_in_meta, lines: 275-285 }
         - { name: test_no_partial_failure_no_meta_key, lines: 287-294 }
+
+tests/test_job_registry.py:  # 238 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 7 }
+    - { module: pytest, items: [], line: 9 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 10 }
+  classes:
+    - name: TestJobRegistryModule
+      lines: 29-84
+      methods:
+        - { name: test_module_exports_required_symbols, lines: 30-39 }
+        - { name: test_register_returns_stored_config, lines: 41-61 }
+        - { name: test_get_returns_none_for_unknown_job_type, lines: 63-68 }
+        - { name: test_list_returns_all_registered_types, lines: 70-84 }
+    - name: TestEnqueueJobDynamic
+      lines: 91-172
+      methods:
+        - { name: test_dispatches_registered_job_type, lines: 92-127 }
+        - { name: test_returns_error_tuple_for_unregistered_type, lines: 129-141 }
+        - { name: test_respects_should_enqueue_false, lines: 143-172 }
+    - name: TestJobServiceRegistrations
+      lines: 179-238
+      methods:
+        - { name: test_each_service_registers_exactly_one_job_type, lines: 180-238 }
+  functions:
+    - { name: reset_registry, lines: 18-22 }  # @pytest.fixture(autouse=True)
 
 tests/test_lineage_engine.py:  # 336 lines
   imports:

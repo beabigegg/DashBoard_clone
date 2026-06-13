@@ -1,0 +1,11 @@
+agent: test-strategist
+change-id: job-registry-central
+run-date: 2026-06-13
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/job-registry-central/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_job_registry.py → src/mes_dashboard/services/job_registry.py" }
+  - { type: tdd-pairs, pointer: "tests/test_job_registry.py → src/mes_dashboard/services/async_query_job_service.py (enqueue_job_dynamic)" }
+  - { type: coverage-tiers, pointer: "unit (tier 0), contract (tier 1 gate only)" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-8 all mapped; 8 test nodes named in targeted file; AC-5/AC-7 covered by existing test_async_query_job_service.py no-regression run" }

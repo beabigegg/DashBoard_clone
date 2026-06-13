@@ -1,0 +1,15 @@
+{
+  "change_id": "job-registry-central",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate",
+  "duration_ms": 1581,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/job-registry-central/test-runs/20260613-144239/summary.json",
+    "stdout": "specs/changes/job-registry-central/test-runs/20260613-144239/stdout.log",
+    "stderr": "specs/changes/job-registry-central/test-runs/20260613-144239/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

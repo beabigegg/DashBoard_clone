@@ -1,0 +1,15 @@
+agent: ci-cd-gatekeeper
+change-id: job-registry-central
+timestamp: 2026-06-13
+status: complete
+
+summary: >
+  Existing backend-tests.yml and contract-driven-gates.yml already cover all
+  changed surfaces. No new workflow files required. ci-gates.md written with 5
+  gate rows (at or under cap), required section headers present.
+
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3" }
+  - { type: gate-promotions, pointer: "n/a (no gate tier changes; all existing gates reused)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; existing coverage sufficient)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, contract-validate, ruff-lint (Tier 0 local)" }

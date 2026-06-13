@@ -164,3 +164,15 @@ def _execute_msd_seed_resolve_job(
 
     complete_job(_JOB_PREFIX, job_id, query_id=seed_cache_key)
     logger.info("msd seed job completed job_id=%s seed_count=%d", job_id, response["seed_count"])
+
+
+# ---------------------------------------------------------------------------
+# Central job registry — job-registry-central
+# ---------------------------------------------------------------------------
+from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
+
+register_job_type(JobTypeConfig(
+    job_type="msd-seed",
+    queue_name="msd-analysis",
+    worker_fn=_execute_msd_seed_resolve_job,
+))

@@ -290,3 +290,15 @@ def _execute_trace_lineage_job(
         logger.error("trace lineage job failed job_id=%s: %s", job_id, exc, exc_info=True)
         complete_job(_JOB_PREFIX, job_id, error=str(exc))
         raise
+
+
+# ---------------------------------------------------------------------------
+# Central job registry — job-registry-central
+# ---------------------------------------------------------------------------
+from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
+
+register_job_type(JobTypeConfig(
+    job_type="trace-lineage",
+    queue_name="trace-events",
+    worker_fn=_execute_trace_lineage_job,
+))

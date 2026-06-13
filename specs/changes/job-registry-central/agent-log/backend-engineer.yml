@@ -1,0 +1,46 @@
+agent: backend-engineer
+change-id: job-registry-central
+date: 2026-06-13
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/job_registry.py:1-82 (created)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/async_query_job_service.py: added import line 21; added enqueue_job_dynamic() lines 335-375"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/reject_query_job_service.py: appended register_job_type('reject') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/yield_alert_job_service.py: appended register_job_type('yield_alert') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/production_history_job_service.py: appended register_job_type('production_history') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/trace_lineage_job_service.py: appended register_job_type('trace-lineage') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/msd_seed_job_service.py: appended register_job_type('msd-seed') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/msd_lineage_job_service.py: appended register_job_type('msd-lineage') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/material_consumption_service.py: appended register_job_type('material-consumption') at module end"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/material_trace_service.py: appended register_job_type('material-trace') at module end"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestJobRegistryModule::test_module_exports_required_symbols"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestJobRegistryModule::test_register_returns_stored_config"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestJobRegistryModule::test_get_returns_none_for_unknown_job_type"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestJobRegistryModule::test_list_returns_all_registered_types"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestEnqueueJobDynamic::test_dispatches_registered_job_type"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestEnqueueJobDynamic::test_returns_error_tuple_for_unregistered_type"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestEnqueueJobDynamic::test_respects_should_enqueue_false"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestJobServiceRegistrations::test_each_service_registers_exactly_one_job_type"
+  - type: test-output
+    pointer: "48 passed (8 new + 40 existing) in 0.25s — collect/targeted/changed-area/contract all exit 0"
+  - type: contracts-touched
+    pointer: "n/a (no contract files modified; contract-reviewer confirmed no-change)"

@@ -943,3 +943,15 @@ def rq_material_trace_job(job_id: str, mode: str, values: List[str], workcenter_
             complete_job("material_trace", job_id, error=str(exc))
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Central job registry — job-registry-central
+# ---------------------------------------------------------------------------
+from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
+
+register_job_type(JobTypeConfig(
+    job_type="material-trace",
+    queue_name="trace-events",
+    worker_fn=rq_material_trace_job,
+))

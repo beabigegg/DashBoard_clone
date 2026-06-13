@@ -1,0 +1,14 @@
+change-id: job-registry-central
+timestamp: "2026-06-13"
+agent: contract-reviewer
+status: done
+verdict: CONTRACTS-UNCHANGED
+artifacts:
+  - type: contracts-reviewed
+    pointer: "contracts/api/api-contract.md, contracts/business/business-rules.md, contracts/data/data-shape-contract.md, contracts/env/env-contract.md, contracts/css/css-contract.md, contracts/CHANGELOG.md"
+  - type: version-bumps
+    pointer: "none"
+  - type: breaking-changes
+    pointer: "none"
+notes: "job_registry.py is pure internal infrastructure (in-process dict). enqueue_job_dynamic() wraps existing enqueue_job() with identical output semantics. The 8 register_job_type() calls are pure metadata side-effects. No API/data/env/CSS/CI/CD/business contract surface is touched."
+next-action: "test-strategist writes test-plan.md"

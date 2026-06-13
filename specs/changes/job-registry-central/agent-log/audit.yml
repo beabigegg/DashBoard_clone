@@ -1,0 +1,13 @@
+- type: tier-floor-override
+  change-id: job-registry-central
+  timestamp: '2026-06-13T06:45:09.751Z'
+  declared-tier: 3
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - migration
+    - query
+  reason: >-
+    No DB migration, Redis schema change, or concurrency change. 'migration' keyword appears only in
+    the referenced docs/dynamic-rq-migration-plan.md filename; 'query' in service module names. This
+    is purely additive in-process registry metadata.

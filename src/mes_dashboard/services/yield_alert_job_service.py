@@ -150,3 +150,15 @@ def execute_yield_alert_job(
         )
         complete_job(_JOB_PREFIX, job_id, error=str(exc))
         raise
+
+
+# ---------------------------------------------------------------------------
+# Central job registry — job-registry-central
+# ---------------------------------------------------------------------------
+from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
+
+register_job_type(JobTypeConfig(
+    job_type="yield_alert",
+    queue_name="yield-alert-query",
+    worker_fn=execute_yield_alert_job,
+))

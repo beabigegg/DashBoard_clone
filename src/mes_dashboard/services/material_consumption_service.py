@@ -675,3 +675,15 @@ def start_parts_cache_warmup() -> None:
         name="material-consumption-parts-warmup",
     ).start()
     logger.info("material_consumption parts list cache warmup thread started")
+
+
+# ---------------------------------------------------------------------------
+# Central job registry — job-registry-central
+# ---------------------------------------------------------------------------
+from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
+
+register_job_type(JobTypeConfig(
+    job_type="material-consumption",
+    queue_name="material-consumption-detail",
+    worker_fn=rq_material_consumption_job,
+))

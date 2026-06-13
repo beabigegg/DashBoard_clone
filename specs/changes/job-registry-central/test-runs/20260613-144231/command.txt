@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/test_job_registry.py tests/test_async_query_job_service.py -v

@@ -1,0 +1,15 @@
+{
+  "change_id": "job-registry-central",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_job_registry.py -v",
+  "duration_ms": 3431,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/job-registry-central/test-runs/20260613-144223/summary.json",
+    "stdout": "specs/changes/job-registry-central/test-runs/20260613-144223/stdout.log",
+    "stderr": "specs/changes/job-registry-central/test-runs/20260613-144223/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

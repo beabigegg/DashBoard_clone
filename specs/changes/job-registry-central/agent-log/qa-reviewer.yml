@@ -1,0 +1,19 @@
+change-id: job-registry-central
+timestamp: "2026-06-13"
+agent: qa-reviewer
+status: done
+verdict: RELEASE-READY
+artifacts:
+  - type: test-evidence
+    pointer: "specs/changes/job-registry-central/test-evidence.yml — final-status: passed; all 4 required phases green"
+  - type: contracts
+    pointer: "CONTRACTS-UNCHANGED (contract-reviewer); no contract file modified"
+  - type: ac-coverage
+    pointer: "AC-1..AC-8 all covered by green test nodes; 48/48 passed (8 new + 40 no-regression)"
+  - type: decision
+    pointer: "approved — Tier-3 single-reviewer sign-off; PR+nightly CI gates scheduled per ci-gates.md"
+notes: |
+  Note (non-blocking, /cdd-close): classification said "5 new tests"; implementation
+  delivered 8 nodes. Test-plan AC mapping already lists 8 nodes — artifacts are
+  internally consistent. Reconcile classification wording during close-out.
+next-action: "cdd-kit gate job-registry-central"
