@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.9
+schema-version: 1.0.10
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -120,6 +120,22 @@ breaking-change-policy: deprecate-2-minors
 - `DOWNTIME_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ downtime job may run before the worker kills it. Must be set above the worst-case Oracle fetch duration for a 730-day range (≈ 1200 s observed on large datasets; default 1800 s provides 50% headroom). Added by change `downtime-rq-async`.
 
 **Worker env-var parity:** The `mes-dashboard-downtime-worker.service` systemd unit MUST export the same `DOWNTIME_*` and DuckDB env set as gunicorn (at minimum: `DOWNTIME_BROWSER_DUCKDB`, `DOWNTIME_ASYNC_ENABLED`, `DOWNTIME_ANALYSIS_DUCKDB_PATH`, `DOWNTIME_ANALYSIS_CACHE_TTL`). Env-var drift between the worker unit and gunicorn silently changes which acquisition path runs (DuckDB prewarm vs Oracle fallback), breaking AC-3 parity. Validate via deploy-time env comparison or the CI parquet-schema gate (see `contracts/ci/ci-gate-contract.md §downtime-rq-async Gate Compatibility Note`). Added by change `downtime-rq-async`.
+
+## Async Worker — Hold History Query
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| HOLD_ASYNC_ENABLED | feature-flag | all | no | no | true | true | application-team | true or false | yes | false = all hold-history queries run synchronously regardless of date range |
+| HOLD_ASYNC_DAY_THRESHOLD | async | all | no | no | 90 | 90 | application-team | positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when HOLD_ASYNC_ENABLED=true | yes | uses default 90 |
+| HOLD_WORKER_QUEUE | async | all | no | no | hold-history-query | hold-history-query | application-team | non-empty string; RQ queue name for the hold-history worker process | yes | uses default "hold-history-query" |
+| HOLD_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the hold-history worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
+
+- `HOLD_ASYNC_ENABLED`: Feature flag enabling the async RQ path for long hold-history queries. When `false`, all `POST /api/hold-history/query` calls run synchronously regardless of date span. Default `true`; set to `false` for emergency rollback. **Restart required** — module-level constant frozen at import. Added by change `hold-history-rq-async`.
+- `HOLD_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a hold-history query is dispatched via RQ (when `HOLD_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `90`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `hold-history-rq-async`.
+- `HOLD_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes hold-history jobs to. Must match the `--queues` argument of the running hold-history worker process. Default `"hold-history-query"`. Added by change `hold-history-rq-async`.
+- `HOLD_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ hold-history job may run before the worker kills it. Default 1800 s. Added by change `hold-history-rq-async`.
+
+**Worker env-var parity:** The `mes-dashboard-hold-history-worker.service` systemd unit MUST export the same `HOLD_*` env set as gunicorn (at minimum: `HOLD_ASYNC_ENABLED`, `HOLD_ASYNC_DAY_THRESHOLD`, `HOLD_WORKER_QUEUE`, `HOLD_JOB_TIMEOUT_SECONDS`). Env-var drift silently changes query routing. Added by change `hold-history-rq-async`.
 
 ## Batch Query Engine — Row-Count Chunking
 

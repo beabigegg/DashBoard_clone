@@ -1,0 +1,31 @@
+change-id: hold-history-rq-async
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check 2>&1
+    summary: specs/changes/hold-history-rq-async/test-runs/20260613-173605/summary.json
+  - phase: targeted
+    status: passed
+    command: conda run -n mes-dashboard pytest tests/test_hold_history_routes.py tests/test_rq_monitor_service.py -x -q
+    summary: specs/changes/hold-history-rq-async/test-runs/20260613-174452/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      conda run -n mes-dashboard pytest tests/test_hold_history_routes.py tests/test_rq_monitor_service.py
+      tests/integration/test_hold_history_rq_async.py --ignore-glob='*integration_real*' -x -q --co -q
+    summary: specs/changes/hold-history-rq-async/test-runs/20260613-174504/summary.json
+  - phase: quality
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check 2>&1 && npm run css:check 2>&1 | tail -3
+    summary: specs/changes/hold-history-rq-async/test-runs/20260613-173643/summary.json
+  - phase: contract
+    status: passed
+    command: conda run -n mes-dashboard cdd-kit validate
+    summary: specs/changes/hold-history-rq-async/test-runs/20260613-174512/summary.json
+final-status: passed

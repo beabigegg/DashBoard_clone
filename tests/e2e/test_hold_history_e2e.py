@@ -68,6 +68,36 @@ class TestHoldHistoryQuery:
         payload = resp.json()
         assert payload["success"] is True
 
+    def test_long_range_returns_202_and_job_id(self, api_base_url):
+        """Long-range query (≥ HOLD_ASYNC_DAY_THRESHOLD) returns 202 with job_id when async enabled.
+
+        When HOLD_ASYNC_ENABLED=true and the date range meets the threshold, the endpoint
+        must return 202 with {async: true, job_id, status_url}. Falls back to 200 sync if
+        the worker is unavailable (is_async_available()=False). Either outcome is acceptable
+        here; what must NOT happen is a 4xx/5xx.
+        """
+        import datetime
+
+        end = datetime.date.today()
+        start = end - datetime.timedelta(days=120)  # 120 days > default threshold of 90
+        resp = requests.post(
+            f"{api_base_url}/hold-history/query",
+            json={"start_date": start.isoformat(), "end_date": end.isoformat()},
+            timeout=30,
+        )
+        assert resp.status_code in (200, 202), (
+            f"Expected 200 (sync fallback) or 202 (async), got {resp.status_code}"
+        )
+        payload = resp.json()
+        assert payload["success"] is True
+        if resp.status_code == 202:
+            data = payload.get("data", {})
+            assert "job_id" in data, "202 response must include job_id"
+            assert "status_url" in data, "202 response must include status_url"
+            assert "hold-history" in data["status_url"], (
+                "status_url must include hold-history prefix"
+            )
+
 
 @pytest.mark.e2e
 class TestHoldHistoryView:

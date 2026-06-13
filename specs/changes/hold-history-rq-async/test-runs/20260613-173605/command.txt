@@ -1,0 +1,1 @@
+cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check 2>&1

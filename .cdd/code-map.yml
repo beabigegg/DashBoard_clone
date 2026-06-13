@@ -1,6 +1,6 @@
-# generated: 2026-06-13T08:16:27Z by cdd-kit 3.1.0
-# files: 856, src-lines: 247473, map-lines: 18464, compression: 13.4x
-# sources-digest: c8838f52aa590e7477cb36fdb296905933bb54a175c926e0a81ecfb0ba0ca8f1
+# generated: 2026-06-13T09:46:21Z by cdd-kit 3.1.0
+# files: 858, src-lines: 248758, map-lines: 18542, compression: 13.4x
+# sources-digest: e6bf7a74104bd548ea82f4262a27b746a5355451b064a69344266a1fd1f75eb0
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -945,7 +945,7 @@ frontend/src/hold-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-frontend/src/hold-history/App.vue:  # 1129 lines
+frontend/src/hold-history/App.vue:  # 1306 lines
 
 frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
 
@@ -2751,10 +2751,19 @@ frontend/tests/playwright/downtime-analysis.spec.ts:  # 937 lines
     - { name: async waitForErrorBanner, lines: 231-248 }
     - { name: async waitForEmptyState, lines: 250-267 }
 
-frontend/tests/playwright/hold-history-flat-table.spec.js:  # 81 lines
+frontend/tests/playwright/hold-history-flat-table.spec.js:  # 310 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 10 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+    - { module: '@playwright/test', items: [test, expect], line: 14 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 15 }
+  constants:
+    - { name: MOCK_CONFIG, line: 21 }
+    - { name: MOCK_SYNC_QUERY_RESULT, line: 26 }
+    - { name: MOCK_ASYNC_202_RESPONSE, line: 40 }
+    - { name: MOCK_JOB_STATUS_RUNNING, line: 50 }
+    - { name: MOCK_JOB_STATUS_COMPLETED, line: 60 }
+    - { name: MOCK_VIEW_RESULT, line: 78 }
+  functions:
+    - { name: async setupBaseRoutes, lines: 91-123 }
 
 frontend/tests/playwright/hold-overview.spec.js:  # 66 lines
   imports:
@@ -3256,7 +3265,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1634 lines
+src/mes_dashboard/app.py:  # 1635 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3316,8 +3325,8 @@ src/mes_dashboard/app.py:  # 1634 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-746 }
-    - { name: create_app, lines: 755-1508 }
-    - { name: _register_error_handlers, lines: 1511-1634 }
+    - { name: create_app, lines: 755-1509 }
+    - { name: _register_error_handlers, lines: 1512-1635 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4726,7 +4735,7 @@ src/mes_dashboard/routes/health_routes.py:  # 863 lines
     - { name: deep_health_check, lines: 631-837 }  # @health_bp.route('/health/deep', methods=['GET'])
     - { name: frontend_shell_health_check, lines: 841-863 }  # @health_bp.route('/health/frontend-shell', methods=['GET'])
 
-src/mes_dashboard/routes/hold_history_routes.py:  # 364 lines
+src/mes_dashboard/routes/hold_history_routes.py:  # 416 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -4741,17 +4750,24 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 364 lines
     - { module: mes_dashboard.services.hold_dataset_cache, items: [apply_view, execute_primary_query], line: 35 }
     - { module: mes_dashboard.services.hold_today_snapshot_service, items: [execute_today_snapshot], line: 39 }
     - { module: mes_dashboard.core.database, items: [DatabaseCircuitOpenError, DatabasePoolExhaustedError], line: 40 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 41 }
+    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 45 }
+  constants:
+    - { name: HOLD_ASYNC_ENABLED, line: 63 }
+    - { name: HOLD_ASYNC_DAY_THRESHOLD, line: 66 }
+    - { name: HOLD_WORKER_QUEUE, line: 67 }
+    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 68 }
   functions:
-    - { name: _inject_hold_spool_info, lines: 59-76 }
-    - { name: _inject_workcenter_mapping, lines: 79-89 }
-    - { name: _validate_date, lines: 125-131 }
-    - { name: _normalize_hold_type, lines: 134-136 }
-    - { name: _normalize_record_type, lines: 139-147 }
-    - { name: hold_history_page, lines: 156-174 }  # @hold_history_bp.route('/hold-history')
-    - { name: api_hold_history_query, lines: 184-212 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
-    - { name: api_hold_history_view, lines: 222-270 }  # @hold_history_bp.route('/api/hold-history/view')
-    - { name: api_hold_history_config, lines: 279-284 }  # @hold_history_bp.route('/api/hold-history/config')
-    - { name: api_hold_history_today_snapshot, lines: 294-364 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+    - { name: _inject_hold_spool_info, lines: 74-91 }
+    - { name: _inject_workcenter_mapping, lines: 94-104 }
+    - { name: _validate_date, lines: 140-146 }
+    - { name: _normalize_hold_type, lines: 149-151 }
+    - { name: _normalize_record_type, lines: 154-162 }
+    - { name: hold_history_page, lines: 171-189 }  # @hold_history_bp.route('/hold-history')
+    - { name: api_hold_history_query, lines: 199-264 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
+    - { name: api_hold_history_view, lines: 274-322 }  # @hold_history_bp.route('/api/hold-history/view')
+    - { name: api_hold_history_config, lines: 331-336 }  # @hold_history_bp.route('/api/hold-history/config')
+    - { name: api_hold_history_today_snapshot, lines: 346-416 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
 src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
   imports:
@@ -5932,6 +5948,26 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 803 lines
     - { name: _build_record_type_clause, lines: 644-668 }
     - { name: _build_duration_clause, lines: 671-682 }
     - { name: try_compute_view_from_spool, lines: 687-803 }
+
+src/mes_dashboard/services/hold_query_job_service.py:  # 174 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 14 }
+    - { module: logging, items: [], line: 16 }
+    - { module: os, items: [], line: 17 }
+    - { module: datetime, items: [datetime], line: 18 }
+    - { module: typing, items: [Any], line: 19 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 21 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 165 }
+  constants:
+    - { name: HOLD_ASYNC_ENABLED, line: 33 }
+    - { name: HOLD_ASYNC_DAY_THRESHOLD, line: 37 }
+    - { name: HOLD_WORKER_QUEUE, line: 39 }
+    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 41 }
+    - { name: HOLD_JOB_TTL_SECONDS, line: 43 }
+  functions:
+    - { name: should_use_async, lines: 53-71 }
+    - { name: enqueue_hold_history_query, lines: 78-91 }
+    - { name: execute_hold_history_query_job, lines: 98-159 }
 
 src/mes_dashboard/services/hold_today_snapshot_service.py:  # 508 lines
   imports:
@@ -7266,7 +7302,7 @@ src/mes_dashboard/services/resource_service.py:  # 679 lines
     - { name: get_resource_status_summary, lines: 507-604 }
     - { name: get_workcenter_status_matrix, lines: 607-679 }
 
-src/mes_dashboard/services/rq_monitor_service.py:  # 248 lines
+src/mes_dashboard/services/rq_monitor_service.py:  # 249 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -7275,11 +7311,11 @@ src/mes_dashboard/services/rq_monitor_service.py:  # 248 lines
     - { module: typing, items: [Any, Dict, List], line: 14 }
     - { module: mes_dashboard.core.redis_client, items: [get_redis_client], line: 16 }
   functions:
-    - { name: _check_rq_installed, lines: 34-39 }
-    - { name: get_rq_worker_details, lines: 46-125 }
-    - { name: get_rq_queue_details, lines: 132-186 }
-    - { name: get_heavy_query_slot_status, lines: 193-206 }
-    - { name: get_rq_monitor_summary, lines: 213-248 }
+    - { name: _check_rq_installed, lines: 35-40 }
+    - { name: get_rq_worker_details, lines: 47-126 }
+    - { name: get_rq_queue_details, lines: 133-187 }
+    - { name: get_heavy_query_slot_status, lines: 194-207 }
+    - { name: get_rq_monitor_summary, lines: 214-249 }
 
 src/mes_dashboard/services/scrap_reason_exclusion_cache.py:  # 236 lines
   imports:
@@ -8066,61 +8102,62 @@ tests/e2e/test_global_connection.py:  # 155 lines
     - { name: _sidebar_links, lines: 11-13 }
     - { name: _fetch_json_status, lines: 16-32 }
 
-tests/e2e/test_hold_history_e2e.py:  # 371 lines
+tests/e2e/test_hold_history_e2e.py:  # 401 lines
   imports:
     - { module: pytest, items: [], line: 11 }
     - { module: requests, items: [], line: 12 }
   classes:
     - name: TestHoldHistoryQuery
-      lines: 16-69
+      lines: 16-99
       methods:
         - { name: test_query_requires_dates, lines: 19-24 }
         - { name: test_query_rejects_invalid_date_format, lines: 26-33 }
         - { name: test_query_rejects_inverted_dates, lines: 35-42 }
         - { name: test_query_returns_query_id, lines: 44-54 }
         - { name: test_query_with_hold_type_filter, lines: 56-69 }
+        - { name: test_long_range_returns_202_and_job_id, lines: 71-99 }
     - name: TestHoldHistoryView
-      lines: 73-161
+      lines: 103-191
       methods:
-        - { name: query_id, lines: 77-89 }
-        - { name: test_view_requires_query_id, lines: 91-94 }
-        - { name: test_view_returns_data, lines: 96-114 }
-        - { name: test_view_pagination, lines: 116-128 }
-        - { name: test_view_with_hold_type_filter, lines: 130-139 }
-        - { name: test_view_with_duration_range_filter, lines: 141-150 }
-        - { name: test_view_expired_query_id_returns_410, lines: 152-161 }
+        - { name: query_id, lines: 107-119 }
+        - { name: test_view_requires_query_id, lines: 121-124 }
+        - { name: test_view_returns_data, lines: 126-144 }
+        - { name: test_view_pagination, lines: 146-158 }
+        - { name: test_view_with_hold_type_filter, lines: 160-169 }
+        - { name: test_view_with_duration_range_filter, lines: 171-180 }
+        - { name: test_view_expired_query_id_returns_410, lines: 182-191 }
     - name: TestHoldHistoryDurationPayloadFields
-      lines: 165-214
+      lines: 195-244
       methods:
-        - { name: _query_id, lines: 169-179 }
-        - { name: test_duration_has_avg_released_hours, lines: 181-184 }
-        - { name: test_duration_has_avg_on_hold_hours, lines: 186-189 }
-        - { name: test_duration_has_max_released_hours, lines: 191-194 }
-        - { name: test_duration_has_max_on_hold_hours, lines: 196-199 }
-        - { name: test_duration_via_view_endpoint, lines: 201-214 }
+        - { name: _query_id, lines: 199-209 }
+        - { name: test_duration_has_avg_released_hours, lines: 211-214 }
+        - { name: test_duration_has_avg_on_hold_hours, lines: 216-219 }
+        - { name: test_duration_has_max_released_hours, lines: 221-224 }
+        - { name: test_duration_has_max_on_hold_hours, lines: 226-229 }
+        - { name: test_duration_via_view_endpoint, lines: 231-244 }
     - name: TestHoldHistoryTrendRepeatQualityField
-      lines: 218-237
+      lines: 248-267
       methods:
-        - { name: test_query_trend_days_have_repeat_quality, lines: 221-237 }
+        - { name: test_query_trend_days_have_repeat_quality, lines: 251-267 }
     - name: TestHoldHistoryConfig
-      lines: 258-280
+      lines: 288-310
       methods:
-        - { name: test_config_returns_200, lines: 261-265 }
-        - { name: test_config_has_today_mode_enabled, lines: 267-272 }
-        - { name: test_config_has_auto_refresh_seconds, lines: 274-280 }
+        - { name: test_config_returns_200, lines: 291-295 }
+        - { name: test_config_has_today_mode_enabled, lines: 297-302 }
+        - { name: test_config_has_auto_refresh_seconds, lines: 304-310 }
     - name: TestHoldHistoryTodaySnapshot
-      lines: 284-371
+      lines: 314-401
       methods:
-        - { name: _post_snapshot, lines: 287-293 }
-        - { name: test_today_snapshot_returns_200_or_503, lines: 295-303 }
-        - { name: test_today_snapshot_envelope_structure, lines: 305-313 }
-        - { name: test_today_snapshot_summary_keys, lines: 315-323 }
-        - { name: test_today_snapshot_no_trend_key, lines: 325-331 }
-        - { name: test_today_snapshot_has_list_and_pareto, lines: 333-340 }
-        - { name: test_today_snapshot_rejects_bad_record_type, lines: 342-347 }
-        - { name: test_today_snapshot_rejects_bad_duration_range, lines: 349-352 }
-        - { name: test_today_snapshot_all_record_types_accepted, lines: 355-360 }
-        - { name: test_today_snapshot_summary_numeric_values, lines: 362-371 }
+        - { name: _post_snapshot, lines: 317-323 }
+        - { name: test_today_snapshot_returns_200_or_503, lines: 325-333 }
+        - { name: test_today_snapshot_envelope_structure, lines: 335-343 }
+        - { name: test_today_snapshot_summary_keys, lines: 345-353 }
+        - { name: test_today_snapshot_no_trend_key, lines: 355-361 }
+        - { name: test_today_snapshot_has_list_and_pareto, lines: 363-370 }
+        - { name: test_today_snapshot_rejects_bad_record_type, lines: 372-377 }
+        - { name: test_today_snapshot_rejects_bad_duration_range, lines: 379-382 }
+        - { name: test_today_snapshot_all_record_types_accepted, lines: 385-390 }
+        - { name: test_today_snapshot_summary_numeric_values, lines: 392-401 }
 
 tests/e2e/test_hold_overview_e2e.py:  # 94 lines
   imports:
@@ -8973,6 +9010,34 @@ tests/integration/test_fixtures_smoke.py:  # 44 lines
     - { name: test_workers_boot, lines: 12-20 }  # @pytest.mark.parametrize('gunicorn_workers', [1], indirect=True)
     - { name: test_local_redis_fixture, lines: 23-31 }
     - { name: test_temp_spool_dir_fixture, lines: 34-44 }
+
+tests/integration/test_hold_history_rq_async.py:  # 470 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 19 }
+    - { module: importlib, items: [], line: 21 }
+    - { module: os, items: [], line: 22 }
+    - { module: uuid, items: [], line: 23 }
+    - { module: typing, items: [Any, Dict], line: 24 }
+    - { module: unittest.mock, items: [patch], line: 25 }
+    - { module: pytest, items: [], line: 27 }
+  classes:
+    - name: TestHoldHistoryAsyncDispatch
+      lines: 53-195
+      methods:
+        - { name: test_enqueue_to_hold_history_queue, lines: 61-117 }
+        - { name: test_enqueue_payload_contains_owner_and_params, lines: 119-163 }
+        - { name: test_hold_worker_queue_default_is_hold_history_query, lines: 165-179 }
+        - { name: test_hold_job_timeout_default_is_1800, lines: 181-195 }
+    - name: TestHoldHistoryAsyncParity
+      lines: 202-470
+      methods:
+        - { name: test_worker_fn_parity_vs_sync, lines: 217-317 }
+        - { name: test_per_chunk_pct_milestones_fire_in_order, lines: 319-370 }
+        - { name: test_pct_envelope_never_decreases, lines: 372-412 }
+        - { name: test_worker_fn_failure_does_not_call_complete_job, lines: 414-470 }
+  functions:
+    - { name: _reset_registry, lines: 36-39 }
+    - { name: _reload_hold_job_service, lines: 42-46 }
 
 tests/integration/test_multi_worker_concurrency.py:  # 620 lines
   imports:
@@ -13010,63 +13075,75 @@ tests/test_hold_history_chunk_duplication.py:  # 196 lines
     - { name: _run_pipeline, lines: 132-161 }
     - { name: _on_hold_rows, lines: 164-165 }
 
-tests/test_hold_history_routes.py:  # 395 lines
+tests/test_hold_history_routes.py:  # 537 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: unittest, items: [], line: 5 }
     - { module: unittest.mock, items: [patch], line: 6 }
-    - { module: mes_dashboard.app, items: [create_app], line: 8 }
-    - { module: mes_dashboard.core.database, items: [], line: 9 }
+    - { module: pytest, items: [], line: 8 }
+    - { module: mes_dashboard.app, items: [create_app], line: 10 }
+    - { module: mes_dashboard.core.database, items: [], line: 11 }
   classes:
     - name: TestHoldHistoryRoutesBase
-      lines: 12-19
+      lines: 14-21
       methods:
-        - { name: setUp, lines: 15-19 }
+        - { name: setUp, lines: 17-21 }
     - name: TestHoldHistoryPageRoute
-      lines: 22-35
+      lines: 24-37
       methods:
-        - { name: test_hold_history_page_includes_vite_entry, lines: 26-29 }
-        - { name: test_hold_history_page_redirects_without_admin, lines: 32-35 }
+        - { name: test_hold_history_page_includes_vite_entry, lines: 28-31 }
+        - { name: test_hold_history_page_redirects_without_admin, lines: 34-37 }
     - name: TestHoldHistoryQueryRoute
-      lines: 38-156
+      lines: 40-160
       methods:
-        - { name: test_query_missing_dates_returns_400, lines: 41-49 }
-        - { name: test_query_invalid_date_format_returns_400, lines: 51-59 }
-        - { name: test_query_end_before_start_returns_400, lines: 61-69 }
-        - { name: test_query_invalid_record_type_returns_400, lines: 71-83 }
-        - { name: test_query_success, lines: 86-107 }
-        - { name: test_query_passes_params, lines: 110-128 }
-        - { name: test_query_rate_limited_returns_429, lines: 132-142 }
-        - { name: test_query_bootstrap_render_failure_returns_500, lines: 145-156 }
+        - { name: test_query_missing_dates_returns_400, lines: 43-51 }
+        - { name: test_query_invalid_date_format_returns_400, lines: 53-61 }
+        - { name: test_query_end_before_start_returns_400, lines: 63-71 }
+        - { name: test_query_invalid_record_type_returns_400, lines: 73-85 }
+        - { name: test_query_success, lines: 88-109 }
+        - { name: test_query_passes_params, lines: 112-132 }
+        - { name: test_query_rate_limited_returns_429, lines: 136-146 }
+        - { name: test_query_bootstrap_render_failure_returns_500, lines: 149-160 }
+    - name: TestHoldHistoryAsyncQueryRoute
+      lines: 163-289
+      methods:
+        - { name: test_query_long_range_returns_202, lines: 194-198 }
+        - { name: test_query_202_response_has_job_id, lines: 202-210 }
+        - { name: test_query_short_range_returns_200_sync, lines: 215-222 }
+        - { name: test_query_async_flag_false_returns_200_sync, lines: 227-239 }
+        - { name: test_query_redis_down_falls_back_to_sync, lines: 245-251 }
+        - { name: test_hold_async_enabled_default_is_true, lines: 255-274 }
+        - { name: test_hold_async_day_threshold_default_is_90, lines: 276-289 }
     - name: TestHoldHistoryViewRoute
-      lines: 159-269
+      lines: 292-402
       methods:
-        - { name: test_view_missing_query_id_returns_400, lines: 162-168 }
-        - { name: test_view_invalid_record_type_returns_400, lines: 170-177 }
-        - { name: test_view_invalid_duration_range_returns_400, lines: 179-186 }
-        - { name: test_view_cache_expired_returns_410, lines: 189-197 }
-        - { name: test_view_success, lines: 200-225 }
-        - { name: test_view_caps_per_page, lines: 228-242 }
-        - { name: test_view_passes_duration_range, lines: 245-258 }
-        - { name: test_view_rate_limited_returns_429, lines: 262-269 }
+        - { name: test_view_missing_query_id_returns_400, lines: 295-301 }
+        - { name: test_view_invalid_record_type_returns_400, lines: 303-310 }
+        - { name: test_view_invalid_duration_range_returns_400, lines: 312-319 }
+        - { name: test_view_cache_expired_returns_410, lines: 322-330 }
+        - { name: test_view_success, lines: 333-358 }
+        - { name: test_view_caps_per_page, lines: 361-375 }
+        - { name: test_view_passes_duration_range, lines: 378-391 }
+        - { name: test_view_rate_limited_returns_429, lines: 395-402 }
     - name: TestHoldHistoryTodaySnapshotRoute
-      lines: 272-379
+      lines: 405-512
       methods:
-        - { name: test_today_snapshot_success_returns_200, lines: 292-298 }
-        - { name: test_today_snapshot_summary_keys_present, lines: 301-310 }
-        - { name: test_today_snapshot_invalid_record_type_returns_400, lines: 312-319 }
-        - { name: test_today_snapshot_invalid_duration_range_returns_400, lines: 321-328 }
-        - { name: test_today_snapshot_db_unavailable_returns_503, lines: 331-337 }
-        - { name: test_today_snapshot_pool_exhausted_returns_503, lines: 340-346 }
-        - { name: test_today_snapshot_runtime_error_returns_503, lines: 349-354 }
-        - { name: test_today_snapshot_valid_record_types, lines: 357-364 }
-        - { name: test_today_snapshot_default_hold_type_is_quality, lines: 367-371 }
-        - { name: test_today_snapshot_no_trend_key, lines: 374-379 }
+        - { name: test_today_snapshot_success_returns_200, lines: 425-431 }
+        - { name: test_today_snapshot_summary_keys_present, lines: 434-443 }
+        - { name: test_today_snapshot_invalid_record_type_returns_400, lines: 445-452 }
+        - { name: test_today_snapshot_invalid_duration_range_returns_400, lines: 454-461 }
+        - { name: test_today_snapshot_db_unavailable_returns_503, lines: 464-470 }
+        - { name: test_today_snapshot_pool_exhausted_returns_503, lines: 473-479 }
+        - { name: test_today_snapshot_runtime_error_returns_503, lines: 482-487 }
+        - { name: test_today_snapshot_valid_record_types, lines: 490-497 }
+        - { name: test_today_snapshot_default_hold_type_is_quality, lines: 500-504 }
+        - { name: test_today_snapshot_no_trend_key, lines: 507-512 }
     - name: TestHoldHistoryConfigRoute
-      lines: 382-395
+      lines: 515-537
       methods:
-        - { name: test_config_returns_200, lines: 385-389 }
-        - { name: test_config_has_feature_flag_keys, lines: 391-395 }
+        - { name: test_config_returns_200, lines: 518-522 }
+        - { name: test_config_has_feature_flag_keys, lines: 524-528 }
+        - { name: test_config_has_hold_async_keys, lines: 530-537 }
 
 tests/test_hold_history_service.py:  # 520 lines
   imports:
@@ -16927,7 +17004,7 @@ tests/test_resource_service.py:  # 675 lines
         - { name: test_package_groups_filter_oracle_fallback_path, lines: 638-657 }
         - { name: test_package_groups_empty_list_returns_all_resources, lines: 659-675 }
 
-tests/test_rq_monitor_service.py:  # 224 lines
+tests/test_rq_monitor_service.py:  # 233 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 13 }
@@ -16943,21 +17020,22 @@ tests/test_rq_monitor_service.py:  # 224 lines
         - { name: test_birth_date_has_utc_suffix, lines: 83-103 }
         - { name: test_null_birth_date_returns_null, lines: 105-122 }
     - name: TestGetRqQueueDetails
-      lines: 129-170
+      lines: 129-179
       methods:
         - { name: test_returns_empty_when_redis_unavailable, lines: 130-135 }
-        - { name: test_returns_queue_depth_per_queue, lines: 137-160 }
-        - { name: test_handles_queue_exception_gracefully, lines: 162-170 }
+        - { name: test_returns_queue_depth_per_queue, lines: 137-162 }
+        - { name: test_hold_history_queue_in_queue_names, lines: 164-169 }
+        - { name: test_handles_queue_exception_gracefully, lines: 171-179 }
     - name: TestGetHeavyQuerySlotStatus
-      lines: 177-190
+      lines: 186-199
       methods:
-        - { name: test_returns_active_max_utilization, lines: 178-184 }
-        - { name: test_zero_max_handled, lines: 186-190 }
+        - { name: test_returns_active_max_utilization, lines: 187-193 }
+        - { name: test_zero_max_handled, lines: 195-199 }
     - name: TestGetRqMonitorSummary
-      lines: 197-224
+      lines: 206-233
       methods:
-        - { name: test_aggregates_all_sections, lines: 198-212 }
-        - { name: test_graceful_on_partial_failure, lines: 214-224 }
+        - { name: test_aggregates_all_sections, lines: 207-221 }
+        - { name: test_graceful_on_partial_failure, lines: 223-233 }
 
 tests/test_rq_warmup_resilience.py:  # 170 lines
   imports:

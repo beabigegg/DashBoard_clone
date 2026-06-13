@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.21
+schema-version: 1.3.22
 last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
@@ -352,6 +352,35 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 **No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1), `playwright-resilience` (Tier 1), and `nightly-integration` (Tier 3) gate commands.
 
 **Schema-version bump to 1.3.21 (patch)**: additive gate-compatibility note only; gate tier, command, and status are unchanged.
+
+## hold-history-rq-async Gate Compatibility Note
+
+**Tier 1 unit assertions** (covered by existing `unit-mock-integration` gate):
+- Threshold branch: date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` → 202; < threshold → 200 (AC-1, AC-2).
+- Env-var default pinning: `HOLD_ASYNC_ENABLED=True`, `HOLD_ASYNC_DAY_THRESHOLD=90`, `HOLD_WORKER_QUEUE="hold-history-query"`, `HOLD_JOB_TIMEOUT_SECONDS=1800` (`monkeypatch.setattr`, not `setenv` — module-level constants).
+- `register_job_type()` registration: use `importlib.reload()` after clearing the registry dict to re-run registration side-effects.
+- Pct milestone: coarse bracket 5→15→90→100 bracketing the `execute_primary_query()` call (per implementation-plan.md Known Risks, coarse option chosen; ADR-0003 row-count chunking exclusion does NOT apply to hold-history).
+- Worker fn wraps `execute_primary_query()` without mutation (AC-3).
+
+**Tier 1 Playwright coverage** (covered by existing `playwright-resilience` gate):
+- `frontend/tests/playwright/hold-history-flat-table.spec.js`: long-range query → 202 → polling → progress bar → results; short-range → 200 sync unaffected.
+
+**Tier 3 integration coverage** (covered by existing `nightly-integration` gate):
+- `tests/integration/test_hold_history_rq_async.py`: `enqueue_job_dynamic()` dispatch; parity test — worker fn vs sync path produce identical result for same query (AC-3).
+
+**Deploy checklist** (verify before serving traffic):
+1. Start the `hold-history-query` RQ worker systemd unit.
+2. Verify Admin Dashboard shows `hold-history-query` queue with ≥ 1 worker.
+3. `rq_monitor_service._QUEUE_NAMES` must include `os.getenv("HOLD_WORKER_QUEUE", "hold-history-query")`.
+4. `HOLD_ASYNC_ENABLED` defaults to `true`; no explicit env set required unless disabling.
+
+**Rollback checklist** (zero-downtime):
+1. Set `HOLD_ASYNC_ENABLED=false`; reload gunicorn (`kill -HUP`). All queries fall back to sync; no spool cleanup needed.
+2. Hard rollback: stop the `hold-history-query` worker systemd unit. In-flight jobs time out at `HOLD_JOB_TIMEOUT_SECONDS`; frontend retries on next query (sync fallback via `is_async_available()` returning False).
+
+**No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1), `playwright-resilience` (Tier 1), and `nightly-integration` (Tier 3) gate commands.
+
+**Schema-version bump to 1.3.22 (patch)**: additive gate-compatibility note only; no gate tier, command, or status changed.
 
 ## Rollback Policy
 

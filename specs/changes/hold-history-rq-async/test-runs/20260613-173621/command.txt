@@ -1,0 +1,1 @@
+cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose 2>&1 | tail -5

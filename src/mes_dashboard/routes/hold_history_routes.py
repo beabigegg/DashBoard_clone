@@ -38,6 +38,11 @@ from mes_dashboard.services.hold_dataset_cache import (
 )
 from mes_dashboard.services.hold_today_snapshot_service import execute_today_snapshot
 from mes_dashboard.core.database import DatabaseCircuitOpenError, DatabasePoolExhaustedError
+from mes_dashboard.services.async_query_job_service import (
+    enqueue_job_dynamic,
+    is_async_available,
+)
+from mes_dashboard.core.permissions import get_owner_token
 
 logger = logging.getLogger("mes_dashboard.hold_history_routes")
 
@@ -51,6 +56,16 @@ _HOLD_LOCAL_COMPUTE_ENABLED = os.environ.get(
 
 _HOLD_SPOOL_THRESHOLD = int(os.environ.get("HOLD_SPOOL_THRESHOLD", "5000"))
 _HOLD_SPOOL_NAMESPACE = "hold_dataset"
+
+# ── Async RQ path — env-contract §Async Worker — Hold History Query ───────────
+# All four constants are frozen at import time (module-level).
+# Tests must use monkeypatch.setattr(), never monkeypatch.setenv().
+HOLD_ASYNC_ENABLED: bool = os.getenv(
+    "HOLD_ASYNC_ENABLED", "true"
+).strip().lower() in ("1", "true", "yes", "on")
+HOLD_ASYNC_DAY_THRESHOLD: int = int(os.getenv("HOLD_ASYNC_DAY_THRESHOLD", "90"))
+HOLD_WORKER_QUEUE: str = os.getenv("HOLD_WORKER_QUEUE", "hold-history-query")
+HOLD_JOB_TIMEOUT_SECONDS: int = int(os.getenv("HOLD_JOB_TIMEOUT_SECONDS", "1800"))
 
 
 # ── Spool metadata injection helpers (Tasks 1.2, 1.4) ────────────────────────
@@ -197,6 +212,43 @@ def api_hold_history_query():
     record_type = _normalize_record_type(str(body.get('record_type', '')))
     if record_type is None:
         return validation_error('Invalid record_type')
+
+    # ── Async RQ branch (HOLD_ASYNC_ENABLED + threshold + worker available) ──
+    # Falls through to the sync 200 path on any false condition (AC-2, AC-8).
+    if HOLD_ASYNC_ENABLED:
+        from datetime import datetime as _dt
+        try:
+            sd = _dt.strptime(start_date, "%Y-%m-%d")
+            ed = _dt.strptime(end_date, "%Y-%m-%d")
+            day_span = (ed - sd).days
+        except (ValueError, TypeError):
+            day_span = 0
+        if day_span >= HOLD_ASYNC_DAY_THRESHOLD:
+            if is_async_available():
+                _params = dict(
+                    start_date=start_date,
+                    end_date=end_date,
+                    hold_type=hold_type,
+                    record_type=record_type,
+                )
+                try:
+                    job_id, err = enqueue_job_dynamic(
+                        "hold-history",
+                        owner=get_owner_token(),
+                        params=_params,
+                    )
+                    if job_id is not None:
+                        return success_response(
+                            {
+                                "async": True,
+                                "job_id": job_id,
+                                "status_url": f"/api/job/{job_id}?prefix=hold-history",
+                            },
+                            status_code=202,
+                        )
+                    # enqueue returned None — fall through to sync path
+                except Exception:
+                    pass  # Degradable async failure — fall through silently (AC-8)
 
     try:
         result = execute_primary_query(

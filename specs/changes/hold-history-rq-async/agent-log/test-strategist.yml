@@ -1,0 +1,13 @@
+agent: test-strategist
+change-id: hold-history-rq-async
+timestamp: 2026-06-13
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/hold-history-rq-async/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_hold_history_rq_async.py → src/mes_dashboard/services/hold_query_job_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_hold_history_routes.py → src/mes_dashboard/routes/hold_history_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/e2e/test_hold_history_e2e.py → src/mes_dashboard/routes/hold_history_routes.py" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/hold-history-flat-table.spec.js → frontend/src/hold-history/" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, e2e, data-boundary, resilience" }
+  - { type: mapping-completeness, pointer: "all 8 AC mapped; 19 test nodes named across 4 files" }

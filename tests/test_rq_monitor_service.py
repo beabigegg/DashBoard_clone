@@ -150,14 +150,23 @@ class TestGetRqQueueDetails:
              patch("rq.Queue", side_effect=make_queue):
             result = svc.get_rq_queue_details()
 
-        assert len(result["queues"]) == 7  # trace-events, reject-query, msd-analysis, production-history-query, yield-alert-query, material-consumption, downtime-query
+        # trace-events, reject-query, msd-analysis, production-history-query,
+        # yield-alert-query, material-consumption, downtime-query, hold-history-query
+        assert len(result["queues"]) == 8
         assert result["queues"][0]["name"] == "trace-events"
         assert result["queues"][0]["depth"] == 3
         assert result["queues"][1]["name"] == "reject-query"
         assert result["queues"][1]["depth"] == 1
-        assert result["total_queued"] == 9  # 3 + 1 + 1 + 1 + 1 + 1 + 1
-        assert result["total_started"] == 7  # 1 per queue × 7 queues
+        assert result["total_queued"] == 10  # 3 + 1×7
+        assert result["total_started"] == 8  # 1 per queue × 8 queues
         assert result["total_failed"] == 0
+
+    def test_hold_history_queue_in_queue_names(self):
+        """'hold-history-query' must appear in _QUEUE_NAMES (AC-7, IP-4)."""
+        assert "hold-history-query" in svc._QUEUE_NAMES, (
+            "'hold-history-query' must be registered in _QUEUE_NAMES "
+            "(rq_monitor_service IP-4 / AC-7)"
+        )
 
     def test_handles_queue_exception_gracefully(self):
         mock_conn = MagicMock()
@@ -165,8 +174,8 @@ class TestGetRqQueueDetails:
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", side_effect=Exception("Redis error")):
             result = svc.get_rq_queue_details()
-        # Should still return entries with zero values
-        assert len(result["queues"]) == 7  # now includes downtime-query queue
+        # Should still return entries with zero values (now 8 queues including hold-history-query)
+        assert len(result["queues"]) == 8
         assert result["total_queued"] == 0
 
 

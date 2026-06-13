@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.22] — 2026-06-13
+### Added
+- hold-history-rq-async: Added §hold-history-rq-async Gate Compatibility Note — Tier 1/3 test coverage, deploy/rollback checklist, worker queue provisioning notes. Pct milestone per-chunk (row-count chunking; ADR-0003 exclusion does NOT apply). No new gate tier or command. Additive.
+
+## [env 1.0.10] — 2026-06-13
+### Added
+- hold-history-rq-async: New section §Async Worker — Hold History Query: `HOLD_ASYNC_ENABLED` (true), `HOLD_ASYNC_DAY_THRESHOLD` (90), `HOLD_WORKER_QUEUE` (hold-history-query), `HOLD_JOB_TIMEOUT_SECONDS` (1800). Worker env-var parity note added. Additive.
+
+## [api-inventory 1.2.1] — 2026-06-13
+### Added
+- hold-history-rq-async: Updated `hold_history_routes.py` row — added Type B qualifier for long-range async path. Added compatibility note. Additive.
+
+## [api 1.18.0] — 2026-06-13
+### Added
+- hold-history-rq-async: `POST /api/hold-history/query` gains async 202 path when `HOLD_ASYNC_ENABLED=true` and date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` (default 90 days). Short-range, flag-off, or unavailable worker → HTTP 200 sync unchanged. Type B §7 extended to include `hold_history_routes.py`. §10 compatibility note added. New `hold-history-query` RQ queue. Additive.
+
 ## [css 1.8.2] — 2026-06-13
 ### Added
 - downtime-rq-async: Added Rule 4.6 — `LoadingOverlay` must be suppressed (`v-if="... && !asyncJobProgress.active"`) when an async job progress component is active; rendering both simultaneously hides the progress bar. Applies to all pages using HTTP 202 async dispatch. Additive.

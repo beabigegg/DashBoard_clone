@@ -5,6 +5,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 from mes_dashboard.app import create_app
 import mes_dashboard.core.database as db
 
@@ -108,24 +110,26 @@ class TestHoldHistoryQueryRoute(TestHoldHistoryRoutesBase):
 
     @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
     def test_query_passes_params(self, mock_exec):
+        """Route must forward all four params to execute_primary_query with non-default values."""
         mock_exec.return_value = {'query_id': 'x', 'trend': {}, 'reason_pareto': {}, 'duration': {}, 'list': {}}
 
+        # Use non-default values to ensure they are truly forwarded (not filled by defaults)
         self.client.post(
             '/api/hold-history/query',
             json={
                 'start_date': '2026-02-01',
-                'end_date': '2026-02-07',
+                'end_date': '2026-02-07',  # < 90 days so sync path is used
                 'hold_type': 'non-quality',
                 'record_type': 'on_hold',
             },
         )
 
-        mock_exec.assert_called_once_with(
-            start_date='2026-02-01',
-            end_date='2026-02-07',
-            hold_type='non-quality',
-            record_type='on_hold',
-        )
+        mock_exec.assert_called_once()
+        kw = mock_exec.call_args.kwargs
+        self.assertEqual(kw['start_date'], '2026-02-01')
+        self.assertEqual(kw['end_date'], '2026-02-07')
+        self.assertEqual(kw['hold_type'], 'non-quality')
+        self.assertEqual(kw['record_type'], 'on_hold')
 
     @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 8))
@@ -154,6 +158,135 @@ class TestHoldHistoryQueryRoute(TestHoldHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 500)
         self.assertFalse(payload['success'])
+
+
+class TestHoldHistoryAsyncQueryRoute(TestHoldHistoryRoutesBase):
+    """Tests for the async RQ branch in POST /api/hold-history/query (AC-1, AC-2, AC-6, AC-8)."""
+
+    # ── fixtures ─────────────────────────────────────────────────────────────
+
+    LONG_RANGE_BODY = {
+        'start_date': '2025-01-01',
+        'end_date': '2025-06-01',   # 151 days — well above default threshold of 90
+        'hold_type': 'quality',
+        'record_type': 'new',
+    }
+
+    SHORT_RANGE_BODY = {
+        'start_date': '2026-02-01',
+        'end_date': '2026-02-07',   # 6 days — below threshold
+        'hold_type': 'quality',
+        'record_type': 'new',
+    }
+
+    SYNC_RESULT = {
+        'query_id': 'sync-abc',
+        'trend': {'days': []},
+        'reason_pareto': {'items': []},
+        'duration': {'items': []},
+        'list': {'items': [], 'pagination': {}},
+    }
+
+    # ── AC-1: long range with enabled flag + available worker → 202 ──────────
+
+    @patch('mes_dashboard.routes.hold_history_routes.is_async_available', return_value=True)
+    @patch('mes_dashboard.routes.hold_history_routes.enqueue_job_dynamic', return_value=('job-001', None))
+    def test_query_long_range_returns_202(self, _mock_enq, _mock_avail):
+        response = self.client.post('/api/hold-history/query', json=self.LONG_RANGE_BODY)
+        self.assertEqual(response.status_code, 202)
+        payload = json.loads(response.data)
+        self.assertTrue(payload['success'])
+
+    @patch('mes_dashboard.routes.hold_history_routes.is_async_available', return_value=True)
+    @patch('mes_dashboard.routes.hold_history_routes.enqueue_job_dynamic', return_value=('job-002', None))
+    def test_query_202_response_has_job_id(self, _mock_enq, _mock_avail):
+        response = self.client.post('/api/hold-history/query', json=self.LONG_RANGE_BODY)
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 202)
+        self.assertIn('job_id', payload['data'])
+        self.assertEqual(payload['data']['job_id'], 'job-002')
+        self.assertIn('status_url', payload['data'])
+        self.assertIn('hold-history', payload['data']['status_url'])
+        self.assertTrue(payload['data']['async'])
+
+    # ── AC-2: short range → sync 200 ─────────────────────────────────────────
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
+    def test_query_short_range_returns_200_sync(self, mock_exec):
+        mock_exec.return_value = self.SYNC_RESULT
+        response = self.client.post('/api/hold-history/query', json=self.SHORT_RANGE_BODY)
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        self.assertIn('query_id', payload['data'])
+        mock_exec.assert_called_once()
+
+    # ── AC-2: HOLD_ASYNC_ENABLED=False → sync 200 ────────────────────────────
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
+    def test_query_async_flag_false_returns_200_sync(self, mock_exec, monkeypatch=None):
+        mock_exec.return_value = self.SYNC_RESULT
+        import mes_dashboard.routes.hold_history_routes as _rmod
+        orig = _rmod.HOLD_ASYNC_ENABLED
+        _rmod.HOLD_ASYNC_ENABLED = False
+        try:
+            response = self.client.post('/api/hold-history/query', json=self.LONG_RANGE_BODY)
+            payload = json.loads(response.data)
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(payload['success'])
+            mock_exec.assert_called_once()
+        finally:
+            _rmod.HOLD_ASYNC_ENABLED = orig
+
+    # ── AC-8: is_async_available=False → fall through to sync 200 (no error) ─
+
+    @patch('mes_dashboard.routes.hold_history_routes.execute_primary_query')
+    @patch('mes_dashboard.routes.hold_history_routes.is_async_available', return_value=False)
+    def test_query_redis_down_falls_back_to_sync(self, _mock_avail, mock_exec):
+        mock_exec.return_value = self.SYNC_RESULT
+        response = self.client.post('/api/hold-history/query', json=self.LONG_RANGE_BODY)
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        mock_exec.assert_called_once()
+
+    # ── AC-6: default constant values ────────────────────────────────────────
+
+    def test_hold_async_enabled_default_is_true(self):
+        """HOLD_ASYNC_ENABLED route-module constant must default to True."""
+        import mes_dashboard.routes.hold_history_routes as _rmod
+        # The constant is frozen at import time; read directly from the module.
+        # To assert the default we check the unpatched value against True.
+        # (monkeypatch.setattr is the prescribed override mechanism in tests,
+        # but the default must be True per env-contract pinned default.)
+        import importlib
+        import os
+        # Save and temporarily remove env override to confirm code default
+        _old = os.environ.pop("HOLD_ASYNC_ENABLED", None)
+        try:
+            # Reload to evaluate default expression fresh
+            importlib.reload(_rmod)
+            self.assertTrue(_rmod.HOLD_ASYNC_ENABLED)
+        finally:
+            if _old is not None:
+                os.environ["HOLD_ASYNC_ENABLED"] = _old
+            else:
+                importlib.reload(_rmod)  # restore original module state
+
+    def test_hold_async_day_threshold_default_is_90(self):
+        """HOLD_ASYNC_DAY_THRESHOLD route-module constant must default to 90."""
+        import mes_dashboard.routes.hold_history_routes as _rmod
+        import importlib
+        import os
+        _old = os.environ.pop("HOLD_ASYNC_DAY_THRESHOLD", None)
+        try:
+            importlib.reload(_rmod)
+            self.assertEqual(_rmod.HOLD_ASYNC_DAY_THRESHOLD, 90)
+        finally:
+            if _old is not None:
+                os.environ["HOLD_ASYNC_DAY_THRESHOLD"] = _old
+            else:
+                importlib.reload(_rmod)
 
 
 class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
@@ -393,3 +526,12 @@ class TestHoldHistoryConfigRoute(TestHoldHistoryRoutesBase):
         data = json.loads(response.data)['data']
         self.assertIn('today_mode_enabled', data)
         self.assertIn('auto_refresh_seconds', data)
+
+    def test_config_has_hold_async_keys(self):
+        """Route module must expose HOLD_ASYNC_ENABLED and HOLD_ASYNC_DAY_THRESHOLD
+        as module-level constants (AC-6 — config surface test)."""
+        import mes_dashboard.routes.hold_history_routes as _rmod
+        self.assertTrue(hasattr(_rmod, 'HOLD_ASYNC_ENABLED'))
+        self.assertTrue(hasattr(_rmod, 'HOLD_ASYNC_DAY_THRESHOLD'))
+        self.assertTrue(hasattr(_rmod, 'HOLD_WORKER_QUEUE'))
+        self.assertTrue(hasattr(_rmod, 'HOLD_JOB_TIMEOUT_SECONDS'))

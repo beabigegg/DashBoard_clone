@@ -1,0 +1,37 @@
+[Unit]
+Description=MES Dashboard Hold History Query Worker (RQ, Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/opt/mes-dashboard/.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${HOLD_WORKER_QUEUE:-hold-history-query}" --url "${REDIS_URL:-redis://localhost:6379/0}" --job-execution-timeout "${HOLD_JOB_TIMEOUT_SECONDS:-1800}"'
+
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-dashboard-hold-history-worker
+
+# Memory protection: hold-history worker handles large Oracle hold-event queries.
+# MemoryMax prevents single large job from killing the VM.
+MemoryHigh=3G
+MemoryMax=4G
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/mes-dashboard/logs /opt/mes-dashboard/tmp
+
+[Install]
+WantedBy=multi-user.target

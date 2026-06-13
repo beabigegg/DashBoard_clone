@@ -891,6 +891,7 @@ def create_app(config_name: str | None = None) -> Flask:
     # (not lazily inside a route handler) so that register_job_type("downtime",...)
     # fires before any request is handled (IP-3 / design.md D6 / AC-7a).
     import mes_dashboard.services.downtime_query_job_service  # noqa: F401
+    import mes_dashboard.services.hold_query_job_service  # noqa: F401
 
     # Register API routes
     register_routes(app)
