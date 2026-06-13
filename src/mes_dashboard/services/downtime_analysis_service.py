@@ -417,8 +417,10 @@ def _bridge_jobid(events_df: pd.DataFrame, jobs_df: pd.DataFrame) -> pd.DataFram
                 _jobs_b, _spans,
                 left_on='_res_norm', right_on='_hist_norm', how='left',
             )
+            _eff_end_span = _jobs_b['COMPLETEDATE'].fillna(_jobs_b['LASTCLOCKOFFDATE'])
             _jobs_b = _jobs_b[
-                (_jobs_b['COMPLETEDATE'] > _jobs_b['_span_start']) &
+                _eff_end_span.notna() &
+                (_eff_end_span > _jobs_b['_span_start']) &
                 (_jobs_b['CREATEDATE'] < _jobs_b['_span_end'])
             ].drop(columns=['_span_start', '_span_end', '_hist_norm'])
 
@@ -430,14 +432,16 @@ def _bridge_jobid(events_df: pd.DataFrame, jobs_df: pd.DataFrame) -> pd.DataFram
             how='left',
         )
         cand = cand.dropna(subset=['_jobid_norm'])
+        cand['_eff_end'] = cand['COMPLETEDATE'].fillna(cand['LASTCLOCKOFFDATE'])
         cand = cand[
-            (cand['COMPLETEDATE'] > cand['event_start']) &
+            cand['_eff_end'].notna() &
+            (cand['_eff_end'] > cand['event_start']) &
             (cand['CREATEDATE'] < cand['event_end'])
         ].copy()
 
         if not cand.empty:
             cand['_overlap'] = (
-                cand[['event_end', 'COMPLETEDATE']].min(axis=1) -
+                cand[['event_end', '_eff_end']].min(axis=1) -
                 cand[['event_start', 'CREATEDATE']].max(axis=1)
             ).dt.total_seconds().clip(lower=0)
 

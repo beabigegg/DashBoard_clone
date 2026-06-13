@@ -327,28 +327,28 @@ path_b_overlap AS (
         j.CREATEDATE,
         j.COMPLETEDATE,
         epoch(
-            LEAST(e.event_end, j.COMPLETEDATE) -
+            LEAST(e.event_end, COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE)) -
             GREATEST(e.event_start, j.CREATEDATE)
         )                          AS _overlap_sec,
         ROW_NUMBER() OVER (
             PARTITION BY e.HISTORYID, e.event_start
             ORDER BY
                 epoch(
-                    LEAST(e.event_end, j.COMPLETEDATE) -
+                    LEAST(e.event_end, COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE)) -
                     GREATEST(e.event_start, j.CREATEDATE)
                 ) DESC,
                 j.CREATEDATE ASC,
                 j.JOBID ASC
         ) AS _rank,
         MAX(epoch(
-            LEAST(e.event_end, j.COMPLETEDATE) -
+            LEAST(e.event_end, COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE)) -
             GREATEST(e.event_start, j.CREATEDATE)
         )) OVER (PARTITION BY e.HISTORYID, e.event_start) AS _max_overlap_sec
     FROM merged_events e
     LEFT JOIN job_bridge j
         ON TRIM(CAST(j.RESOURCEID AS VARCHAR)) = TRIM(CAST(e.HISTORYID AS VARCHAR))
-        AND j.COMPLETEDATE IS NOT NULL
-        AND j.COMPLETEDATE > e.event_start
+        AND COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE) IS NOT NULL
+        AND COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE) > e.event_start
         AND j.CREATEDATE < e.event_end
     WHERE e.JOBID IS NULL
 ),
@@ -399,8 +399,8 @@ path_b_no_job AS (
       AND NOT EXISTS (
           SELECT 1 FROM job_bridge j
           WHERE TRIM(CAST(j.RESOURCEID AS VARCHAR)) = TRIM(CAST(e.HISTORYID AS VARCHAR))
-            AND j.COMPLETEDATE IS NOT NULL
-            AND j.COMPLETEDATE > e.event_start
+            AND COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE) IS NOT NULL
+            AND COALESCE(j.COMPLETEDATE, j.LASTCLOCKOFFDATE) > e.event_start
             AND j.CREATEDATE < e.event_end
       )
 )
