@@ -1,0 +1,19 @@
+change-id: async-progress-ui
+timestamp: "2026-06-13"
+agent: qa-reviewer
+status: done
+verdict: RELEASE-READY
+artifacts:
+  - type: test-evidence
+    pointer: "specs/changes/async-progress-ui/test-evidence.yml — final-status: passed; all required phases green"
+  - type: contracts
+    pointer: "5 contracts updated additively; no breaking changes"
+  - type: blocking-resolved
+    pointer: "ui-ux B-1 (sync cancel) + B-2 (status prop + failed visual) fixed; re-run targeted/contract green"
+  - type: decision
+    pointer: "approved — all Tier-1 gates covered by green local evidence + CI path filters"
+notes: |
+  Advisory (non-blocking, /cdd-close):
+  - css-contract Component Rules table says `stage` prop, implementation uses `progress` prop — align wording
+  - backend pct evidence in separate cdd-kit test run artifacts (133421/133429/133437); CI enforces via backend-tests.yml
+next-action: "cdd-kit gate async-progress-ui"

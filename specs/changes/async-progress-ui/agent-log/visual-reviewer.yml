@@ -1,0 +1,19 @@
+change-id: async-progress-ui
+timestamp: "2026-06-13"
+agent: visual-reviewer
+status: done
+verdict: PASS-WITH-NOTES
+artifacts:
+  - type: css-contract-compliance
+    pointer: "PASS — theme() tokens throughout; no hex literals; no theme-* ancestor; scoped only"
+  - type: css-inventory
+    pointer: "PASS — AsyncQueryProgress.vue listed at css-inventory.md line 52"
+  - type: reduced-motion
+    pointer: "PASS — @media (prefers-reduced-motion: reduce) disables transition"
+  - type: layout
+    pointer: "PASS — inline (not modal/overlay); document flow; overflow:hidden clip"
+  - type: leakage-check
+    pointer: "PASS — no :deep(), no :global(); .async-job-progress absent from all feature style.css"
+notes: |
+  Advisory (non-blocking): Contract Component Rules table declares `stage` prop, but implementation uses `progress: string` prop for the stage label. Functional equivalence confirmed; CSS unaffected. Recommend aligning contract wording in a follow-up or during /cdd-close.
+next-action: "qa-reviewer final release readiness"

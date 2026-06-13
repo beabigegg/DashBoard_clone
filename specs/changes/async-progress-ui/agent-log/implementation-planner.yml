@@ -1,0 +1,9 @@
+agent: implementation-planner
+change-id: async-progress-ui
+timestamp: 2026-06-13T00:00:00Z
+status: complete
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/async-progress-ui/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-3), frontend-engineer (IP-4..IP-10)" }
+  - { type: scope-summary, pointer: "in scope: AsyncQueryProgress.vue + 2 consumers + composable type fix + 2 backend pct-milestone services + tests; out of scope: reject-history, downtime, hold-history, job-registry, new endpoints/env/Redis schema" }

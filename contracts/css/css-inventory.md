@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.4
+schema-version: 1.2.5
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-05-29
+last-changed: 2026-06-13
 ---
 
 # CSS Inventory (Governed Source List)
@@ -49,6 +49,7 @@ last-changed: 2026-05-29
 | `frontend/src/shared-ui/components/SectionCard.vue` | `<style scoped>` | Section wrapper；`variant` prop |
 | `frontend/src/shared-ui/components/DataTable.vue` | `<style scoped>` | Data table；`data-table-*` scoped classes |
 | `frontend/src/shared-ui/components/Chip.vue` | `<style scoped>` | Inline chip/tag；`tone` prop |
+| `frontend/src/shared-ui/components/AsyncQueryProgress.vue` | `<style scoped>` | Async job progress bar；`pct` (0–100), `stage` label, `status` prop；reduced-motion fallback required |
 
 ## Route-Local Feature Layers
 

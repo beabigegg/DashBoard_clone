@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.17.0
-last-changed: 2026-06-12
+schema-version: 1.18.0
+last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -39,6 +39,7 @@ breaking-change-policy: deprecate-2-minors
 | ASYNC-02 | Type B — 202 polling on cache miss | query miss + RQ available → 202 `{async, job_id, status_url}`；client polling；RQ unavailable → fallback sync 200；適用：reject-history、yield-alert、production-history、trace、material-trace | resilience tests |
 | ASYNC-03 | Job abandon | `POST /api/job/<job_id>/abandon` idempotent；已 terminal 的 job 回傳 409；已放棄的 job 回傳 200 | route tests |
 | ASYNC-04 | Job ownership | 若 job metadata 含 `owner`，caller 必須提供匹配的 `owner` 值；否則 403 `FORBIDDEN` | route tests |
+| ASYNC-05 | Progress milestone semantics | Services that call `update_job_progress(pct, stage)` MUST follow the canonical milestone map: `pct=0` (job start), `pct=30` (Oracle query issued, `stage="querying"`), `pct=100` (data written to spool, `stage="complete"`). Intermediate milestones are additive; omitting them for a service is permitted. Services that do not call `update_job_progress` omit `pct`/`stage` entirely from the job status payload. Consumer (`AsyncQueryProgress.vue`) MUST treat absent `pct` as indeterminate (show spinner, not 0%). | unit tests (backend pct-milestone, frontend composable) |
 
 ## Hold-History Rules
 

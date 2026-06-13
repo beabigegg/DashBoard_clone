@@ -1,6 +1,6 @@
-# generated: 2026-06-13T04:20:00Z by cdd-kit 3.1.0
-# files: 850, src-lines: 244999, map-lines: 18321, compression: 13.4x
-# sources-digest: 2ed22239697c5c1cdcd431a059f39e347581807a24c532cd715cb100464a0bc8
+# generated: 2026-06-13T06:10:08Z by cdd-kit 3.1.0
+# files: 852, src-lines: 245548, map-lines: 18337, compression: 13.4x
+# sources-digest: 765f62473c0f0c004771e01bc11fd5071f74b1af9390d0a34a9d64a212a151d4
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1427,7 +1427,7 @@ frontend/src/portal/main.js:  # 160 lines
   imports:
     - { module: './portal.css', items: [], line: 1 }
 
-frontend/src/production-history/App.vue:  # 563 lines
+frontend/src/production-history/App.vue:  # 574 lines
 
 frontend/src/production-history/components/ProductionDetailTable.vue:  # 103 lines
 
@@ -1452,7 +1452,7 @@ frontend/src/production-history/composables/useFirstTierFilters.ts:  # 365 lines
     - { name: CachedFilterField, lines: 35-35 }
     - { name: WildcardField, lines: 39-39 }
 
-frontend/src/production-history/composables/useProductionHistory.ts:  # 637 lines
+frontend/src/production-history/composables/useProductionHistory.ts:  # 648 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiPost], line: 2 }
@@ -1463,7 +1463,7 @@ frontend/src/production-history/composables/useProductionHistory.ts:  # 637 line
   functions:
     - { name: validateQueryMode, lines: 167-185 }
     - { name: buildModePayload, lines: 196-217 }
-    - { name: useProductionHistory, lines: 245-637 }
+    - { name: useProductionHistory, lines: 245-648 }
   interfaces:
     - { name: MatrixFilter, lines: 11-16 }
     - { name: SupplementaryFilter, lines: 25-28 }
@@ -1931,7 +1931,7 @@ frontend/src/shared-composables/useAiChat.ts:  # 202 lines
   types:
     - { name: MessageRole, lines: 4-4 }
 
-frontend/src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
+frontend/src/shared-composables/useAsyncJobPolling.ts:  # 106 lines
   imports:
     - { module: '../core/api.js', items: [apiGet], line: 1 }
   constants:
@@ -1939,13 +1939,13 @@ frontend/src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
     - { name: JOB_POLL_MAX_MS, line: 4 }
   functions:
     - { name: sleep, lines: 6-8 }
-    - { name: async pollJobUntilComplete, lines: 50-94 }
-    - { name: useAsyncJobPolling, lines: 100-104 }
+    - { name: async pollJobUntilComplete, lines: 52-96 }
+    - { name: useAsyncJobPolling, lines: 102-106 }
   interfaces:
-    - { name: JobStatusResponse, lines: 10-16 }
-    - { name: PollOptions, lines: 18-23 }
-    - { name: AsyncJobPollingComposable, lines: 25-27 }
-    - { name: JobError, lines: 29-31 }  # local
+    - { name: JobStatusResponse, lines: 10-18 }
+    - { name: PollOptions, lines: 20-25 }
+    - { name: AsyncJobPollingComposable, lines: 27-29 }
+    - { name: JobError, lines: 31-33 }  # local
 
 frontend/src/shared-composables/useAutoRefresh.ts:  # 23 lines
   imports:
@@ -2080,6 +2080,8 @@ frontend/src/shared-ui/components/AiChatPanel.vue:  # 410 lines
 
 frontend/src/shared-ui/components/AiChatTrigger.vue:  # 72 lines
 
+frontend/src/shared-ui/components/AsyncQueryProgress.vue:  # 130 lines
+
 frontend/src/shared-ui/components/BlockLoadingState.vue:  # 36 lines
 
 frontend/src/shared-ui/components/Chip.vue:  # 162 lines
@@ -2132,7 +2134,7 @@ frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 199 lines
     - { name: getOptions, lines: 47-49 }
     - { name: getCloseBtn, lines: 50-52 }
 
-frontend/src/shared-ui/index.ts:  # 23 lines
+frontend/src/shared-ui/index.ts:  # 24 lines
 
 frontend/src/wip-detail/App.vue:  # 594 lines
 
@@ -2220,7 +2222,7 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 985 lines
+frontend/src/yield-alert-center/App.vue:  # 1003 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
@@ -2313,6 +2315,12 @@ frontend/tests/components/ActionButton.test.js:  # 98 lines
     - { module: vitest, items: [describe, it, expect, vi], line: 18 }
     - { module: '@vue/test-utils', items: [mount], line: 19 }
     - { module: '../../src/query-tool/components/ExportButton.vue', items: ['default:ExportButton'], line: 20 }
+
+frontend/tests/components/AsyncQueryProgress.test.js:  # 150 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 20 }
+    - { module: '@vue/test-utils', items: [mount], line: 21 }
+    - { module: '../../src/shared-ui/components/AsyncQueryProgress.vue', items: ['default:AsyncQueryProgress'], line: 22 }
 
 frontend/tests/components/DataTable.test.js:  # 76 lines
   imports:
@@ -2979,7 +2987,7 @@ frontend/tests/schema-guard.test.js:  # 157 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 13 }
     - { module: '../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 14 }
 
-frontend/tests/shared-composables/useAsyncJobPolling.test.js:  # 237 lines
+frontend/tests/shared-composables/useAsyncJobPolling.test.js:  # 290 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 12 }
     - { module: '../../src/shared-composables/useAsyncJobPolling.ts', items: [pollJobUntilComplete, useAsyncJobPolling], line: 13 }
@@ -6427,7 +6435,7 @@ src/mes_dashboard/services/page_registry.py:  # 504 lines
     - { name: is_api_public, lines: 480-494 }
     - { name: reload_cache, lines: 497-504 }
 
-src/mes_dashboard/services/production_history_job_service.py:  # 138 lines
+src/mes_dashboard/services/production_history_job_service.py:  # 139 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -6443,7 +6451,7 @@ src/mes_dashboard/services/production_history_job_service.py:  # 138 lines
   functions:
     - { name: _build_retry, lines: 52-55 }
     - { name: enqueue_production_history_query, lines: 62-86 }
-    - { name: execute_production_history_job, lines: 93-138 }
+    - { name: execute_production_history_job, lines: 93-139 }
 
 src/mes_dashboard/services/production_history_service.py:  # 757 lines
   imports:
@@ -7519,7 +7527,7 @@ src/mes_dashboard/services/yield_alert_dataset_cache.py:  # 986 lines
     - { name: _enrich_alerts_with_linkage, lines: 802-902 }
     - { name: apply_view, lines: 905-986 }
 
-src/mes_dashboard/services/yield_alert_job_service.py:  # 151 lines
+src/mes_dashboard/services/yield_alert_job_service.py:  # 152 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -7535,7 +7543,7 @@ src/mes_dashboard/services/yield_alert_job_service.py:  # 151 lines
   functions:
     - { name: _build_retry, lines: 52-55 }
     - { name: enqueue_yield_alert_query, lines: 62-86 }
-    - { name: execute_yield_alert_job, lines: 93-151 }
+    - { name: execute_yield_alert_job, lines: 93-152 }
 
 src/mes_dashboard/services/yield_alert_service.py:  # 1034 lines
   imports:
@@ -14812,7 +14820,7 @@ tests/test_production_history_async_routes.py:  # 215 lines
   functions:
     - { name: _parse, lines: 20-21 }
 
-tests/test_production_history_job_service.py:  # 180 lines
+tests/test_production_history_job_service.py:  # 270 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 14 }
@@ -14829,11 +14837,15 @@ tests/test_production_history_job_service.py:  # 180 lines
         - { name: test_passes_ttl_and_timeout_from_config, lines: 72-80 }
         - { name: test_passes_retry_configuration_to_enqueue_job, lines: 82-91 }
     - name: TestExecuteProductionHistoryJob
-      lines: 98-180
+      lines: 98-270
       methods:
         - { name: test_spool_hit_skips_oracle_and_calls_complete_job, lines: 101-125 }
         - { name: test_spool_miss_calls_query_and_complete_job, lines: 127-151 }
         - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 153-180 }
+        - { name: _make_spool_miss_mocks, lines: 182-189 }
+        - { name: test_update_job_progress_called_with_pct_0_at_start, lines: 191-211 }
+        - { name: test_update_job_progress_called_with_pct_30_after_query, lines: 213-233 }
+        - { name: test_update_job_progress_called_with_pct_100_before_complete, lines: 235-270 }
 
 tests/test_production_history_routes.py:  # 682 lines
   imports:
@@ -18136,7 +18148,7 @@ tests/test_yield_alert_dataset_cache.py:  # 663 lines
     - { name: test_spool_write_failure_logs_warning, lines: 636-647 }
     - { name: test_linkage_spool_not_available_logs_warning, lines: 650-663 }
 
-tests/test_yield_alert_job_service.py:  # 183 lines
+tests/test_yield_alert_job_service.py:  # 264 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 14 }
@@ -18153,11 +18165,15 @@ tests/test_yield_alert_job_service.py:  # 183 lines
         - { name: test_passes_ttl_and_timeout_from_config, lines: 72-80 }
         - { name: test_passes_retry_configuration_to_enqueue_job, lines: 82-91 }
     - name: TestExecuteYieldAlertJob
-      lines: 98-183
+      lines: 98-264
       methods:
         - { name: test_cache_hit_skips_oracle_and_calls_complete_job, lines: 101-126 }
         - { name: test_cache_miss_calls_execute_primary_query_then_complete, lines: 128-153 }
         - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 155-183 }
+        - { name: _make_cache_miss_mocks, lines: 185-195 }
+        - { name: test_update_job_progress_called_with_pct_0_at_start, lines: 197-213 }
+        - { name: test_update_job_progress_called_with_pct_30_after_query, lines: 215-231 }
+        - { name: test_update_job_progress_called_with_pct_100_before_complete, lines: 233-264 }
 
 tests/test_yield_alert_lock_behavior.py:  # 76 lines
   imports:

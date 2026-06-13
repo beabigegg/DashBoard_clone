@@ -1,0 +1,17 @@
+change-id: async-progress-ui
+timestamp: "2026-06-13"
+agent: ui-ux-reviewer
+status: blocking
+verdict: BLOCKING-FINDINGS
+artifacts:
+  - type: journeys-reviewed
+    pointer: "async-job-start, in-progress-display, cancel, failed-state — yield-alert-center + production-history"
+  - type: blocking-findings
+    pointer: "B-1: cancel does not dismiss bar synchronously; B-2: status prop never passed, failed state visually identical to running"
+  - type: advisory-findings
+    pointer: "A-1 elapsedSeconds hardcoded 0; A-2 no progressbar aria role; A-3 cancel no confirmation; A-4 placement in yield-alert; A-5 canCancel undocumented risk; A-6 queued fallback opaque; A-7 no aria-busy on container"
+notes: |
+  B-1: Both consumer cancel handlers rely on finally-block cleanup; must synchronously set jobProgress.active = false + loading.value = false on cancel click.
+  B-2: Both consumers omit :status="jobProgress.status"; component has no CSS branch for failed state (same blue bar as running). Failed must look different.
+  Advisory A-1 (elapsedSeconds=0 hardcoded) is the most impactful UX gap after the blockers — strong recommendation to wire a real timer.
+next-action: "frontend-engineer fix B-1 and B-2; then re-run test ladder phases; qa-reviewer follows"

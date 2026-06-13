@@ -12,6 +12,8 @@ export interface JobStatusResponse {
   error?: string;
   elapsed_seconds?: number;
   progress?: string;
+  pct?: number;
+  stage?: string;
   [key: string]: unknown;
 }
 

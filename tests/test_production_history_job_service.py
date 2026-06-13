@@ -178,3 +178,93 @@ class TestExecuteProductionHistoryJob:
         assert call_kwargs.args[1] == "prod-hist-fail"
         assert call_kwargs.kwargs.get("error") is not None
         assert "ORA-timeout" in call_kwargs.kwargs["error"]
+
+    def _make_spool_miss_mocks(self, dataset_id="ph-pct-001"):
+        """Return shared mock objects for the spool-miss (normal) execution path."""
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+        mock_query_fn = MagicMock()
+        mock_spool_id = MagicMock(return_value=dataset_id)
+        mock_get_spool = MagicMock(return_value=None)  # spool miss
+        return mock_complete_job, mock_update_progress, mock_query_fn, mock_spool_id, mock_get_spool
+
+    def test_update_job_progress_called_with_pct_0_at_start(self):
+        """update_job_progress first call must carry pct=0 (job start milestone)."""
+        mock_complete_job, mock_update_progress, mock_query_fn, mock_spool_id, mock_get_spool = (
+            self._make_spool_miss_mocks()
+        )
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.rq_worker_preload": MagicMock(ensure_rq_logging=MagicMock()),
+        }), \
+        patch("mes_dashboard.services.production_history_job_service.complete_job", mock_complete_job), \
+        patch("mes_dashboard.services.production_history_job_service.update_job_progress", mock_update_progress), \
+        patch("mes_dashboard.core.query_spool_store.get_spool_file_path", mock_get_spool), \
+        patch("mes_dashboard.services.production_history_service.make_canonical_spool_id", mock_spool_id), \
+        patch("mes_dashboard.services.production_history_service.query_production_history", mock_query_fn):
+            pjs.execute_production_history_job(
+                job_id="prod-hist-pct-0",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        pct_values = [c.kwargs.get("pct") for c in mock_update_progress.call_args_list if "pct" in c.kwargs]
+        assert pct_values[0] == 0
+
+    def test_update_job_progress_called_with_pct_30_after_query(self):
+        """update_job_progress second pct call must carry pct=30 (Oracle query issued milestone)."""
+        mock_complete_job, mock_update_progress, mock_query_fn, mock_spool_id, mock_get_spool = (
+            self._make_spool_miss_mocks()
+        )
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.rq_worker_preload": MagicMock(ensure_rq_logging=MagicMock()),
+        }), \
+        patch("mes_dashboard.services.production_history_job_service.complete_job", mock_complete_job), \
+        patch("mes_dashboard.services.production_history_job_service.update_job_progress", mock_update_progress), \
+        patch("mes_dashboard.core.query_spool_store.get_spool_file_path", mock_get_spool), \
+        patch("mes_dashboard.services.production_history_service.make_canonical_spool_id", mock_spool_id), \
+        patch("mes_dashboard.services.production_history_service.query_production_history", mock_query_fn):
+            pjs.execute_production_history_job(
+                job_id="prod-hist-pct-30",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        pct_values = [c.kwargs.get("pct") for c in mock_update_progress.call_args_list if "pct" in c.kwargs]
+        assert pct_values[1] == 30
+
+    def test_update_job_progress_called_with_pct_100_before_complete(self):
+        """update_job_progress third pct call must carry pct=100 (data written milestone), before complete_job."""
+        mock_complete_job, mock_update_progress, mock_query_fn, mock_spool_id, mock_get_spool = (
+            self._make_spool_miss_mocks()
+        )
+
+        call_order = []
+
+        def track_update(*args, **kwargs):
+            call_order.append(("update", kwargs.get("pct")))
+
+        def track_complete(*args, **kwargs):
+            call_order.append(("complete", None))
+
+        mock_update_progress.side_effect = track_update
+        mock_complete_job.side_effect = track_complete
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.rq_worker_preload": MagicMock(ensure_rq_logging=MagicMock()),
+        }), \
+        patch("mes_dashboard.services.production_history_job_service.complete_job", mock_complete_job), \
+        patch("mes_dashboard.services.production_history_job_service.update_job_progress", mock_update_progress), \
+        patch("mes_dashboard.core.query_spool_store.get_spool_file_path", mock_get_spool), \
+        patch("mes_dashboard.services.production_history_service.make_canonical_spool_id", mock_spool_id), \
+        patch("mes_dashboard.services.production_history_service.query_production_history", mock_query_fn):
+            pjs.execute_production_history_job(
+                job_id="prod-hist-pct-100",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        pct_values = [c.kwargs.get("pct") for c in mock_update_progress.call_args_list if "pct" in c.kwargs]
+        assert pct_values[2] == 100
+        # pct=100 update must precede complete_job in call order
+        pct_100_index = next(i for i, (kind, pct) in enumerate(call_order) if kind == "update" and pct == 100)
+        complete_index = next(i for i, (kind, _) in enumerate(call_order) if kind == "complete")
+        assert pct_100_index < complete_index

@@ -181,3 +181,84 @@ class TestExecuteYieldAlertJob:
         assert call_kwargs.args[1] == "yield-alert-fail"
         assert call_kwargs.kwargs.get("error") is not None
         assert "DB timeout" in call_kwargs.kwargs["error"]
+
+    def _make_cache_miss_mocks(self, query_id="ya-qid-pct-001"):
+        """Return shared mock objects for the cache-miss (normal) execution path."""
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+        mock_execute_fn = MagicMock()
+        mock_cache_module = MagicMock()
+        mock_cache_module._CACHE_SCHEMA_VERSION = 4
+        mock_cache_module._make_query_id.return_value = query_id
+        mock_cache_module._get_cached_payload.return_value = None  # cache miss
+        mock_cache_module.execute_primary_query = mock_execute_fn
+        return mock_complete_job, mock_update_progress, mock_execute_fn, mock_cache_module
+
+    def test_update_job_progress_called_with_pct_0_at_start(self):
+        """update_job_progress first call must carry pct=0 (job start milestone)."""
+        mock_complete_job, mock_update_progress, _, mock_cache_module = self._make_cache_miss_mocks()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.rq_worker_preload": MagicMock(ensure_rq_logging=MagicMock()),
+            "mes_dashboard.services.yield_alert_dataset_cache": mock_cache_module,
+        }), \
+        patch("mes_dashboard.services.yield_alert_job_service.complete_job", mock_complete_job), \
+        patch("mes_dashboard.services.yield_alert_job_service.update_job_progress", mock_update_progress):
+            yajs.execute_yield_alert_job(
+                job_id="yield-alert-pct-0",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        pct_values = [c.kwargs.get("pct") for c in mock_update_progress.call_args_list if "pct" in c.kwargs]
+        assert pct_values[0] == 0
+
+    def test_update_job_progress_called_with_pct_30_after_query(self):
+        """update_job_progress second pct call must carry pct=30 (Oracle query issued milestone)."""
+        mock_complete_job, mock_update_progress, _, mock_cache_module = self._make_cache_miss_mocks()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.rq_worker_preload": MagicMock(ensure_rq_logging=MagicMock()),
+            "mes_dashboard.services.yield_alert_dataset_cache": mock_cache_module,
+        }), \
+        patch("mes_dashboard.services.yield_alert_job_service.complete_job", mock_complete_job), \
+        patch("mes_dashboard.services.yield_alert_job_service.update_job_progress", mock_update_progress):
+            yajs.execute_yield_alert_job(
+                job_id="yield-alert-pct-30",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        pct_values = [c.kwargs.get("pct") for c in mock_update_progress.call_args_list if "pct" in c.kwargs]
+        assert pct_values[1] == 30
+
+    def test_update_job_progress_called_with_pct_100_before_complete(self):
+        """update_job_progress third pct call must carry pct=100 (data written milestone), before complete_job."""
+        mock_complete_job, mock_update_progress, _, mock_cache_module = self._make_cache_miss_mocks()
+
+        call_order = []
+
+        def track_update(*args, **kwargs):
+            call_order.append(("update", kwargs.get("pct")))
+
+        def track_complete(*args, **kwargs):
+            call_order.append(("complete", None))
+
+        mock_update_progress.side_effect = track_update
+        mock_complete_job.side_effect = track_complete
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.rq_worker_preload": MagicMock(ensure_rq_logging=MagicMock()),
+            "mes_dashboard.services.yield_alert_dataset_cache": mock_cache_module,
+        }), \
+        patch("mes_dashboard.services.yield_alert_job_service.complete_job", mock_complete_job), \
+        patch("mes_dashboard.services.yield_alert_job_service.update_job_progress", mock_update_progress):
+            yajs.execute_yield_alert_job(
+                job_id="yield-alert-pct-100",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        pct_values = [c.kwargs.get("pct") for c in mock_update_progress.call_args_list if "pct" in c.kwargs]
+        assert pct_values[2] == 100
+        # pct=100 update must precede complete_job in call order
+        pct_100_index = next(i for i, (kind, pct) in enumerate(call_order) if kind == "update" and pct == 100)
+        complete_index = next(i for i, (kind, _) in enumerate(call_order) if kind == "complete")
+        assert pct_100_index < complete_index

@@ -1,0 +1,15 @@
+change-id: async-progress-ui
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-13T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 2" }
+  - { type: gate-promotions, pointer: "n/a (no gate moved between tiers; existing gates are sufficient)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files required changes)" }
+  - { type: required-status-checks, pointer: "frontend-unit-tests, type-check, css-governance, backend-unit-tests, cdd-gate" }
+next-action: none
+files-read:
+  - specs/changes/async-progress-ui/context-manifest.md
+  - .github/workflows/frontend-tests.yml
+  - .github/workflows/backend-tests.yml
+  - .github/workflows/contract-driven-gates.yml

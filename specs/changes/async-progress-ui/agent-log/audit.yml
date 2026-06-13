@@ -1,0 +1,12 @@
+- type: tier-floor-override
+  change-id: async-progress-ui
+  timestamp: '2026-06-13T05:53:27.632Z'
+  declared-tier: 3
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - migration
+    - redis
+  reason: >-
+    No DB migration or Redis schema change; 'migration' and 'redis' keywords appear in contract
+    prose references only — purely additive pct field to existing job metadata

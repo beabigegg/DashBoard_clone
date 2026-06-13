@@ -1,0 +1,42 @@
+change-id: async-progress-ui
+status: in-progress
+tier: 3
+context-governance: v1
+tier-floor-override: "No DB migration or Redis schema change; 'migration' and 'redis' keywords appear in contract prose references only — purely additive pct field to existing job metadata"
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "Architecture review not required — extracting existing pattern into shared component" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "Added pct/stage optional fields to §10 Compatibility Notes + CHANGELOG; 1.15.0→1.16.0" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done, note: "css-contract 1.7.0→1.8.0 (AsyncQueryProgress row); css-inventory 1.2.4→1.2.5 (new SFC entry)" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "No new env vars" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done, note: "§1.4 updated with pct?/stage? optional fields; 1.13.0→1.14.0" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "ASYNC-05 pct milestone semantics rule added; 1.17.0→1.18.0" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "No gate definition change; using existing workflows" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "Not required for this enhancement; unit + integration + visual review sufficient" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "n/a for progress UI component" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "n/a — no high-load behavior change" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "No new env vars or deploy config" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "No workflow changes required; existing gates cover all surfaces" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "PASS after fix-back: B-1 cancel sync dismiss; B-2 status prop + failed visual state" }
+  - { id: "5.2", section: Review, title: "Visual review", status: done, note: "PASS-WITH-NOTES: stage/progress prop naming advisory (non-blocking)" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "RELEASE-READY" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 passes locally; CI gates defined in ci-gates.md" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "Full backend suite green (informational)" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates defined for this change" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

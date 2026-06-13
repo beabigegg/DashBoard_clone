@@ -1,0 +1,36 @@
+agent: backend-engineer
+change-id: async-progress-ui
+date: 2026-06-13
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/yield_alert_job_service.py:119,140-143"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/production_history_job_service.py:112,127-130"
+  - type: tests-added
+    pointer: "tests/test_yield_alert_job_service.py::TestExecuteYieldAlertJob::test_update_job_progress_called_with_pct_0_at_start"
+  - type: tests-added
+    pointer: "tests/test_yield_alert_job_service.py::TestExecuteYieldAlertJob::test_update_job_progress_called_with_pct_30_after_query"
+  - type: tests-added
+    pointer: "tests/test_yield_alert_job_service.py::TestExecuteYieldAlertJob::test_update_job_progress_called_with_pct_100_before_complete"
+  - type: tests-added
+    pointer: "tests/test_production_history_job_service.py::TestExecuteProductionHistoryJob::test_update_job_progress_called_with_pct_0_at_start"
+  - type: tests-added
+    pointer: "tests/test_production_history_job_service.py::TestExecuteProductionHistoryJob::test_update_job_progress_called_with_pct_30_after_query"
+  - type: tests-added
+    pointer: "tests/test_production_history_job_service.py::TestExecuteProductionHistoryJob::test_update_job_progress_called_with_pct_100_before_complete"
+  - type: test-output
+    pointer: "24 passed in 0.41s (all phases: collect/targeted/changed-area passed)"
+  - type: contracts-touched
+    pointer: "none (ASYNC-05 pct milestones additive; no contract doc edit required per implementation-plan.md)"
+
+notes: |
+  IP-1: yield_alert_job_service.py — added pct=0 to started/initializing call,
+  pct=30 to running/querying-Oracle call, and new pct=100/stage=complete call
+  immediately before complete_job() in the success path.
+  IP-2: production_history_job_service.py — identical milestone additions.
+  IP-3: 3 new test methods per service; use call_args_list[N].kwargs['pct'] per
+  test-discipline rules; pct=100 test also asserts ordering vs complete_job via
+  side_effect call_order list.
+  All 24 tests (18 pre-existing + 6 new) passed on all three ladder phases.

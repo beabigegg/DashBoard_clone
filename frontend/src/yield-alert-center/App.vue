@@ -10,6 +10,7 @@ import { replaceRuntimeHistory } from '../core/shell-navigation';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
 import { toQueryParams } from './utils';
 
+import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -698,6 +699,15 @@ watch(() => [...filters.packages],         scheduleCrossFilter);
 watch(() => [...filters.types],            scheduleCrossFilter);
 watch(() => [...filters.functions],        scheduleCrossFilter);
 
+function cancelAsyncJob(): void {
+  if (_jobAbortController) {
+    _jobAbortController.abort();
+    _jobAbortController = null;
+  }
+  jobProgress.active = false;
+  loading.value = false;
+}
+
 onMounted(() => {
   setDefaultDateRange();
   restoreFromUrl();
@@ -980,6 +990,14 @@ onUnmounted(() => {
         <button class="ui-btn ui-btn--ghost" :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages" @click="goToPage(pagination.page + 1)">下一頁</button>
       </footer>
     </section>
+    <AsyncQueryProgress
+      :active="jobProgress.active"
+      :progress="jobProgress.progress"
+      :pct="jobProgress.pct"
+      :elapsed-seconds="0"
+      :status="jobProgress.status"
+      @cancel="cancelAsyncJob"
+    />
     <LoadingOverlay v-if="loading" tier="page" />
   </div>
 </template>

@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.13.0
-last-changed: 2026-06-12
+schema-version: 1.14.0
+last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -74,11 +74,18 @@ breaking-change-policy: deprecate-2-minors
     "status": "queued | started | finished | failed | abandoned",
     "job_id": "<string>",
     "result": "<payload | null>",
-    "error": "<string | null>"
+    "error": "<string | null>",
+    "pct": "<float 0.0–100.0 | omitted>",
+    "stage": "<string | omitted>"
   },
   "meta": { "timestamp": "...", "app_version": "..." }
 }
 ```
+
+- `pct`: optional float, range `[0.0, 100.0]`; present only when the backend job service calls `update_job_progress(pct=...)`. Omitted (not `null`) when the job was enqueued by a service that does not emit progress milestones.
+- `stage`: optional string; human-readable stage label emitted alongside `pct`; omitted when not set.
+- These fields are additive — existing consumers that do not read them are unaffected.
+- Frontend `JobStatusResponse` interface in `useAsyncJobPolling.ts` must declare `pct?: number` and `stage?: string` to match this shape.
 
 ---
 

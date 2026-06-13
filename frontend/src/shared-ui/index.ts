@@ -1,3 +1,4 @@
+export { default as AsyncQueryProgress } from './components/AsyncQueryProgress.vue';
 export { default as AiChartRenderer } from './components/AiChartRenderer.vue';
 export { default as AiChatMessage } from './components/AiChatMessage.vue';
 export { default as AiChatPanel } from './components/AiChatPanel.vue';

@@ -590,6 +590,16 @@ export function useProductionHistory() {
     expiredDataset.value = false;
   }
 
+  // ── Cancel async job ───────────────────────────────────────────────────────
+  function cancelJob(): void {
+    if (_jobAbortController) {
+      _jobAbortController.abort();
+      _jobAbortController = null;
+    }
+    jobProgress.active = false;
+    loading.value = false;
+  }
+
   // ── Export ─────────────────────────────────────────────────────────────────
   async function exportCsv(): Promise<void> {
     if (!datasetId.value) return;
@@ -633,5 +643,6 @@ export function useProductionHistory() {
     stageSupplementaryFilter,
     exportCsv,
     resetResults,
+    cancelJob,
   };
 }

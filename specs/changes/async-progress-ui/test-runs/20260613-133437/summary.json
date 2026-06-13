@@ -1,0 +1,15 @@
+{
+  "change_id": "async-progress-ui",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_yield_alert_job_service.py tests/test_production_history_job_service.py tests/test_async_query_job_service.py -v",
+  "duration_ms": 3547,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/async-progress-ui/test-runs/20260613-133437/summary.json",
+    "stdout": "specs/changes/async-progress-ui/test-runs/20260613-133437/stdout.log",
+    "stderr": "specs/changes/async-progress-ui/test-runs/20260613-133437/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

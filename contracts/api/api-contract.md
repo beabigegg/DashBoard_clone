@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.15.0
-last-changed: 2026-06-12
+schema-version: 1.16.0
+last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -369,11 +369,16 @@ breaking-change-policy: deprecate-2-minors
   - Consumers: `frontend/src/downtime-analysis/useDowntimeDuckDB.ts` (new composable; flag ON path only).
   - **Spool namespace whitelist**: `GET /api/spool/<namespace>/…` validates namespace against `_ALLOWED_NAMESPACES` in `spool_routes.py`. Any new spool-using feature MUST add its namespace to that frozenset AND to the parametrize list in `tests/test_spool_routes.py`; omitting either causes HTTP 400 for all parquet downloads from that feature. Contract: namespaces are `downtime_analysis_base_events` and `downtime_analysis_job_bridge` (added 2026-06-13; omission caused post-deploy HTTP 400 regression).
 
+- **async-progress-ui (2026-06-13)**: `GET /api/job/<job_id>?prefix=<p>` response `data` object gains two optional fields: `pct` (float 0.0–100.0) and `stage` (string). Present only when the job service explicitly calls `update_job_progress(pct=..., stage=...)`. Consumers that poll only `status`/`result`/`error` are unaffected. Additive; no existing fields removed. See data-shape-contract.md §1.4.
+
 ## Breaking Change Policy
 
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.16.0]
+- async-progress-ui (2026-06-13): `GET /api/job/<job_id>` response `data` gains optional `pct: float` (0.0–100.0) and `stage: string` fields. Emitted by yield-alert-job-service and production-history-job-service progress milestones. Additive; no existing fields removed or renamed.
 
 ## [api 1.12.0]
 - ai-pipeline-upgrade (2026-05-29): [api-pipeline-upgrade] Internal function-mode pipeline collapsed from two LLM calls (R1 intent + R2 params) to one combined call returning `{"function","params","explanation"}`. `_SESSION_STORE` extended with `chat_history` key (list of role/content pairs, cap 8 pairs); history injected into combined call and text2sql Stage 1 only. Three new AI functions registered (`production_history_query`, `resource_history_summary`, `qc_gate_status`). Route surface (`/api/ai/query`), response envelope keys, TTL, and error codes are unchanged. No fields removed; all changes internal to the AI service layer. Backward-compatible.

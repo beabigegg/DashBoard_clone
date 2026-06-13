@@ -235,3 +235,56 @@ describe('useAsyncJobPolling — composable wrapper', () => {
     expect(fn).toBe(pollJobUntilComplete);
   });
 });
+
+describe('pollJobUntilComplete — pct and stage field forwarding', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('pollJobUntilComplete forwards pct field from job status response', async () => {
+    apiGet
+      .mockResolvedValueOnce({ data: { status: 'running', pct: 50, stage: 'querying' } })
+      .mockResolvedValueOnce({ data: { status: 'completed', pct: 100 } });
+
+    const onProgress = vi.fn();
+    const promise = pollJobUntilComplete('/api/job/pct-test', {
+      pollIntervalMs: 50,
+      maxPollMs: 10000,
+      onProgress,
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await vi.runAllTimersAsync();
+    await promise;
+
+    expect(onProgress).toHaveBeenCalled();
+    const firstCall = onProgress.mock.calls[0][0];
+    expect(firstCall.pct).toBe(50);
+  });
+
+  it('pollJobUntilComplete forwards stage field from job status response', async () => {
+    apiGet
+      .mockResolvedValueOnce({ data: { status: 'running', pct: 50, stage: 'querying' } })
+      .mockResolvedValueOnce({ data: { status: 'completed', pct: 100 } });
+
+    const onProgress = vi.fn();
+    const promise = pollJobUntilComplete('/api/job/stage-test', {
+      pollIntervalMs: 50,
+      maxPollMs: 10000,
+      onProgress,
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await vi.runAllTimersAsync();
+    await promise;
+
+    expect(onProgress).toHaveBeenCalled();
+    const firstCall = onProgress.mock.calls[0][0];
+    expect(firstCall.stage).toBe('querying');
+  });
+});

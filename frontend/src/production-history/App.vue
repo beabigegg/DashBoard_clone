@@ -11,6 +11,7 @@ import {
 import { useFirstTierFilters, type CachedFilterField } from './composables/useFirstTierFilters';
 import { ref } from 'vue';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
+import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -42,6 +43,8 @@ const {
   stageSupplementaryFilter,
   exportCsv: doExportCsv,
   resetResults,
+  jobProgress,
+  cancelJob,
 } = useProductionHistory();
 
 // ── First-tier cached cross-filter + wildcard composable ───────────────────
@@ -558,6 +561,14 @@ async function exportCsv(): Promise<void> {
       }}
     </div>
 
+    <AsyncQueryProgress
+      :active="jobProgress.active"
+      :progress="jobProgress.progress"
+      :pct="jobProgress.pct"
+      :elapsed-seconds="0"
+      :status="jobProgress.status"
+      @cancel="cancelJob"
+    />
     <LoadingOverlay v-if="loading" tier="page" />
   </div>
 </template>

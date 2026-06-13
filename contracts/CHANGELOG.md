@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.18.0] — 2026-06-13
+### Added
+- async-progress-ui: Added ASYNC-05 (progress milestone semantics): canonical pct milestone map (0=start, 30=querying Oracle, 100=complete); consumer must treat absent pct as indeterminate; per-service opt-in. Bumped from 1.17.0.
+
+## [data 1.14.0] — 2026-06-13
+### Added
+- async-progress-ui: Updated §1.4 (Async Job Status Response) — added two optional fields: `pct` (float 0.0–100.0, omitted when not set) and `stage` (string, omitted when not set). Emitted by backend `update_job_progress()` for services that report progress milestones. Additive; existing consumers are unaffected. Bumped from 1.13.0.
+
+## [api 1.16.0] — 2026-06-13
+### Added
+- async-progress-ui: `GET /api/job/<job_id>` response `data` gains optional `pct: float` (0.0–100.0) and `stage: string` fields. Emitted by yield-alert-job-service and production-history-job-service progress milestones. Additive; no existing fields removed or renamed.
+
+## [css 1.8.0] — 2026-06-13
+### Added
+- async-progress-ui: Added `AsyncQueryProgress.vue` to Component Rules table. Component uses `<style scoped>`; `.async-job-progress` is component-internal; no feature CSS file may reproduce this class externally.
+
+## [css-inventory 1.2.5] — 2026-06-13
+### Added
+- async-progress-ui: Added `frontend/src/shared-ui/components/AsyncQueryProgress.vue` to Shared UI Component Styles table (`<style scoped>`; async job progress bar).
+
 ## [ci 1.3.20] — 2026-06-12
 ### Added
 - downtime-browser-duckdb: Added `downtime-playwright-e2e` gate (Tier 1, PR); extended `playwright-resilience` and `playwright-data-boundary` with atomicity + error-banner + malformed-parquet specs; extended `frontend-unit` with `useDowntimeDuckDB.test.ts` 7-parity suite; added `nightly-parity-regression` (Tier 3, required from day one; Python vs DuckDB-WASM on 184k-row fixture). Added gate compatibility note: CI browser install step for new Playwright spec; concurrency + retention config; OOM-risk rollback caveat (flag-off path without `_MAX_ORACLE_DAYS` guard); parquet cleanup commands for `downtime_analysis_base_events` and `downtime_analysis_job_bridge` namespaces. Bumped from 1.3.19.

@@ -1,0 +1,15 @@
+{
+  "change_id": "async-progress-ui",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose --run",
+  "duration_ms": 13057,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/async-progress-ui/test-runs/20260613-134231/summary.json",
+    "stdout": "specs/changes/async-progress-ui/test-runs/20260613-134231/stdout.log",
+    "stderr": "specs/changes/async-progress-ui/test-runs/20260613-134231/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

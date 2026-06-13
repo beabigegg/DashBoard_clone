@@ -116,7 +116,7 @@ def execute_yield_alert_job(
         "yield_alert job started job_id=%s start_date=%s end_date=%s",
         job_id, start_date, end_date,
     )
-    update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing")
+    update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing", pct=0)
 
     try:
         # Compute deterministic query_id (same formula as execute_primary_query)
@@ -137,10 +137,11 @@ def execute_yield_alert_job(
             complete_job(_JOB_PREFIX, job_id, query_id=query_id)
             return
 
-        update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle")
+        update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle", pct=30)
 
         execute_primary_query(start_date=start_date, end_date=end_date)
 
+        update_job_progress(_JOB_PREFIX, job_id, status="running", progress="complete", pct=100, stage="complete")
         complete_job(_JOB_PREFIX, job_id, query_id=query_id)
 
     except Exception as exc:

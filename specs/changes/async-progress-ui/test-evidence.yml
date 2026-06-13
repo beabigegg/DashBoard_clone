@@ -1,0 +1,31 @@
+change-id: async-progress-ui
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose --run
+    summary: specs/changes/async-progress-ui/test-runs/20260613-134231/summary.json
+  - phase: targeted
+    status: passed
+    command: >-
+      cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- AsyncQueryProgress useAsyncJobPolling
+      --reporter=verbose --run
+    summary: specs/changes/async-progress-ui/test-runs/20260613-135023/summary.json
+  - phase: changed-area
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose --run
+    summary: specs/changes/async-progress-ui/test-runs/20260613-134254/summary.json
+  - phase: contract
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check && npm run css:check
+    summary: specs/changes/async-progress-ui/test-runs/20260613-135029/summary.json
+  - phase: quality
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose --run
+    summary: specs/changes/async-progress-ui/test-runs/20260613-134327/summary.json
+final-status: passed

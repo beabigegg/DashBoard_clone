@@ -1,0 +1,15 @@
+{
+  "change_id": "async-progress-ui",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- AsyncQueryProgress useAsyncJobPolling --reporter=verbose --run",
+  "duration_ms": 1247,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/async-progress-ui/test-runs/20260613-135023/summary.json",
+    "stdout": "specs/changes/async-progress-ui/test-runs/20260613-135023/stdout.log",
+    "stderr": "specs/changes/async-progress-ui/test-runs/20260613-135023/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -109,7 +109,7 @@ def execute_production_history_job(
     )
 
     logger.info("production_history job started job_id=%s", job_id)
-    update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing")
+    update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing", pct=0)
 
     try:
         # Compute deterministic dataset_id from params
@@ -124,10 +124,11 @@ def execute_production_history_job(
             complete_job(_JOB_PREFIX, job_id, query_id=dataset_id)
             return
 
-        update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle")
+        update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle", pct=30)
 
         query_production_history(params)
 
+        update_job_progress(_JOB_PREFIX, job_id, status="running", progress="complete", pct=100, stage="complete")
         complete_job(_JOB_PREFIX, job_id, query_id=dataset_id)
 
     except Exception as exc:

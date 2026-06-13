@@ -1,0 +1,23 @@
+agent: frontend-engineer
+change-id: async-progress-ui
+date: 2026-06-13
+status: complete
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/shared-ui/components/AsyncQueryProgress.vue:1-108" }
+  - { type: files-changed, pointer: "frontend/src/shared-composables/useAsyncJobPolling.ts:10-17 (pct/stage added to JobStatusResponse)" }
+  - { type: files-changed, pointer: "frontend/src/shared-ui/index.ts:1 (AsyncQueryProgress export added)" }
+  - { type: files-changed, pointer: "frontend/src/yield-alert-center/App.vue (import + cancelAsyncJob + AsyncQueryProgress in template)" }
+  - { type: files-changed, pointer: "frontend/src/production-history/App.vue (import + destructure jobProgress/cancelJob + AsyncQueryProgress in template)" }
+  - { type: files-changed, pointer: "frontend/src/production-history/composables/useProductionHistory.ts (cancelJob function + return export)" }
+  - { type: files-changed, pointer: "frontend/tests/components/AsyncQueryProgress.test.js (new, 10 tests)" }
+  - { type: files-changed, pointer: "frontend/tests/shared-composables/useAsyncJobPolling.test.js (2 pct/stage tests appended)" }
+  - { type: components-affected, pointer: "AsyncQueryProgress (new), yield-alert-center/App, production-history/App, useProductionHistory (cancelJob)" }
+  - { type: accessibility-audit, pointer: "role=status + aria-live=polite on root; cancel button has visible text label; no aria violations introduced" }
+
+notes: |
+  - reject-history/App.vue was NOT modified (AC-7 satisfied)
+  - All HEX colors replaced with theme() tokens to pass css:check
+  - cancelJob added additively to useProductionHistory (no polling logic change)
+  - elapsedSeconds wired to 0 in both consumers (jobProgress state shape not extended per plan)
+  - Test ladder phases all passed: collect, targeted, changed-area, contract, quality

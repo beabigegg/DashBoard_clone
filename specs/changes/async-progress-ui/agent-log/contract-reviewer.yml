@@ -1,0 +1,13 @@
+change-id: async-progress-ui
+timestamp: "2026-06-13"
+agent: contract-reviewer
+status: done
+artifacts:
+  - type: contracts-reviewed
+    pointer: "contracts/css/css-contract.md, contracts/css/css-inventory.md, contracts/data/data-shape-contract.md, contracts/api/api-contract.md, contracts/business/business-rules.md"
+  - type: version-bumps
+    pointer: "css-contract: 1.7.0→1.8.0; css-inventory: 1.2.4→1.2.5; data-shape: 1.13.0→1.14.0; api-contract: 1.15.0→1.16.0; business-rules: 1.17.0→1.18.0"
+  - type: breaking-changes
+    pointer: "none — all five changes are purely additive"
+notes: "api-contract §10 compatibility note added (pct/stage additive optional fields). ASYNC-05 pct milestone rule added to business-rules. AsyncQueryProgress.vue added to css-contract Component Rules and css-inventory Shared UI Component Styles. §1.4 data-shape updated with pct?/stage? optional fields."
+next-action: "test-strategist writes test-plan.md"

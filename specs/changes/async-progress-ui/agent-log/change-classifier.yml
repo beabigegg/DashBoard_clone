@@ -1,0 +1,21 @@
+change-id: async-progress-ui
+timestamp: "2026-06-13"
+agent: change-classifier
+status: done
+artifacts:
+  - type: tier
+    pointer: "Tier 3"
+  - type: risk
+    pointer: "low / module-level"
+  - type: lane
+    pointer: "enhancement"
+  - type: required-artifacts
+    pointer: "change-request, change-classification, implementation-plan, test-plan, ci-gates, tasks, context-manifest"
+  - type: required-reviewers
+    pointer: "contract-reviewer, ui-ux-reviewer, visual-reviewer, ci-cd-gatekeeper, qa-reviewer"
+  - type: context-manifest
+    pointer: "specs/changes/async-progress-ui/context-manifest.md"
+  - type: cer-001-resolved
+    pointer: "backend test path confirmed as tests/ (root level — tests/test_async_query_job_service.py present)"
+notes: "CER-001 resolved inline — project-map confirms tests/ at root contains job service tests. No atomic split required."
+next-action: "contract-reviewer → css-contract + css-inventory + data-shape-contract + api-contract (no-change confirm)"
