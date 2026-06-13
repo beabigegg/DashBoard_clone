@@ -140,6 +140,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Canonical spool: implement two-phase key resolution (superset warmup reuse + exact-match Oracle fallback) — see docs/architecture/cache-spool-patterns.md
 - `spool_routes._ALLOWED_NAMESPACES`: add namespace AND parametrize test in the same PR as the spool write — see docs/architecture/cache-spool-patterns.md
 - BatchQueryEngine `ROW_NUMBER()` chunking is incompatible with cross-row reductions; classify at design time — see docs/adr/0003-downtime-rowcount-chunking-exclusion.md
+- Type B async: when inner fn can't accept `progress_callback`, use coarse bracket milestones 5→15→90→100 bracketing the call; avoid hash-mirroring unless per-chunk granularity is required — see docs/architecture/cache-spool-patterns.md
 
 **Service architecture** — see `docs/architecture/service-patterns.md` for full detail:
 - `downtime_analysis_service`: patch `load_downtime_events` at definition site (`downtime_analysis_cache`), not the service module — see docs/architecture/service-patterns.md

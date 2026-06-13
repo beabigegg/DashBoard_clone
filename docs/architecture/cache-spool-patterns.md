@@ -119,3 +119,15 @@ Evidence: `resource-history-cache-fix`.
 Add the namespace to the `frozenset` in `spool_routes.py` AND to the `@pytest.mark.parametrize("ns", […])` list in `tests/test_spool_routes.py`.
 
 Evidence: `downtime-browser-duckdb` — `downtime_analysis_base_events` and `downtime_analysis_job_bridge` omitted from whitelist; browser received HTTP 400 on every parquet download post-deploy.
+
+## Type B Async — Coarse Bracket Milestones
+
+**When a Type B RQ worker wraps a function that cannot accept a `progress_callback` (hard constraint: do not modify its signature), use coarse bracket milestones instead of per-chunk hash-mirroring.**
+
+Emit in order: `pct=5` (worker started, before the call) → `pct=15` (entry confirmed) → `pct=90` (call returned successfully) → `pct=100` (job complete). This satisfies the required AC-4 ordering invariants: non-decreasing, first value ≤ 5, final value == 100.
+
+Hash-mirroring (polling `get_batch_progress` from a background thread to extract per-chunk pct) is technically available but brittle — it couples the worker to engine internals and breaks on engine refactors. Only choose it when genuine per-chunk granularity is a hard QA requirement, and pin the hash recipe with a membership test.
+
+Pattern: `src/mes_dashboard/services/hold_query_job_service.py` (hold-history Phase 3-B).  
+Contrast: downtime Phase 3-A uses `5→15→60→90→100` with a mid-call emit — also coarse bracket, not hash-mirrored.  
+Evidence: `specs/changes/hold-history-rq-async/archive.md` §Production Reality Findings #2.

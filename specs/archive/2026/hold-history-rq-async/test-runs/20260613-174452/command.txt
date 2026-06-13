@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/test_hold_history_routes.py tests/test_rq_monitor_service.py -x -q

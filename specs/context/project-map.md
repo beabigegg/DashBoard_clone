@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 169
-visible-files: 857
+visible-files: 859
 omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -150,6 +150,7 @@ DashBoard_vite/
 |   \-- table_schema_info.json
 |-- deploy/
 |   |-- mes-dashboard-downtime-worker.service
+|   |-- mes-dashboard-hold-history-worker.service
 |   |-- mes-dashboard-material-consumption-worker.service
 |   |-- mes-dashboard-msd-worker.service
 |   |-- mes-dashboard-reject-worker.service
@@ -787,6 +788,7 @@ DashBoard_vite/
 |       |   |-- hold_dataset_cache.py
 |       |   |-- hold_history_service.py
 |       |   |-- hold_history_sql_runtime.py
+|       |   |-- hold_query_job_service.py
 |       |   |-- hold_today_snapshot_service.py
 |       |   |-- internal_metrics_service.py
 |       |   |-- job_query_service.py
@@ -809,8 +811,7 @@ DashBoard_vite/
 |       |   |-- query_tool_service.py
 |       |   |-- query_tool_sql_runtime.py
 |       |   |-- realtime_equipment_cache.py
-|       |   |-- reason_filter_cache.py
-|       |   \-- ... (23 more entries truncated; cap=50)
+|       |   \-- ... (24 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -917,6 +918,7 @@ DashBoard_vite/
 |   |   |-- conftest.py
 |   |   |-- test_downtime_rq_async.py
 |   |   |-- test_fixtures_smoke.py
+|   |   |-- test_hold_history_rq_async.py
 |   |   |-- test_multi_worker_concurrency.py
 |   |   |-- test_oracle_error_codes.py
 |   |   |-- test_oracle_error_path.py
@@ -1090,7 +1092,7 @@ DashBoard_vite/
 |   |   |-- probe_179781.json
 |   |   |-- probe_181537.json
 |   |   |-- probe_183181.json
-|   |   \-- ... (68 more entries truncated; cap=50)
+|   |   \-- ... (73 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   \-- resource_history.duckdb
 |-- tools/
