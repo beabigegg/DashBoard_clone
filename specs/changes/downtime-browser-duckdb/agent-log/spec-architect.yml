@@ -1,0 +1,7 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0007-downtime-browser-duckdb-compute-relocation.md" }
+  - { type: affected-areas, pointer: "downtime-analysis routes/service/cache, raw spool data-shape, downtime frontend, shared duckdb core" }
+  - { type: decision-summary, pointer: "relocate cross-shift merge/job-bridge/taxonomy to browser DuckDB over two raw spools; deprecate-in-place legacy endpoints behind feature flag; browser-blob CSV; SCHEMA_VERSION raw-spool key" }
+  - { type: risks-noted, pointer: "3 medium (browser/Python parity, low-RAM 62MB ceiling, two-parquet atomicity), 0 high" }
+  - { type: design-doc, pointer: "specs/changes/downtime-browser-duckdb/design.md" }
+  - { type: current-behavior-doc, pointer: "specs/changes/downtime-browser-duckdb/current-behavior.md" }

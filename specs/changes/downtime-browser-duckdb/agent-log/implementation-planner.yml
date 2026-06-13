@@ -1,0 +1,16 @@
+agent: implementation-planner
+change-id: downtime-browser-duckdb
+timestamp: 2026-06-12
+status: done
+summary: >
+  Wrote implementation-plan.md from change-classification, design (D1-D8),
+  current-behavior baseline, test-plan AC mapping, ci-gates, and
+  contract-reviewer version bumps. design.md present and fully authored
+  (not a scaffold) so not blocked. Plan fixes a 7-step agent sequence,
+  file-level owner map, 6 contract updates + 5 CHANGELOG entries, TDD
+  red-first test plan, DOWNTIME_BROWSER_DUCKDB flag governance, and the
+  ADR-0003 / patch-site / two-parquet-atomicity / no-silent-empty constraints.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/downtime-browser-duckdb/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer, e2e-resilience-engineer, stress-soak-engineer, ui-ux-reviewer, visual-reviewer, qa-reviewer" }
+  - { type: scope-summary, pointer: "7 in-scope areas; 6 out-of-scope; 12 required changes IP-1..IP-12" }

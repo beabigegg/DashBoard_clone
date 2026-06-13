@@ -1,0 +1,22 @@
+agent: test-strategist
+change-id: downtime-browser-duckdb
+timestamp: 2026-06-12
+status: done
+summary: >
+  AC→test mapping written for all 8 acceptance criteria. 33 test entries across
+  unit, contract, integration, e2e, data-boundary, resilience, stress, and soak
+  families. Parity fixture requirement specified (184k-row reference, must include
+  cross-midnight event + ambiguous tie-break case). Existing tests identified for
+  extension vs. new test files. Patch-site discipline (load_downtime_events,
+  feature-flag setattr) and integration-real marker avoidance documented.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/downtime-browser-duckdb/test-plan.md" }
+  - type: tdd-pairs
+    pointer: >
+      tests/test_downtime_analysis_routes.py ↔ src/mes_dashboard/routes/downtime_analysis_routes.py;
+      tests/test_downtime_analysis_service.py ↔ src/mes_dashboard/services/downtime_analysis_service.py;
+      frontend/src/downtime-analysis/__tests__/useDowntimeDuckDB.test.ts ↔ frontend/src/downtime-analysis/useDowntimeDuckDB.ts;
+      frontend/tests/playwright/downtime-analysis.spec.ts ↔ frontend/src/downtime-analysis/;
+      tests/stress/test_downtime_analysis_stress.py ↔ src/mes_dashboard/services/downtime_analysis_service.py
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 0), integration (Tier 0), e2e (Tier 0), data-boundary (Tier 0), resilience (Tier 0), stress (Tier 4), soak (Tier 4)" }
+  - { type: mapping-completeness, pointer: "all 8 AC covered; AC-3 parity requires 184k-row fixture with discriminating edge cases; AC-5 zero-round-trip only verifiable at Playwright layer" }

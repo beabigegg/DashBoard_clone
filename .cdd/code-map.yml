@@ -1,6 +1,6 @@
-# generated: 2026-06-12T02:49:50Z by cdd-kit 2.2.1
-# files: 846, src-lines: 239364, map-lines: 18111, compression: 13.2x
-# sources-digest: 97a503d5e27f549948bd13a5dfd699eb5530233e65dd9d8414324bc5691effd5
+# generated: 2026-06-13T01:36:16Z by cdd-kit 2.2.1
+# files: 850, src-lines: 244941, map-lines: 18319, compression: 13.4x
+# sources-digest: def5aa2cc6070702045da1c8677a40720174860d30086e161445cfaa7ef4b685
 frontend/playwright.config.js:  # 28 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -737,7 +737,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 305 lines
+frontend/src/downtime-analysis/App.vue:  # 534 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -759,6 +759,27 @@ frontend/src/downtime-analysis/__tests__/useBigCategory.test.ts:  # 157 lines
   imports:
     - { module: vitest, items: [describe, it, expect], line: 1 }
     - { module: '../composables/useBigCategory', items: [getBigCategory, ALL_BIG_CATEGORIES, BIG_CATEGORY_MAP, useBigCategory], line: 2 }
+
+frontend/src/downtime-analysis/__tests__/useDowntimeDuckDB.test.ts:  # 812 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 17 }
+  constants:
+    - { name: BASE_EVENTS_FIXTURE, line: 67 }
+    - { name: JOB_BRIDGE_FIXTURE, line: 142 }
+    - { name: PATH_B_AMBIGUOUS_EVENTS, line: 205 }
+    - { name: PATH_B_AMBIGUOUS_JOBS, line: 217 }
+    - { name: TAXONOMY_FIXTURE, line: 263 }
+  functions:
+    - { name: async importComposable, lines: 299-302 }
+    - { name: applyTaxonomy, lines: 324-334 }
+    - { name: crossShiftMerge, lines: 349-416 }
+    - { name: bridgeJobs, lines: 428-489 }
+  interfaces:
+    - { name: RawBaseEvent, lines: 21-29 }  # local
+    - { name: RawJobBridge, lines: 31-48 }  # local
+    - { name: TaxonomyShape, lines: 50-55 }  # local
+    - { name: MergedEvent, lines: 338-347 }  # local
+    - { name: BridgedEvent, lines: 420-426 }  # local
 
 frontend/src/downtime-analysis/__tests__/useFilterState.test.ts:  # 161 lines
   imports:
@@ -815,18 +836,55 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 478 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 501 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
     - { module: '../types', items: [DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow, EquipmentDetailRow, EventDetailRow, Pagination, FilterOptions, ChartFilter], line: 3 }
+    - { module: './useDowntimeDuckDB', items: [TaxonomyShape], line: 14 }
   constants:
-    - { name: API_TIMEOUT, line: 15 }
+    - { name: API_TIMEOUT, line: 16 }
   functions:
-    - { name: useDowntimeData, lines: 46-478 }
+    - { name: useDowntimeData, lines: 47-501 }
   interfaces:
-    - { name: SummaryData, lines: 17-22 }  # local
-    - { name: EventDetailData, lines: 24-27 }  # local
+    - { name: SummaryData, lines: 18-23 }  # local
+    - { name: EventDetailData, lines: 25-28 }  # local
+
+frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1068 lines
+  imports:
+    - { module: vue, items: [ref, readonly], line: 27 }
+    - { module: '../../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 28 }
+    - { module: '../../core/duckdb-client', items: [DuckDBClient], line: 29 }
+  constants:
+    - { name: MERGE_GAP_SECONDS, line: 148 }
+    - { name: CROSS_SHIFT_MERGE_SQL, line: 155 }
+    - { name: JOB_BRIDGE_SQL, line: 225 }
+  functions:
+    - { name: sf, lines: 431-434 }
+    - { name: nullableStr, lines: 436-441 }
+    - { name: nullableFloat, lines: 443-446 }
+    - { name: toIsoString, lines: 448-459 }
+    - { name: applyTaxonomyMapping, lines: 469-482 }
+    - { name: buildFilterClause, lines: 488-512 }
+    - { name: interpolateParams, lines: 520-529 }
+    - { name: rowsToCsv, lines: 533-547 }
+    - { name: downloadCsv, lines: 549-560 }
+    - { name: useDowntimeDuckDB, lines: 564-1068 }
+  interfaces:
+    - { name: TaxonomyShape, lines: 33-38 }
+    - { name: DowntimeFilters, lines: 40-45 }
+    - { name: KpiResult, lines: 47-54 }
+    - { name: DailyTrendRow, lines: 56-62 }
+    - { name: BigCategoryRow, lines: 64-69 }
+    - { name: EquipmentDetailRow, lines: 71-78 }
+    - { name: EquipmentDetailResult, lines: 80-86 }
+    - { name: EventDetailJobEnrichment, lines: 88-105 }
+    - { name: EventDetailRow, lines: 107-118 }
+    - { name: EventDetailResult, lines: 120-126 }
+    - { name: TopReasonRow, lines: 128-133 }
+  types:
+    - { name: ComposableState, lines: 135-135 }
+    - { name: DuckdbErrorKind, lines: 143-143 }
 
 frontend/src/downtime-analysis/composables/useFilterState.ts:  # 104 lines
   imports:
@@ -2662,6 +2720,25 @@ frontend/tests/playwright/downtime-analysis.spec.js:  # 408 lines
     - { name: MOCK_EVENT_DETAIL_WITH_NONE, line: 61 }
     - { name: MOCK_EQUIPMENT_DETAIL, line: 107 }
     - { name: MOCK_EVENT_DETAIL_TIER3, line: 141 }
+
+frontend/tests/playwright/downtime-analysis.spec.ts:  # 937 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 35 }
+  constants:
+    - { name: PAGE_URL, line: 41 }
+    - { name: DOWNTIME_PAGE_HEADING, line: 42 }
+    - { name: ERROR_BANNER_SELECTORS, line: 45 }
+    - { name: EMPTY_STATE_SELECTORS, line: 57 }
+    - { name: PARQUET_CONTENT_TYPE, line: 80 }
+    - { name: EMPTY_PARQUET_BYTES, line: 82 }
+    - { name: MOCK_OPTIONS, line: 84 }
+    - { name: MOCK_QUERY_RESULT_DUCKDB, line: 102 }
+    - { name: MOCK_QUERY_RESULT_LEGACY, line: 131 }
+  functions:
+    - { name: async setupBaseRoutes, lines: 164-196 }
+    - { name: async setupDuckDBRoutes, lines: 202-225 }
+    - { name: async waitForErrorBanner, lines: 231-248 }
+    - { name: async waitForEmptyState, lines: 250-267 }
 
 frontend/tests/playwright/hold-history-flat-table.spec.js:  # 81 lines
   imports:
@@ -4573,25 +4650,26 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 402 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 442 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: datetime, items: [datetime], line: 19 }
     - { module: flask, items: [Blueprint, Response, request], line: 21 }
     - { module: flask, items: [stream_with_context], line: 22 }
     - { module: mes_dashboard.core.response, items: [cache_expired_error, internal_error, success_response, validation_error], line: 24 }
-    - { module: mes_dashboard.services.downtime_analysis_service, items: [apply_view, export_equipment_detail_csv, export_event_detail_csv, get_filter_options, query_downtime_dataset], line: 30 }
+    - { module: os, items: [], line: 30 }
+    - { module: mes_dashboard.services.downtime_analysis_service, items: [apply_view, export_equipment_detail_csv, export_event_detail_csv, get_filter_options, query_downtime_dataset, query_downtime_dataset_raw], line: 32 }
   functions:
-    - { name: _validate_dates, lines: 53-62 }
-    - { name: _csv_param, lines: 65-70 }
-    - { name: api_downtime_options, lines: 79-111 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 120-171 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 180-213 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 222-266 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 275-315 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 324-349 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 358-383 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 391-402 }
+    - { name: _validate_dates, lines: 68-83 }
+    - { name: _csv_param, lines: 86-91 }
+    - { name: api_downtime_options, lines: 100-132 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
+    - { name: api_downtime_query, lines: 141-211 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 220-253 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 262-306 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 315-355 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 364-389 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 398-423 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 431-442 }
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5544,7 +5622,7 @@ src/mes_dashboard/services/dashboard_service.py:  # 504 lines
     - { name: query_ou_trend, lines: 343-420 }
     - { name: query_utilization_heatmap, lines: 427-504 }
 
-src/mes_dashboard/services/downtime_analysis_cache.py:  # 106 lines
+src/mes_dashboard/services/downtime_analysis_cache.py:  # 206 lines
   imports:
     - { module: __future__, items: [annotations], line: 19 }
     - { module: logging, items: [], line: 21 }
@@ -5554,10 +5632,16 @@ src/mes_dashboard/services/downtime_analysis_cache.py:  # 106 lines
     - { module: mes_dashboard.core.cache, items: [ProcessLevelCache, register_process_cache], line: 27 }
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path, store_spooled_df], line: 28 }
   functions:
-    - { name: has_downtime_events, lines: 57-61 }
-    - { name: store_downtime_events, lines: 64-76 }
-    - { name: load_downtime_events, lines: 79-91 }
-    - { name: start_downtime_prewarm, lines: 99-106 }
+    - { name: has_downtime_events, lines: 78-82 }
+    - { name: store_downtime_events, lines: 85-97 }
+    - { name: load_downtime_events, lines: 100-112 }
+    - { name: has_downtime_base_events, lines: 120-124 }
+    - { name: store_downtime_base_events, lines: 127-139 }
+    - { name: load_downtime_base_events, lines: 142-154 }
+    - { name: has_downtime_job_bridge, lines: 157-161 }
+    - { name: store_downtime_job_bridge, lines: 164-176 }
+    - { name: load_downtime_job_bridge, lines: 179-191 }
+    - { name: start_downtime_prewarm, lines: 199-206 }
 
 src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 384 lines
   imports:
@@ -5584,43 +5668,49 @@ src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 384 lines
     - { name: run_prewarm_job, lines: 351-373 }
     - { name: start_duckdb_prewarm, lines: 376-384 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1302 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1815 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
     - { module: json, items: [], line: 16 }
     - { module: logging, items: [], line: 17 }
-    - { module: typing, items: [Any, Dict, Generator, List, Optional, Tuple], line: 18 }
-    - { module: pandas, items: [], line: 20 }
-    - { module: mes_dashboard.config.constants, items: [DOWNTIME_BRIDGE_VERSION], line: 22 }
+    - { module: os, items: [], line: 18 }
+    - { module: pathlib, items: [Path], line: 19 }
+    - { module: typing, items: [Any, Dict, Generator, List, Optional, Tuple], line: 20 }
+    - { module: pandas, items: [], line: 22 }
+    - { module: mes_dashboard.config.constants, items: [DOWNTIME_BRIDGE_VERSION], line: 24 }
   functions:
-    - { name: _map_big_category, lines: 68-95 }
-    - { name: _merge_cross_shift_events, lines: 105-172 }
-    - { name: _build_merged_row, lines: 175-193 }
-    - { name: _bridge_jobid, lines: 200-298 }
-    - { name: _compute_overlap_seconds, lines: 301-310 }
-    - { name: _enrich_event, lines: 313-360 }
-    - { name: _no_match_event, lines: 363-383 }
-    - { name: _add_empty_job_columns, lines: 386-397 }
-    - { name: _safe_str, lines: 400-405 }
-    - { name: _enrich_events_df, lines: 412-445 }
-    - { name: _ts_to_iso, lines: 448-457 }
-    - { name: make_downtime_query_id, lines: 464-469 }
-    - { name: get_filter_options, lines: 476-564 }
-    - { name: query_downtime_dataset, lines: 571-755 }
-    - { name: _apply_resource_filters, lines: 758-844 }
-    - { name: _empty_events_df, lines: 847-854 }
-    - { name: _build_response, lines: 861-874 }
-    - { name: _build_summary, lines: 877-903 }
-    - { name: _build_daily_trend, lines: 906-927 }
-    - { name: _build_big_category, lines: 930-949 }
-    - { name: _build_top_reasons, lines: 952-981 }
-    - { name: apply_view, lines: 988-1045 }
-    - { name: _build_equipment_detail_page, lines: 1048-1073 }
-    - { name: _build_equipment_detail, lines: 1076-1119 }
-    - { name: _build_event_detail_page, lines: 1122-1189 }
-    - { name: export_equipment_detail_csv, lines: 1197-1240 }
-    - { name: export_event_detail_csv, lines: 1243-1302 }
+    - { name: _map_big_category, lines: 81-108 }
+    - { name: _merge_cross_shift_events_from_parquet, lines: 187-214 }
+    - { name: _merge_cross_shift_events, lines: 217-284 }
+    - { name: _build_merged_row, lines: 287-305 }
+    - { name: _bridge_jobid, lines: 312-537 }
+    - { name: _compute_overlap_seconds, lines: 540-549 }
+    - { name: _enrich_event, lines: 552-599 }
+    - { name: _no_match_event, lines: 602-622 }
+    - { name: _add_empty_job_columns, lines: 625-636 }
+    - { name: _safe_str, lines: 639-644 }
+    - { name: _enrich_events_df, lines: 651-684 }
+    - { name: _ts_to_iso, lines: 687-696 }
+    - { name: make_downtime_query_id, lines: 703-708 }
+    - { name: make_raw_spool_query_id, lines: 711-723 }
+    - { name: _build_taxonomy_json, lines: 731-752 }
+    - { name: query_downtime_dataset_raw, lines: 760-962 }
+    - { name: get_filter_options, lines: 969-1057 }
+    - { name: query_downtime_dataset, lines: 1064-1268 }
+    - { name: _apply_resource_filters, lines: 1271-1357 }
+    - { name: _empty_events_df, lines: 1360-1367 }
+    - { name: _build_response, lines: 1374-1387 }
+    - { name: _build_summary, lines: 1390-1416 }
+    - { name: _build_daily_trend, lines: 1419-1440 }
+    - { name: _build_big_category, lines: 1443-1462 }
+    - { name: _build_top_reasons, lines: 1465-1494 }
+    - { name: apply_view, lines: 1501-1558 }
+    - { name: _build_equipment_detail_page, lines: 1561-1586 }
+    - { name: _build_equipment_detail, lines: 1589-1632 }
+    - { name: _build_event_detail_page, lines: 1635-1702 }
+    - { name: export_equipment_detail_csv, lines: 1710-1753 }
+    - { name: export_event_detail_csv, lines: 1756-1815 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -6963,7 +7053,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1261 lines
     - { name: get_vendors, lines: 1231-1233 }
     - { name: get_resource_cascade_metadata, lines: 1236-1261 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 758 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 774 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6989,16 +7079,16 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 758 lines
     - { name: _get_resource_lookup, lines: 118-129 }
     - { name: _get_workcenter_mapping, lines: 132-139 }
     - { name: _get_filtered_resources_and_lookup, lines: 142-170 }
-    - { name: execute_primary_query, lines: 178-527 }
-    - { name: apply_view, lines: 535-576 }
-    - { name: _empty_summary, lines: 579-585 }
-    - { name: _empty_detail, lines: 588-589 }
-    - { name: _empty_detail_by_date, lines: 592-593 }
-    - { name: _empty_kpi, lines: 596-617 }
-    - { name: make_canonical_base_query_id, lines: 634-645 }
-    - { name: make_canonical_oee_query_id, lines: 648-659 }
-    - { name: _query_and_store_canonical_dataset, lines: 662-730 }
-    - { name: ensure_dataset_loaded, lines: 733-758 }
+    - { name: execute_primary_query, lines: 178-543 }
+    - { name: apply_view, lines: 551-592 }
+    - { name: _empty_summary, lines: 595-601 }
+    - { name: _empty_detail, lines: 604-605 }
+    - { name: _empty_detail_by_date, lines: 608-609 }
+    - { name: _empty_kpi, lines: 612-633 }
+    - { name: make_canonical_base_query_id, lines: 650-661 }
+    - { name: make_canonical_oee_query_id, lines: 664-675 }
+    - { name: _query_and_store_canonical_dataset, lines: 678-746 }
+    - { name: ensure_dataset_loaded, lines: 749-774 }
 
 src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 349 lines
   imports:
@@ -7834,7 +7924,7 @@ tests/e2e/test_cache_e2e.py:  # 281 lines
         - { name: test_wip_detail_with_workcenter, lines: 245-263 }
         - { name: test_wip_detail_pagination, lines: 265-281 }
 
-tests/e2e/test_downtime_analysis_e2e.py:  # 293 lines
+tests/e2e/test_downtime_analysis_e2e.py:  # 606 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: datetime, items: [datetime], line: 12 }
@@ -7855,6 +7945,24 @@ tests/e2e/test_downtime_analysis_e2e.py:  # 293 lines
       methods:
         - { name: test_no_match_events_included_in_summary, lines: 225-263 }
         - { name: test_event_detail_view_returns_no_match_rows, lines: 266-293 }
+    - name: TestDowntimeQueryNewShape
+      lines: 301-520
+      methods:
+        - { name: _patch_flag_on, lines: 305-308 }
+        - { name: test_query_returns_spool_urls, lines: 317-350 }
+        - { name: test_base_spool_url_points_to_correct_namespace, lines: 359-383 }
+        - { name: test_jobs_spool_url_points_to_correct_namespace, lines: 392-416 }
+        - { name: test_taxonomy_has_required_keys, lines: 425-452 }
+        - { name: test_ninety_day_range_accepted, lines: 461-485 }
+        - { name: test_legacy_keys_absent_when_flag_on, lines: 494-520 }
+    - name: TestTwoParquetAtomicityRoute
+      lines: 528-553
+      methods:
+        - { name: test_base_hit_job_miss_returns_500_via_route, lines: 533-553 }
+    - name: TestFeatureFlagFallback
+      lines: 561-606
+      methods:
+        - { name: test_flag_off_returns_legacy_shape, lines: 570-606 }
   functions:
     - { name: app, lines: 26-30 }  # @pytest.fixture
     - { name: client, lines: 34-35 }  # @pytest.fixture
@@ -9733,6 +9841,44 @@ tests/stress/test_data_integrity.py:  # 475 lines
     - { name: _date_range, lines: 31-34 }
     - { name: _post, lines: 37-42 }
     - { name: _get, lines: 45-50 }
+
+tests/stress/test_downtime_analysis_stress.py:  # 710 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 39 }
+    - { module: concurrent.futures, items: [], line: 41 }
+    - { module: gc, items: [], line: 42 }
+    - { module: os, items: [], line: 43 }
+    - { module: sys, items: [], line: 44 }
+    - { module: time, items: [], line: 45 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 46 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 47 }
+    - { module: numpy, items: [], line: 49 }
+    - { module: pandas, items: [], line: 50 }
+    - { module: psutil, items: [], line: 51 }
+    - { module: pytest, items: [], line: 52 }
+  classes:
+    - name: TestDowntimeRawSpoolMemory
+      lines: 352-591
+      methods:
+        - { name: test_single_large_query_rss_delta, lines: 378-418 }
+        - { name: test_concurrent_three_queries_no_oom, lines: 420-480 }
+        - { name: test_raw_path_does_not_call_merge, lines: 482-512 }
+        - { name: test_raw_path_response_has_four_required_keys, lines: 514-532 }
+        - { name: test_concurrent_wide_range_queries_no_oom_kill, lines: 534-591 }
+    - name: TestDowntimeSoakMemoryStability
+      lines: 599-710
+      methods:
+        - { name: test_fifty_repeated_queries_memory_stable, lines: 621-666 }
+        - { name: test_rss_samples_show_no_monotonic_growth_trend, lines: 668-710 }
+  functions:
+    - { name: _make_base_events_df, lines: 103-143 }
+    - { name: _make_job_bridge_df, lines: 146-175 }
+    - { name: _build_raw_service_patches, lines: 182-219 }
+    - { name: _patch_for_raw_path, lines: 222-292 }
+    - { name: _call_raw, lines: 295-308 }
+    - { name: _get_large_dfs, lines: 319-329 }
+    - { name: _rss_bytes, lines: 336-338 }
+    - { name: _gc_collect, lines: 341-344 }
 
 tests/stress/test_frontend_stress.py:  # 493 lines
   imports:
@@ -11988,7 +12134,7 @@ tests/test_downtime_analysis_duckdb_cache.py:  # 186 lines
         - { name: test_loaded_at_yesterday_triggers_fresh_load, lines: 168-178 }
         - { name: test_run_prewarm_job_exists_as_module_callable, lines: 180-186 }
 
-tests/test_downtime_analysis_routes.py:  # 461 lines
+tests/test_downtime_analysis_routes.py:  # 695 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: json, items: [], line: 12 }
@@ -12065,13 +12211,40 @@ tests/test_downtime_analysis_routes.py:  # 461 lines
         - { name: test_event_detail_missing_resource_id_returns_200, lines: 429-435 }
         - { name: test_equipment_detail_response_has_equipment_detail_key, lines: 439-448 }
         - { name: test_event_detail_response_has_events_key, lines: 452-461 }
+    - name: TestQueryRoute
+      lines: 484-635
+      methods:
+        - { name: test_response_shape_has_all_four_keys, lines: 492-508 }
+        - { name: test_base_spool_url_non_null, lines: 511-519 }
+        - { name: test_jobs_spool_url_non_null, lines: 522-530 }
+        - { name: test_query_id_non_null, lines: 533-541 }
+        - { name: test_taxonomy_non_null, lines: 544-552 }
+        - { name: test_legacy_keys_absent_when_flag_on, lines: 555-566 }
+        - { name: test_feature_flag_off_returns_legacy_shape, lines: 569-580 }
+        - { name: test_range_over_90_days_returns_200_not_400, lines: 582-592 }
+        - { name: test_range_over_730_days_still_returns_400, lines: 594-598 }
+        - { name: test_start_date_forwarded_flag_on, lines: 603-611 }
+        - { name: test_workcenter_groups_forwarded_flag_on, lines: 614-623 }
+        - { name: test_resource_ids_forwarded_flag_on, lines: 626-635 }
+    - name: TestQueryRouteContract
+      lines: 638-660
+      methods:
+        - { name: test_response_shape_conforms_to_api_contract_v1_15, lines: 642-660 }
+    - name: TestMaxOracleDaysRemoved
+      lines: 668-695
+      methods:
+        - { name: test_max_oracle_days_constant_absent, lines: 671-676 }
+        - { name: test_validate_dates_accepts_180_days, lines: 678-682 }
+        - { name: test_validate_dates_accepts_91_days_oracle_path, lines: 684-688 }
+        - { name: test_duckdb_window_days_constant_absent, lines: 690-695 }
   functions:
     - { name: app, lines: 22-26 }  # @pytest.fixture
     - { name: client, lines: 30-31 }  # @pytest.fixture
     - { name: _mock_query_result, lines: 34-44 }
     - { name: _mock_view_result, lines: 47-56 }
+    - { name: _mock_raw_result, lines: 469-481 }
 
-tests/test_downtime_analysis_service.py:  # 1244 lines
+tests/test_downtime_analysis_service.py:  # 1826 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: hashlib, items: [], line: 17 }
@@ -12195,13 +12368,48 @@ tests/test_downtime_analysis_service.py:  # 1244 lines
         - { name: test_empty_big_category_string_is_no_op, lines: 1065-1078 }
         - { name: test_equipment_detail_row_count_within_page_size_cap, lines: 1081-1093 }
     - name: TestDowntimeMigration
-      lines: 1100-1244
+      lines: 1100-1248
       methods:
         - { name: _make_base_df, lines: 1109-1119 }
-        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 1121-1170 }
-        - { name: test_spool_namespace_unchanged, lines: 1172-1175 }
-        - { name: test_spool_column_schema_matches_previous_path, lines: 1177-1201 }
-        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 1203-1244 }
+        - { name: test_uses_batch_query_engine_not_direct_oracle, lines: 1121-1172 }
+        - { name: test_spool_namespace_unchanged, lines: 1174-1177 }
+        - { name: test_spool_column_schema_matches_previous_path, lines: 1179-1203 }
+        - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 1205-1248 }
+    - name: TestRawSpoolWriter
+      lines: 1256-1474
+      methods:
+        - { name: _patch_flag_on, lines: 1259-1262 }
+        - { name: _make_base_df, lines: 1264-1274 }
+        - { name: _make_job_df, lines: 1276-1295 }
+        - { name: test_base_events_parquet_written_without_merge, lines: 1297-1346 }
+        - { name: test_job_bridge_parquet_written_raw, lines: 1348-1380 }
+        - { name: test_merge_cross_shift_not_called_on_request_path, lines: 1382-1411 }
+        - { name: test_schema_version_in_cache_key, lines: 1413-1445 }
+        - { name: test_result_has_base_spool_url, lines: 1447-1474 }
+    - name: TestTaxonomyBuilder
+      lines: 1482-1527
+      methods:
+        - { name: test_taxonomy_json_shape_has_map_prefixes_egt_fallback, lines: 1485-1492 }
+        - { name: test_taxonomy_map_covers_all_nine_buckets, lines: 1494-1504 }
+        - { name: test_taxonomy_egt_category_is_工程, lines: 1506-1509 }
+        - { name: test_taxonomy_fallback_is_other, lines: 1511-1514 }
+        - { name: test_taxonomy_prefixes_includes_tmtt, lines: 1516-1520 }
+        - { name: test_taxonomy_map_is_list_of_pairs, lines: 1522-1527 }
+    - name: TestTwoParquetAtomicity
+      lines: 1535-1556
+      methods:
+        - { name: test_base_hit_jobs_miss_raises_loudly, lines: 1538-1556 }
+    - name: TestDataBoundary
+      lines: 1564-1826
+      methods:
+        - { name: _patch_flag_on, lines: 1573-1576 }
+        - { name: test_empty_base_events_handled, lines: 1581-1619 }
+        - { name: test_char_trailing_space_in_oldreasonname, lines: 1624-1643 }
+        - { name: test_char_trailing_space_tmtt_prefix, lines: 1645-1653 }
+        - { name: test_null_oldreasonname_uses_fallback, lines: 1658-1666 }
+        - { name: test_empty_string_reason_uses_fallback, lines: 1668-1675 }
+        - { name: test_cross_midnight_event_in_base_spool, lines: 1680-1750 }
+        - { name: test_no_overlap_job_bridge_written_raw, lines: 1755-1826 }
   functions:
     - { name: _ts, lines: 41-43 }
     - { name: _shift_row, lines: 46-63 }

@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.12.3
-last-changed: 2026-06-03
+schema-version: 1.13.0
+last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -824,6 +824,82 @@ Paginated: `page` (default 1), `page_size` (default 50, max 200). Response inclu
 **Oracle DATE midnight-UTC handling:** `start_ts` and `end_ts` derive from `OLDLASTSTATUSCHANGEDATE`/`LASTSTATUSCHANGEDATE`. Frontend formatters must apply midnight-UTC detection (raw H/M/S check before `new Date()`) per CLAUDE.md Frontend Date Formatting Notes.
 
 **Spool schema breaking-change surface:** column rename/add/remove to `tmp/query_spool/downtime_analysis/*.parquet` requires `rm tmp/query_spool/downtime_analysis/*.parquet` on deploy/rollback. IT JOBID backfill uses `DOWNTIME_BRIDGE_VERSION` constant to force cache-key change without manual parquet deletion (DA-06). Migration of `downtime_analysis_service` to `BatchQueryEngine → execute_plan → merge_chunks_to_spool` (change `batch-rowcount-unification`) does not alter the parquet column schema or namespace; no parquet cleanup is required for this migration alone.
+
+**Note on §3.12.1–3.12.4 (DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow):** These shapes are no longer returned by the primary `POST /api/downtime-analysis/query` endpoint when `DOWNTIME_BROWSER_DUCKDB=true`. They are computed in-browser by `useDowntimeDuckDB.ts` from the raw spool parquets (§3.13). The flag-off (legacy) path continues to return them unchanged. The shapes remain documented here as the parity reference for browser-side aggregation.
+
+### 3.13 Downtime Analysis Raw Spool Schemas (browser-DuckDB path)
+
+Added by change `downtime-browser-duckdb` (2026-06-12). These are the raw parquet namespaces written by `query_downtime_dataset_raw()` when `DOWNTIME_BROWSER_DUCKDB=true`. Both files are downloaded by `useDowntimeDuckDB.ts` and processed entirely in-browser by DuckDB-WASM. No server-side pandas reductions run on the request path for these namespaces.
+
+**Spool namespace split:**
+- `downtime_analysis_base_events` → `tmp/query_spool/downtime_analysis_base_events/<query_id>.parquet`
+- `downtime_analysis_job_bridge` → `tmp/query_spool/downtime_analysis_job_bridge/<query_id>.parquet`
+- Enriched namespace `downtime_analysis_events` retained for flag-off fallback (unchanged).
+
+**SCHEMA_VERSION:** integer constant in `downtime_analysis_cache.py`; participates in raw-spool `query_id` hash. Bumping `SCHEMA_VERSION` orphans old raw parquets by key so readers miss-and-rewrite without a manual `rm`. Schema-breaking rollback requires: `rm -f tmp/query_spool/downtime_analysis_base_events/*.parquet tmp/query_spool/downtime_analysis_job_bridge/*.parquet`.
+
+#### 3.13.1 `base_events` Parquet Schema
+
+Source: `sql/downtime_analysis/base_events.sql`. DuckDB types as stored.
+
+| column | DuckDB type | nullable | description |
+|---|---|---|---|
+| HISTORYID | VARCHAR | no | Equipment history ID (RESOURCEID equivalent) |
+| OLDSTATUSNAME | VARCHAR | no | Status type: UDT, SDT, or EGT (DA-01) |
+| OLDREASONNAME | VARCHAR | yes | Downtime reason (TRIM applied at SQL layer; null allowed) |
+| OLDLASTSTATUSCHANGEDATE | TIMESTAMP | no | Event start timestamp |
+| LASTSTATUSCHANGEDATE | TIMESTAMP | no | Event end timestamp |
+| HOURS | DOUBLE | no | Duration in hours (CAST AS FLOAT in SQL) |
+| JOBID | VARCHAR | yes | Direct JOBID if available (Path A bridge); null for Path B candidates |
+
+**Cross-shift merge:** browser DuckDB-WASM runs the equivalent of `_merge_cross_shift_events` as SQL (60s contiguity rule, DA-02) on the full parquet before any view aggregation. The complete parquet must be loaded before running the merge — no chunk-seam split (ADR-0003).
+
+#### 3.13.2 `job_bridge` Parquet Schema
+
+Source: `sql/downtime_analysis/job_bridge.sql`. DuckDB types as stored.
+
+| column | DuckDB type | nullable | description |
+|---|---|---|---|
+| JOBID | VARCHAR | no | Job ID |
+| RESOURCEID | VARCHAR | no | Equipment ID (TRIM applied at SQL layer) |
+| CREATEDATE | TIMESTAMP | no | Job creation timestamp |
+| COMPLETEDATE | TIMESTAMP | yes | Job completion timestamp (null = open job) |
+| SYMPTOMCODENAME | VARCHAR | yes | Symptom code (TRIM applied) |
+| CAUSECODENAME | VARCHAR | yes | Cause code (TRIM applied) |
+| REPAIRCODENAME | VARCHAR | yes | Repair code (TRIM applied) |
+| COMPLETE_FULLNAME | VARCHAR | yes | Handler full name (TRIM applied) |
+| FIRSTCLOCKONDATE | TIMESTAMP | yes | First clock-on (DA-05 wait calculation basis) |
+| LASTCLOCKOFFDATE | TIMESTAMP | yes | Last clock-off (DA-05 repair calculation basis) |
+| JOBORDERNAME | VARCHAR | yes | Job order name (TRIM applied) |
+| JOBMODELNAME | VARCHAR | yes | Job model name (TRIM applied) |
+| ASSIGNED_DATE | TIMESTAMP | yes | First ASSIGNED txn date |
+| ACK_DATE | TIMESTAMP | yes | First ACKNOWLEDGED txn date |
+| INSPECT_START | TIMESTAMP | yes | First inspection-stage txn date |
+| INSPECT_END | TIMESTAMP | yes | Last inspection-stage txn date |
+
+**Job overlap bridge:** browser DuckDB-WASM runs the equivalent of `_bridge_jobid` (Path A direct match + Path B overlap tiebreak + no-match; DA-03) on the full parquet after cross-shift merge. Ambiguity rule (≥80% runner-up) and tiebreak order (overlap DESC, CREATEDATE ASC, JOBID ASC) must match Python reference exactly (parity test: `TestCrossShiftMerge` + `TestJobidBridge`).
+
+#### 3.13.3 Taxonomy JSON Shape
+
+Returned as `taxonomy` key in the `POST /api/downtime-analysis/query` response (flag ON). Server-authoritative (DA-04); browser applies as SQL join/CASE without a rebuild on taxonomy change.
+
+```json
+{
+  "map": [["EE Repair", "維修"], ["EE_PM", "保養"], ...],
+  "prefixes": [["TMTT_", "檢查"]],
+  "egt_category": "工程",
+  "fallback": "其他/未分類"
+}
+```
+
+| field | type | description |
+|---|---|---|
+| map | `[[reason: string, category: string], …]` | Exact-match rows from `_BIG_CATEGORY_MAP` |
+| prefixes | `[[prefix: string, category: string], …]` | Prefix-match rules from `_PREFIX_CATEGORIES` |
+| egt_category | string | Category applied to all EGT events (constant: `"工程"`) |
+| fallback | string | Category for unknown/null reasons (constant: `"其他/未分類"`) |
+
+**Two-parquet atomicity (AC-7):** server writes both `base_events` and `job_bridge` parquets or neither. A `base_events` spool hit with a missing/expired `job_bridge` spool is a server-side error (500); the service must not silently return empty job enrichment. Browser raises a visible error banner if either parquet fetch returns 404/410; never a silent empty table (CLAUDE.md Type-A rule).
 
 ---
 

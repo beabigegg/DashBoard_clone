@@ -1,0 +1,25 @@
+agent: ui-ux-reviewer
+change-id: downtime-browser-duckdb
+timestamp: 2026-06-12
+status: changes-required
+summary: >
+  Full journey review of DuckDB-wired downtime-analysis App.vue.
+  3 high + 5 medium findings. Blocking items: E-1, A-1, E-3, ES-1, R-1.
+  Routed to frontend-engineer for fixes before qa-reviewer.
+artifacts:
+  - type: blocking-findings
+    notes: >
+      E-1 (high): DuckDB error copy is one-size-fits-all; parquet-expired case tells user to narrow date range (wrong advice). Fix: classify error in composable (fetch / wasm_init / compute) so App.vue chooses appropriate copy.
+      A-1 (high): legacy ErrorBanner instance has no aria-label/role=alert. Asymmetric with DuckDB banner.
+      E-3 (medium): CSV export failure is silent console.error. Surface to duckdbError or toast.
+      ES-1 (medium): TopReasonsTable is permanently blank in DuckDB mode. refreshDuckdbViews() never calls queryTopReasons(). Fix: add queryTopReasons() to composable OR show "瀏覽器模式暫不支援此統計" instead of "暫無資料".
+      R-1 (medium): Double-activation race — user clicks 清除條件 during in-flight activate() starts a second activate(). Guard: check state !== 'loading' before deactivate/re-activate.
+  - type: medium-non-blocking
+    notes: >
+      L-1: No refreshing state indicator during refreshDuckdbViews() filter-change path.
+      F-1: Granularity buttons still render but are no-ops in DuckDB mode.
+      A-2: No aria-live/aria-busy during duckdbLoading.
+      A-3: role=button on tr elements breaks table semantics.
+      E-2: Error banners non-dismissible.
+  - type: taxonomylabel-note
+    notes: "Backend taxonomy label rename (改機換料 vs old 換型換線) is expected per design.md D5. Deployment runbook should note stale bookmark mismatch risk."

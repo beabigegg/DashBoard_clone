@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.19
-last-changed: 2026-06-05
+schema-version: 1.3.20
+last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -284,6 +284,40 @@ Promote from informational to required after ALL of:
 **No parquet cleanup in query-tool**: this gate entry is specific to `material_consumption`. Do NOT add `rm tmp/query_spool/material_consumption/*.parquet` to query-tool rollbacks (query-tool has no persistent spool).
 
 ---
+
+## downtime-browser-duckdb Gate Compatibility Note
+
+**New Playwright spec → CI browser install step required** (`frontend-tests.yml`): `npx playwright install --with-deps chromium` must be added before `npx playwright test tests/playwright/downtime-analysis.spec.ts` per CLAUDE.md CI Workflow Notes. Without this step, CI runners exit with "Executable doesn't exist."
+
+**Concurrency** (`downtime-playwright-e2e` job):
+```yaml
+concurrency:
+  group: ${{ github.ref }}-downtime-e2e
+  cancel-in-progress: true
+```
+
+**Artifact retention**: playwright trace for new spec: `retention-days: 7` (30 on failure); stress/soak report: `retention-days: 90`.
+
+**New gates added** (all Tier 1 for this change):
+- `downtime-playwright-e2e`: `cd frontend && npx playwright test tests/playwright/downtime-analysis.spec.ts`
+- `playwright-resilience`: extended with atomicity + error-banner specs
+- `playwright-data-boundary`: extended with malformed-parquet + cross-midnight specs
+- `frontend-unit`: extended with `useDowntimeDuckDB.test.ts` (7 parity tests + taxonomy + CSV)
+
+**Parity regression gate** (`nightly-parity-regression`, Tier 3, required from day one):
+- `pytest tests/integration/test_downtime_parity_regression.py --run-integration-real`
+- Python `_merge_cross_shift_events` / `_bridge_jobid` vs browser DuckDB SQL on 184k-row fixture; cross-midnight event + ambiguous-tie cases required.
+
+**OOM-risk note (flag-OFF rollback)**: Rolling back to `DOWNTIME_BROWSER_DUCKDB=false` without reinstating `_MAX_ORACLE_DAYS` accepts gunicorn worker OOM risk on >90-day Oracle-path queries under the 6 GB/no-swap host profile. Flag-off must only be used for short rollback windows (< 24h). If the rollback window exceeds 24h, re-introduce the 90-day guard or migrate to a host with more RAM.
+
+**Parquet cleanup (schema-breaking rollback)**: If raw-spool schema shipped and must be abandoned, run:
+```bash
+rm -f tmp/query_spool/downtime_analysis_base_events/*.parquet
+rm -f tmp/query_spool/downtime_analysis_job_bridge/*.parquet
+```
+Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw parquets by key (design.md D4) without a manual `rm`.
+
+**Enriched spool retention**: `downtime_analysis_events` namespace parquets do not need cleanup on cutover — they expire naturally via 20h TTL (DA-07).
 
 ## Rollback Policy
 

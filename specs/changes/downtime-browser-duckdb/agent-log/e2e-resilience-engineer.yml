@@ -1,0 +1,48 @@
+agent: e2e-resilience-engineer
+change-id: downtime-browser-duckdb
+date: 2026-06-12
+status: done
+
+artifacts:
+  - type: test-files
+    pointer: "frontend/tests/playwright/downtime-analysis.spec.ts (created: 937 lines, 17 tests, 10 describe blocks; migrated from .spec.js to .spec.ts)"
+  - type: test-files
+    pointer: "tests/e2e/test_downtime_analysis_e2e.py (appended: TestDowntimeQueryNewShape 6 tests, TestTwoParquetAtomicityRoute 1 test, TestFeatureFlagFallback 1 test)"
+  - type: test-files
+    pointer: "tests/test_downtime_analysis_service.py (appended: TestDataBoundary 7 tests)"
+  - type: scenarios-covered
+    pointer: >
+      happy-path: full browser flow query→spool-URLs→parquets-fetched→page-renders;
+      AC-5 zero-round-trip filter change;
+      AC-6 >90-day range accepted (200 not 400), _MAX_ORACLE_DAYS removed;
+      AC-7 WASM init failure → error banner; parquet 404 → error banner; slow/abort → no stuck spinner;
+      AC-8 CSV export download triggers browser blob;
+      AC-1 response shape (base_spool_url, jobs_spool_url, query_id, taxonomy present; legacy keys absent);
+      AC-1 namespace correctness (downtime_analysis_base_events / downtime_analysis_job_bridge);
+      AC-4 taxonomy keys (map/prefixes/egt_category/fallback);
+      AC-7 two-parquet atomicity via route layer (base hit + job miss → HTTP 500);
+      flag-OFF legacy shape regression (summary/daily_trend/big_category/top_reasons present);
+      data-boundary: empty 0-row result (spool URL returned, no crash);
+      data-boundary: CHAR trailing-space in OLDREASONNAME (strip() confirmed);
+      data-boundary: TMTT_ prefix + CHAR spaces (strip before prefix match);
+      data-boundary: None/empty OLDREASONNAME → fallback category;
+      data-boundary: cross-midnight fragments written verbatim (no server merge on raw path, AC-2);
+      data-boundary: non-overlapping job bridge rows written verbatim (browser does join, not server);
+      resilience: HTTP 500 from /query — no stuck spinner, error feedback shown;
+      resilience: HTTP 503 + Retry-After — no crash;
+      resilience: aborted /query — no stuck spinner;
+      browser back/forward — no crash on re-navigation;
+      legacy flag-OFF rollback path — no crash with old response shape;
+      taxonomy server-label contract (server labels used, not hardcoded frontend constants)
+  - type: mutation-checks
+    pointer: "n/a (mutation testing is not configured for this change; parity matrix in useDowntimeDuckDB.test.ts covers correctness at unit level)"
+  - type: trace-artifacts
+    pointer: "n/a (Playwright tests are CI-only; no traces captured locally per CLAUDE.md hard rule #2)"
+
+notes:
+  - "Playwright spec migrated .spec.js → .spec.ts per ci-gates.md (downtime-playwright-e2e gate targets .spec.ts)"
+  - "Feature flag tests use monkeypatch.setattr('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', ...) — not os.environ — per test-plan.md"
+  - "load_downtime_events patched at downtime_analysis_cache (definition site) — not downtime_analysis_service (function-body import) — per CLAUDE.md Downtime Analysis Service Architecture Notes"
+  - "TestFeatureFlagFallback also patches at downtime_analysis_cache + duckdb_cache (flag-OFF legacy path still uses the same Oracle-avoidance layer)"
+  - "_map_big_category(reason, status) arg order verified against TestBigCategoryMapping existing tests before writing data-boundary tests"
+  - "Pre-existing breakage in TestSummaryEndpointIntegration + TestEventDetailMatchSourceNoneRowsPresent (patch at wrong module) is NOT introduced by this change and is out of scope per test-plan.md §Existing Tests to Extend"

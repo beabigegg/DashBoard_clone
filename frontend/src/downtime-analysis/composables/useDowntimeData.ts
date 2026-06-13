@@ -11,6 +11,7 @@ import type {
   FilterOptions,
   ChartFilter,
 } from '../types';
+import type { TaxonomyShape } from './useDowntimeDuckDB';
 
 const API_TIMEOUT = 360000;
 
@@ -45,6 +46,13 @@ const defaultKpi: DowntimeKpiShape = {
  */
 export function useDowntimeData() {
   const queryId = ref('');
+
+  /** Present when server responds with browser-DuckDB shape (flag on). */
+  const duckdbSpoolUrls = ref<{
+    base_spool_url: string;
+    jobs_spool_url: string;
+    taxonomy: TaxonomyShape;
+  } | null>(null);
 
   const loading = reactive({
     initial: false,
@@ -131,7 +139,21 @@ export function useDowntimeData() {
       }
 
       queryId.value = String(data.query_id || '');
-      applyViewResult(data);
+
+      // Detect browser-DuckDB shape (flag on): has base_spool_url + jobs_spool_url + taxonomy
+      if (data.base_spool_url && data.jobs_spool_url && data.taxonomy) {
+        duckdbSpoolUrls.value = {
+          base_spool_url: String(data.base_spool_url),
+          jobs_spool_url: String(data.jobs_spool_url),
+          taxonomy: data.taxonomy as TaxonomyShape,
+        };
+        // Flag-on path: server does NOT return legacy view keys; reset them
+        resetSummaryData();
+      } else {
+        // Flag-off path: legacy shape with summary/daily_trend/big_category/top_reasons
+        duckdbSpoolUrls.value = null;
+        applyViewResult(data);
+      }
     } catch (err) {
       const e = err as Error & { status?: number };
       if (e?.name === 'AbortError') {
@@ -457,6 +479,7 @@ export function useDowntimeData() {
 
   return {
     queryId,
+    duckdbSpoolUrls,
     loading,
     error,
     summaryData,

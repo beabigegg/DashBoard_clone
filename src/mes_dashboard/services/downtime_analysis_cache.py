@@ -39,13 +39,34 @@ _CACHE_TTL = int(os.getenv("DOWNTIME_ANALYSIS_CACHE_TTL", "72000"))
 # ── Redis / spool namespaces ──────────────────────────────────────────────────
 _EVENTS_NAMESPACE = "downtime_analysis_events"
 
+# Raw-spool namespaces (browser-DuckDB path, DA-12)
+_BASE_EVENTS_NAMESPACE = "downtime_analysis_base_events"
+_JOB_BRIDGE_NAMESPACE = "downtime_analysis_job_bridge"
+
+# Schema version for raw spool cache-key participation (design.md D4).
+# Bump this integer to orphan all existing raw parquets by key on a
+# schema-breaking change — readers will miss-and-rewrite without a manual rm.
+_SCHEMA_VERSION = 1
+
 # ── In-process L1 cache (lightweight spool-presence marker) ──────────────────
 _events_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=32)
+_base_events_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=32)
+_job_bridge_cache = ProcessLevelCache(ttl_seconds=_CACHE_TTL, max_size=32)
 
 register_process_cache(
     "downtime_analysis_events",
     _events_cache,
     "Downtime Analysis Events (L1, TTL={})".format(_CACHE_TTL),
+)
+register_process_cache(
+    "downtime_analysis_base_events",
+    _base_events_cache,
+    "Downtime Analysis Base Events raw spool (L1, TTL={})".format(_CACHE_TTL),
+)
+register_process_cache(
+    "downtime_analysis_job_bridge",
+    _job_bridge_cache,
+    "Downtime Analysis Job Bridge raw spool (L1, TTL={})".format(_CACHE_TTL),
 )
 
 
@@ -81,13 +102,92 @@ def load_downtime_events(query_id: str) -> Optional[pd.DataFrame]:
     try:
         spool_path = get_spool_file_path(_EVENTS_NAMESPACE, query_id)
         if spool_path is None:
-            _events_cache.delete(query_id)
+            _events_cache.invalidate(query_id)
             return None
         df = pd.read_parquet(spool_path)
         return df
     except Exception as exc:
         logger.warning("load_downtime_events failed for query_id=%s: %s", query_id, exc)
-        _events_cache.delete(query_id)
+        _events_cache.invalidate(query_id)
+        return None
+
+
+# ============================================================
+# Raw-spool helpers (browser-DuckDB path)
+# ============================================================
+
+
+def has_downtime_base_events(query_id: str) -> bool:
+    """Return True if the base_events raw spool exists (L1 marker or Redis pointer)."""
+    if _base_events_cache.get(query_id) is not None:
+        return True
+    return get_spool_file_path(_BASE_EVENTS_NAMESPACE, query_id) is not None
+
+
+def store_downtime_base_events(
+    query_id: str,
+    df: pd.DataFrame,
+    end_date: str = "",
+) -> None:
+    """Write base_events DataFrame to raw spool and set L1 marker."""
+    _base_events_cache.set(query_id, True)
+    store_spooled_df(
+        _BASE_EVENTS_NAMESPACE,
+        query_id,
+        df,
+        ttl_seconds=_CACHE_TTL,
+    )
+
+
+def load_downtime_base_events(query_id: str) -> Optional[pd.DataFrame]:
+    """Read base_events DataFrame from raw spool. Returns None if expired."""
+    try:
+        spool_path = get_spool_file_path(_BASE_EVENTS_NAMESPACE, query_id)
+        if spool_path is None:
+            _base_events_cache.invalidate(query_id)
+            return None
+        df = pd.read_parquet(spool_path)
+        return df
+    except Exception as exc:
+        logger.warning("load_downtime_base_events failed for query_id=%s: %s", query_id, exc)
+        _base_events_cache.invalidate(query_id)
+        return None
+
+
+def has_downtime_job_bridge(query_id: str) -> bool:
+    """Return True if the job_bridge raw spool exists (L1 marker or Redis pointer)."""
+    if _job_bridge_cache.get(query_id) is not None:
+        return True
+    return get_spool_file_path(_JOB_BRIDGE_NAMESPACE, query_id) is not None
+
+
+def store_downtime_job_bridge(
+    query_id: str,
+    df: pd.DataFrame,
+    end_date: str = "",
+) -> None:
+    """Write job_bridge DataFrame to raw spool and set L1 marker."""
+    _job_bridge_cache.set(query_id, True)
+    store_spooled_df(
+        _JOB_BRIDGE_NAMESPACE,
+        query_id,
+        df,
+        ttl_seconds=_CACHE_TTL,
+    )
+
+
+def load_downtime_job_bridge(query_id: str) -> Optional[pd.DataFrame]:
+    """Read job_bridge DataFrame from raw spool. Returns None if expired."""
+    try:
+        spool_path = get_spool_file_path(_JOB_BRIDGE_NAMESPACE, query_id)
+        if spool_path is None:
+            _job_bridge_cache.invalidate(query_id)
+            return None
+        df = pd.read_parquet(spool_path)
+        return df
+    except Exception as exc:
+        logger.warning("load_downtime_job_bridge failed for query_id=%s: %s", query_id, exc)
+        _job_bridge_cache.invalidate(query_id)
         return None
 
 

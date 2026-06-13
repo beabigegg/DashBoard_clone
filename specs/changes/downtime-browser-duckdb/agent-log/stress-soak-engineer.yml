@@ -1,0 +1,26 @@
+change-id: downtime-browser-duckdb
+agent: stress-soak-engineer
+timestamp: "2026-06-12T00:00:00Z"
+status: complete
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_downtime_analysis_stress.py" }
+  - { type: runner, pointer: "pytest (in-process psutil RSS measurement; no external HTTP runner required — service called directly)" }
+  - { type: pass-criteria-cited, pointer: "single-query RSS delta < 150 MB; 3-concurrent RSS delta < 400 MB; 5-concurrent RSS delta < 600 MB; _merge_cross_shift_events call_count == 0; 50-iter RSS growth < 50 MB; RSS samples not strictly monotonic" }
+  - { type: artifacts-location, pointer: "specs/changes/downtime-browser-duckdb/stress-soak-report.md" }
+next-action: none
+files-read:
+  - specs/changes/downtime-browser-duckdb/design.md
+  - specs/changes/downtime-browser-duckdb/ci-gates.md
+  - specs/changes/downtime-browser-duckdb/test-plan.md
+  - specs/changes/downtime-browser-duckdb/change-classification.md
+  - tests/stress/conftest.py
+  - pytest.ini
+  - src/mes_dashboard/services/downtime_analysis_service.py
+  - src/mes_dashboard/services/downtime_analysis_cache.py
+notes: >
+  Stress file exercises query_downtime_dataset_raw() in-process with 100k-row
+  synthetic DataFrames (180-day range).  DuckDB fast path is patched to return
+  synthetic data; spool store writes are no-ops.  The regression guard
+  (test_raw_path_does_not_call_merge) patches _merge_cross_shift_events at the
+  service module level — NOT _merge_cross_shift_events_from_parquet, which is
+  the deprecated flag-off path.  Syntax verified: python -m py_compile PASSED.

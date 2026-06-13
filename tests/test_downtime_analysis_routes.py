@@ -459,3 +459,237 @@ class TestFilterDataBoundary:
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'events' in data['data']
+
+
+# ===========================================================================
+# TestQueryRoute — POST /query — new browser-DuckDB response shape (AC-1, AC-6)
+# ===========================================================================
+
+
+def _mock_raw_result(query_id='raw-qid'):
+    """Mock return value for query_downtime_dataset_raw (flag-on path)."""
+    return {
+        'base_spool_url': f'/api/spool/downtime_analysis_base_events/{query_id}.parquet',
+        'jobs_spool_url': f'/api/spool/downtime_analysis_job_bridge/{query_id}.parquet',
+        'query_id': query_id,
+        'taxonomy': {
+            'map': [['EE Repair', '維修']],
+            'prefixes': [['TMTT_', '檢查']],
+            'egt_category': '工程',
+            'fallback': '其他/未分類',
+        },
+    }
+
+
+class TestQueryRoute:
+    """POST /api/downtime-analysis/query — new response shape (flag ON).
+
+    AC-1: four keys present and non-null.
+    AC-6: 90-day limit removed; >90d range accepted.
+    """
+
+    @patch('mes_dashboard.services.downtime_analysis_service.query_downtime_dataset_raw')
+    def test_response_shape_has_all_four_keys(self, mock_raw, client, monkeypatch):
+        """Flag-on: response must have base_spool_url, jobs_spool_url, query_id, taxonomy."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        # Patch at route-module level (the name imported into the route module)
+        with patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
+                   return_value=_mock_raw_result()):
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        data = resp.get_json()['data']
+        assert 'base_spool_url' in data
+        assert 'jobs_spool_url' in data
+        assert 'query_id' in data
+        assert 'taxonomy' in data
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_base_spool_url_non_null(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        assert resp.get_json()['data']['base_spool_url'] is not None
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_jobs_spool_url_non_null(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        assert resp.get_json()['data']['jobs_spool_url'] is not None
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_query_id_non_null(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        assert resp.get_json()['data']['query_id'] is not None
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_taxonomy_non_null(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        assert resp.get_json()['data']['taxonomy'] is not None
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_legacy_keys_absent_when_flag_on(self, mock_raw, client, monkeypatch):
+        """Flag-on: summary/daily_trend/big_category/top_reasons must NOT be in data."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        data = resp.get_json()['data']
+        for legacy_key in ('summary', 'daily_trend', 'big_category', 'top_reasons'):
+            assert legacy_key not in data, f"Legacy key '{legacy_key}' must not appear in flag-on response"
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
+    def test_feature_flag_off_returns_legacy_shape(self, mock_svc, client, monkeypatch):
+        """Flag-off: legacy {query_id, summary, daily_trend, big_category, top_reasons} returned."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False
+        )
+        mock_svc.return_value = _mock_query_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        data = resp.get_json()['data']
+        assert 'query_id' in data
+        assert 'summary' in data
+
+    def test_range_over_90_days_returns_200_not_400(self, client, monkeypatch):
+        """AC-6: date range > 90 days must be accepted (no _MAX_ORACLE_DAYS guard)."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        with patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
+                   return_value=_mock_raw_result()):
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2025-12-15', 'end_date': '2026-06-12'})
+        # 179 days — should pass (only 730d cap remains)
+        assert resp.status_code == 200
+
+    def test_range_over_730_days_still_returns_400(self, client):
+        """SYS-04 730-day hard cap must remain in place."""
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2024-01-01', 'end_date': '2026-06-12'})
+        assert resp.status_code == 400
+
+    # --- per-kwarg forwarding tests for flag-on path ---
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_start_date_forwarded_flag_on(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        client.post('/api/downtime-analysis/query',
+                    json={'start_date': '2026-01-01', 'end_date': '2026-04-30'})
+        mock_raw.assert_called_once()
+        assert mock_raw.call_args.kwargs['start_date'] == '2026-01-01'
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_workcenter_groups_forwarded_flag_on(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        client.post('/api/downtime-analysis/query',
+                    json={'start_date': '2026-04-01', 'end_date': '2026-04-30',
+                          'workcenter_groups': ['WC_TEST']})
+        mock_raw.assert_called_once()
+        assert mock_raw.call_args.kwargs['workcenter_groups'] == ['WC_TEST']
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_resource_ids_forwarded_flag_on(self, mock_raw, client, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        client.post('/api/downtime-analysis/query',
+                    json={'start_date': '2026-04-01', 'end_date': '2026-04-30',
+                          'resource_ids': ['R-42']})
+        mock_raw.assert_called_once()
+        assert mock_raw.call_args.kwargs['resource_ids'] == ['R-42']
+
+
+class TestQueryRouteContract:
+    """Contract-level assertions: response shape conforms to api-contract v1.15.0 (AC-1)."""
+
+    @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw')
+    def test_response_shape_conforms_to_api_contract_v1_15(self, mock_raw, client, monkeypatch):
+        """All four top-level keys present; taxonomy has map/prefixes/egt_category/fallback."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        mock_raw.return_value = _mock_raw_result()
+        resp = client.post('/api/downtime-analysis/query',
+                           json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
+        assert resp.status_code == 200
+        data = resp.get_json()['data']
+        # Four required top-level keys
+        for key in ('base_spool_url', 'jobs_spool_url', 'query_id', 'taxonomy'):
+            assert key in data, f"Missing required key: {key}"
+        # Taxonomy shape
+        taxonomy = data['taxonomy']
+        for tkey in ('map', 'prefixes', 'egt_category', 'fallback'):
+            assert tkey in taxonomy, f"taxonomy missing key: {tkey}"
+        assert taxonomy['egt_category'] == '工程'
+        assert taxonomy['fallback'] == '其他/未分類'
+
+
+# ===========================================================================
+# TestMaxOracleDaysRemoved — AC-6: _MAX_ORACLE_DAYS constant must be absent
+# ===========================================================================
+
+
+class TestMaxOracleDaysRemoved:
+    """AC-6: _MAX_ORACLE_DAYS and its guard in _validate_dates must be gone."""
+
+    def test_max_oracle_days_constant_absent(self):
+        """_MAX_ORACLE_DAYS must NOT exist on the routes module (AC-6)."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        assert not hasattr(routes_mod, '_MAX_ORACLE_DAYS'), (
+            "_MAX_ORACLE_DAYS must be removed from downtime_analysis_routes (AC-6)"
+        )
+
+    def test_validate_dates_accepts_180_days(self):
+        """_validate_dates must accept 180-day range without raising ValueError."""
+        from mes_dashboard.routes.downtime_analysis_routes import _validate_dates
+        # Should not raise — only the 730-day cap remains
+        _validate_dates('2025-12-15', '2026-06-12')  # 179 days
+
+    def test_validate_dates_accepts_91_days_oracle_path(self):
+        """Dates older than 3 months and >90 days must no longer be rejected."""
+        from mes_dashboard.routes.downtime_analysis_routes import _validate_dates
+        # Historical range that previously triggered _MAX_ORACLE_DAYS guard
+        _validate_dates('2025-01-01', '2025-06-30')  # 179 days, historical = Oracle path
+
+    def test_duckdb_window_days_constant_absent(self):
+        """_DUCKDB_WINDOW_DAYS must also be removed (only needed for _MAX_ORACLE_DAYS check)."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        assert not hasattr(routes_mod, '_DUCKDB_WINDOW_DAYS'), (
+            "_DUCKDB_WINDOW_DAYS must be removed from downtime_analysis_routes"
+        )

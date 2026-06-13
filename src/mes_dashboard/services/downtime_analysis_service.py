@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import pandas as pd
@@ -67,6 +68,15 @@ _BIG_CATEGORY_MAP = {str(k).strip(): str(v).strip() for k, v in _BIG_CATEGORY_MA
 
 _DOWNTIME_ENGINE_PARALLEL = max(1, int(os.getenv("DOWNTIME_ENGINE_PARALLEL", "3")))
 
+# ── Feature flag: browser-DuckDB path (AC-6, design.md Migration) ─────────────
+# Default false at initial ship (env-contract 1.0.7); set DOWNTIME_BROWSER_DUCKDB=true
+# to enable the new response shape {base_spool_url, jobs_spool_url, query_id, taxonomy}.
+# Module-level constant — frozen at import time; tests must use monkeypatch.setattr,
+# never os.environ (CLAUDE.md env-var-default discipline).
+_BROWSER_DUCKDB_ENABLED: bool = os.getenv(
+    "DOWNTIME_BROWSER_DUCKDB", "false"
+).lower() in ("1", "true", "yes")
+
 
 def _map_big_category(reason: Optional[str], status: str) -> str:
     """Map OLDREASONNAME + OLDSTATUSNAME → big category (DA-04).
@@ -103,6 +113,105 @@ def _map_big_category(reason: Optional[str], status: str) -> str:
 # ============================================================
 
 _MERGE_GAP_SECONDS = 60  # contiguity tolerance
+
+# _CROSS_SHIFT_MERGE_SQL is the DuckDB SQL equivalent of _merge_cross_shift_events.
+# It reads from a view named "base_events" (registered by the caller) and returns
+# the merged events.  Uses window functions (LAG + SUM cumsum) instead of pandas
+# shift/cumsum, processes the parquet on disk without loading into Python RAM.
+_CROSS_SHIFT_MERGE_SQL = """
+WITH sorted_events AS (
+    SELECT
+        *,
+        COALESCE(TRY_CAST(HOURS AS DOUBLE), 0.0)        AS _hours_num,
+        TRY_CAST(OLDLASTSTATUSCHANGEDATE AS TIMESTAMP)   AS _estart,
+        TRY_CAST(LASTSTATUSCHANGEDATE    AS TIMESTAMP)   AS _eend,
+        TRIM(CAST(HISTORYID      AS VARCHAR))             AS _h,
+        TRIM(CAST(OLDSTATUSNAME  AS VARCHAR))             AS _s,
+        COALESCE(NULLIF(TRIM(CAST(OLDREASONNAME AS VARCHAR)), ''), '') AS _r
+    FROM base_events
+    ORDER BY
+        TRIM(CAST(HISTORYID     AS VARCHAR)),
+        TRIM(CAST(OLDSTATUSNAME AS VARCHAR)),
+        COALESCE(NULLIF(TRIM(CAST(OLDREASONNAME AS VARCHAR)), ''), ''),
+        TRY_CAST(OLDLASTSTATUSCHANGEDATE AS TIMESTAMP) NULLS LAST
+),
+numbered AS (
+    SELECT *, ROW_NUMBER() OVER () AS _srn
+    FROM sorted_events
+),
+lagged AS (
+    SELECT *,
+        LAG(_h)    OVER (ORDER BY _srn) AS _ph,
+        LAG(_s)    OVER (ORDER BY _srn) AS _ps,
+        LAG(_r)    OVER (ORDER BY _srn) AS _pr,
+        LAG(_eend) OVER (ORDER BY _srn) AS _prev_end
+    FROM numbered
+),
+breaks AS (
+    SELECT *,
+        CASE
+            WHEN _ph IS NULL                                                 THEN 1
+            WHEN _h  != _ph                                                  THEN 1
+            WHEN _s  != _ps                                                  THEN 1
+            WHEN _r  != COALESCE(_pr, '')                                    THEN 1
+            WHEN _prev_end IS NULL                                           THEN 1
+            WHEN datediff('second', _prev_end, _estart) > {gap_seconds}      THEN 1
+            ELSE 0
+        END AS _is_break
+    FROM lagged
+),
+run_ids AS (
+    SELECT *,
+        SUM(_is_break) OVER (
+            ORDER BY _srn
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS _run_id
+    FROM breaks
+)
+SELECT
+    FIRST(_h)                                                                             AS HISTORYID,
+    FIRST(_s)                                                                             AS OLDSTATUSNAME,
+    FIRST(NULLIF(TRIM(CAST(OLDREASONNAME AS VARCHAR)), ''))
+        FILTER (WHERE NULLIF(TRIM(CAST(OLDREASONNAME AS VARCHAR)), '') IS NOT NULL)       AS OLDREASONNAME,
+    MIN(_estart)                                                                          AS event_start,
+    MAX(_eend)                                                                            AS event_end,
+    ROUND(SUM(_hours_num), 6)                                                             AS hours,
+    COUNT(*)                                                                              AS fragment_count,
+    FIRST(CAST(JOBID AS VARCHAR)) FILTER (WHERE JOBID IS NOT NULL)                        AS JOBID
+FROM run_ids
+GROUP BY _run_id
+ORDER BY HISTORYID, event_start
+"""
+
+
+def _merge_cross_shift_events_from_parquet(parquet_path: Path) -> pd.DataFrame:
+    """Run cross-shift merge directly on a parquet file via DuckDB.
+
+    Avoids loading the full raw dataset into Python RAM — DuckDB reads the
+    parquet in columnar streaming mode, returning only the reduced merged result.
+    Falls back to the pandas path on any DuckDB error.
+    """
+    try:
+        import duckdb
+        con = duckdb.connect()
+        try:
+            con.execute(f"CREATE VIEW base_events AS SELECT * FROM read_parquet('{parquet_path}')")
+            sql = _CROSS_SHIFT_MERGE_SQL.format(gap_seconds=_MERGE_GAP_SECONDS)
+            result = con.execute(sql).df()
+            # Restore empty-string OLDREASONNAME -> None (pandas path behaviour)
+            if 'OLDREASONNAME' in result.columns:
+                result['OLDREASONNAME'] = result['OLDREASONNAME'].replace('', None)
+            return result
+        finally:
+            con.close()
+    except Exception as exc:
+        logger.warning(
+            "_merge_cross_shift_events_from_parquet: DuckDB failed (%s), "
+            "falling back to pandas path",
+            exc,
+        )
+        base_df = pd.read_parquet(str(parquet_path))
+        return _merge_cross_shift_events(base_df)
 
 
 def _merge_cross_shift_events(df: pd.DataFrame) -> pd.DataFrame:
@@ -201,104 +310,231 @@ def _build_merged_row(
 # ============================================================
 
 def _bridge_jobid(events_df: pd.DataFrame, jobs_df: pd.DataFrame) -> pd.DataFrame:
-    """Attach JOB enrichment to each logical event (DA-03).
+    """Attach JOB enrichment to each logical event (DA-03). Vectorized implementation.
 
-    Path A: JOBID not null → direct join on JOBID → match_source='jobid'.
-    Path B: JOBID null → overlap candidates:
-        JOB.RESOURCEID == SHIFT.HISTORYID AND
-        event_start < JOB.COMPLETEDATE AND event_end > JOB.CREATEDATE
-      Tiebreak: largest temporal overlap (LEAST(end,COMPLETEDATE) - GREATEST(start,CREATEDATE))
-      Ties: JOB.CREATEDATE ASC, JOB.JOBID ASC
-      match_ambiguous=True when runner-up overlap >= 80% of winner.
-    No-match: all JOB fields None, match_source='none'.
+    Path A: JOBID not null AND found in jobs → merge on JOBID → match_source='jobid'.
+            JOBID not null but NOT found in jobs → match_source='none' (orphan).
+    Path B: JOBID null → merge-filter on RESOURCEID==HISTORYID + time overlap →
+            tiebreak by largest overlap, then CREATEDATE ASC, then JOBID ASC →
+            match_source='overlap' or 'none'.
+    match_ambiguous=True when runner-up overlap >= 80% of winner (Path B only).
     """
     if events_df.empty:
         return _add_empty_job_columns(events_df)
 
-    # Ensure datetime types
+    # Ensure datetime types on events
     for col in ('event_start', 'event_end'):
         if col in events_df.columns and events_df[col].dtype == object:
             events_df = events_df.copy()
             events_df[col] = pd.to_datetime(events_df[col], errors='coerce')
 
     if not jobs_df.empty:
-        for col in ('CREATEDATE', 'COMPLETEDATE', 'FIRSTCLOCKONDATE', 'LASTCLOCKOFFDATE'):
+        for col in ('CREATEDATE', 'COMPLETEDATE', 'FIRSTCLOCKONDATE', 'LASTCLOCKOFFDATE',
+                    'ASSIGNED_DATE', 'ACK_DATE', 'INSPECT_START', 'INSPECT_END'):
             if col in jobs_df.columns and jobs_df[col].dtype == object:
                 jobs_df = jobs_df.copy()
                 jobs_df[col] = pd.to_datetime(jobs_df[col], errors='coerce')
 
-    # Pre-process jobs_df once for Path B overlap matching (avoids O(N) copies inside loop)
-    if not jobs_df.empty:
-        jobs_df_working = jobs_df.copy()
-        jobs_df_working['_RESOURCEID_stripped'] = (
-            jobs_df_working['RESOURCEID'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
-        )
-    else:
-        jobs_df_working = jobs_df
-
-    results = []
-    for _, event in events_df.iterrows():
-        jobid = event.get('JOBID')
-        hist_id = str(event['HISTORYID']).strip()
-        e_start = event['event_start']
-        e_end = event['event_end']
-
-        if jobid is not None and str(jobid).strip() not in ('', 'None', 'nan'):
-            # Path A: direct join
-            if not jobs_df.empty:
-                matched = jobs_df[jobs_df['JOBID'].astype(str) == str(jobid).strip()]
-                if not matched.empty:
-                    job_row = matched.iloc[0]
-                    enriched = _enrich_event(event, job_row, match_source='jobid', match_ambiguous=False)
-                    results.append(enriched)
-                    continue
-            # JOBID referenced but not found in jobs table — treat as no-match
-            results.append(_no_match_event(event))
-        else:
-            # Path B: overlap fallback
-            if jobs_df.empty:
-                results.append(_no_match_event(event))
-                continue
-
-            candidates = jobs_df_working[
-                (jobs_df_working['_RESOURCEID_stripped'] == hist_id) &
-                (jobs_df_working['COMPLETEDATE'] > e_start) &
-                (jobs_df_working['CREATEDATE'] < e_end)
-            ].copy()
-
-            if candidates.empty:
-                results.append(_no_match_event(event))
-                continue
-
-            # Compute overlap duration for each candidate
-            candidates['_overlap'] = candidates.apply(
-                lambda r: _compute_overlap_seconds(e_start, e_end, r['CREATEDATE'], r['COMPLETEDATE']),
-                axis=1,
-            )
-
-            # Tiebreak: largest overlap DESC, then CREATEDATE ASC, then JOBID ASC
-            candidates = candidates.sort_values(
-                ['_overlap', 'CREATEDATE', 'JOBID'],
-                ascending=[False, True, True],
-            )
-
-            winner = candidates.iloc[0]
-            winner_overlap = winner['_overlap']
-
-            # match_ambiguous: runner-up overlap >= 80% of winner
-            match_ambiguous = False
-            if len(candidates) > 1:
-                runner_overlap = candidates.iloc[1]['_overlap']
-                if winner_overlap > 0 and runner_overlap >= 0.8 * winner_overlap:
-                    match_ambiguous = True
-
-            enriched = _enrich_event(event, winner, match_source='overlap', match_ambiguous=match_ambiguous)
-            results.append(enriched)
-
-    if not results:
+    if jobs_df.empty:
         return _add_empty_job_columns(events_df)
 
-    return pd.DataFrame(results)
+    _OPTIONAL = ['ASSIGNED_DATE', 'ACK_DATE', 'INSPECT_START', 'INSPECT_END']
+    _JOB_ENRICH = [
+        'JOBORDERNAME', 'JOBMODELNAME', 'SYMPTOMCODENAME', 'CAUSECODENAME',
+        'REPAIRCODENAME', 'COMPLETE_FULLNAME', 'FIRSTCLOCKONDATE', 'LASTCLOCKOFFDATE',
+        'CREATEDATE', 'COMPLETEDATE',
+    ] + [c for c in _OPTIONAL if c in jobs_df.columns]
+
+    events_df = events_df.copy().reset_index(drop=True)
+    events_df['_eidx'] = events_df.index
+
+    # Normalize JOBID from events (None for null / empty / 'nan' / 'None')
+    _jnorm = events_df['JOBID'].apply(lambda x: str(x).strip() if pd.notna(x) else None)
+    events_df['_jobid_norm'] = _jnorm.apply(lambda x: None if x in ('', 'None', 'nan') else x)
+
+    # Prepare jobs lookup
+    jobs_work = jobs_df.copy()
+    jobs_work['_jobid_norm'] = jobs_work['JOBID'].astype(str).str.strip()
+    jobs_work['_res_norm'] = (
+        jobs_work['RESOURCEID'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
+        if 'RESOURCEID' in jobs_work.columns else pd.Series([''] * len(jobs_work))
+    )
+
+    _enrich_cols = [c for c in _JOB_ENRICH if c in jobs_work.columns]
+    jobs_for_a = (
+        jobs_work[['_jobid_norm'] + _enrich_cols]
+        .drop_duplicates(subset=['_jobid_norm'], keep='first')
+    )
+    jobs_for_b = jobs_work[['_res_norm', '_jobid_norm', 'CREATEDATE', 'COMPLETEDATE']
+                           + [c for c in _enrich_cols if c not in ('CREATEDATE', 'COMPLETEDATE')]].copy()
+
+    valid_jobid_set = set(jobs_for_a['_jobid_norm'].tolist())
+
+    mask_has_jobid = events_df['_jobid_norm'].notna()
+    mask_valid_a = mask_has_jobid & events_df['_jobid_norm'].isin(valid_jobid_set)
+    mask_orphan = mask_has_jobid & ~mask_valid_a
+    mask_path_b = ~mask_has_jobid
+
+    events_a = events_df[mask_valid_a].copy()
+    events_orphan = events_df[mask_orphan].copy()
+    events_b = events_df[mask_path_b].copy()
+
+    # ── Path A: direct merge on _jobid_norm ──
+    if not events_a.empty:
+        result_a = pd.merge(events_a, jobs_for_a, on='_jobid_norm', how='left')
+        result_a['match_source'] = 'jobid'
+        result_a['match_ambiguous'] = False
+        result_a['_matched_jobid'] = result_a['_jobid_norm']
+    else:
+        result_a = pd.DataFrame()
+
+    # ── Orphan: has JOBID but not found in jobs ──
+    if not events_orphan.empty:
+        result_orphan = _add_empty_job_columns(events_orphan.copy())
+        result_orphan['_matched_jobid'] = None
+    else:
+        result_orphan = pd.DataFrame()
+
+    # ── Path B: overlap join ──
+    if not events_b.empty and 'RESOURCEID' in jobs_df.columns:
+        events_b['_hist_norm'] = events_b['HISTORYID'].astype(str).str.strip()
+
+        # Pre-filter 1: only keep jobs for resources that appear in events_b.
+        # Cuts the jobs side from global count to only relevant machines.
+        _hist_ids = set(events_b['_hist_norm'].dropna().unique())
+        _jobs_b = jobs_for_b[jobs_for_b['_res_norm'].isin(_hist_ids)]
+
+        # Pre-filter 2: per-resource time-span filter.
+        # Drop jobs whose window does not overlap ANY event span for that resource.
+        # Prevents N-events × M-jobs Cartesian explosion before the date filter.
+        if not _jobs_b.empty:
+            _spans = (
+                events_b.groupby('_hist_norm', sort=False)
+                .agg(_span_start=('event_start', 'min'), _span_end=('event_end', 'max'))
+                .reset_index()
+            )
+            _jobs_b = pd.merge(
+                _jobs_b, _spans,
+                left_on='_res_norm', right_on='_hist_norm', how='left',
+            )
+            _jobs_b = _jobs_b[
+                (_jobs_b['COMPLETEDATE'] > _jobs_b['_span_start']) &
+                (_jobs_b['CREATEDATE'] < _jobs_b['_span_end'])
+            ].drop(columns=['_span_start', '_span_end', '_hist_norm'])
+
+        cand = pd.merge(
+            events_b[['_eidx', '_hist_norm', 'event_start', 'event_end']],
+            _jobs_b,
+            left_on='_hist_norm',
+            right_on='_res_norm',
+            how='left',
+        )
+        cand = cand.dropna(subset=['_jobid_norm'])
+        cand = cand[
+            (cand['COMPLETEDATE'] > cand['event_start']) &
+            (cand['CREATEDATE'] < cand['event_end'])
+        ].copy()
+
+        if not cand.empty:
+            cand['_overlap'] = (
+                cand[['event_end', 'COMPLETEDATE']].min(axis=1) -
+                cand[['event_start', 'CREATEDATE']].max(axis=1)
+            ).dt.total_seconds().clip(lower=0)
+
+            cand = cand.sort_values(
+                ['_eidx', '_overlap', 'CREATEDATE', '_jobid_norm'],
+                ascending=[True, False, True, True],
+            )
+            cand['_rank'] = cand.groupby('_eidx').cumcount()
+
+            winners = cand[cand['_rank'] == 0].copy()
+            runners = (
+                cand[cand['_rank'] == 1][['_eidx', '_overlap']]
+                .rename(columns={'_overlap': '_runner_overlap'})
+            )
+            winners = winners.merge(runners, on='_eidx', how='left')
+            winners['match_ambiguous'] = (
+                winners['_runner_overlap'].notna()
+                & (winners['_overlap'] > 0)
+                & (winners['_runner_overlap'] >= 0.8 * winners['_overlap'])
+            )
+            winners['match_source'] = 'overlap'
+            winners['_matched_jobid'] = winners['_jobid_norm']
+
+            _winner_cols = (
+                ['_eidx', 'match_source', 'match_ambiguous', '_matched_jobid']
+                + [c for c in _enrich_cols if c in winners.columns]
+            )
+            result_b = pd.merge(
+                events_b.drop(columns=['_hist_norm']),
+                winners[_winner_cols],
+                on='_eidx',
+                how='left',
+            )
+            result_b['match_source'] = result_b['match_source'].fillna('none')
+            result_b['match_ambiguous'] = result_b['match_ambiguous'].fillna(False)
+        else:
+            result_b = _add_empty_job_columns(events_b.drop(columns=['_hist_norm']))
+            result_b['_matched_jobid'] = None
+    else:
+        result_b = _add_empty_job_columns(events_b)
+        result_b['_matched_jobid'] = None
+
+    # ── Combine all paths ──
+    frames = [f for f in [result_a, result_orphan, result_b] if not f.empty]
+    if not frames:
+        return _add_empty_job_columns(events_df)
+    result = pd.concat(frames, ignore_index=True, sort=False)
+    result = result.sort_values('_eidx').reset_index(drop=True)
+
+    # ── Derived enrichment columns (vectorized) ──
+    def _safe_min_s(end_col: str, start_col: str) -> pd.Series:
+        if end_col not in result.columns or start_col not in result.columns:
+            return pd.Series([None] * len(result), dtype=object)
+        t_end = pd.to_datetime(result[end_col], errors='coerce')
+        t_start = pd.to_datetime(result[start_col], errors='coerce')
+        diff = (t_end - t_start).dt.total_seconds() / 60.0
+        mask_valid = diff.notna() & (diff >= 0)
+        out = diff.round(2).astype(object)
+        out[~mask_valid] = None
+        return out
+
+    def _norm_str_col(col: str) -> pd.Series:
+        if col not in result.columns:
+            return pd.Series([None] * len(result), dtype=object)
+        s = result[col].astype(str).str.strip()
+        bad = result[col].isna() | s.isin({'', 'nan', 'None', 'NaT'})
+        return s.where(~bad, other=None)
+
+    result['job_id'] = _norm_str_col('_matched_jobid')
+    result['job_order_name'] = _norm_str_col('JOBORDERNAME')
+    result['job_model'] = _norm_str_col('JOBMODELNAME')
+    result['symptom'] = _norm_str_col('SYMPTOMCODENAME')
+    result['cause'] = _norm_str_col('CAUSECODENAME')
+    result['repair'] = _norm_str_col('REPAIRCODENAME')
+    result['handler'] = _norm_str_col('COMPLETE_FULLNAME')
+    result['wait_min'] = _safe_min_s('FIRSTCLOCKONDATE', 'CREATEDATE')
+    result['repair_min'] = _safe_min_s('LASTCLOCKOFFDATE', 'FIRSTCLOCKONDATE')
+    result['wait_assign_min'] = _safe_min_s('ASSIGNED_DATE', 'CREATEDATE')
+    result['wait_ack_min'] = _safe_min_s('ACK_DATE', 'ASSIGNED_DATE')
+    result['inspect_min'] = _safe_min_s('INSPECT_END', 'INSPECT_START')
+    result['close_wait_min'] = _safe_min_s('COMPLETEDATE', 'LASTCLOCKOFFDATE')
+    _cd = pd.to_datetime(result['CREATEDATE'], errors='coerce') if 'CREATEDATE' in result.columns else None
+    _cp = pd.to_datetime(result['COMPLETEDATE'], errors='coerce') if 'COMPLETEDATE' in result.columns else None
+    result['job_create_date'] = _cd.apply(_ts_to_iso) if _cd is not None else None
+    result['job_complete_date'] = _cp.apply(_ts_to_iso) if _cp is not None else None
+
+    # Drop temp and raw job DB columns (all exposed via job_* derived columns)
+    _drop = [
+        '_eidx', '_jobid_norm', '_matched_jobid', '_res_norm', '_hist_norm',
+        '_overlap', '_runner_overlap', '_rank',
+        'JOBORDERNAME', 'JOBMODELNAME', 'SYMPTOMCODENAME', 'CAUSECODENAME',
+        'REPAIRCODENAME', 'COMPLETE_FULLNAME', 'FIRSTCLOCKONDATE', 'LASTCLOCKOFFDATE',
+        'CREATEDATE', 'COMPLETEDATE', 'ASSIGNED_DATE', 'ACK_DATE', 'INSPECT_START', 'INSPECT_END',
+        'RESOURCEID',
+    ]
+    result = result.drop(columns=[c for c in _drop if c in result.columns])
+    return result
 
 
 def _compute_overlap_seconds(e_start: Any, e_end: Any, j_start: Any, j_end: Any) -> float:
@@ -472,6 +708,260 @@ def make_downtime_query_id(params: dict) -> str:
     return hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:16]
 
 
+def make_raw_spool_query_id(params: dict) -> str:
+    """Deterministic hash for raw spool cache key (DA-06 + SCHEMA_VERSION per D4).
+
+    SCHEMA_VERSION participates alongside DOWNTIME_BRIDGE_VERSION.  Bumping either
+    constant orphans existing raw parquets by key so readers miss-and-rewrite rather
+    than read an incompatible file.
+    """
+    from mes_dashboard.services.downtime_analysis_cache import _SCHEMA_VERSION
+    keyed = dict(params)
+    keyed['_bridge_version'] = DOWNTIME_BRIDGE_VERSION
+    keyed['_schema_version'] = _SCHEMA_VERSION
+    canonical = json.dumps(keyed, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:16]
+
+
+# ============================================================
+# Taxonomy JSON builder (AC-4, design.md D5)
+# ============================================================
+
+
+def _build_taxonomy_json() -> Dict[str, Any]:
+    """Serialize _BIG_CATEGORY_MAP and _PREFIX_CATEGORIES to server-authoritative taxonomy.
+
+    Returns:
+        {
+            "map": [[reason, category], ...],        # exact-match rows
+            "prefixes": [[prefix, category], ...],   # prefix-match rules
+            "egt_category": "工程",                   # all EGT events (DA-04 Rule 1)
+            "fallback": "其他/未分類"                  # unknown/blank reasons
+        }
+
+    Server is single source of truth (design.md D5; DA-04).  Browser applies
+    taxonomy as a SQL CASE/join without a rebuild when reason codes change.
+    """
+    map_entries = [[k, v] for k, v in sorted(_BIG_CATEGORY_MAP.items())]
+    prefix_entries = [[p, cat] for p, cat in _PREFIX_CATEGORIES]
+    return {
+        'map': map_entries,
+        'prefixes': prefix_entries,
+        'egt_category': '工程',
+        'fallback': '其他/未分類',
+    }
+
+
+# ============================================================
+# Raw-spool writer (browser-DuckDB path, AC-2, DA-12)
+# ============================================================
+
+
+def query_downtime_dataset_raw(
+    *,
+    start_date: str,
+    end_date: str,
+    workcenter_groups: Optional[List[str]] = None,
+    families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
+    package_groups: Optional[List[str]] = None,
+    big_categories: Optional[List[str]] = None,
+    status_types: Optional[List[str]] = None,
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
+) -> Dict[str, Any]:
+    """Write two raw spool parquets and return their download URLs + taxonomy.
+
+    Implements the browser-DuckDB path (design.md D7, DA-12):
+    - Acquires base_events (7 cols) and job_bridge (16 cols) from DuckDB prewarm
+      or Oracle BQE fallback — one whole-dataset chunk (ADR-0003).
+    - Writes each DataFrame to its own spool namespace without running any
+      pandas reductions (no _merge_cross_shift_events, no _bridge_jobid,
+      no _enrich_events_df on the request path).
+    - Returns {base_spool_url, jobs_spool_url, query_id, taxonomy}.
+
+    Two-parquet atomicity (DA-11, AC-7): if the base spool is present but the
+    job spool is absent/expired, raises RuntimeError rather than silently
+    returning an empty join.
+    """
+    from mes_dashboard.services.downtime_analysis_cache import (
+        _BASE_EVENTS_NAMESPACE,
+        _JOB_BRIDGE_NAMESPACE,
+        has_downtime_base_events,
+        has_downtime_job_bridge,
+        store_downtime_base_events,
+        store_downtime_job_bridge,
+    )
+
+    query_id_input = {
+        'start_date': start_date,
+        'end_date': end_date,
+        'workcenter_groups': sorted(workcenter_groups or []),
+        'families': sorted(families or []),
+        'resource_ids': sorted(resource_ids or []),
+        'package_groups': sorted(package_groups or []),
+    }
+    query_id = make_raw_spool_query_id(query_id_input)
+
+    # ── Two-parquet atomicity check (AC-7, DA-11) ─────────────────────────────
+    # If base spool exists but job spool is absent/expired, refuse to serve
+    # silently empty join — raise loudly so the client gets a 500 (not empty).
+    base_hit = has_downtime_base_events(query_id)
+    job_hit = has_downtime_job_bridge(query_id)
+
+    if base_hit and job_hit:
+        # Both spools fresh — build URL response without hitting Oracle
+        taxonomy = _build_taxonomy_json()
+        return {
+            'base_spool_url': f'/api/spool/{_BASE_EVENTS_NAMESPACE}/{query_id}.parquet',
+            'jobs_spool_url': f'/api/spool/{_JOB_BRIDGE_NAMESPACE}/{query_id}.parquet',
+            'query_id': query_id,
+            'taxonomy': taxonomy,
+        }
+
+    if base_hit and not job_hit:
+        # Atomicity violation: base present, job missing/expired — raise loudly (DA-11)
+        raise RuntimeError(
+            f"Downtime raw spool atomicity error: base_events spool exists for "
+            f"query_id={query_id} but job_bridge spool is missing or expired. "
+            "This indicates a partial write or TTL mismatch. Re-run the query to refresh both spools."
+        )
+
+    # ── Data acquisition: DuckDB prewarm or Oracle BQE fallback ───────────────
+    _ddb_base: Optional[pd.DataFrame] = None
+    _ddb_job: Optional[pd.DataFrame] = None
+    try:
+        from mes_dashboard.services.downtime_analysis_duckdb_cache import (
+            should_use_duckdb as _should_use_duckdb,
+            query_base_from_duckdb as _qbase,
+            query_job_from_duckdb as _qjob,
+        )
+        if _should_use_duckdb(end_date, start_date):
+            _ddb_base = _qbase(start_date, end_date)
+            _ddb_job = _qjob(start_date, end_date)
+            logger.debug(
+                "downtime_analysis_raw: DuckDB path — %d base_events, %d job_data",
+                len(_ddb_base), len(_ddb_job),
+            )
+    except Exception as _ddb_exc:
+        logger.debug(
+            "downtime_analysis_raw: DuckDB path unavailable, falling back to Oracle: %s",
+            _ddb_exc,
+        )
+
+    if _ddb_base is not None:
+        base_df = _ddb_base
+        job_df = _ddb_job if _ddb_job is not None else pd.DataFrame()
+        # Apply resource filters before writing raw spool (DuckDB fast path)
+        if not base_df.empty:
+            base_df = _apply_resource_filters(
+                base_df, workcenter_groups, families, resource_ids, package_groups,
+                is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+            )
+    else:
+        # ── Oracle BQE fallback (ADR-0003: one whole-dataset chunk, no chunking) ──
+        from mes_dashboard.core.database import read_sql_df_slow as _read_sql_df
+        from mes_dashboard.services.batch_query_engine import (
+            compute_query_hash as _compute_query_hash,
+            decompose_by_time_range as _decompose_date_range,
+            execute_plan,
+            merge_chunks_to_spool,
+        )
+        from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
+
+        sql_dir = Path(__file__).resolve().parent.parent / 'sql' / 'downtime_analysis'
+        base_sql = (sql_dir / 'base_events.sql').read_text(encoding='utf-8')
+        job_sql = (sql_dir / 'job_bridge.sql').read_text(encoding='utf-8')
+
+        base_params = {'start_date': start_date, 'end_date': end_date}
+
+        # One whole-dataset chunk (ADR-0003 — no USE_ROW_COUNT_CHUNKING)
+        whole_dataset_chunk = _decompose_date_range(start_date, end_date)
+        engine_hash = _compute_query_hash({
+            'downtime_base_events_raw': True,
+            'start_date': start_date,
+            'end_date': end_date,
+            '_schema_version': query_id,
+        })
+
+        def _run_base_chunk(chunk, max_rows_per_chunk=None):
+            params = {
+                'start_date': chunk['chunk_start'],
+                'end_date': chunk['chunk_end'],
+            }
+            result = _read_sql_df(base_sql, params, caller='downtime_analysis_raw:base_events')
+            return result if result is not None else pd.DataFrame()
+
+        execute_plan(
+            whole_dataset_chunk,
+            _run_base_chunk,
+            parallel=_DOWNTIME_ENGINE_PARALLEL,
+            query_hash=engine_hash,
+            cache_prefix='downtime_analysis_raw',
+        )
+
+        _spool_dir = QUERY_SPOOL_DIR / 'downtime_analysis_raw'
+        tmp_path, _total_rows = merge_chunks_to_spool(
+            'downtime_analysis_raw',
+            engine_hash,
+            spool_dir=_spool_dir,
+        )
+
+        if tmp_path is not None and tmp_path.exists():
+            base_df = pd.read_parquet(str(tmp_path))
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        else:
+            base_df = pd.DataFrame()
+
+        # Apply resource filters on assembled DataFrame
+        if not base_df.empty:
+            base_df = _apply_resource_filters(
+                base_df, workcenter_groups, families, resource_ids, package_groups,
+                is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+            )
+
+        # Job bridge Oracle query
+        if not base_df.empty and 'HISTORYID' in base_df.columns:
+            hist_ids = sorted({
+                str(x).strip() for x in base_df['HISTORYID'].dropna() if str(x).strip()
+            })
+        else:
+            hist_ids = []
+
+        if hist_ids:
+            from mes_dashboard.sql.builder import QueryBuilder as _QB
+            _jb_builder = _QB()
+            _jb_builder.add_in_condition('RESOURCEID', hist_ids)
+            resource_filter_sql = _jb_builder.get_conditions_sql() or '1=1'
+            job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', resource_filter_sql)
+            job_params = {**base_params, **_jb_builder.params}
+        else:
+            job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', '1=0')
+            job_params = base_params
+
+        job_df = _read_sql_df(job_sql_rendered, job_params, caller='downtime_analysis_raw:job_bridge')
+        if job_df is None:
+            job_df = pd.DataFrame()
+
+    # ── Write both raw spools atomically ──────────────────────────────────────
+    # Write base_events first, then job_bridge.  If either write fails, the
+    # next request will trigger a full re-fetch (no partial state served).
+    store_downtime_base_events(query_id, base_df, end_date=end_date)
+    store_downtime_job_bridge(query_id, job_df, end_date=end_date)
+
+    taxonomy = _build_taxonomy_json()
+    return {
+        'base_spool_url': f'/api/spool/{_BASE_EVENTS_NAMESPACE}/{query_id}.parquet',
+        'jobs_spool_url': f'/api/spool/{_JOB_BRIDGE_NAMESPACE}/{query_id}.parquet',
+        'query_id': query_id,
+        'taxonomy': taxonomy,
+    }
+
+
 # ============================================================
 # Filter options (DA-01, AC-6)
 # ============================================================
@@ -606,10 +1096,7 @@ def query_downtime_dataset(
         execute_plan,
         merge_chunks_to_spool,
     )
-    from mes_dashboard.core.query_spool_store import (
-        QUERY_SPOOL_DIR,
-        register_spool_file,
-    )
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR
     from pathlib import Path
 
     query_id_input = {
@@ -653,6 +1140,14 @@ def query_downtime_dataset(
     if _ddb_base is not None:
         base_df = _ddb_base
         job_df = _ddb_job if _ddb_job is not None else pd.DataFrame()
+        # DuckDB fast path: apply filters and cross-shift merge on pandas DataFrame
+        # (3-month pre-warmed data; smaller dataset, pandas is fine here)
+        if not base_df.empty:
+            base_df = _apply_resource_filters(
+                base_df, workcenter_groups, families, resource_ids, package_groups,
+                is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+            )
+        merged_df = _merge_cross_shift_events(base_df) if not base_df.empty else pd.DataFrame()
     else:
         # --- BatchQueryEngine path (BQE-07) ---
         # ADR-0003: date-range chunking with parallel fetch; reductions run on fully assembled DataFrame.
@@ -693,21 +1188,30 @@ def query_downtime_dataset(
             spool_dir=_spool_dir,
         )
 
-        # Assemble base_df from the spool (post-merge stage for ADR-0003 reductions)
-        if tmp_path is not None and tmp_path.exists():
-            base_df = pd.read_parquet(str(tmp_path))
-            try:
-                tmp_path.unlink()  # clean up temp spool; final events go to store_downtime_events
-            except Exception:
-                pass
-        else:
-            base_df = pd.DataFrame()
+        # --- DuckDB path: extract HISTORYIDs and run cross-shift merge without loading
+        #     the full raw dataset into Python RAM (ADR-0003 reductions still apply).
+        _spool_exists = tmp_path is not None and tmp_path.exists()
 
-        # Build RESOURCEID IN filter from base_events HISTORYIDs so job_bridge only
-        # scans equipment that actually has downtime records in this date range.
-        if not base_df.empty:
+        # Step 1: Get DISTINCT HISTORYIDs from parquet for job_bridge filter.
+        # Uses a DuckDB scan (columnar, no full load) instead of pd.read_parquet.
+        if _spool_exists:
+            try:
+                import duckdb as _ddb_scan
+                _hist_rows = _ddb_scan.sql(
+                    f"SELECT DISTINCT TRIM(CAST(HISTORYID AS VARCHAR)) "
+                    f"FROM read_parquet('{tmp_path}') WHERE HISTORYID IS NOT NULL"
+                ).fetchall()
+                hist_ids = sorted({r[0] for r in _hist_rows if r[0]})
+            except Exception as _scan_exc:
+                logger.warning("DuckDB HISTORYID scan failed (%s); loading parquet column", _scan_exc)
+                _col_df = pd.read_parquet(str(tmp_path), columns=['HISTORYID'])
+                hist_ids = sorted({str(x).strip() for x in _col_df['HISTORYID'].dropna() if str(x).strip()})
+        else:
+            hist_ids = []
+
+        # Step 2: Build job_bridge RESOURCEID filter and query Oracle.
+        if hist_ids:
             from mes_dashboard.sql.builder import QueryBuilder as _QB
-            hist_ids = sorted({str(x).strip() for x in base_df['HISTORYID'].dropna() if str(x).strip()})
             _jb_builder = _QB()
             _jb_builder.add_in_condition('RESOURCEID', hist_ids)
             resource_filter_sql = _jb_builder.get_conditions_sql() or '1=1'
@@ -717,23 +1221,28 @@ def query_downtime_dataset(
             job_sql_rendered = job_sql.replace('{{ RESOURCE_FILTER }}', '1=0')
             job_params = base_params
 
-        # Also read job bridge data (still via direct read_sql_df — not chunked)
         job_df = _read_sql_df(job_sql_rendered, job_params, caller='downtime_analysis:job_bridge')
         if job_df is None:
             job_df = pd.DataFrame()
 
-    # Apply resource filters (workcenter/family/resource_id/package_group/flags)
-    if not base_df.empty:
-        base_df = _apply_resource_filters(
-            base_df, workcenter_groups, families, resource_ids, package_groups,
-            is_production=is_production, is_key=is_key, is_monitor=is_monitor,
-        )
+        # Step 3: DuckDB cross-shift merge — processes parquet in columnar streaming,
+        # never materialises 184k raw rows in Python RAM; returns reduced merged_df.
+        if _spool_exists:
+            merged_df = _merge_cross_shift_events_from_parquet(tmp_path)
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+        else:
+            merged_df = pd.DataFrame()
 
-    # Post-merge stage: cross-shift merge (DA-02) — must run on whole dataset (ADR-0003)
-    if not base_df.empty:
-        merged_df = _merge_cross_shift_events(base_df)
-    else:
-        merged_df = pd.DataFrame()
+        # Step 4: resource filters applied on the already-reduced merged_df.
+        if not merged_df.empty:
+            merged_df = _apply_resource_filters(
+                merged_df, workcenter_groups, families, resource_ids, package_groups,
+                is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+            )
+        base_df = pd.DataFrame()  # base_df is no longer needed; clear for GC
 
     # Post-merge stage: JOBID bridge (DA-03) — cross-product join over whole dataset
     if not merged_df.empty:

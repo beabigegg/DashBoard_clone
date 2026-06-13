@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.20] — 2026-06-12
+### Added
+- downtime-browser-duckdb: Added `downtime-playwright-e2e` gate (Tier 1, PR); extended `playwright-resilience` and `playwright-data-boundary` with atomicity + error-banner + malformed-parquet specs; extended `frontend-unit` with `useDowntimeDuckDB.test.ts` 7-parity suite; added `nightly-parity-regression` (Tier 3, required from day one; Python vs DuckDB-WASM on 184k-row fixture). Added gate compatibility note: CI browser install step for new Playwright spec; concurrency + retention config; OOM-risk rollback caveat (flag-off path without `_MAX_ORACLE_DAYS` guard); parquet cleanup commands for `downtime_analysis_base_events` and `downtime_analysis_job_bridge` namespaces. Bumped from 1.3.19.
+
+## [env 1.0.7] — 2026-06-12
+### Added
+- downtime-browser-duckdb: Added `DOWNTIME_BROWSER_DUCKDB` feature flag (optional, boolean, default `false` at initial ship; governs `/query` response path; module-level constant frozen at import — restart required; tests must use `monkeypatch.setattr` not `os.environ`). Decision: default `false` chosen for safety pending parity sign-off; operators cut over by setting `DOWNTIME_BROWSER_DUCKDB=true` and reloading gunicorn.
+
+## [business 1.17.0] — 2026-06-12
+### Added
+- downtime-browser-duckdb: DA-01..DA-04 updated to note implementation locus change (server pandas → browser DuckDB-WASM SQL) for flag-ON path; server functions retained as parity reference and flag-OFF fallback. New rules added: DA-09 (90-day Oracle-path limit removed; `_MAX_ORACLE_DAYS` eliminated; 730-day SYS-04 cap retained; OOM risk on flag-OFF rollback documented), DA-10 (browser memory ceiling: hard error + banner on WASM/fetch/reduction failure; never silent empty), DA-11 (two-parquet atomicity: base hit + job miss = server 500; browser error on 404/410), DA-12 (BQE-07 raw-spool: one whole-dataset BQE chunk; no reductions on request path). BQE-07 updated to cover both flag-ON raw-spool and flag-OFF enriched-spool paths.
+
+## [data 1.13.0] — 2026-06-12
+### Added
+- downtime-browser-duckdb: Added §3.13 raw parquet spool schemas for `downtime_analysis_base_events` (7 columns: HISTORYID, OLDSTATUSNAME, OLDREASONNAME, OLDLASTSTATUSCHANGEDATE, LASTSTATUSCHANGEDATE, HOURS, JOBID) and `downtime_analysis_job_bridge` (16 columns per job_bridge.sql; includes ASSIGNED_DATE, ACK_DATE, INSPECT_START, INSPECT_END from JOBTXNHISTORY join). Added §3.13.3 taxonomy JSON shape (map, prefixes, egt_category, fallback). Added `SCHEMA_VERSION` note (participates in raw-spool cache key; bump orphans stale parquets without `rm`; schema-breaking rollback cleanup commands). Added note on §3.12.1–3.12.4 (no longer returned by primary `/query` endpoint when flag ON; browser computes from raw spools; shapes retained as parity reference). Bumped from 1.12.3.
+
+## [api 1.15.0] — 2026-06-12
+### Changed
+- downtime-browser-duckdb: `POST /api/downtime-analysis/query` response shape changed when `DOWNTIME_BROWSER_DUCKDB=true`: returns `{base_spool_url, jobs_spool_url, query_id, taxonomy}` (pre-aggregated keys `summary`/`daily_trend`/`big_category`/`top_reasons` removed from live path; moved to browser DuckDB-WASM). Flag-OFF restores prior shape with no redeploy. 90-day Oracle-path guard (`_MAX_ORACLE_DAYS`) removed; 730-day SYS-04 cap retained. Three endpoints deprecated in-place with removal target api 1.17.0: `GET /api/downtime-analysis/view`, `GET /api/downtime-analysis/equipment-detail`, `GET /api/downtime-analysis/event-detail`. Raw spool namespaces: `downtime_analysis_base_events`, `downtime_analysis_job_bridge`. API-inventory updated to 1.2.0 (row description + `[DEPRECATED]` annotations).
+
 ## [business 1.16.0] — 2026-06-12
 ### Added
 - unify-duckdb-prewarm-rq: Added RH-07 (resource_history spool TTL 20h via RESOURCE_HISTORY_SPOOL_TTL; CACHE_TTL_DATASET unchanged), RH-08 (resource_history prewarm via RQ job, not daemon thread; leader-lock; Oracle fallback on absent RQ worker), DA-07 (downtime_analysis spool TTL 20h via DOWNTIME_ANALYSIS_CACHE_TTL default 72000), DA-08 (downtime_analysis RQ prewarm registered in _WARMUP_JOBS; previously absent). Additive; no existing rules changed.

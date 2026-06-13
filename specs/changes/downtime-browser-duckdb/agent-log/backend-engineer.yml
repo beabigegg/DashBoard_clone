@@ -1,0 +1,60 @@
+agent: backend-engineer
+change-id: downtime-browser-duckdb
+timestamp: 2026-06-12
+status: complete
+summary: >
+  Implemented all backend requirements for downtime-browser-duckdb:
+  TDD red-green cycle for route and service tests; 6 contract updates + CHANGELOG;
+  _MAX_ORACLE_DAYS removal; raw-spool writer (query_downtime_dataset_raw);
+  taxonomy JSON builder (_build_taxonomy_json); DOWNTIME_BROWSER_DUCKDB feature flag;
+  two-parquet atomicity guard; SCHEMA_VERSION cache-key participation.
+  All 151 downtime tests pass; 4458 total unit-mock-integration tests pass.
+  cdd-kit validate green. ruff clean.
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/downtime_analysis_routes.py:1-460"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_service.py:1-1700 (added _BROWSER_DUCKDB_ENABLED, _build_taxonomy_json, query_downtime_dataset_raw, make_raw_spool_query_id; added Path import; fixed pre-existing F821)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/downtime_analysis_cache.py:1-185 (added _BASE_EVENTS_NAMESPACE, _JOB_BRIDGE_NAMESPACE, _SCHEMA_VERSION, has/store/load for both raw namespaces)"
+  - type: files-changed
+    pointer: "contracts/api/api-contract.md (1.14.0→1.15.0)"
+  - type: files-changed
+    pointer: "contracts/api/api-inventory.md (1.1.13→1.2.0)"
+  - type: files-changed
+    pointer: "contracts/data/data-shape-contract.md (1.12.3→1.13.0; added §3.13)"
+  - type: files-changed
+    pointer: "contracts/business/business-rules.md (1.16.0→1.17.0; DA-01..DA-04 locus notes; DA-09..DA-12 new rules)"
+  - type: files-changed
+    pointer: "contracts/env/env-contract.md (1.0.6→1.0.7; DOWNTIME_BROWSER_DUCKDB flag)"
+  - type: files-changed
+    pointer: "contracts/ci/ci-gate-contract.md (1.3.19→1.3.20; gate compat note + OOM-risk rollback caveat)"
+  - type: files-changed
+    pointer: "contracts/CHANGELOG.md (5 entries: api 1.15.0, data 1.13.0, business 1.17.0, env 1.0.7, ci 1.3.20)"
+  - type: files-changed
+    pointer: ".github/workflows/frontend-tests.yml (updated playwright spec path for .spec.ts migration)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_routes.py::TestQueryRoute (12 tests: AC-1 shape + AC-6 90d removal + per-kwarg flag-on)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_routes.py::TestQueryRouteContract (contract v1.15.0 shape assertion)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_routes.py::TestMaxOracleDaysRemoved (AC-6: constant absent, 180d accepted, historical path accepted)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_service.py::TestRawSpoolWriter (AC-2: 5 tests: merge-not-called, base/job spool written, SCHEMA_VERSION in key, result shape)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_service.py::TestTaxonomyBuilder (AC-4: 6 tests: shape/buckets/egt/fallback/prefixes/list-of-pairs)"
+  - type: tests-added
+    pointer: "tests/test_downtime_analysis_service.py::TestTwoParquetAtomicity (AC-7: base-hit + job-miss raises loudly)"
+  - type: test-output
+    pointer: "151 passed (tests/test_downtime_analysis_routes.py + tests/test_downtime_analysis_service.py); 4458 passed 122 skipped (full unit-mock-integration gate)"
+  - type: contracts-touched
+    pointer: "contracts/api/api-contract.md; contracts/api/api-inventory.md; contracts/data/data-shape-contract.md; contracts/business/business-rules.md; contracts/env/env-contract.md; contracts/ci/ci-gate-contract.md; contracts/CHANGELOG.md"
+
+known-risks:
+  - "Flag default is false (conservative ship); operators must explicitly set DOWNTIME_BROWSER_DUCKDB=true to cut over after parity sign-off."
+  - "Flag-off rollback accepts OOM risk on >90d Oracle-path queries (documented in ci-gates.md §Rollback item 2 + DA-09)."
+  - "Two-parquet expiry race (base hit + expired jobs) raises RuntimeError → 500 to client; browser-side handling required from frontend-engineer."
+  - "query_downtime_dataset_raw Oracle BQE fallback reads full parquet into Python RAM via pd.read_parquet before writing spool; this is acceptable since it only happens on a cache miss and the parquet is then discarded."
+
+next-reviewer: frontend-engineer

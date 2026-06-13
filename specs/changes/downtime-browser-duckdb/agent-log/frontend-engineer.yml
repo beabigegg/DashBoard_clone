@@ -1,0 +1,51 @@
+agent: frontend-engineer
+change-id: downtime-browser-duckdb
+date: 2026-06-12
+status: complete
+
+summary: >
+  Implemented useDowntimeDuckDB composable and wired it into App.vue.
+  TDD: wrote failing parity tests first, then implemented to green.
+  All 53 test files pass (555 tests). TypeScript clean. CSS:check 0 errors.
+  Re-invocation: fixed four blocking UI/UX reviewer items (E-1, E-3, ES-1, R-1).
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts (E-1 errorKind, E-3 rethrow, ES-1 queryTopReasons)"
+  - type: files-changed
+    pointer: "frontend/src/downtime-analysis/App.vue (E-1 kind-specific copy, E-3 export catch, ES-1 topReasons, R-1 guard)"
+  - type: components-affected
+    pointer: "useDowntimeDuckDB (modified), App.vue (modified)"
+  - type: screenshot-paths
+    pointer: "n/a (no UI screenshots — logic change only)"
+  - type: accessibility-audit
+    pointer: "n/a (no new interactive elements added; error banner re-uses existing ErrorBanner component with aria-label)"
+
+tdd-evidence:
+  - "Tests written before composable: 6 error-handling tests failed with 'Cannot find module'"
+  - "Pure-logic tests: 25 passed before composable (fixture logic verified independently)"
+  - "After composable created: all 31 useDowntimeDuckDB tests pass"
+
+test-commands:
+  - "cd frontend && npm run test  # 53 files, 555 passed"
+  - "cd frontend && npm run type-check  # 0 errors"
+  - "cd frontend && npm run css:check  # 0 errors, 103 warnings (pre-existing)"
+
+notes: >
+  - tsconfig.json already included src/downtime-analysis/**/* (IP-8 pre-satisfied).
+  - Taxonomy discrepancy found: backend uses '改機換料'/'治工具更換與模具清潔'/'教讀程式';
+    frontend useBigCategory.ts uses '換型換線'/'換刀清模'. The composable uses
+    server-authoritative taxonomy from the API response (design.md D5). The test
+    explicitly documents this discrepancy and verifies both paths agree on EGT+TMTT_ 
+    (the cases where both taxonomy sources agree), without asserting equality on
+    divergent category names.
+  - The JOB_BRIDGE_SQL uses a complex UNION ALL + subquery approach since DuckDB-WASM
+    sendQuery() doesn't support parameterized queries; all filter values are interpolated
+    safely (values come from server-controlled filter arrays).
+  - Error states: idle→loading→ready (activate success) or loading→error (any failure).
+    View functions throw on non-ready state (no silent empty table, CLAUDE.md Type-A).
+  - CSV export: browser-blob approach per design.md D2; downloadCsv() uses URL.createObjectURL.
+  - AC-5 (zero round-trips): handleCategoryClick/handleStatusClick/handleGranularityChange
+    all branch to refreshDuckdbViews() when duckdb.state === 'ready'.
+  - Two-parquet atomicity: both parquets fetched with Promise.all; if either fails, the
+    error propagates and state transitions to 'error' with a visible message (AC-7).

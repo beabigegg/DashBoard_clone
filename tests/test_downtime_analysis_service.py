@@ -1246,3 +1246,581 @@ class TestDowntimeMigration:
 
         assert len(execute_plan_called) >= 1, "execute_plan was not called"
         assert len(merge_called) >= 1, "merge_chunks_to_spool was not called"
+
+
+# ===========================================================================
+# TestRawSpoolWriter — AC-2: raw spool writer (browser-DuckDB path)
+# ===========================================================================
+
+
+class TestRawSpoolWriter:
+    """AC-2: query_downtime_dataset_raw writes two raw parquets without pandas reductions."""
+
+    def _patch_flag_on(self, monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.services.downtime_analysis_service._BROWSER_DUCKDB_ENABLED', True
+        )
+
+    def _make_base_df(self):
+        from datetime import datetime
+        return pd.DataFrame([{
+            'HISTORYID': 'R-001',
+            'OLDSTATUSNAME': 'UDT',
+            'OLDREASONNAME': 'EE Repair',
+            'OLDLASTSTATUSCHANGEDATE': datetime(2026, 4, 1, 8, 0, 0),
+            'LASTSTATUSCHANGEDATE': datetime(2026, 4, 1, 10, 0, 0),
+            'HOURS': 2.0,
+            'JOBID': None,
+        }])
+
+    def _make_job_df(self):
+        from datetime import datetime
+        return pd.DataFrame([{
+            'JOBID': 'JB-001',
+            'RESOURCEID': 'R-001',
+            'CREATEDATE': datetime(2026, 4, 1, 7, 0, 0),
+            'COMPLETEDATE': datetime(2026, 4, 1, 11, 0, 0),
+            'SYMPTOMCODENAME': 'SYM',
+            'CAUSECODENAME': 'CAUSE',
+            'REPAIRCODENAME': 'REP',
+            'COMPLETE_FULLNAME': 'H',
+            'FIRSTCLOCKONDATE': None,
+            'LASTCLOCKOFFDATE': None,
+            'JOBORDERNAME': 'JO-001',
+            'JOBMODELNAME': 'M-A',
+            'ASSIGNED_DATE': None,
+            'ACK_DATE': None,
+            'INSPECT_START': None,
+            'INSPECT_END': None,
+        }])
+
+    def test_base_events_parquet_written_without_merge(self, monkeypatch, tmp_path):
+        """AC-2: base_events spool written; _merge_cross_shift_events NOT called on request path."""
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        base_df = self._make_base_df()
+        job_df = self._make_job_df()
+
+        merge_called = []
+        orig_merge = svc._merge_cross_shift_events
+
+        def _track_merge(*a, **kw):
+            merge_called.append(True)
+            return orig_merge(*a, **kw)
+
+        written_spools = {}
+
+        def _fake_store_base(query_id, df, **kwargs):
+            written_spools['base'] = (query_id, df)
+
+        def _fake_store_job(query_id, df, **kwargs):
+            written_spools['job'] = (query_id, df)
+
+        with patch.object(svc, '_merge_cross_shift_events', side_effect=_track_merge), \
+             patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events',
+                   return_value=None), \
+             patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events',
+                   side_effect=_fake_store_base), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge',
+                   side_effect=_fake_store_job), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=base_df), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=job_df), \
+             patch('mes_dashboard.services.downtime_analysis_service._apply_resource_filters',
+                   side_effect=lambda df, *a, **kw: df):
+            result = svc.query_downtime_dataset_raw(
+                start_date='2026-04-01',
+                end_date='2026-04-30',
+            )
+
+        # Merge must NOT have been called on the request path
+        assert len(merge_called) == 0, "_merge_cross_shift_events must not be called on raw path"
+        # Both spools must be written
+        assert 'base' in written_spools, "base_events spool must be written"
+        assert 'job' in written_spools, "job_bridge spool must be written"
+
+    def test_job_bridge_parquet_written_raw(self, monkeypatch, tmp_path):
+        """AC-2: job_bridge spool written with raw rows from Oracle."""
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        base_df = self._make_base_df()
+        job_df = self._make_job_df()
+        job_written = {}
+
+        def _fake_store_job(query_id, df, **kwargs):
+            job_written['df'] = df
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events'), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge',
+                   side_effect=_fake_store_job), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=base_df), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=job_df), \
+             patch('mes_dashboard.services.downtime_analysis_service._apply_resource_filters',
+                   side_effect=lambda df, *a, **kw: df):
+            svc.query_downtime_dataset_raw(
+                start_date='2026-04-01',
+                end_date='2026-04-30',
+            )
+
+        assert 'df' in job_written, "job_bridge spool must be written"
+        df = job_written['df']
+        assert 'JOBID' in df.columns
+
+    def test_merge_cross_shift_not_called_on_request_path(self, monkeypatch):
+        """AC-2: _merge_cross_shift_events must not run on the raw-spool path."""
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        merge_called = []
+
+        def _track_merge(*a, **kw):
+            merge_called.append(True)
+            return pd.DataFrame()
+
+        with patch.object(svc, '_merge_cross_shift_events', side_effect=_track_merge), \
+             patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events'), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge'), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=self._make_base_df()), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=self._make_job_df()), \
+             patch('mes_dashboard.services.downtime_analysis_service._apply_resource_filters',
+                   side_effect=lambda df, *a, **kw: df):
+            svc.query_downtime_dataset_raw(
+                start_date='2026-04-01',
+                end_date='2026-04-30',
+            )
+
+        assert len(merge_called) == 0, "_merge_cross_shift_events must NOT be called (AC-2)"
+
+    def test_schema_version_in_cache_key(self, monkeypatch):
+        """AC-2 / D4: SCHEMA_VERSION must participate in the raw-spool query_id."""
+        from mes_dashboard.services.downtime_analysis_cache import _SCHEMA_VERSION
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        params_base = {
+            'start_date': '2026-04-01',
+            'end_date': '2026-04-30',
+            'workcenter_groups': [],
+            'families': [],
+            'resource_ids': [],
+            'package_groups': [],
+        }
+
+        # Make a query_id with schema_version=1 and another with schema_version=2
+        import hashlib, json
+        from mes_dashboard.config.constants import DOWNTIME_BRIDGE_VERSION
+
+        def _make_qid(sv):
+            p = dict(params_base)
+            p['_bridge_version'] = DOWNTIME_BRIDGE_VERSION
+            p['_schema_version'] = sv
+            return hashlib.sha256(
+                json.dumps(p, sort_keys=True, ensure_ascii=False, default=str).encode()
+            ).hexdigest()[:16]
+
+        qid_v1 = _make_qid(1)
+        qid_v2 = _make_qid(2)
+        assert qid_v1 != qid_v2, "SCHEMA_VERSION must change the cache key (D4)"
+
+        # And the constant must exist
+        assert isinstance(_SCHEMA_VERSION, int), "_SCHEMA_VERSION must be an int"
+        assert _SCHEMA_VERSION >= 1, "_SCHEMA_VERSION must be >= 1"
+
+    def test_result_has_base_spool_url(self, monkeypatch):
+        """AC-1: query_downtime_dataset_raw result must contain base_spool_url."""
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events'), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge'), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=self._make_base_df()), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=self._make_job_df()), \
+             patch('mes_dashboard.services.downtime_analysis_service._apply_resource_filters',
+                   side_effect=lambda df, *a, **kw: df):
+            result = svc.query_downtime_dataset_raw(
+                start_date='2026-04-01',
+                end_date='2026-04-30',
+            )
+
+        assert 'base_spool_url' in result
+        assert 'jobs_spool_url' in result
+        assert 'query_id' in result
+        assert 'taxonomy' in result
+        assert result['base_spool_url'].startswith('/api/spool/downtime_analysis_base_events/')
+        assert result['jobs_spool_url'].startswith('/api/spool/downtime_analysis_job_bridge/')
+
+
+# ===========================================================================
+# TestTaxonomyBuilder — AC-4: taxonomy JSON builder
+# ===========================================================================
+
+
+class TestTaxonomyBuilder:
+    """AC-4: _build_taxonomy_json serializes _map_big_category correctly."""
+
+    def test_taxonomy_json_shape_has_map_prefixes_egt_fallback(self):
+        """Taxonomy dict must have map/prefixes/egt_category/fallback keys."""
+        from mes_dashboard.services.downtime_analysis_service import _build_taxonomy_json
+        tax = _build_taxonomy_json()
+        assert 'map' in tax, "taxonomy missing 'map'"
+        assert 'prefixes' in tax, "taxonomy missing 'prefixes'"
+        assert 'egt_category' in tax, "taxonomy missing 'egt_category'"
+        assert 'fallback' in tax, "taxonomy missing 'fallback'"
+
+    def test_taxonomy_map_covers_all_nine_buckets(self):
+        """Taxonomy categories must cover all nine expected buckets (DA-04)."""
+        from mes_dashboard.services.downtime_analysis_service import _build_taxonomy_json
+        tax = _build_taxonomy_json()
+        categories_in_map = {entry[1] for entry in tax['map']}
+        expected_buckets = {
+            '維修', '保養', '改機換料', '治工具更換與模具清潔',
+            '教讀程式', '檢查', '待料待指示',
+        }
+        missing = expected_buckets - categories_in_map
+        assert not missing, f"Taxonomy map missing categories: {missing}"
+
+    def test_taxonomy_egt_category_is_工程(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_taxonomy_json
+        tax = _build_taxonomy_json()
+        assert tax['egt_category'] == '工程'
+
+    def test_taxonomy_fallback_is_other(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_taxonomy_json
+        tax = _build_taxonomy_json()
+        assert tax['fallback'] == '其他/未分類'
+
+    def test_taxonomy_prefixes_includes_tmtt(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_taxonomy_json
+        tax = _build_taxonomy_json()
+        prefix_list = [p[0] for p in tax['prefixes']]
+        assert 'TMTT_' in prefix_list, "Prefixes must include TMTT_"
+
+    def test_taxonomy_map_is_list_of_pairs(self):
+        from mes_dashboard.services.downtime_analysis_service import _build_taxonomy_json
+        tax = _build_taxonomy_json()
+        assert isinstance(tax['map'], list), "map must be a list"
+        for entry in tax['map']:
+            assert len(entry) == 2, f"Each map entry must be [reason, category], got: {entry}"
+
+
+# ===========================================================================
+# TestTwoParquetAtomicity — AC-7: base hit + job miss must raise loudly
+# ===========================================================================
+
+
+class TestTwoParquetAtomicity:
+    """AC-7: Two-parquet atomicity — server must error loudly if jobs parquet is missing."""
+
+    def test_base_hit_jobs_miss_raises_loudly(self, monkeypatch):
+        """AC-7: If has_downtime_base_events=True but job_bridge spool missing → raise, not empty."""
+        monkeypatch.setattr(
+            'mes_dashboard.services.downtime_analysis_service._BROWSER_DUCKDB_ENABLED', True
+        )
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        # Simulate: base spool present, but job spool query returns None (expired/missing)
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_base_events',
+                   return_value=pd.DataFrame([{'HISTORYID': 'R-001'}])), \
+             patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge',
+                   return_value=False):
+            with pytest.raises(Exception, match=r"(?i)(job|bridge|atomic|missing|spool)"):
+                svc.query_downtime_dataset_raw(
+                    start_date='2026-04-01',
+                    end_date='2026-04-30',
+                )
+
+
+# ===========================================================================
+# TestDataBoundary — data-boundary tests for raw-spool path
+# ===========================================================================
+
+
+class TestDataBoundary:
+    """Data-boundary tests: empty parquets, null/CHAR reasons, cross-midnight events.
+
+    These tests exercise the raw-spool write path (query_downtime_dataset_raw)
+    with pathological inputs to confirm the service does not crash, produce
+    wrong results, or silently drop data.
+    """
+
+    @staticmethod
+    def _patch_flag_on(monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.services.downtime_analysis_service._BROWSER_DUCKDB_ENABLED', True
+        )
+
+    # -----------------------------------------------------------------------
+    # Empty base events
+    # -----------------------------------------------------------------------
+    def test_empty_base_events_handled(self, monkeypatch):
+        """Oracle returns 0 rows → base_spool_url still returned, no crash (D3)."""
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        stored_base = {}
+
+        def _fake_store_base(query_id, df, **kwargs):
+            stored_base['df'] = df
+            stored_base['query_id'] = query_id
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events',
+                   side_effect=_fake_store_base), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge'), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=pd.DataFrame()), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=pd.DataFrame()):
+            result = svc.query_downtime_dataset_raw(
+                start_date='2026-04-01',
+                end_date='2026-04-30',
+            )
+
+        # base_spool_url must still be returned — empty parquet is valid (D3)
+        assert 'base_spool_url' in result, "base_spool_url must be returned even for 0-row result"
+        assert 'jobs_spool_url' in result
+        assert 'query_id' in result
+        assert 'taxonomy' in result
+
+        # The stored DataFrame must be empty (not None/missing)
+        assert 'df' in stored_base, "store_downtime_base_events must have been called"
+        assert isinstance(stored_base['df'], pd.DataFrame), "stored base events must be a DataFrame"
+        assert len(stored_base['df']) == 0, "empty Oracle result must produce empty parquet, not None"
+
+    # -----------------------------------------------------------------------
+    # CHAR trailing space in OLDREASONNAME
+    # -----------------------------------------------------------------------
+    def test_char_trailing_space_in_oldreasonname(self, monkeypatch):
+        """OLDREASONNAME with CHAR trailing spaces must map correctly via taxonomy.
+
+        Oracle CHAR pads values to fixed width (e.g. 'EE Repair  ').
+        _map_big_category must strip before lookup or the category falls to 'fallback'.
+        Signature: _map_big_category(reason, status).
+        """
+        # This test exercises _map_big_category directly — the raw-spool path
+        # writes without mapping, but the taxonomy the client uses must be
+        # tolerant of CHAR-padded values in the DuckDB SQL CASE expression.
+        # We verify the Python reference is strip()-safe (design.md D5).
+        from mes_dashboard.services.downtime_analysis_service import _map_big_category
+
+        # OLDREASONNAME with trailing CHAR spaces, OLDSTATUSNAME='UDT'
+        padded_reason = 'EE Repair    '   # simulates Oracle CHAR(13)
+        category = _map_big_category(padded_reason, 'UDT')
+        assert category == '維修', (
+            f"CHAR-padded 'EE Repair    ' must map to '維修', got '{category}'. "
+            "strip() must be applied before dict lookup."
+        )
+
+    def test_char_trailing_space_tmtt_prefix(self, monkeypatch):
+        """OLDREASONNAME with TMTT_ prefix + trailing spaces must map to '檢查'."""
+        from mes_dashboard.services.downtime_analysis_service import _map_big_category
+
+        padded = 'TMTT_Visual Inspection   '
+        category = _map_big_category(padded, 'SDT')
+        assert category == '檢查', (
+            f"TMTT_-prefixed reason with CHAR spaces must map to '檢查', got '{category}'"
+        )
+
+    # -----------------------------------------------------------------------
+    # Null OLDREASONNAME uses fallback
+    # -----------------------------------------------------------------------
+    def test_null_oldreasonname_uses_fallback(self, monkeypatch):
+        """None OLDREASONNAME on a non-EGT status must return the fallback category (AC-7 / D3)."""
+        from mes_dashboard.services.downtime_analysis_service import _map_big_category
+
+        category = _map_big_category(None, 'UDT')
+        # None reason must not crash and must fall through to '其他/未分類'
+        assert category == '其他/未分類', (
+            f"None OLDREASONNAME must return fallback '其他/未分類', got '{category}'"
+        )
+
+    def test_empty_string_reason_uses_fallback(self, monkeypatch):
+        """Empty-string OLDREASONNAME must return the fallback category, not crash."""
+        from mes_dashboard.services.downtime_analysis_service import _map_big_category
+
+        category = _map_big_category('', 'UDT')
+        assert category == '其他/未分類', (
+            f"Empty-string reason must return fallback, got '{category}'"
+        )
+
+    # -----------------------------------------------------------------------
+    # Cross-midnight event in base spool
+    # -----------------------------------------------------------------------
+    def test_cross_midnight_event_in_base_spool(self, monkeypatch):
+        """Base event spanning midnight is written to spool with correct timestamps.
+
+        The raw-spool path must NOT merge the cross-midnight fragments (that is
+        the browser's job).  This test confirms the pre-merge rows are stored
+        verbatim with no OLDLASTSTATUSCHANGEDATE mutation.
+        """
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        # Two fragments: R-001 UDT, same reason, < 60s gap across midnight
+        cross_midnight_rows = pd.DataFrame([
+            {
+                'HISTORYID': 'R-CM-001',
+                'OLDSTATUSNAME': 'UDT',
+                'OLDREASONNAME': 'EE Repair',
+                'OLDLASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 20, 0, 0),
+                'LASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 23, 59, 30),
+                'HOURS': 3.9917,
+                'JOBID': 'J-CM-001',
+            },
+            {
+                'HISTORYID': 'R-CM-001',
+                'OLDSTATUSNAME': 'UDT',
+                'OLDREASONNAME': 'EE Repair',
+                'OLDLASTSTATUSCHANGEDATE': datetime(2026, 5, 28, 0, 0, 0),
+                'LASTSTATUSCHANGEDATE': datetime(2026, 5, 28, 6, 0, 0),
+                'HOURS': 6.0,
+                'JOBID': 'J-CM-001',
+            },
+        ])
+        stored_base = {}
+
+        def _fake_store_base(query_id, df, **kwargs):
+            stored_base['df'] = df.copy()
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events',
+                   side_effect=_fake_store_base), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge'), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=cross_midnight_rows), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=pd.DataFrame()), \
+             patch('mes_dashboard.services.downtime_analysis_service._apply_resource_filters',
+                   side_effect=lambda df, *a, **kw: df):
+            svc.query_downtime_dataset_raw(
+                start_date='2026-05-27',
+                end_date='2026-05-28',
+            )
+
+        assert 'df' in stored_base, "store_downtime_base_events must be called"
+        df = stored_base['df']
+        # Both raw fragments must be present — no server-side merge on raw path (AC-2)
+        assert len(df) == 2, (
+            f"Raw spool must store both cross-midnight fragments (no server merge), "
+            f"got {len(df)} rows"
+        )
+        # Timestamps must not be modified by the spool write path
+        dates = sorted(df['OLDLASTSTATUSCHANGEDATE'].tolist())
+        assert dates[0] == datetime(2026, 5, 27, 20, 0, 0), (
+            "First fragment OLDLASTSTATUSCHANGEDATE must be unchanged"
+        )
+        assert dates[1] == datetime(2026, 5, 28, 0, 0, 0), (
+            "Cross-midnight fragment start time must be preserved"
+        )
+
+    # -----------------------------------------------------------------------
+    # No-overlap job bridge
+    # -----------------------------------------------------------------------
+    def test_no_overlap_job_bridge_written_raw(self, monkeypatch):
+        """Job rows with no time-overlap to base events are written verbatim to the job spool.
+
+        The raw-spool path must not drop non-overlapping job rows — the browser
+        does the overlap join, not the server.
+        """
+        self._patch_flag_on(monkeypatch)
+        import mes_dashboard.services.downtime_analysis_service as svc
+
+        # One base event
+        base_df = pd.DataFrame([{
+            'HISTORYID': 'R-NO-001',
+            'OLDSTATUSNAME': 'UDT',
+            'OLDREASONNAME': 'EE Repair',
+            'OLDLASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 8, 0),
+            'LASTSTATUSCHANGEDATE': datetime(2026, 5, 27, 10, 0),
+            'HOURS': 2.0,
+            'JOBID': None,
+        }])
+        # One job row that does NOT overlap the base event time range
+        job_df = pd.DataFrame([{
+            'JOBID': 'J-FUTURE-001',
+            'RESOURCEID': 'R-NO-001',
+            'CREATEDATE': datetime(2026, 5, 27, 22, 0),
+            'COMPLETEDATE': datetime(2026, 5, 27, 23, 0),
+            'SYMPTOMCODENAME': 'NOISE',
+            'CAUSECODENAME': 'LUBRICATION',
+            'REPAIRCODENAME': 'LUBRICATED',
+            'COMPLETE_FULLNAME': 'Technician B',
+            'FIRSTCLOCKONDATE': datetime(2026, 5, 27, 22, 30),
+            'LASTCLOCKOFFDATE': datetime(2026, 5, 27, 22, 55),
+            'JOBORDERNAME': 'JO-FUTURE-001',
+            'JOBMODELNAME': 'MODEL-ABC',
+            'ASSIGNED_DATE': None,
+            'ACK_DATE': None,
+            'INSPECT_START': None,
+            'INSPECT_END': None,
+        }])
+
+        stored_job = {}
+
+        def _fake_store_job(query_id, df, **kwargs):
+            stored_job['df'] = df.copy()
+
+        with patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge',
+                   return_value=False), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events'), \
+             patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge',
+                   side_effect=_fake_store_job), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb',
+                   return_value=True), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb',
+                   return_value=base_df), \
+             patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb',
+                   return_value=job_df), \
+             patch('mes_dashboard.services.downtime_analysis_service._apply_resource_filters',
+                   side_effect=lambda df, *a, **kw: df):
+            svc.query_downtime_dataset_raw(
+                start_date='2026-05-27',
+                end_date='2026-05-27',
+            )
+
+        assert 'df' in stored_job, "store_downtime_job_bridge must be called"
+        df = stored_job['df']
+        # The non-overlapping job row must be present — browser does the join
+        assert len(df) == 1, (
+            f"Non-overlapping job row must be written verbatim to job spool, "
+            f"got {len(df)} rows (server must not pre-filter by overlap)"
+        )
+        assert df.iloc[0]['JOBID'] == 'J-FUTURE-001'

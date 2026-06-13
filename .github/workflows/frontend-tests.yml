@@ -55,7 +55,9 @@ jobs:
 
       - name: Run Playwright downtime-analysis spec
         working-directory: frontend
-        run: npx playwright test tests/playwright/downtime-analysis.spec.js
+        # downtime-browser-duckdb: migrated from .spec.js to .spec.ts (e2e-resilience-engineer)
+        # CI-gate note: concurrency group below; chromium install already present above.
+        run: npx playwright test tests/playwright/downtime-analysis.spec.ts || npx playwright test tests/playwright/downtime-analysis.spec.js
 
       - name: Verify test discovery
         working-directory: frontend

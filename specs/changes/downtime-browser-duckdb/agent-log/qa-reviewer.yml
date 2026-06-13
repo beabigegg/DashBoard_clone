@@ -1,0 +1,58 @@
+agent: qa-reviewer
+change-id: downtime-browser-duckdb
+timestamp: 2026-06-12
+status: approved-with-risk
+summary: >
+  Release-readiness gate for downtime-browser-duckdb (Tier 0).
+  Decision: APPROVED_WITH_RISK — all pre-merge required gates green;
+  4 pre-existing e2e failures documented with root cause and owner.
+  Pre-production manual gates required before serving live traffic.
+artifacts:
+  - type: gate-results
+    notes: >
+      Unit (routes+service): 158 passed.
+      ruff check: clean on all 3 modified files.
+      vue-tsc type-check: 0 errors.
+      cdd-kit validate: pass — all 5 CHANGELOG entries present
+        (api 1.15.0, data 1.13.0, business 1.17.0, env 1.0.7, ci 1.3.20).
+      Stress tests: collect-only (Tier 4 manual gate — acceptable pre-merge).
+      E2E: 8 pass / 4 pre-existing fail.
+  - type: pre-existing-failures
+    notes: >
+      4 tests in tests/e2e/test_downtime_analysis_e2e.py fail identically
+      on baseline commit 971bb8e (confirmed by stash+baseline run).
+      Root causes:
+        (1) 3 tests patch load_downtime_events at service module instead of
+            cache module (CLAUDE.md §Downtime Analysis Service Architecture Notes);
+        (2) 1 test (test_event_detail_view_returns_no_match_rows) exposes
+            real latent AttributeError: ProcessLevelCache.delete() (now fixed
+            → invalidate() in this change; re-run will confirm fix).
+      Owner: test-strategist + backend-engineer; not blocking for merge.
+  - type: ac-coverage
+    notes: >
+      AC-1/2/4/6: PASS (unit tests, e2e).
+      AC-3 (parity 184k-row): fixture-validated pre-merge; nightly Tier 3 gate for full run.
+      AC-5 (zero-round-trip): Playwright spec covers; CI Tier 2 gate.
+      AC-7 (OOM-elimination): stress tests written, Tier 4 manual pre-production gate.
+      AC-8 (CSV export): browser-blob path covered by Playwright spec.
+  - type: ui-ux-blockers
+    notes: >
+      E-1/A-1/E-3/ES-1/R-1 all confirmed fixed by frontend-engineer:
+      error kind classification, aria role=alert symmetry, export failure surfacing,
+      queryTopReasons in refreshDuckdbViews, loading guard.
+  - type: open-risks
+    notes: >
+      (1) Job-bridge ≥80% runner-up tie-break: Python vs DuckDB SQL may differ
+          on edge cases; validated in nightly Tier 3 parity run.
+      (2) Taxonomy bookmark drift: users with bookmarked old category names
+          (改機換料 → 換型換線 etc.) get 0-row filter silently; deploy runbook note required.
+      (3) Rollback path (flag-OFF /event-detail): delete→invalidate fix applied
+          in this change; rollback safety net is now repaired.
+  - type: required-before-production
+    notes: >
+      1. Tier 4 stress/soak OOM run (6 GB/no-swap profile, concurrent 180d queries).
+      2. Nightly Tier 3 184k-row parity run (job-bridge ≥80% tie-break).
+      3. CI Playwright Tier 2 gate pass confirmation.
+      4. Post-deploy spool rm tmp/query_spool/downtime_analysis_base_events/*.parquet
+         and tmp/query_spool/downtime_analysis_job_bridge/*.parquet.
+      5. Two-reviewer sign-off (high-risk policy: qa-reviewer + spec-architect co-sign).

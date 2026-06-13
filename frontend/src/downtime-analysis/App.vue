@@ -15,6 +15,7 @@ import StatusMachineJobTable from './components/StatusMachineJobTable.vue';
 
 import { useFilterState } from './composables/useFilterState';
 import { useDowntimeData } from './composables/useDowntimeData';
+import { useDowntimeDuckDB } from './composables/useDowntimeDuckDB';
 import type { FilterState, ChartFilter, TierThreeEntry } from './types';
 
 ensureMesApiAvailable();
@@ -32,6 +33,7 @@ const {
   summaryData,
   equipmentData,
   filterOptions,
+  duckdbSpoolUrls,
   loadOptions,
   executePrimaryQuery,
   applyView,
@@ -41,6 +43,15 @@ const {
   exportEquipmentDetailCsv,
   resetSummaryData,
 } = useDowntimeData();
+
+/**
+ * Browser DuckDB composable — activated when server returns browser-DuckDB shape
+ * (DOWNTIME_BROWSER_DUCKDB=true → response has base_spool_url + jobs_spool_url + taxonomy).
+ * When active, all view queries are served locally (zero API round-trips, AC-5).
+ */
+const duckdb = useDowntimeDuckDB();
+const duckdbError = ref('');
+const duckdbLoading = ref(false);
 
 /** Chart cross-filter state (distinct from committed FilterState) */
 const chartFilter = ref<ChartFilter>({ big_category: null, status_types: null });
@@ -61,6 +72,23 @@ function clearTierThreeCache(): void {
 async function handleExportEquipment(): Promise<void> {
   exportingEquipment.value = true;
   try {
+    if (duckdb.state.value === 'ready') {
+      // Browser-blob CSV from DuckDB (design.md D2: CSV equals exactly what user sees)
+      const filters = {
+        resourceIds: filterState.resource_ids.length > 0 ? filterState.resource_ids : undefined,
+        bigCategories: chartFilter.value.big_category ? [chartFilter.value.big_category] : undefined,
+        statusTypes: chartFilter.value.status_types && chartFilter.value.status_types.length > 0
+          ? chartFilter.value.status_types
+          : undefined,
+      };
+      try {
+        await duckdb.exportCsv(filters, 'equipment');
+      } catch (err) {
+        // E-3: surface export failures to the user rather than silently swallowing them
+        duckdbError.value = '匯出失敗，請重試';
+      }
+      return;
+    }
     await exportEquipmentDetailCsv();
   } finally {
     exportingEquipment.value = false;
@@ -99,6 +127,11 @@ function syncDraftFromState(): void {
 }
 
 async function runPrimaryQuery(): Promise<void> {
+  // R-1: guard against double-activation while a parquet load/merge is already in flight
+  if (duckdb.state.value === 'loading') {
+    return;
+  }
+
   const body = buildQueryBody();
   if (!body.start_date || !body.end_date) {
     return;
@@ -106,9 +139,126 @@ async function runPrimaryQuery(): Promise<void> {
   // Clear cross-filter and Tier 3 cache on re-query (DQ-3)
   chartFilter.value = { big_category: null, status_types: null };
   clearTierThreeCache();
+  duckdbError.value = '';
+
+  // Deactivate any existing DuckDB session before re-query
+  if (duckdb.state.value === 'ready') {
+    duckdb.deactivate();
+  }
 
   await executePrimaryQuery(body);
+
+  // Browser-DuckDB path: server returned spool URLs → activate DuckDB-WASM
+  if (duckdbSpoolUrls.value) {
+    duckdbLoading.value = true;
+    try {
+      await duckdb.activate(
+        duckdbSpoolUrls.value.base_spool_url,
+        duckdbSpoolUrls.value.jobs_spool_url,
+        duckdbSpoolUrls.value.taxonomy
+      );
+      // Populate view data from local DuckDB (zero round-trips)
+      await refreshDuckdbViews();
+    } catch (err) {
+      duckdbError.value = duckdb.errorMessage.value || String((err as Error)?.message ?? err);
+    } finally {
+      duckdbLoading.value = false;
+    }
+    return; // Skip legacy equipment-detail API call
+  }
+
+  // Flag-off / legacy path: load equipment detail from server
   await loadAllEquipmentDetail({ big_category: null, status_types: null });
+}
+
+/**
+ * Refresh all view data from local DuckDB (called after activate() and on filter changes).
+ * Replaces server API calls to /view, /equipment-detail, /event-detail.
+ * Zero API round-trips per filter change (AC-5).
+ */
+async function refreshDuckdbViews(): Promise<void> {
+  if (duckdb.state.value !== 'ready') return;
+
+  const filters = {
+    resourceIds: filterState.resource_ids.length > 0 ? filterState.resource_ids : undefined,
+    bigCategories: chartFilter.value.big_category ? [chartFilter.value.big_category] : undefined,
+    statusTypes: chartFilter.value.status_types && chartFilter.value.status_types.length > 0
+      ? chartFilter.value.status_types
+      : undefined,
+  };
+
+  try {
+    const [kpi, trend, categories, equipment, topReasons] = await Promise.all([
+      duckdb.queryKpi(filters),
+      duckdb.queryDailyTrend(filters),
+      duckdb.queryBigCategory(filters),
+      duckdb.queryEquipmentDetail(filters, 1, 1000),
+      duckdb.queryTopReasons(filters, 10),
+    ]);
+
+    // Map DuckDB KPI result to summaryData.summary shape
+    summaryData.summary = {
+      total_hours: kpi.total_hours,
+      udt_hours: kpi.udt_hours,
+      sdt_hours: kpi.sdt_hours,
+      egt_hours: kpi.egt_hours,
+      event_count: kpi.event_count,
+      avg_event_min: kpi.avg_event_min,
+    };
+
+    // Map DuckDB trend rows to summaryData.daily_trend shape
+    summaryData.daily_trend = trend.map((r) => ({
+      date: r.date,
+      udt_hours: r.udt_hours,
+      sdt_hours: r.sdt_hours,
+      egt_hours: r.egt_hours,
+      total_hours: r.total_hours,
+    }));
+
+    // Map BigCategory rows
+    summaryData.big_category = categories.map((r) => ({
+      category: r.category,
+      hours: r.hours,
+      event_count: r.event_count,
+      pct: r.pct,
+    }));
+
+    // ES-1: populate top_reasons from DuckDB so TopReasonsTable is not permanently blank in DuckDB mode
+    // Map to TopReasonRow shape (types.ts): reason/status/hours/event_count/avg_min
+    // Status is not available per-reason in the aggregated view, omitted (empty string).
+    summaryData.top_reasons = topReasons.map((r) => ({
+      reason: r.reason,
+      status: '',
+      hours: r.total_hours,
+      event_count: r.event_count,
+      avg_min: r.avg_min,
+    }));
+
+    // Map equipment detail rows
+    equipmentData.rows = equipment.data.map((r) => ({
+      resource_id: r.resource_id,
+      resource_name: null,
+      workcenter: null,
+      family: null,
+      udt_hours: r.udt_hours,
+      sdt_hours: r.sdt_hours,
+      egt_hours: r.egt_hours,
+      total_hours: r.total_hours,
+      event_count: r.event_count,
+      udt_event_count: 0,
+      sdt_event_count: 0,
+      egt_event_count: 0,
+      top_reason: null,
+    }));
+    equipmentData.pagination = {
+      page: equipment.page,
+      page_size: equipment.page_size,
+      total_rows: equipment.total,
+      total_pages: equipment.total_pages,
+    };
+  } catch (err) {
+    duckdbError.value = String((err as Error)?.message ?? err);
+  }
 }
 
 /**
@@ -151,6 +301,11 @@ async function handleClear(): Promise<void> {
 async function handleGranularityChange(next: FilterState): Promise<void> {
   updateAll(next);
   syncDraftFromState();
+  if (duckdb.state.value === 'ready') {
+    // DuckDB path: granularity is not used (daily grouping only per design), re-run views
+    await refreshDuckdbViews();
+    return;
+  }
   await applyView(next.granularity, runPrimaryQuery);
 }
 
@@ -158,6 +313,11 @@ async function handleGranularityChange(next: FilterState): Promise<void> {
 async function handleCategoryClick(category: string | null): Promise<void> {
   chartFilter.value.big_category = category;
   clearTierThreeCache();
+  if (duckdb.state.value === 'ready') {
+    // Zero round-trip: re-run DuckDB views with updated chart filter (AC-5)
+    await refreshDuckdbViews();
+    return;
+  }
   await loadAllEquipmentDetail(chartFilter.value);
 }
 
@@ -165,6 +325,11 @@ async function handleCategoryClick(category: string | null): Promise<void> {
 async function handleStatusClick(statusTypes: string[] | null): Promise<void> {
   chartFilter.value.status_types = statusTypes;
   clearTierThreeCache();
+  if (duckdb.state.value === 'ready') {
+    // Zero round-trip: re-run DuckDB views with updated chart filter (AC-5)
+    await refreshDuckdbViews();
+    return;
+  }
   await Promise.all([
     loadAllEquipmentDetail(chartFilter.value),
     loadChartFilterView(statusTypes),
@@ -180,6 +345,56 @@ async function handleExpandMachine(payload: { resourceId: string; statusType: st
   if (cached?.loaded || cached?.loading) return;
   tierThreeCache[key] = { rows: [], loading: true, loaded: false, error: '' };
   try {
+    if (duckdb.state.value === 'ready') {
+      // Browser DuckDB path: query event detail locally (zero round-trip)
+      const result = await duckdb.queryEventDetail(
+        {
+          resourceIds: [resourceId],
+          statusTypes: [statusType],
+          bigCategories: chartFilter.value.big_category ? [chartFilter.value.big_category] : undefined,
+        },
+        1,
+        200
+      );
+      // Map to EventDetailRow shape expected by StatusMachineJobTable
+      tierThreeCache[key] = {
+        rows: result.data.map((e) => ({
+          event_id: e.event_id,
+          resource_id: e.resource_id,
+          resource_name: null,
+          status: e.status,
+          reason: e.reason,
+          category: e.category,
+          start_ts: e.start_ts,
+          end_ts: e.end_ts,
+          hours: e.hours,
+          match_source: e.match_source,
+          job: e.job ? {
+            job_id: e.job.job_id,
+            job_order_name: e.job.job_order_name,
+            job_model: e.job.job_model,
+            symptom: e.job.symptom,
+            cause: e.job.cause,
+            repair: e.job.repair,
+            wait_min: e.job.wait_min,
+            repair_min: e.job.repair_min,
+            wait_assign_min: e.job.wait_assign_min,
+            wait_ack_min: e.job.wait_ack_min,
+            inspect_min: e.job.inspect_min,
+            close_wait_min: e.job.close_wait_min,
+            job_create_date: e.job.job_create_date,
+            job_complete_date: e.job.job_complete_date,
+            handler: e.job.handler,
+            match_ambiguous: e.job.match_ambiguous,
+          } : null,
+        })),
+        loading: false,
+        loaded: true,
+        error: '',
+      };
+      return;
+    }
+    // Legacy server path
     const rows = await loadMachineStatusEvents(resourceId, statusType, chartFilter.value);
     tierThreeCache[key] = { rows, loading: false, loaded: true, error: '' };
   } catch (e) {
@@ -219,8 +434,22 @@ onMounted(() => {
         @clear="handleClear"
       />
 
-      <!-- Error banner -->
+      <!-- Error banner: legacy API error -->
       <ErrorBanner :message="error" :dismissible="false" />
+
+      <!-- DuckDB error banner: WASM init / parquet fetch / merge failure (AC-7, D3, E-1) -->
+      <!-- Copy is classified by errorKind for actionable user guidance -->
+      <ErrorBanner
+        v-if="duckdb.state.value === 'error' || duckdbError"
+        :message="duckdbError || (
+          duckdb.errorKind.value === 'fetch'     ? '資料快取已過期，請重新查詢' :
+          duckdb.errorKind.value === 'wasm_init' ? '瀏覽器分析加速初始化失敗，請使用 Chrome 或 Edge' :
+          duckdb.errorKind.value === 'compute'   ? '本地資料處理失敗，請縮小日期範圍後重試' :
+          duckdb.errorMessage.value || '分析資料載入失敗'
+        )"
+        :dismissible="false"
+        aria-label="DuckDB 分析錯誤"
+      />
 
       <!-- KPI cards (clickable: UDT/SDT/EGT toggle chart cross-filter) -->
       <div class="kpi-section">
@@ -299,7 +528,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Page-level loading overlay -->
-    <LoadingOverlay v-if="isInitialLoad || loading.initial" tier="page" />
+    <!-- Page-level loading overlay: initial page load or DuckDB parquet download/merge -->
+    <LoadingOverlay v-if="isInitialLoad || loading.initial || duckdbLoading" tier="page" />
   </div>
 </template>

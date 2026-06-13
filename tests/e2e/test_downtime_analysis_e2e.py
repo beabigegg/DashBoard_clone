@@ -291,3 +291,316 @@ class TestEventDetailMatchSourceNoneRowsPresent:
         event = data['events'][0]
         assert event['match_source'] == 'none'
         assert event['job'] is None
+
+
+# ===========================================================================
+# TestDowntimeQueryNewShape — AC-1: new /query response shape (flag ON)
+# ===========================================================================
+
+
+class TestDowntimeQueryNewShape:
+    """E2E: /query returns {base_spool_url, jobs_spool_url, query_id, taxonomy} when flag on."""
+
+    @staticmethod
+    def _patch_flag_on(monkeypatch):
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_query_returns_spool_urls(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_store_job,
+        mock_store_base,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """POST /query with flag ON returns four-key DuckDB shape."""
+        self._patch_flag_on(monkeypatch)
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['success'] is True
+        result = data['data']
+
+        assert 'base_spool_url' in result, "base_spool_url must be present (AC-1)"
+        assert 'jobs_spool_url' in result, "jobs_spool_url must be present (AC-1)"
+        assert 'query_id' in result, "query_id must be present (AC-1)"
+        assert 'taxonomy' in result, "taxonomy must be present (AC-1)"
+
+        assert result['base_spool_url'] is not None
+        assert result['jobs_spool_url'] is not None
+        assert result['query_id'] is not None
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_base_spool_url_points_to_correct_namespace(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_store_job,
+        mock_store_base,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """base_spool_url must reference the downtime_analysis_base_events namespace."""
+        self._patch_flag_on(monkeypatch)
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        result = resp.get_json()['data']
+        assert result['base_spool_url'].startswith(
+            '/api/spool/downtime_analysis_base_events/'
+        ), f"base_spool_url has wrong namespace: {result['base_spool_url']}"
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_jobs_spool_url_points_to_correct_namespace(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_store_job,
+        mock_store_base,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """jobs_spool_url must reference the downtime_analysis_job_bridge namespace."""
+        self._patch_flag_on(monkeypatch)
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        result = resp.get_json()['data']
+        assert result['jobs_spool_url'].startswith(
+            '/api/spool/downtime_analysis_job_bridge/'
+        ), f"jobs_spool_url has wrong namespace: {result['jobs_spool_url']}"
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_taxonomy_has_required_keys(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_store_job,
+        mock_store_base,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """taxonomy must have map, prefixes, egt_category, fallback keys (AC-4)."""
+        self._patch_flag_on(monkeypatch)
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        tax = resp.get_json()['data']['taxonomy']
+        assert 'map' in tax, "taxonomy missing 'map'"
+        assert 'prefixes' in tax, "taxonomy missing 'prefixes'"
+        assert 'egt_category' in tax, "taxonomy missing 'egt_category'"
+        assert 'fallback' in tax, "taxonomy missing 'fallback'"
+        assert isinstance(tax['map'], list), "taxonomy 'map' must be a list"
+        assert len(tax['map']) > 0, "taxonomy 'map' must not be empty"
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_ninety_day_range_accepted(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_store_job,
+        mock_store_base,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """POST with 91-day range must return 200, not 400 (AC-6: _MAX_ORACLE_DAYS removed)."""
+        self._patch_flag_on(monkeypatch)
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-01-01', 'end_date': '2026-04-02'},  # 91 days
+        )
+        assert resp.status_code == 200, (
+            f"91-day range must return 200, not {resp.status_code} — "
+            "_MAX_ORACLE_DAYS guard must be removed on the browser-DuckDB path (AC-6)"
+        )
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_base_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_job_bridge')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_legacy_keys_absent_when_flag_on(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_store_job,
+        mock_store_base,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """summary/daily_trend/big_category/top_reasons must be absent when flag ON (AC-1)."""
+        self._patch_flag_on(monkeypatch)
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        result = resp.get_json()['data']
+        for legacy_key in ('summary', 'daily_trend', 'big_category', 'top_reasons'):
+            assert legacy_key not in result, (
+                f"Legacy key '{legacy_key}' must be absent in the browser-DuckDB response "
+                f"(flag ON path removes pre-aggregated server views — AC-1)"
+            )
+
+
+# ===========================================================================
+# TestTwoParquetAtomicity — extended: base-hit/job-miss via route layer
+# ===========================================================================
+
+
+class TestTwoParquetAtomicityRoute:
+    """AC-7: Two-parquet atomicity surfaced as HTTP 500 via the route layer."""
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_base_events', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_job_bridge', return_value=False)
+    def test_base_hit_job_miss_returns_500_via_route(
+        self,
+        mock_has_job,
+        mock_has_base,
+        client,
+        monkeypatch,
+    ):
+        """AC-7: When base spool is present but jobs spool is missing, route returns HTTP 500."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', True
+        )
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        # The atomicity error raised by the service must propagate as 500, not 200 with empty data
+        assert resp.status_code == 500, (
+            f"Atomicity error must produce HTTP 500, got {resp.status_code}"
+        )
+        body = resp.get_json()
+        assert body['success'] is False
+
+
+# ===========================================================================
+# TestFeatureFlagFallback — AC-1: flag-OFF returns legacy shape
+# ===========================================================================
+
+
+class TestFeatureFlagFallback:
+    """Flag-OFF path: /query returns legacy {query_id, summary, daily_trend, ...} shape."""
+
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=True)
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_base_from_duckdb')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.query_job_from_duckdb')
+    def test_flag_off_returns_legacy_shape(
+        self,
+        mock_qjob,
+        mock_qbase,
+        mock_use_duckdb,
+        mock_load,
+        mock_store,
+        mock_has_cache,
+        client,
+        monkeypatch,
+    ):
+        """DOWNTIME_BROWSER_DUCKDB=false → response has summary/daily_trend/big_category/top_reasons."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False
+        )
+        mock_qbase.return_value = _make_oracle_rows()
+        mock_qjob.return_value = _make_job_rows()
+        mock_store.return_value = None
+
+        resp = client.post(
+            '/api/downtime-analysis/query',
+            json={'start_date': '2026-05-27', 'end_date': '2026-05-28'},
+        )
+        assert resp.status_code == 200
+        result = resp.get_json()['data']
+
+        # Legacy shape must contain the pre-aggregated server-side keys
+        for expected_key in ('query_id', 'summary', 'daily_trend', 'big_category', 'top_reasons'):
+            assert expected_key in result, (
+                f"Legacy (flag-OFF) response must contain '{expected_key}'"
+            )
+
+        # And must NOT contain the DuckDB-path spool URL keys
+        for duckdb_key in ('base_spool_url', 'jobs_spool_url', 'taxonomy'):
+            assert duckdb_key not in result, (
+                f"Legacy (flag-OFF) response must NOT contain '{duckdb_key}'"
+            )

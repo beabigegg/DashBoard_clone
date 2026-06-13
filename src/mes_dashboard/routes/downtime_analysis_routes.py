@@ -27,12 +27,15 @@ from mes_dashboard.core.response import (
     success_response,
     validation_error,
 )
+import os
+
 from mes_dashboard.services.downtime_analysis_service import (
     apply_view,
     export_equipment_detail_csv,
     export_event_detail_csv,
     get_filter_options,
     query_downtime_dataset,
+    query_downtime_dataset_raw,
 )
 
 downtime_analysis_bp = Blueprint(
@@ -43,6 +46,18 @@ downtime_analysis_bp = Blueprint(
 
 # ── Maximum allowed date range (SYS-04) ──────────────────────────────────────
 _MAX_DAYS = 730
+# _MAX_ORACLE_DAYS (90) and _DUCKDB_WINDOW_DAYS (93) are intentionally removed.
+# The OOM risk for wide Oracle-path queries is eliminated by the browser-DuckDB
+# path: the server writes raw parquets and all pandas reductions run in the browser.
+# Only the SYS-04 730-day hard cap remains (DA-09, AC-6).
+
+# ── Feature flag: browser-DuckDB response path (env-contract 1.0.7) ──────────
+# Default false at initial ship; operators cut over by setting
+# DOWNTIME_BROWSER_DUCKDB=true and reloading gunicorn.  This constant is frozen
+# at import time — tests must use monkeypatch.setattr, never os.environ.
+_BROWSER_DUCKDB_ENABLED: bool = os.getenv(
+    "DOWNTIME_BROWSER_DUCKDB", "false"
+).lower() in ("1", "true", "yes")
 
 
 # ============================================================
@@ -51,14 +66,20 @@ _MAX_DAYS = 730
 
 
 def _validate_dates(start_date: str, end_date: str) -> None:
-    """Raise ValueError on invalid/missing dates or range > 730d (SYS-04)."""
+    """Raise ValueError on invalid/missing dates or range > _MAX_DAYS (SYS-04).
+
+    Only the 730-day hard cap is enforced (DA-09, AC-6).  The prior 90-day
+    Oracle-path guard (_MAX_ORACLE_DAYS) is intentionally removed — the OOM
+    risk is eliminated by the browser-DuckDB path (design.md D3, DA-10).
+    """
     if not start_date or not end_date:
         raise ValueError("必須提供 start_date 和 end_date 參數")
     sd = datetime.strptime(start_date, "%Y-%m-%d")
     ed = datetime.strptime(end_date, "%Y-%m-%d")
     if ed < sd:
         raise ValueError("end_date 不可早於 start_date")
-    if (ed - sd).days > _MAX_DAYS:
+    days = (ed - sd).days
+    if days > _MAX_DAYS:
         raise ValueError(f"查詢範圍不可超過 {_MAX_DAYS} 天")
 
 
@@ -153,19 +174,38 @@ def api_downtime_query():
     is_monitor = bool(body.get('is_monitor', False))
 
     try:
-        result = query_downtime_dataset(
-            start_date=start_date,
-            end_date=end_date,
-            workcenter_groups=workcenter_groups,
-            families=families,
-            resource_ids=resource_ids,
-            package_groups=package_groups,
-            big_categories=big_categories,
-            status_types=status_types,
-            is_production=is_production,
-            is_key=is_key,
-            is_monitor=is_monitor,
-        )
+        if _BROWSER_DUCKDB_ENABLED:
+            # Browser-DuckDB path (AC-1, DA-12): write two raw spool parquets;
+            # return URLs + taxonomy; no server-side reductions.
+            result = query_downtime_dataset_raw(
+                start_date=start_date,
+                end_date=end_date,
+                workcenter_groups=workcenter_groups,
+                families=families,
+                resource_ids=resource_ids,
+                package_groups=package_groups,
+                big_categories=big_categories,
+                status_types=status_types,
+                is_production=is_production,
+                is_key=is_key,
+                is_monitor=is_monitor,
+            )
+        else:
+            # Legacy enriched-spool path (flag OFF / rollback target):
+            # returns {query_id, summary, daily_trend, big_category, top_reasons}.
+            result = query_downtime_dataset(
+                start_date=start_date,
+                end_date=end_date,
+                workcenter_groups=workcenter_groups,
+                families=families,
+                resource_ids=resource_ids,
+                package_groups=package_groups,
+                big_categories=big_categories,
+                status_types=status_types,
+                is_production=is_production,
+                is_key=is_key,
+                is_monitor=is_monitor,
+            )
         return success_response(result)
     except Exception as exc:
         return internal_error(str(exc))

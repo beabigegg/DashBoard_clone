@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.6
-last-changed: 2026-06-10
+schema-version: 1.0.7
+last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -87,6 +87,7 @@ breaking-change-policy: deprecate-2-minors
 | RESOURCE_HISTORY_SPOOL_TTL | cache | all | no | no | 72000 | 72000 | application-team | positive integer (seconds); minimum 3600; controls Redis spool metadata TTL for recent resource_history queries; overrides CACHE_TTL_DATASET for this service | yes | uses default 72000 |
 | RESOURCE_VIEW_CACHE_TTL | cache | all | no | no | 300 | 300 | application-team | non-negative integer (seconds); 0 disables view-result cache | yes | uses default 300 |
 | RESOURCE_HISTORY_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables DuckDB prewarm | yes | uses default 3 |
+| DOWNTIME_BROWSER_DUCKDB | feature-flag | all | no | no | false | true | application-team | boolean (1/true/yes = enabled); governs whether `POST /api/downtime-analysis/query` returns raw-spool URLs for browser DuckDB-WASM (`true`) or the legacy enriched-spool response (`false`); restart required to take effect (module-level constant frozen at import) | yes | uses default false |
 | DOWNTIME_ANALYSIS_CACHE_TTL | cache | all | no | no | 72000 | 72000 | application-team | positive integer (seconds); minimum 3600; controls Redis spool metadata TTL for downtime_analysis queries; overrides CACHE_TTL_DATASET for this service | yes | uses default 72000 |
 | DOWNTIME_ANALYSIS_PREWARM_DAYS | cache | all | no | no | 30 | 30 | application-team | deprecated — superseded by DOWNTIME_ANALYSIS_PREWARM_MONTHS; kept for backward compat | yes | uses default 30 |
 | DOWNTIME_ANALYSIS_PREWARM_MONTHS | cache | all | no | no | 3 | 3 | application-team | positive integer 1–12; 0 disables DuckDB prewarm | yes | uses default 3 |
@@ -96,6 +97,7 @@ breaking-change-policy: deprecate-2-minors
 - `RESOURCE_HISTORY_HISTORICAL_TTL`: Redis TTL for resource-history queries where `end_date < today − 2 days`. Historical data is immutable; default 86400s (24h). Added by change `resource-history-perf`.
 - `RESOURCE_HISTORY_SPOOL_TTL`: Redis spool metadata TTL for recent resource_history queries (end_date ≥ today − 2d). Default 72000 s (20h), aligned to the daily DuckDB refresh cycle. Overrides `CACHE_TTL_DATASET` (2h) for this service specifically; hold/reject/yield_alert datasets are unaffected. Set to a value slightly less than 86400 to guarantee daily refresh takes effect. Restart required. Added by change `unify-duckdb-prewarm-rq`.
 - `RESOURCE_HISTORY_PREWARM_MONTHS`: Number of calendar months of resource-history data to load into the persistent DuckDB cache at startup. Background thread starts 10s after worker boot; `0` disables entirely. Default 3 months (~25s Oracle load time, ~15MB DuckDB file). Added by change `resource-history-perf`.
+- `DOWNTIME_BROWSER_DUCKDB`: Feature flag controlling the `POST /api/downtime-analysis/query` response path. `true` (or `1`/`yes`) → returns `{base_spool_url, jobs_spool_url, query_id, taxonomy}` for browser DuckDB-WASM processing; `false` (default at initial ship) → returns prior `{query_id, summary, daily_trend, big_category, top_reasons}` enriched-spool response. Default `false` chosen for safety — parity sign-off required before enabling in production. **Restart required** — module-level constant `_BROWSER_DUCKDB_ENABLED` in `downtime_analysis_routes.py` is frozen at import time; `monkeypatch.setattr()` required in tests (never `os.environ`). Added by change `downtime-browser-duckdb`.
 - `DOWNTIME_ANALYSIS_PREWARM_DAYS`: Deprecated — superseded by `DOWNTIME_ANALYSIS_PREWARM_MONTHS` and the DuckDB persistent cache. Kept for backward compatibility. Default 30 days.
 - `DOWNTIME_ANALYSIS_CACHE_TTL`: Redis spool metadata TTL for downtime_analysis queries. Default 72000 s (20h), aligned to the daily DuckDB refresh cycle. Overrides `CACHE_TTL_DATASET` (2h) for this service; other dataset TTLs are unaffected. Restart required. Added by change `unify-duckdb-prewarm-rq` (previously existed in code but undocumented).
 - `DOWNTIME_ANALYSIS_PREWARM_MONTHS`: Number of calendar months of downtime-analysis data to load into the persistent DuckDB cache at startup. DuckDB prewarm now runs via RQ job (not daemon thread); `0` disables entirely. Default 3 months. Added by change `downtime-analysis-duckdb-cache`; startup mechanism updated by `unify-duckdb-prewarm-rq`.

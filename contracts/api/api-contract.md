@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.14.0
-last-changed: 2026-06-03
+schema-version: 1.15.0
+last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -213,10 +213,10 @@ breaking-change-policy: deprecate-2-minors
 | POST | /admin/api/analytics/recalculate | admin | — | success_response | 403/500 | route tests |
 
 | GET | /api/downtime-analysis/options | required | — | success_response | 500 | route tests |
-| POST | /api/downtime-analysis/query | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/downtime-analysis/view | required | ?query_id=&granularity=&top_n= (granularity: day only; week/month planned) | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/equipment-detail | required | ?query_id= &page_size=(opt,max:1000,default:20) &big_category=(opt) &status_types=(opt,CSV:UDT,SDT,EGT) | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/event-detail | required | ?query_id= &page= &page_size= &big_category=(opt) &status_types=(opt,CSV) &resource_id=(opt) | success_response | 400/410 | route tests |
+| POST | /api/downtime-analysis/query | required | JSON body | success_response `{base_spool_url, jobs_spool_url, query_id, taxonomy}` (flag ON) / `{query_id, summary, daily_trend, big_category, top_reasons}` (flag OFF) | 400/500 | route tests |
+| GET | /api/downtime-analysis/view | required | ?query_id=&granularity=&top_n= (granularity: day only; week/month planned) — **[DEPRECATED: removal target api 1.17.0]** | success_response | 400/410 | route tests |
+| GET | /api/downtime-analysis/equipment-detail | required | ?query_id= &page_size=(opt,max:1000,default:20) &big_category=(opt) &status_types=(opt,CSV:UDT,SDT,EGT) — **[DEPRECATED: removal target api 1.17.0]** | success_response | 400/410 | route tests |
+| GET | /api/downtime-analysis/event-detail | required | ?query_id= &page= &page_size= &big_category=(opt) &status_types=(opt,CSV) &resource_id=(opt) — **[DEPRECATED: removal target api 1.17.0]** | success_response | 400/410 | route tests |
 
 ## 5. Routing & Naming
 
@@ -355,6 +355,18 @@ breaking-change-policy: deprecate-2-minors
   - Backward-compatible: omitting all params returns byte-for-byte identical unfiltered response.
   - Consumers: `frontend/src/downtime-analysis/` only (StatusMachineJobTable.vue, MachineEventRows.vue).
   - Spool namespace `downtime_analysis_*`, cache key includes `DOWNTIME_BRIDGE_VERSION`. Additive; no existing endpoints changed.
+
+- **downtime-browser-duckdb (2026-06-12)**: `POST /api/downtime-analysis/query` response shape changed when `DOWNTIME_BROWSER_DUCKDB=true` (default: false at initial ship). All pre-aggregated keys (`summary`, `daily_trend`, `big_category`, `top_reasons`) removed from primary path; moved to browser DuckDB-WASM. Three endpoints deprecated for removal at api 1.17.0.
+  - `POST /api/downtime-analysis/query` (flag ON): returns `{base_spool_url: string, jobs_spool_url: string, query_id: string, taxonomy: TaxonomyShape}`. `base_spool_url = /api/spool/downtime_analysis_base_events/<query_id>.parquet`; `jobs_spool_url = /api/spool/downtime_analysis_job_bridge/<query_id>.parquet`. `taxonomy = {map: [[reason, category], …], prefixes: [[prefix, category], …], egt_category: "工程", fallback: "其他/未分類"}`. 90-day Oracle-path guard removed (`_MAX_ORACLE_DAYS`); 730-day SYS-04 hard cap retained. 400 on invalid/missing dates or >730d range; 500 on Oracle error.
+  - `POST /api/downtime-analysis/query` (flag OFF): returns prior `{query_id, summary, daily_trend, big_category, top_reasons}` shape unchanged (rollback target).
+  - `GET /api/downtime-analysis/view` — **DEPRECATED** (removal target api 1.17.0); kept alive for flag-off fallback. No behavior change.
+  - `GET /api/downtime-analysis/equipment-detail` — **DEPRECATED** (removal target api 1.17.0); kept alive for flag-off fallback. No behavior change.
+  - `GET /api/downtime-analysis/event-detail` — **DEPRECATED** (removal target api 1.17.0); kept alive for flag-off fallback. No behavior change.
+  - Feature flag: `DOWNTIME_BROWSER_DUCKDB` env var (default false); module-level `_BROWSER_DUCKDB_ENABLED` in routes module; toggle without redeploy via gunicorn env reload.
+  - Two-parquet atomicity: server writes both spools or neither; base hit with missing job spool → 500, never silent empty join.
+  - CSV export for new shape: browser-blob from DuckDB-WASM result; server `export_*_csv` streamers kept as flag-off fallback only.
+  - Raw spool schema: `downtime_analysis_base_events` (7 cols) and `downtime_analysis_job_bridge` (16 cols); see data-shape-contract.md §3.13. `SCHEMA_VERSION` constant participates in cache key; bumping orphans stale raw parquets without manual `rm`. Post-deploy `rm -f tmp/query_spool/downtime_analysis_base_events/*.parquet tmp/query_spool/downtime_analysis_job_bridge/*.parquet` required on schema-breaking rollback.
+  - Consumers: `frontend/src/downtime-analysis/useDowntimeDuckDB.ts` (new composable; flag ON path only).
 
 ## Breaking Change Policy
 
