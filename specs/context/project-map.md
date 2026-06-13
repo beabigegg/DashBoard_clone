@@ -794,6 +794,7 @@ DashBoard_vite/
 |       |   |-- hold_today_snapshot_service.py
 |       |   |-- internal_metrics_service.py
 |       |   |-- job_query_service.py
+|       |   |-- job_registry.py
 |       |   |-- lineage_engine.py
 |       |   |-- material_consumption_duckdb_runtime.py
 |       |   |-- material_consumption_service.py
@@ -814,8 +815,7 @@ DashBoard_vite/
 |       |   |-- realtime_equipment_cache.py
 |       |   |-- reason_filter_cache.py
 |       |   |-- reject_cache_sql_runtime.py
-|       |   |-- reject_dataset_cache.py
-|       |   \-- ... (21 more entries truncated; cap=50)
+|       |   \-- ... (22 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -1040,7 +1040,7 @@ DashBoard_vite/
 |   |-- test_cross_worker_result_sharing.py
 |   |-- test_dashboard_routes.py
 |   |-- test_dashboard_service.py
-|   \-- ... (166 more entries truncated; cap=50)
+|   \-- ... (167 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
 |   |   |-- anomaly_hold_dataset/

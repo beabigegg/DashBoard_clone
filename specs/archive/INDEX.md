@@ -50,3 +50,4 @@
 | downtime-browser-duckdb | 2026 | 2026-06-13 | specs/archive/2026/downtime-browser-duckdb/ |
 | unify-duckdb-prewarm-rq | 2026 | 2026-06-13 | specs/archive/2026/unify-duckdb-prewarm-rq/ |
 | async-progress-ui | 2026 | 2026-06-13 | specs/archive/2026/async-progress-ui/ |
+| job-registry-central | 2026 | 2026-06-13 | specs/archive/2026/job-registry-central/ |

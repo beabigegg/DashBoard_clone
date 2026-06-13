@@ -167,7 +167,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Test BOTH snapshot and Oracle fallback paths for every filter kwarg — see docs/architecture/test-discipline.md
 - Filter fixtures must include every column the function filters on — see docs/architecture/test-discipline.md
 - Cross-filter narrowing has its own test surface: assert "selecting A narrows B" — see docs/architecture/test-discipline.md
-- Module-level constants: `monkeypatch.setattr()` not `setenv` (frozen at import) — see docs/architecture/test-discipline.md
+- Module-level constants: `monkeypatch.setattr()` not `setenv` (frozen at import); module-level side-effects (e.g. `register_job_type()`): use `importlib.reload()` after clearing the dict to re-run registration — `setattr` alone does not re-execute them — see docs/architecture/test-discipline.md
 - Env-var contract tests must pin default values, not just assert var name presence — see docs/architecture/test-discipline.md
 - Check `pytestmark` before adding mock tests to `tests/integration/` — see docs/architecture/test-discipline.md
 - Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md
