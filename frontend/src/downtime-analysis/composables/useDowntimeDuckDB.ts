@@ -68,8 +68,17 @@ export interface BigCategoryRow {
   pct: number;
 }
 
+export interface ResourceLookupEntry {
+  resource_name: string | null;
+  workcenter: string | null;
+  family: string | null;
+}
+
 export interface EquipmentDetailRow {
   resource_id: string;
+  resource_name: string | null;
+  workcenter: string | null;
+  family: string | null;
   udt_hours: number;
   sdt_hours: number;
   egt_hours: number;
@@ -568,6 +577,7 @@ export function useDowntimeDuckDB() {
 
   let _client: DuckDBClient | null = null;
   let _taxonomy: TaxonomyShape | null = null;
+  let _resourceLookup: Record<string, ResourceLookupEntry> = {};
   let _isMerged = false;
 
   /**
@@ -631,12 +641,14 @@ export function useDowntimeDuckDB() {
   async function activate(
     baseSpool: string,
     jobsSpool: string,
-    taxonomy: TaxonomyShape
+    taxonomy: TaxonomyShape,
+    resourceLookup: Record<string, ResourceLookupEntry> = {}
   ): Promise<void> {
     state.value = 'loading';
     errorMessage.value = '';
     errorKind.value = null;
     _taxonomy = null;
+    _resourceLookup = resourceLookup;
     _isMerged = false;
 
     // Phase 1: WASM init
@@ -867,14 +879,21 @@ export function useDowntimeDuckDB() {
     `;
     const sql = interpolateParams(rawSQL, params);
     const rows = await _client!.sendQuery(sql);
-    const data: EquipmentDetailRow[] = (rows as Record<string, unknown>[]).map((row) => ({
-      resource_id: String(row.resource_id ?? ''),
-      udt_hours: Math.round(sf(row.udt_hours) * 100) / 100,
-      sdt_hours: Math.round(sf(row.sdt_hours) * 100) / 100,
-      egt_hours: Math.round(sf(row.egt_hours) * 100) / 100,
-      total_hours: Math.round(sf(row.total_hours) * 100) / 100,
-      event_count: Math.round(sf(row.event_count)),
-    }));
+    const data: EquipmentDetailRow[] = (rows as Record<string, unknown>[]).map((row) => {
+      const rid = String(row.resource_id ?? '');
+      const info = _resourceLookup[rid] ?? {};
+      return {
+        resource_id: rid,
+        resource_name: info.resource_name ?? null,
+        workcenter: info.workcenter ?? null,
+        family: info.family ?? null,
+        udt_hours: Math.round(sf(row.udt_hours) * 100) / 100,
+        sdt_hours: Math.round(sf(row.sdt_hours) * 100) / 100,
+        egt_hours: Math.round(sf(row.egt_hours) * 100) / 100,
+        total_hours: Math.round(sf(row.total_hours) * 100) / 100,
+        event_count: Math.round(sf(row.event_count)),
+      };
+    });
 
     return {
       data,
@@ -907,12 +926,12 @@ export function useDowntimeDuckDB() {
 
     const rawSQL = `
       SELECT
-        TRIM(CAST(HISTORYID AS VARCHAR))       AS HISTORYID,
-        TRIM(CAST(OLDSTATUSNAME AS VARCHAR))   AS OLDSTATUSNAME,
+        TRIM(CAST(HISTORYID AS VARCHAR))                              AS HISTORYID,
+        TRIM(CAST(OLDSTATUSNAME AS VARCHAR))                         AS OLDSTATUSNAME,
         OLDREASONNAME,
         big_category,
-        event_start,
-        event_end,
+        STRFTIME(event_start, '%Y-%m-%dT%H:%M:%S')                  AS event_start,
+        STRFTIME(event_end,   '%Y-%m-%dT%H:%M:%S')                  AS event_end,
         hours,
         match_source,
         match_ambiguous,
@@ -921,16 +940,16 @@ export function useDowntimeDuckDB() {
         CAUSECODENAME,
         REPAIRCODENAME,
         COMPLETE_FULLNAME,
-        FIRSTCLOCKONDATE,
-        LASTCLOCKOFFDATE,
+        STRFTIME(FIRSTCLOCKONDATE,  '%Y-%m-%dT%H:%M:%S')            AS FIRSTCLOCKONDATE,
+        STRFTIME(LASTCLOCKOFFDATE,  '%Y-%m-%dT%H:%M:%S')            AS LASTCLOCKOFFDATE,
         JOBORDERNAME,
         JOBMODELNAME,
-        ASSIGNED_DATE,
-        ACK_DATE,
-        INSPECT_START,
-        INSPECT_END,
-        CREATEDATE,
-        COMPLETEDATE
+        STRFTIME(ASSIGNED_DATE, '%Y-%m-%dT%H:%M:%S')                AS ASSIGNED_DATE,
+        STRFTIME(ACK_DATE,      '%Y-%m-%dT%H:%M:%S')                AS ACK_DATE,
+        STRFTIME(INSPECT_START, '%Y-%m-%dT%H:%M:%S')                AS INSPECT_START,
+        STRFTIME(INSPECT_END,   '%Y-%m-%dT%H:%M:%S')                AS INSPECT_END,
+        STRFTIME(CREATEDATE,    '%Y-%m-%dT%H:%M:%S')                AS CREATEDATE,
+        STRFTIME(COMPLETEDATE,  '%Y-%m-%dT%H:%M:%S')                AS COMPLETEDATE
       FROM bridged_events
       ${where}
       ORDER BY HISTORYID, event_start

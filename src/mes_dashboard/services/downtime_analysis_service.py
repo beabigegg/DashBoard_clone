@@ -752,6 +752,25 @@ def _build_taxonomy_json() -> Dict[str, Any]:
     }
 
 
+def _build_resource_lookup() -> Dict[str, Any]:
+    """Return {historyid: {resource_name, workcenter, family}} for browser enrichment."""
+    try:
+        from mes_dashboard.services.resource_cache import get_all_resources
+        resources = get_all_resources()
+        lookup: Dict[str, Any] = {}
+        for r in resources:
+            rid = str(r.get('HISTORYID', '') or '').strip()
+            if rid:
+                lookup[rid] = {
+                    'resource_name': str(r.get('RESOURCENAME', '') or '').strip() or None,
+                    'workcenter': str(r.get('WORKCENTERNAME', '') or '').strip() or None,
+                    'family': str(r.get('RESOURCEFAMILYNAME', '') or '').strip() or None,
+                }
+        return lookup
+    except Exception:
+        return {}
+
+
 # ============================================================
 # Raw-spool writer (browser-DuckDB path, AC-2, DA-12)
 # ============================================================
@@ -818,6 +837,7 @@ def query_downtime_dataset_raw(
             'jobs_spool_url': f'/api/spool/{_JOB_BRIDGE_NAMESPACE}/{query_id}.parquet',
             'query_id': query_id,
             'taxonomy': taxonomy,
+            'resource_lookup': _build_resource_lookup(),
         }
 
     if base_hit and not job_hit:
@@ -959,6 +979,7 @@ def query_downtime_dataset_raw(
         'jobs_spool_url': f'/api/spool/{_JOB_BRIDGE_NAMESPACE}/{query_id}.parquet',
         'query_id': query_id,
         'taxonomy': taxonomy,
+        'resource_lookup': _build_resource_lookup(),
     }
 
 

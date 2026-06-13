@@ -52,6 +52,7 @@ export function useDowntimeData() {
     base_spool_url: string;
     jobs_spool_url: string;
     taxonomy: TaxonomyShape;
+    resource_lookup: Record<string, { resource_name: string | null; workcenter: string | null; family: string | null }>;
   } | null>(null);
 
   const loading = reactive({
@@ -146,6 +147,7 @@ export function useDowntimeData() {
           base_spool_url: String(data.base_spool_url),
           jobs_spool_url: String(data.jobs_spool_url),
           taxonomy: data.taxonomy as TaxonomyShape,
+          resource_lookup: (data.resource_lookup as Record<string, { resource_name: string | null; workcenter: string | null; family: string | null }>) ?? {},
         };
         // Flag-on path: server does NOT return legacy view keys; reset them
         resetSummaryData();

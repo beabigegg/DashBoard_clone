@@ -155,7 +155,8 @@ async function runPrimaryQuery(): Promise<void> {
       await duckdb.activate(
         duckdbSpoolUrls.value.base_spool_url,
         duckdbSpoolUrls.value.jobs_spool_url,
-        duckdbSpoolUrls.value.taxonomy
+        duckdbSpoolUrls.value.taxonomy,
+        duckdbSpoolUrls.value.resource_lookup ?? {}
       );
       // Populate view data from local DuckDB (zero round-trips)
       await refreshDuckdbViews();
@@ -237,9 +238,9 @@ async function refreshDuckdbViews(): Promise<void> {
     // Map equipment detail rows
     equipmentData.rows = equipment.data.map((r) => ({
       resource_id: r.resource_id,
-      resource_name: null,
-      workcenter: null,
-      family: null,
+      resource_name: r.resource_name ?? null,
+      workcenter: r.workcenter ?? null,
+      family: r.family ?? null,
       udt_hours: r.udt_hours,
       sdt_hours: r.sdt_hours,
       egt_hours: r.egt_hours,
@@ -361,7 +362,7 @@ async function handleExpandMachine(payload: { resourceId: string; statusType: st
         rows: result.data.map((e) => ({
           event_id: e.event_id,
           resource_id: e.resource_id,
-          resource_name: null,
+          resource_name: duckdbSpoolUrls.value?.resource_lookup?.[e.resource_id]?.resource_name ?? null,
           status: e.status,
           reason: e.reason,
           category: e.category,
