@@ -128,8 +128,6 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Pre-warm cache namespace must exactly match the key pattern user queries read — see docs/architecture/cache-spool-patterns.md
 - Multi-worker gunicorn startup: use file-based exclusive lock (`O_CREAT|O_EXCL` sentinel) for Oracle load tasks — see docs/architecture/cache-spool-patterns.md
 - Parquet schema breaking changes: add `rm` to rollback runbook AND bump `_SCHEMA_VERSION` in same commit — see docs/architecture/cache-spool-patterns.md
-- Multi-parquet spool: validate all interdependent files atomically before serving any (DA-11) — see contracts/business/business-rules.md §DA-11
-- DuckDB prewarm TTL: use per-service env var (default 72000 s), never `CACHE_TTL_DATASET` — see contracts/env/env-contract.md §Cache Tuning
 - query-tool has no persistent spool — skip parquet cleanup in all rollbacks — see docs/architecture/cache-spool-patterns.md
 - hold-history spool: use `DESCRIBE`-based column detection for live schema compat without forced purge — see docs/architecture/cache-spool-patterns.md
 - SQL-to-API rename layer at route boundary absorbs column renames; audit it before touching frontend — see docs/architecture/cache-spool-patterns.md
