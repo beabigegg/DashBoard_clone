@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.16.0
+schema-version: 1.17.0
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -211,6 +211,7 @@ breaking-change-policy: deprecate-2-minors
 | PUT | /admin/api/drawers/<drawer_id> | admin | JSON body | success_response | 400/403/404 | route tests |
 | DELETE | /admin/api/drawers/<drawer_id> | admin | — | success_response | 403/404 | route tests |
 | POST | /admin/api/analytics/recalculate | admin | — | success_response | 403/500 | route tests |
+| POST | /api/downtime-analysis/query | required | JSON body | HTTP 200 sync: existing shape when days < DOWNTIME_ASYNC_DAY_THRESHOLD; HTTP 202 async: {async:true, job_id, status_url} when days >= DOWNTIME_ASYNC_DAY_THRESHOLD AND DOWNTIME_ASYNC_ENABLED=true | 202/400/500 | route tests |
 
 | GET | /api/downtime-analysis/options | required | — | success_response | 500 | route tests |
 | POST | /api/downtime-analysis/query | required | JSON body | success_response `{base_spool_url, jobs_spool_url, query_id, taxonomy}` (flag ON) / `{query_id, summary, daily_trend, big_category, top_reasons}` (flag OFF) | 400/500 | route tests |
@@ -233,7 +234,7 @@ breaking-change-policy: deprecate-2-minors
 
 **Type A — 同步 re-query on 410：** view miss → 410 `cache_expired` → client 同步重新觸發 `execute_primary_query()`。適用：`hold_history_routes.py`、`resource_history_routes.py`。
 
-**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`。
+**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` when `DOWNTIME_ASYNC_ENABLED=true`）。
 
 ## 8. API Inventory Governance
 
@@ -370,6 +371,14 @@ breaking-change-policy: deprecate-2-minors
   - **Spool namespace whitelist**: `GET /api/spool/<namespace>/…` validates namespace against `_ALLOWED_NAMESPACES` in `spool_routes.py`. Any new spool-using feature MUST add its namespace to that frozenset AND to the parametrize list in `tests/test_spool_routes.py`; omitting either causes HTTP 400 for all parquet downloads from that feature. Contract: namespaces are `downtime_analysis_base_events` and `downtime_analysis_job_bridge` (added 2026-06-13; omission caused post-deploy HTTP 400 regression).
 
 - **async-progress-ui (2026-06-13)**: `GET /api/job/<job_id>?prefix=<p>` response `data` object gains two optional fields: `pct` (float 0.0–100.0) and `stage` (string). Present only when the job service explicitly calls `update_job_progress(pct=..., stage=...)`. Consumers that poll only `status`/`result`/`error` are unaffected. Additive; no existing fields removed. See data-shape-contract.md §1.4.
+
+- **downtime-rq-async (2026-06-13)**: `POST /api/downtime-analysis/query` gains async 202 path (additive, env-gated):
+  - date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` (default 30) + `DOWNTIME_ASYNC_ENABLED=true` + worker available → HTTP 202 `{async: true, job_id, status_url}` where `status_url = /api/job/<job_id>?prefix=downtime`.
+  - Short range (< threshold), disabled flag, or unavailable worker → HTTP 200 sync (unchanged, AC-2).
+  - After job `status=finished`: `result.query_id` loads both parquet spools atomically (DA-11; data-shape-contract.md §3.14).
+  - New env vars: `DOWNTIME_ASYNC_ENABLED`, `DOWNTIME_ASYNC_DAY_THRESHOLD` (30), `DOWNTIME_WORKER_QUEUE` (`downtime-query`), `DOWNTIME_JOB_TIMEOUT_SECONDS` (1800) — env-contract.md §Async Worker — Downtime Query.
+  - Rollback: `DOWNTIME_ASYNC_ENABLED=false` restores pure-sync; no parquet cleanup required.
+  - **Prerequisite**: async path requires `DOWNTIME_BROWSER_DUCKDB=true` (module-level `_BROWSER_DUCKDB_ENABLED`). When `DOWNTIME_BROWSER_DUCKDB=false`, all downtime queries fall through to the flag-OFF aggregated-response sync path regardless of `DOWNTIME_ASYNC_ENABLED`.
 
 ## Breaking Change Policy
 

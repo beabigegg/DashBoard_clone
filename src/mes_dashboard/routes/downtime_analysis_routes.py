@@ -16,6 +16,7 @@ Endpoints per api-contract.md §10:
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 from flask import Blueprint, Response, request
@@ -27,7 +28,6 @@ from mes_dashboard.core.response import (
     success_response,
     validation_error,
 )
-import os
 
 from mes_dashboard.services.downtime_analysis_service import (
     apply_view,
@@ -37,6 +37,11 @@ from mes_dashboard.services.downtime_analysis_service import (
     query_downtime_dataset,
     query_downtime_dataset_raw,
 )
+from mes_dashboard.services.async_query_job_service import (
+    enqueue_job_dynamic,
+    is_async_available,
+)
+from mes_dashboard.core.permissions import get_owner_token
 
 downtime_analysis_bp = Blueprint(
     'downtime_analysis',
@@ -58,6 +63,16 @@ _MAX_DAYS = 730
 _BROWSER_DUCKDB_ENABLED: bool = os.getenv(
     "DOWNTIME_BROWSER_DUCKDB", "false"
 ).lower() in ("1", "true", "yes")
+
+# ── Async RQ path — env-contract §Async Worker — Downtime Query ───────────────
+# All four constants are frozen at import time (module-level).
+# Tests must use monkeypatch.setattr(), never monkeypatch.setenv().
+_ASYNC_ENABLED: bool = os.getenv(
+    "DOWNTIME_ASYNC_ENABLED", "true"
+).lower() in ("1", "true", "yes", "on")
+_ASYNC_DAY_THRESHOLD: int = int(os.getenv("DOWNTIME_ASYNC_DAY_THRESHOLD", "30"))
+_ASYNC_WORKER_QUEUE: str = os.getenv("DOWNTIME_WORKER_QUEUE", "downtime-query")
+_JOB_TIMEOUT: int = int(os.getenv("DOWNTIME_JOB_TIMEOUT_SECONDS", "1800"))
 
 
 # ============================================================
@@ -172,6 +187,46 @@ def api_downtime_query():
     is_production = bool(body.get('is_production', False))
     is_key = bool(body.get('is_key', False))
     is_monitor = bool(body.get('is_monitor', False))
+
+    # ── Async RQ branch (DOWNTIME_ASYNC_ENABLED + threshold + worker available) ──
+    # Only enter when: browser-DuckDB flag is ON (raw-spool path), AND the async
+    # flag is enabled, AND the date span meets the threshold, AND a worker is live.
+    # Falls through to the sync path on any false condition (ASYNC-02/ASYNC-DA-01).
+    if _BROWSER_DUCKDB_ENABLED and _ASYNC_ENABLED:
+        sd = datetime.strptime(start_date, "%Y-%m-%d")
+        ed = datetime.strptime(end_date, "%Y-%m-%d")
+        day_span = (ed - sd).days
+        if day_span >= _ASYNC_DAY_THRESHOLD:
+            if is_async_available():
+                query_params = dict(
+                    start_date=start_date,
+                    end_date=end_date,
+                    workcenter_groups=workcenter_groups,
+                    families=families,
+                    resource_ids=resource_ids,
+                    package_groups=package_groups,
+                    big_categories=big_categories,
+                    status_types=status_types,
+                    is_production=is_production,
+                    is_key=is_key,
+                    is_monitor=is_monitor,
+                    owner=get_owner_token(),
+                )
+                job_id, err = enqueue_job_dynamic(
+                    "downtime",
+                    owner=get_owner_token(),
+                    params=query_params,
+                )
+                if job_id is not None:
+                    return success_response(
+                        {
+                            "async": True,
+                            "job_id": job_id,
+                            "status_url": f"/api/job/{job_id}?prefix=downtime",
+                        },
+                        status_code=202,
+                    )
+                # enqueue failed — fall through to sync path
 
     try:
         if _BROWSER_DUCKDB_ENABLED:

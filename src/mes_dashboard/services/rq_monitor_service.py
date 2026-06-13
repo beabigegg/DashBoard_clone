@@ -27,6 +27,7 @@ _QUEUE_NAMES: List[str] = [
     os.getenv("PRODUCTION_HISTORY_WORKER_QUEUE", "production-history-query"),
     os.getenv("YIELD_ALERT_WORKER_QUEUE", "yield-alert-query"),
     os.getenv("MATERIAL_CONSUMPTION_WORKER_QUEUE", "material-consumption"),
+    os.getenv("DOWNTIME_WORKER_QUEUE", "downtime-query"),
 ]
 
 

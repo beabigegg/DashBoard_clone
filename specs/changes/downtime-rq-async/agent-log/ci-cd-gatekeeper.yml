@@ -1,0 +1,17 @@
+change-id: downtime-rq-async
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-13T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3" }
+  - { type: gate-promotions, pointer: "n/a (no gate moved between tiers; all new tests fit existing gate commands)" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml (add npx playwright install --with-deps chromium before downtime-analysis.spec.js)" }
+  - { type: required-status-checks, pointer: "contract-validate, lint, unit-mock-integration, frontend-unit, css-governance, playwright-resilience" }
+next-action: none
+notes: >
+  No new gate tier or workflow job created. The only required workflow edit is
+  adding the Playwright browser install step in frontend-tests.yml before the
+  downtime-analysis Playwright spec — per ci-gate-contract.md §downtime-rq-async
+  Gate Compatibility Note and CLAUDE.md CI Workflow Notes. Soft rollback via
+  DOWNTIME_ASYNC_ENABLED=false; hard rollback via systemctl stop
+  mes-dashboard-downtime-worker.service. No parquet cleanup on flag-based rollback.

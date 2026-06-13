@@ -1,0 +1,41 @@
+agent: e2e-resilience-engineer
+change-id: downtime-rq-async
+date: 2026-06-13
+status: complete
+
+summary: |
+  Wrote integration and resilience tests for the downtime-rq-async change.
+  Three new test files/extensions covering AC-3, AC-7b, and all resilience rows
+  from test-plan.md.  All new tests pass; no regressions in the 158 existing
+  downtime unit tests.
+
+artifacts:
+  - type: test-files
+    pointer: "tests/integration/test_downtime_rq_async.py (4 tests: TestDowntimeAsyncDispatch x2, TestDowntimeAsyncParity x2)"
+  - type: test-files
+    pointer: "tests/e2e/test_downtime_analysis_e2e.py::TestDowntimeAsyncResilience (4 new tests appended)"
+  - type: test-files
+    pointer: "frontend/tests/playwright/downtime-analysis.spec.js (AC-5a, AC-5b, + resilience test appended)"
+  - type: scenarios-covered
+    pointer: "AC-7b dispatch-to-downtime-queue, AC-3 worker-fn-parity+DA-11-ordering, resilience-timeout, resilience-cancel-mid-job, worker-startup-sentinel, DA-11-failure-no-complete-job"
+  - type: mutation-checks
+    pointer: "n/a (mutation check deferred to nightly gate per test-plan tier 3 notes)"
+  - type: trace-artifacts
+    pointer: "n/a (Playwright trace not generated — spec runs via mock routes, no browser instance)"
+
+test-results:
+  - suite: tests/test_downtime_analysis_routes.py + tests/test_downtime_analysis_service.py
+    result: "158 passed, 0 failed (regression guard)"
+  - suite: tests/integration/test_downtime_rq_async.py (without --run-integration-real)
+    result: "4 skipped (correct — requires --run-integration-real flag)"
+  - suite: tests/e2e/test_downtime_analysis_e2e.py::TestDowntimeAsyncResilience (--run-e2e)
+    result: "4 passed, 0 failed"
+  - suite: tests/e2e/test_downtime_analysis_e2e.py full (--run-e2e)
+    result: "8 passed (new+pre-existing passing), 4 pre-existing failures (TestSummaryEndpointIntegration x2, TestEventDetailMatchSourceNoneRowsPresent x2) — NOT caused by this change; verified pre-existing"
+
+notes:
+  - "Patch boundary for job status route tests: mes_dashboard.routes.job_routes.get_job_status (not service module — service-patterns.md pattern)"
+  - "test_worker_startup_sentinel uses importlib.util.find_spec for graceful pre-IP-1 skip"
+  - "Integration test has pytestmark = pytest.mark.integration_real (skips without --run-integration-real)"
+  - "AC-3 parity test mocks query_downtime_dataset_raw for structural parity; real Oracle parity is a nightly gate (tier 3)"
+  - "DA-11 failure path: verifies complete_job called with error= and no query_id when query_raw raises"

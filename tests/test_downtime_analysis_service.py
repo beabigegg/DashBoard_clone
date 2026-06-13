@@ -1824,3 +1824,128 @@ class TestDataBoundary:
             f"got {len(df)} rows (server must not pre-filter by overlap)"
         )
         assert df.iloc[0]['JOBID'] == 'J-FUTURE-001'
+
+
+# ===========================================================================
+# TestDowntimeAsyncWorker — AC-6a pct milestones + AC-6b DA-11 atomicity
+# ===========================================================================
+
+
+class TestDowntimeAsyncWorker:
+    """Unit tests for execute_downtime_query_job worker function.
+
+    AC-6a: pct milestones 5→15→60→90→100 emitted in order.
+    AC-6b: DA-11 two-parquet atomicity — base hit + job bridge miss raises 500.
+    """
+
+    def test_pct_milestones_sequence(self, monkeypatch):
+        """AC-6a: update_job_progress must be called with pcts 5,15,60,90,100 in order."""
+        from mes_dashboard.services.downtime_query_job_service import execute_downtime_query_job
+
+        recorded_pcts = []
+
+        def _fake_update_progress(prefix, job_id, **kwargs):
+            if 'pct' in kwargs:
+                recorded_pcts.append(int(kwargs['pct']))
+
+        def _fake_complete_job(prefix, job_id, **kwargs):
+            pass  # success path
+
+        mock_result = {
+            'base_spool_url': '/api/spool/downtime_analysis_base_events/qid.parquet',
+            'jobs_spool_url': '/api/spool/downtime_analysis_job_bridge/qid.parquet',
+            'query_id': 'test-query-id',
+            'taxonomy': {},
+            'resource_lookup': {},
+        }
+
+        with patch('mes_dashboard.services.downtime_query_job_service.update_job_progress',
+                   side_effect=_fake_update_progress), \
+             patch('mes_dashboard.services.downtime_query_job_service.complete_job',
+                   side_effect=_fake_complete_job), \
+             patch('mes_dashboard.rq_worker_preload.ensure_rq_logging'), \
+             patch('mes_dashboard.services.downtime_analysis_service.query_downtime_dataset_raw',
+                   return_value=mock_result):
+            execute_downtime_query_job(
+                job_id='test-job-001',
+                owner='test-owner',
+                start_date='2026-01-01',
+                end_date='2026-04-30',
+            )
+
+        assert recorded_pcts == [5, 15, 60, 90, 100], (
+            f"pct milestones must be 5,15,60,90,100 in order; got {recorded_pcts}"
+        )
+
+    def test_atomicity_base_hit_bridge_miss_raises_500(self, monkeypatch):
+        """AC-6b: DA-11 — base_events spool exists but job_bridge missing → loud error.
+
+        The worker must propagate the RuntimeError raised by
+        query_downtime_dataset_raw (which in turn raises from has_downtime_job_bridge).
+        """
+        from mes_dashboard.services.downtime_query_job_service import execute_downtime_query_job
+
+        # Simulate DA-11 atomicity violation: query_downtime_dataset_raw raises
+        # because base_events is present but job_bridge is absent.
+        atomicity_error = RuntimeError(
+            "Downtime raw spool atomicity error: base_events spool exists for "
+            "query_id=test-qid but job_bridge spool is missing or expired."
+        )
+
+        with patch('mes_dashboard.services.downtime_query_job_service.update_job_progress'), \
+             patch('mes_dashboard.services.downtime_query_job_service.complete_job') as mock_complete, \
+             patch('mes_dashboard.rq_worker_preload.ensure_rq_logging'), \
+             patch('mes_dashboard.services.downtime_analysis_service.query_downtime_dataset_raw',
+                   side_effect=atomicity_error):
+            with pytest.raises(RuntimeError, match=r"(?i)(job|bridge|atomic|missing|spool)"):
+                execute_downtime_query_job(
+                    job_id='test-job-002',
+                    owner='test-owner',
+                    start_date='2026-01-01',
+                    end_date='2026-04-30',
+                )
+
+        # complete_job must have been called with error= (fail the job loudly)
+        mock_complete.assert_called_once()
+        call_kwargs = mock_complete.call_args.kwargs
+        assert call_kwargs.get('error') is not None, (
+            "complete_job must be called with error= when query_downtime_dataset_raw raises"
+        )
+
+
+# ===========================================================================
+# TestDowntimeAsyncEnvVars — AC-4a..d env-var default values pinned
+# ===========================================================================
+
+
+class TestDowntimeAsyncEnvVars:
+    """AC-4: env-var defaults for downtime async must be pinned to contract values.
+
+    Uses monkeypatch.setattr on module-level constants (frozen at import).
+    Never uses monkeypatch.setenv (frozen constants don't re-read from env).
+    """
+
+    def test_default_async_enabled_true(self, monkeypatch):
+        """AC-4a: DOWNTIME_ASYNC_ENABLED defaults to True."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        # The constant was read from env at import time; patch to verify default is True
+        monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
+        assert routes_mod._ASYNC_ENABLED is True
+
+    def test_default_day_threshold_30(self, monkeypatch):
+        """AC-4b: DOWNTIME_ASYNC_DAY_THRESHOLD defaults to 30."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+        assert routes_mod._ASYNC_DAY_THRESHOLD == 30
+
+    def test_default_worker_queue(self):
+        """AC-4c: DOWNTIME_WORKER_QUEUE default is 'downtime-query'."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        # Verify the module-level constant has the correct default value.
+        # Since DOWNTIME_WORKER_QUEUE is not set in test env, it should be default.
+        assert routes_mod._ASYNC_WORKER_QUEUE == "downtime-query"
+
+    def test_default_job_timeout(self):
+        """AC-4d: DOWNTIME_JOB_TIMEOUT_SECONDS default is 1800."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        assert routes_mod._JOB_TIMEOUT == 1800

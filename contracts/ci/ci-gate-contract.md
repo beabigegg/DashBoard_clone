@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.20
+schema-version: 1.3.21
 last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
@@ -318,6 +318,40 @@ rm -f tmp/query_spool/downtime_analysis_job_bridge/*.parquet
 Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw parquets by key (design.md D4) without a manual `rm`.
 
 **Enriched spool retention**: `downtime_analysis_events` namespace parquets do not need cleanup on cutover — they expire naturally via 20h TTL (DA-07).
+
+## downtime-rq-async Gate Compatibility Note
+
+**New Playwright spec → CI browser install step required** (`frontend-tests.yml`): add `npx playwright install --with-deps chromium` before `npx playwright test tests/playwright/downtime-analysis.spec.js` per CLAUDE.md CI Workflow Notes. Without this step, CI runners exit with "Executable doesn't exist."
+
+**Tier 1 unit assertions** (covered by existing `unit-mock-integration` gate):
+- Threshold branch logic: date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` → 202; < threshold → 200 (AC-1, AC-2).
+- Env-var default pinning: `DOWNTIME_ASYNC_ENABLED=True`, `DOWNTIME_ASYNC_DAY_THRESHOLD=30`, `DOWNTIME_WORKER_QUEUE="downtime-query"`, `DOWNTIME_JOB_TIMEOUT_SECONDS=1800` (`monkeypatch.setattr`, not `setenv` — module-level constants).
+- `register_job_type()` registration: use `importlib.reload()` after clearing the registry dict to re-run registration side-effects.
+- Pct milestone sequence assertion: 5→15→60→90→100 (ASYNC-DA-01, data-shape-contract.md §3.14.3).
+- DA-11 atomicity: `execute_downtime_query_job()` writes both parquets or neither (resilience).
+
+**Tier 1 Playwright coverage** (covered by existing `playwright-resilience` gate):
+- `tests/e2e/test_downtime_analysis_e2e.py`: long-range query → 202 → polling → progress bar → results; cancel mid-job; short-range → 200 sync unaffected.
+
+**Tier 3 integration coverage** (covered by existing `nightly-integration` gate):
+- `tests/integration/test_downtime_rq_async.py`: `enqueue_job_dynamic()` dispatch; spool write ordering; DA-11 atomicity validation; parity test (RQ worker fn vs sync path produce byte/row-identical spools, AC-3).
+
+**Deploy checklist** (verify before serving traffic):
+1. Enable + start the `downtime-query` worker systemd unit and watchdog.
+2. Verify Admin Dashboard `/admin/api/worker/status` shows `downtime-query` queue with ≥ 1 worker.
+3. `rq_monitor_service._QUEUE_NAMES` must include `os.getenv("DOWNTIME_WORKER_QUEUE", "downtime-query")`.
+4. `DOWNTIME_ASYNC_ENABLED` defaults to `true`; no explicit env set required unless disabling.
+
+**Rollback checklist** (zero-downtime path: set flag=false):
+1. Set `DOWNTIME_ASYNC_ENABLED=false` in environment; reload gunicorn (no restart required).
+2. All downtime queries fall back to synchronous path; no parquet spool cleanup required.
+3. Hard rollback (remove worker): stop the `downtime-query` RQ worker systemd unit. In-flight jobs time out at `DOWNTIME_JOB_TIMEOUT_SECONDS` (default 1800 s); frontend retries on next query.
+
+**Parquet schema gate**: `downtime_analysis_base_events` and `downtime_analysis_job_bridge` namespaces are shared with `downtime-browser-duckdb`; schema-breaking changes require `rm -f tmp/query_spool/downtime_analysis_base_events/*.parquet tmp/query_spool/downtime_analysis_job_bridge/*.parquet` (same cleanup as downtime-browser-duckdb).
+
+**No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1), `playwright-resilience` (Tier 1), and `nightly-integration` (Tier 3) gate commands.
+
+**Schema-version bump to 1.3.21 (patch)**: additive gate-compatibility note only; gate tier, command, and status are unchanged.
 
 ## Rollback Policy
 

@@ -1,5 +1,6 @@
 import { ref, reactive } from 'vue';
 import { apiGet, apiPost } from '../../core/api';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
 import type {
   DowntimeKpiShape,
   DailyTrendRow,
@@ -14,6 +15,16 @@ import type {
 import type { TaxonomyShape } from './useDowntimeDuckDB';
 
 const API_TIMEOUT = 360000;
+
+/** Async-job progress state surfaced to App.vue for the AsyncQueryProgress component. */
+export interface DowntimeAsyncJobProgress {
+  active: boolean;
+  jobId: string | null;
+  status: string | null;
+  progress: string;
+  pct: number;
+  elapsedSeconds: number;
+}
 
 interface SummaryData {
   summary: DowntimeKpiShape;
@@ -64,6 +75,62 @@ export function useDowntimeData() {
   });
 
   const error = ref('');
+
+  /** Async job progress state — driven by pollJobUntilComplete when the route returns 202. */
+  const asyncJobProgress = reactive<DowntimeAsyncJobProgress>({
+    active: false,
+    jobId: null,
+    status: null,
+    progress: '',
+    pct: 0,
+    elapsedSeconds: 0,
+  });
+
+  let _jobAbortController: AbortController | null = null;
+  let _jobStartedAt: number | null = null;
+  let _elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+  function _startElapsedTimer(): void {
+    _jobStartedAt = Date.now();
+    _elapsedTimer = setInterval(() => {
+      if (_jobStartedAt !== null) {
+        asyncJobProgress.elapsedSeconds = Math.floor((Date.now() - _jobStartedAt) / 1000);
+      }
+    }, 1000);
+  }
+
+  function _stopElapsedTimer(): void {
+    if (_elapsedTimer !== null) {
+      clearInterval(_elapsedTimer);
+      _elapsedTimer = null;
+    }
+    _jobStartedAt = null;
+  }
+
+  /**
+   * Cancel the currently running async job.
+   * Aborts the polling loop; the progress bar will be dismissed by the caller.
+   * Also calls the abandon endpoint so the server-side job is terminated.
+   */
+  async function cancelAsyncJob(): Promise<void> {
+    const jobId = asyncJobProgress.jobId;
+    if (_jobAbortController) {
+      _jobAbortController.abort();
+      _jobAbortController = null;
+    }
+    _stopElapsedTimer();
+    asyncJobProgress.active = false;
+    asyncJobProgress.jobId = null;
+
+    // Best-effort abandon — do not surface errors to the user
+    if (jobId) {
+      try {
+        await apiPost(`/api/job/${jobId}/abandon`, {}, { silent: true, timeout: 10000 });
+      } catch {
+        // Non-fatal: abandon is best-effort
+      }
+    }
+  }
 
   const summaryData = reactive<SummaryData>({
     summary: { ...defaultKpi },
@@ -120,9 +187,33 @@ export function useDowntimeData() {
 
   /**
    * Execute primary query: POST /api/downtime-analysis/query
-   * Returns query_id and initial view data (summary, daily_trend, big_category, top_reasons).
+   *
+   * Three possible response shapes:
+   *   1. HTTP 202 `{async: true, job_id, status_url}` — long-range RQ async path:
+   *      poll the job status URL until finished, then read result.query_id and
+   *      load both parquet spools (browser-DuckDB path).
+   *   2. HTTP 200 with `{base_spool_url, jobs_spool_url, taxonomy}` — short-range
+   *      browser-DuckDB path (DOWNTIME_BROWSER_DUCKDB=true or short range): caller
+   *      activates DuckDB-WASM.
+   *   3. HTTP 200 legacy shape with `{summary, daily_trend, big_category, top_reasons}` —
+   *      flag-off / sync fallback: apply view data directly.
+   *
+   * AC-5: the sync (200) path is byte-identical to the pre-change behavior.
    */
   async function executePrimaryQuery(body: Record<string, unknown>): Promise<void> {
+    // Cancel any in-progress async job before starting a new query
+    if (_jobAbortController) {
+      _jobAbortController.abort();
+      _jobAbortController = null;
+    }
+    asyncJobProgress.active = false;
+    asyncJobProgress.jobId = null;
+    asyncJobProgress.pct = 0;
+    asyncJobProgress.progress = '';
+    asyncJobProgress.status = null;
+    asyncJobProgress.elapsedSeconds = 0;
+    _stopElapsedTimer();
+
     loading.querying = true;
     loading.initial = true;
     error.value = '';
@@ -139,6 +230,96 @@ export function useDowntimeData() {
         return;
       }
 
+      // ── Async 202 path ────────────────────────────────────────────────────
+      // Route returned {async: true, job_id, status_url} — long-range RQ job.
+      if (data.async === true && data.job_id) {
+        const jobId = String(data.job_id);
+        // status_url includes the correct ?prefix= for this job type
+        const statusUrl = String(data.status_url || `/api/job/${jobId}`);
+
+        asyncJobProgress.active = true;
+        asyncJobProgress.jobId = jobId;
+        asyncJobProgress.status = 'queued';
+        asyncJobProgress.progress = '';
+        asyncJobProgress.pct = 0;
+        asyncJobProgress.elapsedSeconds = 0;
+        _startElapsedTimer();
+
+        // Suspend loading.querying while polling (the progress bar replaces the
+        // generic loading state for the duration of the job).
+        loading.querying = false;
+        loading.initial = false;
+
+        const controller = new AbortController();
+        _jobAbortController = controller;
+
+        try {
+          const finalStatus = await pollJobUntilComplete(statusUrl, {
+            signal: controller.signal,
+            onProgress: (statusResp) => {
+              asyncJobProgress.status = statusResp.status;
+              asyncJobProgress.progress = (statusResp.progress as string) || (statusResp.stage as string) || '';
+              asyncJobProgress.pct = typeof statusResp.pct === 'number' ? statusResp.pct : 0;
+            },
+          });
+
+          // Job finished: read query_id from job result and load the parquet spools.
+          // `result` is the payload the worker stored when calling complete_job().
+          const jobResult = (finalStatus.result as Record<string, unknown> | null | undefined);
+          const resultQueryId = String(jobResult?.query_id || '');
+          if (!resultQueryId) {
+            error.value = '背景查詢完成但未返回 query_id';
+            resetSummaryData();
+            return;
+          }
+
+          // The job writes to the same two namespaces as the sync path.
+          // Construct the spool URLs using the canonical pattern.
+          const baseSpoolUrl = `/api/spool/downtime_analysis_base_events/${resultQueryId}.parquet`;
+          const jobsSpoolUrl = `/api/spool/downtime_analysis_job_bridge/${resultQueryId}.parquet`;
+
+          queryId.value = resultQueryId;
+          duckdbSpoolUrls.value = {
+            base_spool_url: baseSpoolUrl,
+            jobs_spool_url: jobsSpoolUrl,
+            // taxonomy is not returned by the async job response; the caller
+            // (App.vue) must have the taxonomy from a prior sync query or use
+            // an empty taxonomy.  For async-only initial queries the taxonomy
+            // is set to an empty structure; the browser-DuckDB composable
+            // handles a missing/empty taxonomy gracefully.
+            taxonomy: (jobResult?.taxonomy as TaxonomyShape | undefined) ?? {
+              map: [],
+              prefixes: [],
+              egt_category: '',
+              fallback: '',
+            },
+            resource_lookup: (jobResult?.resource_lookup as Record<string, { resource_name: string | null; workcenter: string | null; family: string | null }>) ?? {},
+          };
+          // Reset pre-aggregated summary data — all views come from DuckDB-WASM
+          resetSummaryData();
+        } catch (err) {
+          const e = err as Error & { errorCode?: string };
+          if (e?.name === 'AbortError') {
+            // User cancelled — leave error blank; App.vue handles UI state
+          } else if (e?.errorCode === 'JOB_FAILED') {
+            error.value = e?.message || '背景查詢失敗';
+            resetSummaryData();
+          } else if (e?.errorCode === 'JOB_POLL_TIMEOUT') {
+            error.value = '背景查詢超時，請縮小日期範圍後重試';
+            resetSummaryData();
+          } else {
+            error.value = (e as Error)?.message || '背景查詢發生錯誤';
+            resetSummaryData();
+          }
+        } finally {
+          if (_jobAbortController === controller) _jobAbortController = null;
+          _stopElapsedTimer();
+          asyncJobProgress.active = false;
+        }
+        return;
+      }
+
+      // ── Sync 200 path (unchanged from pre-change behavior, AC-5) ─────────
       queryId.value = String(data.query_id || '');
 
       // Detect browser-DuckDB shape (flag on): has base_spool_url + jobs_spool_url + taxonomy
@@ -488,8 +669,10 @@ export function useDowntimeData() {
     equipmentData,
     eventData,
     filterOptions,
+    asyncJobProgress,
     loadOptions,
     executePrimaryQuery,
+    cancelAsyncJob,
     applyView,
     loadEquipmentDetail,
     loadEventDetail,

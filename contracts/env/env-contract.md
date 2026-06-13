@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.7
-last-changed: 2026-06-12
+schema-version: 1.0.8
+last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -104,6 +104,20 @@ breaking-change-policy: deprecate-2-minors
 - `DOWNTIME_ANALYSIS_DUCKDB_PATH`: Path to the persistent DuckDB file that caches the last N months of base_events + job_data for downtime analysis. Relative paths resolve against CWD. For Docker set to an absolute path on a named volume. Atomically replaced on each daily refresh. Added by change `downtime-analysis-duckdb-cache`.
 - `RESOURCE_HISTORY_DUCKDB_PATH`: Path to the persistent DuckDB file that caches the last N months of base_facts + oee_facts. Relative paths resolve against CWD (same as QUERY_SPOOL_DIR). For Docker set to an absolute path on a named volume. File is ~15MB; atomically replaced on each daily refresh. Added by change `resource-history-perf`.
 - `RESOURCE_VIEW_CACHE_TTL`: TTL in seconds for the view-result cache in `apply_view()`. Derived numbers (KPI, trend, heatmap, etc.) may be up to this many seconds stale within an already-warm dataset. Set to `0` to disable the view-result cache and always recompute from spool. Default 300 s (5 min). Added by change `resource-history-cache-fix`.
+
+## Async Worker — Downtime Query
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| DOWNTIME_ASYNC_ENABLED | feature-flag | all | no | no | true | true | application-team | true or false | yes | false = all downtime queries run synchronously regardless of date range |
+| DOWNTIME_ASYNC_DAY_THRESHOLD | async | all | no | no | 30 | 30 | application-team | positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when DOWNTIME_ASYNC_ENABLED=true | yes | uses default 30 |
+| DOWNTIME_WORKER_QUEUE | async | all | no | no | downtime-query | downtime-query | application-team | non-empty string; RQ queue name for the downtime worker process | yes | uses default "downtime-query" |
+| DOWNTIME_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the downtime worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
+
+- `DOWNTIME_ASYNC_ENABLED`: Feature flag enabling the async RQ path for long downtime queries. When `false`, all `POST /api/downtime-analysis/query` calls run synchronously regardless of date span. Default `true`; set to `false` for emergency rollback without disabling the `DOWNTIME_BROWSER_DUCKDB` path. **Restart required** — module-level constant frozen at import. Added by change `downtime-rq-async`.
+- `DOWNTIME_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a downtime query is dispatched via RQ (when `DOWNTIME_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `30`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `downtime-rq-async`.
+- `DOWNTIME_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes downtime jobs to. Must match the `--queues` argument of the running downtime worker process. Default `"downtime-query"`. Added by change `downtime-rq-async`.
+- `DOWNTIME_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ downtime job may run before the worker kills it. Must be set above the worst-case Oracle fetch duration for a 730-day range (≈ 1200 s observed on large datasets; default 1800 s provides 50% headroom). Added by change `downtime-rq-async`.
 
 ## Batch Query Engine — Row-Count Chunking
 

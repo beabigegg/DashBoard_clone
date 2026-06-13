@@ -150,13 +150,13 @@ class TestGetRqQueueDetails:
              patch("rq.Queue", side_effect=make_queue):
             result = svc.get_rq_queue_details()
 
-        assert len(result["queues"]) == 6  # trace-events, reject-query, msd-analysis, production-history-query, yield-alert-query, material-consumption
+        assert len(result["queues"]) == 7  # trace-events, reject-query, msd-analysis, production-history-query, yield-alert-query, material-consumption, downtime-query
         assert result["queues"][0]["name"] == "trace-events"
         assert result["queues"][0]["depth"] == 3
         assert result["queues"][1]["name"] == "reject-query"
         assert result["queues"][1]["depth"] == 1
-        assert result["total_queued"] == 8  # 3 + 1 + 1 + 1 + 1 + 1
-        assert result["total_started"] == 6  # 1 per queue × 6 queues
+        assert result["total_queued"] == 9  # 3 + 1 + 1 + 1 + 1 + 1 + 1
+        assert result["total_started"] == 7  # 1 per queue × 7 queues
         assert result["total_failed"] == 0
 
     def test_handles_queue_exception_gracefully(self):
@@ -166,7 +166,7 @@ class TestGetRqQueueDetails:
              patch("rq.Queue", side_effect=Exception("Redis error")):
             result = svc.get_rq_queue_details()
         # Should still return entries with zero values
-        assert len(result["queues"]) == 6  # now includes material-consumption queue
+        assert len(result["queues"]) == 7  # now includes downtime-query queue
         assert result["total_queued"] == 0
 
 

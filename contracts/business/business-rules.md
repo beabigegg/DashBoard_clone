@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.18.0
+schema-version: 1.19.0
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -225,6 +225,8 @@ breaking-change-policy: deprecate-2-minors
 | No identifier token + missing pj_types/dates | HTTP 400 `VALIDATION_ERROR` | PHF-08 | route tests |
 | Partial trackout group — 4-tuple match, non-key columns consistent | Single aggregated row; `trackin_qty = MAX(...)` (original load), `trackout_qty = SUM(...)`, `trackout_time = MAX(...)`, `partial_count ≥ 2` | PH-06 | unit tests |
 | Partial trackout group — 4-tuple match, any non-key column diverges | Multiple raw rows emitted, `partial_count = 1` each; per-request INFO log with divergent-group count | PH-07 | unit tests |
+| Downtime query: days ≥ DOWNTIME_ASYNC_DAY_THRESHOLD + DOWNTIME_ASYNC_ENABLED=true + worker available | HTTP 202 async job | ASYNC-DA-01 | route tests |
+| Downtime query: days < threshold, OR DOWNTIME_ASYNC_ENABLED=false, OR worker unavailable | HTTP 200 sync | ASYNC-DA-01 | resilience |
 
 ## Material Consumption Rules
 
@@ -252,6 +254,7 @@ breaking-change-policy: deprecate-2-minors
 | DA-10 | Browser memory ceiling | If DuckDB-WASM init, parquet fetch, or a reduction query fails (or estimated buffer exceeds the `duckdb-activation-policy.ts` ceiling), the composable raises a visible error banner offering a narrower date range. Zero-row result (valid empty) is explicitly distinguished from load/compute failure. Never a silent empty render (CLAUDE.md Type-A). | browser: `test_wasm_init_failure_shows_error_banner_not_empty_table`; `test_parquet_fetch_404_shows_error_banner` |
 | DA-11 | Two-parquet atomicity | Server writes both `base_events.parquet` and `job_bridge.parquet` or neither. A `base_events` spool hit with a missing/expired `job_bridge` spool is a server-side error; never silently returns empty join. Browser raises a visible error if either parquet fetch returns 404/410. | `tests/test_downtime_analysis_service.py::TestTwoParquetAtomicity::test_base_hit_jobs_miss_raises_loudly` |
 | DA-12 | BQE-07 raw-spool output | `query_downtime_dataset_raw()` (flag-ON path) writes one whole-dataset BQE chunk to two raw namespaces (`downtime_analysis_base_events`, `downtime_analysis_job_bridge`); no `USE_ROW_COUNT_CHUNKING` (ADR-0003 permanent exclusion). Server does not call `_merge_cross_shift_events`, `_bridge_jobid`, or `_enrich_events_df` on the request path; those reductions run in the browser. | `tests/test_downtime_analysis_service.py::TestRawSpoolWriter` |
+| ASYNC-DA-01 | Async threshold gate | When `DOWNTIME_BROWSER_DUCKDB=true` AND `DOWNTIME_ASYNC_ENABLED=true` (env, default true) AND date range (calendar days) ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` (env, default 30) AND RQ worker available: route to async path → HTTP 202 `{async: true, job_id, status_url}`. Short queries (< threshold), disabled flag, unavailable worker, OR `DOWNTIME_BROWSER_DUCKDB=false`: synchronous path → HTTP 200 (no behavior change for existing callers). Async path requires `DOWNTIME_BROWSER_DUCKDB=true` because the worker fn writes raw-spool parquets (browser-DuckDB format). Worker dispatched via `enqueue_job_dynamic()` + `register_job_type()` (Phase 2). Cross-references: DA-11, DA-12, ADR-0003, ADR-0007, ASYNC-02. | unit tests (threshold boundary); route tests (202 vs 200) |
 
 ## Batch Query Engine Rules
 

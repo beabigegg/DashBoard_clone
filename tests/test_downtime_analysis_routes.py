@@ -693,3 +693,141 @@ class TestMaxOracleDaysRemoved:
         assert not hasattr(routes_mod, '_DUCKDB_WINDOW_DAYS'), (
             "_DUCKDB_WINDOW_DAYS must be removed from downtime_analysis_routes"
         )
+
+
+# ===========================================================================
+# TestDowntimeAsyncQuery — AC-1/2a/2b/2c/AC-7 async gate tests
+# ===========================================================================
+
+
+class TestDowntimeAsyncQuery:
+    """Tests for the async RQ branch in POST /api/downtime-analysis/query.
+
+    Uses monkeypatch.setattr on module-level constants (frozen at import).
+    """
+
+    def test_long_range_returns_202(self, client, monkeypatch):
+        """AC-1: long range + flag=true + worker available → 202 with async/job_id/status_url."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+
+        with patch('mes_dashboard.routes.downtime_analysis_routes.is_async_available',
+                   return_value=True), \
+             patch('mes_dashboard.routes.downtime_analysis_routes.enqueue_job_dynamic',
+                   return_value=('downtime-abc123', None)), \
+             patch('mes_dashboard.routes.downtime_analysis_routes.get_owner_token',
+                   return_value='test-owner'):
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2026-01-01', 'end_date': '2026-04-30'})
+
+        assert resp.status_code == 202
+        data = resp.get_json()['data']
+        assert data['async'] is True
+        assert data['job_id'] == 'downtime-abc123'
+        assert 'status_url' in data
+
+    def test_short_range_returns_200(self, client, monkeypatch):
+        """AC-2a: date range < threshold → 200 sync path unchanged."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+
+        with patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
+                   return_value=_mock_raw_result()):
+            # 28 days — below threshold
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2026-04-01', 'end_date': '2026-04-29'})
+
+        assert resp.status_code == 200
+        data = resp.get_json()['data']
+        assert 'query_id' in data
+        assert data.get('async') is not True
+
+    def test_flag_disabled_returns_200(self, client, monkeypatch):
+        """AC-2b: DOWNTIME_ASYNC_ENABLED=false → 200 sync regardless of range."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', False)
+        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+
+        with patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
+                   return_value=_mock_raw_result()):
+            # 119 days — above threshold, but flag disabled
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2026-01-01', 'end_date': '2026-04-30'})
+
+        assert resp.status_code == 200
+        assert resp.get_json()['data'].get('async') is not True
+
+    def test_worker_unavailable_falls_back_to_200(self, client, monkeypatch):
+        """AC-2c: is_async_available()=False → 200 sync fallback."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+
+        with patch('mes_dashboard.routes.downtime_analysis_routes.is_async_available',
+                   return_value=False), \
+             patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
+                   return_value=_mock_raw_result()):
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2026-01-01', 'end_date': '2026-04-30'})
+
+        assert resp.status_code == 200
+        assert resp.get_json()['data'].get('async') is not True
+
+    def test_status_url_contains_prefix_downtime(self, client, monkeypatch):
+        """AC-7: status_url must be /api/job/<job_id>?prefix=downtime."""
+        import mes_dashboard.routes.downtime_analysis_routes as routes_mod
+        monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
+        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+
+        with patch('mes_dashboard.routes.downtime_analysis_routes.is_async_available',
+                   return_value=True), \
+             patch('mes_dashboard.routes.downtime_analysis_routes.enqueue_job_dynamic',
+                   return_value=('downtime-xyz789', None)), \
+             patch('mes_dashboard.routes.downtime_analysis_routes.get_owner_token',
+                   return_value='test-owner'):
+            resp = client.post('/api/downtime-analysis/query',
+                               json={'start_date': '2026-01-01', 'end_date': '2026-04-30'})
+
+        assert resp.status_code == 202
+        status_url = resp.get_json()['data']['status_url']
+        assert 'prefix=downtime' in status_url
+        assert 'downtime-xyz789' in status_url
+
+
+# ===========================================================================
+# TestDowntimeJobDispatch — AC-7a job-type registration test
+# ===========================================================================
+
+
+class TestDowntimeJobDispatch:
+    """AC-7a: register_job_type('downtime', ...) must fire on import."""
+
+    def test_job_type_registered(self, monkeypatch):
+        """importing downtime_query_job_service must register 'downtime' in the registry.
+
+        Uses importlib.reload() after clearing the registry dict so that the
+        module-level register_job_type() side effect re-runs (setattr alone
+        does not re-execute the call).
+        """
+        import importlib
+
+        from mes_dashboard.services.job_registry import _REGISTRY
+        # Clear the registry to ensure a clean state
+        _REGISTRY.clear()
+
+        # Reload the job service module — this re-executes the module-level
+        # register_job_type() call at the bottom of the file.
+        import mes_dashboard.services.downtime_query_job_service as job_svc
+        importlib.reload(job_svc)
+
+        from mes_dashboard.services.job_registry import list_registered_job_types
+        assert "downtime" in list_registered_job_types(), (
+            "register_job_type('downtime', ...) must run when downtime_query_job_service is imported"
+        )

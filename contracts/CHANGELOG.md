@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.21] — 2026-06-13
+### Added
+- downtime-rq-async: Added §downtime-rq-async Gate Compatibility Note — Tier 1/3 test coverage, deploy/rollback checklist, worker queue provisioning notes, parquet schema gate reminder, and pct milestone sequence assertion. No new gate tier or command. Additive.
+
+## [business 1.19.0] — 2026-06-13
+### Added
+- downtime-rq-async: Added ASYNC-DA-01 (Async threshold gate for downtime analysis) to Downtime Analysis Rules table. Added two corresponding decision table rows (long vs short query matrix against flag/worker availability). Additive; no existing rules changed.
+
+## [data 1.15.0] — 2026-06-13
+### Added
+- downtime-rq-async: Added §3.14 (Downtime Analysis Async Job Response) — §3.14.1 HTTP 202 envelope, §3.14.2 job result payload (`result.query_id`), §3.14.3 pct milestone map (5/starting→15/querying→60/writing→90/finalizing→100/complete), §3.14.4 path decision table referencing ASYNC-DA-01. Added downtime-specific note to §1.4 (status_url prefix=downtime, DA-11 atomicity, §3.14 cross-reference). Additive; no existing schemas changed.
+
+## [env 1.0.8] — 2026-06-13
+### Added
+- downtime-rq-async: Added §Async Worker — Downtime Query with four new vars: `DOWNTIME_ASYNC_ENABLED` (feature flag, default true), `DOWNTIME_ASYNC_DAY_THRESHOLD` (threshold days, default 30), `DOWNTIME_WORKER_QUEUE` (queue name, default `downtime-query`), `DOWNTIME_JOB_TIMEOUT_SECONDS` (job timeout, default 1800). All restart-required; module-level constants.
+
+## [api 1.17.0] — 2026-06-13
+### Changed
+- downtime-rq-async: `POST /api/downtime-analysis/query` gains async 202 path when `DOWNTIME_ASYNC_ENABLED=true` and date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` (default 30 days). Short-range queries (< threshold), disabled flag, or unavailable worker continue returning HTTP 200 synchronously (no behavior change for existing callers). Type B §7 extended to include `downtime_analysis_routes.py`; §10 compatibility note added. New `downtime-query` RQ queue; worker dispatched via `enqueue_job_dynamic()` + `register_job_type()`.
+
 ## [css 1.8.1] — 2026-06-13
 ### Fixed
 - async-progress-ui (close): Corrected AsyncQueryProgress.vue Component Rules table: prop name `stage` → `progress` (stage label string) to match live SFC implementation.

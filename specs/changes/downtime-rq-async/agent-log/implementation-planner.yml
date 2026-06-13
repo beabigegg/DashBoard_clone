@@ -1,0 +1,6 @@
+agent: implementation-planner
+change-id: downtime-rq-async
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/downtime-rq-async/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer, ci-cd-gatekeeper, test-strategist, e2e-resilience-engineer, contract-reviewer" }
+  - { type: scope-summary, pointer: "8 in scope, 7 out of scope; IP-1..IP-9; execution order backend -> frontend -> e2e/resilience, deploy/env with backend, CI with deploy" }

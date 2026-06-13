@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.14.0
+schema-version: 1.15.0
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -86,6 +86,7 @@ breaking-change-policy: deprecate-2-minors
 - `stage`: optional string; human-readable stage label emitted alongside `pct`; omitted when not set.
 - These fields are additive — existing consumers that do not read them are unaffected.
 - Frontend `JobStatusResponse` interface in `useAsyncJobPolling.ts` must declare `pct?: number` and `stage?: string` to match this shape.
+- **downtime query jobs**: `status_url = /api/job/<job_id>?prefix=downtime`. After `status=finished`, read `result.query_id` to load `base_events` and `job_bridge` spools atomically (DA-11; §3.14).
 
 ---
 
@@ -907,6 +908,64 @@ Returned as `taxonomy` key in the `POST /api/downtime-analysis/query` response (
 | fallback | string | Category for unknown/null reasons (constant: `"其他/未分類"`) |
 
 **Two-parquet atomicity (AC-7):** server writes both `base_events` and `job_bridge` parquets or neither. A `base_events` spool hit with a missing/expired `job_bridge` spool is a server-side error (500); the service must not silently return empty job enrichment. Browser raises a visible error banner if either parquet fetch returns 404/410; never a silent empty table (CLAUDE.md Type-A rule).
+
+---
+
+### 3.14 Downtime Analysis Async Job Response
+
+#### 3.14.1 HTTP 202 Async Envelope (long-range query)
+
+When `DOWNTIME_ASYNC_ENABLED=true` and date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` (default 30 days):
+
+```json
+{
+  "success": true,
+  "data": {
+    "async": true,
+    "job_id": "<uuid string>",
+    "status_url": "/api/job/<job_id>?prefix=downtime"
+  },
+  "meta": { "timestamp": "...", "app_version": "..." }
+}
+```
+
+Follows generic shape §1.3. `prefix=downtime` routes status polls to `downtime_query_job_service`.
+
+#### 3.14.2 Job Result Payload (`status=finished`)
+
+```json
+{
+  "query_id": "<uuid string>"
+}
+```
+
+`result.query_id` is used to load both parquet spools atomically (DA-11):
+- `GET /api/spool/downtime_analysis_base_events/<query_id>.parquet`
+- `GET /api/spool/downtime_analysis_job_bridge/<query_id>.parquet`
+
+Both spool schemas: see §3.13 (`downtime_analysis_base_events`, `downtime_analysis_job_bridge`).
+
+#### 3.14.3 Progress Milestones (`pct`)
+
+| pct | stage | meaning |
+|---|---|---|
+| 5 | starting | job received by worker; Oracle query not yet issued |
+| 15 | querying | Oracle BatchQueryEngine query in progress |
+| 60 | writing | `base_events` parquet write in progress |
+| 90 | finalizing | `job_bridge` parquet write + atomic commit in progress |
+| 100 | complete | both spools written; `result.query_id` available |
+
+Extends ASYNC-05 canonical milestone map. Both parquets are written before `pct` reaches 100 (DA-11).
+
+#### 3.14.4 Path Decision Table
+
+| condition | response | rule |
+|---|---|---|
+| `DOWNTIME_ASYNC_ENABLED=false` OR worker unavailable | HTTP 200 sync | ASYNC-DA-01 |
+| date range < `DOWNTIME_ASYNC_DAY_THRESHOLD` | HTTP 200 sync | ASYNC-DA-01 |
+| date range ≥ threshold + flag=true + worker available | HTTP 202 async | ASYNC-DA-01 |
+
+Short-range (HTTP 200) response shape: unchanged from §3.12 (flag ON synchronous path returns `{base_spool_url, jobs_spool_url, query_id, taxonomy}`).
 
 ---
 

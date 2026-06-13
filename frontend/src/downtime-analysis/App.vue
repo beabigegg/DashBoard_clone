@@ -4,6 +4,7 @@ import { onMounted, ref, reactive } from 'vue';
 import { ensureMesApiAvailable } from '../core/api';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
+import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 
 import FilterBar from './components/FilterBar.vue';
 import KpiCards from './components/KpiCards.vue';
@@ -34,8 +35,10 @@ const {
   equipmentData,
   filterOptions,
   duckdbSpoolUrls,
+  asyncJobProgress,
   loadOptions,
   executePrimaryQuery,
+  cancelAsyncJob,
   applyView,
   loadAllEquipmentDetail,
   loadChartFilterView,
@@ -127,7 +130,7 @@ function syncDraftFromState(): void {
 }
 
 async function runPrimaryQuery(): Promise<void> {
-  // R-1: guard against double-activation while a parquet load/merge is already in flight
+  // R-1: guard against double-activation while a parquet load/merge or async job is already in flight
   if (duckdb.state.value === 'loading') {
     return;
   }
@@ -452,6 +455,18 @@ onMounted(() => {
         aria-label="DuckDB 分析錯誤"
       />
 
+      <!-- Async query progress bar (shown when POST /api/downtime-analysis/query returns 202) -->
+      <!-- AC-5: only shown for long-range queries; short-range path is unchanged -->
+      <AsyncQueryProgress
+        :active="asyncJobProgress.active"
+        :progress="asyncJobProgress.progress"
+        :pct="asyncJobProgress.pct"
+        :elapsed-seconds="asyncJobProgress.elapsedSeconds"
+        :status="asyncJobProgress.status"
+        :can-cancel="true"
+        @cancel="cancelAsyncJob"
+      />
+
       <!-- KPI cards (clickable: UDT/SDT/EGT toggle chart cross-filter) -->
       <div class="kpi-section">
         <KpiCards
@@ -530,6 +545,6 @@ onMounted(() => {
     </div>
 
     <!-- Page-level loading overlay: initial page load or DuckDB parquet download/merge -->
-    <LoadingOverlay v-if="isInitialLoad || loading.initial || duckdbLoading" tier="page" />
+    <LoadingOverlay v-if="(isInitialLoad || loading.initial || duckdbLoading) && !asyncJobProgress.active" tier="page" />
   </div>
 </template>

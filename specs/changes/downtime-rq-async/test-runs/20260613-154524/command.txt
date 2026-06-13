@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest --collect-only -q tests/test_downtime_analysis_routes.py::TestDowntimeAsyncQuery tests/test_downtime_analysis_service.py::TestDowntimeAsyncEnvVars tests/test_downtime_analysis_service.py::TestDowntimeAsyncWorker tests/test_downtime_analysis_routes.py::TestDowntimeJobDispatch 2>&1

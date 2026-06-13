@@ -1,0 +1,17 @@
+{
+  "change_id": "downtime-rq-async",
+  "phase": "collect",
+  "status": "failed",
+  "exit_code": 4,
+  "command": "conda run -n mes-dashboard python -m pytest --collect-only -q tests/test_downtime_analysis_routes.py::TestDowntimeAsyncQuery tests/test_downtime_analysis_service.py::TestDowntimeAsyncEnvVars tests/test_downtime_analysis_service.py::TestDowntimeAsyncWorker tests/test_downtime_analysis_routes.py::TestDowntimeJobDispatch 2>&1",
+  "duration_ms": 3400,
+  "first_failure": {
+    "kind": "collection-error"
+  },
+  "artifacts": {
+    "summary": "specs/changes/downtime-rq-async/test-runs/20260613-154524/summary.json",
+    "stdout": "specs/changes/downtime-rq-async/test-runs/20260613-154524/stdout.log",
+    "stderr": "specs/changes/downtime-rq-async/test-runs/20260613-154524/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

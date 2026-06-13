@@ -1,0 +1,19 @@
+agent: backend-engineer
+change-id: downtime-rq-async
+timestamp: 2026-06-13
+status: complete
+
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/downtime_query_job_service.py:1-116 (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/downtime_analysis_routes.py:17-45,68-75,186-231 (modified)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/app.py:887-893 (modified)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/rq_monitor_service.py:30 (modified)" }
+  - { type: files-changed, pointer: ".env.example:199-205 (modified)" }
+  - { type: files-changed, pointer: "deploy/mes-dashboard-downtime-worker.service:1-38 (new)" }
+  - { type: tests-added, pointer: "tests/test_downtime_analysis_routes.py::TestDowntimeAsyncQuery (5 tests)" }
+  - { type: tests-added, pointer: "tests/test_downtime_analysis_routes.py::TestDowntimeJobDispatch::test_job_type_registered" }
+  - { type: tests-added, pointer: "tests/test_downtime_analysis_service.py::TestDowntimeAsyncWorker (2 tests)" }
+  - { type: tests-added, pointer: "tests/test_downtime_analysis_service.py::TestDowntimeAsyncEnvVars (4 tests)" }
+  - { type: tests-added, pointer: "tests/test_rq_monitor_service.py (updated queue count assertions)" }
+  - { type: test-output, pointer: "170 passed (test_downtime_analysis_routes.py + test_downtime_analysis_service.py); 4522 passed full suite" }
+  - { type: contracts-touched, pointer: "none (all contract entries already present per implementation-plan §Contract Updates)" }

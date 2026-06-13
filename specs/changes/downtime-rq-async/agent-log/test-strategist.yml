@@ -1,0 +1,21 @@
+change-id: downtime-rq-async
+agent: test-strategist
+timestamp: "2026-06-13T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/downtime-rq-async/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_downtime_analysis_routes.py → src/mes_dashboard/routes/downtime_analysis_routes.py; tests/test_downtime_analysis_service.py → src/mes_dashboard/services/downtime_query_job_service.py; tests/integration/test_downtime_rq_async.py → src/mes_dashboard/services/downtime_query_job_service.py; frontend/tests/playwright/downtime-analysis.spec.js → frontend/src/downtime-analysis/App.vue" }
+  - { type: coverage-tiers, pointer: "unit (T0), contract (T1), integration (T1), data-boundary (T3), e2e (T1), resilience (T3)" }
+  - { type: mapping-completeness, pointer: "all 7 ACs covered; 17 test nodes named across 4 files" }
+next-action: none
+notes: >
+  Existing TestTwoParquetAtomicity (lines 1535-1556) and TestDowntimeMigration must be
+  extended, not duplicated. AC-3 parity is Tier-3 nightly (real Oracle dependency).
+  AC-7a registration test requires importlib.reload pattern per test-discipline rules.
+files-read:
+  - specs/changes/downtime-rq-async/context-manifest.md
+  - specs/changes/downtime-rq-async/change-classification.md
+  - specs/changes/downtime-rq-async/design.md
+  - .cdd/code-map.yml
+indexes-used:
+  - .cdd/code-map.yml

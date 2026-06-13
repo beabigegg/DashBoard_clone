@@ -1,0 +1,46 @@
+agent: frontend-engineer
+change-id: downtime-rq-async
+date: 2026-06-13
+status: complete
+
+summary: >
+  Implemented IP-5: 202/async polling branch in frontend/src/downtime-analysis/App.vue
+  and composables/useDowntimeData.ts. Added useAsyncJobPolling integration and
+  AsyncQueryProgress UI. Short-range (200) path is unchanged per AC-5.
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/composables/useDowntimeData.ts:1-600" }
+  - { type: files-changed, pointer: "frontend/src/downtime-analysis/App.vue:1-10,33-50,460-470" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/downtime-analysis.spec.js:405-550" }
+  - { type: components-affected, pointer: "App.vue (downtime-analysis), useDowntimeData composable" }
+  - { type: accessibility-audit, pointer: "AsyncQueryProgress has role=status aria-live=polite (pre-existing in shared component)" }
+
+test-phases-run:
+  - phase: collect
+    result: passed
+    run-id: "20260613-154614"
+  - phase: targeted
+    result: passed
+    run-id: "20260613-154625"
+  - phase: changed-area
+    result: passed
+    run-id: "20260613-154637"
+  - phase: quality
+    result: passed
+    run-id: "20260613-154648"
+
+type-check: >
+  No new TypeScript errors introduced in downtime-analysis/App.vue or
+  composables/useDowntimeData.ts. All pre-existing errors are unrelated
+  (cannot find module 'vue' pattern shared across all composables — tsconfig
+  project-level issue predating this change).
+
+notes: |
+  - Backend test classes (TestDowntimeAsyncQuery, TestDowntimeAsyncEnvVars, etc.)
+    are out of scope for frontend-engineer; owned by test-strategist.
+  - The async path sets duckdbSpoolUrls.value using the canonical spool URL pattern
+    after job completion. taxonomy defaults to empty structure when not returned by
+    the job result; useDowntimeDuckDB handles empty taxonomy gracefully.
+  - cancelAsyncJob calls POST /api/job/<job_id>/abandon as best-effort (non-fatal).
+  - AC-5 short-range path is byte-identical to pre-change behavior: the sync 200
+    path in executePrimaryQuery is untouched.
