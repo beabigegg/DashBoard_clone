@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [css 1.8.1] — 2026-06-13
+### Fixed
+- async-progress-ui (close): Corrected AsyncQueryProgress.vue Component Rules table: prop name `stage` → `progress` (stage label string) to match live SFC implementation.
+
 ## [business 1.18.0] — 2026-06-13
 ### Added
 - async-progress-ui: Added ASYNC-05 (progress milestone semantics): canonical pct milestone map (0=start, 30=querying Oracle, 100=complete); consumer must treat absent pct as indeterminate; per-service opt-in. Bumped from 1.17.0.

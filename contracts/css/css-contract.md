@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.8.0
+schema-version: 1.8.1
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -70,7 +70,7 @@ breaking-change-policy: deprecate-2-minors
 | `SectionCard` | — | — | 禁止在 feature CSS 新增 `.section-card` |
 | `ErrorBanner` | — | — | 禁止在 feature CSS 新增 `.error-banner` |
 | `LoadingOverlay` | `tier="page"` | — | 禁止自訂 full-page spinner |
-| `AsyncQueryProgress.vue` | `status` prop (`queued\|started\|finished\|failed`), optional `pct`, `stage` | — | Must use `<style scoped>`; `.async-job-progress` is a component-internal base class — do NOT reproduce it in any feature `style.css`. No `theme-*` ancestor required (scoped). |
+| `AsyncQueryProgress.vue` | `status` prop (`queued\|started\|finished\|failed`), optional `pct`, `progress` (stage label string) | — | Must use `<style scoped>`; `.async-job-progress` is a component-internal base class — do NOT reproduce it in any feature `style.css`. No `theme-*` ancestor required (scoped). |
 
 ## Loading 三層治理
 
