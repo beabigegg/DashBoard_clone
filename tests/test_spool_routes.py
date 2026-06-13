@@ -95,6 +95,8 @@ def test_valid_spool_streams_parquet(client, tmp_path):
     "reject_dataset",
     "resource_dataset",
     "hold_dataset",
+    "downtime_analysis_base_events",
+    "downtime_analysis_job_bridge",
 ])
 def test_allowed_namespaces_pass_namespace_validation(client, ns):
     with patch(

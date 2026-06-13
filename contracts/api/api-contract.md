@@ -76,7 +76,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /health/deep | none | — | health-payload | — | smoke tests |
 | GET | /api/job/<job_id> | required | ?prefix= | success_response | 400/404 | route tests |
 | POST | /api/job/<job_id>/abandon | required | JSON body | success_response | 403/404/409 | route tests |
-| GET | /api/spool/<namespace>/<query_id>.parquet | required | — | parquet-binary | 404/410 | route tests |
+| GET | /api/spool/<namespace>/<query_id>.parquet | required | namespace ∈ {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge} | parquet-binary | 400/410 | route tests |
 | GET | /api/wip/overview/summary | required | query params | success_response | 400/500 | route tests |
 | GET | /api/wip/overview/matrix | required | query params | success_response | 400/500 | route tests |
 | GET | /api/wip/overview/hold | required | query params | success_response | 400/500 | route tests |
@@ -367,6 +367,7 @@ breaking-change-policy: deprecate-2-minors
   - CSV export for new shape: browser-blob from DuckDB-WASM result; server `export_*_csv` streamers kept as flag-off fallback only.
   - Raw spool schema: `downtime_analysis_base_events` (7 cols) and `downtime_analysis_job_bridge` (16 cols); see data-shape-contract.md §3.13. `SCHEMA_VERSION` constant participates in cache key; bumping orphans stale raw parquets without manual `rm`. Post-deploy `rm -f tmp/query_spool/downtime_analysis_base_events/*.parquet tmp/query_spool/downtime_analysis_job_bridge/*.parquet` required on schema-breaking rollback.
   - Consumers: `frontend/src/downtime-analysis/useDowntimeDuckDB.ts` (new composable; flag ON path only).
+  - **Spool namespace whitelist**: `GET /api/spool/<namespace>/…` validates namespace against `_ALLOWED_NAMESPACES` in `spool_routes.py`. Any new spool-using feature MUST add its namespace to that frozenset AND to the parametrize list in `tests/test_spool_routes.py`; omitting either causes HTTP 400 for all parquet downloads from that feature. Contract: namespaces are `downtime_analysis_base_events` and `downtime_analysis_job_bridge` (added 2026-06-13; omission caused post-deploy HTTP 400 regression).
 
 ## Breaking Change Policy
 

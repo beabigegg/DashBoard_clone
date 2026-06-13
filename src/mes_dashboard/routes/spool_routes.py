@@ -22,6 +22,8 @@ _ALLOWED_NAMESPACES = frozenset({
     "reject_dataset",
     "resource_dataset",
     "hold_dataset",
+    "downtime_analysis_base_events",
+    "downtime_analysis_job_bridge",
 })
 
 # query_id must be 1-64 hex characters (SHA256 prefix)
