@@ -152,6 +152,8 @@ export interface ComputeViewParams {
   page?: number;
   perPage?: number;
   detailReason?: string | null;
+  sortCol?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 /**
@@ -357,17 +359,25 @@ function buildSummaryFromAnalytics(rows: AnalyticsRawRow[]): SummaryData {
   };
 }
 
+const _DUCKDB_SORT_ALLOWED = new Set([
+  'CONTAINERNAME', 'WORKCENTERNAME', 'PRODUCTLINENAME', 'PJ_FUNCTION',
+  'PJ_TYPE', 'PRODUCTNAME', 'LOSSREASONNAME', 'EQUIPMENTNAME',
+  'REJECTCOMMENT', 'REJECT_TOTAL_QTY', 'DEFECT_QTY', 'TXN_TIME', 'TXN_DAY',
+]);
+
 interface QueryDetailParams {
   page: number;
   perPage: number;
   detailReason: string | null;
   paretoSelections: ParetoSelections;
+  sortCol?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 async function queryDetail(
   client: DuckDBClient,
   allConditions: string[],
-  { page, perPage, detailReason, paretoSelections }: QueryDetailParams,
+  { page, perPage, detailReason, paretoSelections, sortCol, sortDir }: QueryDetailParams,
 ): Promise<DetailResult> {
   const detailConditions = [...allConditions];
 
@@ -405,12 +415,15 @@ async function queryDetail(
     'DEFECT_RATE_PCT', 'REJECT_SHARE_PCT', 'AFFECTED_WORKORDER_COUNT',
   ];
   const selectExpr = detailCols.map((c) => qid(c)).join(', ');
+  const orderBy = (sortCol && _DUCKDB_SORT_ALLOWED.has(sortCol))
+    ? `ORDER BY ${qid(sortCol)} ${sortDir === 'desc' ? 'DESC' : 'ASC'}`
+    : `ORDER BY ${qid('TXN_DAY')} DESC, ${qid('WORKCENTER_GROUP')} ASC, ${qid('WORKCENTERNAME')} ASC,
+             ${qid('REJECT_TOTAL_QTY')} DESC, ${qid('CONTAINERNAME')} ASC`;
   const detailSql = `
     SELECT ${selectExpr}
     FROM ${TABLE_NAME}
     ${detailWhere}
-    ORDER BY ${qid('TXN_DAY')} DESC, ${qid('WORKCENTER_GROUP')} ASC, ${qid('WORKCENTERNAME')} ASC,
-             ${qid('REJECT_TOTAL_QTY')} DESC, ${qid('CONTAINERNAME')} ASC
+    ${orderBy}
     LIMIT ${pp} OFFSET ${offset}
   `;
   const rows = await client.sendQuery(detailSql);
@@ -687,6 +700,8 @@ export function useRejectHistoryDuckDB() {
     page = 1,
     perPage = 20,
     detailReason = null,
+    sortCol = '',
+    sortDir = 'asc' as 'asc' | 'desc',
   }: ComputeViewParams = {}): Promise<ComputeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
 
@@ -720,6 +735,8 @@ export function useRejectHistoryDuckDB() {
         perPage,
         detailReason: detailReason ?? null,
         paretoSelections,
+        sortCol,
+        sortDir,
       }),
       queryBatchPareto(_client, [...policyConditions, ...userConditions], {
         metricMode,

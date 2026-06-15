@@ -352,15 +352,26 @@ def _build_summary_from_analytics(analytics_raw: List[Dict[str, Any]]) -> Dict[s
     }
 
 
-def _detail_sort_clause(cols: set[str]) -> str:
-    order_specs = [
-        ("TXN_DAY", "DESC"),
-        ("WORKCENTERSEQUENCE_GROUP", "ASC"),
-        ("WORKCENTERNAME", "ASC"),
-        ("REJECT_TOTAL_QTY", "DESC"),
-        ("CONTAINERNAME", "ASC"),
-    ]
-    usable = [f'{_qid(col)} {direction}' for col, direction in order_specs if col in cols]
+_DETAIL_SORT_ALLOWED: frozenset[str] = frozenset({
+    "CONTAINERNAME", "WORKCENTERNAME", "PRODUCTLINENAME", "PJ_FUNCTION",
+    "PJ_TYPE", "PRODUCTNAME", "LOSSREASONNAME", "EQUIPMENTNAME",
+    "REJECTCOMMENT", "REJECT_TOTAL_QTY", "DEFECT_QTY", "TXN_TIME", "TXN_DAY",
+})
+
+_DETAIL_SORT_DEFAULT = [
+    ("TXN_DAY", "DESC"),
+    ("WORKCENTERSEQUENCE_GROUP", "ASC"),
+    ("WORKCENTERNAME", "ASC"),
+    ("REJECT_TOTAL_QTY", "DESC"),
+    ("CONTAINERNAME", "ASC"),
+]
+
+
+def _detail_sort_clause(cols: set[str], sort_col: Optional[str] = None, sort_dir: str = "asc") -> str:
+    if sort_col and sort_col in _DETAIL_SORT_ALLOWED and sort_col in cols:
+        direction = "DESC" if sort_dir == "desc" else "ASC"
+        return f"ORDER BY {_qid(sort_col)} {direction}"
+    usable = [f'{_qid(col)} {direction}' for col, direction in _DETAIL_SORT_DEFAULT if col in cols]
     if not usable:
         return ""
     return "ORDER BY " + ", ".join(usable)
@@ -642,6 +653,8 @@ def try_compute_view_from_spool(
     exclude_material_scrap: bool,
     exclude_pb_diode: bool,
     dim_to_column: Dict[str, str],
+    sort_col: Optional[str] = None,
+    sort_dir: str = "asc",
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     if not _CACHE_SQL_ENABLED or not _CACHE_SQL_VIEW_ENABLED:
         return None, {"view_sql_fallback_reason": SQL_FALLBACK_DISABLED}
@@ -847,7 +860,7 @@ def try_compute_view_from_spool(
             f'{_qid(col)} AS {_qid(col)}' if col in cols else f"NULL AS {_qid(col)}"
             for col in detail_columns
         )
-        sort_clause = _detail_sort_clause(cols)
+        sort_clause = _detail_sort_clause(cols, sort_col=sort_col, sort_dir=sort_dir)
         detail_sql = f"""
             SELECT {select_expr}
             FROM reject_src

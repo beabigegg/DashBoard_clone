@@ -290,6 +290,8 @@ export interface ViewParamsOptions {
   };
   page?: number;
   perPage?: number;
+  sortCol?: string;
+  sortDir?: 'asc' | 'desc';
   policyFilters?: {
     includeExcludedScrap?: boolean;
     excludeMaterialScrap?: boolean;
@@ -308,6 +310,8 @@ export function buildViewParams(
     paretoSelections = {},
     page = 1,
     perPage = 20,
+    sortCol = '',
+    sortDir = 'asc' as 'asc' | 'desc',
     policyFilters = {},
   }: ViewParamsOptions = {}
 ): Record<string, unknown> {
@@ -343,6 +347,10 @@ export function buildViewParams(
   }
   params.page = page || 1;
   params.per_page = perPage || 20;
+  if (sortCol) {
+    params.sort_col = sortCol;
+    params.sort_dir = sortDir || 'asc';
+  }
 
   // Policy filters (applied in-memory on cached data)
   if (policyFilters.includeExcludedScrap) {

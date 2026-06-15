@@ -265,6 +265,8 @@ const detail = ref<DetailState>({
     totalPages: 1,
   },
 });
+const detailSortCol = ref('');
+const detailSortDir = ref<'asc' | 'desc'>('asc');
 
 // ---- Loading / error state ----
 const loading = reactive<LoadingState>({
@@ -864,6 +866,8 @@ async function refreshDetailPage(): Promise<void> {
           paretoSelections,
           page: page.value,
           perPage: DEFAULT_PER_PAGE,
+          sortCol: detailSortCol.value,
+          sortDir: detailSortDir.value,
         });
         if (isStaleRequest(requestId)) return;
 
@@ -885,6 +889,8 @@ async function refreshDetailPage(): Promise<void> {
       paretoSelections,
       page: page.value,
       perPage: DEFAULT_PER_PAGE,
+      sortCol: detailSortCol.value,
+      sortDir: detailSortDir.value,
       policyFilters: {
         includeExcludedScrap: committedPrimary.includeExcludedScrap,
         excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
@@ -950,6 +956,13 @@ function goToPage(nextPage: number): void {
     return;
   }
   page.value = nextPage;
+  void refreshDetailPage();
+}
+
+function onDetailSort(payload: { key: string; direction: string }): void {
+  detailSortCol.value = payload.key;
+  detailSortDir.value = payload.direction === 'desc' ? 'desc' : 'asc';
+  page.value = 1;
   void refreshDetailPage();
 }
 
@@ -1442,10 +1455,6 @@ onUnmounted(() => {
 
 <template>
   <div class="dashboard reject-history-page theme-reject-history">
-    <PageHeader
-      title="報廢歷史查詢"
-      :show-refresh="false"
-    />
 
     <ErrorBanner :message="errorMessage" :dismissible="false" />
     <div v-if="partialFailureWarning" class="warning-banner">
@@ -1515,6 +1524,7 @@ onUnmounted(() => {
         :selected-pareto-summary="selectedParetoSummary"
         @go-to-page="goToPage"
         @clear-pareto-selection="clearParetoSelection"
+        @sort="onDetailSort"
       />
     </template>
     <LoadingOverlay v-if="loading.querying && !jobProgress.active" tier="page" />

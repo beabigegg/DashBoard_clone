@@ -1346,6 +1346,8 @@ def apply_view(
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
+    sort_col: Optional[str] = None,
+    sort_dir: str = "asc",
 ) -> Optional[Dict[str, Any]]:
     """Read cache → apply filters → return derived data. Returns None if expired."""
     from mes_dashboard.services.reject_cache_sql_runtime import (
@@ -1370,6 +1372,8 @@ def apply_view(
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
         dim_to_column=_DIM_TO_DF_COLUMN,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
     )
     if sql_result is not None:
         logger.info(

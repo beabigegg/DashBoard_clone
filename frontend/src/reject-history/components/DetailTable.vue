@@ -22,6 +22,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'go-to-page', page: number): void;
   (e: 'clear-pareto-selection'): void;
+  (e: 'sort', payload: { key: string; direction: string }): void;
 }>();
 
 const tablePagination = computed(() => {
@@ -59,6 +60,7 @@ function onPageChange(newPage: number): void {
         :loading="loading || paginating"
         :pagination="tablePagination"
         @page-change="onPageChange"
+        @sort="(p) => emit('sort', p)"
       >
         <DataTableColumn column-key="CONTAINERNAME" label="LOT" :sortable="true" />
         <DataTableColumn column-key="WORKCENTERNAME" label="WORKCENTER" :sortable="true" />
@@ -123,6 +125,10 @@ function onPageChange(newPage: number): void {
 /* Flat-table layout: remove card-body padding so DataTable extends flush to card edges */
 .detail-card-body {
   padding: 0;
+}
+
+:deep(.data-table-td) {
+  white-space: nowrap;
 }
 
 .expand-breakdown {

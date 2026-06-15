@@ -405,7 +405,11 @@ def _register_pool_events(engine, call_timeout_ms: int):
     @event.listens_for(engine, "invalidate")
     def on_invalidate(dbapi_conn, connection_record, exception):
         if exception:
-            logger.warning(f"Connection invalidated due to: {exception}")
+            logger.warning(
+                "Connection invalidated due to: %s (%s)",
+                str(exception) or "(no message)",
+                type(exception).__name__,
+            )
         else:
             logger.debug("Connection invalidated (soft)")
 

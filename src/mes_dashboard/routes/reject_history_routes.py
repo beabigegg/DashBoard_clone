@@ -871,6 +871,16 @@ def api_reject_history_view():
     exclude_material_scrap = _get_bool_simple("exclude_material_scrap", True)
     exclude_pb_diode = _get_bool_simple("exclude_pb_diode", True)
 
+    _SORT_ALLOWED = {
+        "CONTAINERNAME", "WORKCENTERNAME", "PRODUCTLINENAME", "PJ_FUNCTION",
+        "PJ_TYPE", "PRODUCTNAME", "LOSSREASONNAME", "EQUIPMENTNAME",
+        "REJECTCOMMENT", "REJECT_TOTAL_QTY", "DEFECT_QTY", "TXN_TIME", "TXN_DAY",
+    }
+    raw_sort_col = str(args.get("sort_col", "") or "").strip().upper()
+    sort_col = raw_sort_col if raw_sort_col in _SORT_ALLOWED else None
+    raw_sort_dir = str(args.get("sort_dir", "") or "").strip().lower()
+    sort_dir = "desc" if raw_sort_dir == "desc" else "asc"
+
     try:
         result = apply_view(
             query_id=query_id,
@@ -888,6 +898,8 @@ def api_reject_history_view():
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
+            sort_col=sort_col,
+            sort_dir=sort_dir,
         )
 
         if result is None:
