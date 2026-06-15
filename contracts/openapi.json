@@ -1,0 +1,3787 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API behavior, compatibility rules, and endpoint contract requirements.",
+    "version": "1.20.0"
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "summary": "POST /api/auth/login",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "401": {
+            "description": "Error response (see contract error format)"
+          },
+          "429": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "requestBody": {
+          "description": "Contract request: JSON {username,password} (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/401/429"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "POST /api/auth/logout",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          }
+        },
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "—"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "GET /api/auth/me",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          }
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "—"
+      }
+    },
+    "/api/auth/heartbeat": {
+      "patch": {
+        "summary": "PATCH /api/auth/heartbeat",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "401": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "401"
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "GET /health",
+        "responses": {
+          "200": {
+            "description": "Contract response: health-payload"
+          }
+        },
+        "x-cdd-response-contract": "health-payload",
+        "x-cdd-errors": "—"
+      }
+    },
+    "/health/deep": {
+      "get": {
+        "summary": "GET /health/deep",
+        "responses": {
+          "200": {
+            "description": "Contract response: health-payload"
+          }
+        },
+        "x-cdd-response-contract": "health-payload",
+        "x-cdd-errors": "—"
+      }
+    },
+    "/api/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/404"
+      }
+    },
+    "/api/job/<job_id>/abandon": {
+      "post": {
+        "summary": "POST /api/job/<job_id>/abandon",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "409": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/404/409"
+      }
+    },
+    "/api/spool/<namespace>/<query_id>.parquet": {
+      "get": {
+        "summary": "GET /api/spool/<namespace>/<query_id>.parquet",
+        "responses": {
+          "200": {
+            "description": "Contract response: parquet-binary"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "parquet-binary",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/wip/overview/summary": {
+      "get": {
+        "summary": "GET /api/wip/overview/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/wip/overview/summary",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/overview/matrix": {
+      "post": {
+        "summary": "POST /api/wip/overview/matrix",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "get": {
+        "summary": "GET /api/wip/overview/matrix",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/overview/hold": {
+      "get": {
+        "summary": "GET /api/wip/overview/hold",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/wip/overview/hold",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/detail/<workcenter>": {
+      "get": {
+        "summary": "GET /api/wip/detail/<workcenter>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/wip/detail/<workcenter>",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/lot/<lotid>": {
+      "get": {
+        "summary": "GET /api/wip/lot/<lotid>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404/500"
+      }
+    },
+    "/api/wip/meta/workcenters": {
+      "get": {
+        "summary": "GET /api/wip/meta/workcenters",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/wip/meta/packages": {
+      "get": {
+        "summary": "GET /api/wip/meta/packages",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/wip/meta/filter-options": {
+      "get": {
+        "summary": "GET /api/wip/meta/filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      },
+      "post": {
+        "summary": "POST /api/wip/meta/filter-options",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/wip/meta/search": {
+      "get": {
+        "summary": "GET /api/wip/meta/search",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/hold-overview/summary": {
+      "get": {
+        "summary": "GET /api/hold-overview/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/hold-overview/summary",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/hold-overview/matrix": {
+      "get": {
+        "summary": "GET /api/hold-overview/matrix",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/hold-overview/matrix",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/hold-overview/treemap": {
+      "get": {
+        "summary": "GET /api/hold-overview/treemap",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/hold-overview/treemap",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/hold-overview/lots": {
+      "get": {
+        "summary": "GET /api/hold-overview/lots",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      },
+      "post": {
+        "summary": "POST /api/hold-overview/lots",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/hold-detail/summary": {
+      "get": {
+        "summary": "GET /api/wip/hold-detail/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/hold-detail/distribution": {
+      "get": {
+        "summary": "GET /api/wip/hold-detail/distribution",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/wip/hold-detail/lots": {
+      "get": {
+        "summary": "GET /api/wip/hold-detail/lots",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/hold-history/config": {
+      "get": {
+        "summary": "GET /api/hold-history/config",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/hold-history/query": {
+      "post": {
+        "summary": "POST /api/hold-history/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: HTTP 200 sync (days < HOLD_ASYNC_DAY_THRESHOLD or HOLD_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days ≥ HOLD_ASYNC_DAY_THRESHOLD AND HOLD_ASYNC_ENABLED=true): {async:true, job_id, status_url}"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "HTTP 200 sync (days < HOLD_ASYNC_DAY_THRESHOLD or HOLD_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days ≥ HOLD_ASYNC_DAY_THRESHOLD AND HOLD_ASYNC_ENABLED=true): {async:true, job_id, status_url}",
+        "x-cdd-errors": "202/400/410/500"
+      }
+    },
+    "/api/hold-history/today-snapshot": {
+      "post": {
+        "summary": "POST /api/hold-history/today-snapshot",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/503"
+      }
+    },
+    "/api/hold-history/view": {
+      "get": {
+        "summary": "GET /api/hold-history/view",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/qc-gate/summary": {
+      "get": {
+        "summary": "GET /api/qc-gate/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/by_status": {
+      "get": {
+        "summary": "GET /api/resource/by_status",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/by_workcenter": {
+      "get": {
+        "summary": "GET /api/resource/by_workcenter",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/workcenter_status_matrix": {
+      "get": {
+        "summary": "GET /api/resource/workcenter_status_matrix",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/detail": {
+      "post": {
+        "summary": "POST /api/resource/detail",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/resource/filter_options": {
+      "get": {
+        "summary": "GET /api/resource/filter_options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/status_values": {
+      "get": {
+        "summary": "GET /api/resource/status_values",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/status": {
+      "get": {
+        "summary": "GET /api/resource/status",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/resource/status/options": {
+      "get": {
+        "summary": "GET /api/resource/status/options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response (incl. package_groups[])"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response (incl. package_groups[])",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/status/summary": {
+      "get": {
+        "summary": "GET /api/resource/status/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/resource/status/matrix": {
+      "get": {
+        "summary": "GET /api/resource/status/matrix",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/resource/history/options": {
+      "get": {
+        "summary": "GET /api/resource/history/options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/resource/history/query": {
+      "post": {
+        "summary": "POST /api/resource/history/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: HTTP 200 sync (days < RESOURCE_ASYNC_DAY_THRESHOLD or RESOURCE_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days >= RESOURCE_ASYNC_DAY_THRESHOLD AND RESOURCE_ASYNC_ENABLED=true): {async:true, job_id, status_url}"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "HTTP 200 sync (days < RESOURCE_ASYNC_DAY_THRESHOLD or RESOURCE_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days >= RESOURCE_ASYNC_DAY_THRESHOLD AND RESOURCE_ASYNC_ENABLED=true): {async:true, job_id, status_url}",
+        "x-cdd-errors": "202/400/410/500"
+      }
+    },
+    "/api/resource/history/view": {
+      "get": {
+        "summary": "GET /api/resource/history/view",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/resource/history/page": {
+      "get": {
+        "summary": "GET /api/resource/history/page",
+        "responses": {
+          "200": {
+            "description": "Contract response: redirect→/resource-history"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "redirect→/resource-history",
+        "x-cdd-errors": "—"
+      }
+    },
+    "/api/resource/history/export": {
+      "get": {
+        "summary": "GET /api/resource/history/export",
+        "responses": {
+          "200": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      },
+      "post": {
+        "summary": "POST /api/resource/history/export",
+        "responses": {
+          "201": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/resource/history/query/progress": {
+      "get": {
+        "summary": "GET /api/resource/history/query/progress",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/404"
+      }
+    },
+    "/api/reject-history/options": {
+      "get": {
+        "summary": "GET /api/reject-history/options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/reject-history/summary": {
+      "get": {
+        "summary": "GET /api/reject-history/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/trend": {
+      "get": {
+        "summary": "GET /api/reject-history/trend",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/reason-pareto": {
+      "get": {
+        "summary": "GET /api/reject-history/reason-pareto",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/batch-pareto": {
+      "post": {
+        "summary": "POST /api/reject-history/batch-pareto",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      },
+      "get": {
+        "summary": "GET /api/reject-history/batch-pareto",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/list": {
+      "get": {
+        "summary": "GET /api/reject-history/list",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/export": {
+      "get": {
+        "summary": "GET /api/reject-history/export",
+        "responses": {
+          "200": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/export-cached": {
+      "get": {
+        "summary": "GET /api/reject-history/export-cached",
+        "responses": {
+          "200": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      },
+      "post": {
+        "summary": "POST /api/reject-history/export-cached",
+        "responses": {
+          "201": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/analytics": {
+      "get": {
+        "summary": "GET /api/reject-history/analytics",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/query": {
+      "post": {
+        "summary": "POST /api/reject-history/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "202/400/500"
+      }
+    },
+    "/api/reject-history/count": {
+      "get": {
+        "summary": "GET /api/reject-history/count",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/reject-history/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/reject-history/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/reject-history/view": {
+      "get": {
+        "summary": "GET /api/reject-history/view",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      },
+      "post": {
+        "summary": "POST /api/reject-history/view",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/query": {
+      "post": {
+        "summary": "POST /api/yield-alert/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "202/400/500"
+      }
+    },
+    "/api/yield-alert/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/yield-alert/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/yield-alert/analyze": {
+      "post": {
+        "summary": "POST /api/yield-alert/analyze",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/view": {
+      "get": {
+        "summary": "GET /api/yield-alert/view",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/summary": {
+      "get": {
+        "summary": "GET /api/yield-alert/summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/trend": {
+      "get": {
+        "summary": "GET /api/yield-alert/trend",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/alerts": {
+      "get": {
+        "summary": "GET /api/yield-alert/alerts",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/reason-detail": {
+      "get": {
+        "summary": "GET /api/yield-alert/reason-detail",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/drilldown-context": {
+      "get": {
+        "summary": "GET /api/yield-alert/drilldown-context",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/yield-alert/filter-options": {
+      "get": {
+        "summary": "GET /api/yield-alert/filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/yield-alert/cross-filter-options": {
+      "get": {
+        "summary": "GET /api/yield-alert/cross-filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/production-history/type-options": {
+      "get": {
+        "summary": "GET /api/production-history/type-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/production-history/filter-options": {
+      "get": {
+        "summary": "GET /api/production-history/filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/404/500"
+      }
+    },
+    "/api/production-history/options": {
+      "post": {
+        "summary": "POST /api/production-history/options",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "503"
+      }
+    },
+    "/api/production-history/query": {
+      "post": {
+        "summary": "POST /api/production-history/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "202/400/503"
+      }
+    },
+    "/api/production-history/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/production-history/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/production-history/page": {
+      "post": {
+        "summary": "POST /api/production-history/page",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/production-history/matrix": {
+      "post": {
+        "summary": "POST /api/production-history/matrix",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/production-history/count": {
+      "get": {
+        "summary": "GET /api/production-history/count",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/production-history/export": {
+      "get": {
+        "summary": "GET /api/production-history/export",
+        "responses": {
+          "200": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      },
+      "post": {
+        "summary": "POST /api/production-history/export",
+        "responses": {
+          "201": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/material-trace/query": {
+      "post": {
+        "summary": "POST /api/material-trace/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "202/400/503"
+      }
+    },
+    "/api/material-trace/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/material-trace/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/material-trace/export": {
+      "post": {
+        "summary": "POST /api/material-trace/export",
+        "responses": {
+          "201": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "409": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON {query_hash} (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/409"
+      }
+    },
+    "/api/material-trace/filter-options": {
+      "get": {
+        "summary": "GET /api/material-trace/filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/trace/seed-resolve": {
+      "post": {
+        "summary": "POST /api/trace/seed-resolve",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/trace/lineage": {
+      "post": {
+        "summary": "POST /api/trace/lineage",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "202/400/500"
+      }
+    },
+    "/api/trace/lineage/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/trace/lineage/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/trace/lineage/job/<job_id>/result": {
+      "get": {
+        "summary": "GET /api/trace/lineage/job/<job_id>/result",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404/410"
+      }
+    },
+    "/api/trace/events": {
+      "post": {
+        "summary": "POST /api/trace/events",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/trace/job/<job_id>": {
+      "get": {
+        "summary": "GET /api/trace/job/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/trace/job/<job_id>/result": {
+      "get": {
+        "summary": "GET /api/trace/job/<job_id>/result",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404/410"
+      }
+    },
+    "/api/trace/job/<job_id>/stream": {
+      "get": {
+        "summary": "GET /api/trace/job/<job_id>/stream",
+        "responses": {
+          "200": {
+            "description": "Contract response: ndjson-stream"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "ndjson-stream",
+        "x-cdd-errors": "404"
+      }
+    },
+    "/api/mid-section-defect/station-options": {
+      "get": {
+        "summary": "GET /api/mid-section-defect/station-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/mid-section-defect/analysis": {
+      "get": {
+        "summary": "GET /api/mid-section-defect/analysis",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/mid-section-defect/analysis/detail": {
+      "get": {
+        "summary": "GET /api/mid-section-defect/analysis/detail",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/mid-section-defect/loss-reasons": {
+      "get": {
+        "summary": "GET /api/mid-section-defect/loss-reasons",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/mid-section-defect/export": {
+      "get": {
+        "summary": "GET /api/mid-section-defect/export",
+        "responses": {
+          "200": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/analytics/anomaly-summary": {
+      "get": {
+        "summary": "GET /api/analytics/anomaly-summary",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response+cache_state"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response+cache_state",
+        "x-cdd-errors": "503"
+      }
+    },
+    "/api/analytics/yield-anomalies": {
+      "get": {
+        "summary": "GET /api/analytics/yield-anomalies",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "503"
+      }
+    },
+    "/api/analytics/reject-spikes": {
+      "get": {
+        "summary": "GET /api/analytics/reject-spikes",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "503"
+      }
+    },
+    "/api/analytics/hold-outliers": {
+      "get": {
+        "summary": "GET /api/analytics/hold-outliers",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "503"
+      }
+    },
+    "/api/analytics/equipment-deviation": {
+      "get": {
+        "summary": "GET /api/analytics/equipment-deviation",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "503"
+      }
+    },
+    "/api/analytics/yield-anomalies/drilldown": {
+      "get": {
+        "summary": "GET /api/analytics/yield-anomalies/drilldown",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410/503"
+      }
+    },
+    "/api/analytics/reject-spikes/drilldown": {
+      "get": {
+        "summary": "GET /api/analytics/reject-spikes/drilldown",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410/503"
+      }
+    },
+    "/api/analytics/hold-outliers/drilldown": {
+      "get": {
+        "summary": "GET /api/analytics/hold-outliers/drilldown",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410/503"
+      }
+    },
+    "/api/analytics/equipment-deviation/drilldown": {
+      "get": {
+        "summary": "GET /api/analytics/equipment-deviation/drilldown",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/410/503"
+      }
+    },
+    "/api/query-tool/resolve": {
+      "post": {
+        "summary": "POST /api/query-tool/resolve",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/query-tool/lot-history": {
+      "get": {
+        "summary": "GET /api/query-tool/lot-history",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/query-tool/adjacent-lots": {
+      "get": {
+        "summary": "GET /api/query-tool/adjacent-lots",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/query-tool/lot-associations": {
+      "get": {
+        "summary": "GET /api/query-tool/lot-associations",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/query-tool/equipment-period": {
+      "post": {
+        "summary": "POST /api/query-tool/equipment-period",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/query-tool/equipment-list": {
+      "get": {
+        "summary": "GET /api/query-tool/equipment-list",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/query-tool/workcenter-groups": {
+      "get": {
+        "summary": "GET /api/query-tool/workcenter-groups",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/query-tool/lot-equipment-lookup": {
+      "post": {
+        "summary": "POST /api/query-tool/lot-equipment-lookup",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/query-tool/equipment-recent-jobs/<equipment_id>": {
+      "get": {
+        "summary": "GET /api/query-tool/equipment-recent-jobs/<equipment_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404/500"
+      }
+    },
+    "/api/query-tool/export-csv": {
+      "post": {
+        "summary": "POST /api/query-tool/export-csv",
+        "responses": {
+          "201": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/job-query/resources": {
+      "get": {
+        "summary": "GET /api/job-query/resources",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/job-query/jobs": {
+      "post": {
+        "summary": "POST /api/job-query/jobs",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/job-query/txn/<job_id>": {
+      "get": {
+        "summary": "GET /api/job-query/txn/<job_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "404/500"
+      }
+    },
+    "/api/job-query/export": {
+      "post": {
+        "summary": "POST /api/job-query/export",
+        "responses": {
+          "201": {
+            "description": "Contract response: csv-stream"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "csv-stream",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/dashboard/kpi": {
+      "post": {
+        "summary": "POST /api/dashboard/kpi",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/dashboard/workcenter_cards": {
+      "post": {
+        "summary": "POST /api/dashboard/workcenter_cards",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/dashboard/detail": {
+      "post": {
+        "summary": "POST /api/dashboard/detail",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/dashboard/ou_trend": {
+      "post": {
+        "summary": "POST /api/dashboard/ou_trend",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/dashboard/utilization_heatmap": {
+      "post": {
+        "summary": "POST /api/dashboard/utilization_heatmap",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/ai/query": {
+      "post": {
+        "summary": "POST /api/ai/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/admin/api/system-status": {
+      "get": {
+        "summary": "GET /admin/api/system-status",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/metrics": {
+      "get": {
+        "summary": "GET /admin/api/metrics",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/logs": {
+      "get": {
+        "summary": "GET /admin/api/logs",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/logs/cleanup": {
+      "post": {
+        "summary": "POST /admin/api/logs/cleanup",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/log-files/cleanup": {
+      "post": {
+        "summary": "POST /admin/api/log-files/cleanup",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/performance-detail": {
+      "get": {
+        "summary": "GET /admin/api/performance-detail",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/performance-history": {
+      "get": {
+        "summary": "GET /admin/api/performance-history",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/performance-history/purge": {
+      "post": {
+        "summary": "POST /admin/api/performance-history/purge",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/storage-info": {
+      "get": {
+        "summary": "GET /admin/api/storage-info",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/worker/restart": {
+      "post": {
+        "summary": "POST /admin/api/worker/restart",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/worker/status": {
+      "get": {
+        "summary": "GET /admin/api/worker/status",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/user-usage-kpi": {
+      "get": {
+        "summary": "GET /admin/api/user-usage-kpi",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/403"
+      }
+    },
+    "/admin/api/pages": {
+      "get": {
+        "summary": "GET /admin/api/pages",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/admin/api/drawers": {
+      "get": {
+        "summary": "GET /admin/api/drawers",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      },
+      "post": {
+        "summary": "POST /admin/api/drawers",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/403"
+      }
+    },
+    "/admin/api/drawers/<drawer_id>": {
+      "put": {
+        "summary": "PUT /admin/api/drawers/<drawer_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "400/403/404"
+      },
+      "delete": {
+        "summary": "DELETE /admin/api/drawers/<drawer_id>",
+        "responses": {
+          "200": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/404"
+      }
+    },
+    "/admin/api/analytics/recalculate": {
+      "post": {
+        "summary": "POST /admin/api/analytics/recalculate",
+        "responses": {
+          "201": {
+            "description": "Contract response: success_response"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "success_response",
+        "x-cdd-errors": "403/500"
+      }
+    },
+    "/api/downtime-analysis/query": {
+      "post": {
+        "summary": "POST /api/downtime-analysis/query",
+        "responses": {
+          "201": {
+            "description": "Contract response: HTTP 200 sync: existing shape when days < DOWNTIME_ASYNC_DAY_THRESHOLD; HTTP 202 async: {async:true, job_id, status_url} when days >= DOWNTIME_ASYNC_DAY_THRESHOLD AND DOWNTIME_ASYNC_ENABLED=true"
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-response-contract": "HTTP 200 sync: existing shape when days < DOWNTIME_ASYNC_DAY_THRESHOLD; HTTP 202 async: {async:true, job_id, status_url} when days >= DOWNTIME_ASYNC_DAY_THRESHOLD AND DOWNTIME_ASYNC_ENABLED=true",
+        "x-cdd-errors": "202/400/500"
+      }
+    }
+  },
+  "x-cdd-generated-from": "contracts/api/api-contract.md",
+  "x-cdd-note": "Generated by `cdd-kit openapi export` from the markdown API contract (the source of truth). Partial by design: request/response bodies are free-form prose in the contract and are marked unresolved. Do not hand-edit; regenerate from the contract.",
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

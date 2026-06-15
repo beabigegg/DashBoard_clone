@@ -1,6 +1,6 @@
-# generated: 2026-06-15T10:32:58Z by cdd-kit 3.1.0
-# files: 863, src-lines: 251724, map-lines: 18721, compression: 13.4x
-# sources-digest: 504f4e42f4c87fb8fc28f0864393143dd7ec2fb709c03edbcf68f86228b641c1
+# generated: 2026-06-15T12:42:30Z by cdd-kit 3.2.0
+# files: 863, src-lines: 251994, map-lines: 18725, compression: 13.5x
+# sources-digest: 8072518252e9149098c473d8df5635728af2500f9d05c7a01492dcb80131feb0
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -601,7 +601,7 @@ frontend/src/core/post-export.ts:  # 45 lines
   functions:
     - { name: async postExport, lines: 15-45 }
 
-frontend/src/core/reject-history-filters.ts:  # 358 lines
+frontend/src/core/reject-history-filters.ts:  # 366 lines
   constants:
     - { name: PRIMARY_QUERY_MAX_DAYS, line: 32 }
   functions:
@@ -615,7 +615,7 @@ frontend/src/core/reject-history-filters.ts:  # 358 lines
     - { name: buildRejectCommonQueryParams, lines: 213-232 }
     - { name: parseMultiLineInput, lines: 234-250 }
     - { name: validateDateRange, lines: 252-273 }
-    - { name: buildViewParams, lines: 301-358 }
+    - { name: buildViewParams, lines: 303-366 }
   interfaces:
     - { name: RejectFilterInput, lines: 34-45 }
     - { name: RejectFilterSnapshot, lines: 47-57 }
@@ -625,7 +625,7 @@ frontend/src/core/reject-history-filters.ts:  # 358 lines
     - { name: RejectOptionsRequestParams, lines: 177-186 }
     - { name: RejectCommonQueryParams, lines: 205-207 }
     - { name: BuildRejectCommonQueryOptions, lines: 209-211 }
-    - { name: ViewParamsOptions, lines: 275-299 }
+    - { name: ViewParamsOptions, lines: 275-301 }
 
 frontend/src/core/resource-history-filters.ts:  # 247 lines
   functions:
@@ -839,7 +839,7 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 686 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 683 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
@@ -849,7 +849,7 @@ frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 686 lines
   constants:
     - { name: API_TIMEOUT, line: 17 }
   functions:
-    - { name: useDowntimeData, lines: 58-686 }
+    - { name: useDowntimeData, lines: 58-683 }
   interfaces:
     - { name: DowntimeAsyncJobProgress, lines: 20-27 }
     - { name: SummaryData, lines: 29-34 }  # local
@@ -1726,9 +1726,9 @@ frontend/src/query-tool/utils/values.ts:  # 93 lines
     - { name: formatCellValue, lines: 74-82 }
     - { name: hashColor, lines: 84-93 }
 
-frontend/src/reject-history/App.vue:  # 1522 lines
+frontend/src/reject-history/App.vue:  # 1532 lines
 
-frontend/src/reject-history/components/DetailTable.vue:  # 163 lines
+frontend/src/reject-history/components/DetailTable.vue:  # 169 lines
 
 frontend/src/reject-history/components/FilterPanel.vue:  # 295 lines
 
@@ -1748,29 +1748,29 @@ frontend/src/reject-history/main.ts:  # 9 lines
     - { module: './style.css', items: [], line: 5 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
 
-frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
+frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 781 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported], line: 15 }
   constants:
-    - { name: TABLE_NAME, line: 170 }
-    - { name: DIM_TO_COLUMN, line: 173 }
+    - { name: TABLE_NAME, line: 172 }
+    - { name: DIM_TO_COLUMN, line: 175 }
   functions:
-    - { name: getCsrfToken, lines: 181-185 }
-    - { name: async fetchParquetBuffer, lines: 187-201 }
-    - { name: qs, lines: 205-207 }
-    - { name: qid, lines: 209-211 }
-    - { name: normValueExpr, lines: 213-216 }
-    - { name: buildPolicyConditions, lines: 225-262 }
-    - { name: buildUserConditions, lines: 272-308 }
-    - { name: buildWhereClause, lines: 310-312 }
-    - { name: async queryAnalyticsRaw, lines: 316-336 }
-    - { name: buildSummaryFromAnalytics, lines: 338-358 }
-    - { name: async queryDetail, lines: 367-460 }
-    - { name: async queryBatchPareto, lines: 468-558 }
-    - { name: async queryAvailableFilters, lines: 560-589 }
-    - { name: async querySummaryDirect, lines: 591-641 }
-    - { name: useRejectHistoryDuckDB, lines: 645-764 }
+    - { name: getCsrfToken, lines: 183-187 }
+    - { name: async fetchParquetBuffer, lines: 189-203 }
+    - { name: qs, lines: 207-209 }
+    - { name: qid, lines: 211-213 }
+    - { name: normValueExpr, lines: 215-218 }
+    - { name: buildPolicyConditions, lines: 227-264 }
+    - { name: buildUserConditions, lines: 274-310 }
+    - { name: buildWhereClause, lines: 312-314 }
+    - { name: async queryAnalyticsRaw, lines: 318-338 }
+    - { name: buildSummaryFromAnalytics, lines: 340-360 }
+    - { name: async queryDetail, lines: 377-473 }
+    - { name: async queryBatchPareto, lines: 481-571 }
+    - { name: async queryAvailableFilters, lines: 573-602 }
+    - { name: async querySummaryDirect, lines: 604-654 }
+    - { name: useRejectHistoryDuckDB, lines: 658-781 }
   interfaces:
     - { name: AnalyticsRawRow, lines: 20-28 }
     - { name: SummaryData, lines: 31-40 }
@@ -1783,12 +1783,12 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
     - { name: AvailableFilters, lines: 115-119 }
     - { name: ComputeViewResult, lines: 122-128 }
     - { name: PolicyFilters, lines: 131-136 }
-    - { name: ComputeViewParams, lines: 142-155 }
-    - { name: DuckDBClient, lines: 161-166 }  # local
-    - { name: PolicyConditionParams, lines: 218-223 }  # local
-    - { name: UserConditionParams, lines: 264-270 }  # local
-    - { name: QueryDetailParams, lines: 360-365 }  # local
-    - { name: QueryBatchParetoParams, lines: 462-466 }  # local
+    - { name: ComputeViewParams, lines: 142-157 }
+    - { name: DuckDBClient, lines: 163-168 }  # local
+    - { name: PolicyConditionParams, lines: 220-225 }  # local
+    - { name: UserConditionParams, lines: 266-272 }  # local
+    - { name: QueryDetailParams, lines: 368-375 }  # local
+    - { name: QueryBatchParetoParams, lines: 475-479 }  # local
   types:
     - { name: ParetoSelections, lines: 139-139 }
 
@@ -3704,7 +3704,7 @@ src/mes_dashboard/core/csrf.py:  # 85 lines
     - { name: should_enforce_csrf, lines: 56-72 }
     - { name: validate_csrf, lines: 75-85 }
 
-src/mes_dashboard/core/database.py:  # 1186 lines
+src/mes_dashboard/core/database.py:  # 1190 lines
   imports:
     - { module: __future__, items: [annotations], line: 32 }
     - { module: logging, items: [], line: 34 }
@@ -3722,7 +3722,7 @@ src/mes_dashboard/core/database.py:  # 1186 lines
     - { module: mes_dashboard.config.database, items: [DB_CONFIG, CONNECTION_STRING], line: 48 }
     - { module: mes_dashboard.config.settings, items: [get_config], line: 49 }
   constants:
-    - { name: KEEPALIVE_INTERVAL, line: 449 }
+    - { name: KEEPALIVE_INTERVAL, line: 453 }
   classes:
     - name: SecretRedactionFilter
       lines: 68-80
@@ -3748,27 +3748,27 @@ src/mes_dashboard/core/database.py:  # 1186 lines
     - { name: get_engine, lines: 279-316 }
     - { name: get_health_engine, lines: 319-352 }
     - { name: get_slow_engine, lines: 355-389 }
-    - { name: _register_pool_events, lines: 392-414 }
-    - { name: get_db, lines: 422-426 }
-    - { name: close_db, lines: 429-433 }
-    - { name: init_db, lines: 436-438 }
-    - { name: _keepalive_worker, lines: 452-471 }
-    - { name: start_keepalive, lines: 474-485 }
-    - { name: stop_keepalive, lines: 488-494 }
-    - { name: dispose_engine, lines: 497-519 }
-    - { name: _get_slow_query_semaphore, lines: 536-543 }
-    - { name: get_slow_query_active_count, lines: 546-548 }
-    - { name: get_slow_query_waiting_count, lines: 551-553 }
-    - { name: get_direct_connection_count, lines: 556-558 }
-    - { name: get_db_connection, lines: 561-587 }
-    - { name: _get_slow_query_connection, lines: 590-625 }
-    - { name: _extract_ora_code, lines: 628-631 }
-    - { name: read_sql_df, lines: 634-745 }
-    - { name: read_sql_df_slow, lines: 748-862 }
-    - { name: read_sql_df_slow_iter, lines: 865-962 }
-    - { name: get_table_columns, lines: 970-978 }
-    - { name: get_table_data, lines: 984-1068 }
-    - { name: get_table_column_metadata, lines: 1071-1186 }
+    - { name: _register_pool_events, lines: 392-418 }
+    - { name: get_db, lines: 426-430 }
+    - { name: close_db, lines: 433-437 }
+    - { name: init_db, lines: 440-442 }
+    - { name: _keepalive_worker, lines: 456-475 }
+    - { name: start_keepalive, lines: 478-489 }
+    - { name: stop_keepalive, lines: 492-498 }
+    - { name: dispose_engine, lines: 501-523 }
+    - { name: _get_slow_query_semaphore, lines: 540-547 }
+    - { name: get_slow_query_active_count, lines: 550-552 }
+    - { name: get_slow_query_waiting_count, lines: 555-557 }
+    - { name: get_direct_connection_count, lines: 560-562 }
+    - { name: get_db_connection, lines: 565-591 }
+    - { name: _get_slow_query_connection, lines: 594-629 }
+    - { name: _extract_ora_code, lines: 632-635 }
+    - { name: read_sql_df, lines: 638-749 }
+    - { name: read_sql_df_slow, lines: 752-866 }
+    - { name: read_sql_df_slow_iter, lines: 869-966 }
+    - { name: get_table_columns, lines: 974-982 }
+    - { name: get_table_data, lines: 988-1072 }
+    - { name: get_table_column_metadata, lines: 1075-1190 }
 
 src/mes_dashboard/core/duckdb_runtime.py:  # 182 lines
   imports:
@@ -4723,7 +4723,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 497 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 534 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: os, items: [], line: 19 }
@@ -4738,13 +4738,13 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 497 lines
     - { name: _validate_dates, lines: 83-98 }
     - { name: _csv_param, lines: 101-106 }
     - { name: api_downtime_options, lines: 115-147 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 156-266 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 275-308 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 317-361 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 370-410 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 419-444 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 453-478 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 486-497 }
+    - { name: api_downtime_query, lines: 156-303 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 312-345 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 354-398 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 407-447 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 456-481 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 490-515 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 523-534 }
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -4788,7 +4788,7 @@ src/mes_dashboard/routes/health_routes.py:  # 863 lines
     - { name: deep_health_check, lines: 631-837 }  # @health_bp.route('/health/deep', methods=['GET'])
     - { name: frontend_shell_health_check, lines: 841-863 }  # @health_bp.route('/health/frontend-shell', methods=['GET'])
 
-src/mes_dashboard/routes/hold_history_routes.py:  # 418 lines
+src/mes_dashboard/routes/hold_history_routes.py:  # 431 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -4817,10 +4817,10 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 418 lines
     - { name: _normalize_hold_type, lines: 149-151 }
     - { name: _normalize_record_type, lines: 154-162 }
     - { name: hold_history_page, lines: 171-189 }  # @hold_history_bp.route('/hold-history')
-    - { name: api_hold_history_query, lines: 199-266 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
-    - { name: api_hold_history_view, lines: 276-324 }  # @hold_history_bp.route('/api/hold-history/view')
-    - { name: api_hold_history_config, lines: 333-338 }  # @hold_history_bp.route('/api/hold-history/config')
-    - { name: api_hold_history_today_snapshot, lines: 348-418 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+    - { name: api_hold_history_query, lines: 199-279 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
+    - { name: api_hold_history_view, lines: 289-337 }  # @hold_history_bp.route('/api/hold-history/view')
+    - { name: api_hold_history_config, lines: 346-351 }  # @hold_history_bp.route('/api/hold-history/config')
+    - { name: api_hold_history_today_snapshot, lines: 361-431 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
 src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
   imports:
@@ -5038,7 +5038,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
     - { name: get_equipment_recent_jobs_route, lines: 794-807 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 817-990 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 1004 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5079,10 +5079,10 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
     - { name: api_reject_history_count, lines: 781-796 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
     - { name: api_reject_history_job_status, lines: 801-807 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
     - { name: _inject_reject_spool_info, lines: 814-828 }
-    - { name: api_reject_history_view, lines: 832-910 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 914-992 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: api_reject_history_view, lines: 832-922 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 926-1004 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
-src/mes_dashboard/routes/resource_history_routes.py:  # 447 lines
+src/mes_dashboard/routes/resource_history_routes.py:  # 450 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: datetime, items: [datetime], line: 9 }
@@ -5109,10 +5109,10 @@ src/mes_dashboard/routes/resource_history_routes.py:  # 447 lines
     - { name: _validate_dates, lines: 150-158 }
     - { name: _parse_resource_filters, lines: 161-171 }
     - { name: _bool_param, lines: 174-180 }
-    - { name: api_resource_history_query, lines: 184-288 }  # @resource_history_bp.route('/query', methods=['POST'])
-    - { name: api_resource_history_view, lines: 292-313 }  # @resource_history_bp.route('/view', methods=['GET'])
-    - { name: api_resource_history_query_progress, lines: 322-366 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
-    - { name: api_resource_history_export, lines: 374-447 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
+    - { name: api_resource_history_query, lines: 184-291 }  # @resource_history_bp.route('/query', methods=['POST'])
+    - { name: api_resource_history_view, lines: 295-316 }  # @resource_history_bp.route('/view', methods=['GET'])
+    - { name: api_resource_history_query_progress, lines: 325-369 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
+    - { name: api_resource_history_export, lines: 377-450 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/resource_routes.py:  # 475 lines
   imports:
@@ -5901,7 +5901,7 @@ src/mes_dashboard/services/filter_cache.py:  # 637 lines
     - { name: _extract_workcenter_data_from_df, lines: 588-624 }
     - { name: init_cache, lines: 631-637 }
 
-src/mes_dashboard/services/hold_dataset_cache.py:  # 434 lines
+src/mes_dashboard/services/hold_dataset_cache.py:  # 455 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -5930,7 +5930,8 @@ src/mes_dashboard/services/hold_dataset_cache.py:  # 434 lines
     - { name: apply_view, lines: 321-382 }
     - { name: _empty_views, lines: 385-399 }
     - { name: make_canonical_warmup_query_id, lines: 412-414 }
-    - { name: ensure_dataset_loaded, lines: 417-434 }
+    - { name: ensure_canonical_spool, lines: 417-435 }
+    - { name: ensure_dataset_loaded, lines: 438-455 }
 
 src/mes_dashboard/services/hold_history_service.py:  # 507 lines
   imports:
@@ -6009,7 +6010,7 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 803 lines
     - { name: _build_duration_clause, lines: 671-682 }
     - { name: try_compute_view_from_spool, lines: 687-803 }
 
-src/mes_dashboard/services/hold_query_job_service.py:  # 174 lines
+src/mes_dashboard/services/hold_query_job_service.py:  # 190 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
@@ -6017,7 +6018,7 @@ src/mes_dashboard/services/hold_query_job_service.py:  # 174 lines
     - { module: datetime, items: [datetime], line: 18 }
     - { module: typing, items: [Any], line: 19 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 21 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 165 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 181 }
   constants:
     - { name: HOLD_ASYNC_ENABLED, line: 33 }
     - { name: HOLD_ASYNC_DAY_THRESHOLD, line: 37 }
@@ -6027,7 +6028,7 @@ src/mes_dashboard/services/hold_query_job_service.py:  # 174 lines
   functions:
     - { name: should_use_async, lines: 53-71 }
     - { name: enqueue_hold_history_query, lines: 78-91 }
-    - { name: execute_hold_history_query_job, lines: 98-159 }
+    - { name: execute_hold_history_query_job, lines: 98-175 }
 
 src/mes_dashboard/services/hold_today_snapshot_service.py:  # 508 lines
   imports:
@@ -6876,7 +6877,7 @@ src/mes_dashboard/services/reason_filter_cache.py:  # 161 lines
     - { name: _read_from_redis, lines: 134-147 }
     - { name: _write_to_redis, lines: 150-161 }
 
-src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1047 lines
+src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1060 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: logging, items: [], line: 14 }
@@ -6907,14 +6908,14 @@ src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1047 lines
     - { name: _normalize_pareto_values, lines: 273-282 }
     - { name: _apply_detail_pareto_conditions, lines: 285-333 }
     - { name: _build_summary_from_analytics, lines: 336-352 }
-    - { name: _detail_sort_clause, lines: 355-366 }
-    - { name: _detail_item_from_row, lines: 369-400 }
-    - { name: _export_row_from_row, lines: 403-428 }
-    - { name: try_compute_batch_pareto_from_spool, lines: 431-623 }
-    - { name: try_compute_view_from_spool, lines: 626-892 }
-    - { name: try_iter_export_rows_from_spool, lines: 895-1047 }
+    - { name: _detail_sort_clause, lines: 370-377 }
+    - { name: _detail_item_from_row, lines: 380-411 }
+    - { name: _export_row_from_row, lines: 414-439 }
+    - { name: try_compute_batch_pareto_from_spool, lines: 442-634 }
+    - { name: try_compute_view_from_spool, lines: 637-905 }
+    - { name: try_iter_export_rows_from_spool, lines: 908-1060 }
 
-src/mes_dashboard/services/reject_dataset_cache.py:  # 2034 lines
+src/mes_dashboard/services/reject_dataset_cache.py:  # 2038 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6969,22 +6970,22 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 2034 lines
     - { name: execute_primary_query, lines: 804-1233 }
     - { name: ensure_dataset_loaded, lines: 1236-1273 }
     - { name: _apply_policy_filters, lines: 1276-1324 }
-    - { name: apply_view, lines: 1332-1385 }
-    - { name: _apply_supplementary_filters, lines: 1388-1427 }
-    - { name: _normalize_pareto_values, lines: 1430-1439 }
-    - { name: _apply_pareto_selection_filter, lines: 1442-1489 }
-    - { name: _paginate_detail, lines: 1492-1584 }
-    - { name: _extract_available_filters, lines: 1587-1593 }
-    - { name: _project_pareto_guard_frame, lines: 1614-1631 }
-    - { name: _normalize_metric_mode, lines: 1634-1638 }
-    - { name: _normalize_pareto_scope, lines: 1641-1645 }
-    - { name: _normalize_pareto_display_scope, lines: 1648-1652 }
-    - { name: _normalize_pareto_selections, lines: 1655-1668 }
-    - { name: _build_dimension_pareto_items, lines: 1671-1736 }
-    - { name: _apply_cross_filter, lines: 1739-1766 }
-    - { name: compute_dimension_pareto, lines: 1769-1877 }
-    - { name: compute_batch_pareto, lines: 1880-1973 }
-    - { name: export_csv_from_cache, lines: 1981-2034 }
+    - { name: apply_view, lines: 1332-1389 }
+    - { name: _apply_supplementary_filters, lines: 1392-1431 }
+    - { name: _normalize_pareto_values, lines: 1434-1443 }
+    - { name: _apply_pareto_selection_filter, lines: 1446-1493 }
+    - { name: _paginate_detail, lines: 1496-1588 }
+    - { name: _extract_available_filters, lines: 1591-1597 }
+    - { name: _project_pareto_guard_frame, lines: 1618-1635 }
+    - { name: _normalize_metric_mode, lines: 1638-1642 }
+    - { name: _normalize_pareto_scope, lines: 1645-1649 }
+    - { name: _normalize_pareto_display_scope, lines: 1652-1656 }
+    - { name: _normalize_pareto_selections, lines: 1659-1672 }
+    - { name: _build_dimension_pareto_items, lines: 1675-1740 }
+    - { name: _apply_cross_filter, lines: 1743-1770 }
+    - { name: compute_dimension_pareto, lines: 1773-1881 }
+    - { name: compute_batch_pareto, lines: 1884-1977 }
+    - { name: export_csv_from_cache, lines: 1985-2038 }
 
 src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
   imports:
@@ -7200,7 +7201,7 @@ src/mes_dashboard/services/resource_cache.py:  # 1261 lines
     - { name: get_vendors, lines: 1231-1233 }
     - { name: get_resource_cascade_metadata, lines: 1236-1261 }
 
-src/mes_dashboard/services/resource_dataset_cache.py:  # 774 lines
+src/mes_dashboard/services/resource_dataset_cache.py:  # 790 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -7235,7 +7236,8 @@ src/mes_dashboard/services/resource_dataset_cache.py:  # 774 lines
     - { name: make_canonical_base_query_id, lines: 650-661 }
     - { name: make_canonical_oee_query_id, lines: 664-675 }
     - { name: _query_and_store_canonical_dataset, lines: 678-746 }
-    - { name: ensure_dataset_loaded, lines: 749-774 }
+    - { name: ensure_canonical_spool, lines: 749-762 }
+    - { name: ensure_dataset_loaded, lines: 765-790 }
 
 src/mes_dashboard/services/resource_history_duckdb_cache.py:  # 349 lines
   imports:
@@ -7336,7 +7338,7 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 859 lines
     - { name: try_compute_view_from_spool, lines: 570-663 }
     - { name: try_compute_query_from_canonical_spool, lines: 668-859 }
 
-src/mes_dashboard/services/resource_query_job_service.py:  # 184 lines
+src/mes_dashboard/services/resource_query_job_service.py:  # 203 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
@@ -7344,7 +7346,7 @@ src/mes_dashboard/services/resource_query_job_service.py:  # 184 lines
     - { module: datetime, items: [datetime], line: 18 }
     - { module: typing, items: [Any], line: 19 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 21 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 175 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 194 }
   constants:
     - { name: RESOURCE_ASYNC_ENABLED, line: 33 }
     - { name: RESOURCE_ASYNC_DAY_THRESHOLD, line: 37 }
@@ -7354,7 +7356,7 @@ src/mes_dashboard/services/resource_query_job_service.py:  # 184 lines
   functions:
     - { name: should_use_async, lines: 53-71 }
     - { name: enqueue_resource_history_query, lines: 78-91 }
-    - { name: execute_resource_history_query_job, lines: 98-169 }
+    - { name: execute_resource_history_query_job, lines: 98-188 }
 
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:
@@ -16901,7 +16903,7 @@ tests/test_resource_history_routes.py:  # 497 lines
   functions:
     - { name: _rh_client, lines: 401-407 }  # @pytest.fixture
 
-tests/test_resource_history_rq_async_route.py:  # 277 lines
+tests/test_resource_history_rq_async_route.py:  # 314 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: json, items: [], line: 11 }
@@ -16912,7 +16914,7 @@ tests/test_resource_history_rq_async_route.py:  # 277 lines
     - { module: mes_dashboard.core.database, items: [], line: 19 }
   classes:
     - name: TestResourceHistoryAsyncRoute
-      lines: 22-273
+      lines: 22-310
       methods:
         - { name: setUp, lines: 25-31 }
         - { name: _post_query, lines: 33-38 }
@@ -16925,6 +16927,7 @@ tests/test_resource_history_rq_async_route.py:  # 277 lines
         - { name: test_resource_async_day_threshold_default_is_90, lines: 196-211 }
         - { name: test_enqueue_failure_falls_through_to_sync, lines: 223-242 }
         - { name: test_enqueue_exception_falls_through_to_sync, lines: 254-273 }
+        - { name: test_canonical_spool_hit_on_long_span_returns_200_no_rq, lines: 283-310 }
 
 tests/test_resource_history_service.py:  # 498 lines
   imports:
@@ -17079,7 +17082,7 @@ tests/test_resource_history_sql_runtime.py:  # 307 lines
         - { name: test_date_filter_injected_when_superset_used, lines: 207-281 }
         - { name: test_range_outside_warmup_window_returns_spool_miss, lines: 283-307 }
 
-tests/test_resource_query_job_service.py:  # 262 lines
+tests/test_resource_query_job_service.py:  # 299 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: importlib, items: [], line: 11 }
@@ -17090,7 +17093,7 @@ tests/test_resource_query_job_service.py:  # 262 lines
     - { module: pytest, items: [], line: 17 }
   classes:
     - name: TestResourceQueryJobService
-      lines: 22-262
+      lines: 22-299
       methods:
         - { name: test_should_use_async_above_threshold, lines: 27-36 }
         - { name: test_should_use_async_at_exact_threshold, lines: 38-48 }
@@ -17100,12 +17103,13 @@ tests/test_resource_query_job_service.py:  # 262 lines
         - { name: test_should_use_async_invalid_date_format_returns_false, lines: 82-91 }
         - { name: test_worker_fn_failure_reraises_and_sets_error, lines: 95-137 }
         - { name: test_worker_fn_success_calls_complete_job_with_query_id, lines: 139-170 }
-        - { name: test_register_job_type_fires_at_import, lines: 174-183 }
-        - { name: test_register_job_type_reruns_after_reload, lines: 185-196 }
-        - { name: test_resource_async_enabled_defaults_to_true, lines: 200-214 }
-        - { name: test_resource_async_day_threshold_defaults_to_90, lines: 216-230 }
-        - { name: test_resource_worker_queue_defaults_to_resource_history_query, lines: 232-246 }
-        - { name: test_resource_job_timeout_defaults_to_1800, lines: 248-262 }
+        - { name: test_worker_fn_success_primes_canonical_spool, lines: 172-207 }
+        - { name: test_register_job_type_fires_at_import, lines: 211-220 }
+        - { name: test_register_job_type_reruns_after_reload, lines: 222-233 }
+        - { name: test_resource_async_enabled_defaults_to_true, lines: 237-251 }
+        - { name: test_resource_async_day_threshold_defaults_to_90, lines: 253-267 }
+        - { name: test_resource_worker_queue_defaults_to_resource_history_query, lines: 269-283 }
+        - { name: test_resource_job_timeout_defaults_to_1800, lines: 285-299 }
 
 tests/test_resource_routes.py:  # 219 lines
   imports:

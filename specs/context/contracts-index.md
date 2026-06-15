@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: c72c257eb858a90a729a7271e2c04ec44b6e663a56112e4b4d930f5336507698
+inputs-digest: abea80b94871d95ef635bb17841d09908e742ad8d9c4ad878b245463990dac7b
 ---
 
 # Contracts Index
@@ -35,7 +35,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.19.0
+- schema-version: 1.20.0
 - last-changed: 2026-06-13
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.

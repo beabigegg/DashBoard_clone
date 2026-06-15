@@ -34,6 +34,9 @@ jobs:
       - name: Validate contracts and gates
         run: cdd-kit validate
 
+      - name: OpenAPI sync gate
+        run: cdd-kit openapi export --check --out contracts/openapi.json
+
       - name: Repository-specific fast gate
         run: |
           # TODO: add your stack-specific commands here.
