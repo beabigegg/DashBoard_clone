@@ -1,0 +1,15 @@
+{
+  "change_id": "fix-e2e-spec-failures",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx playwright test tests/playwright/production-history-multi-line-input.spec.ts tests/playwright/production-history-wildcard-paste.spec.ts tests/playwright/job-abandon-on-unload.spec.js tests/playwright/resilience/browser-history.spec.js tests/playwright/hold-history-flat-table.spec.js tests/playwright/wip-matrix-drilldown.spec.js tests/playwright/production-history-pruning-feedback.spec.ts tests/playwright/reject-history.spec.js tests/playwright/reject-material-flat-table.spec.js --reporter=list",
+  "duration_ms": 162166,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-143119/summary.json",
+    "stdout": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-143119/stdout.log",
+    "stderr": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-143119/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

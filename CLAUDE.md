@@ -178,5 +178,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `GunicornHarness`: pop `FLASK_ENV`/`FLASK_TESTING`/`PYTEST_CURRENT_TEST`, set `REDIS_ENABLED=true` before `Popen` — see docs/architecture/ci-workflow.md
 - `start_duckdb_prewarm()`: assert "background thread started" sentinel, not "prewarm complete" — see docs/architecture/ci-workflow.md
 - `GunicornHarness`: set both `REGISTER_INTERNAL_METRICS=true` and `INTERNAL_METRICS_ENABLED=1` for `/internal/metrics` — see docs/architecture/ci-workflow.md
+- Playwright `page.route()` is LIFO: register catch-all routes FIRST and specific routes LAST so specific routes take priority — see docs/architecture/ci-workflow.md
+- Playwright specs for reject-history / reject-material: `DetailTable` only renders after `queryId` is set — always click the submit button in `beforeEach` before asserting table content — see docs/architecture/ci-workflow.md
 
 <!-- cdd-kit:learnings:end -->

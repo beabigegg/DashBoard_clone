@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 169
-visible-files: 859
+visible-dirs: 172
+visible-files: 869
 omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -103,7 +103,7 @@ DashBoard_vite/
 |   |   |-- 267688019eacc507
 |   |   |-- 27091f72d62819f4
 |   |   |-- 296b4f265252c452
-|   |   \-- ... (198 more entries truncated; cap=50)
+|   |   \-- ... (202 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -202,6 +202,8 @@ DashBoard_vite/
 |   |   \-- code-map.yml
 |   |-- logs/
 |   |   \-- admin_logs.sqlite
+|   |-- playwright-report/
+|   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
 |   |   \-- ts-resolver-loader.mjs
@@ -467,6 +469,8 @@ DashBoard_vite/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
+|   |-- test-results/
+|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -633,9 +637,15 @@ DashBoard_vite/
 |   |   \-- ... (40 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
 |   |-- rq_msd_worker.log
 |   |-- rq_prod_hist_worker.log
 |   |-- rq_reject_worker.log
@@ -870,6 +880,8 @@ DashBoard_vite/
 |       |-- __main__.py
 |       |-- app.py
 |       \-- rq_worker_preload.py
+|-- test-results/
+|   \-- .last-run.json
 |-- tests/
 |   |-- e2e/
 |   |   |-- __init__.py
@@ -1041,9 +1053,10 @@ DashBoard_vite/
 |   \-- ... (167 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
-|   |   |-- downtime_analysis/
-|   |   |-- msd-events/
-|   |   |   \-- tmpp2s0qs1k.parquet
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- 0fff9d37f176e65b.parquet
 |   |   |-- probe_10707.json
 |   |   |-- probe_10745.json
 |   |   |-- probe_10829.json
@@ -1092,7 +1105,7 @@ DashBoard_vite/
 |   |   |-- probe_179781.json
 |   |   |-- probe_181537.json
 |   |   |-- probe_183181.json
-|   |   \-- ... (73 more entries truncated; cap=50)
+|   |   \-- ... (84 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   \-- resource_history.duckdb
 |-- tools/

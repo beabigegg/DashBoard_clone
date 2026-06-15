@@ -1,0 +1,21 @@
+change-id: fix-e2e-spec-failures
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-15T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "0, 1, 2" }
+  - { type: gate-promotions, pointer: "n/a (no existing gates promoted; new gates authored for test-only change)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; existing npm run test:e2e sufficient)" }
+  - { type: required-status-checks, pointer: "static-scope-check, e2e-targeted, e2e-full-suite" }
+next-action: none
+notes: >
+  All gates execute via existing npm run test:e2e script and shared Chromium at
+  ~/.cache/ms-playwright/. No workflow YAML added or changed (AC-8 confirmed).
+  54-line ci-gates.md is within the 80-line soft cap.
+  Gate 'e2e-full-suite' binds to AC-7 exit criterion (130 passed / 0 failed / 3 skipped).
+  Merge eligibility requires qa-reviewer attestation (agent-log/qa-reviewer.yml).
+files-read:
+  - specs/changes/fix-e2e-spec-failures/change-classification.md
+  - specs/changes/fix-e2e-spec-failures/implementation-plan.md
+  - specs/changes/fix-e2e-spec-failures/test-plan.md
+  - frontend/playwright.config.js
