@@ -655,6 +655,18 @@ def _check_redis_converges(samples: List[Dict[str, Any]], *, warmup_s: float = 0
             )
         return
 
+    # When absolute key counts are tiny (≤5), a single-key jitter produces
+    # large percentage swings that are statistical noise, not real eviction
+    # or accumulation.  Skip the percentage rule; a flat ±3-key tolerance is
+    # sufficient at this scale.
+    if max(head_mean, tail_mean) <= 5:
+        if abs(tail_mean - head_mean) > 3:
+            raise AssertionError(
+                f"[redis_converges] low-count drift: head_mean={head_mean:.1f} "
+                f"tail_mean={tail_mean:.1f} — absolute delta exceeds 3 keys."
+            )
+        return
+
     drift_pct = (tail_mean - head_mean) / head_mean * 100.0
     if abs(drift_pct) > 10.0:
         raise AssertionError(

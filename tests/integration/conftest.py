@@ -275,6 +275,22 @@ def gunicorn_workers(
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture()
+def gunicorn_url(gunicorn_workers: List[Tuple[int, int]]) -> str:
+    """Return the base URL for the first worker spawned by gunicorn_workers.
+
+    Enables tests that need a URL string rather than raw (pid, port) pairs.
+    The fixture skips automatically if gunicorn_workers yields nothing.
+    """
+    if not gunicorn_workers:
+        pytest.skip("gunicorn_workers returned no workers")
+    _, port = gunicorn_workers[0]
+    return f"http://127.0.0.1:{port}"
+
+
+# ---------------------------------------------------------------------------
+
+
 def _wait_for_health(url: str, timeout: float = 15) -> None:
     """Poll *url* until it returns HTTP 200 or *timeout* seconds elapse."""
     import urllib.request
