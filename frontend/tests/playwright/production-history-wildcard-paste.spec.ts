@@ -121,7 +121,7 @@ test.describe('Production History — wildcard textarea UX', () => {
     // Mixed separators: newlines, commas, multiple spaces, AND a duplicate.
     await textarea.fill('MA2025\nMB2025,MC2025  MD2025\nMA2025');
 
-    const queryBtn = page.locator('button:has-text("查詢")').first();
+    const queryBtn = page.locator('[data-testid="ph-query-btn"]');
     await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
 
     const reqPromise = page.waitForRequest('**/api/production-history/query', { timeout: 10_000 });
@@ -146,7 +146,7 @@ test.describe('Production History — wildcard textarea UX', () => {
 
     await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill('MA*');
 
-    const queryBtn = page.locator('button:has-text("查詢")').first();
+    const queryBtn = page.locator('[data-testid="ph-query-btn"]');
     await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
 
     const reqPromise = page.waitForRequest('**/api/production-history/query', { timeout: 10_000 });
@@ -179,7 +179,7 @@ test.describe('Production History — wildcard textarea UX', () => {
     await switchToIdentifierTab(page);
     await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill("MA' OR 1=1--");
 
-    const queryBtn = page.locator('button:has-text("查詢")').first();
+    const queryBtn = page.locator('[data-testid="ph-query-btn"]');
     await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
     await queryBtn.click();
 

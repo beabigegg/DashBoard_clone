@@ -1,0 +1,42 @@
+change-id: fix-e2e-spec-failures
+status: in-progress
+tier: 4
+tier-floor-override: "Test-only change: all edits confined to frontend/tests/playwright/ spec files. The keywords auth/cache/query matched by the tier-floor check appear in Playwright spec file names and mock route patterns that TEST those features, not in production auth/cache/query code being modified. Zero source/contract/env/CI changes."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "No contract changes — test-only" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "No architecture review required per classifier" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "No API contract changes" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "No CSS/UI changes" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "No env changes" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "No data shape changes" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "No business logic changes" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "No CI/CD workflow changes" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: skipped, note: "Test-only change; E2E specs are the test artifact" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: skipped, note: "Not applicable" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "Not required per classifier" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "Not required per classifier" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: skipped, note: "No backend changes" }
+  - { id: "4.2", section: Implementation, title: "Frontend/E2E spec fixes", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "No env/deploy changes" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "No CI/CD workflow changes" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "No UI changes" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "No visual changes" }
+  - { id: "5.3", section: Review, title: "Contract review", status: skipped, note: "No contracts touched" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-reviewer approved; all 5 discipline constraints pass; 126/0/7 confirmed" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate fix-e2e-spec-failures passed; 126/0/7" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 local gate green; no CI environment available" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "API conformance warnings are pre-existing; no new gap introduced" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates defined for test-only change" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

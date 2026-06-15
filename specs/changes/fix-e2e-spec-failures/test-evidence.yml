@@ -1,0 +1,36 @@
+change-id: fix-e2e-spec-failures
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+  - full
+runs:
+  - phase: targeted
+    status: passed
+    command: >-
+      cd frontend && npx playwright test tests/playwright/production-history-multi-line-input.spec.ts
+      tests/playwright/production-history-wildcard-paste.spec.ts tests/playwright/job-abandon-on-unload.spec.js
+      tests/playwright/resilience/browser-history.spec.js tests/playwright/hold-history-flat-table.spec.js
+      tests/playwright/wip-matrix-drilldown.spec.js tests/playwright/production-history-pruning-feedback.spec.ts
+      tests/playwright/reject-history.spec.js tests/playwright/reject-material-flat-table.spec.js --reporter=list
+    summary: specs/changes/fix-e2e-spec-failures/test-runs/20260615-142844/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      cd frontend && npx playwright test tests/playwright/production-history-multi-line-input.spec.ts
+      tests/playwright/production-history-wildcard-paste.spec.ts tests/playwright/job-abandon-on-unload.spec.js
+      tests/playwright/resilience/browser-history.spec.js tests/playwright/hold-history-flat-table.spec.js
+      tests/playwright/wip-matrix-drilldown.spec.js tests/playwright/production-history-pruning-feedback.spec.ts
+      tests/playwright/reject-history.spec.js tests/playwright/reject-material-flat-table.spec.js --reporter=list
+    summary: specs/changes/fix-e2e-spec-failures/test-runs/20260615-143119/summary.json
+  - phase: full
+    status: passed
+    command: cd frontend && npx playwright test --reporter=list
+    summary: specs/changes/fix-e2e-spec-failures/test-runs/20260615-144950/summary.json
+  - phase: collect
+    status: passed
+    command: cd frontend && npx playwright test --list
+    summary: specs/changes/fix-e2e-spec-failures/test-runs/20260615-150036/summary.json
+final-status: passed

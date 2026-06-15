@@ -14,7 +14,7 @@ test.describe('WIP-Overview matrix cell drilldown', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaApi(page);
     await navigateViaSidebar(page, 'wip-overview', {
-      waitForSelector: 'table',
+      waitForSelector: '.matrix-container',
     });
     // Wait for matrix to load
     await page.waitForTimeout(3_000);
@@ -73,7 +73,7 @@ test.describe('WIP-Overview matrix cell drilldown', () => {
 
     // Navigate back after potential first click
     await page.goBack().catch(() => {});
-    await navigateViaSidebar(page, 'wip-overview', { waitForSelector: 'table' });
+    await navigateViaSidebar(page, 'wip-overview', { waitForSelector: '.matrix-container' });
     await page.waitForTimeout(2_000);
 
     const cell = page.locator('table tbody td[data-workcenter][data-package]').first();

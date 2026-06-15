@@ -172,9 +172,16 @@ test.describe('Back/forward navigation between pages', () => {
       waitForSelector: 'textarea',
     });
 
-    // Second navigation: click sidebar link directly WITHOUT another page.goto
+    // Second navigation: open sidebar inline WITHOUT page.goto
     // (page.goto would push an extra history entry and break goBack behavior)
+    const toggleBtn2 = page.locator('button.sidebar-toggle');
+    if ((await toggleBtn2.getAttribute('aria-expanded')) !== 'true') {
+      await toggleBtn2.click();
+    }
+    await page.locator('.sidebar-overlay').waitFor({ state: 'detached', timeout: 3_000 }).catch(() => {});
+    await page.waitForSelector('a[href*="reject-history"]', { timeout: 20_000 });
     await page.click('a[href*="reject-history"]');
+    await page.locator('.sidebar-overlay').waitFor({ state: 'detached', timeout: 3_000 }).catch(() => {});
     await page.waitForSelector('input[type="date"]', { timeout: 20_000 });
 
     await page.goBack();

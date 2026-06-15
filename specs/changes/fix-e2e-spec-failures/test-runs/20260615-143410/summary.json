@@ -1,0 +1,18 @@
+{
+  "change_id": "fix-e2e-spec-failures",
+  "phase": "full",
+  "status": "timeout",
+  "exit_code": null,
+  "command": "cd frontend && npx playwright test --reporter=list",
+  "duration_ms": 300033,
+  "first_failure": {
+    "kind": "timeout",
+    "message": "command exceeded timeout of 300000 ms"
+  },
+  "artifacts": {
+    "summary": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-143410/summary.json",
+    "stdout": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-143410/stdout.log",
+    "stderr": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-143410/stderr.log"
+  },
+  "next_action": "investigate the timeout or raise --timeout for a legitimately long suite"
+}

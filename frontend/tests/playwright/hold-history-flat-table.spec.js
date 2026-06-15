@@ -158,7 +158,8 @@ test.describe('hold-history async 202 path — AsyncQueryProgress', () => {
       }
     });
 
-    await page.goto('/portal-shell.html#/hold-history');
+    await loginViaApi(page);
+    await navigateViaSidebar(page, 'hold-history', { waitForSelector: '.ui-card' });
 
     // AsyncQueryProgress should appear while job is in progress
     // It renders only when asyncJobProgress.active is true
@@ -189,7 +190,8 @@ test.describe('hold-history async 202 path — AsyncQueryProgress', () => {
       });
     });
 
-    await page.goto('/portal-shell.html#/hold-history');
+    await loginViaApi(page);
+    await navigateViaSidebar(page, 'hold-history', { waitForSelector: '.ui-card' });
 
     // Wait for query to complete (loading overlay disappears)
     await page.waitForFunction(
@@ -223,7 +225,8 @@ test.describe('hold-history async 202 path — AsyncQueryProgress', () => {
       });
     });
 
-    await page.goto('/portal-shell.html#/hold-history');
+    await loginViaApi(page);
+    await navigateViaSidebar(page, 'hold-history', { waitForSelector: '.ui-card' });
 
     // AsyncQueryProgress must be visible (async is active)
     const progressBar = page.locator('.async-job-progress');

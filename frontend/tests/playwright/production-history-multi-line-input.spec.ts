@@ -108,7 +108,7 @@ test.describe('Production History — multi-line input (AC-5)', () => {
     const messy = '  GA250605\r\nGA250606,\tGA250607 \n  GA250605\r\n\r\n,GA250608  ';
     await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill(messy);
 
-    const queryBtn = page.locator('button:has-text("查詢")').first();
+    const queryBtn = page.locator('[data-testid="ph-query-btn"]');
     await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
 
     const reqPromise = page.waitForRequest('**/api/production-history/query', { timeout: 10_000 });
@@ -142,7 +142,7 @@ test.describe('Production History — multi-line input (AC-5)', () => {
     await page.locator('[data-testid="ph-first-tier-lot-ids"]').fill('');
     await page.locator('[data-testid="ph-first-tier-wafer-lots"]').fill('');
 
-    const queryBtn = page.locator('button:has-text("查詢")').first();
+    const queryBtn = page.locator('[data-testid="ph-query-btn"]');
     await expect(queryBtn).toBeEnabled({ timeout: 10_000 });
     await queryBtn.click();
 

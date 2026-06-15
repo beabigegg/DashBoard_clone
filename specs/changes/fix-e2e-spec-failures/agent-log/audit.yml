@@ -1,0 +1,15 @@
+- type: tier-floor-override
+  change-id: fix-e2e-spec-failures
+  timestamp: '2026-06-15T07:01:45.422Z'
+  declared-tier: 4
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - auth
+    - cache
+    - query
+  reason: >-
+    Test-only change: all edits confined to frontend/tests/playwright/ spec files. The keywords
+    auth/cache/query matched by the tier-floor check appear in Playwright spec file names and mock
+    route patterns that TEST those features, not in production auth/cache/query code being modified.
+    Zero source/contract/env/CI changes.

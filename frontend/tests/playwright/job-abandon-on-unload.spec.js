@@ -11,7 +11,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { loginViaApi, BASE_URL } from './_auth.js';
+import { loginViaApi, navigateViaSidebar, BASE_URL } from './_auth.js';
 
 test.describe('Job abandonment on tab close', () => {
   test('sendBeacon fires on page close and abandon endpoint works', async ({ page, context, playwright }) => {
@@ -19,10 +19,7 @@ test.describe('Job abandonment on tab close', () => {
     await loginViaApi(page);
 
     // ── 2. Navigate to reject-history via SPA sidebar ────────────────────────
-    await page.goto('/portal-shell/');
-    await page.waitForSelector('a[href*="reject-history"]', { timeout: 20_000 });
-    await page.click('a[href*="reject-history"]');
-    await page.waitForSelector('input[type="date"]', { timeout: 20_000 });
+    await navigateViaSidebar(page, 'reject-history', { waitForSelector: 'input[type="date"]' });
 
     // ── 3. Enqueue async job ─────────────────────────────────────────────────
     const enqueueResp = await page.request.post(`${BASE_URL}/api/reject-history/query`, {

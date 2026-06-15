@@ -1,0 +1,15 @@
+{
+  "change_id": "fix-e2e-spec-failures",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx playwright test --list",
+  "duration_ms": 1705,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-150036/summary.json",
+    "stdout": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-150036/stdout.log",
+    "stderr": "specs/changes/fix-e2e-spec-failures/test-runs/20260615-150036/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

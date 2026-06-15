@@ -61,16 +61,20 @@ test.describe('Production History — pruning feedback', () => {
   test('Pruned notice appears, then auto-clears', async ({ page }) => {
     await installPruningMock(page);
     await loginViaApi(page);
+
+    // Register waitForResponse BEFORE navigation so the initial mount fetch is captured.
+    const filterOptionsResponseP = page.waitForResponse(
+      (r) =>
+        r.url().includes('/api/production-history/filter-options') && r.status() === 200,
+      { timeout: 15_000 },
+    );
+
     await navigateViaSidebar(page, 'production-history', {
       waitForSelector: '[data-testid="ph-first-tier-bop"]',
     });
 
     // Wait for initial fetch.
-    await page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/production-history/filter-options') && r.status() === 200,
-      { timeout: 15_000 },
-    );
+    await filterOptionsResponseP;
 
     // Pick BOP-B
     await pickByTestidLabel(page, 'ph-first-tier-bop', 'BOP-B');
