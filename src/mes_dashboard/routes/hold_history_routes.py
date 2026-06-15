@@ -225,7 +225,9 @@ def api_hold_history_query():
             day_span = 0
         if day_span >= HOLD_ASYNC_DAY_THRESHOLD:
             if is_async_available():
+                _owner = get_owner_token()
                 _params = dict(
+                    owner=_owner,
                     start_date=start_date,
                     end_date=end_date,
                     hold_type=hold_type,
@@ -234,7 +236,7 @@ def api_hold_history_query():
                 try:
                     job_id, err = enqueue_job_dynamic(
                         "hold-history",
-                        owner=get_owner_token(),
+                        owner=_owner,
                         params=_params,
                     )
                     if job_id is not None:

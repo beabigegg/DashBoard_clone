@@ -452,9 +452,8 @@ async function executePrimaryQuery({ showOverlay = false } = {}): Promise<void> 
 
         if (isStaleRequest(requestId)) return;
 
-        // Job finished: read query_id from job result and load view data.
-        const jobResult = (finalStatus.result as Record<string, unknown> | null | undefined);
-        const resultQueryId = String(jobResult?.query_id || '');
+        // Job finished: query_id is stored at the top level of the job status response.
+        const resultQueryId = String((finalStatus as Record<string, unknown>).query_id || '');
         if (!resultQueryId) {
           errorMessage.value = '查詢完成但未返回 query_id';
           refreshError.value = true;
@@ -462,27 +461,9 @@ async function executePrimaryQuery({ showOverlay = false } = {}): Promise<void> 
         }
 
         queryId.value = resultQueryId;
-        // Populate view data from job result if present (worker stores view payload in result)
-        if (jobResult) {
-          applyViewResult(jobResult);
-        }
         updateUrlState();
-
-        // Check DuckDB eligibility from job result
-        const { eligible } = checkLocalComputeEligibility({
-          spoolDownloadUrl: jobResult?.spool_download_url as string | null | undefined,
-          totalRowCount: Number(jobResult?.total_row_count || 0),
-        });
-        if (eligible) {
-          try {
-            await duckdb.activate(
-              String(jobResult!.spool_download_url),
-              (jobResult!.workcenter_mapping || {}) as Record<string, string>,
-            );
-          } catch (_) {
-            // Activation failed — remain in server-view mode
-          }
-        }
+        // Fetch full view data from server (spool info, DuckDB eligibility handled inside refreshView)
+        await refreshView();
 
         refreshSuccess.value = true;
         setTimeout(() => { refreshSuccess.value = false; }, 1500);
