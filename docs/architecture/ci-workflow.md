@@ -54,3 +54,19 @@ Evidence: `gunicorn-preload-workers`.
 Pattern: `src/mes_dashboard/config/settings.py:53, 179`; `tests/integration/_multi_worker_harness.py:434-436`
 
 Evidence: `gunicorn-preload-workers`.
+
+## Playwright CI-Safe Specs — Use `page.goto()` Not `page.request.post()`
+
+**`page.request.post()` (used by `loginViaApi` in `_auth.js`) is a direct Node.js HTTP call from the Playwright test runner — it cannot be intercepted by `page.route()` and throws `ECONNREFUSED` immediately when no Flask server is running.** For resilience-style specs that must pass vacuously in CI (no live server), use `page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {})` and add an early-return guard instead of calling `loginViaApi`.
+
+Pattern: `frontend/tests/playwright/downtime-analysis.spec.js` (reference — never calls `loginViaApi`); `frontend/tests/playwright/resource-history-async.spec.ts` (fixed in `f8b15d6`).
+
+Evidence: `resource-history-rq-async` — CI run failed (all 3 tests ECONNREFUSED at `_auth.js:55`); fixed by removing `loginViaApi` and replacing with direct `page.goto`.
+
+## Playwright `pageRendered` Guard — Use App-Specific Content, Not `bodyText.length`
+
+**Chrome's ECONNREFUSED error page body can exceed 100 chars.** A guard like `pageRendered = bodyText.length > 100` will incorrectly report the Vue app as mounted on the browser error page, causing assertions to run against error-page DOM and fail unexpectedly. Use app-specific content detection instead: `bodyText.includes('<feature-keyword>') || (await page.locator('.theme-<name>, #<app-id>').count()) > 0`.
+
+Pattern: `frontend/tests/playwright/resource-history-async.spec.ts` — AC-9 `pageRendered` check uses `bodyText.includes('設備') || bodyText.includes('KPI') || locator('.theme-resource-history, #resource-history-app').count() > 0`.
+
+Evidence: `resource-history-rq-async` — fix commit `f8b15d6`.
