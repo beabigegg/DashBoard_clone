@@ -213,9 +213,22 @@ def api_hold_history_query():
     if record_type is None:
         return validation_error('Invalid record_type')
 
+    # ── Spool existence check — skip async if raw data already cached ──
+    # _make_query_id keys on {start_date, end_date} only; hold_type/record_type
+    # are view-level filters applied after spool read, so a cache hit here means
+    # the full date-range spool exists and we can serve any filter combination
+    # synchronously without dispatching a new RQ job.
+    from mes_dashboard.services.hold_dataset_cache import (
+        _make_query_id as _hold_make_qid,
+        _has_cached_df as _hold_has_cached,
+    )
+    _spool_qid = _hold_make_qid({"start_date": start_date, "end_date": end_date})
+    _spool_exists = _hold_has_cached(_spool_qid)
+
     # ── Async RQ branch (HOLD_ASYNC_ENABLED + threshold + worker available) ──
     # Falls through to the sync 200 path on any false condition (AC-2, AC-8).
-    if HOLD_ASYNC_ENABLED:
+    # Also falls through when spool already exists (no need to re-dispatch).
+    if HOLD_ASYNC_ENABLED and not _spool_exists:
         from datetime import datetime as _dt
         try:
             sd = _dt.strptime(start_date, "%Y-%m-%d")
