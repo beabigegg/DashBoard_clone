@@ -55,6 +55,9 @@ RQ_HOLD_HIST_WORKER_QUEUE="${HOLD_WORKER_QUEUE:-hold-history-query}"
 # RQ resource-history worker configuration
 RQ_RESOURCE_WORKER_ENABLED="${RQ_RESOURCE_WORKER_ENABLED:-true}"
 RQ_RESOURCE_WORKER_QUEUE="${RESOURCE_WORKER_QUEUE:-resource-history-query}"
+# RQ downtime worker configuration
+RQ_DOWNTIME_WORKER_ENABLED="${RQ_DOWNTIME_WORKER_ENABLED:-true}"
+RQ_DOWNTIME_WORKER_QUEUE="${DOWNTIME_WORKER_QUEUE:-downtime-query}"
 # RQ warmup worker configuration
 RQ_WARMUP_WORKER_ENABLED="${RQ_WARMUP_WORKER_ENABLED:-true}"
 RQ_WARMUP_WORKER_QUEUE="${WARMUP_WORKER_QUEUE:-warmup}"
@@ -120,6 +123,8 @@ resolve_runtime_paths() {
     RQ_HOLD_HIST_WORKER_LOG="${LOG_DIR}/rq_hold_hist_worker.log"
     RQ_RESOURCE_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_resource_worker.pid"
     RQ_RESOURCE_WORKER_LOG="${LOG_DIR}/rq_resource_worker.log"
+    RQ_DOWNTIME_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_downtime_worker.pid"
+    RQ_DOWNTIME_WORKER_LOG="${LOG_DIR}/rq_downtime_worker.log"
     RQ_WARMUP_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_warmup_worker.pid"
     RQ_WARMUP_WORKER_LOG="${LOG_DIR}/rq_warmup_worker.log"
     RQ_LOG_FORMAT="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -644,6 +649,11 @@ rotate_logs() {
         log_info "Archived rq_resource_worker.log -> archive/rq_resource_worker_${ts}.log"
     fi
 
+    if [ -f "$RQ_DOWNTIME_WORKER_LOG" ] && [ -s "$RQ_DOWNTIME_WORKER_LOG" ]; then
+        mv "$RQ_DOWNTIME_WORKER_LOG" "${LOG_DIR}/archive/rq_downtime_worker_${ts}.log"
+        log_info "Archived rq_downtime_worker.log -> archive/rq_downtime_worker_${ts}.log"
+    fi
+
     if [ -f "$RQ_WARMUP_WORKER_LOG" ] && [ -s "$RQ_WARMUP_WORKER_LOG" ]; then
         mv "$RQ_WARMUP_WORKER_LOG" "${LOG_DIR}/archive/rq_warmup_worker_${ts}.log"
         log_info "Archived rq_warmup_worker.log -> archive/rq_warmup_worker_${ts}.log"
@@ -661,6 +671,7 @@ rotate_logs() {
         ls -t rq_yield_alert_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
         ls -t rq_hold_hist_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
         ls -t rq_resource_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
+        ls -t rq_downtime_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f && \
         ls -t rq_warmup_worker_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
     cd "$ROOT"
 
@@ -1543,6 +1554,109 @@ rq_resource_worker_status() {
 # ---------------------------------------------------------------------------
 # RQ Warmup Worker functions
 # ---------------------------------------------------------------------------
+get_rq_downtime_worker_pid() {
+    local saved_pid=""
+    if [ -f "${RQ_DOWNTIME_WORKER_PID_FILE:-}" ]; then
+        saved_pid=$(cat "${RQ_DOWNTIME_WORKER_PID_FILE}" 2>/dev/null || true)
+        if [ -n "$saved_pid" ] && kill -0 "$saved_pid" 2>/dev/null; then
+            echo "$saved_pid"
+            return 0
+        fi
+    fi
+    local discovered_pid
+    discovered_pid=$(pgrep -f "[r]q worker.*${RQ_DOWNTIME_WORKER_QUEUE}" 2>/dev/null | head -1 || true)
+    if [ -n "$discovered_pid" ]; then
+        echo "$discovered_pid"
+        return 0
+    fi
+    return 1
+}
+
+is_rq_downtime_worker_running() {
+    get_rq_downtime_worker_pid &>/dev/null
+}
+
+start_rq_downtime_worker() {
+    if ! is_enabled "${RQ_DOWNTIME_WORKER_ENABLED:-true}"; then
+        log_info "RQ downtime worker is disabled (RQ_DOWNTIME_WORKER_ENABLED=${RQ_DOWNTIME_WORKER_ENABLED:-true})"
+        return 0
+    fi
+
+    resolve_runtime_paths
+
+    if is_rq_downtime_worker_running; then
+        local pid
+        pid=$(get_rq_downtime_worker_pid)
+        log_info "RQ downtime worker already running (PID: ${pid})"
+        return 0
+    fi
+
+    local redis_url="redis://127.0.0.1:6379/0"
+    if [ -n "${REDIS_URL:-}" ]; then
+        redis_url="${REDIS_URL}"
+    fi
+
+    log_info "Starting RQ downtime worker (queue: ${RQ_DOWNTIME_WORKER_QUEUE})..."
+
+    if command -v setsid &>/dev/null; then
+        setsid env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 rq worker "${RQ_DOWNTIME_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_DOWNTIME_WORKER_LOG}" 2>&1 < /dev/null &
+    else
+        env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 nohup rq worker "${RQ_DOWNTIME_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_DOWNTIME_WORKER_LOG}" 2>&1 < /dev/null &
+    fi
+    local worker_pid=$!
+    echo "$worker_pid" > "${RQ_DOWNTIME_WORKER_PID_FILE}"
+    sleep 1
+    if kill -0 "$worker_pid" 2>/dev/null; then
+        log_success "RQ downtime worker started (PID: ${worker_pid}, queue: ${RQ_DOWNTIME_WORKER_QUEUE})"
+        return 0
+    else
+        log_error "RQ downtime worker failed to start"
+        return 1
+    fi
+}
+
+stop_rq_downtime_worker() {
+    if ! is_rq_downtime_worker_running; then
+        log_info "RQ downtime worker is not running"
+        return 0
+    fi
+
+    local pid
+    pid=$(get_rq_downtime_worker_pid)
+    log_info "Stopping RQ downtime worker (PID: ${pid})..."
+    if kill "$pid" 2>/dev/null; then
+        local wait=0
+        while kill -0 "$pid" 2>/dev/null && [ "$wait" -lt 10 ]; do
+            sleep 1
+            wait=$((wait+1))
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "${RQ_DOWNTIME_WORKER_PID_FILE:-}" 2>/dev/null || true
+        log_success "RQ downtime worker stopped"
+        return 0
+    else
+        log_error "Failed to stop RQ downtime worker"
+        return 1
+    fi
+}
+
+rq_downtime_worker_status() {
+    if ! is_enabled "${RQ_DOWNTIME_WORKER_ENABLED:-true}"; then
+        echo -e "  RQ Downtime Worker:${YELLOW} DISABLED${NC}"
+        return 0
+    fi
+
+    if is_rq_downtime_worker_running; then
+        local pid
+        pid=$(get_rq_downtime_worker_pid)
+        echo -e "  RQ Downtime Worker:${GREEN} RUNNING${NC} (PID: ${pid}, queue: ${RQ_DOWNTIME_WORKER_QUEUE})"
+    else
+        echo -e "  RQ Downtime Worker:${RED} STOPPED${NC}"
+    fi
+}
+
 get_rq_warmup_worker_pid() {
     local saved_pid=""
     if [ -f "${RQ_WARMUP_WORKER_PID_FILE:-}" ]; then
@@ -1738,6 +1852,7 @@ do_start() {
             start_rq_yield_alert_worker
             start_rq_hold_hist_worker
             start_rq_resource_worker
+            start_rq_downtime_worker
             start_rq_warmup_worker
             echo "[$(timestamp)] Server started (PID: ${pid})" >> "$STARTUP_LOG"
         else
@@ -1801,6 +1916,7 @@ do_stop() {
     fi
 
     stop_rq_warmup_worker
+    stop_rq_downtime_worker
     stop_rq_resource_worker
     stop_rq_hold_hist_worker
     stop_rq_yield_alert_worker
@@ -1860,6 +1976,7 @@ do_status() {
     rq_yield_alert_worker_status
     rq_hold_hist_worker_status
     rq_resource_worker_status
+    rq_downtime_worker_status
     rq_warmup_worker_status
 
     if is_running; then
