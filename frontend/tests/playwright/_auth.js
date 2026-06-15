@@ -26,7 +26,7 @@ export const PASSWORD =
  * @param {import('@playwright/test').Page} page
  */
 export async function loginViaUI(page) {
-  await page.goto('/portal-shell.html');
+  await page.goto('/portal-shell/');
 
   // The router guard redirects unauthenticated users to /login.
   // Wait until the login form is visible (it may already be there or we
@@ -65,7 +65,7 @@ export async function loginViaApi(page) {
 
   // Cookies are stored automatically in the browser context; navigate to
   // the shell to initialise the Vue router.
-  await page.goto('/portal-shell.html');
+  await page.goto('/portal-shell/');
   await page.waitForURL((url) => !url.pathname.includes('/login'), {
     timeout: 20_000,
   });
@@ -161,13 +161,27 @@ export async function waitForIdleUi(page, timeout = 20_000) {
 export async function navigateViaSidebar(page, route, opts = {}) {
   const { waitForSelector, timeout = 20_000 } = opts;
 
-  // Navigate to portal-shell SPA base (not portal-shell.html which is a
-  // different entry point without sidebar navigation).
+  // Intercept the heavy WIP filter-options payload (400KB) that keeps the
+  // loading-overlay alive long enough to block sidebar clicks.  We return a
+  // minimal success response so the overlay clears immediately, then
+  // un-route after the sidebar click so the target page hits the real API.
+  const WIP_ROUTE = '**/api/wip/**';
+  await page.route(WIP_ROUTE, (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: {}, meta: {} }),
+    })
+  );
+
   await page.goto('/portal-shell/');
-  await page.waitForTimeout(2_000);
+  await waitForIdleUi(page);
 
   await page.waitForSelector(`a[href*="${route}"]`, { timeout });
   await page.click(`a[href*="${route}"]`);
+
+  // Un-route so the destination page can make real API calls.
+  await page.unroute(WIP_ROUTE);
 
   if (waitForSelector) {
     await page.waitForSelector(waitForSelector, { timeout });

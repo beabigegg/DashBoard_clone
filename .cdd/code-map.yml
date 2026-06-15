@@ -1,7 +1,7 @@
-# generated: 2026-06-13T09:46:21Z by cdd-kit 3.1.0
-# files: 858, src-lines: 248758, map-lines: 18542, compression: 13.4x
-# sources-digest: e6bf7a74104bd548ea82f4262a27b746a5355451b064a69344266a1fd1f75eb0
-frontend/playwright.config.js:  # 28 lines
+# generated: 2026-06-14T23:50:11Z by cdd-kit 3.1.0
+# files: 858, src-lines: 248822, map-lines: 18545, compression: 13.4x
+# sources-digest: 5ae5a0a3b622e6f5cce4a92cb75651f5e14502c7c13bc63bb6ece6d4b14bcef9
+frontend/playwright.config.js:  # 29 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
 
@@ -2669,7 +2669,7 @@ frontend/tests/pending-jobs-registry.test.js:  # 177 lines
   functions:
     - { name: makeLocalStorageStub, lines: 20-29 }
 
-frontend/tests/playwright/_auth.js:  # 177 lines
+frontend/tests/playwright/_auth.js:  # 191 lines
   constants:
     - { name: BASE_URL, line: 12 }
     - { name: USERNAME, line: 13 }
@@ -2679,7 +2679,7 @@ frontend/tests/playwright/_auth.js:  # 177 lines
     - { name: async loginViaApi, lines: 54-72 }
     - { name: async mockApiError, lines: 89-122 }
     - { name: async waitForIdleUi, lines: 132-146 }
-    - { name: async navigateViaSidebar, lines: 161-177 }
+    - { name: async navigateViaSidebar, lines: 161-191 }
 
 frontend/tests/playwright/data-boundary/empty-result.spec.js:  # 174 lines
   imports:
@@ -2775,7 +2775,7 @@ frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 133 lines
     - { module: '@playwright/test', items: [test, expect], line: 13 }
     - { module: './_auth.js', items: [loginViaApi, BASE_URL], line: 14 }
 
-frontend/tests/playwright/material-consumption-data-boundary.spec.ts:  # 180 lines
+frontend/tests/playwright/material-consumption-data-boundary.spec.ts:  # 196 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 13 }
   constants:
@@ -2783,18 +2783,21 @@ frontend/tests/playwright/material-consumption-data-boundary.spec.ts:  # 180 lin
     - { name: PAGE_URL, line: 16 }
     - { name: MOCK_FILTER_OPTIONS, line: 18 }
   functions:
-    - { name: async setupBasicMocks, lines: 28-32 }
+    - { name: async setupBasicMocks, lines: 28-48 }
 
-frontend/tests/playwright/material-consumption-resilience.spec.ts:  # 155 lines
+frontend/tests/playwright/material-consumption-resilience.spec.ts:  # 172 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 12 }
   constants:
-    - { name: BASE_URL, line: 14 }
-    - { name: PAGE_URL, line: 15 }
-    - { name: MOCK_FILTER_OPTIONS, line: 17 }
-    - { name: MOCK_QUERY_RESULT, line: 27 }
+    - { name: AUTH_MOCKS, line: 14 }
+    - { name: BASE_URL, line: 28 }
+    - { name: PAGE_URL, line: 29 }
+    - { name: MOCK_FILTER_OPTIONS, line: 31 }
+    - { name: MOCK_QUERY_RESULT, line: 41 }
+  functions:
+    - { name: async setupAuthMocks, lines: 19-26 }
 
-frontend/tests/playwright/material-consumption.spec.ts:  # 299 lines
+frontend/tests/playwright/material-consumption.spec.ts:  # 315 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 15 }
   constants:
@@ -2804,7 +2807,7 @@ frontend/tests/playwright/material-consumption.spec.ts:  # 299 lines
     - { name: MOCK_QUERY_RESULT, line: 30 }
     - { name: MOCK_VIEW_MONTH, line: 55 }
   functions:
-    - { name: async setupMockRoutes, lines: 76-88 }
+    - { name: async setupMockRoutes, lines: 76-104 }
 
 frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
   imports:

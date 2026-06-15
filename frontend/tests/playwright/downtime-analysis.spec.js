@@ -13,7 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:8080';
 const PAGE_URL = `${BASE_URL}/portal-shell/downtime-analysis`;
 
 const MOCK_OPTIONS = {

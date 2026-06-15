@@ -11,15 +11,61 @@
 
 import { test, expect, Page } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
+const AUTH_MOCKS = {
+  me: { success: true, data: { username: 'testuser', role: 'user' } },
+  pages: { success: true, data: [] },
+};
+
+async function selectParts(page: Page, parts: string[]) {
+  await page.waitForSelector('[data-testid="material-parts-select"] .multi-select-trigger:not([disabled])', { timeout: 45_000 });
+  await page.locator('[data-testid="material-parts-select"] .multi-select-trigger').click();
+  for (const part of parts) {
+    await page.locator('.multi-select-search').fill(part);
+    await page.locator('.multi-select-option').filter({ hasText: part }).first().click();
+    await page.locator('.multi-select-search').fill('');
+  }
+  await page.locator('.multi-select-dropdown button:has-text("關閉")').click();
+}
+
+const MOCK_PORTAL_NAV = {
+  drawers: [
+    {
+      id: 'drawer',
+      name: '查詢工具',
+      order: 3,
+      admin_only: false,
+      pages: [{ route: '/material-consumption', name: '原物料用量查詢', status: 'released', order: 6 }],
+    },
+  ],
+  is_admin: false,
+  admin_user: null,
+  admin_links: { logout: null, pages: null, dashboard: null, performance: null },
+  diagnostics: { filtered_drawers: 0, filtered_pages: 0, invalid_drawers: 0, invalid_pages: 0, contract_mismatch_routes: [] },
+  portal_spa_enabled: false,
+  features: { ai_query_enabled: false },
+};
+
+async function setupAuthMocks(page: Page) {
+  await page.route('**/api/auth/me**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(AUTH_MOCKS.me) })
+  );
+  await page.route('**/api/pages**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(AUTH_MOCKS.pages) })
+  );
+  // 200ms delay lets the Vue Router initial navigation commit before addRoute fires
+  await page.route('**/api/portal/navigation**', async (route) => {
+    await new Promise((r) => setTimeout(r, 200));
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PORTAL_NAV) });
+  });
+}
+
+const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:8080';
 const PAGE_URL = `${BASE_URL}/portal-shell/material-consumption`;
 
 const MOCK_FILTER_OPTIONS = {
   success: true,
   data: {
-    workcenter_groups: ['WCG-1'],
-    primary_categories: ['CAT-A'],
-    pj_types: ['TypeX'],
+    parts: [{ name: 'PartA' }],
   },
   meta: { timestamp: new Date().toISOString(), app_version: 'test' },
 };
@@ -36,6 +82,7 @@ const MOCK_QUERY_RESULT = {
 };
 
 test('test_spool_miss_410_triggers_client_requery', async ({ page }) => {
+  await setupAuthMocks(page);
   await page.route('**/api/material-consumption/filter-options', (route) => {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_FILTER_OPTIONS) });
   });
@@ -66,7 +113,7 @@ test('test_spool_miss_410_triggers_client_requery', async ({ page }) => {
   await page.goto(PAGE_URL);
 
   // Run initial query
-  await page.fill('[data-testid="material-parts-input"]', 'PartA');
+  await selectParts(page, ['PartA']);
   await page.fill('[data-testid="start-date"]', '2026-01-01');
   await page.fill('[data-testid="end-date"]', '2026-01-31');
   await page.click('[data-testid="query-submit-button"]');
@@ -82,6 +129,7 @@ test('test_spool_miss_410_triggers_client_requery', async ({ page }) => {
 });
 
 test('test_filter_options_error_shows_inline_error', async ({ page }) => {
+  await setupAuthMocks(page);
   // filter-options endpoint returns 500
   await page.route('**/api/material-consumption/filter-options', (route) => {
     route.fulfill({
@@ -104,6 +152,7 @@ test('test_filter_options_error_shows_inline_error', async ({ page }) => {
 });
 
 test('test_detail_worker_absent_shows_pending_state', async ({ page }) => {
+  await setupAuthMocks(page);
   await page.route('**/api/material-consumption/filter-options', (route) => {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_FILTER_OPTIONS) });
   });
@@ -136,7 +185,7 @@ test('test_detail_worker_absent_shows_pending_state', async ({ page }) => {
 
   await page.goto(PAGE_URL);
 
-  await page.fill('[data-testid="material-parts-input"]', 'PartA');
+  await selectParts(page, ['PartA']);
   await page.fill('[data-testid="start-date"]', '2026-01-01');
   await page.fill('[data-testid="end-date"]', '2026-01-31');
   await page.click('[data-testid="query-submit-button"]');

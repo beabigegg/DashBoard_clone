@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './tests/playwright',
   timeout: 60_000,
   retries: 1,
+  workers: process.env.PW_WORKERS ? parseInt(process.env.PW_WORKERS) : 1,
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:8080',
     headless: true,
