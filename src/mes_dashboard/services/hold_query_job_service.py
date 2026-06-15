@@ -145,6 +145,22 @@ def execute_hold_history_query_job(*, job_id: str, owner: str, **query_params: A
         )
 
         query_id = result["query_id"]
+
+        # Prime the canonical spool for this date range so subsequent queries
+        # (any hold_type / record_type combination) are served synchronously
+        # by the route's spool-existence check without dispatching a new job.
+        # Mirrors resource_query_job_service.ensure_canonical_spool() pattern.
+        # This is a no-op (cheap Redis check) when execute_primary_query already
+        # stored the spool — which is the normal case.
+        try:
+            from mes_dashboard.services.hold_dataset_cache import ensure_canonical_spool
+            ensure_canonical_spool(
+                query_params["start_date"],
+                query_params["end_date"],
+            )
+        except Exception as _exc:
+            logger.warning("hold-history canonical spool prime failed (non-fatal): %s", _exc)
+
         update_job_progress(
             _JOB_PREFIX, job_id,
             status="running", progress="complete", pct=100, stage="complete",

@@ -414,6 +414,27 @@ def make_canonical_warmup_query_id(start_date: str, end_date: str) -> str:
     return _make_query_id({"start_date": start_date, "end_date": end_date})
 
 
+def ensure_canonical_spool(start_date: str, end_date: str) -> Dict[str, Any]:
+    """Ensure the hold spool exists for an arbitrary date range.
+
+    Called by the RQ worker after completing a user-triggered async query so
+    that subsequent queries for the same date range are served from the spool
+    synchronously (no Oracle hit, no new job dispatch).
+
+    Unlike resource-history, hold-history has a single spool key space keyed on
+    {start_date, end_date} only — hold_type/record_type are view-level filters.
+    So the spool created here IS the canonical; no separate canonical key exists.
+
+    If the spool already exists (common case — worker just created it), this is
+    a cheap Redis check and returns immediately.
+    """
+    query_id = _make_query_id({"start_date": start_date, "end_date": end_date})
+    if _has_cached_df(query_id):
+        return {"query_id": query_id, "cache_hit": True}
+    result = execute_primary_query(start_date=start_date, end_date=end_date)
+    return {"query_id": result.get("query_id", query_id), "cache_hit": False}
+
+
 def ensure_dataset_loaded() -> Dict[str, Any]:
     """Ensure the default hold dataset exists in cache (used by warmup scheduler)."""
     end_dt = date.today()
