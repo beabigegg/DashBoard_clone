@@ -12,5 +12,5 @@
     "contractEndpointNotImplemented": "warning",
     "frontendCallNotInContract": "warning"
   },
-  "strict": false
+  "strict": true
 }

@@ -272,6 +272,43 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
         self.assertTrue(data['success'])
         mock_query.assert_called_once()
 
+    # ── Canonical spool hit skips async dispatch ─────────────────────────────
+
+    @patch('mes_dashboard.routes.resource_history_routes.is_async_available', return_value=True)
+    @patch('mes_dashboard.routes.resource_history_routes.get_owner_token', return_value='user-token')
+    @patch('mes_dashboard.routes.resource_history_routes.enqueue_job_dynamic')
+    @patch(
+        'mes_dashboard.services.resource_history_sql_runtime.try_compute_query_from_canonical_spool',
+    )
+    def test_canonical_spool_hit_on_long_span_returns_200_no_rq(
+        self, mock_canonical, mock_enqueue, _mock_owner, _mock_avail
+    ):
+        """Canonical spool hit → 200 sync even for long-range query; RQ never dispatched.
+
+        After the first RQ job primes the canonical spool, subsequent filter-change
+        queries with the same date range must be served from DuckDB (no Oracle,
+        no new RQ job) regardless of day_span.
+        """
+        import mes_dashboard.routes.resource_history_routes as _rmod
+        _canonical_result = {
+            'query_id': 'canonical-qid-long-001',
+            'summary': {'kpi': {}, 'trend': [], 'heatmap': [], 'workcenter_comparison': []},
+            'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
+        }
+        mock_canonical.return_value = (_canonical_result, {"canonical_spool_latency_s": 0.3})
+
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
+            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
+                # 200 days span — would normally dispatch RQ, but canonical spool hits first
+                response = self._post_query("2024-01-01", "2024-07-20")
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['data']['query_id'], 'canonical-qid-long-001')
+        # RQ must NOT have been dispatched
+        mock_enqueue.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

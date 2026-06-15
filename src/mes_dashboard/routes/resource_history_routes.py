@@ -210,10 +210,35 @@ def api_resource_history_query():
 
     filters = _parse_resource_filters(body)
 
+    try:
+        # ── Canonical spool check — BEFORE async dispatch ─────────────────────
+        # Serves any request (short or long date range) from the pre-warmed or
+        # previously-built canonical spool via DuckDB filter, with zero Oracle
+        # cost.  The RQ worker primes the canonical spool after its first Oracle
+        # fetch, so subsequent filter changes on the same date range are fast.
+        from mes_dashboard.services.resource_history_sql_runtime import (
+            try_compute_query_from_canonical_spool,
+        )
+        canonical_result, _canonical_meta = try_compute_query_from_canonical_spool(
+            start_date=start_date,
+            end_date=end_date,
+            granularity=granularity,
+            workcenter_groups=filters.get("workcenter_groups"),
+            families=filters.get("families"),
+            resource_ids=filters.get("resource_ids"),
+            is_production=filters.get("is_production", False),
+            is_key=filters.get("is_key", False),
+            is_monitor=filters.get("is_monitor", False),
+            package_groups=filters.get("package_groups"),
+        )
+        if canonical_result is not None:
+            _inject_resource_spool_info(canonical_result, canonical_result.get("query_id", ""))
+            return success_response(canonical_result)
+    except Exception:
+        pass  # Canonical miss or runtime error — fall through to async/sync path
+
     # ── Async RQ branch (RESOURCE_ASYNC_ENABLED + threshold + worker available) ──
     # Falls through to the sync 200 path on any false condition (AC-2, AC-6).
-    # IMPORTANT: this branch must short-circuit BEFORE the canonical-spool try-block
-    # so the two polling mechanisms (RQ 202 and isBatch /query/progress) do not collide.
     if RESOURCE_ASYNC_ENABLED:
         from datetime import datetime as _dt
         try:
@@ -254,28 +279,6 @@ def api_resource_history_query():
                     pass  # Degradable async failure — fall through silently (AC-6)
 
     try:
-        # Try canonical base spool first (DuckDB filter at view time).
-        # SPOOL_MISS returns (None, meta) — falls through to Oracle path.
-        # A genuine runtime error now propagates (IP-5: removed except Exception: pass).
-        from mes_dashboard.services.resource_history_sql_runtime import (
-            try_compute_query_from_canonical_spool,
-        )
-        canonical_result, _canonical_meta = try_compute_query_from_canonical_spool(
-            start_date=start_date,
-            end_date=end_date,
-            granularity=granularity,
-            workcenter_groups=filters.get("workcenter_groups"),
-            families=filters.get("families"),
-            resource_ids=filters.get("resource_ids"),
-            is_production=filters.get("is_production", False),
-            is_key=filters.get("is_key", False),
-            is_monitor=filters.get("is_monitor", False),
-            package_groups=filters.get("package_groups"),
-        )
-        if canonical_result is not None:
-            _inject_resource_spool_info(canonical_result, canonical_result.get("query_id", ""))
-            return success_response(canonical_result)
-
         result = execute_primary_query(
             start_date=start_date,
             end_date=end_date,

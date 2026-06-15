@@ -746,6 +746,22 @@ def _query_and_store_canonical_dataset(start_date: str, end_date: str) -> None:
             )
 
 
+def ensure_canonical_spool(start_date: str, end_date: str) -> Dict[str, Any]:
+    """Ensure the canonical (unfiltered) resource spool exists for an arbitrary date range.
+
+    Called by the RQ worker after completing a filter-specific query, so that
+    subsequent queries for the same date range with different filters can be
+    served from the canonical spool via DuckDB (no Oracle hit required).
+
+    If the canonical spool already exists, this is a no-op (cheap Redis check).
+    """
+    base_query_id = make_canonical_base_query_id(start_date, end_date)
+    if _has_cached_df(base_query_id):
+        return {"query_id": base_query_id, "cache_hit": True}
+    _query_and_store_canonical_dataset(start_date, end_date)
+    return {"query_id": base_query_id, "cache_hit": False}
+
+
 def ensure_dataset_loaded() -> Dict[str, Any]:
     """Ensure the canonical resource base dataset exists in cache.
 

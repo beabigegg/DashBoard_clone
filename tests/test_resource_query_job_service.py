@@ -169,6 +169,43 @@ class TestResourceQueryJobService:
         assert complete_calls[0]["query_id"] == mock_qid
         assert complete_calls[0]["error"] is None
 
+    def test_worker_fn_success_primes_canonical_spool(self, monkeypatch):
+        """On success, worker calls ensure_canonical_spool(start_date, end_date) (cache-spool-patterns)."""
+        import mes_dashboard.services.resource_query_job_service as _svc
+
+        canonical_calls = []
+
+        def _mock_ensure_canonical(start_date, end_date):
+            canonical_calls.append((start_date, end_date))
+            return {"query_id": "canonical-qid", "cache_hit": False}
+
+        monkeypatch.setattr(_svc, "update_job_progress", lambda *a, **kw: None)
+        monkeypatch.setattr(_svc, "complete_job", lambda *a, **kw: None)
+
+        with patch("mes_dashboard.rq_worker_preload.ensure_rq_logging"):
+            with patch(
+                "mes_dashboard.services.resource_dataset_cache.execute_primary_query",
+                return_value={"query_id": "filter-specific-qid"},
+            ):
+                with patch(
+                    "mes_dashboard.services.resource_dataset_cache.ensure_canonical_spool",
+                    side_effect=_mock_ensure_canonical,
+                ):
+                    _svc.execute_resource_history_query_job(
+                        job_id="unit-canonical-prime-001",
+                        owner="unit-test-user",
+                        start_date="2024-01-01",
+                        end_date="2024-07-20",
+                        granularity="day",
+                    )
+
+        assert len(canonical_calls) == 1, (
+            f"ensure_canonical_spool must be called once; got {canonical_calls}"
+        )
+        assert canonical_calls[0] == ("2024-01-01", "2024-07-20"), (
+            f"ensure_canonical_spool called with wrong date range: {canonical_calls[0]}"
+        )
+
     # ── register_job_type side-effect tests ────────────────────────────────────
 
     def test_register_job_type_fires_at_import(self):

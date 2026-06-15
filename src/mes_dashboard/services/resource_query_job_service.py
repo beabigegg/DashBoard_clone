@@ -136,9 +136,11 @@ def execute_resource_history_query_job(*, job_id: str, owner: str, **query_param
         # Wrap execute_primary_query unmodified (IP constraint: do NOT add
         # progress_callback or alter signature/body).
         # owner is NOT forwarded — execute_primary_query takes no owner param.
+        start_date = query_params["start_date"]
+        end_date = query_params["end_date"]
         result = execute_primary_query(
-            start_date=query_params["start_date"],
-            end_date=query_params["end_date"],
+            start_date=start_date,
+            end_date=end_date,
             granularity=query_params.get("granularity", "day"),
             workcenter_groups=query_params.get("workcenter_groups"),
             families=query_params.get("families"),
@@ -148,6 +150,23 @@ def execute_resource_history_query_job(*, job_id: str, owner: str, **query_param
             is_monitor=query_params.get("is_monitor", False),
             package_groups=query_params.get("package_groups"),
         )
+
+        update_job_progress(
+            _JOB_PREFIX, job_id,
+            status="running", progress="priming canonical spool", pct=70, stage="finalizing",
+        )
+
+        # Prime the canonical (unfiltered) spool for this date range so that
+        # subsequent queries with different filter conditions can be served from
+        # DuckDB without a second Oracle round-trip.  No-op if already cached.
+        try:
+            from mes_dashboard.services.resource_dataset_cache import ensure_canonical_spool
+            ensure_canonical_spool(start_date, end_date)
+        except Exception as _ce:
+            logger.warning(
+                "resource-history job_id=%s: canonical spool priming failed (non-fatal): %s",
+                job_id, _ce,
+            )
 
         update_job_progress(
             _JOB_PREFIX, job_id,
