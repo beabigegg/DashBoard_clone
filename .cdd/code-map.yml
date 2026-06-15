@@ -1,6 +1,6 @@
-# generated: 2026-06-15T07:09:02Z by cdd-kit 3.1.0
-# files: 858, src-lines: 249321, map-lines: 18573, compression: 13.4x
-# sources-digest: a8b037111b5469bc5b2ef4eeeab2c7f4b4f431f02e173fbdc0b92f591cdf8e94
+# generated: 2026-06-15T09:49:45Z by cdd-kit 3.1.0
+# files: 863, src-lines: 251705, map-lines: 18720, compression: 13.4x
+# sources-digest: ce331200646fc34969c160beab2d07082b44c7464235e3db1c846f8f50832821
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -948,7 +948,7 @@ frontend/src/hold-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-frontend/src/hold-history/App.vue:  # 1306 lines
+frontend/src/hold-history/App.vue:  # 1287 lines
 
 frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
 
@@ -1792,7 +1792,7 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
   types:
     - { name: ParetoSelections, lines: 139-139 }
 
-frontend/src/resource-history/App.vue:  # 825 lines
+frontend/src/resource-history/App.vue:  # 982 lines
 
 frontend/src/resource-history/components/ComparisonChart.vue:  # 105 lines
 
@@ -2960,6 +2960,28 @@ frontend/tests/playwright/resilience/slow-network.spec.js:  # 141 lines
   functions:
     - { name: async setupRejectHistoryWithSlowQuery, lines: 16-43 }
 
+frontend/tests/playwright/resource-history-async.spec.ts:  # 433 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 23 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 24 }
+  constants:
+    - { name: JOB_ID_ASYNC, line: 30 }
+    - { name: JOB_ID_FAILED, line: 31 }
+    - { name: QUERY_ID, line: 32 }
+    - { name: STATUS_URL_ASYNC, line: 35 }
+    - { name: STATUS_URL_FAILED, line: 36 }
+    - { name: MOCK_META, line: 39 }
+    - { name: MOCK_OPTIONS, line: 45 }
+    - { name: MOCK_202_RESPONSE, line: 57 }
+    - { name: MOCK_202_FAILED_RESPONSE, line: 68 }
+    - { name: MOCK_JOB_STARTED, line: 79 }
+    - { name: MOCK_JOB_FINISHED, line: 94 }
+    - { name: MOCK_JOB_FAILED, line: 109 }
+    - { name: MOCK_VIEW_RESPONSE, line: 127 }
+    - { name: MOCK_200_SYNC_RESPONSE, line: 158 }
+  functions:
+    - { name: async registerCatchAllRoutes, lines: 184-239 }
+
 frontend/tests/playwright/wip-matrix-drilldown.spec.js:  # 111 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 10 }
@@ -3295,7 +3317,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1635 lines
+src/mes_dashboard/app.py:  # 1636 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3355,8 +3377,8 @@ src/mes_dashboard/app.py:  # 1635 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-746 }
-    - { name: create_app, lines: 755-1509 }
-    - { name: _register_error_handlers, lines: 1512-1635 }
+    - { name: create_app, lines: 755-1510 }
+    - { name: _register_error_handlers, lines: 1513-1636 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4765,7 +4787,7 @@ src/mes_dashboard/routes/health_routes.py:  # 863 lines
     - { name: deep_health_check, lines: 631-837 }  # @health_bp.route('/health/deep', methods=['GET'])
     - { name: frontend_shell_health_check, lines: 841-863 }  # @health_bp.route('/health/frontend-shell', methods=['GET'])
 
-src/mes_dashboard/routes/hold_history_routes.py:  # 416 lines
+src/mes_dashboard/routes/hold_history_routes.py:  # 418 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -4794,10 +4816,10 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 416 lines
     - { name: _normalize_hold_type, lines: 149-151 }
     - { name: _normalize_record_type, lines: 154-162 }
     - { name: hold_history_page, lines: 171-189 }  # @hold_history_bp.route('/hold-history')
-    - { name: api_hold_history_query, lines: 199-264 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
-    - { name: api_hold_history_view, lines: 274-322 }  # @hold_history_bp.route('/api/hold-history/view')
-    - { name: api_hold_history_config, lines: 331-336 }  # @hold_history_bp.route('/api/hold-history/config')
-    - { name: api_hold_history_today_snapshot, lines: 346-416 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+    - { name: api_hold_history_query, lines: 199-266 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
+    - { name: api_hold_history_view, lines: 276-324 }  # @hold_history_bp.route('/api/hold-history/view')
+    - { name: api_hold_history_config, lines: 333-338 }  # @hold_history_bp.route('/api/hold-history/config')
+    - { name: api_hold_history_today_snapshot, lines: 348-418 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
 src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
   imports:
@@ -5059,30 +5081,37 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 992 lines
     - { name: api_reject_history_view, lines: 832-910 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
     - { name: api_reject_history_export_cached, lines: 914-992 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
-src/mes_dashboard/routes/resource_history_routes.py:  # 389 lines
+src/mes_dashboard/routes/resource_history_routes.py:  # 447 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: datetime, items: [datetime], line: 9 }
     - { module: flask, items: [Blueprint, request, redirect, Response], line: 11 }
     - { module: mes_dashboard.core.cache, items: [cache_get, cache_set, make_cache_key], line: 13 }
     - { module: mes_dashboard.config.constants, items: [CACHE_TTL_FILTER_OPTIONS], line: 14 }
-    - { module: mes_dashboard.core.permissions, items: [login_required], line: 15 }
+    - { module: mes_dashboard.core.permissions, items: [login_required, get_owner_token], line: 15 }
     - { module: mes_dashboard.core.response, items: [cache_expired_error, internal_error, not_found_error, success_response, validation_error], line: 16 }
-    - { module: mes_dashboard.services.batch_query_engine, items: [get_batch_progress], line: 23 }
-    - { module: mes_dashboard.services.resource_history_service, items: [get_filter_options, export_csv], line: 24 }
-    - { module: mes_dashboard.services.resource_dataset_cache, items: [execute_primary_query, apply_view], line: 28 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 23 }
+    - { module: mes_dashboard.services.batch_query_engine, items: [get_batch_progress], line: 27 }
+    - { module: mes_dashboard.services.resource_history_service, items: [get_filter_options, export_csv], line: 28 }
+    - { module: mes_dashboard.services.resource_dataset_cache, items: [execute_primary_query, apply_view], line: 32 }
+    - { module: mes_dashboard.services.resource_query_job_service, items: [], line: 36 }
+  constants:
+    - { name: RESOURCE_ASYNC_ENABLED, line: 50 }
+    - { name: RESOURCE_ASYNC_DAY_THRESHOLD, line: 53 }
+    - { name: RESOURCE_WORKER_QUEUE, line: 54 }
+    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 55 }
   functions:
-    - { name: _inject_resource_spool_info, lines: 53-70 }
-    - { name: _inject_resource_metadata, lines: 73-94 }
-    - { name: api_resource_history_page, lines: 102-104 }  # @resource_history_bp.route('/page', methods=['GET'], endpoint='page_alias')
-    - { name: api_resource_history_options, lines: 112-128 }  # @resource_history_bp.route('/options', methods=['GET'])
-    - { name: _validate_dates, lines: 135-143 }
-    - { name: _parse_resource_filters, lines: 146-156 }
-    - { name: _bool_param, lines: 159-165 }
-    - { name: api_resource_history_query, lines: 169-230 }  # @resource_history_bp.route('/query', methods=['POST'])
-    - { name: api_resource_history_view, lines: 234-255 }  # @resource_history_bp.route('/view', methods=['GET'])
-    - { name: api_resource_history_query_progress, lines: 264-308 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
-    - { name: api_resource_history_export, lines: 316-389 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
+    - { name: _inject_resource_spool_info, lines: 68-85 }
+    - { name: _inject_resource_metadata, lines: 88-109 }
+    - { name: api_resource_history_page, lines: 117-119 }  # @resource_history_bp.route('/page', methods=['GET'], endpoint='page_alias')
+    - { name: api_resource_history_options, lines: 127-143 }  # @resource_history_bp.route('/options', methods=['GET'])
+    - { name: _validate_dates, lines: 150-158 }
+    - { name: _parse_resource_filters, lines: 161-171 }
+    - { name: _bool_param, lines: 174-180 }
+    - { name: api_resource_history_query, lines: 184-288 }  # @resource_history_bp.route('/query', methods=['POST'])
+    - { name: api_resource_history_view, lines: 292-313 }  # @resource_history_bp.route('/view', methods=['GET'])
+    - { name: api_resource_history_query_progress, lines: 322-366 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
+    - { name: api_resource_history_export, lines: 374-447 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/resource_routes.py:  # 475 lines
   imports:
@@ -7306,6 +7335,26 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 859 lines
     - { name: try_compute_view_from_spool, lines: 570-663 }
     - { name: try_compute_query_from_canonical_spool, lines: 668-859 }
 
+src/mes_dashboard/services/resource_query_job_service.py:  # 184 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 14 }
+    - { module: logging, items: [], line: 16 }
+    - { module: os, items: [], line: 17 }
+    - { module: datetime, items: [datetime], line: 18 }
+    - { module: typing, items: [Any], line: 19 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 21 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 175 }
+  constants:
+    - { name: RESOURCE_ASYNC_ENABLED, line: 33 }
+    - { name: RESOURCE_ASYNC_DAY_THRESHOLD, line: 37 }
+    - { name: RESOURCE_WORKER_QUEUE, line: 39 }
+    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 41 }
+    - { name: RESOURCE_JOB_TTL_SECONDS, line: 43 }
+  functions:
+    - { name: should_use_async, lines: 53-71 }
+    - { name: enqueue_resource_history_query, lines: 78-91 }
+    - { name: execute_resource_history_query_job, lines: 98-169 }
+
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:
     - { module: logging, items: [], line: 7 }
@@ -7332,7 +7381,7 @@ src/mes_dashboard/services/resource_service.py:  # 679 lines
     - { name: get_resource_status_summary, lines: 507-604 }
     - { name: get_workcenter_status_matrix, lines: 607-679 }
 
-src/mes_dashboard/services/rq_monitor_service.py:  # 249 lines
+src/mes_dashboard/services/rq_monitor_service.py:  # 250 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -7341,11 +7390,11 @@ src/mes_dashboard/services/rq_monitor_service.py:  # 249 lines
     - { module: typing, items: [Any, Dict, List], line: 14 }
     - { module: mes_dashboard.core.redis_client, items: [get_redis_client], line: 16 }
   functions:
-    - { name: _check_rq_installed, lines: 35-40 }
-    - { name: get_rq_worker_details, lines: 47-126 }
-    - { name: get_rq_queue_details, lines: 133-187 }
-    - { name: get_heavy_query_slot_status, lines: 194-207 }
-    - { name: get_rq_monitor_summary, lines: 214-249 }
+    - { name: _check_rq_installed, lines: 36-41 }
+    - { name: get_rq_worker_details, lines: 48-127 }
+    - { name: get_rq_queue_details, lines: 134-188 }
+    - { name: get_heavy_query_slot_status, lines: 195-208 }
+    - { name: get_rq_monitor_summary, lines: 215-250 }
 
 src/mes_dashboard/services/scrap_reason_exclusion_cache.py:  # 236 lines
   imports:
@@ -9306,6 +9355,36 @@ tests/integration/test_redis_timeout_fallback.py:  # 295 lines
   functions:
     - { name: _make_redis, lines: 31-38 }
 
+tests/integration/test_resource_history_rq_async.py:  # 587 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 19 }
+    - { module: importlib, items: [], line: 21 }
+    - { module: os, items: [], line: 22 }
+    - { module: uuid, items: [], line: 23 }
+    - { module: typing, items: [Any, Dict], line: 24 }
+    - { module: unittest.mock, items: [patch], line: 25 }
+    - { module: pytest, items: [], line: 27 }
+  classes:
+    - name: TestResourceHistoryAsyncDispatch
+      lines: 53-205
+      methods:
+        - { name: test_enqueue_to_resource_history_queue, lines: 61-116 }
+        - { name: test_enqueue_payload_owner_inside_params_dict, lines: 118-173 }
+        - { name: test_resource_worker_queue_default_is_resource_history_query, lines: 175-189 }
+        - { name: test_resource_job_timeout_default_is_1800, lines: 191-205 }
+    - name: TestResourceHistoryAsyncParity
+      lines: 212-587
+      methods:
+        - { name: test_worker_fn_parity_vs_sync, lines: 225-343 }
+        - { name: test_coarse_milestones_fire_in_order, lines: 345-395 }
+        - { name: test_pct_envelope_never_decreases, lines: 397-436 }
+        - { name: test_worker_exception_calls_complete_job_with_error, lines: 438-493 }
+        - { name: test_job_timeout_produces_terminal_error_status, lines: 495-545 }
+        - { name: test_worker_fn_does_not_forward_owner_to_execute_primary_query, lines: 547-587 }
+  functions:
+    - { name: _reset_registry, lines: 36-39 }
+    - { name: _reload_resource_job_service, lines: 42-46 }
+
 tests/integration/test_rowcount_flag_parity.py:  # 776 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
@@ -10327,7 +10406,7 @@ tests/stress/test_reject_history_stress.py:  # 181 lines
         - { name: _run_query, lines: 76-125 }
         - { name: test_concurrent_190_day_queries_no_crash, lines: 127-181 }
 
-tests/stress/test_resource_history_stress.py:  # 120 lines
+tests/stress/test_resource_history_stress.py:  # 384 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
     - { module: concurrent.futures, items: [], line: 10 }
@@ -10346,6 +10425,12 @@ tests/stress/test_resource_history_stress.py:  # 120 lines
       methods:
         - { name: _run_view, lines: 78-96 }
         - { name: test_concurrent_view_requests, lines: 98-120 }
+    - name: TestResourceHistoryAsyncStress
+      lines: 128-384
+      methods:
+        - { name: test_concurrent_async_jobs_complete_without_db_pool_exhaustion, lines: 149-216 }
+        - { name: test_async_job_progress_milestones_under_load, lines: 222-304 }
+        - { name: test_job_timeout_enforced_under_slow_oracle, lines: 310-384 }
 
 tests/stress/test_yield_alert_stress.py:  # 116 lines
   imports:
@@ -11081,7 +11166,7 @@ tests/test_anomaly_detection_sql_runtime.py:  # 91 lines
         - { name: test_hold_percentile_is_between_0_and_1, lines: 87-88 }
         - { name: test_deviation_threshold_is_positive, lines: 90-91 }
 
-tests/test_api_contract.py:  # 982 lines
+tests/test_api_contract.py:  # 1059 lines
   imports:
     - { module: ast, items: [], line: 13 }
     - { module: unittest, items: [], line: 14 }
@@ -11212,6 +11297,12 @@ tests/test_api_contract.py:  # 982 lines
         - { name: test_job_enrichment_fields_present, lines: 926-935 }
         - { name: test_wait_min_nullable, lines: 937-971 }
         - { name: test_match_ambiguous_is_boolean, lines: 973-978 }
+    - name: TestResourceHistoryAsyncContract
+      lines: 981-1055
+      methods:
+        - { name: setUp, lines: 984-990 }
+        - { name: test_202_response_shape_has_job_id_and_status_url, lines: 995-1030 }
+        - { name: test_resource_history_query_short_span_returns_200_not_202, lines: 1032-1055 }
   functions:
     - { name: _count_jsonify_in_file, lines: 46-63 }
 
@@ -12658,7 +12749,7 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
 
-tests/test_env_contract.py:  # 207 lines
+tests/test_env_contract.py:  # 292 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pathlib, items: [Path], line: 9 }
@@ -12687,13 +12778,15 @@ tests/test_env_contract.py:  # 207 lines
         - { name: test_resource_view_cache_ttl_default_equals_300, lines: 118-134 }
         - { name: test_resource_view_cache_ttl_documented_in_contract, lines: 136-141 }
     - name: TestDuckdbPrewarmTtlDefaults
-      lines: 148-207
+      lines: 148-292
       methods:
         - { name: test_resource_history_spool_ttl_default_is_72000, lines: 151-168 }
         - { name: test_downtime_analysis_cache_ttl_default_is_72000, lines: 170-186 }
         - { name: test_cache_ttl_dataset_unchanged_at_7200, lines: 188-193 }
         - { name: test_resource_history_spool_ttl_documented_in_contract, lines: 195-200 }
         - { name: test_downtime_analysis_cache_ttl_documented_in_contract, lines: 202-207 }
+        - { name: test_resource_async_env_vars_pinned_defaults, lines: 209-279 }
+        - { name: test_resource_async_vars_documented_in_env_contract, lines: 281-292 }
 
 tests/test_event_fetcher.py:  # 413 lines
   imports:
@@ -16807,6 +16900,31 @@ tests/test_resource_history_routes.py:  # 497 lines
   functions:
     - { name: _rh_client, lines: 401-407 }  # @pytest.fixture
 
+tests/test_resource_history_rq_async_route.py:  # 277 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: json, items: [], line: 11 }
+    - { module: sys, items: [], line: 12 }
+    - { module: os, items: [], line: 13 }
+    - { module: unittest, items: [], line: 14 }
+    - { module: unittest.mock, items: [patch, MagicMock], line: 15 }
+    - { module: mes_dashboard.core.database, items: [], line: 19 }
+  classes:
+    - name: TestResourceHistoryAsyncRoute
+      lines: 22-273
+      methods:
+        - { name: setUp, lines: 25-31 }
+        - { name: _post_query, lines: 33-38 }
+        - { name: test_query_long_span_returns_202, lines: 45-63 }
+        - { name: test_query_short_span_returns_200_sync, lines: 73-91 }
+        - { name: test_query_async_flag_false_returns_200_sync, lines: 100-118 }
+        - { name: test_redis_unavailable_falls_back_to_sync, lines: 128-145 }
+        - { name: test_owner_in_params_dict, lines: 152-171 }
+        - { name: test_resource_async_enabled_default_is_true, lines: 175-194 }
+        - { name: test_resource_async_day_threshold_default_is_90, lines: 196-211 }
+        - { name: test_enqueue_failure_falls_through_to_sync, lines: 223-242 }
+        - { name: test_enqueue_exception_falls_through_to_sync, lines: 254-273 }
+
 tests/test_resource_history_service.py:  # 498 lines
   imports:
     - { module: unittest, items: [], line: 7 }
@@ -16960,6 +17078,34 @@ tests/test_resource_history_sql_runtime.py:  # 307 lines
         - { name: test_date_filter_injected_when_superset_used, lines: 207-281 }
         - { name: test_range_outside_warmup_window_returns_spool_miss, lines: 283-307 }
 
+tests/test_resource_query_job_service.py:  # 262 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: importlib, items: [], line: 11 }
+    - { module: os, items: [], line: 12 }
+    - { module: sys, items: [], line: 13 }
+    - { module: uuid, items: [], line: 14 }
+    - { module: unittest.mock, items: [patch], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  classes:
+    - name: TestResourceQueryJobService
+      lines: 22-262
+      methods:
+        - { name: test_should_use_async_above_threshold, lines: 27-36 }
+        - { name: test_should_use_async_at_exact_threshold, lines: 38-48 }
+        - { name: test_should_use_async_below_threshold_is_false, lines: 50-59 }
+        - { name: test_should_use_async_flag_false_returns_false, lines: 61-70 }
+        - { name: test_should_use_async_missing_dates_returns_false, lines: 72-80 }
+        - { name: test_should_use_async_invalid_date_format_returns_false, lines: 82-91 }
+        - { name: test_worker_fn_failure_reraises_and_sets_error, lines: 95-137 }
+        - { name: test_worker_fn_success_calls_complete_job_with_query_id, lines: 139-170 }
+        - { name: test_register_job_type_fires_at_import, lines: 174-183 }
+        - { name: test_register_job_type_reruns_after_reload, lines: 185-196 }
+        - { name: test_resource_async_enabled_defaults_to_true, lines: 200-214 }
+        - { name: test_resource_async_day_threshold_defaults_to_90, lines: 216-230 }
+        - { name: test_resource_worker_queue_defaults_to_resource_history_query, lines: 232-246 }
+        - { name: test_resource_job_timeout_defaults_to_1800, lines: 248-262 }
+
 tests/test_resource_routes.py:  # 219 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
@@ -17035,7 +17181,7 @@ tests/test_resource_service.py:  # 675 lines
         - { name: test_package_groups_filter_oracle_fallback_path, lines: 638-657 }
         - { name: test_package_groups_empty_list_returns_all_resources, lines: 659-675 }
 
-tests/test_rq_monitor_service.py:  # 233 lines
+tests/test_rq_monitor_service.py:  # 234 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 13 }
@@ -17051,22 +17197,22 @@ tests/test_rq_monitor_service.py:  # 233 lines
         - { name: test_birth_date_has_utc_suffix, lines: 83-103 }
         - { name: test_null_birth_date_returns_null, lines: 105-122 }
     - name: TestGetRqQueueDetails
-      lines: 129-179
+      lines: 129-180
       methods:
         - { name: test_returns_empty_when_redis_unavailable, lines: 130-135 }
-        - { name: test_returns_queue_depth_per_queue, lines: 137-162 }
-        - { name: test_hold_history_queue_in_queue_names, lines: 164-169 }
-        - { name: test_handles_queue_exception_gracefully, lines: 171-179 }
+        - { name: test_returns_queue_depth_per_queue, lines: 137-163 }
+        - { name: test_hold_history_queue_in_queue_names, lines: 165-170 }
+        - { name: test_handles_queue_exception_gracefully, lines: 172-180 }
     - name: TestGetHeavyQuerySlotStatus
-      lines: 186-199
+      lines: 187-200
       methods:
-        - { name: test_returns_active_max_utilization, lines: 187-193 }
-        - { name: test_zero_max_handled, lines: 195-199 }
+        - { name: test_returns_active_max_utilization, lines: 188-194 }
+        - { name: test_zero_max_handled, lines: 196-200 }
     - name: TestGetRqMonitorSummary
-      lines: 206-233
+      lines: 207-234
       methods:
-        - { name: test_aggregates_all_sections, lines: 207-221 }
-        - { name: test_graceful_on_partial_failure, lines: 223-233 }
+        - { name: test_aggregates_all_sections, lines: 208-222 }
+        - { name: test_graceful_on_partial_failure, lines: 224-234 }
 
 tests/test_rq_warmup_resilience.py:  # 170 lines
   imports:
@@ -17277,7 +17423,7 @@ tests/test_spool_replay.py:  # 229 lines
     - { name: test_replay_snapshot_null_promotion_synthesis, lines: 137-202 }  # @pytest.mark.skipif(not _SNAPSHOTS, reason='no local spool snapshots captured')
     - { name: test_replay_snapshot_rejects_column_drift, lines: 207-229 }  # @pytest.mark.skipif(not _SNAPSHOTS, reason='no local spool snapshots captured')
 
-tests/test_spool_routes.py:  # 111 lines
+tests/test_spool_routes.py:  # 125 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: unittest.mock, items: [patch], line: 12 }
@@ -17293,6 +17439,7 @@ tests/test_spool_routes.py:  # 111 lines
     - { name: test_valid_namespace_but_file_not_on_disk_returns_410, lines: 64-70 }
     - { name: test_valid_spool_streams_parquet, lines: 75-88 }
     - { name: test_allowed_namespaces_pass_namespace_validation, lines: 101-111 }  # @pytest.mark.parametrize('ns', ['yield_alert_dataset', 'reject_dataset', 'resourc...
+    - { name: test_resource_dataset_stays_in_allowed_namespaces, lines: 114-125 }
 
 tests/test_spool_warmup_scheduler.py:  # 201 lines
   imports:

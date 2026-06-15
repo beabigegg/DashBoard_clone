@@ -12,13 +12,17 @@ from flask import Blueprint, request, redirect, Response
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
 from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS
-from mes_dashboard.core.permissions import login_required
+from mes_dashboard.core.permissions import login_required, get_owner_token
 from mes_dashboard.core.response import (
     cache_expired_error,
     internal_error,
     not_found_error,
     success_response,
     validation_error,
+)
+from mes_dashboard.services.async_query_job_service import (
+    enqueue_job_dynamic,
+    is_async_available,
 )
 from mes_dashboard.services.batch_query_engine import get_batch_progress
 from mes_dashboard.services.resource_history_service import (
@@ -29,6 +33,7 @@ from mes_dashboard.services.resource_dataset_cache import (
     execute_primary_query,
     apply_view,
 )
+import mes_dashboard.services.resource_query_job_service  # noqa: F401 — forces register_job_type() side-effect
 
 # ── Local-compute feature flags (Task 1.3) ────────────────────────────────────
 
@@ -38,6 +43,16 @@ _RESOURCE_LOCAL_COMPUTE_ENABLED = os.environ.get(
 
 _RESOURCE_SPOOL_THRESHOLD = int(os.environ.get("RESOURCE_SPOOL_THRESHOLD", "5000"))
 _RESOURCE_SPOOL_NAMESPACE = "resource_dataset"
+
+# ── Async RQ path — env-contract §Async Worker — Resource History Query ───────
+# All four constants are frozen at import time (module-level).
+# Tests must use monkeypatch.setattr(), never monkeypatch.setenv().
+RESOURCE_ASYNC_ENABLED: bool = os.getenv(
+    "RESOURCE_ASYNC_ENABLED", "true"
+).strip().lower() in ("1", "true", "yes", "on")
+RESOURCE_ASYNC_DAY_THRESHOLD: int = int(os.getenv("RESOURCE_ASYNC_DAY_THRESHOLD", "90"))
+RESOURCE_WORKER_QUEUE: str = os.getenv("RESOURCE_WORKER_QUEUE", "resource-history-query")
+RESOURCE_JOB_TIMEOUT_SECONDS: int = int(os.getenv("RESOURCE_JOB_TIMEOUT_SECONDS", "1800"))
 
 # Create Blueprint
 resource_history_bp = Blueprint(
@@ -194,6 +209,49 @@ def api_resource_history_query():
         return validation_error(str(exc))
 
     filters = _parse_resource_filters(body)
+
+    # ── Async RQ branch (RESOURCE_ASYNC_ENABLED + threshold + worker available) ──
+    # Falls through to the sync 200 path on any false condition (AC-2, AC-6).
+    # IMPORTANT: this branch must short-circuit BEFORE the canonical-spool try-block
+    # so the two polling mechanisms (RQ 202 and isBatch /query/progress) do not collide.
+    if RESOURCE_ASYNC_ENABLED:
+        from datetime import datetime as _dt
+        try:
+            sd = _dt.strptime(start_date, "%Y-%m-%d")
+            ed = _dt.strptime(end_date, "%Y-%m-%d")
+            day_span = (ed - sd).days
+        except (ValueError, TypeError):
+            day_span = 0
+        if day_span >= RESOURCE_ASYNC_DAY_THRESHOLD:
+            if is_async_available():
+                _owner = get_owner_token()
+                # owner MUST be inside _params (AC-7: enqueue_job forwards only kwargs
+                # to the worker fn; worker signature requires owner=)
+                _params = dict(
+                    owner=_owner,
+                    start_date=start_date,
+                    end_date=end_date,
+                    granularity=granularity,
+                    **filters,
+                )
+                try:
+                    job_id, err = enqueue_job_dynamic(
+                        "resource-history",
+                        owner=_owner,
+                        params=_params,
+                    )
+                    if job_id is not None:
+                        return success_response(
+                            {
+                                "async": True,
+                                "job_id": job_id,
+                                "status_url": f"/api/job/{job_id}?prefix=resource-history",
+                            },
+                            status_code=202,
+                        )
+                    # enqueue returned None — fall through to sync path
+                except Exception:
+                    pass  # Degradable async failure — fall through silently (AC-6)
 
     try:
         # Try canonical base spool first (DuckDB filter at view time).

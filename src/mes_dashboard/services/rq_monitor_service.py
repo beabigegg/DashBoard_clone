@@ -29,6 +29,7 @@ _QUEUE_NAMES: List[str] = [
     os.getenv("MATERIAL_CONSUMPTION_WORKER_QUEUE", "material-consumption"),
     os.getenv("DOWNTIME_WORKER_QUEUE", "downtime-query"),
     os.getenv("HOLD_WORKER_QUEUE", "hold-history-query"),
+    os.getenv("RESOURCE_WORKER_QUEUE", "resource-history-query"),
 ]
 
 

@@ -1,0 +1,15 @@
+{
+  "change_id": "resource-history-rq-async",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate",
+  "duration_ms": 1478,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/resource-history-rq-async/test-runs/20260615-171844/summary.json",
+    "stdout": "specs/changes/resource-history-rq-async/test-runs/20260615-171844/stdout.log",
+    "stderr": "specs/changes/resource-history-rq-async/test-runs/20260615-171844/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

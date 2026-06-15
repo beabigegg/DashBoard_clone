@@ -1,0 +1,12 @@
+agent: implementation-planner
+change-id: resource-history-rq-async
+status: complete
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/resource-history-rq-async/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer, e2e-resilience-engineer, stress-soak-engineer, ci-cd-gatekeeper, qa-reviewer" }
+  - { type: scope-summary, pointer: "7 in scope, 5 out of scope; 11 required changes IP-1..IP-11" }
+notes:
+  - "Real url_prefix is /api/resource/history (not /api/resource-history) — corrected in plan from kickoff brief."
+  - "execute_primary_query signature: (start_date, end_date, granularity='day', **filters); worker passes filters through, NOT owner."
+  - "Frontend 202 insertion point: App.vue::executePrimaryQuery after responseData (line 529), before isBatch heuristic."
+  - "supervisord hold block at lines 97-110; start_server.sh hold worker blocks 52-54/116-117/632-634/1323-1420/1622/1686/1742."

@@ -109,3 +109,17 @@ def test_allowed_namespaces_pass_namespace_validation(client, ns):
         resp = client.get(f"/api/spool/{ns}/abc123.parquet")
     # Should reach spool-expired logic, not namespace-invalid
     assert resp.status_code == 410
+
+
+def test_resource_dataset_stays_in_allowed_namespaces():
+    """resource_dataset namespace must remain in spool_routes._ALLOWED_NAMESPACES (AC-8).
+
+    This is a regression guard: resource-history-rq-async reuses the existing
+    resource_dataset namespace (no new namespace was added). Removing it from
+    _ALLOWED_NAMESPACES would cause HTTP 400 for all resource-history parquet downloads.
+    """
+    from mes_dashboard.routes import spool_routes
+    assert "resource_dataset" in spool_routes._ALLOWED_NAMESPACES, (
+        "'resource_dataset' must remain in spool_routes._ALLOWED_NAMESPACES "
+        "(resource-history-rq-async reuses this namespace; removal causes HTTP 400)"
+    )

@@ -1,0 +1,8 @@
+change-id: resource-history-rq-async
+agent: spec-architect
+artifacts:
+  - { type: adr-written, pointer: "none (ADR-0003 analyzed, confirmed not applicable; no ADR change required)" }
+  - { type: affected-areas, pointer: "resource-history route, new resource_query_job_service worker, spool namespace, worker process registration, frontend polling" }
+  - { type: decision-summary, pointer: "worker wraps unmodified execute_primary_query (no re-chunking); reuse resource_dataset namespace (already in allowlist)" }
+  - { type: risks-noted, pointer: "0 high, 3 medium (worker DB pool sizing, future cross-row reduction in chunked base, job-timeout vs spool TTL)" }
+  - { type: files-changed, pointer: "specs/changes/resource-history-rq-async/design.md (created)" }

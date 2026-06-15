@@ -1,0 +1,16 @@
+change-id: resource-history-rq-async
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-15T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3, 4, 5" }
+  - { type: gate-promotions, pointer: "resource-history-async-e2e: required from day 1 (Tier 1), same precedent as hold-history-rq-async" }
+  - { type: workflow-files-changed, pointer: "frontend-tests.yml — added 'Run resource-history-async e2e spec' step after existing downtime-analysis step; playwright install already present; spec path tests/playwright/resource-history-async.spec.ts" }
+  - { type: required-status-checks, pointer: "contract-validate, lint, unit-mock-integration, frontend-unit, css-governance, playwright-resilience, playwright-data-boundary, resource-history-async-e2e" }
+next-action: none
+notes: >
+  All gates map to existing workflow jobs. No new workflow files needed.
+  Manual gates cover worker registration in scripts/start_server.sh and supervisord.conf (AC-8).
+  Soft rollback via RESOURCE_ASYNC_ENABLED=false is zero-downtime; hard rollback stops the
+  resource-history-query RQ worker systemd unit. Parquet cleanup only required on
+  schema-breaking rollback, not flag-off rollback.

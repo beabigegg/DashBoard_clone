@@ -1,0 +1,22 @@
+agent: stress-soak-engineer
+change-id: resource-history-rq-async
+date: 2026-06-15
+status: done
+
+summary: >
+  Extended tests/stress/test_resource_history_stress.py with TestResourceHistoryAsyncStress
+  (3 tests: pool-exhaustion probe N=5, milestone-sequence probe N=10, timeout-enforcement probe).
+  All 3 pass under --run-stress. Authored stress-soak-report.md.
+
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_resource_history_stress.py::TestResourceHistoryAsyncStress" }
+  - { type: runner, pointer: "pytest --run-stress (unit-level, no live server)" }
+  - { type: pass-criteria-cited, pointer: "DatabasePoolExhaustedError==0 (N=5); milestones non-decreasing + last==100 (N=10); complete_job(error!=empty) + reraise + elapsed<10s (timeout probe)" }
+  - { type: artifacts-location, pointer: "specs/changes/resource-history-rq-async/stress-soak-report.md" }
+
+notes:
+  - Per-thread mock.patch on shared target is not thread-safe under N=10 concurrency;
+    fixed by using monkeypatch.setattr (module-level) + threading.Lock for milestone capture.
+  - Live Oracle pool exhaustion risk remains open until nightly integration gate runs.
+  - RESOURCE_JOB_TIMEOUT_SECONDS (1800) < spool TTL (3600) ordering must be verified
+    per-deployment; default values satisfy the constraint.

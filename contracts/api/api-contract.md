@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.18.0
+schema-version: 1.19.0
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -109,7 +109,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/resource/status/summary | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
 | GET | /api/resource/status/matrix | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
 | GET | /api/resource/history/options | required | — | success_response | 500 | route tests |
-| POST | /api/resource/history/query | required | JSON body | success_response | 400/410/500 | route tests |
+| POST | /api/resource/history/query | required | JSON body | HTTP 200 sync (days < RESOURCE_ASYNC_DAY_THRESHOLD or RESOURCE_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days >= RESOURCE_ASYNC_DAY_THRESHOLD AND RESOURCE_ASYNC_ENABLED=true): {async:true, job_id, status_url} | 202/400/410/500 | route tests |
 | GET | /api/resource/history/view | required | ?query_id= | success_response | 400/410 | route tests |
 | GET | /api/resource/history/export | required | query params | csv-stream | 400/410 | e2e tests |
 | GET | /api/resource/history/query/progress | required | ?query_id=<uuid> | success_response | 400/404 | route tests |
@@ -234,7 +234,7 @@ breaking-change-policy: deprecate-2-minors
 
 **Type A — 同步 re-query on 410：** view miss → 410 `cache_expired` → client 同步重新觸發 `execute_primary_query()`。適用：`hold_history_routes.py`、`resource_history_routes.py`。
 
-**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` when `HOLD_ASYNC_ENABLED=true`）。
+**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` when `RESOURCE_ASYNC_ENABLED=true`）。
 
 ## 8. API Inventory Governance
 
@@ -387,11 +387,22 @@ breaking-change-policy: deprecate-2-minors
   - New env vars: `HOLD_ASYNC_ENABLED`, `HOLD_ASYNC_DAY_THRESHOLD` (90), `HOLD_WORKER_QUEUE` (`hold-history-query`), `HOLD_JOB_TIMEOUT_SECONDS` (1800) — env-contract.md §Async Worker — Hold History Query.
   - Rollback: `HOLD_ASYNC_ENABLED=false` restores pure-sync; no spool cleanup required.
 
+- **resource-history-rq-async (2026-06-15)**: `POST /api/resource/history/query` gains async 202 path (additive, env-gated):
+  - date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` (default 90) + `RESOURCE_ASYNC_ENABLED=true` + worker available → HTTP 202 `{async: true, job_id, status_url}` where `status_url = /api/job/<job_id>?prefix=resource-history`.
+  - Short range (< threshold), disabled flag, or unavailable worker → HTTP 200 sync (unchanged).
+  - After job `status=finished`: `result.query_id` loads the resource_dataset spool (existing Type A pattern for `/view` unchanged).
+  - New env vars: `RESOURCE_ASYNC_ENABLED`, `RESOURCE_ASYNC_DAY_THRESHOLD` (90), `RESOURCE_WORKER_QUEUE` (`resource-history-query`), `RESOURCE_JOB_TIMEOUT_SECONDS` (1800) — env-contract.md §Async Worker — Resource History Query.
+  - Rollback: `RESOURCE_ASYNC_ENABLED=false` restores pure-sync; no spool cleanup required.
+
 ## Breaking Change Policy
 
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.19.0] — 2026-06-15
+### Added
+- resource-history-rq-async: `POST /api/resource/history/query` gains async 202 path when `RESOURCE_ASYNC_ENABLED=true` and date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` (default 90 days). Short-range, flag-off, or unavailable worker → HTTP 200 sync unchanged. Type B §7 extended to include `resource_history_routes.py`. §10 compatibility note added. New `resource-history-query` RQ queue. Additive; no existing fields removed.
 
 ## [api 1.18.0] — 2026-06-13
 ### Added

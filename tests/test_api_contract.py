@@ -978,5 +978,82 @@ class TestJobEnrichmentShape(unittest.TestCase):
         self.assertIsInstance(job['match_ambiguous'], bool)
 
 
+class TestResourceHistoryAsyncContract(unittest.TestCase):
+    """AC-1: POST /api/resource/history/query with long span → 202 with correct async shape."""
+
+    def setUp(self):
+        import mes_dashboard.core.database as db
+        db._ENGINE = None
+        from mes_dashboard.app import create_app
+        self.app = create_app('testing')
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+
+    @patch('mes_dashboard.routes.resource_history_routes.is_async_available', return_value=True)
+    @patch('mes_dashboard.routes.resource_history_routes.get_owner_token', return_value='contract-test-user')
+    @patch('mes_dashboard.routes.resource_history_routes.enqueue_job_dynamic')
+    def test_202_response_shape_has_job_id_and_status_url(
+        self, mock_enqueue, _mock_owner, _mock_avail
+    ):
+        """POST /api/resource/history/query long-span → 202 body has async=True, job_id, status_url (AC-1).
+
+        Validates the contract shape: {success: true, data: {async: true, job_id: str, status_url: str}}
+        where status_url points to the resource-history prefix.
+        """
+        import mes_dashboard.routes.resource_history_routes as _rmod
+        mock_enqueue.return_value = ("contract-job-001", None)
+
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True), \
+             patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
+            response = self.client.post(
+                '/api/resource/history/query',
+                json={"start_date": "2024-01-01", "end_date": "2024-07-20"},
+            )
+
+        self.assertEqual(response.status_code, 202)
+        data = json.loads(response.data)
+
+        # Standard envelope
+        self.assertIn('success', data)
+        self.assertTrue(data['success'])
+        self.assertIn('data', data)
+
+        # Async shape
+        payload = data['data']
+        self.assertIn('async', payload, "202 body must have 'async' field")
+        self.assertTrue(payload['async'], "202 body must have async=True")
+        self.assertIn('job_id', payload, "202 body must have 'job_id'")
+        self.assertIsInstance(payload['job_id'], str, "job_id must be a string")
+        self.assertTrue(len(payload['job_id']) > 0, "job_id must be non-empty")
+        self.assertIn('status_url', payload, "202 body must have 'status_url'")
+        self.assertIn('resource-history', payload['status_url'],
+                      "status_url must reference 'resource-history' prefix")
+
+    def test_resource_history_query_short_span_returns_200_not_202(self):
+        """POST /api/resource/history/query short-span → 200 sync (contract backward compat)."""
+        import mes_dashboard.routes.resource_history_routes as _rmod
+
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True), \
+             patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90), \
+             patch('mes_dashboard.services.resource_history_sql_runtime.try_compute_query_from_canonical_spool',
+                   return_value=(None, None)), \
+             patch('mes_dashboard.routes.resource_history_routes.execute_primary_query',
+                   return_value={
+                       'query_id': 'short-span-200',
+                       'summary': {'kpi': {}, 'trend': [], 'heatmap': [], 'workcenter_comparison': []},
+                       'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
+                   }):
+            response = self.client.post(
+                '/api/resource/history/query',
+                json={"start_date": "2024-01-01", "end_date": "2024-01-07"},  # 6 days
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        # Sync response has query_id, not async:true
+        self.assertNotIn('async', data.get('data', {}))
+
+
 if __name__ == "__main__":
     unittest.main()

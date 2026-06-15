@@ -1,0 +1,17 @@
+agent: e2e-resilience-engineer
+change-id: resource-history-rq-async
+date: 2026-06-15
+status: done
+
+artifacts:
+  - type: test-files
+    pointer: "frontend/tests/playwright/resource-history-async.spec.ts"
+  - type: scenarios-covered
+    pointer: >
+      AC-4 long-span async flow (202 → AsyncQueryProgress visible → job finished → refreshView → results render);
+      AC-6 regression short-span sync flow (200 → no AsyncQueryProgress);
+      AC-9 job failure (status=failed → error state visible, progress bar cleared)
+  - type: mutation-checks
+    pointer: "none"
+  - type: trace-artifacts
+    pointer: "n/a (no server running in this session — ECONNREFUSED at loginViaApi; all peer specs exhibit same failure without backend)"

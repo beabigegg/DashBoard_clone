@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.10
+schema-version: 1.0.11
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -136,6 +136,22 @@ breaking-change-policy: deprecate-2-minors
 - `HOLD_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ hold-history job may run before the worker kills it. Default 1800 s. Added by change `hold-history-rq-async`.
 
 **Worker env-var parity:** The `mes-dashboard-hold-history-worker.service` systemd unit MUST export the same `HOLD_*` env set as gunicorn (at minimum: `HOLD_ASYNC_ENABLED`, `HOLD_ASYNC_DAY_THRESHOLD`, `HOLD_WORKER_QUEUE`, `HOLD_JOB_TIMEOUT_SECONDS`). Env-var drift silently changes query routing. Added by change `hold-history-rq-async`.
+
+## Async Worker — Resource History Query
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| RESOURCE_ASYNC_ENABLED | feature-flag | all | no | no | true | true | application-team | true or false | yes | false = all resource-history queries run synchronously regardless of date range |
+| RESOURCE_ASYNC_DAY_THRESHOLD | async | all | no | no | 90 | 90 | application-team | positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when RESOURCE_ASYNC_ENABLED=true | yes | uses default 90 |
+| RESOURCE_WORKER_QUEUE | async | all | no | no | resource-history-query | resource-history-query | application-team | non-empty string; RQ queue name for the resource-history worker process | yes | uses default "resource-history-query" |
+| RESOURCE_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the resource-history worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
+
+- `RESOURCE_ASYNC_ENABLED`: Feature flag enabling the async RQ path for long resource-history queries. When `false`, all `POST /api/resource/history/query` calls run synchronously regardless of date span. Default `true`; set to `false` for emergency rollback. **Restart required** — module-level constant frozen at import. Added by change `resource-history-rq-async`.
+- `RESOURCE_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a resource-history query is dispatched via RQ (when `RESOURCE_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `90`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `resource-history-rq-async`.
+- `RESOURCE_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes resource-history jobs to. Must match the `--queues` argument of the running resource-history worker process. Default `"resource-history-query"`. Added by change `resource-history-rq-async`.
+- `RESOURCE_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ resource-history job may run before the worker kills it. Default 1800 s. Added by change `resource-history-rq-async`.
+
+**Worker env-var parity:** The `mes-dashboard-resource-history-worker.service` systemd unit MUST export the same `RESOURCE_*` env set as gunicorn (at minimum: `RESOURCE_ASYNC_ENABLED`, `RESOURCE_ASYNC_DAY_THRESHOLD`, `RESOURCE_WORKER_QUEUE`, `RESOURCE_JOB_TIMEOUT_SECONDS`). Env-var drift silently changes query routing. Added by change `resource-history-rq-async`.
 
 ## Batch Query Engine — Row-Count Chunking
 

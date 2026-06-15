@@ -1,0 +1,18 @@
+{
+  "change_id": "resource-history-rq-async",
+  "phase": "quality",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "ruff check . && cd frontend && npm run type-check",
+  "duration_ms": 19,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "message": "[*] 9 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option)."
+  },
+  "artifacts": {
+    "summary": "specs/changes/resource-history-rq-async/test-runs/20260615-172713/summary.json",
+    "stdout": "specs/changes/resource-history-rq-async/test-runs/20260615-172713/stdout.log",
+    "stderr": "specs/changes/resource-history-rq-async/test-runs/20260615-172713/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

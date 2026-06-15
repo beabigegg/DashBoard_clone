@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.23] — 2026-06-15
+### Added
+- resource-history-rq-async: Added §resource-history-rq-async Gate Compatibility Note — Tier 1/3 test coverage, deploy/rollback checklist, worker queue provisioning notes. Pct milestone coarse bracket (ADR-0003 exclusion does NOT apply). No new gate tier or command. Additive.
+
+## [business 1.20.0] — 2026-06-15
+### Added
+- resource-history-rq-async: New rule RH-09 (Async threshold gate) in Resource History Rules table. Two new decision table rows for long-span vs short-span resource-history queries. Additive.
+
+## [env 1.0.11] — 2026-06-15
+### Added
+- resource-history-rq-async: New section §Async Worker — Resource History Query: `RESOURCE_ASYNC_ENABLED` (true), `RESOURCE_ASYNC_DAY_THRESHOLD` (90), `RESOURCE_WORKER_QUEUE` (resource-history-query), `RESOURCE_JOB_TIMEOUT_SECONDS` (1800). Worker env-var parity note added. Additive.
+
+## [api-inventory 1.2.2] — 2026-06-15
+### Added
+- resource-history-rq-async: `resource_history_routes.py` — `POST /api/resource/history/query` gains optional async 202 path (env-gated; additive). Type B qualifier added to route row. Compatibility note added. No endpoint added or removed.
+
+## [api 1.19.0] — 2026-06-15
+### Added
+- resource-history-rq-async: `POST /api/resource/history/query` gains async 202 path when `RESOURCE_ASYNC_ENABLED=true` and date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` (default 90 days). Short-range, flag-off, or unavailable worker → HTTP 200 sync unchanged. Type B §7 extended to include `resource_history_routes.py`. §10 compatibility note added. New `resource-history-query` RQ queue. Additive; no existing fields removed.
+
 ## [ci 1.3.22] — 2026-06-13
 ### Added
 - hold-history-rq-async: Added §hold-history-rq-async Gate Compatibility Note — Tier 1/3 test coverage, deploy/rollback checklist, worker queue provisioning notes. Pct milestone per-chunk (row-count chunking; ADR-0003 exclusion does NOT apply). No new gate tier or command. Additive.

@@ -1,0 +1,95 @@
+agent: backend-engineer
+change-id: resource-history-rq-async
+date: 2026-06-15
+status: complete
+
+summary: |
+  Implemented the full backend async (RQ) path for resource-history long-span queries,
+  mirroring hold-history-rq-async exactly. Created resource_query_job_service.py,
+  wired the 202 dispatch branch into resource_history_routes.py, registered the worker
+  in supervisord.conf and scripts/start_server.sh, appended the queue to
+  rq_monitor_service._QUEUE_NAMES, added the startup import in app.py, updated
+  all 5 required contracts + CHANGELOG + .env.example, and wrote all required tests.
+  All 4 test phases (collect, targeted, changed-area, contract) pass.
+
+ac-coverage:
+  - ac: AC-1
+    status: satisfied
+    evidence: "test_query_long_span_returns_202 + test_202_response_shape_has_job_id_and_status_url both pass"
+  - ac: AC-2
+    status: satisfied
+    evidence: "test_query_short_span_returns_200_sync + test_query_async_flag_false_returns_200_sync pass"
+  - ac: AC-3
+    status: satisfied
+    evidence: "integration parity/milestone/monotonicity tests pass (using mocked Oracle)"
+  - ac: AC-4
+    status: satisfied
+    evidence: "frontend/src/resource-history/App.vue wired with pollJobUntilComplete, asyncJobProgress state,
+      useRequestGuard, and AsyncQueryProgress component; 202 branch short-circuits before isBatch heuristic;
+      vue-tsc type-check passes; Vitest 570 tests pass"
+  - ac: AC-5
+    status: satisfied
+    evidence: "test_resource_async_env_vars_pinned_defaults + queue/timeout default tests pass"
+  - ac: AC-6
+    status: satisfied
+    evidence: "Redis-down fallback + flag-off fallback tests pass; enqueue exception falls through"
+  - ac: AC-7
+    status: satisfied
+    evidence: "test_owner_in_params_dict + integration dispatch tests verify params.owner"
+  - ac: AC-8
+    status: satisfied
+    evidence: "supervisord.conf + start_server.sh blocks added; rq_monitor_service queue registered"
+  - ac: AC-9
+    status: satisfied
+    evidence: "test_worker_exception_calls_complete_job_with_error + job_timeout_produces_terminal_error_status pass"
+
+deviations:
+  - "tests/unit/ directory does not exist in this project; unit tests created at tests/ top level as
+     tests/test_resource_history_rq_async_route.py and tests/test_resource_query_job_service.py"
+  - "execute_primary_query is lazily imported inside the worker fn body (following hold_query_job_service
+     pattern); tests patch at mes_dashboard.services.resource_dataset_cache.execute_primary_query
+     not at resource_query_job_service module level"
+  - "Integration tests (pytestmark = pytest.mark.integration_real) include dispatch tests that run
+     without real Redis (using mocks) and parity tests — all pass in the mock tier"
+  - "deploy/ systemd unit clone was not created (no deploy/ directory found in project tree);
+     this was listed in IP-5 but the hold-history precedent only has supervisord.conf + start_server.sh
+     in the codebase. No blocking risk — the test ladder does not gate on systemd unit existence."
+
+known-risks:
+  - "Worker DB pool sizing: resource queries fan out base+OEE in ThreadPoolExecutor(max_workers=2);
+     DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 in worker launch command covers this per implementation-plan"
+  - "RESOURCE_JOB_TIMEOUT_SECONDS (1800s) must be < spool TTL (72000s) — satisfied by defaults"
+  - "Integration tests (AC-3/AC-5/AC-7) run in nightly integration_real gate, not pre-merge"
+  - "E2E Playwright spec (AC-4, IP-9) and stress extension (IP-10) are out of scope for this agent
+     (frontend-engineer and stress-soak-engineer respectively)"
+
+test-run-phases:
+  collect: "pass — specs/changes/resource-history-rq-async/test-runs/20260615-171748/"
+  targeted: "pass — specs/changes/resource-history-rq-async/test-runs/20260615-171755/"
+  changed-area: "pass — specs/changes/resource-history-rq-async/test-runs/20260615-171803/"
+  contract: "pass (cdd-kit validate all green) — specs/changes/resource-history-rq-async/test-runs/20260615-171844/"
+  quality: "pass (bounded ruff + vue-tsc) — specs/changes/resource-history-rq-async/test-runs/20260615-172742/"
+
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/resource_query_job_service.py:1-176" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/resource_history_routes.py:8-55 (imports + constants + async branch)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/app.py:894 (import resource_query_job_service)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/rq_monitor_service.py:32 (RESOURCE_WORKER_QUEUE appended)" }
+  - { type: files-changed, pointer: "supervisord.conf:111-126 (worker-resource-history block)" }
+  - { type: files-changed, pointer: "scripts/start_server.sh (config vars, pid/log paths, rotation, lifecycle fns, do_start/stop/status)" }
+  - { type: files-changed, pointer: ".env.example:213-218 (RESOURCE_ASYNC_* vars)" }
+  - { type: files-changed, pointer: "contracts/api/api-contract.md (schema-version 1.19.0, endpoint row, §7 Type B, §10 note, CHANGELOG)" }
+  - { type: files-changed, pointer: "contracts/api/api-inventory.md (schema-version 1.2.2, route row, compat note)" }
+  - { type: files-changed, pointer: "contracts/env/env-contract.md (schema-version 1.0.11, §Async Worker — Resource History Query)" }
+  - { type: files-changed, pointer: "contracts/business/business-rules.md (schema-version 1.20.0, RH-09, decision table rows)" }
+  - { type: files-changed, pointer: "contracts/ci/ci-gate-contract.md (schema-version 1.3.23, resource-history-rq-async Gate Compatibility Note)" }
+  - { type: files-changed, pointer: "contracts/CHANGELOG.md (5 new version entries)" }
+  - { type: tests-added, pointer: "tests/test_resource_history_rq_async_route.py (9 unit tests — AC-1/2/5/6/7)" }
+  - { type: tests-added, pointer: "tests/test_resource_query_job_service.py (14 unit tests — AC-7/9 + env defaults)" }
+  - { type: tests-added, pointer: "tests/integration/test_resource_history_rq_async.py (10 integration tests — AC-3/5/7/9)" }
+  - { type: tests-added, pointer: "tests/test_env_contract.py::TestDuckdbPrewarmTtlDefaults::test_resource_async_env_vars_pinned_defaults + test_resource_async_vars_documented_in_env_contract" }
+  - { type: tests-added, pointer: "tests/test_api_contract.py::TestResourceHistoryAsyncContract (2 tests — AC-1)" }
+  - { type: tests-added, pointer: "tests/test_spool_routes.py::test_resource_dataset_stays_in_allowed_namespaces (AC-8 regression guard)" }
+  - { type: test-output, pointer: "changed-area: 153 passed, 34 skipped; contract: cdd-kit validate all green; targeted: 23 passed" }
+  - { type: contracts-touched, pointer: "contracts/api/api-contract.md, contracts/api/api-inventory.md, contracts/env/env-contract.md, contracts/business/business-rules.md, contracts/ci/ci-gate-contract.md, contracts/CHANGELOG.md" }
+  - { type: files-changed, pointer: "frontend/src/resource-history/App.vue (imports: pollJobUntilComplete, useRequestGuard, AsyncQueryProgress; asyncJobProgress state; 202 branch in executePrimaryQuery; AsyncQueryProgress in template)" }

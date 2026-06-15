@@ -1,0 +1,24 @@
+agent: test-strategist
+change-id: resource-history-rq-async
+date: 2026-06-15
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/resource-history-rq-async/test-plan.md" }
+  - type: tdd-pairs
+    pointer: |
+      tests/unit/test_resource_query_job_service.py → src/mes_dashboard/services/resource_query_job_service.py
+      tests/test_resource_history_routes.py (extended) → src/mes_dashboard/routes/resource_history_routes.py
+      tests/integration/test_resource_history_rq_async.py → src/mes_dashboard/services/resource_query_job_service.py + routes
+      tests/test_env_contract.py (extended) → contracts/env/env-contract.md
+      tests/test_api_contract.py (extended) → contracts/api/api-contract.md
+      tests/test_spool_routes.py (extended) → src/mes_dashboard/routes/spool_routes.py
+      frontend/tests/playwright/resource-history-async.spec.ts → frontend/src/resource-history/
+  - { type: coverage-tiers, pointer: "unit (tier 0), contract (tier 0), integration (tier 1), e2e (tier 2), resilience (tier 1), stress (tier 3/nightly), soak (tier 4/weekly)" }
+  - { type: mapping-completeness, pointer: "all 9 AC covered; AC-5 split across unit+contract+integration for env-var pinning; AC-7 owner-in-params regression guard explicitly named in integration" }
+
+notes: |
+  - All new test files are pre-merge blockers except stress (nightly) and soak (weekly).
+  - AC-8 spool namespace: existing `resource_dataset` entry in `_ALLOWED_NAMESPACES` confirmed at tests/test_spool_routes.py:96; test is a regression guard, no new allowlist row needed.
+  - monkeypatch discipline: all RESOURCE_* constant overrides must use setattr on the service module, not setenv.
+  - tests/integration/ pytestmark verified as `pytest.mark.integration_real` in reference file.

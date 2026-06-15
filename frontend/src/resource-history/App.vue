@@ -15,8 +15,11 @@ import {
 import type { ResourceFilterSnapshot, ResourceItem } from '../core/resource-history-filters';
 import { replaceRuntimeHistory } from '../core/shell-navigation';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import { useRequestGuard } from '../shared-composables/useRequestGuard';
+import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling';
 import { useResourceHistoryDuckDB } from './useResourceHistoryDuckDB';
 
+import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 
@@ -176,7 +179,64 @@ function startPolling(qid: string): void {
 
 onUnmounted(() => {
   stopPolling();
+  if (_jobAbortController) {
+    _jobAbortController.abort();
+    _jobAbortController = null;
+  }
+  _stopElapsedTimer();
 });
+
+// ── RQ async job progress (202 path) ─────────────────────────────────────────
+const asyncJobProgress = reactive({
+  active: false,
+  jobId: null as string | null,
+  status: null as string | null,
+  progress: '',
+  pct: 0,
+  elapsedSeconds: 0,
+});
+
+let _jobAbortController: AbortController | null = null;
+let _jobStartedAt: number | null = null;
+let _elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+function _startElapsedTimer(): void {
+  _jobStartedAt = Date.now();
+  _elapsedTimer = setInterval(() => {
+    if (_jobStartedAt !== null) {
+      asyncJobProgress.elapsedSeconds = Math.floor((Date.now() - _jobStartedAt) / 1000);
+    }
+  }, 1000);
+}
+
+function _stopElapsedTimer(): void {
+  if (_elapsedTimer !== null) {
+    clearInterval(_elapsedTimer);
+    _elapsedTimer = null;
+  }
+  _jobStartedAt = null;
+}
+
+async function cancelAsyncJob(): Promise<void> {
+  const jobId = asyncJobProgress.jobId;
+  if (_jobAbortController) {
+    _jobAbortController.abort();
+    _jobAbortController = null;
+  }
+  _stopElapsedTimer();
+  asyncJobProgress.active = false;
+  asyncJobProgress.jobId = null;
+
+  if (jobId) {
+    try {
+      await apiPost(`/api/job/${jobId}/abandon`, {}, { silent: true, timeout: 10000 });
+    } catch {
+      // Non-fatal: abandon is best-effort
+    }
+  }
+}
+
+const { nextRequestId, isStaleRequest } = useRequestGuard();
 
 // ── DuckDB local compute (Tasks 3.2–3.4) ─────────────────────────────────────
 const duckdb = useResourceHistoryDuckDB();
@@ -487,6 +547,21 @@ function applyViewResult(result: Record<string, unknown>): void {
 }
 
 async function executePrimaryQuery() {
+  const requestId = nextRequestId();
+
+  // Cancel any in-progress async RQ job before starting a new query
+  if (_jobAbortController) {
+    _jobAbortController.abort();
+    _jobAbortController = null;
+  }
+  asyncJobProgress.active = false;
+  asyncJobProgress.jobId = null;
+  asyncJobProgress.pct = 0;
+  asyncJobProgress.progress = '';
+  asyncJobProgress.status = null;
+  asyncJobProgress.elapsedSeconds = 0;
+  _stopElapsedTimer();
+
   const validationError = validateDateRange(committedFilters);
   if (validationError) {
     queryError.value = validationError;
@@ -525,8 +600,80 @@ async function executePrimaryQuery() {
       silent: true,
     });
 
+    if (isStaleRequest(requestId)) return;
+
     const payload = unwrapApiResult(response, '查詢失敗') as Record<string, unknown>;
     const responseData = (payload?.data || {}) as Record<string, unknown>;
+
+    // ── RQ async 202 path ─────────────────────────────────────────────────────
+    // Backend returned {async: true, job_id, status_url} — long-range RQ job.
+    // Short-circuit before the isBatch heuristic so the two polling mechanisms
+    // do not collide (IP-6 constraint).
+    if (responseData.async === true && responseData.job_id) {
+      const jobId = String(responseData.job_id);
+      const statusUrl = String(responseData.status_url || `/api/job/${jobId}?prefix=resource-history`);
+
+      asyncJobProgress.active = true;
+      asyncJobProgress.jobId = jobId;
+      asyncJobProgress.status = 'queued';
+      asyncJobProgress.progress = '';
+      asyncJobProgress.pct = 0;
+      asyncJobProgress.elapsedSeconds = 0;
+      _startElapsedTimer();
+
+      // Suspend loading indicators while polling (progress bar replaces generic loading state)
+      loading.primaryQuery = false;
+      loading.querying = false;
+      loading.initial = false;
+
+      const controller = new AbortController();
+      _jobAbortController = controller;
+
+      try {
+        const finalStatus = await pollJobUntilComplete(statusUrl, {
+          signal: controller.signal,
+          onProgress: (statusResp) => {
+            asyncJobProgress.status = statusResp.status;
+            asyncJobProgress.progress = (statusResp.progress as string) || (statusResp.stage as string) || '';
+            asyncJobProgress.pct = typeof statusResp.pct === 'number' ? statusResp.pct : 0;
+          },
+        });
+
+        if (isStaleRequest(requestId)) return;
+
+        // Job finished: query_id is at the top level of the job status response (NOT result?.query_id)
+        const resultQueryId = String((finalStatus as Record<string, unknown>).query_id || '');
+        if (!resultQueryId) {
+          queryError.value = '查詢完成但未返回 query_id';
+          return;
+        }
+
+        queryId.value = resultQueryId;
+        lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
+        updateUrlState();
+        // refreshView handles spool/DuckDB eligibility — do NOT parse from job metadata
+        await refreshView();
+      } catch (err) {
+        if (isStaleRequest(requestId)) return;
+        const e = err as Error & { errorCode?: string };
+        if (e?.name === 'AbortError') {
+          // User cancelled — leave error blank; UI resets via asyncJobProgress.active = false
+        } else if (e?.errorCode === 'JOB_FAILED') {
+          queryError.value = e?.message || '查詢執行失敗';
+        } else if (e?.errorCode === 'JOB_POLL_TIMEOUT') {
+          queryError.value = '查詢執行超時，請縮小日期範圍後重試';
+        } else {
+          queryError.value = (e as Error)?.message || '查詢執行發生錯誤';
+        }
+      } finally {
+        if (_jobAbortController === controller) _jobAbortController = null;
+        _stopElapsedTimer();
+        asyncJobProgress.active = false;
+      }
+      return;
+    }
+
+    // ── Sync 200 path (unchanged from pre-change behavior) ────────────────────
     queryId.value = String(responseData.query_id || '');
     lastPrimarySnapshot.value = buildPrimarySnapshot(committedFilters);
 
@@ -776,6 +923,16 @@ onMounted(() => {
       <p v-if="autoPruneHint" class="filter-indicator">{{ autoPruneHint }}</p>
       <p v-if="detailWarning" class="filter-indicator active">{{ detailWarning }}</p>
       <p v-if="exportMessage" class="filter-indicator active">{{ exportMessage }}</p>
+
+      <!-- RQ async job progress (202 path) — replaces generic loading while polling -->
+      <AsyncQueryProgress
+        :active="asyncJobProgress.active"
+        :progress="asyncJobProgress.progress"
+        :pct="asyncJobProgress.pct"
+        :elapsed-seconds="asyncJobProgress.elapsedSeconds"
+        :status="asyncJobProgress.status"
+        @cancel="cancelAsyncJob"
+      />
 
       <div v-if="isPolling" class="mx-4 mb-4 rounded-lg bg-white p-4 shadow-sm" role="status" aria-live="polite">
         <div class="mb-2 flex items-center justify-between text-sm text-gray-600">

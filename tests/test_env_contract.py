@@ -205,3 +205,88 @@ class TestDuckdbPrewarmTtlDefaults:
         assert "DOWNTIME_ANALYSIS_CACHE_TTL" in content, (
             "DOWNTIME_ANALYSIS_CACHE_TTL must be documented in env-contract.md"
         )
+
+    def test_resource_async_env_vars_pinned_defaults(self):
+        """All four RESOURCE_* async env vars must have exact contract-pinned defaults (AC-5).
+
+        Tests RESOURCE_ASYNC_ENABLED=true, RESOURCE_ASYNC_DAY_THRESHOLD=90,
+        RESOURCE_WORKER_QUEUE='resource-history-query', RESOURCE_JOB_TIMEOUT_SECONDS=1800.
+
+        Note: module-level constants are frozen at import; tests must use monkeypatch.setattr(),
+        not monkeypatch.setenv(). Here we reload the module with env cleared to verify defaults.
+        """
+        import importlib
+        import os
+
+        # Test RESOURCE_ASYNC_ENABLED default=True
+        _old_enabled = os.environ.pop("RESOURCE_ASYNC_ENABLED", None)
+        try:
+            from mes_dashboard.services import resource_query_job_service as _svc
+            importlib.reload(_svc)
+            assert _svc.RESOURCE_ASYNC_ENABLED is True, (
+                f"RESOURCE_ASYNC_ENABLED must default True, got {_svc.RESOURCE_ASYNC_ENABLED!r}"
+            )
+        finally:
+            if _old_enabled is not None:
+                os.environ["RESOURCE_ASYNC_ENABLED"] = _old_enabled
+            else:
+                from mes_dashboard.services import resource_query_job_service as _svc
+                importlib.reload(_svc)
+
+        # Test RESOURCE_ASYNC_DAY_THRESHOLD default=90
+        _old_threshold = os.environ.pop("RESOURCE_ASYNC_DAY_THRESHOLD", None)
+        try:
+            from mes_dashboard.services import resource_query_job_service as _svc
+            importlib.reload(_svc)
+            assert _svc.RESOURCE_ASYNC_DAY_THRESHOLD == 90, (
+                f"RESOURCE_ASYNC_DAY_THRESHOLD must default 90, got {_svc.RESOURCE_ASYNC_DAY_THRESHOLD!r}"
+            )
+        finally:
+            if _old_threshold is not None:
+                os.environ["RESOURCE_ASYNC_DAY_THRESHOLD"] = _old_threshold
+            else:
+                from mes_dashboard.services import resource_query_job_service as _svc
+                importlib.reload(_svc)
+
+        # Test RESOURCE_WORKER_QUEUE default='resource-history-query'
+        _old_queue = os.environ.pop("RESOURCE_WORKER_QUEUE", None)
+        try:
+            from mes_dashboard.services import resource_query_job_service as _svc
+            importlib.reload(_svc)
+            assert _svc.RESOURCE_WORKER_QUEUE == "resource-history-query", (
+                f"RESOURCE_WORKER_QUEUE must default 'resource-history-query', got {_svc.RESOURCE_WORKER_QUEUE!r}"
+            )
+        finally:
+            if _old_queue is not None:
+                os.environ["RESOURCE_WORKER_QUEUE"] = _old_queue
+            else:
+                from mes_dashboard.services import resource_query_job_service as _svc
+                importlib.reload(_svc)
+
+        # Test RESOURCE_JOB_TIMEOUT_SECONDS default=1800
+        _old_timeout = os.environ.pop("RESOURCE_JOB_TIMEOUT_SECONDS", None)
+        try:
+            from mes_dashboard.services import resource_query_job_service as _svc
+            importlib.reload(_svc)
+            assert _svc.RESOURCE_JOB_TIMEOUT_SECONDS == 1800, (
+                f"RESOURCE_JOB_TIMEOUT_SECONDS must default 1800, got {_svc.RESOURCE_JOB_TIMEOUT_SECONDS!r}"
+            )
+        finally:
+            if _old_timeout is not None:
+                os.environ["RESOURCE_JOB_TIMEOUT_SECONDS"] = _old_timeout
+            else:
+                from mes_dashboard.services import resource_query_job_service as _svc
+                importlib.reload(_svc)
+
+    def test_resource_async_vars_documented_in_env_contract(self):
+        """All four RESOURCE_* async vars must appear in env-contract.md (AC-5)."""
+        content = _CONTRACT_PATH.read_text(encoding="utf-8")
+        for var in (
+            "RESOURCE_ASYNC_ENABLED",
+            "RESOURCE_ASYNC_DAY_THRESHOLD",
+            "RESOURCE_WORKER_QUEUE",
+            "RESOURCE_JOB_TIMEOUT_SECONDS",
+        ):
+            assert var in content, (
+                f"{var} must be documented in env-contract.md (AC-5)"
+            )

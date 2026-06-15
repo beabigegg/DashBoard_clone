@@ -1,0 +1,1 @@
+ruff check . && cd frontend && npm run type-check

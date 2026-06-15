@@ -1,0 +1,52 @@
+change-id: resource-history-rq-async
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      python -m pytest --collect-only -q tests/test_resource_history_rq_async_route.py
+      tests/test_resource_query_job_service.py tests/test_api_contract.py tests/test_env_contract.py
+      tests/test_spool_routes.py tests/integration/test_resource_history_rq_async.py
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/resource-history-rq-async/test-runs/20260615-171748/junit.xml'
+      --maxfail=1 --tb=short -ra
+    summary: specs/changes/resource-history-rq-async/test-runs/20260615-171748/summary.json
+    junit: specs/changes/resource-history-rq-async/test-runs/20260615-171748/junit.xml
+  - phase: targeted
+    status: passed
+    command: >-
+      python -m pytest tests/test_resource_history_rq_async_route.py tests/test_resource_query_job_service.py
+      tests/integration/test_resource_history_rq_async.py -v --tb=short
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/resource-history-rq-async/test-runs/20260615-171755/junit.xml'
+      -q --maxfail=1 -ra
+    summary: specs/changes/resource-history-rq-async/test-runs/20260615-171755/summary.json
+    junit: specs/changes/resource-history-rq-async/test-runs/20260615-171755/junit.xml
+  - phase: changed-area
+    status: passed
+    command: >-
+      python -m pytest tests/integration/test_resource_history_rq_async.py tests/test_api_contract.py
+      tests/test_env_contract.py tests/test_resource_history_rq_async_route.py tests/test_resource_query_job_service.py
+      tests/test_spool_routes.py -q --tb=short
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/resource-history-rq-async/test-runs/20260615-171803/junit.xml'
+      --maxfail=1 -ra
+    summary: specs/changes/resource-history-rq-async/test-runs/20260615-171803/summary.json
+    junit: specs/changes/resource-history-rq-async/test-runs/20260615-171803/junit.xml
+  - phase: contract
+    status: passed
+    command: cdd-kit validate
+    summary: specs/changes/resource-history-rq-async/test-runs/20260615-171844/summary.json
+  - phase: quality
+    status: passed
+    command: >-
+      ruff check src/mes_dashboard/services/resource_query_job_service.py
+      src/mes_dashboard/routes/resource_history_routes.py src/mes_dashboard/app.py
+      src/mes_dashboard/services/rq_monitor_service.py tests/test_resource_history_rq_async_route.py
+      tests/test_resource_query_job_service.py tests/integration/test_resource_history_rq_async.py
+      tests/test_api_contract.py tests/test_env_contract.py tests/test_spool_routes.py && cd frontend && npm run
+      type-check
+    summary: specs/changes/resource-history-rq-async/test-runs/20260615-172742/summary.json
+final-status: passed

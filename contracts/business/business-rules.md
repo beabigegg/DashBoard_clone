@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.19.0
+schema-version: 1.20.0
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -124,6 +124,7 @@ breaking-change-policy: deprecate-2-minors
 | RH-06 | View-result cache TTL staleness window | `apply_view()` caches the full computed result dict for `RESOURCE_VIEW_CACHE_TTL` seconds (default 300 s). Derived numbers (KPI, trend, heatmap, detail) may be up to 5 minutes stale within an already-warm dataset. This is acceptable for a reporting surface. Set `RESOURCE_VIEW_CACHE_TTL=0` to disable the cache and always recompute from spool. Cache is atomic: all structures are cached or none (no partial state). | unit tests |
 | RH-07 | Spool TTL aligned to daily DuckDB refresh | The Redis spool metadata TTL for resource_history recent queries is 20h (72000 s), controlled by `RESOURCE_HISTORY_SPOOL_TTL` env var (default 72000). This is distinct from the global `CACHE_TTL_DATASET` (2h / 7200 s), which applies to hold/reject/yield_alert datasets but NOT to resource_history. Historical queries (end_date < today − 2d) continue to use `RESOURCE_HISTORY_HISTORICAL_TTL` (default 86400 s). The 20h window ensures that after the daily DuckDB prewarm refresh (keyed by `loaded_at == today`), the next user query reads newly refreshed data. | unit tests (RESOURCE_HISTORY_SPOOL_TTL resolves to 72000; CACHE_TTL_DATASET unchanged at 7200) |
 | RH-08 | DuckDB prewarm via RQ job | At gunicorn startup, resource_history DuckDB prewarm is enqueued as an RQ job registered in `spool_warmup_scheduler._WARMUP_JOBS` — no `start_duckdb_prewarm()` daemon-thread call remains in `app.py`. Leader-lock (file-based `fcntl.flock`) prevents duplicate concurrent Oracle prewarms across gunicorn workers. DuckDB cache is refreshed once daily, keyed by `loaded_at == today`. If no RQ worker is available at first user query, the query falls back to Oracle without error (AC-7). | integration tests (no daemon thread on startup; RQ job enqueued; Oracle call count = 1 across N workers) |
+| RH-09 | Async threshold gate | `POST /api/resource/history/query` dispatches to RQ worker when `RESOURCE_ASYNC_ENABLED=true` AND `(end_date − start_date).days ≥ RESOURCE_ASYNC_DAY_THRESHOLD` (default 90) AND `is_async_available()` returns True. Dispatched jobs return HTTP 202 `{async: true, job_id, status_url}`. Short-range queries, disabled flag, or unavailable worker fall through to the synchronous 200 path unchanged. Worker queue: `resource-history-query` (default). Job timeout: `RESOURCE_JOB_TIMEOUT_SECONDS` (default 1800 s). Spool namespace `resource_dataset` is reused (no new namespace). (resource-history-rq-async) | unit tests (AC-1, AC-2, AC-5, AC-6, AC-7); integration tests (AC-3, AC-9) |
 
 ## Production-History Rules
 
@@ -227,6 +228,8 @@ breaking-change-policy: deprecate-2-minors
 | Partial trackout group — 4-tuple match, any non-key column diverges | Multiple raw rows emitted, `partial_count = 1` each; per-request INFO log with divergent-group count | PH-07 | unit tests |
 | Downtime query: days ≥ DOWNTIME_ASYNC_DAY_THRESHOLD + DOWNTIME_ASYNC_ENABLED=true + worker available | HTTP 202 async job | ASYNC-DA-01 | route tests |
 | Downtime query: days < threshold, OR DOWNTIME_ASYNC_ENABLED=false, OR worker unavailable | HTTP 200 sync | ASYNC-DA-01 | resilience |
+| Resource-history query: days ≥ RESOURCE_ASYNC_DAY_THRESHOLD + RESOURCE_ASYNC_ENABLED=true + worker available | HTTP 202 async job | RH-09 | route tests |
+| Resource-history query: days < threshold, OR RESOURCE_ASYNC_ENABLED=false, OR worker unavailable | HTTP 200 sync | RH-09 | resilience |
 
 ## Material Consumption Rules
 

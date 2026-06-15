@@ -1,0 +1,16 @@
+{
+  "change_id": "resource-history-rq-async",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/integration/test_resource_history_rq_async.py tests/test_api_contract.py tests/test_env_contract.py tests/test_resource_history_rq_async_route.py tests/test_resource_query_job_service.py tests/test_spool_routes.py -q --tb=short --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/resource-history-rq-async/test-runs/20260615-171803/junit.xml' --maxfail=1 -ra",
+  "duration_ms": 34515,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/resource-history-rq-async/test-runs/20260615-171803/summary.json",
+    "stdout": "specs/changes/resource-history-rq-async/test-runs/20260615-171803/stdout.log",
+    "stderr": "specs/changes/resource-history-rq-async/test-runs/20260615-171803/stderr.log",
+    "junit": "specs/changes/resource-history-rq-async/test-runs/20260615-171803/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

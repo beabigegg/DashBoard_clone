@@ -1,0 +1,15 @@
+{
+  "change_id": "resource-history-rq-async",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "ruff check src/mes_dashboard/services/resource_query_job_service.py src/mes_dashboard/routes/resource_history_routes.py src/mes_dashboard/app.py src/mes_dashboard/services/rq_monitor_service.py tests/test_resource_history_rq_async_route.py tests/test_resource_query_job_service.py tests/integration/test_resource_history_rq_async.py tests/test_api_contract.py tests/test_env_contract.py tests/test_spool_routes.py && cd frontend && npm run type-check",
+  "duration_ms": 9162,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/resource-history-rq-async/test-runs/20260615-172742/summary.json",
+    "stdout": "specs/changes/resource-history-rq-async/test-runs/20260615-172742/stdout.log",
+    "stderr": "specs/changes/resource-history-rq-async/test-runs/20260615-172742/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

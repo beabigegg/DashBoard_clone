@@ -56,8 +56,15 @@ jobs:
       - name: Run Playwright downtime-analysis spec
         working-directory: frontend
         # downtime-browser-duckdb: migrated from .spec.js to .spec.ts (e2e-resilience-engineer)
-        # CI-gate note: concurrency group below; chromium install already present above.
+        # CI-gate note: chromium install already present above.
         run: npx playwright test tests/playwright/downtime-analysis.spec.ts || npx playwright test tests/playwright/downtime-analysis.spec.js
+
+      - name: Run resource-history-async e2e spec (resource-history-async-e2e, Tier 1)
+        working-directory: frontend
+        # ci-gates.md gate: resource-history-async-e2e (Tier 1, required)
+        # Covers: TP-E2E-01 (long-span 202 poll), TP-E2E-02 (short-span 200 sync), TP-E2E-03 (useAsyncJobPolling wiring)
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/resource-history-async.spec.ts
 
       - name: Verify test discovery
         working-directory: frontend
