@@ -1,14 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
+import { createRequire } from 'module';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-// Load project-root .env so LOCAL_AUTH_USERNAME / LOCAL_AUTH_PASSWORD
-// (and other variables) are available to test helpers like _auth.js.
-// process.loadEnvFile is built-in since Node 22.3; only sets vars that
-// are not already in the environment (safe to call unconditionally).
+// Load project-root .env so LOCAL_AUTH_USERNAME / LOCAL_AUTH_PASSWORD reach
+// _auth.js loginViaApi.  Use manual parsing to avoid a dotenv dependency;
+// only sets vars not already present (so real env vars in CI always win).
 try {
-  process.loadEnvFile(resolve(import.meta.dirname, '../.env'));
+  const envPath = resolve(createRequire(import.meta.url).resolve('./package.json'), '../../.env');
+  const lines = readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m && !(m[1] in process.env)) {
+      process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
+  }
 } catch {
-  // .env absent or Node < 22.3 — skip silently; CI uses real env vars
+  // .env absent — CI uses real env vars
 }
 
 export default defineConfig({

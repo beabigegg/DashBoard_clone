@@ -175,13 +175,29 @@ export async function navigateViaSidebar(page, route, opts = {}) {
   );
 
   await page.goto('/portal-shell/');
-  await waitForIdleUi(page);
+  // Best-effort idle wait: wip-overview loading overlay may stay alive when Oracle
+  // is unavailable. Fail open after 5s so sidebar link click can still proceed.
+  await waitForIdleUi(page, 5_000).catch(() => {});
+
+  // The sidebar is closed by default (sidebarOpen = ref(false)) and is also closed
+  // by the route watcher on every navigation.  Open it so the link is in the viewport.
+  const toggleBtn = page.locator('button.sidebar-toggle');
+  await toggleBtn.waitFor({ timeout });
+  if ((await toggleBtn.getAttribute('aria-expanded')) !== 'true') {
+    await toggleBtn.click();
+  }
 
   await page.waitForSelector(`a[href*="${route}"]`, { timeout });
   await page.click(`a[href*="${route}"]`);
 
   // Un-route so the destination page can make real API calls.
   await page.unroute(WIP_ROUTE);
+
+  // The sidebar-overlay fades out via CSS transition after the link click triggers
+  // closeSidebar().  While it is still in the DOM (even at opacity-0), it sits on
+  // top of the destination page's click targets.  Wait for it to detach fully before
+  // any subsequent clicks in the test body can hit the right element.
+  await page.locator('.sidebar-overlay').waitFor({ state: 'detached', timeout: 3_000 }).catch(() => {});
 
   if (waitForSelector) {
     await page.waitForSelector(waitForSelector, { timeout });
