@@ -1,4 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolve } from 'path';
+
+// Load project-root .env so LOCAL_AUTH_USERNAME / LOCAL_AUTH_PASSWORD
+// (and other variables) are available to test helpers like _auth.js.
+// process.loadEnvFile is built-in since Node 22.3; only sets vars that
+// are not already in the environment (safe to call unconditionally).
+try {
+  process.loadEnvFile(resolve(import.meta.dirname, '../.env'));
+} catch {
+  // .env absent or Node < 22.3 — skip silently; CI uses real env vars
+}
 
 export default defineConfig({
   testDir: './tests/playwright',
