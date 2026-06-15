@@ -8,6 +8,12 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.20.0] — 2026-06-15
+### Changed
+- contract-conformance-fix: Added POST variants for dual GET+POST endpoints (wip/overview, hold-overview, reject-history/view, reject-history/export-cached, production-history/export, resource/history/export). Changed method GET→POST for production-history/options and yield-alert/analyze (backend changed to POST-only). Added GET entry for reject-history/batch-pareto. Fixed admin cleanup routes DELETE→POST. Removed non-existent GET /admin/api/drawers/<drawer_id>.
+### Added
+- contract-conformance-fix: New endpoints now in contract: GET /api/portal/navigation, GET /api/resource/history/page, GET+GET /api/trace/seed/job/<job_id>{,/result}, GET+POST /api/material-consumption/{filter-options,query,view,detail,detail/page,detail/job/<job_id>,export}, GET /api/downtime-analysis/export-{equipment,event}-detail, GET /api/get_table_info, POST /api/get_table_columns, POST /api/query_table.
+
 ## [ci 1.3.23] — 2026-06-15
 ### Added
 - resource-history-rq-async: Added §resource-history-rq-async Gate Compatibility Note — Tier 1/3 test coverage, deploy/rollback checklist, worker queue provisioning notes. Pct milestone coarse bracket (ADR-0003 exclusion does NOT apply). No new gate tier or command. Additive.

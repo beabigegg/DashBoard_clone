@@ -188,6 +188,43 @@ def api_downtime_query():
     is_key = bool(body.get('is_key', False))
     is_monitor = bool(body.get('is_monitor', False))
 
+    # ── Spool cache check (browser-DuckDB path only) ──────────────────────────
+    # When both raw parquets already exist for this date range + resource filter
+    # combination, serve them directly without Oracle or a new RQ job.  Changing
+    # non-key filter params (big_categories, status_types, is_production, etc.)
+    # hits this path because the spool key only covers the data-acquisition dims.
+    if _BROWSER_DUCKDB_ENABLED:
+        from mes_dashboard.services.downtime_analysis_service import (
+            make_raw_spool_query_id,
+        )
+        from mes_dashboard.services.downtime_analysis_cache import (
+            has_downtime_base_events,
+            has_downtime_job_bridge,
+            _BASE_EVENTS_NAMESPACE,
+            _JOB_BRIDGE_NAMESPACE,
+        )
+        from mes_dashboard.services.downtime_analysis_service import (
+            _build_taxonomy_json,
+            _build_resource_lookup,
+        )
+        _spool_key_params = {
+            'start_date': start_date,
+            'end_date': end_date,
+            'workcenter_groups': sorted(workcenter_groups or []),
+            'families': sorted(families or []),
+            'resource_ids': sorted(resource_ids or []),
+            'package_groups': sorted(package_groups or []),
+        }
+        _spool_qid = make_raw_spool_query_id(_spool_key_params)
+        if has_downtime_base_events(_spool_qid) and has_downtime_job_bridge(_spool_qid):
+            return success_response({
+                'base_spool_url': f'/api/spool/{_BASE_EVENTS_NAMESPACE}/{_spool_qid}.parquet',
+                'jobs_spool_url': f'/api/spool/{_JOB_BRIDGE_NAMESPACE}/{_spool_qid}.parquet',
+                'query_id': _spool_qid,
+                'taxonomy': _build_taxonomy_json(),
+                'resource_lookup': _build_resource_lookup(),
+            })
+
     # ── Async RQ branch (DOWNTIME_ASYNC_ENABLED + threshold + worker available) ──
     # Only enter when: browser-DuckDB flag is ON (raw-spool path), AND the async
     # flag is enabled, AND the date span meets the threshold, AND a worker is live.

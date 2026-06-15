@@ -263,10 +263,10 @@ export function useDowntimeData() {
             },
           });
 
-          // Job finished: read query_id from job result and load the parquet spools.
-          // `result` is the payload the worker stored when calling complete_job().
-          const jobResult = (finalStatus.result as Record<string, unknown> | null | undefined);
-          const resultQueryId = String(jobResult?.query_id || '');
+          // Job finished: read query_id from the flat job status dict.
+          // get_job_status() stores query_id at the top level (not nested under "result").
+          const statusObj = finalStatus as Record<string, unknown>;
+          const resultQueryId = String(statusObj.query_id || '');
           if (!resultQueryId) {
             error.value = '背景查詢完成但未返回 query_id';
             resetSummaryData();
@@ -282,18 +282,15 @@ export function useDowntimeData() {
           duckdbSpoolUrls.value = {
             base_spool_url: baseSpoolUrl,
             jobs_spool_url: jobsSpoolUrl,
-            // taxonomy is not returned by the async job response; the caller
-            // (App.vue) must have the taxonomy from a prior sync query or use
-            // an empty taxonomy.  For async-only initial queries the taxonomy
-            // is set to an empty structure; the browser-DuckDB composable
-            // handles a missing/empty taxonomy gracefully.
-            taxonomy: (jobResult?.taxonomy as TaxonomyShape | undefined) ?? {
+            // taxonomy is not in the job status response; use empty structure.
+            // The browser-DuckDB composable handles missing taxonomy gracefully.
+            taxonomy: {
               map: [],
               prefixes: [],
               egt_category: '',
               fallback: '',
             },
-            resource_lookup: (jobResult?.resource_lookup as Record<string, { resource_name: string | null; workcenter: string | null; family: string | null }>) ?? {},
+            resource_lookup: {},
           };
           // Reset pre-aggregated summary data — all views come from DuckDB-WASM
           resetSummaryData();
