@@ -53,3 +53,4 @@
 | job-registry-central | 2026 | 2026-06-13 | specs/archive/2026/job-registry-central/ |
 | downtime-rq-async | 2026 | 2026-06-13 | specs/archive/2026/downtime-rq-async/ |
 | hold-history-rq-async | 2026 | 2026-06-13 | specs/archive/2026/hold-history-rq-async/ |
+| fix-e2e-spec-failures | 2026 | 2026-06-15 | specs/archive/2026/fix-e2e-spec-failures/ |
