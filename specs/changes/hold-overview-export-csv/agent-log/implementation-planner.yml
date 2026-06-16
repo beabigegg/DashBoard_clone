@@ -1,0 +1,11 @@
+agent: implementation-planner
+change-id: hold-overview-export-csv
+status: complete
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/hold-overview-export-csv/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-5), frontend-engineer (IP-6..IP-8)" }
+  - { type: scope-summary, pointer: "in: export param on /api/hold-overview/lots + client CSV button; out: server-side CSV, new deps, new CSS, i18n" }
+notes:
+  - "Open decisions to lock pre-impl: service flag shape, pagination key snake/camel reconciliation, cap enforcement point, CSV helper module path, env-contract write target."
+  - "Contract entries already authored (api §10 + CHANGELOG api 1.23.0; data-shape §3.15); no new contract prose required from planner."
+  - "Filed CER-002 for contracts/env/env-contract.md (outside Allowed Paths)."

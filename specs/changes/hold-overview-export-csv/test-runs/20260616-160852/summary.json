@@ -1,0 +1,15 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check && npm run css:check",
+  "duration_ms": 9227,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-160852/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-160852/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-160852/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

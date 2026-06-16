@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.2.2
-last-changed: 2026-06-12
+schema-version: 1.2.3
+last-changed: 2026-06-16
 ---
 
 # API Inventory
@@ -22,7 +22,7 @@ last-changed: 2026-06-12
 | `wip_routes.py` | All JSON API endpoints — `GET /api/wip/overview/summary`, `/matrix`, `/meta/filter-options`, `/overview/hold`；同時接受 `POST` JSON body（避免 URL 過長）。`/overview/summary`、`/overview/matrix`、`/detail/<workcenter>`、`/meta/filter-options` 接受新增可選參數 `workflow`、`bop`、`pj_function`（wip-hold-drilldown-filters）。`/detail/<workcenter>` lot 列新增 `pjType` 欄位。`/meta/filter-options` response 新增 `workflows`、`bops`、`pjFunctions` 陣列。 |
 | `dashboard_routes.py` | All JSON API endpoints |
 | `hold_routes.py` | All JSON API endpoints |
-| `hold_overview_routes.py` | All JSON API endpoints — `/summary`, `/matrix`, `/treemap`, `/lots` 接受 `POST` JSON body；`reason` 可為 CSV string (GET) 或 JSON array (POST) |
+| `hold_overview_routes.py` | All JSON API endpoints — `/summary`, `/matrix`, `/treemap`, `/lots` 接受 `POST` JSON body；`reason` 可為 CSV string (GET) 或 JSON array (POST)；`/lots` 新增可選 `export` boolean 參數（GET: `?export=true`, POST body: `"export": true`），export 模式下略過 per_page 上限，回傳全量匹配列（上限 `HOLD_OVERVIEW_EXPORT_MAX_ROWS`）；不含 `export` 時行為完全不變（hold-overview-export-csv，additive）。 |
 | `hold_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410); **Also Type B** for `POST /api/hold-history/query` when date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` AND `HOLD_ASYNC_ENABLED=true` → HTTP 202 `{async:true, job_id, status_url=/api/job/<id>?prefix=hold-history}`; short-range or flag-off → HTTP 200 sync unchanged (hold-history-rq-async)；`duration` payload: `{ items: [{range, count, qty, pct}], avgReleasedHours, avgOnHoldHours, maxReleasedHours, maxOnHoldHours }`；trend day 含 `repeatQualityHoldQty`；**`POST /api/hold-history/today-snapshot`**: inputs `{ hold_type, record_type, reason, duration_range, page, per_page }`，response `{ query_id, summary: { onHoldTotalCount, onHoldTotalQty, todayNewQty, todayReleaseQty, todayFutureHoldQty, onHoldAvgHours, onHoldMaxHours }, reason_pareto, duration, list }`；cache `hold_today:*` TTL 60s；DB 不可用 → 503 `service_unavailable`；detail list 每筆明細列新增 `package: string \| null`（add-package-detail-tables，additive） |
 | `reject_history_routes.py` | All JSON API endpoints — **Type B** (async 202 polling on 410)；含 `GET /api/reject-history/job/<job_id>`；`/batch-pareto` / `/view` 接受 `POST` JSON body |
 | `resource_routes.py` | All JSON API endpoints — `/status`、`/status/summary`、`/status/matrix` 新增可選查詢參數 `package_groups`（逗號分隔字串，resource-status-package-group）；`/status/options` response 新增 `package_groups: string[]`；`/status` response record 新增 `PACKAGEGROUPNAME: string \| null`（PACKAGEGROUPID NULL 時為 null）。 |

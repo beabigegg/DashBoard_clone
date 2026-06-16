@@ -23,6 +23,8 @@ import FilterPanel from '../wip-overview/components/FilterPanel.vue';
 import FilterBar from './components/FilterBar.vue';
 import FilterIndicator from './components/FilterIndicator.vue';
 import HoldMatrix from './components/HoldMatrix.vue';
+import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
+import { _buildCsv, _downloadCsv } from './csvExport';
 
 // ── Local type aliases ──────────────────────────────────────────────────────
 interface HoldOverviewSummary {
@@ -97,6 +99,7 @@ const refreshSuccess = ref(false);
 const refreshError = ref(false);
 const errorMessage = ref('');
 const lotsError = ref('');
+const exportLoading = ref(false);
 
 const { nextRequestId, isStaleRequest } = useRequestGuard();
 
@@ -768,6 +771,28 @@ function nextPage() {
   void loadLotsPage();
 }
 
+async function exportLots(): Promise<void> {
+  if (exportLoading.value) return;
+  exportLoading.value = true;
+  try {
+    const params = {
+      ...buildAllFilterParams(),
+      ...buildMatrixFilterParams(),
+      export: true,
+    };
+    const result = await apiPost('/api/hold-overview/lots', params, { timeout: API_TIMEOUT });
+    const data = unwrapApiResult(result, '匯出失敗') as { lots?: Record<string, unknown>[] };
+    const rows = Array.isArray(data?.lots) ? data.lots : [];
+    const dateStr = new Date().toISOString().slice(0, 10);
+    _downloadCsv(_buildCsv(rows), `hold-overview-${dateStr}.csv`);
+  } catch (err: unknown) {
+    console.error('[hold-overview] CSV export failed:', err);
+    lotsError.value = 'CSV 匯出失敗，請稍後再試';
+  } finally {
+    exportLoading.value = false;
+  }
+}
+
 async function manualRefresh() {
   await triggerRefresh({ resetTimer: true, force: true });
 }
@@ -968,6 +993,16 @@ onBeforeUnmount(() => {
             <span>篩選: {{ lotFilterText }}</span>
             <button type="button" class="text-brand-500 hover:underline" @click="clearMatrixFilter">清除</button>
           </div>
+          <button
+            type="button"
+            class="ui-btn ui-btn--secondary"
+            :class="{ 'is-loading': exportLoading }"
+            :disabled="exportLoading || lotsLoading || pagination.total === 0"
+            @click="exportLots"
+          >
+            <LoadingSpinner v-if="exportLoading" size="sm" aria-hidden="true" />
+            {{ exportLoading ? '匯出中...' : '↓ 匯出 CSV' }}
+          </button>
         </div>
         <div class="card-body ui-card-body lots-card-body">
           <ErrorBanner :message="lotsError" @dismiss="lotsError = ''" />

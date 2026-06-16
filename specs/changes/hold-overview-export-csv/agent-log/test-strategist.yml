@@ -1,0 +1,14 @@
+agent: test-strategist
+date: 2026-06-16
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/hold-overview-export-csv/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/hold-overview/csv-export.test.js → frontend/src/hold-overview/App.vue (CSV helpers)" }
+  - { type: tdd-pairs, pointer: "frontend/tests/validation/useHoldOverview.validation.test.js → frontend/src/hold-overview/ (composable export flag)" }
+  - { type: tdd-pairs, pointer: "tests/test_hold_overview_routes.py → src/mes_dashboard/routes/hold_overview_routes.py (export param + row cap)" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/hold-overview.spec.js → frontend/src/hold-overview/App.vue (button loading/download)" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/data-boundary/hold-overview-export-csv.spec.js → frontend/src/hold-overview/ (null field handling)" }
+  - { type: tdd-pairs, pointer: "tests/stress/test_hold_overview_export_stress.py → src/mes_dashboard/routes/hold_overview_routes.py (row cap)" }
+  - { type: coverage-tiers, pointer: "unit (tier-0), contract (tier-1), integration (tier-1), e2e (tier-1), data-boundary (tier-1), stress (tier-3)" }
+  - { type: mapping-completeness, pointer: "all 8 AC covered; AC-7 covered at unit + stress; AC-5 covered at unit + data-boundary" }

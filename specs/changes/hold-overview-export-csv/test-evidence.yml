@@ -1,0 +1,35 @@
+change-id: hold-overview-export-csv
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test -- --reporter=verbose 2>&1 | tail -10
+    summary: specs/changes/hold-overview-export-csv/test-runs/20260616-155103/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npm run test -- tests/hold-overview/csv-export.test.js
+    summary: specs/changes/hold-overview-export-csv/test-runs/20260616-155123/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- tests/hold-overview/
+      tests/validation/useHoldOverview.validation.test.js
+    summary: specs/changes/hold-overview-export-csv/test-runs/20260616-160846/summary.json
+  - phase: contract
+    status: passed
+    command: conda run -n mes-dashboard bash -c 'pip install jsonschema -q && cdd-kit validate --contracts'
+    summary: specs/changes/hold-overview-export-csv/test-runs/20260616-154900/summary.json
+  - phase: full
+    status: passed
+    command: conda run -n mes-dashboard pytest tests/test_hold_overview_routes.py -v -q
+    summary: specs/changes/hold-overview-export-csv/test-runs/20260616-160145/summary.json
+  - phase: quality
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check && npm run css:check
+    summary: specs/changes/hold-overview-export-csv/test-runs/20260616-160852/summary.json
+final-status: passed

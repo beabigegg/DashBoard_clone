@@ -1,0 +1,15 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_hold_overview_routes.py -k 'export' -v",
+  "duration_ms": 4073,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-154830/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-154830/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-154830/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

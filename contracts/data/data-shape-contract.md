@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.15.0
+schema-version: 1.16.1
 last-changed: 2026-06-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -967,9 +967,48 @@ Extends ASYNC-05 canonical milestone map. Both parquets are written before `pct`
 
 Short-range (HTTP 200) response shape: unchanged from §3.12 (flag ON synchronous path returns `{base_spool_url, jobs_spool_url, query_id, taxonomy}`).
 
+### 3.15 Hold-Overview Lots Export Column Set
+
+Client-side CSV assembled from `data.lots[]` returned by `GET/POST /api/hold-overview/lots?export=true`. 13 columns in display order, matching the JSON key names in the lot row object:
+
+| position | CSV header | JSON key | type | nullable | notes |
+|---|---|---|---|---|---|
+| 1 | Lot ID | lotId | string | yes | LOTID |
+| 2 | Work Order | workorder | string | yes | WORKORDER |
+| 3 | Qty | qty | integer | no | NVL(QTY,0) |
+| 4 | Product | product | string | yes | PRODUCTNAME |
+| 5 | Package | package | string | yes | PACKAGE_LEF |
+| 6 | Work Center | workcenter | string | yes | WORKCENTER_GROUP |
+| 7 | Hold Reason | holdReason | string | yes | HOLDREASONNAME |
+| 8 | Spec | spec | string | yes | SPECNAME |
+| 9 | Age (days) | age | float | no | AGEBYDAYS |
+| 10 | Hold By | holdBy | string | yes | HOLDEMP |
+| 11 | Dept | dept | string | yes | DEPTNAME |
+| 12 | Hold Comment | holdComment | string | yes | COMMENT_HOLD |
+| 13 | Future Hold Comment | futureHoldComment | string | yes | COMMENT_FUTURE; may decay after MES lot release |
+
+**CSV format rules:**
+- UTF-8 BOM prefix (`\uFEFF`) so Excel renders non-ASCII correctly (mirrors hold-history pattern).
+- Header row required; values follow the JSON key order above.
+- Values containing commas, double-quotes, or newlines must be RFC 4180 escaped.
+- `null` / `None` values render as empty string in CSV (not the string `"null"`).
+- Missing/malformed fields in a lot row must NOT abort CSV assembly; emit empty string for that cell.
+- Filename: `hold-overview-<YYYY-MM-DD>.csv` (date = export day in client locale).
+
+**Row boundary (AC-7):**
+Maximum rows returned by the server in export mode: `HOLD_OVERVIEW_EXPORT_MAX_ROWS` env var, default **10,000**. Cap is enforced server-side on both snapshot and Oracle-fallback paths (`wip_service.get_hold_detail_lots` + `_get_hold_detail_lots_from_oracle`). See `contracts/env/env-contract.md §Hold Overview Export`. If the production hold-dataset regularly exceeds 10,000 rows after filtering, raise the cap and consider adding a warning banner.
+
+**Client-side assembly:** CSV is assembled in the frontend from the `data.lots` array, not server-side streamed. The server returns a standard `success_response` JSON envelope; the frontend converts it to a Blob download. No `Content-Disposition` header is set by the server for this endpoint in export mode.
+
+Added by change `hold-overview-export-csv`.
+
 ---
 
 ## CHANGELOG
+
+## [data 1.16.0] — 2026-06-16
+### Added
+- hold-overview-export-csv: Added §3.15 (Hold-Overview Lots Export Column Set) — 13-column CSV schema (lotId, workorder, qty, product, package, workcenter, holdReason, spec, age, holdBy, dept, holdComment, futureHoldComment), display order, CSV format rules (UTF-8 BOM, RFC 4180 escaping, null-as-empty), filename convention, client-side assembly note, and row boundary placeholder (TBD ≤ 10,000; env var `HOLD_OVERVIEW_EXPORT_MAX_ROWS`). Additive; no existing schemas changed.
 
 ## [data 1.11.0]
 - ai-pipeline-upgrade (2026-05-29): Added §2.9 (AI Session Store Shape including `chat_history` pairs, cap 8/16, TTL, pop-preservation semantics) and three new AI function param schemas (`production_history_query` raw_params dispatch, `resource_history_summary` kwargs, `qc_gate_status` no-params). Added `normalize_chart_data` output for `qc_gate_status` (→ stations list) and pass-through for `production_history_query`/`resource_history_summary`. Additive; no existing schemas changed.

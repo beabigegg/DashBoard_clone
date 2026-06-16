@@ -1,0 +1,15 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run type-check && npm run css:check",
+  "duration_ms": 10346,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-155730/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-155730/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-155730/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

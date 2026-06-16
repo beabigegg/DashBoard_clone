@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.11
-last-changed: 2026-06-13
+schema-version: 1.0.12
+last-changed: 2026-06-16
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -172,6 +172,14 @@ breaking-change-policy: deprecate-2-minors
 | MSD_ENGINE_PARALLEL | batch-engine | all | no | no | 1 | 2 | application-team | positive integer; must not exceed DB_SLOW_POOL_SIZE (code default: dev=2, prod=5) | yes | uses default 1 (sequential) |
 
 - `HOLD_ENGINE_PARALLEL` / `JOB_ENGINE_PARALLEL` / `MSD_ENGINE_PARALLEL`: Maximum parallel Oracle connections for the respective service's BatchQueryEngine. Hard ceiling: must not exceed `DB_SLOW_POOL_SIZE` (env-configurable; code default: dev=2, prod=5 per `settings.py`). A value above the ceiling silently saturates the slow pool and causes connection timeouts for other services. Default `1` (sequential) matches pre-existing behavior. Added by change `batch-rowcount-unification`.
+
+## Hold Overview Export
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| HOLD_OVERVIEW_EXPORT_MAX_ROWS | hold-overview | all | no | no | 10000 | 10000 | application-team | positive integer >= 1 | no | uses default 10000 |
+
+- `HOLD_OVERVIEW_EXPORT_MAX_ROWS`: Maximum number of rows returned by `GET/POST /api/hold-overview/lots` when `export=true`. The per-request cap is enforced in the service layer (both snapshot and Oracle paths) so the cap applies regardless of which path executes. Exports silently truncate when the filtered hold set exceeds this cap; raise the cap and add a UI warning banner if truncation becomes a production concern. Default `10000`. Added by change `hold-overview-export-csv`.
 
 ## Observability / Circuit Breaker
 

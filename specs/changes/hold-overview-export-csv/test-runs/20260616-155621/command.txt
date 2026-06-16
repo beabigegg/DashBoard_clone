@@ -1,0 +1,1 @@
+cd frontend && npx playwright test tests/playwright/hold-overview.spec.js --reporter=line

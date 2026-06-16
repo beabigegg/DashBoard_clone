@@ -1,0 +1,18 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "full",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "cd frontend && npx playwright test tests/playwright/hold-overview.spec.js --reporter=line",
+  "duration_ms": 19069,
+  "first_failure": {
+    "kind": "unknown",
+    "message": "[chromium] › tests/playwright/hold-overview.spec.js:144:3 › Hold Overview — CSV export button › export button shows loading state during in-flight request"
+  },
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-155621/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-155621/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-155621/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

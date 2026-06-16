@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.22.0
+schema-version: 1.23.0
 last-changed: 2026-06-16
 breaking-change-policy: deprecate-2-minors
 ---
@@ -97,8 +97,8 @@ breaking-change-policy: deprecate-2-minors
 | POST | /api/hold-overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/hold-overview/treemap | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/hold-overview/treemap | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
-| GET | /api/hold-overview/lots | required | query params | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/hold-overview/lots | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/hold-overview/lots | required | query params (optional: export=true) | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/hold-overview/lots | required | JSON body (optional: export: bool) | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/wip/hold-detail/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/wip/hold-detail/distribution | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/wip/hold-detail/lots | required | query params | GenericSuccessResponse | 400/500 | route tests |
@@ -421,11 +421,21 @@ breaking-change-policy: deprecate-2-minors
   - New env vars: `RESOURCE_ASYNC_ENABLED`, `RESOURCE_ASYNC_DAY_THRESHOLD` (90), `RESOURCE_WORKER_QUEUE` (`resource-history-query`), `RESOURCE_JOB_TIMEOUT_SECONDS` (1800) — env-contract.md §Async Worker — Resource History Query.
   - Rollback: `RESOURCE_ASYNC_ENABLED=false` restores pure-sync; no spool cleanup required.
 
+- **hold-overview-export-csv (2026-06-16)**: `GET/POST /api/hold-overview/lots` gains optional export/full-data mode (additive):
+  - New optional request param: `export` (boolean; GET: `?export=true`, POST body: `"export": true`). Default false/absent (omitting it preserves existing paginated behavior exactly).
+  - Export mode: pagination cap (`per_page` max 200) is bypassed; all matching rows up to `HOLD_OVERVIEW_EXPORT_MAX_ROWS` are returned. Response `data.lots` array shape is unchanged (same 13-column lot row). Response `data.summary`, `data.specs`, `data.sys_date` are still present; `meta.pagination` is set to `{page: 1, per_page: <total>, total_count: <n>, total_pages: 1}` for consistency with existing consumers.
+  - Additive; existing paginated callers that do not send `export` receive identical responses. No existing fields removed or renamed. No new error codes.
+  - Sole consumer: `frontend/src/hold-overview/`. No external partners or mobile consumers known.
+
 ## Breaking Change Policy
 
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.23.0] — 2026-06-16
+### Added
+- hold-overview-export-csv: `GET /api/hold-overview/lots` and `POST /api/hold-overview/lots` gain optional `export` boolean parameter (GET: `?export=true`, POST body: `"export": true`). Export mode bypasses per_page cap (200) and returns all matching rows up to `HOLD_OVERVIEW_EXPORT_MAX_ROWS`. Paginated behavior is unchanged when `export` is absent or false. Additive; no existing fields removed or renamed.
 
 ## [api 1.22.0] — 2026-06-16
 ### Added

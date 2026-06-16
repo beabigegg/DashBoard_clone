@@ -249,6 +249,7 @@ def api_hold_overview_lots():
     pj_function = args.get('pj_function', '').strip() or ''
     age_range = args.get('age_range', '').strip() or None
     include_dummy = parse_bool_query(args.get('include_dummy'))
+    export_mode = parse_bool_query(args.get('export'))
     page = _coerce_int(args.get('page', 1), default=1)
     per_page = _coerce_int(args.get('per_page', 50), default=50)
 
@@ -261,7 +262,13 @@ def api_hold_overview_lots():
         per_page = 50
 
     page = max(page, 1)
-    per_page = max(1, min(per_page, 200))
+
+    if export_mode:
+        import os
+        _export_max_rows = int(os.environ.get('HOLD_OVERVIEW_EXPORT_MAX_ROWS', 10000))
+        per_page = _export_max_rows
+    else:
+        per_page = max(1, min(per_page, 200))
 
     result = get_hold_detail_lots(
         reason=reason,
@@ -281,6 +288,7 @@ def api_hold_overview_lots():
         include_dummy=include_dummy,
         page=page,
         page_size=per_page,
+        export_mode=export_mode,
     )
     if result is not None:
         return success_response(result)

@@ -1,0 +1,15 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- --reporter=verbose 2>&1 | tail -10",
+  "duration_ms": 12743,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-155103/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-155103/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-155103/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

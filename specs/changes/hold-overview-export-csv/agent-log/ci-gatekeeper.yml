@@ -1,0 +1,9 @@
+agent: ci-gatekeeper
+date: 2026-06-16
+status: complete
+
+artifacts:
+  - { type: tiers-modified, pointer: "1 (PR gates), 3 (nightly stress)" }
+  - { type: gate-promotions, pointer: "n/a (no gate moved between tiers; stress correctly stays Tier 3)" }
+  - { type: workflow-files-changed, pointer: "n/a (no new workflow files; existing nightly job must cover tests/stress/ glob)" }
+  - { type: required-status-checks, pointer: "python-lint, type-check, backend-unit, backend-integration, frontend-unit, contract-validation, data-boundary-e2e, e2e-hold-overview" }

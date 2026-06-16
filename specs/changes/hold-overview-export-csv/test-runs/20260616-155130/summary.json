@@ -1,0 +1,15 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- tests/hold-overview/ tests/validation/useHoldOverview.validation.test.js",
+  "duration_ms": 759,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-155130/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-155130/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-155130/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

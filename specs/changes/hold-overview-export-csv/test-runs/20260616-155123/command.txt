@@ -1,0 +1,1 @@
+cd frontend && npm run test -- tests/hold-overview/csv-export.test.js

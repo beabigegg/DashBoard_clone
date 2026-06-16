@@ -204,6 +204,7 @@ class TestHoldOverviewLotsRoute(TestHoldOverviewRoutesBase):
             workflow='',
             bop='',
             pj_function='',
+            export_mode=False,
         )
 
     @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
@@ -412,3 +413,196 @@ class TestHoldOverviewSummaryPostCompat(TestHoldOverviewRoutesBase):
         self.assertEqual(response.status_code, 200)
         payload = json.loads(response.data)
         self.assertTrue(payload['success'])
+
+
+class TestHoldOverviewLotsExportMode(TestHoldOverviewRoutesBase):
+    """Export mode tests for GET/POST /api/hold-overview/lots.
+
+    AC-2: export=true fetches full dataset (pagination cap bypassed).
+    AC-6: existing paginated behavior unchanged when export is absent/false.
+    AC-7: full-data request bounded by HOLD_OVERVIEW_EXPORT_MAX_ROWS env var.
+    """
+
+    def _sample_service_result(self, lots_count=2, total=2):
+        """Build a minimal valid service return value."""
+        lots = [
+            {
+                'lotId': f'LOT{i}',
+                'workorder': f'WO{i}',
+                'qty': 100,
+                'product': 'PROD-A',
+                'package': 'QFN',
+                'workcenter': 'WB',
+                'holdReason': '品質確認',
+                'spec': 'SPEC1',
+                'age': 1.0,
+                'holdBy': 'user',
+                'dept': 'dept',
+                'holdComment': None,
+                'futureHoldComment': None,
+            }
+            for i in range(lots_count)
+        ]
+        return {
+            'lots': lots,
+            'pagination': {
+                'page': 1,
+                'perPage': lots_count,
+                'total': total,
+                'totalPages': 1,
+            },
+            'filters': {},
+        }
+
+    # ------------------------------------------------------------------
+    # AC-2 / GET: export=true bypasses per_page clamp, forwards export_mode=True
+    # ------------------------------------------------------------------
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_export_bypasses_pagination_get(self, mock_service):
+        """GET ?export=true must call service with export_mode=True (not clamped page_size)."""
+        mock_service.return_value = self._sample_service_result(lots_count=5000, total=5000)
+
+        response = self.client.get('/api/hold-overview/lots?export=true&per_page=50')
+        self.assertEqual(response.status_code, 200)
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        # export_mode must be True when export param is true
+        self.assertTrue(kw['export_mode'])
+        # per_page clamp (max 200) must NOT apply – page_size should exceed 200
+        self.assertGreater(kw['page_size'], 200)
+
+    # ------------------------------------------------------------------
+    # AC-2 / POST: export=true bypasses per_page clamp, forwards export_mode=True
+    # ------------------------------------------------------------------
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_export_bypasses_pagination_post(self, mock_service):
+        """POST with export:true must call service with export_mode=True."""
+        mock_service.return_value = self._sample_service_result(lots_count=5000, total=5000)
+
+        response = self.client.post(
+            '/api/hold-overview/lots',
+            data=json.dumps({'export': True, 'per_page': 50}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        self.assertTrue(kw['export_mode'])
+        self.assertGreater(kw['page_size'], 200)
+
+    # ------------------------------------------------------------------
+    # AC-7: cap enforced even in export mode (HOLD_OVERVIEW_EXPORT_MAX_ROWS)
+    # ------------------------------------------------------------------
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_export_capped_at_max_rows(self, mock_service):
+        """page_size passed in export mode must be <= HOLD_OVERVIEW_EXPORT_MAX_ROWS."""
+        import os
+        os.environ['HOLD_OVERVIEW_EXPORT_MAX_ROWS'] = '500'
+        try:
+            mock_service.return_value = self._sample_service_result(lots_count=500, total=99999)
+
+            response = self.client.get('/api/hold-overview/lots?export=true')
+            self.assertEqual(response.status_code, 200)
+            mock_service.assert_called_once()
+            kw = mock_service.call_args.kwargs
+            self.assertTrue(kw['export_mode'])
+            self.assertLessEqual(kw['page_size'], 500)
+        finally:
+            os.environ.pop('HOLD_OVERVIEW_EXPORT_MAX_ROWS', None)
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_export_capped_at_max_rows_post(self, mock_service):
+        """POST export mode: page_size must not exceed HOLD_OVERVIEW_EXPORT_MAX_ROWS."""
+        import os
+        os.environ['HOLD_OVERVIEW_EXPORT_MAX_ROWS'] = '300'
+        try:
+            mock_service.return_value = self._sample_service_result(lots_count=300, total=50000)
+
+            response = self.client.post(
+                '/api/hold-overview/lots',
+                data=json.dumps({'export': True}),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+            mock_service.assert_called_once()
+            kw = mock_service.call_args.kwargs
+            self.assertTrue(kw['export_mode'])
+            self.assertLessEqual(kw['page_size'], 300)
+        finally:
+            os.environ.pop('HOLD_OVERVIEW_EXPORT_MAX_ROWS', None)
+
+    # ------------------------------------------------------------------
+    # AC-6: existing paginated behavior unchanged when export is absent
+    # ------------------------------------------------------------------
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_normal_pagination_unchanged_get(self, mock_service):
+        """GET without export must keep per_page clamp at 200 and export_mode=False."""
+        mock_service.return_value = self._sample_service_result()
+
+        response = self.client.get('/api/hold-overview/lots?per_page=500&page=2')
+        self.assertEqual(response.status_code, 200)
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        # Normal path: per_page clamped to 200
+        self.assertEqual(kw['page_size'], 200)
+        self.assertEqual(kw['page'], 2)
+        # export_mode must be False (or absent)
+        self.assertFalse(kw.get('export_mode', False))
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_normal_pagination_unchanged_post(self, mock_service):
+        """POST without export must keep per_page clamp at 200 and export_mode=False."""
+        mock_service.return_value = self._sample_service_result()
+
+        response = self.client.post(
+            '/api/hold-overview/lots',
+            data=json.dumps({'per_page': 500, 'page': 3}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['page_size'], 200)
+        self.assertEqual(kw['page'], 3)
+        self.assertFalse(kw.get('export_mode', False))
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_export_false_does_not_bypass_pagination(self, mock_service):
+        """Explicit export=false must behave identically to absent export param."""
+        mock_service.return_value = self._sample_service_result()
+
+        response = self.client.get('/api/hold-overview/lots?export=false&per_page=500')
+        self.assertEqual(response.status_code, 200)
+        mock_service.assert_called_once()
+        kw = mock_service.call_args.kwargs
+        self.assertEqual(kw['page_size'], 200)
+        self.assertFalse(kw.get('export_mode', False))
+
+    # ------------------------------------------------------------------
+    # Filter forwarding in export mode (per-kwarg assertions, AC-2 service fwd)
+    # ------------------------------------------------------------------
+
+    @patch('mes_dashboard.routes.hold_overview_routes.get_hold_detail_lots')
+    def test_lots_export_forwards_all_filters(self, mock_service):
+        """In export mode all filter params must reach the service unchanged."""
+        mock_service.return_value = self._sample_service_result()
+
+        response = self.client.get(
+            '/api/hold-overview/lots?export=true'
+            '&hold_type=quality&reason=品質確認&workcenter=WB&package=QFN'
+            '&workflow=FLOW_A&bop=EAC17&pj_function=FUNC_Y'
+        )
+        self.assertEqual(response.status_code, 200)
+        kw = mock_service.call_args.kwargs
+        self.assertTrue(kw['export_mode'])
+        self.assertEqual(kw['hold_type'], 'quality')
+        self.assertEqual(kw['reason'], ['品質確認'])
+        self.assertEqual(kw['workcenter'], 'WB')
+        self.assertEqual(kw['package'], 'QFN')
+        self.assertEqual(kw['workflow'], 'FLOW_A')
+        self.assertEqual(kw['bop'], 'EAC17')
+        self.assertEqual(kw['pj_function'], 'FUNC_Y')

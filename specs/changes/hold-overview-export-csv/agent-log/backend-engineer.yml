@@ -1,0 +1,34 @@
+# Agent Log: backend-engineer
+
+change-id: hold-overview-export-csv
+agent: backend-engineer
+date: 2026-06-16
+status: complete
+
+## Summary
+
+Implemented AC-2, AC-6, AC-7 backend changes for hold-overview CSV export.
+All four required test phases passed (collect, targeted, changed-area, contract).
+Stress test (Tier-3 nightly) collected with 3 test cases — not a PR gate.
+
+## Open Decision Resolutions
+
+- OD-2 (pagination envelope keys): kept existing camelCase service keys
+  (perPage/totalPages) unchanged. Contract sample authored to match real
+  route output, not the prose note in api-contract.md §10.
+- OD-3 (cap enforcement point): enforced in service layer (both snapshot
+  and Oracle paths) so both paths share one cap.
+- OD-5 (env-contract write): CER-002 approved; added HOLD_OVERVIEW_EXPORT_MAX_ROWS
+  to contracts/env/env-contract.md.
+
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/hold_overview_routes.py:252-279" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/wip_service.py:3416-3598,3596-3760" }
+  - { type: files-changed, pointer: "tests/test_hold_overview_routes.py:415-607" }
+  - { type: files-changed, pointer: "tests/stress/test_hold_overview_export_stress.py (new)" }
+  - { type: files-changed, pointer: "tests/contract/samples/get_hold_overview_lots_export.json (new)" }
+  - { type: files-changed, pointer: "contracts/env/env-contract.md:## Hold Overview Export section" }
+  - { type: tests-added, pointer: "tests/test_hold_overview_routes.py::TestHoldOverviewLotsExportMode (8 methods)" }
+  - { type: tests-added, pointer: "tests/stress/test_hold_overview_export_stress.py::TestHoldOverviewExportRowCap (3 methods)" }
+  - { type: test-output, pointer: "33 passed in 1.80s (tests/test_hold_overview_routes.py); all 4 cdd-kit phases: passed" }
+  - { type: contracts-touched, pointer: "contracts/env/env-contract.md (HOLD_OVERVIEW_EXPORT_MAX_ROWS added); tests/contract/samples/get_hold_overview_lots_export.json (new sample)" }

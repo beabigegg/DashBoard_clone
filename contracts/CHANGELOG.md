@@ -8,6 +8,26 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [env 1.0.12] — 2026-06-16
+### Added
+- hold-overview-export-csv: Added `HOLD_OVERVIEW_EXPORT_MAX_ROWS` (int, default 10000, no restart required) — caps rows returned by `/api/hold-overview/lots` in export mode. Additive.
+
+## [api 1.23.0] — 2026-06-16
+### Added
+- hold-overview-export-csv: `GET /api/hold-overview/lots` and `POST /api/hold-overview/lots` gain optional `export` boolean parameter. Export mode bypasses per_page cap and returns all matching rows up to `HOLD_OVERVIEW_EXPORT_MAX_ROWS`. Paginated behavior unchanged when `export` absent or false. Additive; no existing fields removed or renamed.
+
+## [data 1.16.1] — 2026-06-16
+### Fixed
+- hold-overview-export-csv: Updated §3.15 row boundary from "TBD" to pinned `HOLD_OVERVIEW_EXPORT_MAX_ROWS=10000` (env-contract.md §Hold Overview Export). No schema change; prose only.
+
+## [data 1.16.0] — 2026-06-16
+### Added
+- hold-overview-export-csv: Added §3.15 (Hold-Overview Lots Export Column Set) — 13-column CSV schema, CSV format rules (UTF-8 BOM, RFC 4180 escaping, null-as-empty), filename convention, client-side assembly note, and row boundary placeholder (TBD ≤ 10,000; env var `HOLD_OVERVIEW_EXPORT_MAX_ROWS`). Additive; no existing schemas changed.
+
+## [api-inventory 1.2.3] — 2026-06-16
+### Added
+- hold-overview-export-csv: `hold_overview_routes.py` `/lots` gains optional `export` boolean param (GET/POST). Export mode bypasses per_page cap; bounded by `HOLD_OVERVIEW_EXPORT_MAX_ROWS`. Additive.
+
 ## [api 1.22.0] — 2026-06-16
 ### Added
 - response-shape-adr0007: Added `## Schema Authoring Rules` section to api-contract.md documenting cdd-kit response schema cell format (`/^[A-Za-z][A-Za-z0-9_]*/`), Tier-A field table header requirements (`| field | type | required |`), `dataPath` semantics, and `contracts/openapi.json` regeneration obligation. Additive; no API surface changed.

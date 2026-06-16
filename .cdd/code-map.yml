@@ -1,6 +1,6 @@
-# generated: 2026-06-16T06:44:35Z by cdd-kit 3.2.0
-# files: 870, src-lines: 253402, map-lines: 18868, compression: 13.4x
-# sources-digest: 344931046a781e43221ea2a9e5b68ac6e6798ea94c09afea6dc5473d74f62e08
+# generated: 2026-06-16T08:17:30Z by cdd-kit 3.2.0
+# files: 874, src-lines: 254360, map-lines: 18926, compression: 13.4x
+# sources-digest: f70e031f62533e8f9ff6de03e9675e8a8b9d051e6fd9d16f3887702529425f46
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1022,7 +1022,7 @@ frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 587 lines
     - { name: BaseConditionParams, lines: 193-198 }  # local
     - { name: QueryListParams, lines: 403-411 }  # local
 
-frontend/src/hold-overview/App.vue:  # 1006 lines
+frontend/src/hold-overview/App.vue:  # 1041 lines
 
 frontend/src/hold-overview/components/FilterBar.vue:  # 103 lines
 
@@ -1031,6 +1031,15 @@ frontend/src/hold-overview/components/FilterIndicator.vue:  # 77 lines
 frontend/src/hold-overview/components/HoldMatrix.vue:  # 151 lines
 
 frontend/src/hold-overview/components/HoldTreeMap.vue:  # 237 lines
+
+frontend/src/hold-overview/csvExport.ts:  # 88 lines
+  constants:
+    - { name: CSV_HEADERS, line: 15 }
+    - { name: CSV_KEYS, line: 32 }
+  functions:
+    - { name: _toCsvField, lines: 52-57 }
+    - { name: _buildCsv, lines: 63-72 }
+    - { name: _downloadCsv, lines: 78-88 }
 
 frontend/src/hold-overview/main.ts:  # 10 lines
   imports:
@@ -2400,6 +2409,14 @@ frontend/tests/core/api-dedup.test.js:  # 174 lines
   functions:
     - { name: makeOkResponse, lines: 25-33 }
 
+frontend/tests/hold-overview/csv-export.test.js:  # 190 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 14 }
+    - { module: '../../src/hold-overview/csvExport.ts', items: [_buildCsv, _downloadCsv], line: 15 }
+  constants:
+    - { name: EXPECTED_HEADERS, line: 18 }
+    - { name: SAMPLE_LOT, line: 35 }
+
 frontend/tests/legacy/admin-dashboard.test.js:  # 89 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 7 }
@@ -2706,6 +2723,16 @@ frontend/tests/playwright/data-boundary/hold-history-today-snapshot.spec.js:  # 
     - { name: makeTodayPayload, lines: 19-40 }
     - { name: async switchToTodayMode, lines: 42-49 }
 
+frontend/tests/playwright/data-boundary/hold-overview-export-csv.spec.js:  # 137 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 12 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar], line: 13 }
+  constants:
+    - { name: BASE_META, line: 15 }
+    - { name: NULL_FIELD_LOT, line: 28 }
+  functions:
+    - { name: makeExportPayload, lines: 17-26 }
+
 frontend/tests/playwright/data-boundary/malformed-input.spec.js:  # 190 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 16 }
@@ -2768,7 +2795,7 @@ frontend/tests/playwright/hold-history-flat-table.spec.js:  # 313 lines
   functions:
     - { name: async setupBaseRoutes, lines: 91-123 }
 
-frontend/tests/playwright/hold-overview.spec.js:  # 66 lines
+frontend/tests/playwright/hold-overview.spec.js:  # 167 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 7 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 8 }
@@ -3076,12 +3103,13 @@ frontend/tests/unwrap-api-result.test.js:  # 88 lines
     - { module: vitest, items: [describe, it, expect], line: 12 }
     - { module: '../src/core/unwrap-api-result.js', items: [unwrapApiResult, unwrapApiData], line: 13 }
 
-frontend/tests/validation/useHoldOverview.validation.test.js:  # 287 lines
+frontend/tests/validation/useHoldOverview.validation.test.js:  # 360 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
     - { module: '../../src/core/endpoint-schemas.js', items: [HOLD_OVERVIEW_SUMMARY_SCHEMA, HOLD_OVERVIEW_TREEMAP_SCHEMA], line: 16 }
     - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 20 }
+    - { module: '../../src/hold-overview/csvExport.ts', items: [_buildCsv], line: 297 }
 
 frontend/tests/validation/useMaterialTrace.validation.test.js:  # 220 lines
   imports:
@@ -4822,7 +4850,7 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 431 lines
     - { name: api_hold_history_config, lines: 346-351 }  # @hold_history_bp.route('/api/hold-history/config')
     - { name: api_hold_history_today_snapshot, lines: 361-431 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
-src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
+src/mes_dashboard/routes/hold_overview_routes.py:  # 295 lines
   imports:
     - { module: os, items: [], line: 4 }
     - { module: typing, items: [Optional], line: 5 }
@@ -4842,7 +4870,7 @@ src/mes_dashboard/routes/hold_overview_routes.py:  # 287 lines
     - { name: api_hold_overview_summary, lines: 121-160 }  # @hold_overview_bp.route('/api/hold-overview/summary', methods=['GET', 'POST'])
     - { name: api_hold_overview_matrix, lines: 165-201 }  # @hold_overview_bp.route('/api/hold-overview/matrix', methods=['GET', 'POST'])
     - { name: api_hold_overview_treemap, lines: 205-226 }  # @hold_overview_bp.route('/api/hold-overview/treemap', methods=['GET', 'POST'])
-    - { name: api_hold_overview_lots, lines: 231-287 }  # @hold_overview_bp.route('/api/hold-overview/lots', methods=['GET', 'POST'])
+    - { name: api_hold_overview_lots, lines: 231-295 }  # @hold_overview_bp.route('/api/hold-overview/lots', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/hold_routes.py:  # 247 lines
   imports:
@@ -7534,7 +7562,7 @@ src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
     - { name: _safe_int, lines: 412-419 }
     - { name: _compute_duration_buckets, lines: 422-434 }
 
-src/mes_dashboard/services/wip_service.py:  # 4179 lines
+src/mes_dashboard/services/wip_service.py:  # 4198 lines
   imports:
     - { module: logging, items: [], line: 10 }
     - { module: threading, items: [], line: 11 }
@@ -7549,7 +7577,7 @@ src/mes_dashboard/services/wip_service.py:  # 4179 lines
     - { module: mes_dashboard.sql.filters, items: [CommonFilters, NON_QUALITY_HOLD_REASONS], line: 30 }
   constants:
     - { name: WIP_VIEW, line: 146 }
-    - { name: LOT_DETAIL_FIELD_LABELS, line: 3892 }
+    - { name: LOT_DETAIL_FIELD_LABELS, line: 3911 }
   functions:
     - { name: _safe_value, lines: 52-59 }
     - { name: _build_base_conditions_builder, lines: 62-99 }
@@ -7615,13 +7643,13 @@ src/mes_dashboard/services/wip_service.py:  # 4179 lines
     - { name: _get_hold_detail_summary_from_oracle, lines: 2994-3065 }
     - { name: get_hold_detail_distribution, lines: 3068-3246 }
     - { name: _get_hold_detail_distribution_from_oracle, lines: 3249-3413 }
-    - { name: get_hold_detail_lots, lines: 3416-3593 }
-    - { name: _get_hold_detail_lots_from_oracle, lines: 3596-3741 }
-    - { name: get_hold_overview_treemap, lines: 3748-3823 }
-    - { name: _get_hold_overview_treemap_from_oracle, lines: 3826-3884 }
-    - { name: get_lot_detail, lines: 3950-3984 }
-    - { name: _get_lot_detail_from_oracle, lines: 3987-4067 }
-    - { name: _build_lot_detail_response, lines: 4070-4179 }
+    - { name: get_hold_detail_lots, lines: 3416-3604 }
+    - { name: _get_hold_detail_lots_from_oracle, lines: 3607-3760 }
+    - { name: get_hold_overview_treemap, lines: 3767-3842 }
+    - { name: _get_hold_overview_treemap_from_oracle, lines: 3845-3903 }
+    - { name: get_lot_detail, lines: 3969-4003 }
+    - { name: _get_lot_detail_from_oracle, lines: 4006-4086 }
+    - { name: _build_lot_detail_response, lines: 4089-4198 }
 
 src/mes_dashboard/services/yield_alert_contracts.py:  # 84 lines
   imports:
@@ -10330,6 +10358,24 @@ tests/stress/test_frontend_stress.py:  # 493 lines
     - { name: browser_context_args, lines: 28-34 }  # @pytest.fixture(scope='session')
     - { name: load_page_with_js, lines: 37-40 }
     - { name: locate_portal_nav_links, lines: 43-45 }
+
+tests/stress/test_hold_overview_export_stress.py:  # 113 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: os, items: [], line: 14 }
+    - { module: time, items: [], line: 15 }
+    - { module: unittest.mock, items: [patch], line: 16 }
+    - { module: pytest, items: [], line: 18 }
+    - { module: mes_dashboard.services.wip_service, items: [get_hold_detail_lots], line: 20 }
+  classes:
+    - name: TestHoldOverviewExportRowCap
+      lines: 57-113
+      methods:
+        - { name: test_export_result_bounded_at_cap_snapshot_path, lines: 60-79 }
+        - { name: test_export_result_bounded_exact_at_cap, lines: 81-94 }
+        - { name: test_custom_cap_via_env_is_respected, lines: 96-113 }
+  functions:
+    - { name: _build_oversized_df, lines: 25-52 }
 
 tests/stress/test_hold_today_snapshot_stress.py:  # 139 lines
   imports:
@@ -13565,7 +13611,7 @@ tests/test_hold_history_sql_runtime.py:  # 226 lines
         - { name: test_day_map_initialized_with_repeat_quality, lines: 208-215 }
         - { name: test_repeat_quality_accumulates_from_batch, lines: 217-226 }
 
-tests/test_hold_overview_routes.py:  # 414 lines
+tests/test_hold_overview_routes.py:  # 608 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: unittest, items: [], line: 5 }
@@ -13601,31 +13647,43 @@ tests/test_hold_overview_routes.py:  # 414 lines
         - { name: test_treemap_passes_filters, lines: 148-161 }
         - { name: test_treemap_failure_returns_500, lines: 164-169 }
     - name: TestHoldOverviewLotsRoute
-      lines: 172-242
+      lines: 172-243
       methods:
-        - { name: test_lots_passes_all_filters_and_caps_per_page, lines: 176-207 }
-        - { name: test_lots_handles_page_less_than_one, lines: 210-220 }
-        - { name: test_lots_invalid_age_range, lines: 222-226 }
-        - { name: test_lots_invalid_hold_type, lines: 228-232 }
-        - { name: test_lots_rate_limited_returns_429, lines: 236-242 }
+        - { name: test_lots_passes_all_filters_and_caps_per_page, lines: 176-208 }
+        - { name: test_lots_handles_page_less_than_one, lines: 211-221 }
+        - { name: test_lots_invalid_age_range, lines: 223-227 }
+        - { name: test_lots_invalid_hold_type, lines: 229-233 }
+        - { name: test_lots_rate_limited_returns_429, lines: 237-243 }
     - name: TestHoldOverviewTreemapEdgeCases
-      lines: 245-321
+      lines: 246-322
       methods:
-        - { name: test_treemap_3_level_nesting, lines: 249-278 }
-        - { name: test_treemap_leaf_without_children, lines: 281-296 }
-        - { name: test_treemap_post_json_reasons, lines: 299-311 }
-        - { name: test_treemap_get_legacy_compat, lines: 314-321 }
+        - { name: test_treemap_3_level_nesting, lines: 250-279 }
+        - { name: test_treemap_leaf_without_children, lines: 282-297 }
+        - { name: test_treemap_post_json_reasons, lines: 300-312 }
+        - { name: test_treemap_get_legacy_compat, lines: 315-322 }
     - name: TestHoldOverviewNonIndexedFilterForwarding
-      lines: 324-389
+      lines: 325-390
       methods:
-        - { name: test_summary_forwards_workflow_bop_pj_function, lines: 334-346 }
-        - { name: test_matrix_forwards_workflow_bop_pj_function, lines: 349-361 }
-        - { name: test_lots_forwards_workflow_bop_pj_function, lines: 364-377 }
-        - { name: test_summary_forwards_multi_value_csv, lines: 380-389 }
+        - { name: test_summary_forwards_workflow_bop_pj_function, lines: 335-347 }
+        - { name: test_matrix_forwards_workflow_bop_pj_function, lines: 350-362 }
+        - { name: test_lots_forwards_workflow_bop_pj_function, lines: 365-378 }
+        - { name: test_summary_forwards_multi_value_csv, lines: 381-390 }
     - name: TestHoldOverviewSummaryPostCompat
-      lines: 392-414
+      lines: 393-415
       methods:
-        - { name: test_summary_post_json_body, lines: 396-414 }
+        - { name: test_summary_post_json_body, lines: 397-415 }
+    - name: TestHoldOverviewLotsExportMode
+      lines: 418-608
+      methods:
+        - { name: _sample_service_result, lines: 426-455 }
+        - { name: test_lots_export_bypasses_pagination_get, lines: 462-473 }
+        - { name: test_lots_export_bypasses_pagination_post, lines: 480-493 }
+        - { name: test_lots_export_capped_at_max_rows, lines: 500-514 }
+        - { name: test_lots_export_capped_at_max_rows_post, lines: 517-535 }
+        - { name: test_lots_normal_pagination_unchanged_get, lines: 542-554 }
+        - { name: test_lots_normal_pagination_unchanged_post, lines: 557-571 }
+        - { name: test_lots_export_false_does_not_bypass_pagination, lines: 574-583 }
+        - { name: test_lots_export_forwards_all_filters, lines: 590-608 }
 
 tests/test_hold_routes.py:  # 411 lines
   imports:

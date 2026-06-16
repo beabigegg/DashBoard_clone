@@ -3431,6 +3431,7 @@ def get_hold_detail_lots(
     workflow: str = "",
     bop: str = "",
     pj_function: str = "",
+    export_mode: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Get paginated lot details for hold lots.
 
@@ -3493,6 +3494,7 @@ def get_hold_detail_lots(
                     workflow=workflow,
                     bop=bop,
                     pj_function=pj_function,
+                    export_mode=export_mode,
                 )
 
             df = _apply_non_indexed_filters(df, workflow=workflow, bop=bop, pj_function=pj_function)
@@ -3525,9 +3527,17 @@ def get_hold_detail_lots(
             # Sort by age descending, then LOTID
             df = df.sort_values(['AGEBYDAYS', 'LOTID'], ascending=[False, True])
 
-            # Pagination
-            offset = (page - 1) * page_size
-            page_df = df.iloc[offset:offset + page_size]
+            # Cap for export mode
+            if export_mode:
+                import os as _os
+                _cap = int(_os.environ.get('HOLD_OVERVIEW_EXPORT_MAX_ROWS', 10000))
+                page_size = min(page_size, _cap)
+                df = df.iloc[:page_size]
+                page_df = df
+            else:
+                # Pagination
+                offset = (page - 1) * page_size
+                page_df = df.iloc[offset:offset + page_size]
 
             lots = []
             for _, row in page_df.iterrows():
@@ -3590,6 +3600,7 @@ def get_hold_detail_lots(
         workflow=workflow,
         bop=bop,
         pj_function=pj_function,
+        export_mode=export_mode,
     )
 
 
@@ -3611,6 +3622,7 @@ def _get_hold_detail_lots_from_oracle(
     workflow: str = "",
     bop: str = "",
     pj_function: str = "",
+    export_mode: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Get hold detail lots directly from Oracle (fallback)."""
     try:
@@ -3662,6 +3674,13 @@ def _get_hold_detail_lots_from_oracle(
         """
         count_df = read_sql_df(count_sql, params)
         total = int(count_df.iloc[0]['TOTAL'] or 0) if count_df is not None else 0
+
+        # Apply export cap before pagination
+        if export_mode:
+            import os as _os
+            _cap = int(_os.environ.get('HOLD_OVERVIEW_EXPORT_MAX_ROWS', 10000))
+            page_size = min(page_size, _cap)
+            page = 1
 
         # Get paginated lots with bind variables
         offset = (page - 1) * page_size

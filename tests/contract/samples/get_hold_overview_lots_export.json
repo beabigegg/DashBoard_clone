@@ -1,0 +1,55 @@
+{
+  "data": {
+    "filters": {
+      "ageRange": null,
+      "holdType": null,
+      "package": null,
+      "reason": null,
+      "treemapReason": null,
+      "workcenter": null
+    },
+    "lots": [
+      {
+        "age": 100.0,
+        "dept": "封裝品質管制課",
+        "futureHoldComment": null,
+        "holdBy": "詹慈嬿",
+        "holdComment": "留料10pcs給IPQC慈嬿",
+        "holdReason": "工程驗證(PE)",
+        "lotId": "GA26021978-A00-001",
+        "package": "TO-277C",
+        "product": "SBT20100UPC_R2_00701",
+        "qty": 1136,
+        "spec": "3M",
+        "workcenter": "TMTT",
+        "workorder": "GA26021978"
+      },
+      {
+        "age": 91.8,
+        "dept": "封裝品質管制課",
+        "futureHoldComment": ";RD料號工程驗證",
+        "holdBy": "宋品萱",
+        "holdComment": null,
+        "holdReason": "工程驗證(RD)",
+        "lotId": "GA26021999-A00-002",
+        "package": "DO-218AB",
+        "product": "RD-SM6S22A-AU_R2_007A1",
+        "qty": 358,
+        "spec": "PRE TMTT",
+        "workcenter": "TMTT",
+        "workorder": "GA26021999"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "perPage": 124,
+      "total": 124,
+      "totalPages": 1
+    }
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:32.444833"
+  },
+  "success": true
+}

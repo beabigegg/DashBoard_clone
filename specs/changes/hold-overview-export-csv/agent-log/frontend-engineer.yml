@@ -1,0 +1,41 @@
+agent: frontend-engineer
+change-id: hold-overview-export-csv
+timestamp: 2026-06-16T16:10:00Z
+status: complete
+
+summary: |
+  Re-invocation: fixed 5 UI/UX reviewer issues (2 medium, 3 low) in App.vue.
+  (1) Added lotsLoading and pagination.total===0 guards to export button :disabled
+  binding to prevent race-condition and empty-table exports.
+  (2) Export catch block now sets lotsError.value so ErrorBanner surfaces the
+  failure to the user.
+  (3) Added aria-hidden="true" to decorative LoadingSpinner in export button.
+  (4) Changed button label from '匯出 CSV' to '↓ 匯出 CSV' to match hold-history.
+  (5) Verified ui-btn.is-loading has no pseudo-element spinner — LoadingSpinner
+  kept (no double-spinner risk).
+  changed-area and quality test phases both pass.
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/hold-overview/csvExport.ts:1-78"
+  - type: files-changed
+    pointer: "frontend/src/hold-overview/App.vue:788-792 (catch block adds lotsError), App.vue:998-1004 (button :disabled, aria-hidden, label)"
+  - type: files-changed
+    pointer: "frontend/tests/hold-overview/csv-export.test.js:1-195"
+  - type: files-changed
+    pointer: "frontend/tests/validation/useHoldOverview.validation.test.js:288-351"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/hold-overview.spec.js:67-212"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/data-boundary/hold-overview-export-csv.spec.js:1-115"
+  - type: components-affected
+    pointer: "hold-overview/App.vue"
+  - type: accessibility-audit
+    pointer: "LoadingSpinner in export button now has aria-hidden=true (decorative); button :disabled includes lotsLoading and empty-table guard"
+
+test-phases:
+  collect: passed
+  targeted: passed
+  changed-area: passed (re-run 2026-06-16T16:08)
+  quality: passed (re-run 2026-06-16T16:09)
+  full: failed-infrastructure (server ECONNREFUSED; pre-existing on all 4 hold-overview E2E tests)

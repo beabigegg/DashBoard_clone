@@ -1,0 +1,15 @@
+{
+  "change_id": "hold-overview-export-csv",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard bash -c 'pip install jsonschema -q && cdd-kit validate --contracts'",
+  "duration_ms": 3612,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/hold-overview-export-csv/test-runs/20260616-154900/summary.json",
+    "stdout": "specs/changes/hold-overview-export-csv/test-runs/20260616-154900/stdout.log",
+    "stderr": "specs/changes/hold-overview-export-csv/test-runs/20260616-154900/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}
