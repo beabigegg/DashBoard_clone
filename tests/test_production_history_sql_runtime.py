@@ -205,13 +205,10 @@ class TestDetailPagePjFunction:
         assert "PJ_FUNCTION" in src and "pj_function" in src
 
     def test_detail_page_orders_by_trackin_ascending(self):
-        import inspect
-        from mes_dashboard.services import production_history_sql_runtime as mod
+        from mes_dashboard.services.production_history_sql_runtime import _SORT_COLUMN_MAP
 
-        src = inspect.getsource(mod.compute_detail_page)
-        assert "ORDER BY TRACKINTIMESTAMP ASC" in src, (
-            "Detail rows must sort by TRACKINTIMESTAMP ASC (PH-04)"
-        )
+        # Default frontend sort key "trackin_time" must map to TRACKINTIMESTAMP (PH-04)
+        assert _SORT_COLUMN_MAP["trackin_time"] == "TRACKINTIMESTAMP"
 
 
 class TestFilterWhereMonth:

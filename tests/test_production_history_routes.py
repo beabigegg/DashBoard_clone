@@ -385,8 +385,9 @@ class TestLotTraceGuards:
 
     def test_validate_query_params_missing_pj_types(self):
         from mes_dashboard.services.production_history_service import validate_query_params
-        with pytest.raises(ValueError, match="pj_types"):
-            validate_query_params({"start_date": "2026-03-01", "end_date": "2026-03-10"})
+        # pj_types is now optional — classification-mode queries need only a date range
+        result = validate_query_params({"start_date": "2026-03-01", "end_date": "2026-03-10"})
+        assert result["start_date"] == "2026-03-01"
 
     def test_validate_query_params_max_date_range(self):
         from mes_dashboard.services.production_history_service import (
