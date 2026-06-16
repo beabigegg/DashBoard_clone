@@ -62,6 +62,9 @@ interface ApiErrorLike {
  * - Separators: newline, comma, whitespace
  * - Trims whitespace from each token
  * - Removes empty tokens
+ * - Normalises SQL-style `%` wildcard to `*` when no `*` is present —
+ *   users familiar with SQL LIKE may type `%` instead of `*`. Idempotent
+ *   because the normalised token already contains `*`.
  * - Deduplicates while preserving first-seen order
  * - Idempotent: parseWildcardInput(parseWildcardInput(x).join('\n')) yields
  *   the same array (AC-5)
@@ -77,7 +80,11 @@ export function parseWildcardInput(text: string | null | undefined): string[] {
     .filter(Boolean);
   const seen = new Set<string>();
   const result: string[] = [];
-  for (const token of tokens) {
+  for (const rawToken of tokens) {
+    // Users from SQL background often type `%` (SQL LIKE wildcard) instead of
+    // `*` (system wildcard). Normalise only when no `*` is already present so
+    // tokens like `MA%25*` (literal `%` + glob) are left unchanged.
+    const token = rawToken.includes('*') ? rawToken : rawToken.replace(/%/g, '*');
     if (!seen.has(token)) {
       seen.add(token);
       result.push(token);

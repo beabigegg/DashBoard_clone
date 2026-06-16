@@ -1,6 +1,6 @@
-# generated: 2026-06-16T08:17:30Z by cdd-kit 3.2.0
-# files: 874, src-lines: 254360, map-lines: 18926, compression: 13.4x
-# sources-digest: f70e031f62533e8f9ff6de03e9675e8a8b9d051e6fd9d16f3887702529425f46
+# generated: 2026-06-16T09:58:35Z by cdd-kit 3.2.0
+# files: 874, src-lines: 254451, map-lines: 18926, compression: 13.4x
+# sources-digest: 65cc87aa4b68c76ab80efc3712b95ae0f953d0d901a0b2d1f1e74de0fcf2b37f
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1022,7 +1022,7 @@ frontend/src/hold-history/useHoldHistoryDuckDB.ts:  # 587 lines
     - { name: BaseConditionParams, lines: 193-198 }  # local
     - { name: QueryListParams, lines: 403-411 }  # local
 
-frontend/src/hold-overview/App.vue:  # 1041 lines
+frontend/src/hold-overview/App.vue:  # 1043 lines
 
 frontend/src/hold-overview/components/FilterBar.vue:  # 103 lines
 
@@ -1050,7 +1050,7 @@ frontend/src/hold-overview/main.ts:  # 10 lines
     - { module: './style.css', items: [], line: 6 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-frontend/src/job-query/App.vue:  # 221 lines
+frontend/src/job-query/App.vue:  # 215 lines
 
 frontend/src/job-query/composables/useJobQueryData.ts:  # 371 lines
   imports:
@@ -1735,11 +1735,11 @@ frontend/src/query-tool/utils/values.ts:  # 93 lines
     - { name: formatCellValue, lines: 74-82 }
     - { name: hashColor, lines: 84-93 }
 
-frontend/src/reject-history/App.vue:  # 1532 lines
+frontend/src/reject-history/App.vue:  # 1570 lines
 
-frontend/src/reject-history/components/DetailTable.vue:  # 169 lines
+frontend/src/reject-history/components/DetailTable.vue:  # 182 lines
 
-frontend/src/reject-history/components/FilterPanel.vue:  # 295 lines
+frontend/src/reject-history/components/FilterPanel.vue:  # 309 lines
 
 frontend/src/reject-history/components/ParetoGrid.vue:  # 51 lines
 
@@ -1757,29 +1757,29 @@ frontend/src/reject-history/main.ts:  # 9 lines
     - { module: './style.css', items: [], line: 5 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
 
-frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 781 lines
+frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 804 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported], line: 15 }
   constants:
-    - { name: TABLE_NAME, line: 172 }
-    - { name: DIM_TO_COLUMN, line: 175 }
+    - { name: TABLE_NAME, line: 174 }
+    - { name: DIM_TO_COLUMN, line: 177 }
   functions:
-    - { name: getCsrfToken, lines: 183-187 }
-    - { name: async fetchParquetBuffer, lines: 189-203 }
-    - { name: qs, lines: 207-209 }
-    - { name: qid, lines: 211-213 }
-    - { name: normValueExpr, lines: 215-218 }
-    - { name: buildPolicyConditions, lines: 227-264 }
-    - { name: buildUserConditions, lines: 274-310 }
-    - { name: buildWhereClause, lines: 312-314 }
-    - { name: async queryAnalyticsRaw, lines: 318-338 }
-    - { name: buildSummaryFromAnalytics, lines: 340-360 }
-    - { name: async queryDetail, lines: 377-473 }
-    - { name: async queryBatchPareto, lines: 481-571 }
-    - { name: async queryAvailableFilters, lines: 573-602 }
-    - { name: async querySummaryDirect, lines: 604-654 }
-    - { name: useRejectHistoryDuckDB, lines: 658-781 }
+    - { name: getCsrfToken, lines: 185-189 }
+    - { name: async fetchParquetBuffer, lines: 191-205 }
+    - { name: qs, lines: 209-211 }
+    - { name: qid, lines: 213-215 }
+    - { name: normValueExpr, lines: 217-220 }
+    - { name: buildPolicyConditions, lines: 229-266 }
+    - { name: buildUserConditions, lines: 277-319 }
+    - { name: buildWhereClause, lines: 321-323 }
+    - { name: async queryAnalyticsRaw, lines: 327-347 }
+    - { name: buildSummaryFromAnalytics, lines: 349-369 }
+    - { name: async queryDetail, lines: 386-482 }
+    - { name: async queryBatchPareto, lines: 490-585 }
+    - { name: async queryAvailableFilters, lines: 587-623 }
+    - { name: async querySummaryDirect, lines: 625-675 }
+    - { name: useRejectHistoryDuckDB, lines: 679-804 }
   interfaces:
     - { name: AnalyticsRawRow, lines: 20-28 }
     - { name: SummaryData, lines: 31-40 }
@@ -1789,17 +1789,17 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 781 lines
     - { name: ParetoItem, lines: 88-97 }
     - { name: ParetoDimension, lines: 100-104 }
     - { name: BatchParetoResult, lines: 107-112 }
-    - { name: AvailableFilters, lines: 115-119 }
-    - { name: ComputeViewResult, lines: 122-128 }
-    - { name: PolicyFilters, lines: 131-136 }
-    - { name: ComputeViewParams, lines: 142-157 }
-    - { name: DuckDBClient, lines: 163-168 }  # local
-    - { name: PolicyConditionParams, lines: 220-225 }  # local
-    - { name: UserConditionParams, lines: 266-272 }  # local
-    - { name: QueryDetailParams, lines: 368-375 }  # local
-    - { name: QueryBatchParetoParams, lines: 475-479 }  # local
+    - { name: AvailableFilters, lines: 115-120 }
+    - { name: ComputeViewResult, lines: 123-129 }
+    - { name: PolicyFilters, lines: 132-137 }
+    - { name: ComputeViewParams, lines: 143-159 }
+    - { name: DuckDBClient, lines: 165-170 }  # local
+    - { name: PolicyConditionParams, lines: 222-227 }  # local
+    - { name: UserConditionParams, lines: 268-275 }  # local
+    - { name: QueryDetailParams, lines: 377-384 }  # local
+    - { name: QueryBatchParetoParams, lines: 484-488 }  # local
   types:
-    - { name: ParetoSelections, lines: 139-139 }
+    - { name: ParetoSelections, lines: 140-140 }
 
 frontend/src/resource-history/App.vue:  # 982 lines
 
@@ -5066,7 +5066,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
     - { name: get_equipment_recent_jobs_route, lines: 794-807 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 817-990 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 1004 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 1003 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5106,9 +5106,9 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 1004 lines
     - { name: api_reject_history_query, lines: 661-777 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
     - { name: api_reject_history_count, lines: 781-796 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
     - { name: api_reject_history_job_status, lines: 801-807 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
-    - { name: _inject_reject_spool_info, lines: 814-828 }
-    - { name: api_reject_history_view, lines: 832-922 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 926-1004 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: _inject_reject_spool_info, lines: 814-827 }
+    - { name: api_reject_history_view, lines: 831-921 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 925-1003 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
 src/mes_dashboard/routes/resource_history_routes.py:  # 450 lines
   imports:
@@ -6905,7 +6905,7 @@ src/mes_dashboard/services/reason_filter_cache.py:  # 161 lines
     - { name: _read_from_redis, lines: 134-147 }
     - { name: _write_to_redis, lines: 150-161 }
 
-src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1060 lines
+src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1067 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: logging, items: [], line: 14 }
@@ -6927,23 +6927,23 @@ src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1060 lines
     - { name: _norm_value_expr, lines: 54-56 }
     - { name: _append_in_condition, lines: 59-71 }
     - { name: _available_columns, lines: 74-77 }
-    - { name: _extract_available_filters_sql, lines: 80-111 }
-    - { name: _build_base_filters, lines: 114-210 }
-    - { name: _normalize_pareto_selections, lines: 213-227 }
-    - { name: _apply_pareto_scope, lines: 230-234 }
-    - { name: _build_dimension_items, lines: 237-263 }
-    - { name: _fetch_dict_rows, lines: 266-270 }
-    - { name: _normalize_pareto_values, lines: 273-282 }
-    - { name: _apply_detail_pareto_conditions, lines: 285-333 }
-    - { name: _build_summary_from_analytics, lines: 336-352 }
-    - { name: _detail_sort_clause, lines: 370-377 }
-    - { name: _detail_item_from_row, lines: 380-411 }
-    - { name: _export_row_from_row, lines: 414-439 }
-    - { name: try_compute_batch_pareto_from_spool, lines: 442-634 }
-    - { name: try_compute_view_from_spool, lines: 637-905 }
-    - { name: try_iter_export_rows_from_spool, lines: 908-1060 }
+    - { name: _extract_available_filters_sql, lines: 80-118 }
+    - { name: _build_base_filters, lines: 121-217 }
+    - { name: _normalize_pareto_selections, lines: 220-234 }
+    - { name: _apply_pareto_scope, lines: 237-241 }
+    - { name: _build_dimension_items, lines: 244-270 }
+    - { name: _fetch_dict_rows, lines: 273-277 }
+    - { name: _normalize_pareto_values, lines: 280-289 }
+    - { name: _apply_detail_pareto_conditions, lines: 292-340 }
+    - { name: _build_summary_from_analytics, lines: 343-359 }
+    - { name: _detail_sort_clause, lines: 377-384 }
+    - { name: _detail_item_from_row, lines: 387-418 }
+    - { name: _export_row_from_row, lines: 421-446 }
+    - { name: try_compute_batch_pareto_from_spool, lines: 449-641 }
+    - { name: try_compute_view_from_spool, lines: 644-912 }
+    - { name: try_iter_export_rows_from_spool, lines: 915-1067 }
 
-src/mes_dashboard/services/reject_dataset_cache.py:  # 2038 lines
+src/mes_dashboard/services/reject_dataset_cache.py:  # 2039 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -7003,17 +7003,17 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 2038 lines
     - { name: _normalize_pareto_values, lines: 1434-1443 }
     - { name: _apply_pareto_selection_filter, lines: 1446-1493 }
     - { name: _paginate_detail, lines: 1496-1588 }
-    - { name: _extract_available_filters, lines: 1591-1597 }
-    - { name: _project_pareto_guard_frame, lines: 1618-1635 }
-    - { name: _normalize_metric_mode, lines: 1638-1642 }
-    - { name: _normalize_pareto_scope, lines: 1645-1649 }
-    - { name: _normalize_pareto_display_scope, lines: 1652-1656 }
-    - { name: _normalize_pareto_selections, lines: 1659-1672 }
-    - { name: _build_dimension_pareto_items, lines: 1675-1740 }
-    - { name: _apply_cross_filter, lines: 1743-1770 }
-    - { name: compute_dimension_pareto, lines: 1773-1881 }
-    - { name: compute_batch_pareto, lines: 1884-1977 }
-    - { name: export_csv_from_cache, lines: 1985-2038 }
+    - { name: _extract_available_filters, lines: 1591-1598 }
+    - { name: _project_pareto_guard_frame, lines: 1619-1636 }
+    - { name: _normalize_metric_mode, lines: 1639-1643 }
+    - { name: _normalize_pareto_scope, lines: 1646-1650 }
+    - { name: _normalize_pareto_display_scope, lines: 1653-1657 }
+    - { name: _normalize_pareto_selections, lines: 1660-1673 }
+    - { name: _build_dimension_pareto_items, lines: 1676-1741 }
+    - { name: _apply_cross_filter, lines: 1744-1771 }
+    - { name: compute_dimension_pareto, lines: 1774-1882 }
+    - { name: compute_batch_pareto, lines: 1885-1978 }
+    - { name: export_csv_from_cache, lines: 1986-2039 }
 
 src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
   imports:

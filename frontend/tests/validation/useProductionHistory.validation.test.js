@@ -294,6 +294,21 @@ describe('parseWildcardInput — multi-line parser', () => {
     expect(parseWildcardInput('A\r\nB\tC,D\n\nE')).toEqual(['A', 'B', 'C', 'D', 'E']);
   });
 
+  it('normalises SQL-style % to * when no * is present', () => {
+    // Users from SQL background type `%` (SQL LIKE) instead of `*` (system).
+    expect(parseWildcardInput('GA2604000%')).toEqual(['GA2604000*']);
+    expect(parseWildcardInput('%GA2604000')).toEqual(['*GA2604000']);
+    expect(parseWildcardInput('GA26%04000')).toEqual(['GA26*04000']);
+    // Multiple % → multiple * (backend will reject >1 * per token with clear error)
+    expect(parseWildcardInput('%GA26%')).toEqual(['*GA26*']);
+  });
+
+  it('leaves % unchanged when * is already present (literal % + glob)', () => {
+    // Token already has *, so % is kept as a literal percent (SQL LIKE escape).
+    expect(parseWildcardInput('MA%25*')).toEqual(['MA%25*']);
+    expect(parseWildcardInput('MA_X*')).toEqual(['MA_X*']);
+  });
+
   it('is idempotent: parse(parse(x).join("\\n")) == parse(x) (AC-5)', () => {
     const inputs = [
       'MA2025\nMA2025*\nMA*2025',
@@ -301,6 +316,8 @@ describe('parseWildcardInput — multi-line parser', () => {
       'one\ntwo,three four',
       '',
       'X*\n*Y\n*Z*',
+      // % normalised to * — second parse already has *, so idempotent
+      'GA2604000%\nGA250605%',
     ];
     for (const input of inputs) {
       const once = parseWildcardInput(input);
