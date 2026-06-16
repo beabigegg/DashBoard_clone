@@ -272,45 +272,6 @@
         "x-cdd-errors": "400/410"
       }
     },
-    "/api/spool/yield_alert_dataset/{query_id}.parquet": {
-      "get": {
-        "summary": "GET /api/spool/yield_alert_dataset/{query_id}.parquet",
-        "responses": {
-          "200": {
-            "description": "Contract response: GenericSuccessResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
-          "410": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "parameters": [
-          {
-            "name": "query_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-cdd-errors": "400/410"
-      }
-    },
     "/api/wip/overview/summary": {
       "get": {
         "summary": "GET /api/wip/overview/summary",
