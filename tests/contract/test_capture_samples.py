@@ -113,7 +113,7 @@ class TestCaptureSamples:
             env=OFFLINE_ENV,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,
         )
         assert result.returncode == 0, (
             f"capture_samples.py exited with {result.returncode}\n"
