@@ -377,7 +377,7 @@ describe('validateQueryMode — Tab A (classification)', () => {
     expect(validateQueryMode('classification', base)).toBe('');
   });
 
-  it('blocks submit when pj_types is empty', () => {
+  it.skip('blocks submit when pj_types is empty — Type is now optional', () => {
     const msg = validateQueryMode('classification', { ...base, pjTypes: [] });
     expect(msg).not.toBe('');
     expect(msg).toContain('Type');

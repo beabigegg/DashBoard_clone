@@ -314,7 +314,7 @@ async function exportCsv(): Promise<void> {
           <!-- Row 1: 4 cached MultiSelects (Type / Package / BOP / Function) -->
           <div class="ph-first-tier__multiselect-grid">
             <div class="ui-filter-group">
-              <label class="ui-filter-label">Type <span class="ph-app__required">*</span></label>
+              <label class="ui-filter-label">Type</label>
               <MultiSelect
                 data-testid="ph-first-tier-type"
                 :model-value="firstTier.selection.pj_types"
@@ -552,7 +552,7 @@ async function exportCsv(): Promise<void> {
     <div v-else-if="!loading" class="ph-app__empty-state" data-testid="ph-empty-state">
       {{
         queryMode === 'classification'
-          ? '請選擇 Type 與日期區間後按「查詢」'
+          ? '請選擇日期區間後按「查詢」'
           : '請輸入工單號 / LOT ID / Wafer LOT 後按「查詢」'
       }}
     </div>

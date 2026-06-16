@@ -171,10 +171,6 @@ export function validateQueryMode(mode: QueryMode, input: ModeValidationInput): 
     }
     return '';
   }
-  // classification
-  if (!input.pjTypes.length) {
-    return '請選擇至少一個 Type';
-  }
   if (!input.startDate || !input.endDate) {
     return '請填寫查詢起訖日期';
   }
