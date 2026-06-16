@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { LineChart } from 'echarts/charts';
-import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
+import { BarChart, LineChart } from 'echarts/charts';
+import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
-use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, MarkLineComponent]);
+use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, MarkLineComponent, LegendComponent]);
 
 const GRANULARITY_LABEL = { day: '日', week: '週', month: '月', year: '年' };
 
@@ -24,6 +24,7 @@ const chartOption = computed(() => {
   const threshold = Number(props.riskThreshold || 98);
 
   const yieldVals = items.map((i) => Number(i.yield_pct ?? 0));
+  const inputVals = items.map((i) => Number(i.transaction_qty ?? 0));
   const dataMin = yieldVals.length ? Math.min(...yieldVals) : 0;
   const dataMax = yieldVals.length ? Math.max(...yieldVals) : 100;
   const yMin = Math.max(0, Math.floor(Math.min(dataMin, threshold) - 2));
@@ -32,6 +33,13 @@ const chartOption = computed(() => {
   const rotateLabel = items.length > 20 ? 40 : 0;
 
   return {
+    legend: {
+      top: 4,
+      right: 16,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { fontSize: 11 },
+    },
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross', crossStyle: { color: 'rgb(153, 153, 153)' } },
@@ -43,32 +51,52 @@ const chartOption = computed(() => {
         return [
           `<b>${(p[0] as Record<string, unknown>)?.name ?? ''}</b>`,
           `良率：<b>${Number(item.yield_pct ?? 0).toFixed(2)}%</b>`,
-          `移轉量：${Number(item.transaction_qty ?? 0).toLocaleString()}`,
-          `報廢量：${Number(item.scrap_qty ?? 0).toLocaleString()}`,
+          `Input：${Number(item.transaction_qty ?? 0).toLocaleString()} pcs`,
+          `報廢量：${Number(item.scrap_qty ?? 0).toLocaleString()} pcs`,
         ].join('<br/>');
       },
     },
-    grid: { left: 52, right: 24, top: 24, bottom: rotateLabel > 0 ? 80 : 50 },
+    grid: { left: 56, right: 60, top: 36, bottom: rotateLabel > 0 ? 80 : 50 },
     xAxis: {
       type: 'category',
       data: items.map((i) => i.date_bucket),
       axisLabel: { fontSize: 11, rotate: rotateLabel },
-      boundaryGap: false,
+      boundaryGap: true,
     },
-    yAxis: {
-      type: 'value',
-      min: yMin,
-      max: yMax,
-      axisLabel: { formatter: '{value}%', fontSize: 11 },
-      splitLine: { lineStyle: { type: 'dashed', color: 'rgb(229, 231, 235)' } },
-    },
+    yAxis: [
+      {
+        type: 'value',
+        min: yMin,
+        max: yMax,
+        axisLabel: { formatter: '{value}%', fontSize: 11 },
+        splitLine: { lineStyle: { type: 'dashed', color: 'rgb(229, 231, 235)' } },
+      },
+      {
+        type: 'value',
+        axisLabel: {
+          fontSize: 11,
+          formatter: (v: number) => v >= 10000 ? `${(v / 1000).toFixed(0)}k` : String(v),
+        },
+        splitLine: { show: false },
+      },
+    ],
     series: [
+      {
+        name: 'Input',
+        type: 'bar',
+        yAxisIndex: 1,
+        barMaxWidth: 18,
+        itemStyle: { color: 'rgba(148, 163, 184, 0.55)' },
+        data: inputVals,
+      },
       {
         name: '良率%',
         type: 'line',
+        yAxisIndex: 0,
         smooth: true,
         symbolSize: 5,
         symbol: 'circle',
+        z: 3,
         areaStyle: { opacity: 0.12, color: 'rgb(37, 99, 235)' },
         lineStyle: { width: 2, color: 'rgb(37, 99, 235)' },
         itemStyle: { color: 'rgb(37, 99, 235)' },

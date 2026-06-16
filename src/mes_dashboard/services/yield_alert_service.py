@@ -37,6 +37,7 @@ VALID_SORT_FIELDS = {
     "reason_code": "reason_code",
     "package": "package",
     "type": "type",
+    "transaction_qty": "transaction_qty",
     "scrap_qty": "scrap_qty",
     "yield_pct": "yield_pct",
     "risk_score": "risk_score",

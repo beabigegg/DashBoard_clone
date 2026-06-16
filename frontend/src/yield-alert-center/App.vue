@@ -610,7 +610,7 @@ function riskClass(level) {
 }
 
 async function toggleReasonDetail(row) {
-  const rowKey = `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`;
+  const rowKey = alertRowKey(row);
   if (expandedRowKey.value === rowKey) {
     expandedRowKey.value = '';
     return;
@@ -961,6 +961,7 @@ onUnmounted(() => {
               <th>站別群組</th>
               <th>Package</th>
               <th>Type</th>
+              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'transaction_qty' }" @click="onSort('transaction_qty')">轉出數{{ sortIcon('transaction_qty') }}</button></th>
               <th><button class="th-btn" :class="{ active: sortState.sort_by === 'scrap_qty' }" @click="onSort('scrap_qty')">報廢量{{ sortIcon('scrap_qty') }}</button></th>
               <th><button class="th-btn" :class="{ active: sortState.sort_by === 'yield_pct' }" @click="onSort('yield_pct')">良率(%){{ sortIcon('yield_pct') }}</button></th>
               <th><button class="th-btn" :class="{ active: sortState.sort_by === 'risk_score' }" @click="onSort('risk_score')">風險分數{{ sortIcon('risk_score') }}</button></th>
@@ -977,6 +978,7 @@ onUnmounted(() => {
                 <td>{{ row.department }}</td>
                 <td>{{ row.package || '' }}</td>
                 <td>{{ row.type || '' }}</td>
+                <td>{{ Number(row.transaction_qty || 0).toLocaleString() }}</td>
                 <td>{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
                 <td>{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
                 <td>
@@ -994,7 +996,7 @@ onUnmounted(() => {
                 </td>
               </tr>
               <tr v-if="expandedRowKey === alertRowKey(row)" class="reason-detail-row">
-                <td colspan="11">
+                <td colspan="12">
                   <EmptyState v-if="reasonDetailLoading" type="loading" />
                   <EmptyState v-else-if="reasonDetailRows.length === 0" type="filter-empty" />
                   <div v-else class="reason-sub-wrap">

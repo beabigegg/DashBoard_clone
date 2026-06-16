@@ -256,38 +256,63 @@ async function queryTrend(client: DuckDBClient, { granularity, deptWhere, reason
     ? `WHERE ${deptWhere} AND ${reasonWhere}`
     : `WHERE ${reasonWhere}`;
 
-  const txSql = `
-    SELECT ${bucket} AS bucket, SUM(TRANSACTION_QTY) AS tx_qty
+  // Step 1: per-station TX (deduped per workorder+station) for each date bucket.
+  const txPerStationSql = `
+    SELECT ${bucket} AS bucket, ${qid('DEPARTMENT_GROUP')},
+           SUM(TRANSACTION_QTY) AS station_tx
     FROM (
         SELECT ${bucket} AS DATE_BUCKET,
+               ${qid('DEPARTMENT_GROUP')},
                SUM(${qid('TRANSACTION_QTY')}) AS TRANSACTION_QTY
         FROM ${qid(TABLE_NAME)}
         ${deptClause}
         GROUP BY ${txDedup}
     )
-    GROUP BY 1
+    GROUP BY 1, 2
   `;
-  const scSql = `
-    SELECT ${bucket} AS bucket, SUM(${qid('SCRAP_QTY')}) AS sc_qty
+  // Step 2: per-station scrap (reason-filtered) for each date bucket.
+  const scPerStationSql = `
+    SELECT ${bucket} AS bucket, ${qid('DEPARTMENT_GROUP')},
+           SUM(${qid('SCRAP_QTY')}) AS station_sc
     FROM ${qid(TABLE_NAME)}
     ${scrapClause}
-    GROUP BY 1
+    GROUP BY 1, 2
   `;
-  const [txRows, scRows] = await Promise.all([
-    client.sendQuery(txSql) as Promise<Array<Record<string, unknown>>>,
-    client.sendQuery(scSql) as Promise<Array<Record<string, unknown>>>,
+  const [txStRows, scStRows] = await Promise.all([
+    client.sendQuery(txPerStationSql) as Promise<Array<Record<string, unknown>>>,
+    client.sendQuery(scPerStationSql) as Promise<Array<Record<string, unknown>>>,
   ]);
-  const txMap = Object.fromEntries(txRows.map(r => [String(r.bucket), sf(r.tx_qty)]));
-  const scMap = Object.fromEntries(scRows.map(r => [String(r.bucket), sf(r.sc_qty)]));
-  const buckets = [...new Set([...Object.keys(txMap), ...Object.keys(scMap)])].sort();
+
+  // Per-station scrap lookup: "bucket::dept" -> sc
+  const scStMap: Record<string, number> = {};
+  for (const r of scStRows) scStMap[`${r.bucket}::${r.DEPARTMENT_GROUP}`] = sf(r.station_sc);
+
+  // Aggregate per date: FPY = PRODUCT(per-station yield), Input = SUM(SCRAP) / (1 - FPY)
+  type DayAgg = { fpy: number; totalSc: number; totalTx: number };
+  const dayMap: Record<string, DayAgg> = {};
+  for (const r of txStRows) {
+    const b = String(r.bucket);
+    const dept = String(r.DEPARTMENT_GROUP ?? '');
+    const stTx = sf(r.station_tx);
+    const stSc = scStMap[`${b}::${dept}`] ?? 0;
+    const stYield = stTx > 0 ? Math.max((stTx - stSc) / stTx, 1e-6) : 1;
+    if (!dayMap[b]) dayMap[b] = { fpy: 1, totalSc: 0, totalTx: 0 };
+    dayMap[b].fpy *= stYield;
+    dayMap[b].totalSc += stSc;
+    dayMap[b].totalTx += stTx;
+  }
+
+  const buckets = Object.keys(dayMap).sort();
   return buckets.map(b => {
-    const tx = txMap[b] ?? 0;
-    const sc = scMap[b] ?? 0;
+    const { fpy, totalSc, totalTx } = dayMap[b];
+    // Multi-station: INPUT = SUM(SCRAP) / (1 - FPY)
+    const denom = 1 - fpy;
+    const inputQty = denom > 1e-9 ? totalSc / denom : totalTx;
     return {
       date_bucket: b,
-      transaction_qty: Math.round(tx * 10000) / 10000,
-      scrap_qty: Math.round(sc * 10000) / 10000,
-      yield_pct: tx <= 0 ? 100 : Math.round((1 - sc / tx) * 100 * 10000) / 10000,
+      transaction_qty: Math.round(inputQty * 10000) / 10000,
+      scrap_qty: Math.round(totalSc * 10000) / 10000,
+      yield_pct: Math.round(fpy * 100 * 10000) / 10000,
     };
   });
 }

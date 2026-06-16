@@ -1,6 +1,6 @@
-# generated: 2026-06-16T23:17:36Z by cdd-kit 3.2.0
-# files: 874, src-lines: 255394, map-lines: 18977, compression: 13.5x
-# sources-digest: 87af7c97e00d9da82d3741ca01cdbff8083f9d94a8c9966555c95dd08c786b05
+# generated: 2026-06-16T23:52:10Z by cdd-kit 3.2.0
+# files: 874, src-lines: 255450, map-lines: 18977, compression: 13.5x
+# sources-digest: 9e5c44bb678f074bd3f8e9ce4e65cdd5b332497475d6347c1e2118662bd09773
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -2236,7 +2236,7 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 1060 lines
+frontend/src/yield-alert-center/App.vue:  # 1062 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
@@ -2244,7 +2244,7 @@ frontend/src/yield-alert-center/YieldPackageChart.vue:  # 128 lines
 
 frontend/src/yield-alert-center/YieldStationChart.vue:  # 94 lines
 
-frontend/src/yield-alert-center/YieldTrendChart.vue:  # 104 lines
+frontend/src/yield-alert-center/YieldTrendChart.vue:  # 132 lines
 
 frontend/src/yield-alert-center/main.ts:  # 10 lines
   imports:
@@ -2255,7 +2255,7 @@ frontend/src/yield-alert-center/main.ts:  # 10 lines
     - { module: './style.css', items: [], line: 6 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 681 lines
+frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 706 lines
   imports:
     - { module: vue, items: [ref, readonly, Ref], line: 15 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported, DuckDBClient], line: 16 }
@@ -2274,13 +2274,13 @@ frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 681 lines
     - { name: buildReasonExclusionWhere, lines: 199-210 }
     - { name: sf, lines: 212-215 }
     - { name: async querySummary, lines: 219-249 }
-    - { name: async queryTrend, lines: 251-293 }
-    - { name: async queryHeatmap, lines: 295-345 }
-    - { name: async queryStationSummary, lines: 347-388 }
-    - { name: async queryPackageSummary, lines: 390-428 }
-    - { name: async queryAlerts, lines: 430-567 }
-    - { name: async queryFilterOptions, lines: 569-592 }
-    - { name: useYieldAlertDuckDB, lines: 596-681 }
+    - { name: async queryTrend, lines: 251-318 }
+    - { name: async queryHeatmap, lines: 320-370 }
+    - { name: async queryStationSummary, lines: 372-413 }
+    - { name: async queryPackageSummary, lines: 415-453 }
+    - { name: async queryAlerts, lines: 455-592 }
+    - { name: async queryFilterOptions, lines: 594-617 }
+    - { name: useYieldAlertDuckDB, lines: 621-706 }
   interfaces:
     - { name: SummaryResult, lines: 56-60 }  # local
     - { name: TrendItem, lines: 62-67 }  # local
@@ -7734,7 +7734,7 @@ src/mes_dashboard/services/yield_alert_job_service.py:  # 164 lines
     - { name: enqueue_yield_alert_query, lines: 62-86 }
     - { name: execute_yield_alert_job, lines: 93-152 }
 
-src/mes_dashboard/services/yield_alert_service.py:  # 951 lines
+src/mes_dashboard/services/yield_alert_service.py:  # 952 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -7759,37 +7759,37 @@ src/mes_dashboard/services/yield_alert_service.py:  # 951 lines
     - { name: VALID_GRANULARITY, line: 33 }
     - { name: VALID_SORT_FIELDS, line: 34 }
   functions:
-    - { name: _normalize_process_category, lines: 95-100 }
-    - { name: _parse_date, lines: 103-104 }
-    - { name: validate_date_range, lines: 107-114 }
-    - { name: normalize_reason_code, lines: 117-143 }
-    - { name: build_canonical_key, lines: 146-150 }
-    - { name: _normalize_yield_department_group, lines: 153-175 }
-    - { name: expand_workcenter_groups_to_departments, lines: 178-202 }
-    - { name: get_yield_workcenter_group_options, lines: 205-235 }
-    - { name: _normalize_tokens, lines: 238-251 }
-    - { name: normalize_query_key_payload, lines: 254-268 }
-    - { name: build_query_cache_key, lines: 271-273 }
-    - { name: _load_sql, lines: 276-277 }
-    - { name: _bucket_expr, lines: 280-285 }
-    - { name: _build_optional_where, lines: 288-298 }
-    - { name: _load_excluded_reason_tokens, lines: 301-307 }
-    - { name: _build_normalized_exclusion_tokens, lines: 310-316 }
-    - { name: _build_reason_exclusion_clause, lines: 319-333 }
-    - { name: _namespace_bind_params, lines: 336-346 }
-    - { name: _bucket_to_text, lines: 349-352 }
-    - { name: _query_filtered_scrap_total, lines: 355-387 }
-    - { name: _query_filtered_scrap_trend, lines: 390-427 }
-    - { name: _safe_float, lines: 430-436 }
-    - { name: _chunked, lines: 439-442 }
-    - { name: query_yield_summary, lines: 445-460 }
-    - { name: query_yield_trend, lines: 463-479 }
-    - { name: _risk_level, lines: 482-489 }
-    - { name: _compute_reject_linkage, lines: 492-568 }
-    - { name: query_alert_candidates, lines: 571-813 }
-    - { name: _bucket_to_date_range, lines: 816-848 }
-    - { name: query_reason_detail, lines: 851-912 }
-    - { name: build_drilldown_payload, lines: 915-951 }
+    - { name: _normalize_process_category, lines: 96-101 }
+    - { name: _parse_date, lines: 104-105 }
+    - { name: validate_date_range, lines: 108-115 }
+    - { name: normalize_reason_code, lines: 118-144 }
+    - { name: build_canonical_key, lines: 147-151 }
+    - { name: _normalize_yield_department_group, lines: 154-176 }
+    - { name: expand_workcenter_groups_to_departments, lines: 179-203 }
+    - { name: get_yield_workcenter_group_options, lines: 206-236 }
+    - { name: _normalize_tokens, lines: 239-252 }
+    - { name: normalize_query_key_payload, lines: 255-269 }
+    - { name: build_query_cache_key, lines: 272-274 }
+    - { name: _load_sql, lines: 277-278 }
+    - { name: _bucket_expr, lines: 281-286 }
+    - { name: _build_optional_where, lines: 289-299 }
+    - { name: _load_excluded_reason_tokens, lines: 302-308 }
+    - { name: _build_normalized_exclusion_tokens, lines: 311-317 }
+    - { name: _build_reason_exclusion_clause, lines: 320-334 }
+    - { name: _namespace_bind_params, lines: 337-347 }
+    - { name: _bucket_to_text, lines: 350-353 }
+    - { name: _query_filtered_scrap_total, lines: 356-388 }
+    - { name: _query_filtered_scrap_trend, lines: 391-428 }
+    - { name: _safe_float, lines: 431-437 }
+    - { name: _chunked, lines: 440-443 }
+    - { name: query_yield_summary, lines: 446-461 }
+    - { name: query_yield_trend, lines: 464-480 }
+    - { name: _risk_level, lines: 483-490 }
+    - { name: _compute_reject_linkage, lines: 493-569 }
+    - { name: query_alert_candidates, lines: 572-814 }
+    - { name: _bucket_to_date_range, lines: 817-849 }
+    - { name: query_reason_detail, lines: 852-913 }
+    - { name: build_drilldown_payload, lines: 916-952 }
 
 src/mes_dashboard/services/yield_alert_sql_runtime.py:  # 980 lines
   imports:
