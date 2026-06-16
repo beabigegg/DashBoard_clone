@@ -1589,11 +1589,12 @@ def _paginate_detail(
 
 
 def _extract_available_filters(df: pd.DataFrame) -> dict:
-    """Extract distinct packages/reasons/WC groups from the full cache DF."""
+    """Extract distinct packages/reasons/WC groups/types from the full cache DF."""
     return {
         "workcenter_groups": _extract_workcenter_group_options(df),
         "packages": _extract_distinct_text_values(df, "PRODUCTLINENAME"),
         "reasons": _extract_distinct_text_values(df, "LOSSREASONNAME"),
+        "types": _extract_distinct_text_values(df, "PJ_TYPE"),
     }
 
 
