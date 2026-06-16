@@ -13,12 +13,14 @@ interface AvailableFilters {
   workcenterGroups?: string[];
   packages?: string[];
   reasons?: string[];
+  types?: string[];
 }
 
 interface SupplementaryFilters {
   packages?: string[];
   workcenterGroups?: string[];
   reasons?: string[];
+  types?: string[];
 }
 
 interface LoadingState {
@@ -64,14 +66,15 @@ const emit = defineEmits<{
   (e: 'update:queryMode', value: string): void;
   (e: 'update:containerInputType', value: string): void;
   (e: 'update:containerInput', value: string): void;
-  (e: 'supplementary-change', value: { packages: string[]; workcenterGroups: string[]; reasons: string[] }): void;
+  (e: 'supplementary-change', value: { packages: string[]; workcenterGroups: string[]; reasons: string[]; types: string[] }): void;
 }>();
 
-function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups: string[]; reasons: string[] }>): void {
+function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups: string[]; reasons: string[]; types: string[] }>): void {
   emit('supplementary-change', {
     packages: props.supplementaryFilters?.packages || [],
     workcenterGroups: props.supplementaryFilters?.workcenterGroups || [],
     reasons: props.supplementaryFilters?.reasons || [],
+    types: props.supplementaryFilters?.types || [],
     ...patch,
   });
 }
@@ -263,6 +266,17 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
             placeholder="全部原因"
             searchable
             @update:model-value="emitSupplementary({ reasons: $event })"
+          />
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">TYPE</label>
+          <MultiSelect
+            :model-value="supplementaryFilters?.types"
+            :options="availableFilters?.types || []"
+            placeholder="全部 TYPE"
+            searchable
+            @update:model-value="emitSupplementary({ types: $event })"
           />
         </div>
       </div>

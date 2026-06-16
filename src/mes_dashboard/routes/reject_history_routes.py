@@ -812,7 +812,7 @@ _REJECT_SPOOL_NAMESPACE = "reject_dataset"
 
 
 def _inject_reject_spool_info(data: dict, query_id: str) -> None:
-    """Add spool_download_url and total_row_count for large reject datasets."""
+    """Add spool_download_url and total_row_count — always, so frontend can activate DuckDB-WASM."""
     try:
         from mes_dashboard.core.query_spool_store import get_spool_metadata
         metadata = get_spool_metadata(_REJECT_SPOOL_NAMESPACE, query_id)
@@ -820,10 +820,9 @@ def _inject_reject_spool_info(data: dict, query_id: str) -> None:
             return
         row_count = int(metadata.get("row_count") or 0)
         data["total_row_count"] = row_count
-        if row_count >= _REJECT_SPOOL_DOWNLOAD_THRESHOLD:
-            data["spool_download_url"] = (
-                f"/api/spool/{_REJECT_SPOOL_NAMESPACE}/{query_id}.parquet"
-            )
+        data["spool_download_url"] = (
+            f"/api/spool/{_REJECT_SPOOL_NAMESPACE}/{query_id}.parquet"
+        )
     except Exception:
         pass
 

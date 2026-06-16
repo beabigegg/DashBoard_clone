@@ -53,12 +53,14 @@ interface SupplementaryFilters {
   packages: string[];
   workcenterGroups: string[];
   reasons: string[];
+  types: string[];
 }
 
 interface AvailableFiltersState {
   workcenterGroups: string[];
   packages: string[];
   reasons: string[];
+  types: string[];
 }
 
 interface LoadingState {
@@ -162,7 +164,6 @@ interface AnalyticsRawItem {
 
 const API_TIMEOUT = 360000;
 const DEFAULT_PER_PAGE = 20;
-const DUCKDB_THRESHOLD = 5000;
 const PARETO_DIMENSIONS: string[] = ['reason', 'package', 'type'];
 const PARETO_DISPLAY_SCOPE_FIXED = 'top20';
 const PARETO_SELECTION_PARAM_MAP: Record<string, string> = {
@@ -228,13 +229,14 @@ const committedPrimary = reactive<CommittedPrimary>({
 // ---- Query result state ----
 const queryId = ref<string>('');
 const resolutionInfo = ref<ResolutionInfo | null>(null);
-const availableFilters = ref<AvailableFiltersState>({ workcenterGroups: [], packages: [], reasons: [] });
+const availableFilters = ref<AvailableFiltersState>({ workcenterGroups: [], packages: [], reasons: [], types: [] });
 
 // ---- Supplementary filters (post-query, applied via /view) ----
 const supplementaryFilters = reactive<SupplementaryFilters>({
   packages: [],
   workcenterGroups: [],
   reasons: [],
+  types: [],
 });
 
 // ---- Interactive state ----
@@ -332,6 +334,7 @@ const filterOrchestrator = useFilterOrchestrator({
     packages:             { trigger: 'immediate', initial: [] },
     workcenterGroups:     { trigger: 'immediate', initial: [] },
     reasons:              { trigger: 'immediate', initial: [] },
+    types:                { trigger: 'immediate', initial: [] },
   },
   pagination: { resetOn: ['*'] },
   onPrimaryQuery(_committed) {
@@ -413,6 +416,9 @@ function buildBatchParetoParams(): Record<string, unknown> {
   }
   if (supplementaryFilters.reasons.length > 0) {
     params.reasons = supplementaryFilters.reasons;
+  }
+  if (supplementaryFilters.types.length > 0) {
+    params.types = supplementaryFilters.types;
   }
   if (selectedTrendDates.value.length > 0) {
     params.trend_dates = selectedTrendDates.value;
@@ -518,11 +524,13 @@ async function _applyQueryResult(result: Record<string, unknown>): Promise<void>
     workcenterGroups: (af.workcenter_groups as string[] | undefined) || (af.workcenterGroups as string[] | undefined) || [],
     packages: (af.packages as string[] | undefined) || [],
     reasons: (af.reasons as string[] | undefined) || [],
+    types: (af.types as string[] | undefined) || [],
   };
 
   supplementaryFilters.packages = [];
   supplementaryFilters.workcenterGroups = [];
   supplementaryFilters.reasons = [];
+  supplementaryFilters.types = [];
   page.value = 1;
   selectedTrendDates.value = [];
   resetParetoSelections();
@@ -535,9 +543,8 @@ async function _applyQueryResult(result: Record<string, unknown>): Promise<void>
   detail.value = (result.detail as DetailState) || detail.value;
 
   // Activate DuckDB-WASM mode for large datasets
-  const totalRowCount = (result.total_row_count as number | undefined) ?? 0;
   const spoolUrl = result.spool_download_url as string | undefined;
-  if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
+  if (spoolUrl && isDuckDBSupported() && !duckdbMode.value) {
     try {
       await duckdb.activate(spoolUrl);
       duckdbMode.value = true;
@@ -601,7 +608,8 @@ async function executePrimaryQuery(): Promise<void> {
     supplementaryFilters.packages = [];
     supplementaryFilters.workcenterGroups = [];
     supplementaryFilters.reasons = [];
-    availableFilters.value = { workcenterGroups: [], packages: [], reasons: [] };
+    supplementaryFilters.types = [];
+    availableFilters.value = { workcenterGroups: [], packages: [], reasons: [], types: [] };
     resolutionInfo.value = null;
     page.value = 1;
     selectedTrendDates.value = [];
@@ -717,6 +725,7 @@ async function refreshView(): Promise<void> {
         packages: supplementaryFilters.packages,
         workcenterGroups: supplementaryFilters.workcenterGroups,
         reasons: supplementaryFilters.reasons,
+        types: supplementaryFilters.types,
         trendDates: selectedTrendDates.value,
         metricFilter: metricFilterParam(),
         metricMode: paretoMetricApiMode(),
@@ -724,6 +733,8 @@ async function refreshView(): Promise<void> {
         paretoSelections,
         page: page.value,
         perPage: DEFAULT_PER_PAGE,
+        sortCol: detailSortCol.value,
+        sortDir: detailSortDir.value,
       });
       if (isStaleRequest(requestId)) return;
 
@@ -749,6 +760,7 @@ async function refreshView(): Promise<void> {
           workcenterGroups: (af.workcenter_groups as string[] | undefined) || [],
           packages: (af.packages as string[] | undefined) || [],
           reasons: (af.reasons as string[] | undefined) || [],
+          types: (af.types as string[] | undefined) || [],
         };
       }
 
@@ -810,14 +822,14 @@ async function refreshView(): Promise<void> {
         workcenterGroups: (af.workcenter_groups as string[] | undefined) || (af.workcenterGroups as string[] | undefined) || [],
         packages: (af.packages as string[] | undefined) || [],
         reasons: (af.reasons as string[] | undefined) || [],
+        types: (af.types as string[] | undefined) || [],
       };
     }
 
     // Activate DuckDB-WASM in background (fire-and-forget so loading.list is not blocked).
     // fetchBatchPareto() will still run from server since duckdbMode is still false here.
-    const totalRowCount = (data.total_row_count as number | undefined) ?? 0;
     const spoolUrl = data.spool_download_url as string | undefined;
-    if (spoolUrl && totalRowCount >= DUCKDB_THRESHOLD && isDuckDBSupported() && !duckdbMode.value) {
+    if (spoolUrl && isDuckDBSupported() && !duckdbMode.value) {
       duckdb.activate(spoolUrl).then(() => {
         duckdbMode.value = true;
       }).catch((err: unknown) => {
@@ -1012,10 +1024,11 @@ function clearParetoSelection(): void {
   void Promise.all([fetchBatchPareto(), refreshView()]);
 }
 
-function onSupplementaryChange(filters: { packages?: string[]; workcenterGroups?: string[]; reasons?: string[] }): void {
+function onSupplementaryChange(filters: { packages?: string[]; workcenterGroups?: string[]; reasons?: string[]; types?: string[] }): void {
   supplementaryFilters.packages = filters.packages || [];
   supplementaryFilters.workcenterGroups = filters.workcenterGroups || [];
   supplementaryFilters.reasons = filters.reasons || [];
+  supplementaryFilters.types = filters.types || [];
   page.value = 1;
   selectedTrendDates.value = [];
   resetParetoSelections();
@@ -1060,6 +1073,16 @@ function removeFilterChip(chip: FilterChip): void {
   if (chip.type === 'package') {
     supplementaryFilters.packages = supplementaryFilters.packages.filter(
       (p: string) => p !== chip.value,
+    );
+    page.value = 1;
+    updateUrlState();
+    void Promise.all([refreshView(), fetchBatchPareto()]);
+    return;
+  }
+
+  if (chip.type === 'pj-type') {
+    supplementaryFilters.types = supplementaryFilters.types.filter(
+      (t: string) => t !== chip.value,
     );
     page.value = 1;
     updateUrlState();
@@ -1269,6 +1292,16 @@ const activeFilterChips = computed<FilterChip[]>(() => {
     });
   });
 
+  supplementaryFilters.types.forEach((t: string) => {
+    chips.push({
+      key: `pj-type:${t}`,
+      label: `TYPE: ${t}`,
+      removable: true,
+      type: 'pj-type',
+      value: t,
+    });
+  });
+
   if (selectedTrendDates.value.length > 0) {
     const dates = selectedTrendDates.value;
     const label =
@@ -1346,6 +1379,7 @@ function updateUrlState(): void {
   appendArrayParams(params, 'packages', supplementaryFilters.packages);
   appendArrayParams(params, 'workcenter_groups', supplementaryFilters.workcenterGroups);
   appendArrayParams(params, 'reasons', supplementaryFilters.reasons);
+  appendArrayParams(params, 'types', supplementaryFilters.types);
 
   appendArrayParams(params, 'trend_dates', selectedTrendDates.value);
   for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
@@ -1416,6 +1450,7 @@ function restoreFromUrl(): void {
   supplementaryFilters.packages = readArrayParam(params, 'packages');
   supplementaryFilters.workcenterGroups = readArrayParam(params, 'workcenter_groups');
   supplementaryFilters.reasons = readArrayParam(params, 'reasons');
+  supplementaryFilters.types = readArrayParam(params, 'types');
 
   selectedTrendDates.value = readArrayParam(params, 'trend_dates');
 
@@ -1497,6 +1532,7 @@ onUnmounted(() => {
     <template v-if="queryId">
       <SummaryCards :cards="kpiCards" />
 
+      <div class="section-gap"></div>
       <TrendChart
         :items="trendItems"
         :selected-dates="selectedTrendDates"
@@ -1520,11 +1556,13 @@ onUnmounted(() => {
         :pagination="pagination"
         :loading="loading.list"
         :paginating="paginationLoading"
+        :exporting="loading.exporting"
         :selected-pareto-count="selectedParetoCount"
         :selected-pareto-summary="selectedParetoSummary"
         @go-to-page="goToPage"
         @clear-pareto-selection="clearParetoSelection"
         @sort="onDetailSort"
+        @export-csv="exportCsv"
       />
     </template>
     <LoadingOverlay v-if="loading.querying && !jobProgress.active" tier="page" />

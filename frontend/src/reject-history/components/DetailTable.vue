@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
+import LoadingSpinner from '../../shared-ui/components/LoadingSpinner.vue';
 
 interface Pagination {
   page: number;
@@ -15,6 +16,7 @@ const props = defineProps<{
   pagination?: Pagination;
   loading?: boolean;
   paginating?: boolean;
+  exporting?: boolean;
   selectedParetoCount?: number;
   selectedParetoSummary?: string;
 }>();
@@ -23,6 +25,7 @@ const emit = defineEmits<{
   (e: 'go-to-page', page: number): void;
   (e: 'clear-pareto-selection'): void;
   (e: 'sort', payload: { key: string; direction: string }): void;
+  (e: 'export-csv'): void;
 }>();
 
 const tablePagination = computed(() => {
@@ -53,6 +56,16 @@ function onPageChange(newPage: number): void {
           <button type="button" class="badge-clear" @click="emit('clear-pareto-selection')">×</button>
         </span>
       </div>
+      <button
+        type="button"
+        class="ui-btn ui-btn--secondary ui-btn--sm"
+        :class="{ 'is-loading': exporting }"
+        :disabled="exporting || (pagination?.total ?? 0) === 0"
+        @click="emit('export-csv')"
+      >
+        <LoadingSpinner v-if="exporting" size="sm" aria-hidden="true" />
+        {{ exporting ? '匯出中...' : '↓ 匯出 CSV' }}
+      </button>
     </div>
     <div class="card-body ui-card-body detail-card-body">
       <DataTable

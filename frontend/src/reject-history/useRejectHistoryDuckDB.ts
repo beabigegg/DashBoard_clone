@@ -116,6 +116,7 @@ export interface AvailableFilters {
   workcenter_groups: string[];
   packages: string[];
   reasons: string[];
+  types: string[];
 }
 
 /** Full result object from computeView(). */
@@ -144,6 +145,7 @@ export interface ComputeViewParams {
   packages?: string[];
   workcenterGroups?: string[];
   reasons?: string[];
+  types?: string[];
   trendDates?: string[];
   metricFilter?: string;
   metricMode?: string;
@@ -267,6 +269,7 @@ interface UserConditionParams {
   packages: string[];
   workcenterGroups: string[];
   reasons: string[];
+  types: string[];
   trendDates: string[];
   metricFilter: string;
 }
@@ -275,6 +278,7 @@ function buildUserConditions({
   packages,
   workcenterGroups,
   reasons,
+  types,
   trendDates,
   metricFilter,
 }: UserConditionParams): string[] {
@@ -293,6 +297,11 @@ function buildUserConditions({
   if (reasons?.length) {
     const inList = reasons.map(qs).join(', ');
     conditions.push(`${normValueExpr('LOSSREASONNAME')} IN (${inList})`);
+  }
+
+  if (types?.length) {
+    const inList = types.map(qs).join(', ');
+    conditions.push(`${normValueExpr('PJ_TYPE')} IN (${inList})`);
   }
 
   if (trendDates?.length) {
@@ -548,14 +557,19 @@ async function queryBatchPareto(
       }
     }
 
-    // top80 pareto scope
+    // top80 pareto scope: include items up to and INCLUDING the one that first crosses 80%
     if (paretoScope === 'top80' && items.length > 0) {
-      const top80 = items.filter((item) => item.cumPct <= 80.0);
-      items = top80.length > 0 ? top80 : [items[0]];
+      const crossIdx = items.findIndex((item) => item.cumPct > 80.0);
+      if (crossIdx >= 0) {
+        items = items.slice(0, crossIdx + 1);
+      }
+      // else: no item crosses 80 (all cumPct <= 80) — keep all items
     }
 
-    // top20 display limit
-    items = items.slice(0, 20);
+    // top20 display limit — only for the 'type' dimension
+    if (dimension === 'type') {
+      items = items.slice(0, 20);
+    }
 
     const apiMetricMode = metricMode === 'defect' ? 'defect' : 'reject_total';
     dimensions[dimension] = { items, dimension, metric_mode: apiMetricMode };
@@ -575,7 +589,7 @@ async function queryAvailableFilters(
   policyConditions: string[],
 ): Promise<AvailableFilters> {
   const policyWhere = buildWhereClause(policyConditions);
-  const result: AvailableFilters = { workcenter_groups: [], packages: [], reasons: [] };
+  const result: AvailableFilters = { workcenter_groups: [], packages: [], reasons: [], types: [] };
 
   const wcRows = await client.sendQuery(
     `SELECT DISTINCT TRIM(CAST(${qid('WORKCENTER_GROUP')} AS VARCHAR)) AS v FROM ${TABLE_NAME} ${policyWhere} ORDER BY 1`,
@@ -596,6 +610,13 @@ async function queryAvailableFilters(
   );
   result.reasons = [
     ...new Set(reasonRows.map((r) => String((r as Record<string, unknown>).v || '').trim()).filter(Boolean)),
+  ].sort();
+
+  const typeRows = await client.sendQuery(
+    `SELECT DISTINCT TRIM(CAST(${qid('PJ_TYPE')} AS VARCHAR)) AS v FROM ${TABLE_NAME} ${policyWhere} ORDER BY 1`,
+  );
+  result.types = [
+    ...new Set(typeRows.map((r) => String((r as Record<string, unknown>).v || '').trim()).filter(Boolean)),
   ].sort();
 
   return result;
@@ -692,6 +713,7 @@ export function useRejectHistoryDuckDB() {
     packages = [],
     workcenterGroups = [],
     reasons = [],
+    types = [],
     trendDates = [],
     metricFilter = 'all',
     metricMode = 'reject_total',
@@ -722,6 +744,7 @@ export function useRejectHistoryDuckDB() {
       packages,
       workcenterGroups,
       reasons,
+      types,
       trendDates,
       metricFilter,
     });

@@ -538,6 +538,10 @@
 }
 
 
+.theme-reject-history .section-gap {
+  height: theme('spacing.token.p18');
+}
+
 @media (max-width: 1400px) {
   .theme-reject-history .reject-summary-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
