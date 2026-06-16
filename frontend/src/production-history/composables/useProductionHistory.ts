@@ -287,6 +287,8 @@ export function useProductionHistory() {
   const detailRows = ref<DetailRow[]>([]);
   const pagination = ref<Pagination>({ page: 1, per_page: 25, total_rows: 0, total_pages: 0 });
   const detailLoading = ref(false);
+  const sortBy = ref('trackin_time');
+  const sortDir = ref<'asc' | 'desc'>('asc');
 
   // ── Overload/expire error state ────────────────────────────────────────────
   const overloadError = ref<OverloadError | null>(null);
@@ -441,6 +443,8 @@ export function useProductionHistory() {
         dataset_id: datasetId.value,
         page,
         per_page: pagination.value.per_page,
+        sort_by: sortBy.value,
+        sort_dir: sortDir.value,
         ...matrixFilter,
         ...suppPayload,
       })) as { data: { rows?: DetailRow[]; pagination?: Pagination } };
@@ -461,6 +465,13 @@ export function useProductionHistory() {
     } finally {
       detailLoading.value = false;
     }
+  }
+
+  // ── Server-side sort ──────────────────────────────────────────────────────
+  async function applySort(key: string, direction: 'asc' | 'desc'): Promise<void> {
+    sortBy.value = key;
+    sortDir.value = direction;
+    await fetchPage(1);
   }
 
   // ── Matrix filter + re-fetch detail ───────────────────────────────────────
@@ -639,6 +650,7 @@ export function useProductionHistory() {
     jobProgress,
     runQuery,
     fetchPage,
+    applySort,
     applyMatrixFilter,
     stageSupplementaryFilter,
     exportCsv,

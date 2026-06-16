@@ -146,11 +146,32 @@ def _build_filter_where(filter_params: Dict[str, Any]) -> tuple[str, List[Any]]:
 
 # ── Detail page ───────────────────────────────────────────────────────────────
 
+# Maps frontend column keys to the underlying DuckDB column names used in ORDER BY.
+_SORT_COLUMN_MAP: Dict[str, str] = {
+    "lot_id":         "CONTAINERNAME",
+    "pj_type":        "PJ_TYPE",
+    "package_name":   "PRODUCTLINENAME",
+    "bop":            "PJ_BOP",
+    "pj_function":    "PJ_FUNCTION",
+    "work_order":     "MFGORDERNAME",
+    "wafer_lot":      "FIRSTNAME",
+    "workcenter":     "WORKCENTERNAME",
+    "spec":           "SPECNAME",
+    "equipment_name": "EQUIPMENTNAME",
+    "trackin_time":   "TRACKINTIMESTAMP",
+    "trackout_time":  "TRACKOUTTIMESTAMP",
+    "trackin_qty":    "TRACKINQTY",
+    "trackout_qty":   "TRACKOUTQTY",
+}
+
+
 def compute_detail_page(
     spool_path: str,
     filter_params: Dict[str, Any],
     page: int = 1,
     per_page: int = 25,
+    sort_by: str = "trackin_time",
+    sort_dir: str = "asc",
 ) -> Dict[str, Any]:
     """Return a single page of detail rows from the Parquet spool.
 
@@ -169,6 +190,9 @@ def compute_detail_page(
     page = max(1, int(page))
     per_page = max(1, min(int(per_page), 200))
     offset = (page - 1) * per_page
+
+    _sort_col = _SORT_COLUMN_MAP.get(sort_by, "TRACKINTIMESTAMP")
+    _sort_dir_sql = "DESC" if str(sort_dir).lower() == "desc" else "ASC"
 
     where, params = _build_filter_where(filter_params)
     # Build an AND-prefixed filter fragment for the raw branch inside the CTE.
@@ -310,7 +334,7 @@ def compute_detail_page(
                 TRACKOUTQTY      AS trackout_qty,
                 partial_count
             FROM combined
-            ORDER BY TRACKINTIMESTAMP ASC NULLS LAST, CONTAINERNAME
+            ORDER BY {_sort_col} {_sort_dir_sql} NULLS LAST, CONTAINERNAME
             LIMIT ? OFFSET ?
         """
         rows = _fetch_dict_rows(conn, page_sql, params + params + [per_page, offset])

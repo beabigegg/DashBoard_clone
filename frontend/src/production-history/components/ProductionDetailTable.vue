@@ -21,6 +21,7 @@ withDefaults(
 const emit = defineEmits<{
   (e: 'page-change', page: number): void;
   (e: 'export-csv'): void;
+  (e: 'sort', payload: { key: string; direction: string }): void;
 }>();
 
 function formatTs(value: unknown): string {
@@ -68,7 +69,9 @@ function getPartialCount(row: Record<string, unknown>): number {
     <DataTable
       :data="rows"
       :loading="loading"
+      :server-sort="true"
       :pagination="pagination.total_pages > 1 ? { page: pagination.page, totalPages: pagination.total_pages, infoText: `${pagination.page} / ${pagination.total_pages}` } : null"
+      @sort="(payload) => emit('sort', payload)"
       @page-change="(p) => emit('page-change', p)"
     >
       <DataTableColumn columnKey="lot_id" label="LotID" :sortable="true" />

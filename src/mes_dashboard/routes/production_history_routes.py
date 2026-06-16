@@ -338,8 +338,17 @@ def api_production_history_page():
 
     filter_params = _parse_filter_params(body)
 
+    sort_by = str(body.get("sort_by") or "trackin_time").strip()
+    sort_dir = str(body.get("sort_dir") or "asc").strip().lower()
+    if sort_dir not in ("asc", "desc"):
+        sort_dir = "asc"
+
     try:
-        result = compute_detail_page(spool_path, filter_params, page=page, per_page=per_page)
+        result = compute_detail_page(
+            spool_path, filter_params,
+            page=page, per_page=per_page,
+            sort_by=sort_by, sort_dir=sort_dir,
+        )
         return success_response(result)
     except MemoryError:
         record_memory_error("production_history.page", reason="rss_guard")

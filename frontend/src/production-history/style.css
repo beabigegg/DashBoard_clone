@@ -193,3 +193,9 @@
   padding: theme('spacing.token.p6') theme('spacing.token.p12');
   border-radius: 6px;
 }
+
+/* ── Detail table — prevent cell text wrap ──────────────────────────────── */
+
+.theme-production-history .data-table-td {
+  white-space: nowrap;
+}

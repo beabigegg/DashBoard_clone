@@ -12,7 +12,6 @@ import { useFirstTierFilters, type CachedFilterField } from './composables/useFi
 import { ref } from 'vue';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -39,6 +38,7 @@ const {
   expiredDataset,
   runQuery,
   fetchPage,
+  applySort,
   applyMatrixFilter,
   stageSupplementaryFilter,
   exportCsv: doExportCsv,
@@ -237,11 +237,6 @@ async function exportCsv(): Promise<void> {
 
 <template>
   <div class="dashboard theme-production-history">
-    <PageHeader
-      title="生產歷程查詢"
-      :show-refresh="false"
-    />
-
     <!-- Filter panel -->
     <div class="ui-card">
       <div class="ui-card-header">
@@ -549,6 +544,7 @@ async function exportCsv(): Promise<void> {
         :can-export="!!datasetId"
         @export-csv="exportCsv"
         @page-change="fetchPage"
+        @sort="({ key, direction }) => applySort(key, direction as 'asc' | 'desc')"
       />
     </template>
 
