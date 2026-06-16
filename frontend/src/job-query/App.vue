@@ -9,7 +9,6 @@ import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../shared-ui/components/FilterToolbar.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SectionCard from '../shared-ui/components/SectionCard.vue';
 import StatusBadge from '../shared-ui/components/StatusBadge.vue';
 import { useJobQueryData } from './composables/useJobQueryData';
@@ -109,11 +108,6 @@ onMounted(async () => {
 
 <template>
   <div class="job-query-page dashboard theme-job-query">
-    <PageHeader
-      title="設備維修查詢"
-      :show-refresh="false"
-    />
-
     <div class="u-panel-stack">
       <SectionCard>
         <template #header>
