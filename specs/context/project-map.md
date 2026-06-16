@@ -3,7 +3,7 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 190
+visible-dirs: 188
 visible-files: 915
 omitted-dirs: 60
 truncated-dirs: 5
@@ -613,9 +613,15 @@ DashBoard_vite/
 |   |-- archive/
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
 |   |-- rq_hold_hist_worker.log
 |   |-- rq_hold_history_worker.log
@@ -1096,41 +1102,20 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- downtime_analysis/
 |   |   |-- downtime_analysis_base_events/
-|   |   |   |-- 0df9e39564a9ae96.parquet
-|   |   |   |-- 2a4a14bfd5b032d0.parquet
-|   |   |   |-- c4a79fa9c72e9f4f.parquet
-|   |   |   \-- c9f45afc349de0a3.parquet
+|   |   |   \-- 2a4a14bfd5b032d0.parquet
 |   |   |-- downtime_analysis_job_bridge/
-|   |   |   |-- 0df9e39564a9ae96.parquet
-|   |   |   |-- 2a4a14bfd5b032d0.parquet
-|   |   |   |-- c4a79fa9c72e9f4f.parquet
-|   |   |   \-- c9f45afc349de0a3.parquet
+|   |   |   \-- 2a4a14bfd5b032d0.parquet
 |   |   |-- hold_dataset/
-|   |   |   |-- 0c8b667bedbb5307.parquet
-|   |   |   |-- 0fff9d37f176e65b.parquet
-|   |   |   \-- 89c4f68629e28bd0.parquet
-|   |   |-- production_history/
+|   |   |   \-- cd9458b8df889ddc.parquet
 |   |   |-- reject_dataset/
-|   |   |   |-- 2b415553ba384c44.parquet
-|   |   |   |-- 87c6a58005491297.parquet
-|   |   |   \-- d3b13421ef8a6188.parquet
+|   |   |   \-- 780f45126cc24a21.parquet
 |   |   |-- resource_dataset/
-|   |   |   |-- 5ada62e6db0f3ec5.parquet
-|   |   |   |-- be82081ded3ddba7.parquet
-|   |   |   |-- e6c95cf37becce45.parquet
-|   |   |   |-- ed0d84a3d78db4d9.parquet
-|   |   |   \-- fd127a0cc8422c41.parquet
+|   |   |   \-- 43cd1f41156e6df9.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- 0476d2533d306080.parquet
-|   |   |   |-- c27e7129a6ef8ad9.parquet
-|   |   |   |-- e6c95cf37becce45.parquet
-|   |   |   |-- ed0d84a3d78db4d9.parquet
-|   |   |   \-- fd127a0cc8422c41.parquet
+|   |   |   \-- 650224c8a52a6725.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   |-- 1613ab6660aa8199.parquet
-|   |   |   \-- 9753fcd633384df9.parquet
+|   |   |   \-- d3f85ef923d43773.parquet
 |   |   |-- probe_10707.json
 |   |   |-- probe_10745.json
 |   |   |-- probe_10829.json
@@ -1168,10 +1153,23 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166780.json
 |   |   |-- probe_166786.json
-|   |   \-- ... (155 more entries truncated; cap=50)
+|   |   |-- probe_169446.json
+|   |   |-- probe_174363.json
+|   |   \-- ... (180 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
-|   |-- mes_dashboard_restart.flag
-|   \-- resource_history.duckdb
+|   |-- gunicorn.pid
+|   |-- mes_dashboard_restart_state.json
+|   |-- resource_history.duckdb
+|   |-- rq_downtime_worker.pid
+|   |-- rq_hold_hist_worker.pid
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_resource_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_warmup_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

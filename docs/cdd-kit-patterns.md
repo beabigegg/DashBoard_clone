@@ -54,3 +54,20 @@ frontend/src/core/**/*.ts
 ```
 
 Evidence: `migrate-shared-ui-ts` — initial manifest used glob patterns and failed preflight.
+
+
+## `jsonschema` pip Dependency for `cdd-kit validate --contracts`
+
+**`cdd-kit validate --contracts` requires `pip install jsonschema`** before the step in any CI job, and locally when `response-samples.json` exists. It is not bundled with cdd-kit and is not pre-installed on `ubuntu-latest`.
+
+```yaml
+- name: Install Python contract dependencies
+  run: pip install jsonschema
+
+- name: Validate contracts and gates
+  run: cdd-kit validate
+```
+
+The same applies locally: if `tests/contract/response-samples.json` exists and `jsonschema` is absent, `cdd-kit validate` exits non-zero with "jsonschema package is not installed" — even in conda envs where it is absent.
+
+Evidence: `response-shape-adr0007` — CI run 27599574084 "Validate contracts and gates" step; fixed by commit `bf7ba1e`.

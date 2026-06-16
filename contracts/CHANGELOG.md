@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.22.0] — 2026-06-16
+### Added
+- response-shape-adr0007: Added `## Schema Authoring Rules` section to api-contract.md documenting cdd-kit response schema cell format (`/^[A-Za-z][A-Za-z0-9_]*/`), Tier-A field table header requirements (`| field | type | required |`), `dataPath` semantics, and `contracts/openapi.json` regeneration obligation. Additive; no API surface changed.
+
 ## [ci 1.3.24] — 2026-06-15
 ### Added
 - response-shape-adr0007: Added `response-shape-validate` as a new required Tier 1 gate (`cdd-kit validate --contracts`) wired into `contract-driven-gates.yml`. Validates 158 API endpoint response samples against declared schemas.

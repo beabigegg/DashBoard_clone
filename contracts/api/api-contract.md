@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.21.0
-last-changed: 2026-06-15
+schema-version: 1.22.0
+last-changed: 2026-06-16
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -427,6 +427,10 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+## [api 1.22.0] — 2026-06-16
+### Added
+- response-shape-adr0007: Added `## Schema Authoring Rules` section documenting cdd-kit response schema cell format, Tier-A table header requirements, dataPath semantics, and openapi.json regeneration obligation. Additive; no API surface changed.
+
 ## [api 1.19.0] — 2026-06-15
 ### Added
 - resource-history-rq-async: `POST /api/resource/history/query` gains async 202 path when `RESOURCE_ASYNC_ENABLED=true` and date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` (default 90 days). Short-range, flag-off, or unavailable worker → HTTP 200 sync unchanged. Type B §7 extended to include `resource_history_routes.py`. §10 compatibility note added. New `resource-history-query` RQ queue. Additive; no existing fields removed.
@@ -449,6 +453,13 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## [api 1.9.0]
 - material-part-consumption (2026-05-20): Added 7 endpoints under `/api/material-consumption` (filter-options, query, view, detail, detail/page, detail/job, export). New additive surface; no existing endpoints changed.
+
+## Schema Authoring Rules
+
+- **Response schema cell format:** `response schema` cells must contain a bare identifier matching `/^[A-Za-z][A-Za-z0-9_]*/` (optionally with `[]` suffix for arrays). Any prefix such as `→ SchemaName` is treated as prose — no `$ref` is generated and `cdd-kit validate --contracts` reports "checked 0 sampled endpoint(s)" (vacuous pass, silently non-enforcing).
+- **Tier-A field table headers:** A named schema component is compiled only when the table uses exactly `| field | type | required |` as column headers. Any other header set (e.g., `| name | type | description |`) causes the table to be silently skipped. Use Tier-B `json-schema` blocks when in doubt.
+- **`dataPath` in `response-samples.json`:** Set `dataPath` only when the declared schema describes the *inner* payload (not the envelope). Schemas that describe the full `{success, data, meta}` envelope must omit `dataPath`; using it on an envelope schema causes type-mismatch failures on error responses (no `data` key).
+- **`contracts/openapi.json` must be regenerated after every edit** to the endpoint table or `## Schemas` section: run `cdd-kit openapi export --out contracts/openapi.json` and commit the result. The `openapi-sync` CI gate (`cdd-kit openapi export --check`) detects drift and blocks merge.
 
 ## Schemas
 
