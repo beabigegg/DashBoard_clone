@@ -15,7 +15,6 @@ import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import YieldHeatmap from './YieldHeatmap.vue';
@@ -108,7 +107,6 @@ const filters = reactive({
   min_scrap_qty: '1',
 });
 
-const pageTitle = '良率查詢';
 
 // ── DuckDB-WASM mode (Task 7.2) ───────────────────────────────────────────
 const DUCKDB_THRESHOLD = 5000;
@@ -571,7 +569,7 @@ function onSort(field) {
     sortState.sort_by = field;
     sortState.sort_dir = field === 'date_bucket' ? 'desc' : 'asc';
   }
-  void runAlertPage(1);
+  void runQuery(1);
 }
 
 function goToPage(nextPage) {
@@ -723,11 +721,6 @@ onUnmounted(() => {
 
 <template>
   <div class="dashboard theme-yield-alert-center">
-    <PageHeader
-      :title="pageTitle"
-      :show-refresh="false"
-    />
-
     <section class="filter-panel primary-query-panel">
       <header class="panel-header">
         <h2>第一階段：日期主查詢</h2>
