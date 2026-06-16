@@ -448,45 +448,16 @@ def query_yield_summary(
     end_date: str,
     filters: dict | None = None,
 ) -> dict:
-    validate_date_range(start_date, end_date)
-    sql = _load_sql("summary")
+    """B5 (yield-alert-spool-refactor): Live Oracle path RETIRED.
 
-    where_sql, params = _build_optional_where(filters or {}, column_map=_SUMMARY_FILTER_COLUMNS)
-    sql = sql.replace("{{ WHERE_CLAUSE }}", f" AND {where_sql}" if where_sql else "")
-
-    query_params = {"start_date": start_date, "end_date": end_date}
-    query_params.update(params)
-
-    started = time.perf_counter()
-    df = read_sql_df_slow(sql, query_params)
-    excluded_reason_tokens = _load_excluded_reason_tokens()
-    filtered_scrap_qty = _query_filtered_scrap_total(
-        start_date=start_date,
-        end_date=end_date,
-        filters=filters or {},
-        excluded_reason_tokens=excluded_reason_tokens,
+    Summary data is now served from the DuckDB spool via apply_cached_view.
+    This function must NOT issue Oracle queries.  Callers that still invoke it
+    will receive a NotImplementedError so the mis-routing is surfaced immediately.
+    """
+    raise NotImplementedError(
+        "query_yield_summary: live Oracle path retired by yield-alert-spool-refactor. "
+        "Use apply_cached_view (spool path) instead."
     )
-    elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-
-    row = df.iloc[0] if not df.empty else {}
-    transaction_qty = _safe_float(row.get("TRANSACTION_QTY") if hasattr(row, "get") else 0)
-    yield_pct = 100.0
-    if transaction_qty > 0:
-        yield_pct = round((1 - (filtered_scrap_qty / transaction_qty)) * 100, 4)
-    summary = {
-        "transaction_qty": transaction_qty,
-        "scrap_qty": filtered_scrap_qty,
-        "yield_pct": yield_pct,
-    }
-    return {
-        "summary": summary,
-        "meta": {
-            "query_latency_ms": elapsed_ms,
-            "max_query_days": MAX_QUERY_DAYS,
-            "reason_exclusion_applied": True,
-            "excluded_reason_count": len(excluded_reason_tokens),
-        },
-    }
 
 
 def query_yield_trend(
@@ -496,70 +467,16 @@ def query_yield_trend(
     granularity: str,
     filters: dict | None = None,
 ) -> dict:
-    validate_date_range(start_date, end_date)
-    if granularity not in VALID_GRANULARITY:
-        raise ValueError("granularity 僅支援 day/week/month")
+    """B5 (yield-alert-spool-refactor): Live Oracle path RETIRED.
 
-    sql = _load_sql("trend")
-    sql = sql.replace("{{ BUCKET_EXPR }}", _bucket_expr(granularity, alias="m"))
-    where_sql, params = _build_optional_where(filters or {}, column_map=_SUMMARY_FILTER_COLUMNS)
-    sql = sql.replace("{{ WHERE_CLAUSE }}", f" AND {where_sql}" if where_sql else "")
-
-    query_params = {"start_date": start_date, "end_date": end_date}
-    query_params.update(params)
-
-    started = time.perf_counter()
-    df = read_sql_df_slow(sql, query_params)
-    excluded_reason_tokens = _load_excluded_reason_tokens()
-    scrap_by_bucket = _query_filtered_scrap_trend(
-        start_date=start_date,
-        end_date=end_date,
-        granularity=granularity,
-        filters=filters or {},
-        excluded_reason_tokens=excluded_reason_tokens,
+    Trend data is now served from the DuckDB spool via apply_cached_view.
+    This function must NOT issue Oracle queries.  Callers that still invoke it
+    will receive a NotImplementedError so the mis-routing is surfaced immediately.
+    """
+    raise NotImplementedError(
+        "query_yield_trend: live Oracle path retired by yield-alert-spool-refactor. "
+        "Use apply_cached_view (spool path) instead."
     )
-    elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
-
-    items: list[dict] = []
-    seen_buckets: set[str] = set()
-    for _, row in df.iterrows():
-        date_bucket = _bucket_to_text(row.get("DATE_BUCKET"))
-        transaction_qty = _safe_float(row.get("TRANSACTION_QTY"))
-        scrap_qty = _safe_float(scrap_by_bucket.get(date_bucket, 0.0))
-        yield_pct = 100.0
-        if transaction_qty > 0:
-            yield_pct = round((1 - (scrap_qty / transaction_qty)) * 100, 4)
-        items.append(
-            {
-                "date_bucket": date_bucket,
-                "transaction_qty": transaction_qty,
-                "scrap_qty": scrap_qty,
-                "yield_pct": yield_pct,
-            }
-        )
-        seen_buckets.add(date_bucket)
-
-    for date_bucket in sorted(k for k in scrap_by_bucket.keys() if k not in seen_buckets):
-        scrap_qty = _safe_float(scrap_by_bucket.get(date_bucket, 0.0))
-        items.append(
-            {
-                "date_bucket": date_bucket,
-                "transaction_qty": 0.0,
-                "scrap_qty": scrap_qty,
-                "yield_pct": 100.0,
-            }
-        )
-
-    return {
-        "items": items,
-        "granularity": granularity,
-        "meta": {
-            "query_latency_ms": elapsed_ms,
-            "max_query_days": MAX_QUERY_DAYS,
-            "reason_exclusion_applied": True,
-            "excluded_reason_count": len(excluded_reason_tokens),
-        },
-    }
 
 
 def _risk_level(yield_pct: float, scrap_qty: float, threshold: float) -> tuple[str, float]:

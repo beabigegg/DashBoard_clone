@@ -63,17 +63,17 @@
     {
       "date": "2026-06-15",
       "egt_hours": 72.0,
-      "ou_pct": 68.34,
-      "prd_hours": 25120.7,
+      "ou_pct": 68.35,
+      "prd_hours": 25130.6,
       "sby_hours": 9780.4,
       "sdt_hours": 880.0,
-      "total_hours": 47020.8,
+      "total_hours": 47030.7,
       "udt_hours": 906.2
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:42:00.973660"
+    "timestamp": "2026-06-16T22:15:43.919350"
   },
   "success": true
 }

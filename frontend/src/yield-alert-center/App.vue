@@ -82,6 +82,13 @@ const GRANULARITY_OPTIONS = [
   { value: 'year', label: '年' },
 ];
 
+// ── Process type selector (primary query level) ───────────────────────────────
+const selectedProcessType = ref('GA%');
+const PROCESS_TYPE_OPTIONS = [
+  { value: 'GA%', label: '封裝 (GA%)' },
+  { value: 'GC%', label: '點測 (GC%)' },
+];
+
 const summary = ref({ transaction_qty: 0, scrap_qty: 0, yield_pct: 100 });
 const trend = ref([]);
 const heatmapData = ref([]);
@@ -195,7 +202,8 @@ const summaryCards = computed(() => [
 ]);
 
 function alertRowKey(row) {
-  return `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}`;
+  const lotPart = row.source_code != null ? `|${row.source_code}` : '';
+  return `${row.date_bucket}|${row.workorder}|${row.reason_code}|${row.department}${lotPart}`;
 }
 
 
@@ -321,6 +329,7 @@ async function executePrimaryQuery() {
   const resp = await apiPost('/api/yield-alert/query', {
     start_date: filters.start_date,
     end_date: filters.end_date,
+    process_type: selectedProcessType.value,
   }, {
     timeout: API_TIMEOUT,
   });
@@ -510,7 +519,9 @@ async function runQuery(page = 1) {
       await loadCachedView(page);
     } catch (error) {
       if (isCacheExpiredError(error)) {
+        warningMessage.value = '快取已過期，正在重新建立資料快取，請稍候…';
         await executePrimaryQuery();
+        warningMessage.value = '';
         await loadCachedView(page);
       } else {
         throw error;
@@ -544,7 +555,9 @@ async function runAlertPage(page = 1) {
       await loadAlertPage(page);
     } catch (error) {
       if (isCacheExpiredError(error)) {
+        warningMessage.value = '快取已過期，正在重新建立資料快取，請稍候…';
         await executePrimaryQuery();
+        warningMessage.value = '';
         await loadAlertPage(page);
       } else {
         throw error;
@@ -662,6 +675,33 @@ watch(granularity, (newVal, oldVal) => {
   }
 });
 
+// ── Process type: when changed, clear state and trigger a new primary query ──────
+watch(selectedProcessType, (_newVal, oldVal) => {
+  if (!oldVal) return; // skip initial mount
+  // Clear existing spool cache and secondary filters (GA%/GC% have different products/lines)
+  queryId.value = '';
+  hasQueried.value = false;
+  filters.workcenterGroups = [];
+  filters.lines = [];
+  filters.packages = [];
+  filters.types = [];
+  filters.functions = [];
+  lineOptions.value = [];
+  packageOptions.value = [];
+  typeOptions.value = [];
+  functionOptions.value = [];
+  summary.value = { transaction_qty: 0, scrap_qty: 0, yield_pct: 100 };
+  trend.value = [];
+  heatmapData.value = [];
+  stationSummary.value = [];
+  packageSummary.value = [];
+  alerts.value = [];
+  // Trigger new primary query if dates are set
+  if (filters.start_date && filters.end_date) {
+    void runQuery(1);
+  }
+});
+
 // ── Cross-filter: dimension filter changes narrow other dropdowns' options ────
 // Does NOT auto-run the full query; user still clicks "套用篩選" to execute.
 let _crossFilterTimer: ReturnType<typeof setTimeout> | null = null;
@@ -735,6 +775,28 @@ onUnmounted(() => {
           結束日期
           <input v-model="filters.end_date" class="text-input" type="date" />
         </label>
+      </div>
+      <div class="filter-row one">
+        <div class="ctrl-item">
+          <span class="ctrl-label">製程類型</span>
+          <div class="process-type-toggle" role="radiogroup" aria-label="製程類型選擇">
+            <label
+              v-for="opt in PROCESS_TYPE_OPTIONS"
+              :key="opt.value"
+              class="process-type-option"
+              :class="{ active: selectedProcessType === opt.value }"
+            >
+              <input
+                type="radio"
+                :value="opt.value"
+                v-model="selectedProcessType"
+                class="sr-only"
+                name="process-type"
+              />
+              {{ opt.label }}
+            </label>
+          </div>
+        </div>
       </div>
       <div class="filter-row one">
         <div class="filter-actions">
@@ -894,6 +956,7 @@ onUnmounted(() => {
             <tr>
               <th>日期</th>
               <th>工單</th>
+              <th>LOT</th>
               <th>原因碼</th>
               <th>站別群組</th>
               <th>Package</th>
@@ -905,10 +968,11 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <template v-for="row in alerts" :key="`${row.date_bucket}-${row.workorder}-${row.reason_code}-${row.department}`">
+            <template v-for="row in alerts" :key="alertRowKey(row)">
               <tr>
                 <td>{{ row.date_bucket }}</td>
                 <td>{{ row.workorder }}</td>
+                <td>{{ row.source_code != null ? row.source_code : '—' }}</td>
                 <td>{{ row.reason_code }}</td>
                 <td>{{ row.department }}</td>
                 <td>{{ row.package || '' }}</td>
@@ -930,7 +994,7 @@ onUnmounted(() => {
                 </td>
               </tr>
               <tr v-if="expandedRowKey === alertRowKey(row)" class="reason-detail-row">
-                <td colspan="10">
+                <td colspan="11">
                   <EmptyState v-if="reasonDetailLoading" type="loading" />
                   <EmptyState v-else-if="reasonDetailRows.length === 0" type="filter-empty" />
                   <div v-else class="reason-sub-wrap">
@@ -991,6 +1055,6 @@ onUnmounted(() => {
       :status="jobProgress.status"
       @cancel="cancelAsyncJob"
     />
-    <LoadingOverlay v-if="loading" tier="page" />
+    <LoadingOverlay v-if="loading && !jobProgress.active" tier="page" />
   </div>
 </template>

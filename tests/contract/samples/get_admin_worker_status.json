@@ -5,11 +5,11 @@
       "remaining_seconds": 59
     },
     "last_restart": {
-      "completed_at": null,
-      "requested_at": null,
-      "requested_by": null,
-      "requested_ip": null,
-      "success": null
+      "completed_at": "2026-06-16T15:02:54.793325",
+      "requested_at": "2026-06-16T06:45:19.544513+00:00",
+      "requested_by": "unknown",
+      "requested_ip": "127.0.0.1",
+      "success": true
     },
     "resilience": {
       "alerts": {
@@ -32,9 +32,9 @@
         "reason": "healthy"
       },
       "restart_churn": {
-        "count": 0,
+        "count": 1,
         "exceeded": false,
-        "last_completed_at": null,
+        "last_completed_at": "2026-06-16T15:02:54.793325+00:00",
         "threshold": 3,
         "window_seconds": 600
       },
@@ -46,7 +46,34 @@
         "restart_churn_window_seconds": 600
       }
     },
-    "restart_history": [],
+    "restart_history": [
+      {
+        "completed_at": "2026-06-16T15:02:54.793325",
+        "decision": "executed",
+        "decision_reason": "signal_sighup",
+        "manual_override": false,
+        "policy_state": {
+          "allowed": true,
+          "attempts_in_window": 0,
+          "blocked": false,
+          "churn_exceeded": false,
+          "churn_threshold": 3,
+          "cooldown": false,
+          "cooldown_remaining_seconds": 0,
+          "cooldown_seconds": 60,
+          "guarded_mode": false,
+          "retry_budget": 3,
+          "retry_budget_exhausted": false,
+          "state": "allowed",
+          "window_seconds": 600
+        },
+        "requested_at": "2026-06-16T06:45:19.544513+00:00",
+        "requested_by": "unknown",
+        "requested_ip": "127.0.0.1",
+        "source": "manual",
+        "success": true
+      }
+    ],
     "runtime_contract": {
       "single_port_bind": "0.0.0.0:8080",
       "validation": {
@@ -60,16 +87,16 @@
         "pid_exists": false,
         "pid_path": "/home/egg/Project/DashBoard_vite/tmp/gunicorn.pid",
         "runtime_dir": "/home/egg/Project/DashBoard_vite/tmp",
-        "state_exists": false,
+        "state_exists": true,
         "state_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart_state.json"
       }
     },
-    "worker_pid": 626849,
-    "worker_start_time": "2026-06-16T06:40:27.810000+00:00"
+    "worker_pid": 720722,
+    "worker_start_time": "2026-06-16T14:14:09.530000+00:00"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:42:01.750884"
+    "timestamp": "2026-06-16T22:15:44.649731"
   },
   "success": true
 }

@@ -1,0 +1,15 @@
+{
+  "change_id": "yield-alert-spool-refactor",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py -v --tb=short",
+  "duration_ms": 4570,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-spool-refactor/test-runs/20260616-213429/summary.json",
+    "stdout": "specs/changes/yield-alert-spool-refactor/test-runs/20260616-213429/stdout.log",
+    "stderr": "specs/changes/yield-alert-spool-refactor/test-runs/20260616-213429/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

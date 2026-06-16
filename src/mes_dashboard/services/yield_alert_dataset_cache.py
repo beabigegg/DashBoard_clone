@@ -57,7 +57,7 @@ logger = logging.getLogger("mes_dashboard.yield_alert_dataset_cache")
 _CACHE_TTL = max(30, int(os.getenv("YIELD_ALERT_CACHE_TTL_SECONDS", "300")))
 _CACHE_MAX_SIZE = max(1, int(os.getenv("YIELD_ALERT_DATASET_CACHE_MAX_SIZE", "1")))
 _REDIS_NAMESPACE = "yield_alert_dataset"
-_CACHE_SCHEMA_VERSION = 4
+_CACHE_SCHEMA_VERSION = 5
 _SPOOL_NAMESPACE = "yield_alert_dataset"
 _WARMUP_DAYS = max(1, int(os.getenv("YIELD_ALERT_DATASET_WARMUP_DAYS", "30")))
 _STREAMING_SPOOL_ENABLED = os.getenv("YIELD_ALERT_STREAMING_SPOOL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
@@ -66,6 +66,7 @@ _STREAMING_SPOOL_ENABLED = os.getenv("YIELD_ALERT_STREAMING_SPOOL_ENABLED", "tru
 _DETAIL_COLUMNS = [
     "DATE_BUCKET",
     "WORKORDER",
+    "SOURCE_CODE",
     "REASON_RAW",
     "REASON_NAME",
     "DEPARTMENT_NAME",
@@ -81,6 +82,7 @@ _DETAIL_COLUMNS = [
     "REASON_NAME_UPPER",
     "TRANSACTION_QTY",
     "SCRAP_QTY",
+    "REJECT_LINKED",
 ]
 _LINKAGE_COLUMNS = ["CANONICAL_KEY", "REJECT_TOTAL_QTY"]
 
@@ -116,14 +118,13 @@ _PRIMARY_DETAIL_SQL = """
         NVL(TRIM(d.TYPE), '(NA)') AS TYPE_NAME,
         NVL(TRIM(d.FUNCTION), '(NA)') AS FUNCTION_NAME,
         NVL(d.OPERATION_SEQ_NUM, -1) AS OPERATION_SEQ_NUM,
+        NVL(TRIM(d.SOURCE_CODE), NULL) AS SOURCE_CODE,
         SUM(NVL(d.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY,
         SUM(NVL(d.SCRAP_QUANTITY, 0)) AS SCRAP_QTY
     FROM DWH.ERP_WIP_MOVETXN_DETAIL d
     WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
       AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
-      AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
-      AND d.PACKAGE IS NOT NULL
-      AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
+      AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE :process_type
     GROUP BY
         TRUNC(d.TXN_DATE),
         NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)'),
@@ -134,7 +135,8 @@ _PRIMARY_DETAIL_SQL = """
         NVL(TRIM(d.PACKAGE), '(NA)'),
         NVL(TRIM(d.TYPE), '(NA)'),
         NVL(TRIM(d.FUNCTION), '(NA)'),
-        NVL(d.OPERATION_SEQ_NUM, -1)
+        NVL(d.OPERATION_SEQ_NUM, -1),
+        NVL(TRIM(d.SOURCE_CODE), NULL)
 """
 
 
@@ -187,6 +189,13 @@ def _prepare_detail_df(df: Optional[pd.DataFrame]) -> pd.DataFrame:
     prepared["REASON_NAME_UPPER"] = prepared["REASON_NAME"].str.upper()
     prepared["TRANSACTION_QTY"] = pd.to_numeric(prepared["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
     prepared["SCRAP_QTY"] = pd.to_numeric(prepared["SCRAP_QTY"], errors="coerce").fillna(0.0)
+    # SOURCE_CODE: keep NULL as None (scrap-only LOT rows have non-null SOURCE_CODE and TX_QTY=0)
+    if "SOURCE_CODE" in prepared.columns:
+        prepared["SOURCE_CODE"] = prepared["SOURCE_CODE"].where(prepared["SOURCE_CODE"].notna(), None)
+    else:
+        prepared["SOURCE_CODE"] = None
+    # REJECT_LINKED: False by default; set True when SOURCE_CODE is present (joined from reject table)
+    prepared["REJECT_LINKED"] = prepared["SOURCE_CODE"].notna()
     return prepared[_DETAIL_COLUMNS]
 
 
@@ -226,6 +235,13 @@ def _prepare_detail_chunk(columns: list, rows: list) -> "Any":
     df["REASON_NAME_UPPER"] = df["REASON_NAME"].str.upper()
     df["TRANSACTION_QTY"] = pd.to_numeric(df["TRANSACTION_QTY"], errors="coerce").fillna(0.0)
     df["SCRAP_QTY"] = pd.to_numeric(df["SCRAP_QTY"], errors="coerce").fillna(0.0)
+    # SOURCE_CODE: keep NULL as None
+    if "SOURCE_CODE" in df.columns:
+        df["SOURCE_CODE"] = df["SOURCE_CODE"].where(df["SOURCE_CODE"].notna(), None)
+    else:
+        df["SOURCE_CODE"] = None
+    # REJECT_LINKED: boolean from SOURCE_CODE presence
+    df["REJECT_LINKED"] = df["SOURCE_CODE"].notna()
 
     return pa.Table.from_pandas(df[_DETAIL_COLUMNS], preserve_index=False)
 
@@ -399,43 +415,11 @@ def _get_cached_payload(query_id: str) -> Optional[dict]:
     return promoted
 
 
-def _load_primary_detail_df(start_date: str, end_date: str) -> pd.DataFrame:
-    sql = """
-        SELECT
-            TRUNC(d.TXN_DATE) AS DATE_BUCKET,
-            NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)') AS WIP_ENTITY_NAME,
-            NVL(TRIM(d.REASON_CODE), NVL(TRIM(d.REASON_NAME), '(UNMAPPED)')) AS REASON_RAW,
-            NVL(TRIM(d.REASON_NAME), '(未填寫)') AS REASON_NAME,
-            NVL(TRIM(d.DEPARTMENT_NAME), '(NA)') AS DEPARTMENT_NAME,
-            NVL(TRIM(d.LINE), '(NA)') AS LINE_NAME,
-            NVL(TRIM(d.PACKAGE), '(NA)') AS PACKAGE_NAME,
-            NVL(TRIM(d.TYPE), '(NA)') AS TYPE_NAME,
-            NVL(TRIM(d.FUNCTION), '(NA)') AS FUNCTION_NAME,
-            NVL(d.OPERATION_SEQ_NUM, -1) AS OPERATION_SEQ_NUM,
-            SUM(NVL(d.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY,
-            SUM(NVL(d.SCRAP_QUANTITY, 0)) AS SCRAP_QTY
-        FROM DWH.ERP_WIP_MOVETXN_DETAIL d
-        WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
-          AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
-          AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
-          AND d.PACKAGE IS NOT NULL
-          AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
-        GROUP BY
-            TRUNC(d.TXN_DATE),
-            NVL(TRIM(d.WIP_ENTITY_NAME), '(NA)'),
-            NVL(TRIM(d.REASON_CODE), NVL(TRIM(d.REASON_NAME), '(UNMAPPED)')),
-            NVL(TRIM(d.REASON_NAME), '(未填寫)'),
-            NVL(TRIM(d.DEPARTMENT_NAME), '(NA)'),
-            NVL(TRIM(d.LINE), '(NA)'),
-            NVL(TRIM(d.PACKAGE), '(NA)'),
-            NVL(TRIM(d.TYPE), '(NA)'),
-            NVL(TRIM(d.FUNCTION), '(NA)'),
-            NVL(d.OPERATION_SEQ_NUM, -1)
-    """
+def _load_primary_detail_df(start_date: str, end_date: str, process_type: str = "GA%") -> pd.DataFrame:
     return _prepare_detail_df(
         read_sql_df_slow(
-            sql,
-            {"start_date": start_date, "end_date": end_date},
+            _PRIMARY_DETAIL_SQL,
+            {"start_date": start_date, "end_date": end_date, "process_type": process_type},
             caller="yield_alert_dataset_cache:_load_primary_detail_df",
         )
     )
@@ -454,13 +438,14 @@ def _build_linkage_df(start_date: str, end_date: str, detail_df: pd.DataFrame) -
     return _prepare_linkage_df(linked)
 
 
-def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
+def execute_primary_query(*, start_date: str, end_date: str, process_type: str = "GA%") -> dict[str, Any]:
     validate_date_range(start_date, end_date)
     query_id = _make_query_id(
         {
             "cache_schema_version": _CACHE_SCHEMA_VERSION,
             "start_date": start_date,
             "end_date": end_date,
+            "process_type": process_type,
         }
     )
 
@@ -522,7 +507,7 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
             try:
                 tmp_path, total_rows = _streaming_write_to_spool(
                     _PRIMARY_DETAIL_SQL,
-                    {"start_date": start_date, "end_date": end_date},
+                    {"start_date": start_date, "end_date": end_date, "process_type": process_type},
                     query_id,
                 )
             except Exception as exc:
@@ -592,7 +577,7 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
     else:
         # ── Legacy path (YIELD_ALERT_STREAMING_SPOOL_ENABLED=false) ─────
         started = time.perf_counter()
-        detail_df = _load_primary_detail_df(start_date, end_date)
+        detail_df = _load_primary_detail_df(start_date, end_date, process_type=process_type)
         elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
 
         # NOTE: No memory guard here — follows reject module pattern.
@@ -639,7 +624,7 @@ def execute_primary_query(*, start_date: str, end_date: str) -> dict[str, Any]:
         }
 
 
-def ensure_dataset_loaded() -> dict[str, Any]:
+def ensure_dataset_loaded(process_type: str = "GA%") -> dict[str, Any]:
     """Ensure the default yield-alert dataset exists in cache."""
     end = date.today()
     start = end - timedelta(days=_WARMUP_DAYS - 1)
@@ -651,6 +636,7 @@ def ensure_dataset_loaded() -> dict[str, Any]:
             "cache_schema_version": _CACHE_SCHEMA_VERSION,
             "start_date": start_date,
             "end_date": end_date,
+            "process_type": process_type,
         }
     )
     if _get_cached_payload(query_id) is not None:
@@ -661,7 +647,7 @@ def ensure_dataset_loaded() -> dict[str, Any]:
             "end_date": end_date,
         }
 
-    result = execute_primary_query(start_date=start_date, end_date=end_date)
+    result = execute_primary_query(start_date=start_date, end_date=end_date, process_type=process_type)
     return {
         "query_id": result.get("query_id", query_id),
         "cache_hit": False,

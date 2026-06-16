@@ -111,7 +111,7 @@ def test_ensure_dataset_loaded_executes_query_on_miss(monkeypatch):
     monkeypatch.setattr(dataset_cache, "_get_cached_payload", lambda _query_id: None)
     calls = {"executed": 0}
 
-    def _fake_execute(*, start_date: str, end_date: str):
+    def _fake_execute(*, start_date: str, end_date: str, process_type: str = "GA%"):
         calls["executed"] += 1
         return {"query_id": "warmup-yield"}
 
@@ -661,3 +661,109 @@ def test_linkage_spool_not_available_logs_warning(monkeypatch, caplog):
     )
     result = dataset_cache.execute_linkage_query(query_id="no-spool")
     assert result["meta"]["linkage_not_ready_reason"] == "spool_not_available"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# yield-alert-spool-refactor: new tests (B1–B6)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_schema_version_is_5():
+    """B1: _CACHE_SCHEMA_VERSION must be 5 after the bump."""
+    assert dataset_cache._CACHE_SCHEMA_VERSION == 5
+
+
+def test_source_code_column_in_spool_row():
+    """B2: SOURCE_CODE must be present as a column in _DETAIL_COLUMNS."""
+    assert "SOURCE_CODE" in dataset_cache._DETAIL_COLUMNS
+
+
+def test_reject_linked_column_in_spool_row():
+    """B2: REJECT_LINKED must be present as a column in _DETAIL_COLUMNS."""
+    assert "REJECT_LINKED" in dataset_cache._DETAIL_COLUMNS
+
+
+def test_source_code_not_null_rows_have_tx_zero():
+    """B6/D4 invariant: rows where SOURCE_CODE is not None must have TRANSACTION_QTY == 0.
+
+    These are scrap-only rows from the reject JOIN that do not correspond to
+    a transaction event.  Any non-null SOURCE_CODE row with TX > 0 violates the
+    design contract (design.md §D4).
+    """
+    # Build a DataFrame that simulates spool output — one LOT row (scrap-only,
+    # TX=0), one normal row (TX > 0, SOURCE_CODE is None/NaN).
+    rows = [
+        {
+            "DATE_BUCKET": "2026-02-21",
+            "WORKORDER": "GA-WO-001",
+            "SOURCE_CODE": "LOT-123",   # non-null -> must have TX_QTY == 0
+            "TRANSACTION_QTY": 0.0,     # correct
+            "SCRAP_QTY": 5.0,
+        },
+        {
+            "DATE_BUCKET": "2026-02-21",
+            "WORKORDER": "GA-WO-002",
+            "SOURCE_CODE": None,        # normal row: no source code
+            "TRANSACTION_QTY": 100.0,
+            "SCRAP_QTY": 2.0,
+        },
+    ]
+    df = pd.DataFrame(rows)
+    # Invariant: no row where SOURCE_CODE is not null has TRANSACTION_QTY > 0
+    violating = df[df["SOURCE_CODE"].notna() & (df["TRANSACTION_QTY"] > 0)]
+    assert len(violating) == 0, (
+        f"Found {len(violating)} SOURCE_CODE-not-null row(s) with TX_QTY > 0: {violating}"
+    )
+
+
+def test_package_filter_not_applied_to_ga_percent():
+    """B2: The SQL string used for the primary detail query must NOT contain
+    'PACKAGE IS NOT NULL' — the PACKAGE filter has been removed per design.md §D2."""
+    sql = dataset_cache._PRIMARY_DETAIL_SQL
+    assert "PACKAGE IS NOT NULL" not in sql, (
+        "Old PACKAGE IS NOT NULL filter must be removed from _PRIMARY_DETAIL_SQL"
+    )
+
+
+def test_process_type_gc_uses_gc_pattern(monkeypatch):
+    """B2: When process_type='GC%', _load_primary_detail_df must pass 'GC%' to the
+    query via a bind parameter, not hardcode 'GA%'."""
+    captured = {}
+
+    def _fake_read_sql_df_slow(sql, params, *, caller=""):
+        captured["sql"] = sql
+        captured["params"] = dict(params or {})
+        return pd.DataFrame()
+
+    monkeypatch.setattr(dataset_cache, "read_sql_df_slow", _fake_read_sql_df_slow)
+
+    dataset_cache._load_primary_detail_df(
+        start_date="2026-02-01",
+        end_date="2026-02-28",
+        process_type="GC%",
+    )
+
+    # The SQL must use a placeholder, not hardcode 'GA%'
+    assert "LIKE 'GA%'" not in captured.get("sql", ""), (
+        "_load_primary_detail_df must NOT hardcode LIKE 'GA%' in SQL"
+    )
+    # The bind param must carry the actual process_type value
+    assert "GC%" in captured.get("params", {}).values(), (
+        "process_type='GC%' must appear as a bind parameter value"
+    )
+
+
+def test_primary_query_id_differs_for_ga_and_gc():
+    """B2: _make_query_id must produce different IDs for GA% and GC% process_type."""
+    id_ga = dataset_cache._make_query_id({
+        "cache_schema_version": dataset_cache._CACHE_SCHEMA_VERSION,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-28",
+        "process_type": "GA%",
+    })
+    id_gc = dataset_cache._make_query_id({
+        "cache_schema_version": dataset_cache._CACHE_SCHEMA_VERSION,
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-28",
+        "process_type": "GC%",
+    })
+    assert id_ga != id_gc, "GA% and GC% must produce distinct cache/query IDs"

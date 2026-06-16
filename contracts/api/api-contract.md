@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.23.0
+schema-version: 1.24.0
 last-changed: 2026-06-16
 breaking-change-policy: deprecate-2-minors
 ---
@@ -140,13 +140,13 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/reject-history/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
 | GET | /api/reject-history/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | POST | /api/reject-history/view | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
-| POST | /api/yield-alert/query | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
+| POST | /api/yield-alert/query | required | JSON body `{start_date, end_date, process_type (opt, enum: GA% or GC%, default GA%), lines[], packages[], types[]}` | GenericSuccessResponse | 202/400/500 | route tests |
 | GET | /api/yield-alert/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
 | POST | /api/yield-alert/analyze | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/yield-alert/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/yield-alert/summary | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/yield-alert/trend | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
-| GET | /api/yield-alert/alerts | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/alerts | required | ?query_id= | YieldAlertAlertsResponse | 400/410 | route tests |
 | GET | /api/yield-alert/reason-detail | required | ?query_id=&reason= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/yield-alert/drilldown-context | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/yield-alert/filter-options | required | — | GenericSuccessResponse | 500 | route tests |
@@ -421,6 +421,15 @@ breaking-change-policy: deprecate-2-minors
   - New env vars: `RESOURCE_ASYNC_ENABLED`, `RESOURCE_ASYNC_DAY_THRESHOLD` (90), `RESOURCE_WORKER_QUEUE` (`resource-history-query`), `RESOURCE_JOB_TIMEOUT_SECONDS` (1800) — env-contract.md §Async Worker — Resource History Query.
   - Rollback: `RESOURCE_ASYNC_ENABLED=false` restores pure-sync; no spool cleanup required.
 
+- **yield-alert-spool-refactor (2026-06-16)**: The following changes to yield-alert endpoints are additive except where noted:
+  - `POST /api/yield-alert/query` body gains optional `process_type` field: closed enum `"GA%"` (packaging/assembly, default) or `"GC%"` (wafer-sort/point-test). Omitting `process_type` defaults to `"GA%"` (backward-compatible). All four downstream views (trend, summary, heatmap, alerts) scope to the same process type from the spool.
+  - `GET /api/yield-alert/alerts` response rows gain `source_code: string | null` — the LOT ID from `ERP_WIP_MOVETXN_DETAIL.SOURCE_CODE`. `null` for workorder-level rows. Non-null SOURCE_CODE rows always carry TX=0 (scrap-only; do NOT inflate the TX numerator). Additive.
+  - Data source for trend/summary changed from `ERP_WIP_MOVETXN` to `ERP_WIP_MOVETXN_DETAIL` (totals verified identical for GA% — TX=70,494,377, SCRAP=81,972). No change to response values.
+  - `PACKAGE IS NOT NULL` filter removed from GA% queries. Verified 0 GA% rows have PACKAGE=NA; filter was redundant. No change to response values.
+  - Reject linkage now computed in the single initial spool pull; the separate `_compute_reject_linkage` Oracle query is retired.
+  - All four views now served exclusively from DuckDB spool. Live Oracle trend.sql/summary.sql query paths retired. 410 `CACHE_EXPIRED` behavior for spool miss is unchanged.
+  - `yield_alert_dataset` parquet spool gains `process_type`, `SOURCE_CODE`, `REJECT_LINKED` columns; `_SCHEMA_VERSION` must be bumped. Rollback: `rm -f tmp/query_spool/yield_alert_dataset/*.parquet`.
+  - Sole consumer: `frontend/src/yield-alert-center/`. No external partners or mobile consumers known.
 - **hold-overview-export-csv (2026-06-16)**: `GET/POST /api/hold-overview/lots` gains optional export/full-data mode (additive):
   - New optional request param: `export` (boolean; GET: `?export=true`, POST body: `"export": true`). Default false/absent (omitting it preserves existing paginated behavior exactly).
   - Export mode: pagination cap (`per_page` max 200) is bypassed; all matching rows up to `HOLD_OVERVIEW_EXPORT_MAX_ROWS` are returned. Response `data.lots` array shape is unchanged (same 13-column lot row). Response `data.summary`, `data.specs`, `data.sys_date` are still present; `meta.pagination` is set to `{page: 1, per_page: <total>, total_count: <n>, total_pages: 1}` for consistency with existing consumers.
@@ -432,6 +441,10 @@ breaking-change-policy: deprecate-2-minors
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.24.0] — 2026-06-16
+### Added
+- yield-alert-spool-refactor: `POST /api/yield-alert/query` body gains optional `process_type` field (enum: `"GA%"` default / `"GC%"`; backward-compatible when omitted). `GET /api/yield-alert/alerts` response rows gain `source_code: string | null` (LOT ID from ERP_WIP_MOVETXN_DETAIL; null for workorder-level rows; non-null always TX=0). All four views now served from DuckDB spool only; live Oracle trend/summary paths retired. `yield_alert_dataset` spool gains `process_type`, `SOURCE_CODE`, `REJECT_LINKED` columns (schema-version bump + parquet cleanup on deploy/rollback). `PACKAGE IS NOT NULL` filter removed from GA% queries (0 affected rows). Reject linkage folded into initial spool pull. Data source changed from ERP_WIP_MOVETXN to ERP_WIP_MOVETXN_DETAIL (totals identical for GA%). Sole consumer: `frontend/src/yield-alert-center/`. Additive; no existing response fields removed or renamed.
 
 ## [api 1.23.0] — 2026-06-16
 ### Added
@@ -691,6 +704,50 @@ Tier-B — 202 async branch for `POST /api/yield-alert/query`.
     "success": { "type": "boolean", "enum": [true] },
     "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
     "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### YieldAlertAlertsResponse
+
+Tier-B — `GET /api/yield-alert/alerts`; alert list rows including LOT dimension.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": "object",
+      "properties": {
+        "query_id": { "type": "string" },
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "line":        { "type": "string" },
+              "type":        { "type": "string" },
+              "package":     { "type": ["string", "null"] },
+              "tx_qty":      { "type": "integer" },
+              "scrap_qty":   { "type": "integer" },
+              "yield_pct":   { "type": "number" },
+              "alert_level": { "type": "string" },
+              "source_code": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["timestamp"],
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
   }
 }
 ```

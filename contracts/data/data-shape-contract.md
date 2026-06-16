@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.16.1
-last-changed: 2026-06-13
+schema-version: 1.17.0
+last-changed: 2026-06-16
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1002,9 +1002,56 @@ Maximum rows returned by the server in export mode: `HOLD_OVERVIEW_EXPORT_MAX_RO
 
 Added by change `hold-overview-export-csv`.
 
+
+### 3.16 Yield-Alert Dataset Spool Schema (`yield_alert_dataset`)
+
+Added by change `yield-alert-spool-refactor`. Spool namespace: `tmp/query_spool/yield_alert_dataset/`. All four views (trend, summary, heatmap, alerts) are computed in-browser or by DuckDB from this single spool; no separate Oracle trend/summary query runs on the view-serve path.
+
+**Data source:** `ERP_WIP_MOVETXN_DETAIL` joined with reject linkage. Replaces `ERP_WIP_MOVETXN` for GA% aggregation; verified totals identical (TX=70,494,377, SCRAP=81,972 for GA%).
+
+**`_SCHEMA_VERSION`** constant in `yield_alert_dataset_cache.py` participates in the spool cache key. Bumping it orphans stale parquets by key without a manual `rm`. Schema-breaking rollback requires: `rm -f tmp/query_spool/yield_alert_dataset/*.parquet`.
+
+#### 3.16.1 Spool Column Schema
+
+| column | type | nullable | description |
+|---|---|---|---|
+| WIP_ENTITY_NAME | VARCHAR | no | Workorder entity name; prefix determines process scope (`GA%` = packaging/assembly, `GC%` = wafer-sort/point-test) |
+| LINE | VARCHAR | yes | Production line identifier |
+| TYPE | VARCHAR | yes | Product type |
+| PACKAGE | VARCHAR | yes | Package type; may be `null` — `PACKAGE IS NOT NULL` filter is NOT applied (removed: 0 GA% rows have PACKAGE=NA; GC% PACKAGE=NA is valid data) |
+| TXN_DATE | DATE | no | Transaction date |
+| TX_QTY | INTEGER | no | Move transaction quantity (yield denominator); SOURCE_CODE NOT NULL rows always contribute TX_QTY = 0 |
+| SCRAP_QTY | INTEGER | no | Scrap quantity (yield numerator) |
+| SOURCE_CODE | VARCHAR | yes | LOT ID (`DW_MES_WIP.CONTAINERNAME` equivalent; format `GA26020192-A00-003-01`); null for workorder-level rows. When NOT NULL, TX_QTY = 0 (scrap-only row; does not inflate the TX numerator). |
+| REJECT_LINKED | BOOLEAN | no | True when this row has a matching reject record from the reject linkage join (folded into initial spool pull; no separate Oracle `_compute_reject_linkage` query). |
+| process_type | VARCHAR | no | Process scope applied at query time: `'GA%'` or `'GC%'`. Derived from the `process_type` request parameter. |
+
+#### 3.16.2 SOURCE_CODE Invariant
+
+`SOURCE_CODE NOT NULL ⇒ TX_QTY = 0` always (verified by direct Oracle query; 100% of SOURCE_CODE NOT NULL rows are scrap-only). This invariant means:
+- LOT-level scrap attribution (non-null SOURCE_CODE) adds precision to the alert list display but does NOT alter the TX denominator or yield formula.
+- The yield formula remains `SCRAP_QTY / TX_QTY` at the workorder grain, unchanged from the prior implementation.
+
+#### 3.16.3 PACKAGE Filter Removal Invariant
+
+`PACKAGE IS NOT NULL` was previously applied to GA% queries. Verified by direct Oracle query: GA% workorders have zero rows where PACKAGE=NA. The filter was redundant and has been removed. For GC% (wafer-sort), PACKAGE=NA is valid data and was never filtered. No change to result sets for any process type.
+
+#### 3.16.4 process_type Scope
+
+| process_type | WIP_ENTITY_NAME pattern | domain |
+|---|---|---|
+| `GA%` | `LIKE 'GA%'` | Packaging / assembly |
+| `GC%` | `LIKE 'GC%'` | Wafer-sort / point-test |
+
+**Breaking-change surface:** column add/remove/rename to `yield_alert_dataset` parquet orphans existing files. `rm -f tmp/query_spool/yield_alert_dataset/*.parquet` required on both deploy and rollback.
+
 ---
 
 ## CHANGELOG
+
+## [data 1.17.0] — 2026-06-16
+### Added
+- yield-alert-spool-refactor: Added §3.16 (Yield-Alert Dataset Spool Schema) documenting the `yield_alert_dataset` spool column schema (10 columns: WIP_ENTITY_NAME, LINE, TYPE, PACKAGE, TXN_DATE, TX_QTY, SCRAP_QTY, SOURCE_CODE, REJECT_LINKED, process_type), SOURCE_CODE invariant (NOT NULL ⇒ TX_QTY=0), PACKAGE filter removal invariant (GA% has 0 NA rows), process_type scope table, and breaking-change surface rule (parquet cleanup on deploy/rollback). Additive; no existing spool schemas changed.
 
 ## [data 1.16.0] — 2026-06-16
 ### Added

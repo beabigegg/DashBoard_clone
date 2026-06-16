@@ -62,7 +62,7 @@
     ],
     "mysql": {
       "dashboard_logs_rows": 520891,
-      "dashboard_metrics_snapshots_rows": 185757,
+      "dashboard_metrics_snapshots_rows": 187267,
       "enabled": true,
       "healthy": true
     },
@@ -84,7 +84,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:42:01.745938"
+    "timestamp": "2026-06-16T22:15:44.646177"
   },
   "success": true
 }

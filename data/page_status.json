@@ -172,6 +172,12 @@
       "name": "追溯工具",
       "order": 4,
       "admin_only": false
+    },
+    {
+      "id": "test",
+      "name": "test",
+      "order": 1,
+      "admin_only": false
     }
   ]
 }

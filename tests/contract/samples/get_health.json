@@ -128,9 +128,9 @@
       "reason": "healthy"
     },
     "restart_churn": {
-      "count": 0,
+      "count": 1,
       "exceeded": false,
-      "last_completed_at": null,
+      "last_completed_at": "2026-06-16T15:02:54.793325+00:00",
       "threshold": 3,
       "window_seconds": 600
     },
@@ -193,10 +193,10 @@
     "running": false
   },
   "system_memory": {
-    "available_mb": 3892.0,
+    "available_mb": 4072.0,
     "pressure": "normal",
-    "total_mb": 7624.0,
-    "used_pct": 48.9
+    "total_mb": 8542.0,
+    "used_pct": 52.3
   },
   "warnings": [
     "Equipment status cache not loaded",

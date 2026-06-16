@@ -1,3 +1,8 @@
+-- B5 (yield-alert-spool-refactor): DEAD CODE — live Oracle trend path RETIRED.
+-- query_yield_trend() now raises NotImplementedError; this SQL is no longer executed.
+-- Trend data is served from the DuckDB spool via apply_cached_view.
+-- Kept for reference only; safe to delete after spool-refactor rollout.
+--
 -- Yield Alert trend aggregate
 -- Placeholders:
 --   {{ BUCKET_EXPR }}
@@ -7,15 +12,7 @@
 --   + optional QueryBuilder params in {{ WHERE_CLAUSE }}
 SELECT
     {{ BUCKET_EXPR }} AS DATE_BUCKET,
-    SUM(NVL(m.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY,
-    SUM(NVL(m.SCRAP_QUANTITY, 0)) AS SCRAP_QTY,
-    CASE
-        WHEN SUM(NVL(m.TRANSACTION_QUANTITY, 0)) = 0 THEN 100
-        ELSE ROUND(
-            (1 - SUM(NVL(m.SCRAP_QUANTITY, 0)) / NULLIF(SUM(NVL(m.TRANSACTION_QUANTITY, 0)), 0)) * 100,
-            4
-        )
-    END AS YIELD_PCT
+    SUM(NVL(m.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY
 FROM DWH.ERP_WIP_MOVETXN m
 WHERE m.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
   AND m.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1

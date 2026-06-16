@@ -256,6 +256,239 @@ class TestYieldAlertDateRangeLimit:
         assert str(max_days) in payload.get("error", {}).get("message", "")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# yield-alert-spool-refactor: E2E + resilience tests
+# AC-1: process_type validation (default GA%, GC% accepted, invalid rejected)
+# AC-2: trend/summary serve from spool only (410 when spool absent)
+# AC-4: source_code key present in every alert row
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _post_query(api_base_url: str, body: dict, timeout: int = 120) -> "requests.Response":
+    """POST /api/yield-alert/query and return the response."""
+    return requests.post(
+        f"{api_base_url}/yield-alert/query",
+        json=body,
+        timeout=timeout,
+    )
+
+
+def _acquire_query_id(api_base_url: str, process_type: str = "GA%") -> str:
+    """Submit a query and return the query_id, or skip the test if unavailable."""
+    resp = _post_query(
+        api_base_url,
+        {"start_date": "2026-03-01", "end_date": "2026-03-07", "process_type": process_type},
+    )
+    if resp.status_code == 503:
+        pytest.skip("yield-alert service busy — skipping spool-dependent test")
+    if resp.status_code not in (200, 202):
+        pytest.skip(f"yield-alert/query returned {resp.status_code} — server may be unavailable")
+    payload = resp.json()
+    query_id = payload.get("data", {}).get("query_id", "")
+    if not query_id:
+        pytest.skip("yield-alert/query succeeded but returned no query_id")
+    return query_id
+
+
+@pytest.mark.e2e
+class TestYieldAlertProcessType:
+    """AC-1: process_type validation — default, GC% acceptance, invalid rejection."""
+
+    def test_process_type_defaults_to_ga_percent(self, api_base_url):
+        """POST /query without process_type must succeed (defaults to GA%).
+
+        AC-1: absent process_type → GA% default, not a 400 VALIDATION_ERROR.
+        """
+        resp = _post_query(
+            api_base_url,
+            {"start_date": "2026-03-01", "end_date": "2026-03-07"},
+        )
+        # 503 = busy is acceptable; 200/202 = success; 400 = fail (regression)
+        if resp.status_code == 503:
+            pytest.skip("yield-alert service busy")
+        assert resp.status_code in (200, 202), (
+            f"POST /query without process_type returned {resp.status_code} — "
+            f"expected 200/202 (GA% default). Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is True, (
+            f"POST /query without process_type: success=False. Error: {payload.get('error')}"
+        )
+
+    def test_process_type_gc_percent_query_accepted(self, api_base_url):
+        """POST /query with process_type='GC%' must be accepted (200 or 202).
+
+        AC-1: GC% is a valid process_type; must not return VALIDATION_ERROR.
+        """
+        resp = _post_query(
+            api_base_url,
+            {"start_date": "2026-03-01", "end_date": "2026-03-07", "process_type": "GC%"},
+        )
+        if resp.status_code == 503:
+            pytest.skip("yield-alert service busy")
+        assert resp.status_code in (200, 202), (
+            f"POST /query with process_type='GC%' returned {resp.status_code} — "
+            f"expected acceptance. Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is True, (
+            f"POST /query with process_type='GC%': success=False. Error: {payload.get('error')}"
+        )
+        # Must not be a VALIDATION_ERROR
+        if "error" in payload:
+            assert payload["error"].get("code") != "VALIDATION_ERROR", (
+                "GC% was incorrectly rejected with VALIDATION_ERROR"
+            )
+
+    def test_process_type_invalid_returns_400(self, api_base_url):
+        """POST /query with process_type='XX%' must return 400 VALIDATION_ERROR.
+
+        AC-1: Invalid process_type must be rejected; must NOT be coerced to GA%.
+        Per implementation plan Non-goals: 'Do NOT coerce an invalid process_type to GA%'.
+        """
+        resp = _post_query(
+            api_base_url,
+            {"start_date": "2026-03-01", "end_date": "2026-03-07", "process_type": "XX%"},
+            timeout=30,
+        )
+        assert resp.status_code == 400, (
+            f"POST /query with process_type='XX%' returned {resp.status_code} — "
+            f"expected 400 VALIDATION_ERROR. Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is False
+        assert payload.get("error", {}).get("code") == "VALIDATION_ERROR", (
+            f"Expected error.code='VALIDATION_ERROR', got: {payload.get('error')}"
+        )
+
+
+@pytest.mark.e2e
+class TestYieldAlertSourceCodeField:
+    """AC-4: source_code key must be present in every alert row."""
+
+    def test_alerts_response_includes_source_code_field(self, api_base_url):
+        """GET /alerts after a GA% query must have 'source_code' key in each item.
+
+        AC-4: SOURCE_CODE (LOT) column wired into alert rows. Key must exist even
+        when the value is null — its absence is a regression of the spool-refactor.
+        """
+        # Use the /alerts endpoint directly (date-range based, no query_id needed).
+        # The /alerts endpoint was not retired — it still accepts date-range params.
+        resp = requests.get(
+            f"{api_base_url}/yield-alert/alerts",
+            params={
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-07",
+                "page": 1,
+                "per_page": 5,
+            },
+            timeout=60,
+        )
+        if resp.status_code in (503, 202):
+            pytest.skip("yield-alert/alerts unavailable or async — cannot inspect items")
+        assert resp.status_code == 200, (
+            f"GET /yield-alert/alerts returned {resp.status_code}. Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is True
+        items = payload["data"].get("items", [])
+        if not items:
+            pytest.skip("No alert items returned for 2026-03-01..03-07 — cannot assert source_code key")
+        for idx, item in enumerate(items):
+            assert "source_code" in item, (
+                f"Alert item[{idx}] missing 'source_code' key after spool-refactor. "
+                f"Keys present: {list(item.keys())}"
+            )
+
+
+@pytest.mark.e2e
+class TestYieldAlertSpoolOnlyPaths:
+    """AC-2: trend and summary endpoints serve only from spool after refactor."""
+
+    def test_trend_endpoint_uses_spool_only(self, api_base_url):
+        """GET /trend with a live query_id must return 200 (served from spool).
+
+        AC-2: Trend data served from DuckDB spool, not live Oracle.
+        Then calling with a bad query_id must return 410 — no Oracle fallback.
+        """
+        query_id = _acquire_query_id(api_base_url, process_type="GA%")
+
+        # Part 1: valid spool → 200
+        resp = requests.get(
+            f"{api_base_url}/yield-alert/trend",
+            params={"query_id": query_id},
+            timeout=60,
+        )
+        assert resp.status_code == 200, (
+            f"GET /trend with valid query_id={query_id!r} returned {resp.status_code} — "
+            f"expected 200 from spool. Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is True
+
+        # Part 2: corrupted query_id → 410 (confirms no Oracle fallback)
+        resp_miss = requests.get(
+            f"{api_base_url}/yield-alert/trend",
+            params={"query_id": "definitely-expired-qid-0000"},
+            timeout=30,
+        )
+        assert resp_miss.status_code == 410, (
+            f"GET /trend with expired query_id returned {resp_miss.status_code} — "
+            f"expected 410 (live Oracle fallback must be gone). Body: {resp_miss.text[:300]}"
+        )
+        miss_payload = resp_miss.json()
+        assert miss_payload.get("error", {}).get("code") == "CACHE_EXPIRED", (
+            f"Expected error.code='CACHE_EXPIRED', got: {miss_payload.get('error')}"
+        )
+
+
+@pytest.mark.e2e
+class TestYieldAlertSpoolMissResilience:
+    """Resilience: spool-miss on trend and summary must return 410, no Oracle fallback."""
+
+    def test_trend_with_expired_spool_returns_410(self, api_base_url):
+        """GET /trend?query_id=nonexistent_id must return 410 CACHE_EXPIRED.
+
+        AC-2 resilience: confirms the live Oracle trend fallback is retired.
+        The route must not attempt any Oracle call when spool is absent.
+        """
+        resp = requests.get(
+            f"{api_base_url}/yield-alert/trend",
+            params={"query_id": "nonexistent-expired-spool-id"},
+            timeout=30,
+        )
+        assert resp.status_code == 410, (
+            f"GET /trend with nonexistent query_id returned {resp.status_code} — "
+            f"expected 410. Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is False
+        assert payload.get("error", {}).get("code") == "CACHE_EXPIRED", (
+            f"Expected error.code='CACHE_EXPIRED', got: {payload.get('error')}"
+        )
+
+    def test_summary_with_expired_spool_returns_410(self, api_base_url):
+        """GET /summary?query_id=nonexistent_id must return 410 CACHE_EXPIRED.
+
+        AC-2 resilience: confirms the live Oracle summary fallback is retired.
+        The route must not attempt any Oracle call when spool is absent.
+        """
+        resp = requests.get(
+            f"{api_base_url}/yield-alert/summary",
+            params={"query_id": "nonexistent-expired-spool-id"},
+            timeout=30,
+        )
+        assert resp.status_code == 410, (
+            f"GET /summary with nonexistent query_id returned {resp.status_code} — "
+            f"expected 410. Body: {resp.text[:300]}"
+        )
+        payload = resp.json()
+        assert payload["success"] is False
+        assert payload.get("error", {}).get("code") == "CACHE_EXPIRED", (
+            f"Expected error.code='CACHE_EXPIRED', got: {payload.get('error')}"
+        )
+
+
 @pytest.mark.e2e
 class TestYieldAlertBrowserE2E:
     """Browser E2E for yield-alert-center primary workflow."""

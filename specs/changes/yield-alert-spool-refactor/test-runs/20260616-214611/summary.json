@@ -1,0 +1,15 @@
+{
+  "change_id": "yield-alert-spool-refactor",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose tests/validation/ tests/yield-alert/ tests/abort/ 2>&1 | tail -30",
+  "duration_ms": 2343,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-spool-refactor/test-runs/20260616-214611/summary.json",
+    "stdout": "specs/changes/yield-alert-spool-refactor/test-runs/20260616-214611/stdout.log",
+    "stderr": "specs/changes/yield-alert-spool-refactor/test-runs/20260616-214611/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -59,80 +59,25 @@ def test_drilldown_payload_contains_launch_href_and_filters():
     assert "start_date=2026-03-06" in payload["launch_href"]
 
 
-def test_compute_reject_linkage_batches_workorders_for_oracle_in_limit(monkeypatch):
-    calls: list[dict] = []
+# REMOVED BY yield-alert-spool-refactor: _compute_reject_linkage separate Oracle round-trip removed.
+# The reject linkage is now inlined in the spool query via LEFT JOIN.
+# test_compute_reject_linkage_batches_workorders_for_oracle_in_limit was deleted per
+# test-plan.md Test Update Contract (AC-5/D3).
 
-    def _fake_read_sql_df_slow(sql: str, params: dict):
-        bind_values = [value for key, value in params.items() if key.startswith("p")]
-        calls.append({"sql": sql, "params": params.copy(), "bind_values": bind_values})
-        return pd.DataFrame(
-            [
-                {
-                    "DATE_BUCKET": "2026-03-06",
-                    "WORKORDER": bind_values[0] if bind_values else "WO-NA",
-                    "REASON_NAME": "001_SHORT",
-                    "REJECT_TOTAL_QTY": 1,
-                }
-            ]
+
+def test_query_yield_summary_raises_not_implemented_after_spool_refactor():
+    """B5: query_yield_summary must raise NotImplementedError (Oracle path retired).
+
+    Updated per test-plan.md Test Update Contract — the live Oracle summary path
+    was retired by yield-alert-spool-refactor.  Callers must use apply_cached_view.
+    """
+    import pytest
+    with pytest.raises(NotImplementedError, match="live Oracle path retired"):
+        yield_alert_service.query_yield_summary(
+            start_date="2026-03-01",
+            end_date="2026-03-06",
+            filters={},
         )
-
-    monkeypatch.setattr(yield_alert_service, "_ORACLE_IN_MAX_EXPRESSIONS", 3)
-    monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
-
-    workorders = [f"wo-{idx}" for idx in range(1, 8)] + ["wo-1"]
-    linked = yield_alert_service._compute_reject_linkage(
-        start_date="2026-03-01",
-        end_date="2026-03-06",
-        workorders=workorders,
-    )
-
-    assert len(calls) == 3
-    assert all(len([key for key in call["params"] if key.startswith("p")]) <= 3 for call in calls)
-    assert all("IN (" in call["sql"] for call in calls)
-    assert sum(linked.values()) == 3
-
-
-def test_query_yield_summary_applies_reason_exclusion_policy(monkeypatch):
-    captured: dict = {"sql_calls": []}
-
-    monkeypatch.setattr(
-        yield_alert_service,
-        "get_excluded_reasons",
-        lambda force_refresh=False: {"358", "REASON_X"},
-    )
-
-    def _fake_read_sql_df_slow(sql: str, params: dict):
-        captured["sql_calls"].append(sql)
-        captured["params"] = dict(params or {})
-        if "FROM DWH.ERP_WIP_MOVETXN m" in sql:
-            return pd.DataFrame(
-                [
-                    {
-                        "TRANSACTION_QTY": 1000,
-                        "SCRAP_QTY": 999,
-                        "YIELD_PCT": 0.1,
-                    }
-                ]
-            )
-        return pd.DataFrame([{"SCRAP_QTY": 25}])
-
-    monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
-    result = yield_alert_service.query_yield_summary(
-        start_date="2026-03-01",
-        end_date="2026-03-06",
-        filters={},
-    )
-
-    assert result["summary"]["transaction_qty"] == 1000
-    assert result["summary"]["scrap_qty"] == 25
-    assert result["summary"]["yield_pct"] == 97.5
-    assert result["meta"]["reason_exclusion_applied"] is True
-    assert result["meta"]["excluded_reason_count"] == 2
-    assert len(captured["sql_calls"]) == 2
-    assert any("FROM DWH.ERP_WIP_MOVETXN m" in sql for sql in captured["sql_calls"])
-    assert any("NOT IN ('(UNMAPPED)', 'N/A', 'NA', '-')" in sql for sql in captured["sql_calls"])
-    assert "358" in captured["params"].values()
-    assert "REASON_X" in captured["params"].values()
 
 
 def test_query_alert_candidates_excludes_unmapped_and_policy_reason(monkeypatch):
@@ -278,40 +223,22 @@ def test_query_alert_candidates_merges_dw_into_wb_group(monkeypatch):
     assert result["items"][0]["yield_pct"] == 95
 
 
-def test_query_yield_trend_uses_movetxn_for_transaction_and_filtered_detail_for_scrap(monkeypatch):
-    monkeypatch.setattr(
-        yield_alert_service,
-        "get_excluded_reasons",
-        lambda force_refresh=False: {"358"},
-    )
+def test_query_yield_trend_raises_not_implemented_after_spool_refactor():
+    """B5: query_yield_trend must raise NotImplementedError (Oracle path retired).
 
-    def _fake_read_sql_df_slow(sql: str, _params: dict):
-        if "FROM DWH.ERP_WIP_MOVETXN m" in sql:
-            return pd.DataFrame(
-                [
-                    {
-                        "DATE_BUCKET": "2026-03-06",
-                        "TRANSACTION_QTY": 1000,
-                        "SCRAP_QTY": 999,
-                        "YIELD_PCT": 0.1,
-                    }
-                ]
-            )
-        return pd.DataFrame([{"DATE_BUCKET": "2026-03-06", "SCRAP_QTY": 25}])
-
-    monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
-
-    result = yield_alert_service.query_yield_trend(
-        start_date="2026-03-01",
-        end_date="2026-03-06",
-        granularity="day",
-        filters={},
-    )
-
-    assert len(result["items"]) == 1
-    assert result["items"][0]["transaction_qty"] == 1000
-    assert result["items"][0]["scrap_qty"] == 25
-    assert result["items"][0]["yield_pct"] == 97.5
+    Updated per test-plan.md Test Update Contract — the live Oracle trend path was
+    retired by yield-alert-spool-refactor.  Callers must use apply_cached_view.
+    The old test (test_query_yield_trend_uses_movetxn_for_transaction_and_filtered_detail_for_scrap)
+    is replaced by this assertion.
+    """
+    import pytest
+    with pytest.raises(NotImplementedError, match="live Oracle path retired"):
+        yield_alert_service.query_yield_trend(
+            start_date="2026-03-01",
+            end_date="2026-03-06",
+            granularity="day",
+            filters={},
+        )
 
 
 def test_expand_workcenter_groups_to_departments_merges_dw_into_wb():
@@ -337,33 +264,19 @@ def test_get_yield_workcenter_group_options_applies_dw_merge(monkeypatch):
     assert "焊接_DW" not in options
 
 
-def test_query_yield_summary_preserves_department_filter_when_exclusion_enabled(monkeypatch):
-    calls: list[tuple[str, dict]] = []
-    monkeypatch.setattr(
-        yield_alert_service,
-        "get_excluded_reasons",
-        lambda force_refresh=False: {"358"},
-    )
+def test_query_yield_summary_oracle_path_is_dead_code():
+    """B5: query_yield_summary raises NotImplementedError regardless of filters.
 
-    def _fake_read_sql_df_slow(sql: str, params: dict):
-        calls.append((sql, dict(params or {})))
-        if "FROM DWH.ERP_WIP_MOVETXN m" in sql:
-            return pd.DataFrame([{"TRANSACTION_QTY": 14039.147, "SCRAP_QTY": 17.155, "YIELD_PCT": 99.8778}])
-        return pd.DataFrame([{"SCRAP_QTY": 17.155}])
-
-    monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
-    result = yield_alert_service.query_yield_summary(
-        start_date="2026-02-21",
-        end_date="2026-02-21",
-        filters={"departments": ["焊接_WB", "焊接_DW"]},
-    )
-
-    assert result["summary"]["transaction_qty"] == 14039.147
-    assert result["summary"]["scrap_qty"] == 17.155
-    detail_call = next((params for sql, params in calls if "ERP_WIP_MOVETXN_DETAIL d" in sql), {})
-    assert "焊接_WB" in detail_call.values()
-    assert "焊接_DW" in detail_call.values()
-    assert "358" in detail_call.values()
+    Updated from test_query_yield_summary_preserves_department_filter_when_exclusion_enabled
+    per test-plan.md Test Update Contract.  The Oracle path is dead code.
+    """
+    import pytest
+    with pytest.raises(NotImplementedError):
+        yield_alert_service.query_yield_summary(
+            start_date="2026-02-21",
+            end_date="2026-02-21",
+            filters={"departments": ["焊接_WB", "焊接_DW"]},
+        )
 
 
 def test_query_alert_candidates_preserves_department_filter_with_exclusion_params(monkeypatch):
@@ -430,3 +343,76 @@ def test_query_alert_candidates_preserves_department_filter_with_exclusion_param
     tx_call = calls[1]
     assert "焊接_WB" in tx_call["params"].values()
     assert "焊接_DW" in tx_call["params"].values()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# yield-alert-spool-refactor: new service tests (B5)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_query_yield_trend_no_longer_calls_oracle(monkeypatch):
+    """B5: query_yield_trend must NOT call read_sql_df_slow (Oracle) after the spool refactor.
+
+    The function should raise NotImplementedError or be retired (dead code),
+    or alternatively be redirected to read from the spool.  Either way,
+    a live Oracle call via read_sql_df_slow must NOT happen.
+    """
+    oracle_called = {"called": False}
+
+    def _fake_read_sql_df_slow(sql, params, **kwargs):
+        oracle_called["called"] = True
+        import pandas as pd
+        return pd.DataFrame()
+
+    monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
+    monkeypatch.setattr(
+        yield_alert_service,
+        "get_excluded_reasons",
+        lambda force_refresh=False: set(),
+    )
+
+    # After B5 the function should either be removed or replaced.
+    # If it's removed, calling it should raise AttributeError.
+    # If it now reads from spool, it should NOT hit read_sql_df_slow.
+    try:
+        yield_alert_service.query_yield_trend(
+            start_date="2026-02-01",
+            end_date="2026-02-28",
+            granularity="day",
+            filters={},
+        )
+    except (NotImplementedError, AttributeError):
+        pass  # acceptable: function retired
+
+    assert not oracle_called["called"], (
+        "query_yield_trend must NOT call Oracle (read_sql_df_slow) after spool refactor"
+    )
+
+
+def test_query_yield_summary_no_longer_calls_oracle(monkeypatch):
+    """B5: query_yield_summary must NOT call read_sql_df_slow (Oracle) after the spool refactor."""
+    oracle_called = {"called": False}
+
+    def _fake_read_sql_df_slow(sql, params, **kwargs):
+        oracle_called["called"] = True
+        import pandas as pd
+        return pd.DataFrame()
+
+    monkeypatch.setattr(yield_alert_service, "read_sql_df_slow", _fake_read_sql_df_slow)
+    monkeypatch.setattr(
+        yield_alert_service,
+        "get_excluded_reasons",
+        lambda force_refresh=False: set(),
+    )
+
+    try:
+        yield_alert_service.query_yield_summary(
+            start_date="2026-02-01",
+            end_date="2026-02-28",
+            filters={},
+        )
+    except (NotImplementedError, AttributeError):
+        pass  # acceptable: function retired
+
+    assert not oracle_called["called"], (
+        "query_yield_summary must NOT call Oracle (read_sql_df_slow) after spool refactor"
+    )

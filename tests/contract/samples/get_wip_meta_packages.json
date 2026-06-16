@@ -1,75 +1,75 @@
 {
   "data": [
     {
-      "lot_count": 1617,
+      "lot_count": 1590,
       "name": "SOD-323"
     },
     {
-      "lot_count": 1243,
+      "lot_count": 1229,
       "name": "SOT-23 CU"
     },
     {
-      "lot_count": 765,
+      "lot_count": 753,
       "name": "SOD-123"
     },
     {
-      "lot_count": 696,
+      "lot_count": 712,
       "name": "SOD-123FL OP1"
     },
     {
-      "lot_count": 693,
+      "lot_count": 671,
       "name": "SOT-323"
     },
     {
-      "lot_count": 612,
+      "lot_count": 604,
       "name": "SOD-123FL HD"
     },
     {
-      "lot_count": 600,
+      "lot_count": 589,
       "name": "SOT-23"
     },
     {
-      "lot_count": 412,
+      "lot_count": 408,
       "name": "SOD-523"
     },
     {
-      "lot_count": 371,
+      "lot_count": 370,
       "name": "TO-277"
     },
     {
-      "lot_count": 350,
+      "lot_count": 341,
       "name": "SOT-223"
     },
     {
-      "lot_count": 315,
+      "lot_count": 301,
       "name": "DO-218AB"
     },
     {
-      "lot_count": 293,
+      "lot_count": 288,
       "name": "SOT-363"
     },
     {
-      "lot_count": 268,
+      "lot_count": 275,
       "name": "SOT23-6L"
     },
     {
-      "lot_count": 210,
+      "lot_count": 218,
       "name": "SOD-323HE"
     },
     {
-      "lot_count": 196,
+      "lot_count": 197,
       "name": "SOT-563 HD"
     },
     {
-      "lot_count": 177,
+      "lot_count": 174,
       "name": "SMAF-C"
     },
     {
-      "lot_count": 160,
+      "lot_count": 154,
       "name": "SOT-563"
     },
     {
-      "lot_count": 157,
+      "lot_count": 149,
       "name": "SOT-363 CU"
     },
     {
@@ -85,24 +85,24 @@
       "name": "SMBF"
     },
     {
-      "lot_count": 95,
+      "lot_count": 98,
+      "name": "點測"
+    },
+    {
+      "lot_count": 94,
       "name": "SOT-523"
     },
     {
-      "lot_count": 73,
+      "lot_count": 72,
       "name": "SOD-923"
     },
     {
-      "lot_count": 63,
+      "lot_count": 61,
       "name": "TO-277B"
     },
     {
       "lot_count": 59,
       "name": "SMAF"
-    },
-    {
-      "lot_count": 56,
-      "name": "點測"
     },
     {
       "lot_count": 41,
@@ -114,7 +114,7 @@
     },
     {
       "lot_count": 2,
-      "name": "DFN1006-3L"
+      "name": "SOT-353"
     },
     {
       "lot_count": 2,
@@ -122,11 +122,11 @@
     },
     {
       "lot_count": 2,
-      "name": "DFN 2L"
+      "name": "DFN1006-3L"
     },
     {
       "lot_count": 2,
-      "name": "SOT-353"
+      "name": "DFN 2L"
     },
     {
       "lot_count": 1,
@@ -134,16 +134,16 @@
     },
     {
       "lot_count": 1,
-      "name": "DFN1010B-6L"
+      "name": "SOT-23 6L-1"
     },
     {
       "lot_count": 1,
-      "name": "SOT-23 6L-1"
+      "name": "DFN1010B-6L"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:40:31.442476"
+    "timestamp": "2026-06-16T22:14:10.958625"
   },
   "success": true
 }

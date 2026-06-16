@@ -3,6 +3,10 @@
 --   :start_date - YYYY-MM-DD
 --   :end_date   - YYYY-MM-DD
 --   + optional QueryBuilder params in {{ WHERE_CLAUSE }}
+-- B3 (yield-alert-spool-refactor): Added SOURCE_CODE to SELECT/GROUP BY;
+-- removed PACKAGE IS NOT NULL filter; uses :process_type bind param instead of hardcoded GA%.
+-- NOTE: This SQL is used by the legacy query_alert_candidates() path which is now dead code.
+-- The primary data path uses _PRIMARY_DETAIL_SQL in yield_alert_dataset_cache.py.
 WITH grouped AS (
     SELECT
         TRUNC(d.TXN_DATE) AS DATE_BUCKET,
@@ -15,14 +19,13 @@ WITH grouped AS (
         NVL(TRIM(d.TYPE), '(NA)') AS TYPE_NAME,
         NVL(TRIM(d.FUNCTION), '(NA)') AS FUNCTION_NAME,
         NVL(d.OPERATION_SEQ_NUM, -1) AS OPERATION_SEQ_NUM,
+        NVL(TRIM(d.SOURCE_CODE), NULL) AS SOURCE_CODE,
         SUM(NVL(d.TRANSACTION_QUANTITY, 0)) AS TRANSACTION_QTY,
         SUM(NVL(d.SCRAP_QUANTITY, 0)) AS SCRAP_QTY
     FROM DWH.ERP_WIP_MOVETXN_DETAIL d
     WHERE d.TXN_DATE >= TO_DATE(:start_date, 'YYYY-MM-DD')
       AND d.TXN_DATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
   AND UPPER(NVL(TRIM(d.WIP_ENTITY_NAME), '-')) LIKE 'GA%'
-  AND d.PACKAGE IS NOT NULL
-  AND TRIM(d.PACKAGE) NOT IN ('N/A', 'NA', '(NA)', '(N/A)', 'NULL')
 {{ WHERE_CLAUSE }}
 {{ EXCLUSION_CLAUSE }}
     GROUP BY
@@ -35,7 +38,8 @@ WITH grouped AS (
         NVL(TRIM(d.PACKAGE), '(NA)'),
         NVL(TRIM(d.TYPE), '(NA)'),
         NVL(TRIM(d.FUNCTION), '(NA)'),
-        NVL(d.OPERATION_SEQ_NUM, -1)
+        NVL(d.OPERATION_SEQ_NUM, -1),
+        NVL(TRIM(d.SOURCE_CODE), NULL)
 )
 SELECT
     DATE_BUCKET,
@@ -48,6 +52,7 @@ SELECT
     TYPE_NAME,
     FUNCTION_NAME,
     OPERATION_SEQ_NUM,
+    SOURCE_CODE,
     TRANSACTION_QTY,
     SCRAP_QTY,
     CASE

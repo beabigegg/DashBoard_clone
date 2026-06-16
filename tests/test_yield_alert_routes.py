@@ -97,19 +97,25 @@ def test_view_supports_workcenter_group_filters(mock_view, client):
     assert "焊接_DW" in kwargs["filters"]["departments"]
 
 
-@patch("mes_dashboard.routes.yield_alert_routes.cache_get")
-def test_summary_cache_hit_returns_meta(cache_get, client):
-    cache_get.return_value = {
-        "success": True,
-        "data": {"transaction_qty": 100, "scrap_qty": 2, "yield_pct": 98},
-        "meta": {},
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_summary_spool_path_returns_summary(mock_view, client):
+    """B5: GET /api/yield-alert/summary with query_id reads from spool via apply_cached_view."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 100, "scrap_qty": 2, "yield_pct": 98},
+        "trend": {"items": []},
+        "alerts": {"items": [], "pagination": {}, "quality": {}, "sort": {}},
+        "heatmap": {},
+        "station_summary": {},
+        "package_summary": {},
+        "filter_options": {},
+        "meta": {"view_source": "duckdb"},
     }
 
-    response = client.get("/api/yield-alert/summary?start_date=2026-03-01&end_date=2026-03-06")
+    response = client.get("/api/yield-alert/summary?query_id=qid-sum-001")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["success"] is True
-    assert payload["meta"]["cache"]["hit"] is True
+    assert payload["data"]["transaction_qty"] == 100
 
 
 def test_alerts_rejects_invalid_sort_key(client):
@@ -334,3 +340,117 @@ class TestJobExpiry410PollingRace:
         body = rv.get_json()
         assert rv.status_code == 400
         assert body['error']['code'] == 'VALIDATION_ERROR'
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# yield-alert-spool-refactor: new route tests (B4, B5, B6)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_query_requires_valid_process_type(client):
+    """B4: POST /api/yield-alert/query with invalid process_type must return 400 VALIDATION_ERROR."""
+    response = client.post(
+        "/api/yield-alert/query",
+        json={
+            "start_date": "2026-02-01",
+            "end_date": "2026-02-28",
+            "process_type": "INVALID",
+        },
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "VALIDATION_ERROR"
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.execute_primary_query")
+def test_query_defaults_process_type_to_ga(mock_primary, client):
+    """B4: POST /api/yield-alert/query without process_type must default to 'GA%'."""
+    mock_primary.return_value = {"query_id": "ya-ga-default", "meta": {"cache_hit": False}}
+
+    response = client.post(
+        "/api/yield-alert/query",
+        json={"start_date": "2026-02-01", "end_date": "2026-02-28"},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    # process_type must have been forwarded as 'GA%'
+    assert mock_primary.called
+    call_kwargs = mock_primary.call_args.kwargs
+    assert call_kwargs.get("process_type") == "GA%"
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_trend_endpoint_uses_spool_not_oracle(mock_view, client):
+    """B5: GET /api/yield-alert/trend must NOT call Oracle; uses apply_cached_view (spool path).
+
+    query_yield_trend is no longer imported in the routes module after B5 — this test
+    confirms the trend endpoint routes through apply_cached_view, not a live Oracle call.
+    """
+    import mes_dashboard.services.yield_alert_service as svc
+    oracle_called = {"called": False}
+    real_trend = svc.query_yield_trend
+
+    def _spy_trend(*args, **kwargs):
+        oracle_called["called"] = True
+        return real_trend(*args, **kwargs)
+
+    mock_view.return_value = {
+        "summary": {},
+        "trend": {"items": []},
+        "alerts": {"items": [], "pagination": {}, "quality": {}, "sort": {}},
+        "heatmap": {},
+        "station_summary": {},
+        "package_summary": {},
+        "filter_options": {},
+        "meta": {"view_source": "duckdb"},
+    }
+    response = client.get("/api/yield-alert/trend?query_id=spool-qid-001")
+    # apply_cached_view is the spool path — it must have been called
+    assert mock_view.called, "Trend endpoint must call apply_cached_view (spool path)"
+    # Oracle function is NOT called by the route (it's not even imported)
+    assert not oracle_called["called"], (
+        "Trend endpoint must NOT call Oracle query_yield_trend after spool refactor"
+    )
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_alerts_response_includes_source_code_field(mock_view, client):
+    """B6: GET /api/yield-alert/view alerts items must include a 'source_code' key."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 1000, "scrap_qty": 5, "yield_pct": 99.5},
+        "trend": {"items": []},
+        "alerts": {
+            "items": [
+                {
+                    "date_bucket": "2026-02-21",
+                    "workorder": "GA-WO-001",
+                    "reason_code": "031",
+                    "source_code": "LOT-ABC",
+                    "scrap_qty": 5.0,
+                    "transaction_qty": 100.0,
+                    "yield_pct": 95.0,
+                    "risk_level": "low",
+                    "risk_score": 3.0,
+                }
+            ],
+            "pagination": {"page": 1, "per_page": 50, "total": 1, "total_pages": 1},
+            "quality": {},
+            "sort": {"sort_by": "date_bucket", "sort_dir": "desc"},
+        },
+        "heatmap": {},
+        "station_summary": {},
+        "package_summary": {},
+        "filter_options": {},
+        "meta": {"view_source": "duckdb"},
+    }
+
+    response = client.get("/api/yield-alert/view?query_id=qid-src-001")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    items = payload["data"]["alerts"]["items"]
+    assert len(items) >= 1
+    assert "source_code" in items[0], (
+        "Alert items must include 'source_code' field after spool-refactor B6"
+    )

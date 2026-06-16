@@ -8,6 +8,20 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.24.0] — 2026-06-16
+### Added
+- yield-alert-spool-refactor: `POST /api/yield-alert/query` gains required `process_type` param (`"GA%"` packaging | `"GC%"` point-test; default `"GA%"`; invalid value → 400 VALIDATION_ERROR). `GET /api/yield-alert/alerts` response gains `source_code` field (string|null, LOT ID from ERP_WIP_MOVETXN_DETAIL) in each alert row. Schema `YieldAlertAlertsResponse` added.
+### Changed
+- yield-alert-spool-refactor: `GET /api/yield-alert/trend` and `GET /api/yield-alert/summary` now served exclusively from DuckDB spool (live Oracle query path retired); 410 CACHE_EXPIRED when spool cold.
+
+## [data 1.17.0] — 2026-06-16
+### Added
+- yield-alert-spool-refactor: §3.16 (yield_alert_dataset spool v5) — 10-column schema with SOURCE_CODE, REJECT_LINKED, process_type; `SOURCE_CODE IS NOT NULL ⇒ TX_QTY = 0` invariant; `PACKAGE IS NOT NULL` filter removal rationale; process_type scope table (GA%/GC%); `_CACHE_SCHEMA_VERSION` bump 4→5 breaking-change surface.
+
+## [business 1.21.0] — 2026-06-16
+### Added
+- yield-alert-spool-refactor: Rules YA-01..YA-09 — process-type scope (GA%/GC% mutually exclusive), GA%/GC% distinction, PACKAGE filter removal rationale (PACKAGE=NA count is 0 for GA%; GC% must retain PACKAGE=NA), SOURCE_CODE invariant (non-null ⇒ scrap-only, TX=0), LOT dimension semantics, spool-first serving, reject linkage via spool REJECT_LINKED column, ERP_WIP_MOVETXN_DETAIL as data source, schema-version bump policy.
+
 ## [env 1.0.12] — 2026-06-16
 ### Added
 - hold-overview-export-csv: Added `HOLD_OVERVIEW_EXPORT_MAX_ROWS` (int, default 10000, no restart required) — caps rows returned by `/api/hold-overview/lots` in export mode. Additive.

@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.20.0
-last-changed: 2026-06-13
+schema-version: 1.21.0
+last-changed: 2026-06-16
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -151,6 +151,20 @@ breaking-change-policy: deprecate-2-minors
 | PHF-07 | Identifier-mode date optionality | `POST /api/production-history/query` 當 request 含至少一個 identifier wildcard token（`mfg_orders` / `lot_ids` / `wafer_lots`，通過 PHF-02 解析後非空）且未提供 `start_date` / `end_date` 時，`validate_query_params` 不再要求日期，改以 wide / all-time 查詢路徑執行（identifier 述詞已充分 scope 查詢）。日期若有提供仍套用 730d 上限（VAL-03 / SYS-04）。Identifier-mode 查詢不要求 `pj_types`。（AC-4） | unit + contract + integration tests |
 | PHF-08 | Classification-mode required params | `POST /api/production-history/query` 當 request 不含任何 identifier wildcard token 時為 classification mode：`pj_types`、`start_date`、`end_date` 皆為必填，缺少任一 → 400 `VALIDATION_ERROR`（行為與 prod-history-query-mode-tabs 之前完全一致，為 VAL-02 在 mode-split 後的精確化表述）。（AC-2、AC-7） | unit + contract + route tests |
 
+## Yield Alert Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| YA-01 | Process-type scope | `POST /api/yield-alert/query` accepts optional `process_type` field (enum: `"GA%"` = packaging/assembly default, `"GC%"` = wafer-sort/point-test). Applied as `WIP_ENTITY_NAME LIKE process_type` at Oracle query time. All downstream views (trend, summary, heatmap, alerts) are scoped to the same process type via the spool. Omitting `process_type` defaults to `"GA%"` (backward-compatible). Any value not in `{"GA%","GC%"}` → 400 `VALIDATION_ERROR`. | route tests |
+| YA-02 | GA%/GC% distinction | GA% (`WIP_ENTITY_NAME LIKE 'GA%'`) covers packaging/assembly workorders. GC% (`WIP_ENTITY_NAME LIKE 'GC%'`) covers wafer-sort/point-test workorders. Both reside in the same Oracle tables. They are NOT interchangeable: GC% PACKAGE=NA is valid data; GA% PACKAGE=NA has 0 rows. No filter should conflate the two. | route tests |
+| YA-03 | PACKAGE IS NOT NULL filter removal | The `PACKAGE IS NOT NULL` predicate is removed from all GA% queries. Rationale: verified by direct Oracle query — zero GA% workorder rows have PACKAGE=NA. The filter was redundant and added unnecessary exclusion risk. For GC%, PACKAGE=NA is valid data and must never be filtered. | data-invariant test |
+| YA-04 | SOURCE_CODE NOT NULL ⇒ TX_QTY=0 | When `ERP_WIP_MOVETXN_DETAIL.SOURCE_CODE IS NOT NULL`, the row is a LOT-level scrap attribution row and its `TRANSACTION_QTY` (TX) is always 0. Verified by direct Oracle query: 100% of SOURCE_CODE NOT NULL rows have TX=0. These rows MUST NOT be summed into the TX denominator. The yield formula (`SCRAP_QTY / TX_QTY`) at workorder grain is unchanged. | unit tests (data-invariant assertion) |
+| YA-05 | LOT dimension in alert list | The alert list (`GET /api/yield-alert/alerts`) exposes `source_code: string \| null` per row. Non-null `source_code` identifies the LOT ID (`DW_MES_WIP.CONTAINERNAME` equivalent) responsible for the scrap. This adds display precision without changing alert-level scrap totals or yield thresholds. Alert triggering logic operates on workorder-grain aggregates that exclude TX=0 rows (YA-04). | route + unit tests |
+| YA-06 | Spool-first view serving | All four yield-alert views (trend, summary, heatmap, alerts) are computed from the `yield_alert_dataset` DuckDB spool after the initial query. No separate Oracle trend.sql or summary.sql query is issued for view serving. A spool miss → 410 `CACHE_EXPIRED`; client must re-trigger `POST /api/yield-alert/query` (Type A pattern, same as hold-history). The live-query fallback path is retired. | resilience tests |
+| YA-07 | Reject linkage in single spool pull | The `REJECT_LINKED` boolean flag for each spool row is computed during the initial Oracle pull (by joining against the reject table in the same query). The prior separate `_compute_reject_linkage` Oracle query after the main pull is retired. | unit + integration tests |
+| YA-08 | ERP_WIP_MOVETXN_DETAIL as data source | Trend and summary aggregations use `ERP_WIP_MOVETXN_DETAIL` (row-level detail table) instead of `ERP_WIP_MOVETXN` (pre-aggregated). Verified by direct Oracle comparison: GA% totals identical (TX=70,494,377, SCRAP=81,972). `ERP_WIP_MOVETXN_DETAIL` provides `SOURCE_CODE` (LOT ID) which the aggregate table does not. | parity test (totals match) |
+| YA-09 | Spool schema version | `yield_alert_dataset_cache.py` contains a `_SCHEMA_VERSION` integer constant that participates in the spool cache key. Bumping `_SCHEMA_VERSION` orphans stale parquets by key without requiring a manual `rm`. Any column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. Schema-breaking rollback also requires: `rm -f tmp/query_spool/yield_alert_dataset/*.parquet`. | env-validation / constant-pin test |
+
 ## Analytics / Anomaly Detection Rules
 
 | rule id | name | current behavior | tests |
@@ -280,6 +294,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.21.0] — 2026-06-16
+### Added
+- yield-alert-spool-refactor: Added YA-01..YA-09 (Yield Alert Rules section) covering process-type scope (GA%/GC% enum, default GA%, VALIDATION_ERROR on invalid), GA%/GC% domain distinction, PACKAGE IS NOT NULL filter removal rationale (0 GA% rows affected), SOURCE_CODE NOT NULL ⇒ TX_QTY=0 invariant, LOT dimension in alert list (display only; yield formula unchanged), spool-first view serving (Type A spool pattern; live Oracle trend/summary paths retired), reject linkage in single spool pull (_compute_reject_linkage retired), ERP_WIP_MOVETXN_DETAIL as data source (totals verified identical), and spool schema version governance. Additive; no existing rules changed.
 
 ## [business 1.11.0]
 - ai-pipeline-upgrade (2026-05-29): Added AI-04 (combined-prompt output schema), AI-05 (malformed-JSON fallback), AI-06 (chat_history append policy), AI-07 (chat_history cap/eviction), AI-08 (history injection ordering), AI-09 (three new function behaviors). Updated AI-01 description to reflect combined-call. Additive; no existing rules changed.

@@ -93,6 +93,7 @@ interface PackageItem {
 interface AlertItem {
   date_bucket: string;
   workorder: string;
+  source_code: string | null;
   reason_code: string;
   reason_name: string;
   department: string;
@@ -438,7 +439,7 @@ async function queryAlerts(client: DuckDBClient, { fullWhere, reasonWhere, riskT
   const txWhere = fullWhere ? `WHERE ${fullWhere}` : '';
 
   const groupByCols = [
-    'DATE_BUCKET', 'WORKORDER', 'REASON_CODE', 'REASON_NAME',
+    'DATE_BUCKET', 'WORKORDER', 'SOURCE_CODE', 'REASON_CODE', 'REASON_NAME',
     'DEPARTMENT_GROUP', 'PROCESS_CATEGORY', 'LINE_NAME', 'PACKAGE_NAME',
     'TYPE_NAME', 'FUNCTION_NAME', 'OPERATION_TEXT',
   ].map(c => qid(c)).join(', ');
@@ -467,6 +468,7 @@ async function queryAlerts(client: DuckDBClient, { fullWhere, reasonWhere, riskT
       SELECT
         ${qid('DATE_BUCKET')},
         ${qid('WORKORDER')},
+        ${qid('SOURCE_CODE')},
         ${qid('REASON_CODE')},
         ${qid('REASON_NAME')},
         ${qid('DEPARTMENT_GROUP')},
@@ -513,6 +515,7 @@ async function queryAlerts(client: DuckDBClient, { fullWhere, reasonWhere, riskT
     return {
       date_bucket: String(r.DATE_BUCKET || ''),
       workorder: String(r.WORKORDER || '').trim(),
+      source_code: r.SOURCE_CODE != null ? String(r.SOURCE_CODE).trim() : null,
       reason_code: String(r.REASON_CODE || '').trim(),
       reason_name: String(r.REASON_NAME || '').trim(),
       department: String(r.DEPARTMENT_GROUP || '(NA)'),

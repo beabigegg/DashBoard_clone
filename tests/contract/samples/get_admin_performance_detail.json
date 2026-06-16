@@ -43,7 +43,7 @@
     },
     "direct_connections": {
       "total_since_start": 7,
-      "worker_pid": 626849
+      "worker_pid": 720722
     },
     "duckdb": {
       "memory_limit_state": "512MB",
@@ -78,7 +78,7 @@
         },
         {
           "count": 1,
-          "lock_mode": "yield_alert_primary:5351b8591d615679:closed"
+          "lock_mode": "yield_alert_primary:603042460514face:closed"
         }
       ],
       "lock_fail_mode_triggered_total": 2,
@@ -161,44 +161,9 @@
     },
     "spool_disk_usage": [
       {
-        "file_count": 1,
-        "namespace": "anomaly_reject_dataset",
-        "total_bytes": 3652030
-      },
-      {
-        "file_count": 1,
-        "namespace": "anomaly_resource_dataset",
-        "total_bytes": 1861146
-      },
-      {
-        "file_count": 1,
-        "namespace": "anomaly_hold_dataset",
-        "total_bytes": 466651
-      },
-      {
         "file_count": 3,
-        "namespace": "reject_dataset",
-        "total_bytes": 12918074
-      },
-      {
-        "file_count": 4,
-        "namespace": "downtime_analysis_job_bridge",
-        "total_bytes": 19023135
-      },
-      {
-        "file_count": 1,
-        "namespace": "anomaly_yield_dataset",
-        "total_bytes": 134708754
-      },
-      {
-        "file_count": 4,
-        "namespace": "downtime_analysis_base_events",
-        "total_bytes": 8374083
-      },
-      {
-        "file_count": 3,
-        "namespace": "hold_dataset",
-        "total_bytes": 857255
+        "namespace": "msd-events",
+        "total_bytes": 0
       },
       {
         "file_count": 0,
@@ -206,24 +171,9 @@
         "total_bytes": 0
       },
       {
-        "file_count": 5,
-        "namespace": "resource_dataset",
-        "total_bytes": 6298157
-      },
-      {
-        "file_count": 2,
-        "namespace": "yield_alert_dataset",
-        "total_bytes": 144420866
-      },
-      {
         "file_count": 0,
         "namespace": "production_history",
         "total_bytes": 0
-      },
-      {
-        "file_count": 5,
-        "namespace": "resource_oee",
-        "total_bytes": 1781085
       }
     ],
     "worker_memory_guard": {
@@ -274,7 +224,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:42:01.547622"
+    "timestamp": "2026-06-16T22:15:44.476699"
   },
   "success": true
 }

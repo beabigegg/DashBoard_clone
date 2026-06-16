@@ -1,0 +1,1 @@
+conda run -n mes-dashboard ruff check src/mes_dashboard/services/yield_alert_dataset_cache.py src/mes_dashboard/services/yield_alert_service.py src/mes_dashboard/routes/yield_alert_routes.py

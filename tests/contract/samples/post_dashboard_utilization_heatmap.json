@@ -889,11 +889,11 @@
       "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 4197.6,
+      "avail_hours": 4201.5,
       "date": "2026-06-15",
       "group": "焊接_WB",
-      "prd_hours": 3059.8,
-      "prd_pct": 72.89,
+      "prd_hours": 3063.7,
+      "prd_pct": 72.92,
       "workcenter": "焊接_WB"
     },
     {
@@ -1067,7 +1067,7 @@
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:42:01.330741"
+    "timestamp": "2026-06-16T22:15:44.269306"
   },
   "success": true
 }

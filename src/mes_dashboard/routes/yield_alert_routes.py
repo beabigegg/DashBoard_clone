@@ -43,8 +43,6 @@ from mes_dashboard.services.yield_alert_service import (
     get_yield_workcenter_group_options,
     query_alert_candidates,
     query_reason_detail,
-    query_yield_summary,
-    query_yield_trend,
 )
 from mes_dashboard.services.yield_alert_sql_runtime import compute_cross_filter_options
 
@@ -167,6 +165,20 @@ def api_yield_alert_query():
     if not start_date or not end_date:
         return validation_error("缺少必要參數: start_date, end_date")
 
+    # B4: Validate process_type — must be GA% or GC%; default to GA%
+    _VALID_PROCESS_TYPES = frozenset({"GA%", "GC%"})
+    raw_process_type = body.get("process_type")
+    if raw_process_type is None:
+        process_type = "GA%"
+    else:
+        process_type = str(raw_process_type).strip()
+        if process_type not in _VALID_PROCESS_TYPES:
+            return error_response(
+                VALIDATION_ERROR,
+                f"process_type 無效，允許值: {', '.join(sorted(_VALID_PROCESS_TYPES))}",
+                status_code=400,
+            )
+
     # Check if cache already exists — serve immediately if so
     from mes_dashboard.services.yield_alert_dataset_cache import (
         _CACHE_SCHEMA_VERSION,
@@ -179,12 +191,13 @@ def api_yield_alert_query():
             "cache_schema_version": _CACHE_SCHEMA_VERSION,
             "start_date": start_date,
             "end_date": end_date,
+            "process_type": process_type,
         }
     )
 
     if _get_cached_payload(query_id) is not None:
         try:
-            result = execute_primary_query(start_date=start_date, end_date=end_date)
+            result = execute_primary_query(start_date=start_date, end_date=end_date, process_type=process_type)
             return success_response(result)
         except MemoryError as exc:
             record_memory_error("yield_alert.query", reason="rss_guard")
@@ -209,7 +222,7 @@ def api_yield_alert_query():
 
     if YIELD_ALERT_ASYNC_ENABLED and is_async_available():
         from mes_dashboard.core.permissions import get_owner_token
-        job_id, err = enqueue_yield_alert_query({"start_date": start_date, "end_date": end_date}, owner=get_owner_token())
+        job_id, err = enqueue_yield_alert_query({"start_date": start_date, "end_date": end_date, "process_type": process_type}, owner=get_owner_token())
         if job_id is None:
             logger.warning("yield_alert async enqueue failed (%s)", err)
             return error_response(
@@ -231,7 +244,7 @@ def api_yield_alert_query():
 
     # Sync fallback (RQ unavailable or async disabled)
     try:
-        result = execute_primary_query(start_date=start_date, end_date=end_date)
+        result = execute_primary_query(start_date=start_date, end_date=end_date, process_type=process_type)
         return success_response(result)
     except SpoolWriteError as exc:
         logger.warning("Yield alert spool write failed: %s", exc)
@@ -400,84 +413,74 @@ def api_yield_alert_view():
 @yield_alert_bp.route("/api/yield-alert/summary", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_summary():
+    """Return yield summary data.
+
+    B5: When query_id is provided, reads summary from spool via apply_cached_view.
+    Legacy date-range path (no query_id) is retired — returns 410 CACHE_EXPIRED.
+    """
     if not _YIELD_ALERT_ENABLED:
         return not_found_error("yield_alert_disabled")
 
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return date_error
+    query_id = str(request.args.get("query_id", "")).strip()
+    if not query_id:
+        # B5: live Oracle summary path retired; callers must use POST /query first.
+        # For backward compat, also accept date-range params to surface a meaningful error.
+        start_date = str(request.args.get("start_date", "")).strip()
+        end_date = str(request.args.get("end_date", "")).strip()
+        if not start_date or not end_date:
+            return error_response(
+                VALIDATION_ERROR,
+                "缺少必要參數: start_date, end_date",
+                status_code=400,
+                meta={"max_query_days": MAX_QUERY_DAYS},
+            )
+        return cache_expired_error()
 
     filters = _common_filters()
 
-    payload_key = {
-        "start_date": start_date,
-        "end_date": end_date,
-        "filters": filters,
-    }
-
-    def _compute():
-        result = query_yield_summary(
-            start_date=start_date or "",
-            end_date=end_date or "",
+    try:
+        result = apply_cached_view(
+            query_id=query_id,
             filters=filters,
         )
-        return {
-            "success": True,
-            "data": result["summary"],
-            "meta": result.get("meta") or {},
-        }
-
-    try:
-        return _cache_response("summary", payload_key, _compute)
-    except ValueError as exc:
-        return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
+        if result is None:
+            return cache_expired_error()
+        return success_response(result.get("summary", {}))
     except Exception:
-        logger.exception("Yield alert summary query failed")
+        logger.exception("Yield alert summary spool query failed")
         return internal_error("查詢良率摘要失敗")
 
 
 @yield_alert_bp.route("/api/yield-alert/trend", methods=["GET"])
 @_QUERY_RATE_LIMIT
 def api_yield_alert_trend():
+    """Return yield trend data.
+
+    B5: When query_id is provided, reads trend from spool via apply_cached_view.
+    Legacy date-range path (no query_id) is retired — returns 410 CACHE_EXPIRED.
+    """
     if not _YIELD_ALERT_ENABLED:
         return not_found_error("yield_alert_disabled")
 
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return date_error
+    query_id = str(request.args.get("query_id", "")).strip()
+    if not query_id:
+        # B5: live Oracle trend path retired; callers must use POST /query first
+        return cache_expired_error()
 
     granularity = str(request.args.get("granularity", "day") or "day").strip().lower()
     filters = _common_filters()
 
-    payload_key = {
-        "start_date": start_date,
-        "end_date": end_date,
-        "granularity": granularity,
-        "filters": filters,
-    }
-
-    def _compute():
-        result = query_yield_trend(
-            start_date=start_date or "",
-            end_date=end_date or "",
-            granularity=granularity,
-            filters=filters,
-        )
-        return {
-            "success": True,
-            "data": {
-                "items": result["items"],
-                "granularity": result["granularity"],
-            },
-            "meta": result.get("meta") or {},
-        }
-
     try:
-        return _cache_response("trend", payload_key, _compute)
-    except ValueError as exc:
-        return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
+        result = apply_cached_view(
+            query_id=query_id,
+            filters=filters,
+            granularity=granularity,
+        )
+        if result is None:
+            return cache_expired_error()
+        return success_response({"items": result.get("trend", {}).get("items", []), "granularity": granularity})
     except Exception:
-        logger.exception("Yield alert trend query failed")
+        logger.exception("Yield alert trend spool query failed")
         return internal_error("查詢良率趨勢失敗")
 
 

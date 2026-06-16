@@ -10,7 +10,7 @@
     },
     "lots": [
       {
-        "age": 100.0,
+        "age": 100.3,
         "dept": "封裝品質管制課",
         "futureHoldComment": null,
         "holdBy": "詹慈嬿",
@@ -25,7 +25,7 @@
         "workorder": "GA26021978"
       },
       {
-        "age": 91.8,
+        "age": 92.2,
         "dept": "封裝品質管制課",
         "futureHoldComment": ";RD料號工程驗證",
         "holdBy": "宋品萱",
@@ -40,7 +40,7 @@
         "workorder": "GA26021999"
       },
       {
-        "age": 45.4,
+        "age": 45.7,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -55,7 +55,7 @@
         "workorder": "GA26041709"
       },
       {
-        "age": 44.8,
+        "age": 45.1,
         "dept": "供應商管理課",
         "futureHoldComment": "[失效模式]：[鍍銀層偏位]，[不良率]：[??]，[發現時機]：[??]，[現況確認]：[待與其他風險批一同處置]",
         "holdBy": "李育全",
@@ -70,7 +70,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 44.4,
+        "age": 44.7,
         "dept": "供應商管理課",
         "futureHoldComment": "[失效模式]：[鍍銀層偏移]，[不良率]：[??]，[發現時機]：[IPQC首件檢查]，[現況確認]：[風險批]",
         "holdBy": "李育全",
@@ -85,7 +85,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 44.4,
+        "age": 44.7,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -100,22 +100,7 @@
         "workorder": "GA26041709"
       },
       {
-        "age": 44.0,
-        "dept": "供應商管理課",
-        "futureHoldComment": null,
-        "holdBy": "李育全",
-        "holdComment": "[失效模式]：[LY26050004]，[不良率]：[??]，[發現時機]：[??]，[現況確認]：[待QC與其他風險批一同處置]",
-        "holdReason": "工程驗證(PE)",
-        "lotId": "GA26041708-A00-007",
-        "package": "SOD-323HE",
-        "product": "SS1040HEWS-AU_R1_000A1",
-        "qty": 35176,
-        "spec": "PRE TMTT",
-        "workcenter": "TMTT",
-        "workorder": "GA26041708"
-      },
-      {
-        "age": 44.0,
+        "age": 44.3,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -130,7 +115,22 @@
         "workorder": "GA26041706"
       },
       {
-        "age": 43.9,
+        "age": 44.3,
+        "dept": "供應商管理課",
+        "futureHoldComment": null,
+        "holdBy": "李育全",
+        "holdComment": "[失效模式]：[LY26050004]，[不良率]：[??]，[發現時機]：[??]，[現況確認]：[待QC與其他風險批一同處置]",
+        "holdReason": "工程驗證(PE)",
+        "lotId": "GA26041708-A00-007",
+        "package": "SOD-323HE",
+        "product": "SS1040HEWS-AU_R1_000A1",
+        "qty": 35176,
+        "spec": "PRE TMTT",
+        "workcenter": "TMTT",
+        "workorder": "GA26041708"
+      },
+      {
+        "age": 44.2,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -145,7 +145,7 @@
         "workorder": "GA26041709"
       },
       {
-        "age": 43.8,
+        "age": 44.1,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -160,7 +160,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 43.8,
+        "age": 44.1,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -175,7 +175,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 43.7,
+        "age": 44.1,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -190,7 +190,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 43.7,
+        "age": 44.0,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -205,7 +205,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 43.6,
+        "age": 43.9,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -220,7 +220,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 43.5,
+        "age": 43.8,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -235,7 +235,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 43.5,
+        "age": 43.8,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -250,7 +250,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 43.4,
+        "age": 43.7,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -265,7 +265,7 @@
         "workorder": "GA26041574"
       },
       {
-        "age": 43.3,
+        "age": 43.6,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -280,7 +280,7 @@
         "workorder": "GA26041574"
       },
       {
-        "age": 43.3,
+        "age": 43.6,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -295,7 +295,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 43.2,
+        "age": 43.6,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -310,7 +310,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 43.2,
+        "age": 43.5,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -325,7 +325,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 43.2,
+        "age": 43.5,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -340,7 +340,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 43.2,
+        "age": 43.5,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -355,7 +355,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 43.2,
+        "age": 43.5,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -370,7 +370,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 43.0,
+        "age": 43.3,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -385,7 +385,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 42.9,
+        "age": 43.2,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -400,7 +400,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 42.9,
+        "age": 43.2,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -415,7 +415,7 @@
         "workorder": "GA26041708"
       },
       {
-        "age": 42.4,
+        "age": 42.7,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -430,7 +430,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 42.4,
+        "age": 42.7,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -445,7 +445,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 42.3,
+        "age": 42.6,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -460,7 +460,7 @@
         "workorder": "GA26041719"
       },
       {
-        "age": 42.3,
+        "age": 42.6,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -475,7 +475,7 @@
         "workorder": "GA26041715"
       },
       {
-        "age": 42.2,
+        "age": 42.5,
         "dept": "供應商管理課",
         "futureHoldComment": null,
         "holdBy": "李育全",
@@ -490,7 +490,7 @@
         "workorder": "GA26041570"
       },
       {
-        "age": 42.0,
+        "age": 42.3,
         "dept": "供應商管理課",
         "futureHoldComment": "[失效模式]：[鍍銀層偏位]，[不良率]：[??]，[發現時機]：[??]，[現況確認]：[待QC與其他風險批一同處置]",
         "holdBy": "李育全",
@@ -505,7 +505,7 @@
         "workorder": "GA26041709"
       },
       {
-        "age": 23.7,
+        "age": 24.0,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -520,7 +520,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 23.7,
+        "age": 24.0,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -535,7 +535,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 23.3,
+        "age": 23.7,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -550,7 +550,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 23.0,
+        "age": 23.3,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -565,7 +565,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 22.9,
+        "age": 23.2,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -580,7 +580,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 22.9,
+        "age": 23.2,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -595,7 +595,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 22.8,
+        "age": 23.1,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -610,7 +610,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 21.7,
+        "age": 22.0,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -625,7 +625,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 21.7,
+        "age": 22.0,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -640,7 +640,7 @@
         "workorder": "GA26043097"
       },
       {
-        "age": 19.9,
+        "age": 20.2,
         "dept": "移印(D)",
         "futureHoldComment": ";RD料號工程驗證",
         "holdBy": "潘瑞",
@@ -655,7 +655,7 @@
         "workorder": "GA26050563"
       },
       {
-        "age": 19.5,
+        "age": 19.8,
         "dept": "彎腳(N)",
         "futureHoldComment": ";RD料號工程驗證",
         "holdBy": "黃偉萍",
@@ -670,7 +670,7 @@
         "workorder": "GA26050564"
       },
       {
-        "age": 16.8,
+        "age": 17.1,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -685,7 +685,7 @@
         "workorder": "GA26051581"
       },
       {
-        "age": 16.6,
+        "age": 16.9,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -700,7 +700,7 @@
         "workorder": "GA26051581"
       },
       {
-        "age": 16.4,
+        "age": 16.8,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -715,7 +715,7 @@
         "workorder": "GA26051581"
       },
       {
-        "age": 12.2,
+        "age": 12.5,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -730,7 +730,7 @@
         "workorder": "GA26051178"
       },
       {
-        "age": 12.0,
+        "age": 12.3,
         "dept": null,
         "futureHoldComment": null,
         "holdBy": "Camstar Administrator",
@@ -745,7 +745,7 @@
         "workorder": "GA26051178"
       },
       {
-        "age": 11.8,
+        "age": 12.1,
         "dept": "TMTT(D)",
         "futureHoldComment": null,
         "holdBy": "陳美妤",
@@ -763,13 +763,13 @@
     "pagination": {
       "page": 1,
       "perPage": 50,
-      "total": 124,
+      "total": 127,
       "totalPages": 3
     }
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T14:40:32.473361"
+    "timestamp": "2026-06-16T22:14:12.087415"
   },
   "success": true
 }

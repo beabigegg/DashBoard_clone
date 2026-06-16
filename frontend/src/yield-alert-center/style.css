@@ -378,6 +378,55 @@
   font-weight: 600;
 }
 
+/* ── Process type selector ── */
+.theme-yield-alert-center .process-type-toggle {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.theme-yield-alert-center .process-type-option {
+  border: 1px solid var(--ya-border);
+  border-radius: 6px;
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  background: theme('colors.token.hffffff');
+  color: theme('colors.token.h444444');
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--motion-ease);
+  font-family: 'Microsoft JhengHei', Arial, sans-serif;
+  user-select: none;
+}
+
+.theme-yield-alert-center .process-type-option:hover {
+  border-color: var(--ya-primary);
+  color: var(--ya-primary);
+}
+
+.theme-yield-alert-center .process-type-option.active {
+  background: var(--ya-primary);
+  border-color: var(--ya-primary);
+  color: theme('colors.token.hffffff');
+  font-weight: 600;
+}
+
+.theme-yield-alert-center .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.theme-yield-alert-center .process-type-option:has(input:focus-visible) {
+  outline: 2px solid var(--ya-primary);
+  outline-offset: 2px;
+}
+
 /* ── Heatmap panel ── */
 .theme-yield-alert-center .heatmap-panel {
   margin-bottom: theme('spacing.token.p12');

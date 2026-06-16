@@ -1,0 +1,9 @@
+change-id: yield-alert-spool-refactor
+timestamp: 2026-06-16
+agent: implementation-planner
+status: complete
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/yield-alert-spool-refactor/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-5), frontend-engineer (IP-6)" }
+  - { type: scope-summary, pointer: "in: spool builder + service + route + SQL + frontend selector/LOT/shape; out: other report pages, yield formula, css/env contracts, stress/soak/visual/qa evidence" }
