@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "CACHE_EXPIRED",
+    "message": "快取資料已過期，請稍後再試"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:49.823860"
+  },
+  "success": false
+}

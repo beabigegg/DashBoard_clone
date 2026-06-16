@@ -1,0 +1,15 @@
+{
+  "data": {
+    "avgAge": 17.2,
+    "dataUpdateDate": "2026-06-16 14:35:05",
+    "maxAge": 99.95,
+    "totalLots": 124,
+    "totalQty": 9061086,
+    "workcenterCount": 7
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:32.348962"
+  },
+  "success": true
+}

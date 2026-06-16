@@ -1,0 +1,21 @@
+{
+  "data": {
+    "data": [],
+    "date_range": {
+      "end": "2024-01-07",
+      "start": "2024-01-01"
+    },
+    "pagination": {
+      "page": 1,
+      "per_page": 200,
+      "total": 0,
+      "total_pages": 1
+    },
+    "total": 0
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:54.597377"
+  },
+  "success": true
+}

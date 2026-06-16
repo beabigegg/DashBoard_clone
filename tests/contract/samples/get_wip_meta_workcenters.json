@@ -1,0 +1,101 @@
+{
+  "data": [
+    {
+      "lot_count": 56,
+      "name": "點測"
+    },
+    {
+      "lot_count": 1772,
+      "name": "切割"
+    },
+    {
+      "lot_count": 867,
+      "name": "焊接_DB"
+    },
+    {
+      "lot_count": 72,
+      "name": "焊接_DB"
+    },
+    {
+      "lot_count": 340,
+      "name": "焊接_WB"
+    },
+    {
+      "lot_count": 89,
+      "name": "焊接_WB"
+    },
+    {
+      "lot_count": 112,
+      "name": "焊接_DW"
+    },
+    {
+      "lot_count": 10,
+      "name": "焊接_DW"
+    },
+    {
+      "lot_count": 510,
+      "name": "成型"
+    },
+    {
+      "lot_count": 201,
+      "name": "成型"
+    },
+    {
+      "lot_count": 338,
+      "name": "去膠"
+    },
+    {
+      "lot_count": 629,
+      "name": "水吹砂"
+    },
+    {
+      "lot_count": 429,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 64,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 224,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 74,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 171,
+      "name": "移印"
+    },
+    {
+      "lot_count": 211,
+      "name": "切彎腳"
+    },
+    {
+      "lot_count": 3533,
+      "name": "TMTT"
+    },
+    {
+      "lot_count": 10,
+      "name": "預備站"
+    },
+    {
+      "lot_count": 118,
+      "name": "品檢"
+    },
+    {
+      "lot_count": 25,
+      "name": "FQC"
+    },
+    {
+      "lot_count": 23,
+      "name": "成品入庫"
+    }
+  ],
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:31.420936"
+  },
+  "success": true
+}

@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 188
-visible-files: 924
+visible-dirs: 190
+visible-files: 915
 omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -129,7 +129,8 @@ DashBoard_vite/
 |   |-- api/
 |   |   |-- api-contract.md
 |   |   |-- api-inventory.md
-|   |   \-- error-format.md
+|   |   |-- error-format.md
+|   |   \-- openapi.json
 |   |-- business/
 |   |   \-- business-rules.md
 |   |-- ci/
@@ -144,7 +145,8 @@ DashBoard_vite/
 |   |   |-- .env.example.template
 |   |   |-- env-contract.md
 |   |   \-- env.schema.json
-|   \-- CHANGELOG.md
+|   |-- CHANGELOG.md
+|   \-- openapi.json
 |-- data/
 |   |-- page_status.json
 |   \-- table_schema_info.json
@@ -609,68 +611,11 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260615_160715.log
-|   |   |-- access_20260615_161941.log
-|   |   |-- access_20260615_174933.log
-|   |   |-- access_20260615_181816.log
-|   |   |-- access_20260615_182317.log
-|   |   |-- access_20260615_184922.log
-|   |   |-- access_20260615_190344.log
-|   |   |-- access_20260615_192249.log
-|   |   |-- access_20260615_194719.log
-|   |   |-- access_20260615_203727.log
-|   |   |-- error_20260615_161941.log
-|   |   |-- error_20260615_174933.log
-|   |   |-- error_20260615_181816.log
-|   |   |-- error_20260615_182317.log
-|   |   |-- error_20260615_182554.log
-|   |   |-- error_20260615_184922.log
-|   |   |-- error_20260615_190344.log
-|   |   |-- error_20260615_192249.log
-|   |   |-- error_20260615_194719.log
-|   |   |-- error_20260615_203727.log
-|   |   |-- rq_downtime_worker_20260615_194719.log
-|   |   |-- rq_downtime_worker_20260615_203727.log
-|   |   |-- rq_hold_hist_worker_20260615_174933.log
-|   |   |-- rq_hold_hist_worker_20260615_181816.log
-|   |   |-- rq_hold_hist_worker_20260615_182317.log
-|   |   |-- rq_hold_hist_worker_20260615_182554.log
-|   |   |-- rq_hold_hist_worker_20260615_184922.log
-|   |   |-- rq_hold_hist_worker_20260615_190344.log
-|   |   |-- rq_hold_hist_worker_20260615_192249.log
-|   |   |-- rq_hold_hist_worker_20260615_194719.log
-|   |   |-- rq_hold_hist_worker_20260615_203727.log
-|   |   |-- rq_msd_worker_20260615_161941.log
-|   |   |-- rq_msd_worker_20260615_174933.log
-|   |   |-- rq_msd_worker_20260615_181816.log
-|   |   |-- rq_msd_worker_20260615_182317.log
-|   |   |-- rq_msd_worker_20260615_182554.log
-|   |   |-- rq_msd_worker_20260615_184922.log
-|   |   |-- rq_msd_worker_20260615_190344.log
-|   |   |-- rq_msd_worker_20260615_192249.log
-|   |   |-- rq_msd_worker_20260615_194719.log
-|   |   |-- rq_msd_worker_20260615_203727.log
-|   |   |-- rq_prod_hist_worker_20260615_161941.log
-|   |   |-- rq_prod_hist_worker_20260615_174933.log
-|   |   |-- rq_prod_hist_worker_20260615_181816.log
-|   |   |-- rq_prod_hist_worker_20260615_182317.log
-|   |   |-- rq_prod_hist_worker_20260615_182554.log
-|   |   |-- rq_prod_hist_worker_20260615_184922.log
-|   |   |-- rq_prod_hist_worker_20260615_190344.log
-|   |   |-- rq_prod_hist_worker_20260615_192249.log
-|   |   |-- rq_prod_hist_worker_20260615_194719.log
-|   |   \-- ... (59 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
-|   |-- metrics_history.sqlite-shm
-|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
 |   |-- rq_hold_hist_worker.log
 |   |-- rq_hold_history_worker.log
@@ -912,9 +857,67 @@ DashBoard_vite/
 |-- tests/
 |   |-- contract/
 |   |   |-- samples/
-|   |   |   \-- .gitkeep
+|   |   |   |-- .gitkeep
+|   |   |   |-- delete_admin_drawers_id.json
+|   |   |   |-- get_admin_drawers.json
+|   |   |   |-- get_admin_logs.json
+|   |   |   |-- get_admin_metrics.json
+|   |   |   |-- get_admin_pages.json
+|   |   |   |-- get_admin_performance_detail.json
+|   |   |   |-- get_admin_performance_history.json
+|   |   |   |-- get_admin_storage_info.json
+|   |   |   |-- get_admin_system_status.json
+|   |   |   |-- get_admin_user_usage_kpi.json
+|   |   |   |-- get_admin_worker_status.json
+|   |   |   |-- get_analytics_anomaly_summary.json
+|   |   |   |-- get_analytics_equipment_deviation_drilldown.json
+|   |   |   |-- get_analytics_equipment_deviation.json
+|   |   |   |-- get_analytics_hold_outliers_drilldown.json
+|   |   |   |-- get_analytics_hold_outliers.json
+|   |   |   |-- get_analytics_reject_spikes_drilldown.json
+|   |   |   |-- get_analytics_reject_spikes.json
+|   |   |   |-- get_analytics_yield_anomalies_drilldown.json
+|   |   |   |-- get_analytics_yield_anomalies.json
+|   |   |   |-- get_auth_me.json
+|   |   |   |-- get_downtime_analysis_equipment_detail.json
+|   |   |   |-- get_downtime_analysis_event_detail.json
+|   |   |   |-- get_downtime_analysis_export_equipment_detail.json
+|   |   |   |-- get_downtime_analysis_export_event_detail.json
+|   |   |   |-- get_downtime_analysis_options.json
+|   |   |   |-- get_downtime_analysis_view.json
+|   |   |   |-- get_get_table_info.json
+|   |   |   |-- get_health_deep.json
+|   |   |   |-- get_health.json
+|   |   |   |-- get_hold_history_config.json
+|   |   |   |-- get_hold_history_view.json
+|   |   |   |-- get_hold_overview_lots.json
+|   |   |   |-- get_hold_overview_matrix.json
+|   |   |   |-- get_hold_overview_summary.json
+|   |   |   |-- get_hold_overview_treemap.json
+|   |   |   |-- get_job_id.json
+|   |   |   |-- get_job_query_resources.json
+|   |   |   |-- get_job_query_txn.json
+|   |   |   |-- get_material_consumption_detail_job.json
+|   |   |   |-- get_material_consumption_detail_page.json
+|   |   |   |-- get_material_consumption_filter_options.json
+|   |   |   |-- get_material_consumption_view.json
+|   |   |   |-- get_material_trace_filter_options.json
+|   |   |   |-- get_material_trace_job.json
+|   |   |   |-- get_mid_section_defect_analysis_detail.json
+|   |   |   |-- get_mid_section_defect_analysis.json
+|   |   |   |-- get_mid_section_defect_export.json
+|   |   |   |-- get_mid_section_defect_loss_reasons.json
+|   |   |   \-- ... (128 more entries truncated; cap=50)
+|   |   |-- capture_samples.py
 |   |   |-- README.md
-|   |   \-- response-samples.example.json
+|   |   |-- response-samples.example.json
+|   |   |-- response-samples.json
+|   |   |-- test_capture_samples.py
+|   |   |-- test_doctor_clean.py
+|   |   |-- test_gate_wiring.py
+|   |   |-- test_manifest_completeness.py
+|   |   |-- test_openapi_schema_resolution.py
+|   |   \-- test_schema_coverage.py
 |   |-- e2e/
 |   |   |-- __init__.py
 |   |   |-- browser_helpers.py
@@ -1093,6 +1096,7 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- downtime_analysis/
 |   |   |-- downtime_analysis_base_events/
 |   |   |   |-- 0df9e39564a9ae96.parquet
 |   |   |   |-- 2a4a14bfd5b032d0.parquet
@@ -1107,6 +1111,7 @@ DashBoard_vite/
 |   |   |   |-- 0c8b667bedbb5307.parquet
 |   |   |   |-- 0fff9d37f176e65b.parquet
 |   |   |   \-- 89c4f68629e28bd0.parquet
+|   |   |-- production_history/
 |   |   |-- reject_dataset/
 |   |   |   |-- 2b415553ba384c44.parquet
 |   |   |   |-- 87c6a58005491297.parquet
@@ -1163,22 +1168,10 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166780.json
 |   |   |-- probe_166786.json
-|   |   |-- probe_169446.json
-|   |   |-- probe_174363.json
-|   |   \-- ... (124 more entries truncated; cap=50)
+|   |   \-- ... (155 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
-|   |-- gunicorn.pid
-|   |-- resource_history.duckdb
-|   |-- rq_downtime_worker.pid
-|   |-- rq_hold_hist_worker.pid
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_resource_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_warmup_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   |-- mes_dashboard_restart.flag
+|   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

@@ -1,0 +1,18 @@
+{
+  "change_id": "response-shape-adr0007",
+  "phase": "contract",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "cdd-kit validate --contracts",
+  "duration_ms": 1466,
+  "first_failure": {
+    "kind": "contract-drift",
+    "message": "\u001b[31m✗\u001b[0m  One or more validations failed."
+  },
+  "artifacts": {
+    "summary": "specs/changes/response-shape-adr0007/test-runs/20260616-143518/summary.json",
+    "stdout": "specs/changes/response-shape-adr0007/test-runs/20260616-143518/stdout.log",
+    "stderr": "specs/changes/response-shape-adr0007/test-runs/20260616-143518/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

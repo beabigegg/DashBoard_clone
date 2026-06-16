@@ -1,0 +1,1 @@
+python -m pytest tests/contract/ tests/test_api_contract.py -q --maxfail=5 --tb=short -ra --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/response-shape-adr0007/test-runs/20260616-125721/junit.xml' --maxfail=1

@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "查詢無結果，請確認篩選條件後重試"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:24.279281"
+  },
+  "success": false
+}

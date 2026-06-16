@@ -1,0 +1,47 @@
+{
+  "data": {
+    "drawers": [
+      {
+        "admin_only": false,
+        "id": "test",
+        "name": "test",
+        "order": 1
+      },
+      {
+        "admin_only": false,
+        "id": "reports",
+        "name": "即時報表",
+        "order": 1
+      },
+      {
+        "admin_only": false,
+        "id": "drawer-2",
+        "name": "歷史報表",
+        "order": 2
+      },
+      {
+        "admin_only": false,
+        "id": "drawer",
+        "name": "查詢工具",
+        "order": 3
+      },
+      {
+        "admin_only": false,
+        "id": "drawer-3",
+        "name": "追溯工具",
+        "order": 4
+      },
+      {
+        "admin_only": true,
+        "id": "dev-tools",
+        "name": "開發工具",
+        "order": 4
+      }
+    ]
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.767237"
+  },
+  "success": true
+}

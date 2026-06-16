@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "material_parts 必填"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:07.765449"
+  },
+  "success": false
+}

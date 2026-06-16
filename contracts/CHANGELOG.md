@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.24] — 2026-06-15
+### Added
+- response-shape-adr0007: Added `response-shape-validate` as a new required Tier 1 gate (`cdd-kit validate --contracts`) wired into `contract-driven-gates.yml`. Validates 158 API endpoint response samples against declared schemas.
+
+## [api 1.21.0] — 2026-06-16
+### Added
+- response-shape-adr0007 (complete): Converted all Tier-A field tables to Tier-B `json-schema` blocks for AckResponse, HealthPayload, ProgressResponse, all *JobAccepted schemas (9), and StandardErrorResponse. Stripped `→ ` prefix from all 158 endpoint `response schema` cells (dual-branch 202/200 cells simplified to 200-branch schema). Regenerated `contracts/openapi.json` (158 operations, 20 component schemas, 144 operations with `$ref` linkages). Updated `tests/contract/response-samples.json` to validate full response envelopes. Updated `test_doctor_clean.py` (removes known-limitation bypass), `test_openapi_schema_resolution.py` (adds $ref linkage assertions), and `test_schema_coverage.py` (accepts plain schema names). `cdd-kit validate --contracts` passes (127 sampled endpoints checked). `cdd-kit doctor` shows 144 typed response endpoints with ✓. No src/ changes.
+
 ## [api 1.20.0] — 2026-06-15
 ### Changed
 - contract-conformance-fix: Added POST variants for dual GET+POST endpoints (wip/overview, hold-overview, reject-history/view, reject-history/export-cached, production-history/export, resource/history/export). Changed method GET→POST for production-history/options and yield-alert/analyze (backend changed to POST-only). Added GET entry for reject-history/batch-pareto. Fixed admin cleanup routes DELETE→POST. Removed non-existent GET /admin/api/drawers/<drawer_id>.

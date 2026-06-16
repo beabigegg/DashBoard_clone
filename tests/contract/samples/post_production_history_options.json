@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "請求內容不可為空"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:22.573344"
+  },
+  "success": false
+}

@@ -1,0 +1,24 @@
+{
+  "data": {
+    "assets_statuses": [],
+    "departments": [],
+    "families": [],
+    "locations": [],
+    "package_groups": [],
+    "statuses": [
+      "PRODUCTIVE",
+      "STANDBY",
+      "DOWN",
+      "ENGINEERING",
+      "NOT_SCHEDULED",
+      "INACTIVE",
+      "OTHER"
+    ],
+    "workcenters": []
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:49.745869"
+  },
+  "success": true
+}

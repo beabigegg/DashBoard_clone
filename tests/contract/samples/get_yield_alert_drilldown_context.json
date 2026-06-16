@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "缺少必要參數: date_bucket, workorder"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:19.944642"
+  },
+  "success": false
+}

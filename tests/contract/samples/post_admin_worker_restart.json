@@ -1,0 +1,32 @@
+{
+  "data": {
+    "decision": {
+      "allowed": true,
+      "decision": "allowed",
+      "reason": "policy_allows_manual_restart",
+      "requires_acknowledgement": false
+    },
+    "message": "Restart requested. Workers will reload shortly.",
+    "policy_state": {
+      "allowed": true,
+      "blocked": false,
+      "cooldown": false,
+      "cooldown_remaining_seconds": 0,
+      "state": "allowed"
+    },
+    "requested_at": "2026-06-16T06:42:01.748432+00:00",
+    "requested_by": "unknown",
+    "single_port_bind": "0.0.0.0:8080",
+    "watchdog": {
+      "flag_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart.flag",
+      "pid_path": "/home/egg/Project/DashBoard_vite/tmp/gunicorn.pid",
+      "runtime_dir": "/home/egg/Project/DashBoard_vite/tmp",
+      "state_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart_state.json"
+    }
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.749171"
+  },
+  "success": true
+}

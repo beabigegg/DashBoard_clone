@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.23
+schema-version: 1.3.24
 last-changed: 2026-06-12
 breaking-change-policy: deprecate-2-minors
 ---
@@ -17,6 +17,7 @@ breaking-change-policy: deprecate-2-minors
 | gate | tier | trigger | required | command | owner | artifact |
 |---|---:|---|---:|---|---|---|
 | contract-validate | 0 | local pre-PR | yes | `cdd-kit validate` | platform-team | — |
+| response-shape-validate | 1 | push / PR | yes | `cdd-kit validate --contracts` | platform-team | — |
 | lint | 0 | local / PR | yes | `ruff check .` | application-team | — |
 | type-check | 0 | local / PR | informational | `mypy src/` | application-team | — |
 | unit-mock-integration | 1 | PR | yes | `pytest -m "not (e2e or integration_real or stress or load or soak or multi_worker)" --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual -x` | application-team | junit XML |
@@ -422,7 +423,29 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 
 新增、移除或修改 CI gate 時，必須同步更新此契約（同一 PR），並在 PR 描述說明影響的 tier 和原因。
 
+## response-shape-adr0007 Gate Compatibility Note
+
+**New Tier 1 required gate — `response-shape-validate`** (`contract-and-fast-tests` job):
+
+- Step `Response-shape contract gate` added to `.github/workflows/contract-driven-gates.yml`
+  immediately after the existing `OpenAPI sync gate` step.
+- Command: `cdd-kit validate --contracts`
+- What it checks: for every entry in `tests/contract/response-samples.json`, loads the
+  captured sample from `tests/contract/samples/*.json` (with optional `dataPath` envelope
+  unwrap), and validates the payload against the typed schema declared under `## Schemas`
+  in `contracts/api/api-contract.md` (resolved via `contracts/openapi.json`). Endpoints
+  without a typed schema cell are skipped. A mismatch is exit 1 (blocking).
+- Local pre-PR equivalent: `cdd-kit validate --contracts` (Tier 0).
+- No production source (`src/`) is modified by this gate.
+- Rollback: revert schema or sample file in a fix PR; no service restart required.
+
+**Schema-version bump to 1.3.24 (patch)**: new required Tier 1 gate added; no existing
+gate tier, command, or status changed.
+
 ## CHANGELOG
+
+## [ci 1.3.24]
+- response-shape-adr0007 (2026-06-15): Added `response-shape-validate` as a new required Tier 1 gate (`cdd-kit validate --contracts`) wired into `contract-driven-gates.yml`. Validates 158 API endpoint response samples against declared schemas.
 
 ## [ci 1.3.17]
 - material-part-consumption (2026-05-20): Added worker queue deploy/rollback checklist for the new `material-consumption` RQ worker. No existing gates changed.

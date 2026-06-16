@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: abea80b94871d95ef635bb17841d09908e742ad8d9c4ad878b245463990dac7b
+inputs-digest: c759ef1defd4449818e55f690911029ffcf60dddb2b331e51415c20231667ddc
 ---
 
 # Contracts Index
@@ -35,8 +35,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.20.0
-- last-changed: 2026-06-13
+- schema-version: 1.21.0
+- last-changed: 2026-06-15
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
 
@@ -85,7 +85,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.23
+- schema-version: 1.3.24
 - last-changed: 2026-06-12
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.

@@ -1,0 +1,17 @@
+{
+  "data": {
+    "csrf_token": "L35cSusdbgIDWXhkVulpF0tpnvaeNUplN8ow99BJ2go",
+    "department": "Development",
+    "displayName": "Local User (testuser)",
+    "is_admin": true,
+    "mail": "testuser@local.dev",
+    "real_name": "User (testuser)",
+    "telephoneNumber": null,
+    "username": "testuser"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:30.992210"
+  },
+  "success": true
+}

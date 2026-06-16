@@ -1,0 +1,19 @@
+{
+  "data": {
+    "kpi": {
+      "efficiency_pct": 0.0,
+      "lot_count": 0,
+      "total_consumed": 0.0,
+      "total_required": 0.0,
+      "workorder_count": 0
+    },
+    "query_id": "f2d67b1102f74596",
+    "trend": [],
+    "type_breakdown": []
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:07.762735"
+  },
+  "success": true
+}

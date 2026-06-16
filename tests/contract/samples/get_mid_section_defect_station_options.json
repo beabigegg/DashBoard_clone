@@ -1,0 +1,69 @@
+{
+  "data": [
+    {
+      "label": "切割",
+      "name": "切割",
+      "order": 0
+    },
+    {
+      "label": "焊接_DB",
+      "name": "焊接_DB",
+      "order": 1
+    },
+    {
+      "label": "焊接_WB",
+      "name": "焊接_WB",
+      "order": 2
+    },
+    {
+      "label": "焊接_DW",
+      "name": "焊接_DW",
+      "order": 3
+    },
+    {
+      "label": "成型",
+      "name": "成型",
+      "order": 4
+    },
+    {
+      "label": "去膠",
+      "name": "去膠",
+      "order": 5
+    },
+    {
+      "label": "水吹砂",
+      "name": "水吹砂",
+      "order": 6
+    },
+    {
+      "label": "掛鍍",
+      "name": "電鍍",
+      "order": 7
+    },
+    {
+      "label": "移印",
+      "name": "移印",
+      "order": 8
+    },
+    {
+      "label": "切彎腳",
+      "name": "切彎腳",
+      "order": 9
+    },
+    {
+      "label": "元件切割",
+      "name": "元件切割",
+      "order": 10
+    },
+    {
+      "label": "TMTT",
+      "name": "測試",
+      "order": 11
+    }
+  ],
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:24.301836"
+  },
+  "success": true
+}

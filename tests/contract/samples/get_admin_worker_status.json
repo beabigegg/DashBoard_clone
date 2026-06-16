@@ -1,0 +1,75 @@
+{
+  "data": {
+    "cooldown": {
+      "active": true,
+      "remaining_seconds": 59
+    },
+    "last_restart": {
+      "completed_at": null,
+      "requested_at": null,
+      "requested_by": null,
+      "requested_ip": null,
+      "success": null
+    },
+    "resilience": {
+      "alerts": {
+        "restart_blocked": false,
+        "restart_churn_exceeded": false
+      },
+      "policy_state": {
+        "allowed": false,
+        "attempts_in_window": 0,
+        "blocked": false,
+        "churn_threshold": 3,
+        "cooldown": true,
+        "cooldown_remaining_seconds": 59,
+        "retry_budget": 3,
+        "state": "cooldown",
+        "window_seconds": 600
+      },
+      "recovery_recommendation": {
+        "action": "none",
+        "reason": "healthy"
+      },
+      "restart_churn": {
+        "count": 0,
+        "exceeded": false,
+        "last_completed_at": null,
+        "threshold": 3,
+        "window_seconds": 600
+      },
+      "thresholds": {
+        "degraded_alert_seconds": 300,
+        "pool_saturation_critical": 1.0,
+        "pool_saturation_warning": 0.9,
+        "restart_churn_threshold": 3,
+        "restart_churn_window_seconds": 600
+      }
+    },
+    "restart_history": [],
+    "runtime_contract": {
+      "single_port_bind": "0.0.0.0:8080",
+      "validation": {
+        "errors": [],
+        "valid": true
+      },
+      "version": "2026.02-p2",
+      "watchdog": {
+        "flag_exists": true,
+        "flag_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart.flag",
+        "pid_exists": false,
+        "pid_path": "/home/egg/Project/DashBoard_vite/tmp/gunicorn.pid",
+        "runtime_dir": "/home/egg/Project/DashBoard_vite/tmp",
+        "state_exists": false,
+        "state_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart_state.json"
+      }
+    },
+    "worker_pid": 626849,
+    "worker_start_time": "2026-06-16T06:40:27.810000+00:00"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.750884"
+  },
+  "success": true
+}

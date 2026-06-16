@@ -1,0 +1,13 @@
+- type: tier-floor-override
+  change-id: response-shape-adr0007
+  timestamp: '2026-06-16T06:42:48.755Z'
+  declared-tier: 2
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - endpoint
+    - migration
+  reason: >-
+    False positive — keyword match on 'endpoint'/'migration' in ADR name; this change is pure
+    contract annotation with no production code edits (AC-7), no auth/payment/data-migration risk
+    surface.

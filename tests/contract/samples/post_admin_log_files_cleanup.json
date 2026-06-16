@@ -1,0 +1,14 @@
+{
+  "data": {
+    "cleaned": {
+      "archive_files": [],
+      "log_files": []
+    },
+    "freed_bytes": 0
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.495954"
+  },
+  "success": true
+}

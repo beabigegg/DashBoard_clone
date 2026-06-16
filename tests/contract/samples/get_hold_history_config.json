@@ -1,0 +1,11 @@
+{
+  "data": {
+    "auto_refresh_seconds": 60,
+    "today_mode_enabled": true
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:32.478854"
+  },
+  "success": true
+}

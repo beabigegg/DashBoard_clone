@@ -61,3 +61,36 @@ last-changed: 2026-05-05
 - **410 Cache Expired（Type A）：** view miss → 410 `CACHE_EXPIRED` → client 同步重觸發查詢。適用：hold-history、resource-history。
 - **202 Async Job：** spool miss + RQ available → 202 `{async: true, job_id, status_url, ...}`。適用：reject-history、yield-alert、production-history、trace、material-trace。
 - **503 DB Unavailable：** DB 連線失敗時回傳 503 `SERVICE_UNAVAILABLE` with `detail: "database_unavailable"`。
+
+## Schemas
+
+### StandardErrorResponse
+
+Tier-B schema — covers every `4xx` / `5xx` error envelope produced by `error_response()`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "error", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [false] },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code":    { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": "string" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["timestamp"],
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```

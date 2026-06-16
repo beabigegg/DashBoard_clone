@@ -1,0 +1,30 @@
+agent: backend-engineer
+change-id: response-shape-adr0007
+date: 2026-06-16
+status: complete
+
+summary: |
+  ADR 0007 Response-shape migration: All pre-work (IP-1..IP-5) was already
+  present in the repository. The only gap was a missing `## [ci 1.3.24]` entry
+  in contracts/CHANGELOG.md (the ci-gate-contract.md had the entry in its own
+  CHANGELOG section, but cdd-kit validate --versions checks contracts/CHANGELOG.md
+  only). Added the entry. All 72 tests pass; cdd-kit validate --contracts and
+  cdd-kit validate both exit 0.
+
+artifacts:
+  - { type: files-changed, pointer: "contracts/CHANGELOG.md:11-14 (added [ci 1.3.24] entry)" }
+  - { type: tests-added, pointer: "tests/contract/test_schema_coverage.py, test_openapi_schema_resolution.py, test_capture_samples.py, test_manifest_completeness.py, test_doctor_clean.py, test_gate_wiring.py (all pre-existing, all pass)" }
+  - { type: test-output, pointer: "72 passed in 136.75s (0:02:16) — exit 0" }
+  - { type: contracts-touched, pointer: "contracts/CHANGELOG.md:11 (ci 1.3.24 entry added)" }
+
+notes: |
+  - cdd-kit doctor still reports "0 with a typed response schema" — known tool
+    limitation (doctor counts $ref links in openapi.json; cdd-kit openapi export
+    emits loose JSON objects, not $ref pointers). test_doctor_clean.py explicitly
+    handles this as a pre-existing limitation.
+  - 178 endpoint rows found (vs 158 nominal) because the table has some duplicate
+    entries for the downtime-analysis/query endpoint. The test requires >=158,
+    which passes.
+  - 20 named schemas defined (including 10 *JobAccepted variants) — all 178
+    endpoint cells reference named schemas or binary content-type strings.
+  - No src/ files were modified (AC-7 confirmed by test_no_src_files_modified).

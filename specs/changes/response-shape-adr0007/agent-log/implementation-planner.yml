@@ -1,0 +1,4 @@
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/response-shape-adr0007/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-6)" }
+  - { type: scope-summary, pointer: "in: ## Schemas + 158 cell rewrites, StandardErrorResponse, openapi regen, capture harness, contract tests; out: src/ edits, CI workflow edit, frontend, live infra" }

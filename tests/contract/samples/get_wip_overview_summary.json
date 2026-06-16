@@ -1,0 +1,34 @@
+{
+  "data": {
+    "byWipStatus": {
+      "hold": {
+        "lots": 124,
+        "qtyPcs": 9061086
+      },
+      "nonQualityHold": {
+        "lots": 82,
+        "qtyPcs": 6963129
+      },
+      "qualityHold": {
+        "lots": 42,
+        "qtyPcs": 2097957
+      },
+      "queue": {
+        "lots": 8895,
+        "qtyPcs": 753242032
+      },
+      "run": {
+        "lots": 859,
+        "qtyPcs": 89023949
+      }
+    },
+    "dataUpdateDate": "2026-06-16 14:35:05",
+    "totalLots": 9878,
+    "totalQtyPcs": 851327067
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:31.162220"
+  },
+  "success": true
+}

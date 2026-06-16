@@ -1,6 +1,6 @@
-# generated: 2026-06-15T12:42:30Z by cdd-kit 3.2.0
-# files: 863, src-lines: 251994, map-lines: 18725, compression: 13.5x
-# sources-digest: 8072518252e9149098c473d8df5635728af2500f9d05c7a01492dcb80131feb0
+# generated: 2026-06-16T06:44:35Z by cdd-kit 3.2.0
+# files: 870, src-lines: 253402, map-lines: 18868, compression: 13.4x
+# sources-digest: 344931046a781e43221ea2a9e5b68ac6e6798ea94c09afea6dc5473d74f62e08
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -7904,6 +7904,145 @@ tests/conftest.py:  # 196 lines
     - { name: pytest_addoption, lines: 144-169 }
     - { name: pytest_collection_modifyitems, lines: 172-196 }
 
+tests/contract/capture_samples.py:  # 638 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 21 }
+    - { module: json, items: [], line: 23 }
+    - { module: os, items: [], line: 24 }
+    - { module: pathlib, items: [], line: 25 }
+    - { module: sys, items: [], line: 26 }
+    - { module: mes_dashboard.app, items: [create_app], line: 50 }
+    - { module: re, items: [], line: 449 }
+  constants:
+    - { name: REPO_ROOT, line: 29 }
+    - { name: SAMPLES_DIR, line: 52 }
+    - { name: MANIFEST_PATH, line: 53 }
+    - { name: ENDPOINTS, line: 59 }
+  functions:
+    - { name: _make_key, lines: 433-434 }
+    - { name: _need_admin, lines: 437-445 }
+    - { name: _canonical_manifest_key, lines: 452-464 }
+    - { name: capture, lines: 466-529 }
+    - { name: main, lines: 532-634 }
+
+tests/contract/test_capture_samples.py:  # 144 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: json, items: [], line: 11 }
+    - { module: os, items: [], line: 12 }
+    - { module: pathlib, items: [], line: 13 }
+    - { module: subprocess, items: [], line: 14 }
+    - { module: sys, items: [], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  constants:
+    - { name: REPO_ROOT, line: 19 }
+    - { name: SAMPLES_DIR, line: 20 }
+    - { name: CAPTURE_SCRIPT, line: 21 }
+    - { name: MANIFEST_PATH, line: 22 }
+    - { name: OFFLINE_ENV, line: 25 }
+  classes:
+    - name: TestCaptureSamples
+      lines: 44-144
+      methods:
+        - { name: test_capture_script_exists, lines: 47-51 }
+        - { name: test_auth_endpoints_get_session_cookie, lines: 53-104 }
+        - { name: test_capture_runs_without_error, lines: 106-122 }
+        - { name: test_samples_dir_has_158_files, lines: 124-133 }
+        - { name: test_manifest_exists_after_capture, lines: 135-144 }
+
+tests/contract/test_doctor_clean.py:  # 78 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: subprocess, items: [], line: 11 }
+    - { module: pytest, items: [], line: 13 }
+  classes:
+    - name: TestDoctorClean
+      lines: 16-78
+      methods:
+        - { name: test_doctor_response_shape_zero_warnings, lines: 27-78 }
+
+tests/contract/test_gate_wiring.py:  # 50 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 7 }
+    - { module: pathlib, items: [Path], line: 9 }
+    - { module: pytest, items: [], line: 11 }
+  constants:
+    - { name: WORKFLOW_PATH, line: 13 }
+  classes:
+    - name: TestGateWiring
+      lines: 21-50
+      methods:
+        - { name: test_ci_yml_contains_validate_contracts_step, lines: 24-34 }
+        - { name: test_ci_yml_has_validate_contracts_in_jobs, lines: 36-50 }
+
+tests/contract/test_manifest_completeness.py:  # 104 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: json, items: [], line: 11 }
+    - { module: pathlib, items: [Path], line: 12 }
+    - { module: pytest, items: [], line: 14 }
+  constants:
+    - { name: MANIFEST_PATH, line: 16 }
+    - { name: SAMPLES_DIR, line: 17 }
+    - { name: CONTRACT_PATH, line: 18 }
+  classes:
+    - name: TestManifestCompleteness
+      lines: 29-104
+      methods:
+        - { name: test_manifest_exists, lines: 32-37 }
+        - { name: test_manifest_has_at_least_158_entries, lines: 39-44 }
+        - { name: test_manifest_keys_match_known_endpoints, lines: 46-61 }
+        - { name: test_all_sample_files_exist_on_disk, lines: 63-81 }
+        - { name: test_all_sample_files_are_valid_json, lines: 83-104 }
+  functions:
+    - { name: _load_manifest, lines: 23-26 }
+
+tests/contract/test_openapi_schema_resolution.py:  # 187 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 11 }
+    - { module: json, items: [], line: 13 }
+    - { module: pathlib, items: [Path], line: 14 }
+    - { module: pytest, items: [], line: 16 }
+  constants:
+    - { name: OPENAPI_PATH, line: 18 }
+  classes:
+    - name: TestOpenApiSchemaResolution
+      lines: 51-187
+      methods:
+        - { name: test_openapi_json_exists, lines: 54-59 }
+        - { name: test_openapi_json_valid, lines: 61-67 }
+        - { name: test_openapi_json_no_unresolved_refs, lines: 69-85 }
+        - { name: test_openapi_operation_count_at_least_158, lines: 87-106 }
+        - { name: test_operations_have_response_ref_linkages, lines: 108-148 }
+        - { name: test_response_refs_resolve_to_component_schemas, lines: 150-187 }
+  functions:
+    - { name: _collect_refs, lines: 21-33 }
+    - { name: _resolve_ref, lines: 36-48 }
+
+tests/contract/test_schema_coverage.py:  # 166 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: re, items: [], line: 15 }
+    - { module: pathlib, items: [Path], line: 16 }
+    - { module: pytest, items: [], line: 18 }
+  constants:
+    - { name: CONTRACT_PATH, line: 20 }
+    - { name: VALID_SCHEMA_NAME_RE, line: 23 }
+    - { name: VALID_CONTENT_TYPE_CELLS, line: 25 }
+    - { name: OLD_PROSE_VALUES, line: 32 }
+  classes:
+    - name: TestSchemaCoverage
+      lines: 96-166
+      methods:
+        - { name: test_all_endpoints_have_typed_schema_ref, lines: 99-127 }
+        - { name: test_no_arrow_prefix_in_table, lines: 129-144 }
+        - { name: test_endpoint_count_at_least_158, lines: 146-152 }
+        - { name: test_no_prose_success_response_in_table, lines: 154-166 }
+  functions:
+    - { name: _parse_endpoint_rows, lines: 41-67 }
+    - { name: _is_valid_schema_cell, lines: 70-81 }
+    - { name: _classify_cell, lines: 84-93 }
+
 tests/e2e/__init__.py:  # 0 lines
 
 tests/e2e/browser_helpers.py:  # 142 lines
@@ -11169,7 +11308,7 @@ tests/test_anomaly_detection_sql_runtime.py:  # 91 lines
         - { name: test_hold_percentile_is_between_0_and_1, lines: 87-88 }
         - { name: test_deviation_threshold_is_positive, lines: 90-91 }
 
-tests/test_api_contract.py:  # 1059 lines
+tests/test_api_contract.py:  # 1100 lines
   imports:
     - { module: ast, items: [], line: 13 }
     - { module: unittest, items: [], line: 14 }
@@ -11306,6 +11445,10 @@ tests/test_api_contract.py:  # 1059 lines
         - { name: setUp, lines: 984-990 }
         - { name: test_202_response_shape_has_job_id_and_status_url, lines: 995-1030 }
         - { name: test_resource_history_query_short_span_returns_200_not_202, lines: 1032-1055 }
+    - name: TestNoSrcFilesModified
+      lines: 1062-1100
+      methods:
+        - { name: test_no_src_files_modified, lines: 1071-1100 }
   functions:
     - { name: _count_jsonify_in_file, lines: 46-63 }
 

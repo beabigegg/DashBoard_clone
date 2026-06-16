@@ -1,0 +1,145 @@
+{
+  "data": {
+    "pages": [
+      {
+        "name": "首頁",
+        "route": "/",
+        "status": "released"
+      },
+      {
+        "drawer_id": "reports",
+        "name": "WIP 即時概況",
+        "order": 1,
+        "route": "/wip-overview",
+        "status": "released"
+      },
+      {
+        "drawer_id": "reports",
+        "name": "Hold 即時概況",
+        "order": 2,
+        "route": "/hold-overview",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer-2",
+        "name": "Hold 歷史績效",
+        "order": 3,
+        "route": "/hold-history",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer",
+        "name": "報廢歷史查詢",
+        "order": 1,
+        "route": "/reject-history",
+        "status": "released"
+      },
+      {
+        "name": "WIP 明細",
+        "route": "/wip-detail",
+        "status": "released"
+      },
+      {
+        "name": "Hold 明細",
+        "route": "/hold-detail",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer-2",
+        "name": "設備歷史績效",
+        "order": 5,
+        "route": "/resource-history",
+        "status": "released"
+      },
+      {
+        "drawer_id": "reports",
+        "name": "QC-GATE 狀態",
+        "order": 6,
+        "route": "/qc-gate",
+        "status": "released"
+      },
+      {
+        "drawer_id": "reports",
+        "name": "設備即時概況",
+        "order": 4,
+        "route": "/resource",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer",
+        "name": "設備維修查詢",
+        "order": 2,
+        "route": "/job-query",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer-3",
+        "name": "批次追蹤工具",
+        "order": 2,
+        "route": "/query-tool",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer-3",
+        "name": "製程不良追溯分析",
+        "order": 3,
+        "route": "/mid-section-defect",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer-3",
+        "name": "原物料追溯查詢",
+        "order": 3,
+        "route": "/material-trace",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer",
+        "name": "良率查詢",
+        "order": 4,
+        "route": "/yield-alert-center",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer",
+        "name": "生產歷程查詢",
+        "order": 3,
+        "route": "/production-history",
+        "status": "released"
+      },
+      {
+        "drawer_id": "dev-tools",
+        "name": "頁面管理",
+        "order": 1,
+        "route": "/admin/pages",
+        "status": "released"
+      },
+      {
+        "drawer_id": "dev-tools",
+        "name": "管理儀表板",
+        "order": 2,
+        "route": "/admin/dashboard",
+        "status": "dev"
+      },
+      {
+        "drawer_id": "drawer",
+        "name": "原物料用量查詢",
+        "order": 6,
+        "route": "/material-consumption",
+        "status": "released"
+      },
+      {
+        "drawer_id": "drawer-2",
+        "name": "設備停機分析",
+        "order": 6,
+        "route": "/downtime-analysis",
+        "status": "released"
+      }
+    ]
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.766031"
+  },
+  "success": true
+}

@@ -1,0 +1,90 @@
+{
+  "data": {
+    "archive_files": [],
+    "archive_total_bytes": 0,
+    "log_files": [
+      {
+        "path": "logs/access.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/error.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_downtime_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_hold_hist_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_hold_history_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_msd_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_prod_hist_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_reject_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_resource_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_warmup_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_yield_alert_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/startup.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/watchdog.log",
+        "size_bytes": 0
+      }
+    ],
+    "mysql": {
+      "dashboard_logs_rows": 520891,
+      "dashboard_metrics_snapshots_rows": 185757,
+      "enabled": true,
+      "healthy": true
+    },
+    "sqlite_files": [
+      {
+        "path": "logs/admin_logs.sqlite",
+        "size_bytes": 13144064
+      },
+      {
+        "path": "logs/login_sessions.sqlite",
+        "size_bytes": 24576
+      },
+      {
+        "path": "logs/metrics_history.sqlite",
+        "size_bytes": 176128
+      }
+    ],
+    "total_bytes": 13344768
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.745938"
+  },
+  "success": true
+}

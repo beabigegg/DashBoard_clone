@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "伺服器內部錯誤"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:49.834366"
+  },
+  "success": false
+}

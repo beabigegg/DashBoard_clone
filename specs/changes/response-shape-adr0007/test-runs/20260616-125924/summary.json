@@ -1,0 +1,16 @@
+{
+  "change_id": "response-shape-adr0007",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/contract/ tests/test_api_contract.py -q --maxfail=5 --tb=short -ra --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/response-shape-adr0007/test-runs/20260616-125924/junit.xml' --maxfail=1",
+  "duration_ms": 136576,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/response-shape-adr0007/test-runs/20260616-125924/summary.json",
+    "stdout": "specs/changes/response-shape-adr0007/test-runs/20260616-125924/stdout.log",
+    "stderr": "specs/changes/response-shape-adr0007/test-runs/20260616-125924/stderr.log",
+    "junit": "specs/changes/response-shape-adr0007/test-runs/20260616-125924/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

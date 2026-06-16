@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "JOB_NOT_FOUND",
+    "message": "job not found or expired"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:24.299232"
+  },
+  "success": false
+}

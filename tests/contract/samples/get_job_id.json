@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "job 'test-job-id' not found (prefix='test')"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:31.046433"
+  },
+  "success": false
+}

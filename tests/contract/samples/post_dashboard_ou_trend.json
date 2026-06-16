@@ -1,0 +1,79 @@
+{
+  "data": [
+    {
+      "date": "2026-06-09",
+      "egt_hours": 48.0,
+      "ou_pct": 69.7,
+      "prd_hours": 25796.4,
+      "sby_hours": 9759.8,
+      "sdt_hours": 696.2,
+      "total_hours": 47064.0,
+      "udt_hours": 711.4
+    },
+    {
+      "date": "2026-06-10",
+      "egt_hours": 70.4,
+      "ou_pct": 69.75,
+      "prd_hours": 25721.6,
+      "sby_hours": 9596.4,
+      "sdt_hours": 802.6,
+      "total_hours": 47064.0,
+      "udt_hours": 683.7
+    },
+    {
+      "date": "2026-06-11",
+      "egt_hours": 93.2,
+      "ou_pct": 69.65,
+      "prd_hours": 25736.0,
+      "sby_hours": 9598.9,
+      "sdt_hours": 792.1,
+      "total_hours": 47064.0,
+      "udt_hours": 732.4
+    },
+    {
+      "date": "2026-06-12",
+      "egt_hours": 96.0,
+      "ou_pct": 69.81,
+      "prd_hours": 25662.8,
+      "sby_hours": 9540.1,
+      "sdt_hours": 841.7,
+      "total_hours": 47064.0,
+      "udt_hours": 619.3
+    },
+    {
+      "date": "2026-06-13",
+      "egt_hours": 77.9,
+      "ou_pct": 69.9,
+      "prd_hours": 25468.2,
+      "sby_hours": 9616.1,
+      "sdt_hours": 672.3,
+      "total_hours": 47064.0,
+      "udt_hours": 598.3
+    },
+    {
+      "date": "2026-06-14",
+      "egt_hours": 72.0,
+      "ou_pct": 69.47,
+      "prd_hours": 25265.7,
+      "sby_hours": 9531.7,
+      "sdt_hours": 747.3,
+      "total_hours": 47064.0,
+      "udt_hours": 751.6
+    },
+    {
+      "date": "2026-06-15",
+      "egt_hours": 72.0,
+      "ou_pct": 68.34,
+      "prd_hours": 25120.7,
+      "sby_hours": 9780.4,
+      "sdt_hours": 880.0,
+      "total_hours": 47020.8,
+      "udt_hours": 906.2
+    }
+  ],
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:00.973660"
+  },
+  "success": true
+}

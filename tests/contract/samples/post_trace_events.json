@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "INVALID_PROFILE",
+    "message": "unsupported profile"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:24.296891"
+  },
+  "success": false
+}

@@ -1,0 +1,210 @@
+{
+  "anomaly_scheduler": {
+    "anomaly_count": 0,
+    "last_run": null,
+    "running": false
+  },
+  "async_workers": {
+    "queues": {
+      "queues": [],
+      "total_failed": 0,
+      "total_queued": 0,
+      "total_started": 0
+    },
+    "rq_available": false,
+    "slots": {
+      "active": 0,
+      "max": 3,
+      "utilization_pct": 0.0
+    },
+    "workers": {
+      "summary": {
+        "busy": 0,
+        "idle": 0,
+        "total": 0
+      },
+      "workers": []
+    }
+  },
+  "cache": {
+    "derived_frame_snapshot": {},
+    "derived_search_index": {},
+    "enabled": false,
+    "index_metrics": {
+      "search_index_hits": 0,
+      "search_index_incremental_updates": 0,
+      "search_index_misses": 0,
+      "search_index_rebuilds": 0,
+      "search_index_reconciliation_fallbacks": 0,
+      "snapshot_hits": 0,
+      "snapshot_misses": 0
+    },
+    "memory": {
+      "amplification_ratio": 0.0,
+      "frame_bytes_total": 0,
+      "search_bytes_total": 0
+    },
+    "sys_date": null,
+    "updated_at": null
+  },
+  "circuit_breaker": {
+    "enabled": true,
+    "failure_count": 0,
+    "failure_rate": 0.0,
+    "last_failure_time": null,
+    "open_until": null,
+    "state": "CLOSED",
+    "success_count": 0,
+    "total_count": 0,
+    "window_size": 10
+  },
+  "database_pool": {
+    "runtime": {
+      "call_timeout_ms": 5000,
+      "health_max_overflow": 0,
+      "health_pool_size": 1,
+      "health_pool_timeout": 2,
+      "max_overflow": 0,
+      "pool_exhausted_retry_after_seconds": 5,
+      "pool_recycle": 300,
+      "pool_size": 1,
+      "pool_timeout": 5,
+      "retry_count": 0,
+      "retry_delay": 0.0,
+      "slow_call_timeout_ms": 10000,
+      "slow_fetchmany_size": 5000,
+      "slow_max_concurrent": 1,
+      "slow_pool_enabled": false,
+      "slow_pool_max_overflow": 2,
+      "slow_pool_recycle": 1800,
+      "slow_pool_size": 4,
+      "slow_pool_timeout": 30,
+      "tcp_connect_timeout": 5
+    },
+    "state": {
+      "checked_in": 0,
+      "checked_out": 0,
+      "max_capacity": 1,
+      "overflow": -1,
+      "saturation": 0.0,
+      "size": 1,
+      "slow_pool_enabled": false,
+      "slow_query_active": 0,
+      "slow_query_waiting": 0
+    }
+  },
+  "degraded_reason": null,
+  "equipment_status_cache": {
+    "count": 0,
+    "enabled": true,
+    "loaded": false,
+    "lookup": {
+      "age_seconds": null,
+      "built_at": null,
+      "count": 0,
+      "ready": false
+    },
+    "updated_at": null
+  },
+  "online_count": 1,
+  "resilience": {
+    "alerts": {
+      "circuit_open": false,
+      "pool_critical": false,
+      "pool_warning": false,
+      "restart_blocked": false,
+      "restart_churn_exceeded": false,
+      "route_cache_degraded": false
+    },
+    "policy_state": {
+      "allowed": true,
+      "blocked": false,
+      "cooldown": false,
+      "cooldown_remaining_seconds": 0,
+      "state": "allowed"
+    },
+    "recovery_recommendation": {
+      "action": "none",
+      "reason": "healthy"
+    },
+    "restart_churn": {
+      "count": 0,
+      "exceeded": false,
+      "last_completed_at": null,
+      "threshold": 3,
+      "window_seconds": 600
+    },
+    "thresholds": {
+      "degraded_alert_seconds": 300,
+      "pool_saturation_critical": 1.0,
+      "pool_saturation_warning": 0.9,
+      "restart_churn_threshold": 3,
+      "restart_churn_window_seconds": 600
+    }
+  },
+  "resource_cache": {
+    "count": 0,
+    "enabled": false,
+    "loaded": false,
+    "updated_at": null,
+    "version": null
+  },
+  "route_cache": {
+    "available": true,
+    "degraded": false,
+    "l1_hit_rate": 0,
+    "l1_hits": 0,
+    "l1_size": 0,
+    "l2_hit_rate": 0,
+    "l2_hits": 0,
+    "l2_telemetry": null,
+    "miss_rate": 0,
+    "misses": 0,
+    "mode": "l1-only",
+    "reads_total": 0,
+    "redis_expected": false,
+    "writes_total": 0
+  },
+  "runtime_contract": {
+    "contract": {
+      "conda_bin": "",
+      "conda_env_name": "mes-dashboard",
+      "gunicorn_bind": "0.0.0.0:8080",
+      "project_root": "/home/egg/Project/DashBoard_vite",
+      "validation_enforced": false,
+      "version": "2026.02-p2",
+      "watchdog_check_interval": 5,
+      "watchdog_pid_file": "/home/egg/Project/DashBoard_vite/tmp/gunicorn.pid",
+      "watchdog_restart_flag": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart.flag",
+      "watchdog_runtime_dir": "/home/egg/Project/DashBoard_vite/tmp",
+      "watchdog_state_file": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart_state.json"
+    },
+    "errors": [],
+    "strict": false,
+    "valid": true
+  },
+  "services": {
+    "database": "ok",
+    "redis": "disabled"
+  },
+  "status": "healthy",
+  "sync_worker": {
+    "last_sync_at": null,
+    "running": false
+  },
+  "system_memory": {
+    "available_mb": 3892.0,
+    "pressure": "normal",
+    "total_mb": 7624.0,
+    "used_pct": 48.9
+  },
+  "warnings": [
+    "Equipment status cache not loaded",
+    "RQ Worker 離線，非同步查詢不可用"
+  ],
+  "workcenter_mapping": {
+    "group_count": 0,
+    "loaded": false,
+    "workcenter_count": 0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "data": {
+    "workcenter_groups": [
+      "切割",
+      "焊接_DB",
+      "焊接_WB",
+      "成型",
+      "去膠",
+      "水吹砂",
+      "電鍍",
+      "移印",
+      "切彎腳",
+      "TMTT",
+      "品檢",
+      "FQC"
+    ]
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:19.945464"
+  },
+  "success": true
+}

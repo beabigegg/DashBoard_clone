@@ -1,0 +1,24 @@
+{
+  "data": {
+    "packages": [],
+    "reasons": [],
+    "workcenter_groups": []
+  },
+  "meta": {
+    "app_version": "unknown",
+    "exclude_material_scrap": true,
+    "exclude_pb_diode": true,
+    "excluded_reason_count": 0,
+    "exclusion_applied": true,
+    "include_excluded_scrap": false,
+    "material_exclusion_applied": true,
+    "material_reason_selected": false,
+    "package_filter_count": 0,
+    "pb_diode_exclusion_applied": true,
+    "reason_filter_count": 0,
+    "reason_name_prefix_policy_applied": true,
+    "timestamp": "2026-06-16T14:40:49.829850",
+    "workcenter_group_count": 0
+  },
+  "success": true
+}

@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "Drawer name already exists: test"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.768171"
+  },
+  "success": false
+}

@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "single_flight_timeout: 查詢已有另一個 worker 正在執行，請稍後重試"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "retry_after_seconds": 30,
+    "timestamp": "2026-06-16T14:41:19.933449"
+  },
+  "success": false
+}

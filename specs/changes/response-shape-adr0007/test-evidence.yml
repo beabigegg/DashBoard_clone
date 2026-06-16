@@ -1,0 +1,37 @@
+change-id: response-shape-adr0007
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      python -m pytest --collect-only -q tests/contract/ tests/test_api_contract.py
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/response-shape-adr0007/test-runs/20260616-141154/junit.xml'
+      --maxfail=1 --tb=short -ra
+    summary: specs/changes/response-shape-adr0007/test-runs/20260616-141154/summary.json
+    junit: specs/changes/response-shape-adr0007/test-runs/20260616-141154/junit.xml
+  - phase: targeted
+    status: passed
+    command: >-
+      python -m pytest tests/contract/ tests/test_api_contract.py -v --tb=short
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/response-shape-adr0007/test-runs/20260616-141200/junit.xml'
+      -q --maxfail=1 -ra
+    summary: specs/changes/response-shape-adr0007/test-runs/20260616-141200/summary.json
+    junit: specs/changes/response-shape-adr0007/test-runs/20260616-141200/junit.xml
+  - phase: contract
+    status: passed
+    command: cdd-kit validate --contracts
+    summary: specs/changes/response-shape-adr0007/test-runs/20260616-144016/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      pytest tests/contract/ tests/test_api_contract.py -v --tb=short
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/response-shape-adr0007/test-runs/20260616-144026/junit.xml'
+      -q --maxfail=1 -ra
+    summary: specs/changes/response-shape-adr0007/test-runs/20260616-144026/summary.json
+    junit: specs/changes/response-shape-adr0007/test-runs/20260616-144026/junit.xml
+final-status: passed

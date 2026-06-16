@@ -1,0 +1,27 @@
+{
+  "data": {
+    "lots": [],
+    "pagination": {
+      "page": 1,
+      "page_size": 100,
+      "total_count": 0,
+      "total_pages": 1
+    },
+    "specs": [],
+    "summary": {
+      "holdLots": 0,
+      "nonQualityHoldLots": 0,
+      "qualityHoldLots": 0,
+      "queueLots": 0,
+      "runLots": 0,
+      "totalLots": 0
+    },
+    "sys_date": null,
+    "workcenter": "TEST"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:31.383646"
+  },
+  "success": true
+}

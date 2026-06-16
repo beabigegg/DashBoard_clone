@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "down": 0,
+      "egt": 0,
+      "eng": 0,
+      "idle": 0,
+      "nst": 0,
+      "order": 999,
+      "original_wcs": [],
+      "ou_pct": 0,
+      "prd": 0,
+      "run_pct": 0.0,
+      "sby": 0,
+      "sdt": 0,
+      "total": 1241,
+      "udt": 0,
+      "workcenter": "UNKNOWN"
+    }
+  ],
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:55.423866"
+  },
+  "success": true
+}

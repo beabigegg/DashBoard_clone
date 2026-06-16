@@ -1,0 +1,22 @@
+{
+  "data": {
+    "families": [],
+    "package_groups": [],
+    "resources": [],
+    "status_categories": [
+      "PRODUCTIVE",
+      "STANDBY",
+      "DOWN",
+      "ENGINEERING",
+      "NOT_SCHEDULED",
+      "INACTIVE",
+      "OTHER"
+    ],
+    "workcenter_groups": []
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:49.752981"
+  },
+  "success": true
+}

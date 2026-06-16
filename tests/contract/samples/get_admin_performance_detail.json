@@ -1,0 +1,280 @@
+{
+  "data": {
+    "async_workers": {
+      "queues": {
+        "queues": [],
+        "total_failed": 0,
+        "total_queued": 0,
+        "total_started": 0
+      },
+      "rq_available": false,
+      "slots": {
+        "active": 0,
+        "max": 3,
+        "utilization_pct": 0.0
+      },
+      "workers": {
+        "summary": {
+          "busy": 0,
+          "idle": 0,
+          "total": 0
+        },
+        "workers": []
+      }
+    },
+    "db_pool": {
+      "config": {
+        "max_overflow": 0,
+        "pool_recycle": 300,
+        "pool_size": 1,
+        "pool_timeout": 5
+      },
+      "status": {
+        "checked_in": 1,
+        "checked_out": 0,
+        "max_capacity": 1,
+        "overflow": 0,
+        "saturation": 0.0,
+        "size": 1,
+        "slow_pool_enabled": false,
+        "slow_query_active": 0,
+        "slow_query_waiting": 0
+      }
+    },
+    "direct_connections": {
+      "total_since_start": 7,
+      "worker_pid": 626849
+    },
+    "duckdb": {
+      "memory_limit_state": "512MB",
+      "temp_dir_bytes": null
+    },
+    "heavy_query_telemetry": {
+      "async_fallback_reasons": [],
+      "async_fallback_total": 0,
+      "domain_lifecycle_failures": [],
+      "domain_spool_hits": [],
+      "domain_spool_misses": [
+        {
+          "count": 6,
+          "domain": "reject_cache"
+        },
+        {
+          "count": 2,
+          "domain": "hold_history"
+        },
+        {
+          "count": 2,
+          "domain": "resource_history"
+        }
+      ],
+      "guard_reject_total": 0,
+      "lifecycle_failure_reasons": [],
+      "lifecycle_failure_total": 0,
+      "lock_fail_mode_triggered": [
+        {
+          "count": 1,
+          "lock_mode": "scrap_reason_exclusion_cache_refresh:closed"
+        },
+        {
+          "count": 1,
+          "lock_mode": "yield_alert_primary:5351b8591d615679:closed"
+        }
+      ],
+      "lock_fail_mode_triggered_total": 2,
+      "memory_error_reasons": [],
+      "memory_error_total": 0,
+      "reject_reasons": [],
+      "route_async_fallbacks": [],
+      "route_memory_errors": [],
+      "route_rejects": [],
+      "spool_hit_total": 0,
+      "spool_miss_total": 10
+    },
+    "process_caches": {
+      "equipment_status": {
+        "description": "Equipment Status (L1, 30s)",
+        "entries": 0,
+        "max_size": 2,
+        "ttl_seconds": 30
+      },
+      "hold_dataset": {
+        "description": "Hold Dataset (L1, 15min)",
+        "entries": 1,
+        "max_size": 1,
+        "ttl_seconds": 7200
+      },
+      "pareto_snapshot": {
+        "description": "Pareto Snapshot (L1)",
+        "entries": 0,
+        "max_size": 16,
+        "ttl_seconds": 600
+      },
+      "reject_dataset": {
+        "description": "Reject Dataset (L1, 15min)",
+        "entries": 0,
+        "max_size": 1,
+        "ttl_seconds": 7200
+      },
+      "resource": {
+        "description": "Resource DataFrame (L1, 30s)",
+        "entries": 1,
+        "max_size": 2,
+        "ttl_seconds": 30
+      },
+      "resource_dataset": {
+        "description": "Resource Dataset (L1, 15min)",
+        "entries": 0,
+        "max_size": 1,
+        "ttl_seconds": 72000
+      },
+      "wip_dataframe": {
+        "description": "WIP DataFrame (L1, 30s)",
+        "entries": 0,
+        "max_size": 2,
+        "ttl_seconds": 30
+      },
+      "yield_alert_dataset": {
+        "description": "Yield Alert Dataset (L1)",
+        "entries": 0,
+        "max_size": 1,
+        "ttl_seconds": 300
+      }
+    },
+    "redis": null,
+    "redis_namespace_memory": null,
+    "route_cache": {
+      "available": true,
+      "degraded": false,
+      "l1_hit_rate": 0.0,
+      "l1_hits": 0,
+      "l1_size": 7,
+      "l2_hit_rate": 0.0,
+      "l2_hits": 0,
+      "l2_telemetry": null,
+      "miss_rate": 1.0,
+      "misses": 15,
+      "mode": "l1-only",
+      "reads_total": 15,
+      "redis_expected": false,
+      "writes_total": 8
+    },
+    "spool_disk_usage": [
+      {
+        "file_count": 1,
+        "namespace": "anomaly_reject_dataset",
+        "total_bytes": 3652030
+      },
+      {
+        "file_count": 1,
+        "namespace": "anomaly_resource_dataset",
+        "total_bytes": 1861146
+      },
+      {
+        "file_count": 1,
+        "namespace": "anomaly_hold_dataset",
+        "total_bytes": 466651
+      },
+      {
+        "file_count": 3,
+        "namespace": "reject_dataset",
+        "total_bytes": 12918074
+      },
+      {
+        "file_count": 4,
+        "namespace": "downtime_analysis_job_bridge",
+        "total_bytes": 19023135
+      },
+      {
+        "file_count": 1,
+        "namespace": "anomaly_yield_dataset",
+        "total_bytes": 134708754
+      },
+      {
+        "file_count": 4,
+        "namespace": "downtime_analysis_base_events",
+        "total_bytes": 8374083
+      },
+      {
+        "file_count": 3,
+        "namespace": "hold_dataset",
+        "total_bytes": 857255
+      },
+      {
+        "file_count": 0,
+        "namespace": "downtime_analysis",
+        "total_bytes": 0
+      },
+      {
+        "file_count": 5,
+        "namespace": "resource_dataset",
+        "total_bytes": 6298157
+      },
+      {
+        "file_count": 2,
+        "namespace": "yield_alert_dataset",
+        "total_bytes": 144420866
+      },
+      {
+        "file_count": 0,
+        "namespace": "production_history",
+        "total_bytes": 0
+      },
+      {
+        "file_count": 5,
+        "namespace": "resource_oee",
+        "total_bytes": 1781085
+      }
+    ],
+    "worker_memory_guard": {
+      "check_interval": 15,
+      "enabled": true,
+      "evict_count": 0,
+      "last_rss_mb": 0.0,
+      "level": "normal",
+      "limit_mb": 0,
+      "process_memory": {
+        "evict_count": 0,
+        "level": "normal",
+        "limit_mb": 0,
+        "restart_count": 0,
+        "rss_mb": 0.0,
+        "rss_pct": 0.0,
+        "warn_count": 0
+      },
+      "restart_count": 0,
+      "rss_pct": 0.0,
+      "service_memory": {
+        "gunicorn_process_count": 0,
+        "gunicorn_rss_mb": 0.0,
+        "process_count": 0,
+        "rq_process_count": 0,
+        "rq_rss_mb": 0.0,
+        "rss_bytes": 0,
+        "rss_mb": 0.0
+      },
+      "service_rss_bytes": 0,
+      "service_rss_mb": 0.0,
+      "system_mem_available_mb": 0.0,
+      "system_mem_total_mb": 0.0,
+      "system_mem_used_pct": 0.0,
+      "system_memory": {
+        "available_mb": 0.0,
+        "pressure": false,
+        "pressure_state": "normal",
+        "reject_threshold_pct": 92.0,
+        "total_mb": 0.0,
+        "used_mb": 0.0,
+        "used_pct": 0.0,
+        "warn_threshold_pct": 85.0
+      },
+      "system_memory_pressure": false,
+      "warn_count": 0
+    }
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.547622"
+  },
+  "success": true
+}

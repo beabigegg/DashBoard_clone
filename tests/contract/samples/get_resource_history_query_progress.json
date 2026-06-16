@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "找不到指定的查詢進度，可能已過期或尚未建立"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:49.827405"
+  },
+  "success": false
+}

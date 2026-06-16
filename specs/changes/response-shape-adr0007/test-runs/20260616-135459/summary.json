@@ -1,0 +1,15 @@
+{
+  "change_id": "response-shape-adr0007",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/contract/ tests/test_api_contract.py --collect-only -q",
+  "duration_ms": 3376,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/response-shape-adr0007/test-runs/20260616-135459/summary.json",
+    "stdout": "specs/changes/response-shape-adr0007/test-runs/20260616-135459/stdout.log",
+    "stderr": "specs/changes/response-shape-adr0007/test-runs/20260616-135459/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

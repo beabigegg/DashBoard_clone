@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Drawer not found: 1"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:42:01.769005"
+  },
+  "success": false
+}

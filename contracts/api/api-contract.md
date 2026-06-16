@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.20.0
-last-changed: 2026-06-13
+schema-version: 1.21.0
+last-changed: 2026-06-15
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -67,186 +67,184 @@ breaking-change-policy: deprecate-2-minors
 > 雙方法端點（GET+POST 均接受）在下表中各自列出一行；POST body 為 GET query params 的 JSON 等效。
 
 | method | path | auth | request schema | response schema | errors | tests |
-|---|---|---|---|---|---|---|
-| POST | /api/auth/login | public | JSON {username,password} | success_response | 400/401/429 | route tests |
-| POST | /api/auth/logout | public | — | success_response | — | route tests |
-| GET | /api/auth/me | public | — | success_response | — | route tests |
-| PATCH | /api/auth/heartbeat | required | — | success_response | 401 | route tests |
-| GET | /health | none | — | health-payload | — | smoke tests |
-| GET | /health/deep | none | — | health-payload | — | smoke tests |
-| GET | /api/job/<job_id> | required | ?prefix= | success_response | 400/404 | route tests |
-| POST | /api/job/<job_id>/abandon | required | JSON body | success_response | 403/404/409 | route tests |
-| GET | /api/spool/<namespace>/<query_id>.parquet | required | namespace ∈ {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge} | parquet-binary | 400/410 | route tests |
-| GET | /api/wip/overview/summary | required | query params | success_response | 400/500 | route tests |
-| POST | /api/wip/overview/matrix | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/wip/overview/matrix | required | query params | success_response | 400/500 | route tests |
-| GET | /api/wip/overview/hold | required | query params | success_response | 400/500 | route tests |
-| POST | /api/wip/overview/hold | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/wip/detail/<workcenter> | required | query params | success_response | 400/500 | route tests |
-| POST | /api/wip/detail/<workcenter> | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/wip/lot/<lotid> | required | — | success_response | 404/500 | route tests |
-| GET | /api/wip/meta/workcenters | required | — | success_response | 500 | route tests |
-| GET | /api/wip/meta/packages | required | — | success_response | 500 | route tests |
-| GET | /api/wip/meta/filter-options | required | query params | success_response | 500 | route tests |
-| POST | /api/wip/meta/filter-options | required | JSON body | success_response | 500 | route tests |
-| GET | /api/wip/meta/search | required | ?q= | success_response | 400/500 | route tests |
-| GET | /api/hold-overview/summary | required | query params | success_response | 400/500 | route tests |
-| POST | /api/hold-overview/summary | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/hold-overview/matrix | required | query params | success_response | 400/500 | route tests |
-| POST | /api/hold-overview/matrix | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/hold-overview/treemap | required | query params | success_response | 400/500 | route tests |
-| POST | /api/hold-overview/treemap | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/hold-overview/lots | required | query params | success_response | 400/500 | route tests |
-| POST | /api/hold-overview/lots | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/wip/hold-detail/summary | required | query params | success_response | 400/500 | route tests |
-| GET | /api/wip/hold-detail/distribution | required | query params | success_response | 400/500 | route tests |
-| GET | /api/wip/hold-detail/lots | required | query params | success_response | 400/500 | route tests |
-| GET | /api/hold-history/config | required | — | success_response | 500 | route tests |
-| POST | /api/hold-history/query | required | JSON body | HTTP 200 sync (days < HOLD_ASYNC_DAY_THRESHOLD or HOLD_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days ≥ HOLD_ASYNC_DAY_THRESHOLD AND HOLD_ASYNC_ENABLED=true): {async:true, job_id, status_url} | 202/400/410/500 | route tests |
-| POST | /api/hold-history/today-snapshot | required | JSON body | success_response | 400/503 | e2e tests |
-| GET | /api/hold-history/view | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/qc-gate/summary | required | — | success_response | 500 | route tests |
-| GET | /api/resource/by_status | required | — | success_response | 500 | route tests |
-| GET | /api/resource/by_workcenter | required | — | success_response | 500 | route tests |
-| GET | /api/resource/workcenter_status_matrix | required | — | success_response | 500 | route tests |
-| POST | /api/resource/detail | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/resource/filter_options | required | — | success_response | 500 | route tests |
-| GET | /api/resource/status_values | required | — | success_response | 500 | route tests |
-| GET | /api/resource/status | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
-| GET | /api/resource/status/options | required | — | success_response (incl. package_groups[]) | 500 | route tests |
-| GET | /api/resource/status/summary | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
-| GET | /api/resource/status/matrix | required | query params (incl. package_groups) | success_response | 400/500 | route tests |
-| GET | /api/resource/history/options | required | — | success_response | 500 | route tests |
-| POST | /api/resource/history/query | required | JSON body | HTTP 200 sync (days < RESOURCE_ASYNC_DAY_THRESHOLD or RESOURCE_ASYNC_ENABLED=false): existing shape; HTTP 202 async (days >= RESOURCE_ASYNC_DAY_THRESHOLD AND RESOURCE_ASYNC_ENABLED=true): {async:true, job_id, status_url} | 202/400/410/500 | route tests |
-| GET | /api/resource/history/view | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/resource/history/page | required | — | redirect→/resource-history | — | route tests |
-| GET | /api/resource/history/export | required | query params | csv-stream | 400/410 | e2e tests |
-| POST | /api/resource/history/export | required | JSON body | csv-stream | 400/410 | e2e tests |
-| GET | /api/resource/history/query/progress | required | ?query_id=<uuid> | success_response | 400/404 | route tests |
-| GET | /api/reject-history/options | required | — | success_response | 500 | route tests |
-| GET | /api/reject-history/summary | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/reject-history/trend | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/reject-history/reason-pareto | required | ?query_id= | success_response | 400/410 | route tests |
-| POST | /api/reject-history/batch-pareto | required | JSON body | success_response | 400/410 | route tests |
-| GET | /api/reject-history/batch-pareto | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/reject-history/list | required | ?query_id=&page= | success_response | 400/410 | route tests |
-| GET | /api/reject-history/export | required | ?query_id= | csv-stream | 400/410 | e2e tests |
-| GET | /api/reject-history/export-cached | required | ?query_id= | csv-stream | 400/410 | e2e tests |
-| POST | /api/reject-history/export-cached | required | JSON body | csv-stream | 400/410 | e2e tests |
-| GET | /api/reject-history/analytics | required | ?query_id= | success_response | 400/410 | route tests |
-| POST | /api/reject-history/query | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/reject-history/count | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/reject-history/job/<job_id> | required | — | success_response | 404 | route tests |
-| GET | /api/reject-history/view | required | ?query_id= | success_response | 400/410 | route tests |
-| POST | /api/reject-history/view | required | JSON body | success_response | 400/410 | route tests |
-| POST | /api/yield-alert/query | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/yield-alert/job/<job_id> | required | — | success_response | 404 | route tests |
-| POST | /api/yield-alert/analyze | required | JSON body | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/view | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/summary | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/trend | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/alerts | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/reason-detail | required | ?query_id=&reason= | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/drilldown-context | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/yield-alert/filter-options | required | — | success_response | 500 | route tests |
-| GET | /api/yield-alert/cross-filter-options | required | ?query_id=&lines[]=... | success_response | 400/410 | route tests |
-| GET | /api/production-history/type-options | required | — | success_response | 500 | route tests |
-| GET | /api/production-history/filter-options | required | ?selected=<json> | success_response | 400/404/500 | route tests |
-| POST | /api/production-history/options | required | JSON body | success_response | 503 | route tests |
-| POST | /api/production-history/query | required | JSON body | success_response | 202/400/503 | route tests |
-| GET | /api/production-history/job/<job_id> | required | — | success_response | 404 | route tests |
-| POST | /api/production-history/page | required | JSON body | success_response | 400/410 | route tests |
-| POST | /api/production-history/matrix | required | JSON body | success_response | 400/410 | route tests |
-| GET | /api/production-history/count | required | ?query_id= | success_response | 400/410 | route tests |
-| GET | /api/production-history/export | required | query params | csv-stream | 400/410 | e2e tests |
-| POST | /api/production-history/export | required | JSON body | csv-stream | 400/410 | e2e tests |
-| POST | /api/material-trace/query | required | JSON body | success_response | 202/400/503 | route tests |
-| GET | /api/material-trace/job/<job_id> | required | — | success_response | 404 | route tests |
-| POST | /api/material-trace/export | required | JSON {query_hash} | csv-stream | 400/409 | e2e tests |
-| GET | /api/material-trace/filter-options | required | — | success_response | 500 | route tests |
-| POST | /api/trace/seed-resolve | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/trace/lineage | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/trace/lineage/job/<job_id> | required | — | success_response | 404 | route tests |
-| GET | /api/trace/lineage/job/<job_id>/result | required | — | success_response | 404/410 | route tests |
-| POST | /api/trace/events | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/trace/job/<job_id> | required | — | success_response | 404 | route tests |
-| GET | /api/trace/job/<job_id>/result | required | — | success_response | 404/410 | route tests |
-| GET | /api/trace/job/<job_id>/stream | required | — | ndjson-stream | 404 | e2e tests |
-| GET | /api/mid-section-defect/station-options | required | — | success_response | 500 | route tests |
-| GET | /api/mid-section-defect/analysis | required | query params | success_response | 400/500 | route tests |
-| GET | /api/mid-section-defect/analysis/detail | required | query params | success_response | 400/500 | route tests |
-| GET | /api/mid-section-defect/loss-reasons | required | — | success_response | 500 | route tests |
-| GET | /api/mid-section-defect/export | required | query params | csv-stream | 400/500 | e2e tests |
-| GET | /api/analytics/anomaly-summary | required | — | success_response+cache_state | 503 | route tests |
-| GET | /api/analytics/yield-anomalies | required | — | success_response | 503 | route tests |
-| GET | /api/analytics/reject-spikes | required | — | success_response | 503 | route tests |
-| GET | /api/analytics/hold-outliers | required | — | success_response | 503 | route tests |
-| GET | /api/analytics/equipment-deviation | required | — | success_response | 503 | route tests |
-| GET | /api/analytics/yield-anomalies/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
-| GET | /api/analytics/reject-spikes/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
-| GET | /api/analytics/hold-outliers/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
-| GET | /api/analytics/equipment-deviation/drilldown | required | ?query_id= | success_response | 400/410/503 | route tests |
-| POST | /api/query-tool/resolve | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/query-tool/lot-history | required | ?lot_id= | success_response | 400/500 | route tests |
-| GET | /api/query-tool/adjacent-lots | required | ?lot_id= | success_response | 400/500 | route tests |
-| GET | /api/query-tool/lot-associations | required | ?lot_id= | success_response | 400/500 | route tests |
-| POST | /api/query-tool/equipment-period | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/query-tool/equipment-list | required | — | success_response | 500 | route tests |
-| GET | /api/query-tool/workcenter-groups | required | — | success_response | 500 | route tests |
-| POST | /api/query-tool/lot-equipment-lookup | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/query-tool/equipment-recent-jobs/<equipment_id> | required | — | success_response | 404/500 | route tests |
-| POST | /api/query-tool/export-csv | required | JSON body | csv-stream | 400/500 | e2e tests |
-| GET | /api/job-query/resources | required | — | success_response | 500 | route tests |
-| POST | /api/job-query/jobs | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/job-query/txn/<job_id> | required | — | success_response | 404/500 | route tests |
-| POST | /api/job-query/export | required | JSON body | csv-stream | 400/500 | e2e tests |
-| POST | /api/dashboard/kpi | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/dashboard/workcenter_cards | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/dashboard/detail | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/dashboard/ou_trend | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/dashboard/utilization_heatmap | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/ai/query | required | JSON body | success_response | 400/500 | route tests |
-| GET | /admin/api/system-status | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/metrics | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/logs | admin | query params | success_response | 403/500 | route tests |
-| POST | /admin/api/logs/cleanup | admin | — | success_response | 403/500 | route tests |
-| POST | /admin/api/log-files/cleanup | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/performance-detail | admin | query params | success_response | 403/500 | route tests |
-| GET | /admin/api/performance-history | admin | query params | success_response | 403/500 | route tests |
-| POST | /admin/api/performance-history/purge | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/storage-info | admin | — | success_response | 403/500 | route tests |
-| POST | /admin/api/worker/restart | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/worker/status | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/user-usage-kpi | admin | ?start_date=&end_date=&department= | success_response | 400/403 | route tests |
-| GET | /admin/api/pages | admin | — | success_response | 403/500 | route tests |
-| GET | /admin/api/drawers | admin | — | success_response | 403/500 | route tests |
-| POST | /admin/api/drawers | admin | JSON body | success_response | 400/403 | route tests |
-| PUT | /admin/api/drawers/<drawer_id> | admin | JSON body | success_response | 400/403/404 | route tests |
-| DELETE | /admin/api/drawers/<drawer_id> | admin | — | success_response | 403/404 | route tests |
-| POST | /admin/api/analytics/recalculate | admin | — | success_response | 403/500 | route tests |
-| POST | /api/downtime-analysis/query | required | JSON body | HTTP 200 sync: existing shape when days < DOWNTIME_ASYNC_DAY_THRESHOLD; HTTP 202 async: {async:true, job_id, status_url} when days >= DOWNTIME_ASYNC_DAY_THRESHOLD AND DOWNTIME_ASYNC_ENABLED=true | 202/400/500 | route tests |
-| POST | /api/wip/overview/summary | required | JSON body | success_response | 400/500 | route tests |
-
-| GET | /api/downtime-analysis/options | required | — | success_response | 500 | route tests |
-| POST | /api/downtime-analysis/query | required | JSON body | success_response `{base_spool_url, jobs_spool_url, query_id, taxonomy}` (flag ON) / `{query_id, summary, daily_trend, big_category, top_reasons}` (flag OFF) | 400/500 | route tests |
-| GET | /api/downtime-analysis/view | required | ?query_id=&granularity=&top_n= (granularity: day only; week/month planned) — **[DEPRECATED: removal target api 1.17.0]** | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/equipment-detail | required | ?query_id= &page_size=(opt,max:1000,default:20) &big_category=(opt) &status_types=(opt,CSV:UDT,SDT,EGT) — **[DEPRECATED: removal target api 1.17.0]** | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/event-detail | required | ?query_id= &page= &page_size= &big_category=(opt) &status_types=(opt,CSV) &resource_id=(opt) — **[DEPRECATED: removal target api 1.17.0]** | success_response | 400/410 | route tests |
-| GET | /api/downtime-analysis/export-equipment-detail | required | ?query_id= | csv-stream | 400/410 | e2e tests |
-| GET | /api/downtime-analysis/export-event-detail | required | ?query_id= | csv-stream | 400/410 | e2e tests |
-| GET | /api/portal/navigation | required | — | success_response | 500 | route tests |
-| GET | /api/trace/seed/job/<job_id> | required | — | success_response | 404 | route tests |
-| GET | /api/trace/seed/job/<job_id>/result | required | — | success_response | 404/410 | route tests |
-| GET | /api/material-consumption/filter-options | required | — | success_response | 500 | route tests |
-| POST | /api/material-consumption/query | required | JSON body | success_response | 400/500 | route tests |
-| GET | /api/material-consumption/view | required | ?query_id=&granularity= | success_response | 400/410 | route tests |
-| POST | /api/material-consumption/detail | required | JSON body | success_response | 202/400/500 | route tests |
-| GET | /api/material-consumption/detail/page | required | ?query_id=&page= | success_response | 400/410 | route tests |
-| GET | /api/material-consumption/detail/job/<job_id> | required | — | success_response | 404 | route tests |
-| POST | /api/material-consumption/export | required | JSON body | csv-stream | 400/410 | e2e tests |
-| GET | /api/get_table_info | required | — | success_response | 500 | route tests |
-| POST | /api/get_table_columns | required | JSON body | success_response | 400/500 | route tests |
-| POST | /api/query_table | required | JSON body | success_response | 400/500 | route tests |
+|---| --- |---|---|---|---|---|
+| POST | /api/auth/login | public | JSON {username,password} | AuthSessionResponse | 400/401/429 | route tests |
+| POST | /api/auth/logout | public | — | AckResponse | — | route tests |
+| GET | /api/auth/me | public | — | AuthMeResponse | — | route tests |
+| PATCH | /api/auth/heartbeat | required | — | AckResponse | 401 | route tests |
+| GET | /health | none | — | HealthPayload | — | smoke tests |
+| GET | /health/deep | none | — | HealthPayload | — | smoke tests |
+| GET | /api/job/{job_id} | required | ?prefix= | JobStatusResponse | 400/404 | route tests |
+| POST | /api/job/{job_id}/abandon | required | JSON body | AckResponse | 403/404/409 | route tests |
+| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace ∈ {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge} | application/octet-stream (parquet) | 400/410 | route tests |
+| GET | /api/wip/overview/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/wip/overview/summary | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/wip/overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/overview/matrix | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/overview/hold | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/wip/overview/hold | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/detail/{workcenter} | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/wip/detail/{workcenter} | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/lot/{lotid} | required | — | GenericSuccessResponse | 404/500 | route tests |
+| GET | /api/wip/meta/workcenters | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/wip/meta/packages | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/wip/meta/filter-options | required | query params | GenericSuccessResponse | 500 | route tests |
+| POST | /api/wip/meta/filter-options | required | JSON body | GenericSuccessResponse | 500 | route tests |
+| GET | /api/wip/meta/search | required | ?q= | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/hold-overview/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/hold-overview/summary | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/hold-overview/matrix | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/hold-overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/hold-overview/treemap | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/hold-overview/treemap | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/hold-overview/lots | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/hold-overview/lots | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/hold-detail/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/hold-detail/distribution | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/hold-detail/lots | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/hold-history/config | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/hold-history/query | required | JSON body | GenericSuccessResponse | 202/400/410/500 | route tests |
+| POST | /api/hold-history/today-snapshot | required | JSON body | GenericSuccessResponse | 400/503 | e2e tests |
+| GET | /api/hold-history/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/qc-gate/summary | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/resource/by_status | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/resource/by_workcenter | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/resource/workcenter_status_matrix | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/resource/detail | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/resource/filter_options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/resource/status_values | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/resource/status | required | query params (incl. package_groups) | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/resource/status/options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/resource/status/summary | required | query params (incl. package_groups) | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/resource/status/matrix | required | query params (incl. package_groups) | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/resource/history/options | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/resource/history/query | required | JSON body | GenericSuccessResponse | 202/400/410/500 | route tests |
+| GET | /api/resource/history/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/resource/history/page | required | — | GenericSuccessResponse | — | route tests |
+| GET | /api/resource/history/export | required | query params | GenericSuccessResponse | 400/410 | e2e tests |
+| POST | /api/resource/history/export | required | JSON body | GenericSuccessResponse | 400/410 | e2e tests |
+| GET | /api/resource/history/query/progress | required | ?query_id=<uuid> | ProgressResponse | 400/404 | route tests |
+| GET | /api/reject-history/options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/reject-history/summary | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/reject-history/trend | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/reject-history/reason-pareto | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| POST | /api/reject-history/batch-pareto | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/reject-history/batch-pareto | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/reject-history/list | required | ?query_id=&page= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/reject-history/export | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
+| GET | /api/reject-history/export-cached | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
+| POST | /api/reject-history/export-cached | required | JSON body | GenericSuccessResponse | 400/410 | e2e tests |
+| GET | /api/reject-history/analytics | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| POST | /api/reject-history/query | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
+| GET | /api/reject-history/count | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/reject-history/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| GET | /api/reject-history/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| POST | /api/reject-history/view | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
+| POST | /api/yield-alert/query | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
+| GET | /api/yield-alert/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| POST | /api/yield-alert/analyze | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/summary | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/trend | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/alerts | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/reason-detail | required | ?query_id=&reason= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/drilldown-context | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/yield-alert/filter-options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/yield-alert/cross-filter-options | required | ?query_id=&lines[]=... | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/production-history/type-options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/production-history/filter-options | required | ?selected=<json> | GenericSuccessResponse | 400/404/500 | route tests |
+| POST | /api/production-history/options | required | JSON body | GenericSuccessResponse | 503 | route tests |
+| POST | /api/production-history/query | required | JSON body | GenericSuccessResponse | 202/400/503 | route tests |
+| GET | /api/production-history/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| POST | /api/production-history/page | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
+| POST | /api/production-history/matrix | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/production-history/count | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/production-history/export | required | query params | GenericSuccessResponse | 400/410 | e2e tests |
+| POST | /api/production-history/export | required | JSON body | GenericSuccessResponse | 400/410 | e2e tests |
+| POST | /api/material-trace/query | required | JSON body | GenericSuccessResponse | 202/400/503 | route tests |
+| GET | /api/material-trace/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| POST | /api/material-trace/export | required | JSON {query_hash} | GenericSuccessResponse | 400/409 | e2e tests |
+| GET | /api/material-trace/filter-options | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/trace/seed-resolve | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/trace/lineage | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
+| GET | /api/trace/lineage/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| GET | /api/trace/lineage/job/{job_id}/result | required | — | GenericSuccessResponse | 404/410 | route tests |
+| POST | /api/trace/events | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/trace/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| GET | /api/trace/job/{job_id}/result | required | — | GenericSuccessResponse | 404/410 | route tests |
+| GET | /api/trace/job/{job_id}/stream | required | — | GenericSuccessResponse | 404 | e2e tests |
+| GET | /api/mid-section-defect/station-options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/mid-section-defect/analysis | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/mid-section-defect/analysis/detail | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/mid-section-defect/loss-reasons | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/mid-section-defect/export | required | query params | GenericSuccessResponse | 400/500 | e2e tests |
+| GET | /api/analytics/anomaly-summary | required | — | AnomalySummaryResponse | 503 | route tests |
+| GET | /api/analytics/yield-anomalies | required | — | GenericSuccessResponse | 503 | route tests |
+| GET | /api/analytics/reject-spikes | required | — | GenericSuccessResponse | 503 | route tests |
+| GET | /api/analytics/hold-outliers | required | — | GenericSuccessResponse | 503 | route tests |
+| GET | /api/analytics/equipment-deviation | required | — | GenericSuccessResponse | 503 | route tests |
+| GET | /api/analytics/yield-anomalies/drilldown | required | ?query_id= | GenericSuccessResponse | 400/410/503 | route tests |
+| GET | /api/analytics/reject-spikes/drilldown | required | ?query_id= | GenericSuccessResponse | 400/410/503 | route tests |
+| GET | /api/analytics/hold-outliers/drilldown | required | ?query_id= | GenericSuccessResponse | 400/410/503 | route tests |
+| GET | /api/analytics/equipment-deviation/drilldown | required | ?query_id= | GenericSuccessResponse | 400/410/503 | route tests |
+| POST | /api/query-tool/resolve | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/query-tool/lot-history | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/query-tool/adjacent-lots | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/query-tool/lot-associations | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/query-tool/equipment-period | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/query-tool/equipment-list | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/query-tool/workcenter-groups | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/query-tool/lot-equipment-lookup | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/query-tool/equipment-recent-jobs/{equipment_id} | required | — | GenericSuccessResponse | 404/500 | route tests |
+| POST | /api/query-tool/export-csv | required | JSON body | GenericSuccessResponse | 400/500 | e2e tests |
+| GET | /api/job-query/resources | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/job-query/jobs | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/job-query/txn/{job_id} | required | — | GenericSuccessResponse | 404/500 | route tests |
+| POST | /api/job-query/export | required | JSON body | GenericSuccessResponse | 400/500 | e2e tests |
+| POST | /api/dashboard/kpi | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/dashboard/workcenter_cards | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/dashboard/detail | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/dashboard/ou_trend | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/dashboard/utilization_heatmap | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/ai/query | required | JSON body | AiQueryResponse | 400/500 | route tests |
+| GET | /admin/api/system-status | admin | — | GenericSuccessResponse | 403/500 | route tests |
+| GET | /admin/api/metrics | admin | — | GenericSuccessResponse | 403/500 | route tests |
+| GET | /admin/api/logs | admin | query params | GenericSuccessResponse | 403/500 | route tests |
+| POST | /admin/api/logs/cleanup | admin | — | AckResponse | 403/500 | route tests |
+| POST | /admin/api/log-files/cleanup | admin | — | AckResponse | 403/500 | route tests |
+| GET | /admin/api/performance-detail | admin | query params | GenericSuccessResponse | 403/500 | route tests |
+| GET | /admin/api/performance-history | admin | query params | GenericSuccessResponse | 403/500 | route tests |
+| POST | /admin/api/performance-history/purge | admin | — | AckResponse | 403/500 | route tests |
+| GET | /admin/api/storage-info | admin | — | GenericSuccessResponse | 403/500 | route tests |
+| POST | /admin/api/worker/restart | admin | — | AckResponse | 403/500 | route tests |
+| GET | /admin/api/worker/status | admin | — | GenericSuccessResponse | 403/500 | route tests |
+| GET | /admin/api/user-usage-kpi | admin | ?start_date=&end_date=&department= | GenericSuccessResponse | 400/403 | route tests |
+| GET | /admin/api/pages | admin | — | GenericSuccessResponse | 403/500 | route tests |
+| GET | /admin/api/drawers | admin | — | GenericSuccessResponse | 403/500 | route tests |
+| POST | /admin/api/drawers | admin | JSON body | GenericSuccessResponse | 400/403 | route tests |
+| PUT | /admin/api/drawers/{drawer_id} | admin | JSON body | GenericSuccessResponse | 400/403/404 | route tests |
+| DELETE | /admin/api/drawers/{drawer_id} | admin | — | AckResponse | 403/404 | route tests |
+| POST | /admin/api/analytics/recalculate | admin | — | AckResponse | 403/500 | route tests |
+| POST | /api/downtime-analysis/query | required | JSON body | DowntimeQueryResponse | 202/400/500 | route tests |
+| GET | /api/downtime-analysis/options | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/downtime-analysis/view | required | ?query_id=&granularity=&top_n= (granularity: day only; week/month planned) — **[DEPRECATED: removal target api 1.17.0]** | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/downtime-analysis/equipment-detail | required | ?query_id= &page_size=(opt,max:1000,default:20) &big_category=(opt) &status_types=(opt,CSV:UDT,SDT,EGT) — **[DEPRECATED: removal target api 1.17.0]** | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/downtime-analysis/event-detail | required | ?query_id= &page= &page_size= &big_category=(opt) &status_types=(opt,CSV) &resource_id=(opt) — **[DEPRECATED: removal target api 1.17.0]** | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/downtime-analysis/export-equipment-detail | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
+| GET | /api/downtime-analysis/export-event-detail | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
+| GET | /api/portal/navigation | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/trace/seed/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| GET | /api/trace/seed/job/{job_id}/result | required | — | GenericSuccessResponse | 404/410 | route tests |
+| GET | /api/material-consumption/filter-options | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/material-consumption/query | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/material-consumption/view | required | ?query_id=&granularity= | GenericSuccessResponse | 400/410 | route tests |
+| POST | /api/material-consumption/detail | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
+| GET | /api/material-consumption/detail/page | required | ?query_id=&page= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/material-consumption/detail/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
+| POST | /api/material-consumption/export | required | JSON body | GenericSuccessResponse | 400/410 | e2e tests |
+| GET | /api/get_table_info | required | — | GenericSuccessResponse | 500 | route tests |
+| POST | /api/get_table_columns | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/query_table | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -451,3 +449,419 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## [api 1.9.0]
 - material-part-consumption (2026-05-20): Added 7 endpoints under `/api/material-consumption` (filter-options, query, view, detail, detail/page, detail/job, export). New additive surface; no existing endpoints changed.
+
+## Schemas
+
+> Typed response schemas for all 158 contract endpoints. Tier A = field table; Tier B = json-schema block. Referenced by `response schema` column above and resolved by `cdd-kit openapi export → contracts/openapi.json`.
+
+### AckResponse
+
+Tier-B — minimal acknowledgement; body carries no domain payload.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "meta"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": { "type": ["object", "null"] },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### GenericSuccessResponse
+
+Tier-B — wraps any domain payload returned by `success_response(data)`. Used for endpoints whose payload shape is feature-specific or deeply nested. Offline test-client captures may return error envelopes (`success:false`) when Oracle/Redis is unavailable, or raw objects for legacy endpoints — the schema accepts all valid JSON objects.
+
+```json-schema
+{
+  "type": ["object", "null"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {},
+    "error": {},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### HealthPayload
+
+Tier-B — top-level health envelope (no `success`/`data` wrapper; health-exception endpoints).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": { "type": "string", "enum": ["ok", "error", "healthy", "degraded"] },
+    "version": { "type": "string" },
+    "checks": { "type": "object" }
+  }
+}
+```
+
+### AuthSessionResponse
+
+Tier-B — successful login response containing user session info.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": "object",
+      "properties": {
+        "username":    { "type": "string" },
+        "displayName": { "type": "string" },
+        "isAdmin":     { "type": "boolean" }
+      }
+    },
+    "error": {},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### AuthMeResponse
+
+Tier-B — `GET /api/auth/me`; returns current user or null data when not logged in.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": {},
+    "meta": {
+      "type": "object",
+      "required": ["timestamp"],
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### JobStatusResponse
+
+Tier-B — async job polling response (`GET /api/job/<job_id>`).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": {
+      "type": ["object", "null"],
+      "properties": {
+        "status":    { "type": "string", "enum": ["pending", "running", "done", "failed"] },
+        "query_id":  { "type": "string" },
+        "result":    {},
+        "error":     { "type": "string" },
+        "pct":       { "type": "number", "minimum": 0, "maximum": 100 },
+        "stage":     { "type": "string" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["timestamp"],
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### ProgressResponse
+
+Tier-B — batch query progress (`GET /api/resource/history/query/progress`).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": { "type": "object", "properties": { "query_id": { "type": "string" }, "total_chunks": { "type": "integer" }, "completed_chunks": { "type": "integer" }, "percent": { "type": "number" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### HoldHistoryJobAccepted
+
+Tier-B — 202 async branch for `POST /api/hold-history/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### ResourceHistoryJobAccepted
+
+Tier-B — 202 async branch for `POST /api/resource/history/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### RejectHistoryJobAccepted
+
+Tier-B — 202 async branch for `POST /api/reject-history/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### YieldAlertJobAccepted
+
+Tier-B — 202 async branch for `POST /api/yield-alert/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### ProductionHistoryJobAccepted
+
+Tier-B — 202 async branch for `POST /api/production-history/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### MaterialTraceJobAccepted
+
+Tier-B — 202 async branch for `POST /api/material-trace/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### TraceJobAccepted
+
+Tier-B — 202 async branch for `POST /api/trace/lineage`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### MaterialConsumptionJobAccepted
+
+Tier-B — 202 async branch for `POST /api/material-consumption/detail`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### DowntimeJobAccepted
+
+Tier-B — 202 async branch for `POST /api/downtime-analysis/query`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" }, "status": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```
+
+### DowntimeQueryResponse
+
+Tier-B — 200 sync branch for `POST /api/downtime-analysis/query`. Shape varies by `DOWNTIME_BROWSER_DUCKDB` flag.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "error": {},
+    "data": {
+      "type": "object",
+      "properties": {
+        "query_id":       { "type": "string" },
+        "base_spool_url": { "type": "string" },
+        "jobs_spool_url": { "type": "string" },
+        "taxonomy":       { "type": "object" },
+        "summary":        {},
+        "daily_trend":    { "type": "array" },
+        "big_category":   { "type": "array" },
+        "top_reasons":    { "type": "array" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["timestamp"],
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### AnomalySummaryResponse
+
+Tier-B — `GET /api/analytics/anomaly-summary`; injects `meta.cache_state`.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data":    {},
+    "error":   {},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" },
+        "cache_state": { "type": "string", "enum": ["warm", "cold", "stale"] }
+      }
+    }
+  }
+}
+```
+
+### AiQueryResponse
+
+Tier-B — `POST /api/ai/query`; NL query result.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "error": {},
+    "data": {
+      "type": "object",
+      "properties": {
+        "answer":              { "type": "string" },
+        "chart_data":          {},
+        "query_used":          { "type": "string" },
+        "params_used":         {},
+        "suggestions":         { "type": "array" },
+        "sql_used":            { "type": "string" },
+        "tool_trace":          {},
+        "needs_clarification": { "type": "boolean" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["timestamp"],
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### StandardErrorResponse
+
+Tier-B — every `4xx`/`5xx` error envelope; see `contracts/api/error-format.md ## Schemas` for the canonical block.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "error", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [false] },
+    "error": { "type": "object", "required": ["code", "message"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "details": {} } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
+  }
+}
+```

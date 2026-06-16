@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "功能未啟用"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:54.464949"
+  },
+  "success": false
+}

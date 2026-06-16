@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "找不到此批號"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:31.399231"
+  },
+  "success": false
+}

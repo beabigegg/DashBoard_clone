@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "無效的查詢模式，可用值: lot, material_lot, workorder"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:41:24.288678"
+  },
+  "success": false
+}

@@ -1,0 +1,46 @@
+{
+  "data": {
+    "detail": {
+      "data": [],
+      "max_records": null,
+      "total": 0,
+      "truncated": false
+    },
+    "detail_by_date": {
+      "data": [],
+      "total": 0
+    },
+    "query_id": "88244da4cd752d2a",
+    "summary": {
+      "heatmap": [],
+      "kpi": {
+        "availability_pct": 0,
+        "egt_hours": 0,
+        "egt_pct": 0,
+        "machine_count": 0,
+        "ng_qty": 0,
+        "nst_hours": 0,
+        "nst_pct": 0,
+        "oee_pct": 0,
+        "ou_pct": 0,
+        "prd_hours": 0,
+        "prd_pct": 0,
+        "sby_hours": 0,
+        "sby_pct": 0,
+        "sdt_hours": 0,
+        "sdt_pct": 0,
+        "trackout_qty": 0,
+        "udt_hours": 0,
+        "udt_pct": 0,
+        "yield_pct": 0
+      },
+      "trend": [],
+      "workcenter_comparison": []
+    }
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-16T14:40:49.822458"
+  },
+  "success": true
+}
