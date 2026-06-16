@@ -317,13 +317,14 @@ class TestValidateQueryParamsModeSplit:
         with pytest.raises(ValueError, match="start_date, end_date"):
             validate_query_params({"pj_types": ["GA"]})
 
-    def test_classification_mode_missing_pj_types_still_raises(self):
-        """PHF-08 — no identifier token, no pj_types → pj_types-required error."""
+    def test_classification_mode_missing_pj_types_no_longer_raises(self):
+        """pj_types is now optional in classification mode — date-only query is valid."""
         from mes_dashboard.services.production_history_service import (
             validate_query_params,
         )
-        with pytest.raises(ValueError, match="pj_types"):
-            validate_query_params({"start_date": "2026-03-01", "end_date": "2026-03-10"})
+        # Should NOT raise — pj_types omitted, valid date range provided
+        result = validate_query_params({"start_date": "2026-03-01", "end_date": "2026-03-10"})
+        assert result["start_date"] == "2026-03-01"
 
     def test_classification_mode_unchanged_with_dates(self):
         """AC-7 — existing type+date flow byte-identical bind."""

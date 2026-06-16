@@ -148,10 +148,6 @@ def validate_query_params(params: Dict[str, Any]) -> Dict[str, Any]:
     # parsing. The identifier predicate already fully scopes the query.
     is_identifier_mode = bool(mfg_orders_tokens or wafer_lots_tokens or lot_ids_tokens)
 
-    # ``pj_types`` is required only in classification mode.
-    if not is_identifier_mode and not pj_types:
-        raise ValueError("必要參數: pj_types（至少一個）")
-
     start_raw = str(params.get("start_date") or "").strip()
     end_raw = str(params.get("end_date") or "").strip()
 
