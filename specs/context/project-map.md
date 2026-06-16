@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 188
-visible-files: 915
+visible-dirs: 197
+visible-files: 956
 omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -301,6 +301,7 @@ DashBoard_vite/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
+|   |   |   |-- csvExport.ts
 |   |   |   |-- index.html
 |   |   |   |-- main.ts
 |   |   |   \-- style.css
@@ -472,27 +473,59 @@ DashBoard_vite/
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
 |   |-- test-results/
-|   |   |-- resilience-resource-histor-052c9--visible-after-progress-503-chromium/
+|   |   |-- hold-overview-Hold-Overvie-3e04b-nders-the-Hold-Matrix-table-chromium/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
-|   |   |-- resilience-resource-histor-052c9--visible-after-progress-503-chromium-retry1/
+|   |   |-- hold-overview-Hold-Overvie-3e04b-nders-the-Hold-Matrix-table-chromium-retry1/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
-|   |   |-- resilience-resource-histor-14467-ogress-endpoint-returns-503-chromium/
+|   |   |-- hold-overview-Hold-Overvie-52f47-em-navigates-to-hold-detail-chromium/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
-|   |   |-- resilience-resource-histor-14467-ogress-endpoint-returns-503-chromium-retry1/
+|   |   |-- hold-overview-Hold-Overvie-52f47-em-navigates-to-hold-detail-chromium-retry1/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
-|   |   |-- resilience-resource-histor-53b00-03-isPolling-becomes-false--chromium/
+|   |   |-- hold-overview-Hold-Overvie-5a7ee-old-Lot-Details-card-header-chromium/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
-|   |   |-- resilience-resource-histor-53b00-03-isPolling-becomes-false--chromium-retry1/
+|   |   |-- hold-overview-Hold-Overvie-5a7ee-old-Lot-Details-card-header-chromium-retry1/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-61b73-th-correct-filename-pattern-chromium/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-61b73-th-correct-filename-pattern-chromium-retry1/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-81357-d-ui-card-inside-card-body--chromium/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-81357-d-ui-card-inside-card-body--chromium-retry1/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-d0b74-ry-cards-after-initial-load-chromium/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-d0b74-ry-cards-after-initial-load-chromium-retry1/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-f2749-te-during-in-flight-request-chromium/
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- hold-overview-Hold-Overvie-f2749-te-during-in-flight-request-chromium-retry1/
 |   |   |   |-- test-failed-1.png
 |   |   |   |-- trace.zip
 |   |   |   \-- video.webm
@@ -518,6 +551,8 @@ DashBoard_vite/
 |   |   |   \-- ProductionDetailTable.test.js
 |   |   |-- core/
 |   |   |   \-- api-dedup.test.js
+|   |   |-- hold-overview/
+|   |   |   \-- csv-export.test.js
 |   |   |-- legacy/
 |   |   |   |-- admin-dashboard.test.js
 |   |   |   |-- anomaly-overview.test.js
@@ -611,6 +646,18 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
+|   |   |-- access_20260616_162413.log
+|   |   |-- error_20260616_162413.log
+|   |   |-- rq_downtime_worker_20260616_162413.log
+|   |   |-- rq_hold_hist_worker_20260616_162413.log
+|   |   |-- rq_msd_worker_20260616_162413.log
+|   |   |-- rq_prod_hist_worker_20260616_162413.log
+|   |   |-- rq_reject_worker_20260616_162413.log
+|   |   |-- rq_resource_worker_20260616_162413.log
+|   |   |-- rq_warmup_worker_20260616_162413.log
+|   |   |-- rq_worker_20260616_162413.log
+|   |   |-- rq_yield_alert_worker_20260616_162413.log
+|   |   \-- watchdog_20260616_162413.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -896,6 +943,7 @@ DashBoard_vite/
 |   |   |   |-- get_health.json
 |   |   |   |-- get_hold_history_config.json
 |   |   |   |-- get_hold_history_view.json
+|   |   |   |-- get_hold_overview_lots_export.json
 |   |   |   |-- get_hold_overview_lots.json
 |   |   |   |-- get_hold_overview_matrix.json
 |   |   |   |-- get_hold_overview_summary.json
@@ -912,8 +960,7 @@ DashBoard_vite/
 |   |   |   |-- get_mid_section_defect_analysis_detail.json
 |   |   |   |-- get_mid_section_defect_analysis.json
 |   |   |   |-- get_mid_section_defect_export.json
-|   |   |   |-- get_mid_section_defect_loss_reasons.json
-|   |   |   \-- ... (128 more entries truncated; cap=50)
+|   |   |   \-- ... (129 more entries truncated; cap=50)
 |   |   |-- capture_samples.py
 |   |   |-- README.md
 |   |   |-- response-samples.example.json
@@ -1022,6 +1069,7 @@ DashBoard_vite/
 |   |   |-- test_data_integrity.py
 |   |   |-- test_downtime_analysis_stress.py
 |   |   |-- test_frontend_stress.py
+|   |   |-- test_hold_overview_export_stress.py
 |   |   |-- test_hold_today_snapshot_stress.py
 |   |   |-- test_load_collector_unit.py
 |   |   |-- test_material_consumption_stress.py
@@ -1103,10 +1151,12 @@ DashBoard_vite/
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- downtime_analysis_base_events/
-|   |   |   \-- 2a4a14bfd5b032d0.parquet
+|   |   |   \-- bc3802278bb91642.parquet
 |   |   |-- downtime_analysis_job_bridge/
-|   |   |   \-- 2a4a14bfd5b032d0.parquet
+|   |   |   \-- bc3802278bb91642.parquet
 |   |   |-- hold_dataset/
+|   |   |   |-- 0fff9d37f176e65b.parquet
+|   |   |   |-- 40be78accbd0c5d8.parquet
 |   |   |   \-- cd9458b8df889ddc.parquet
 |   |   |-- reject_dataset/
 |   |   |   \-- 780f45126cc24a21.parquet
@@ -1155,7 +1205,7 @@ DashBoard_vite/
 |   |   |-- probe_166786.json
 |   |   |-- probe_169446.json
 |   |   |-- probe_174363.json
-|   |   \-- ... (180 more entries truncated; cap=50)
+|   |   \-- ... (189 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json

@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "All local gates pass; Playwright E2E requires CI run (GunicornHarness) to produce green evidence" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates required — stress test is Tier 3 nightly, runs after merge" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "Widened existing CLAUDE.md line 112 bullet wording; no new entry added" }

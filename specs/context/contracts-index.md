@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 4010eaf5a53f39475ef0117601b650c024c5d6ccc78fe817b67f7d35ca22fe6e
+inputs-digest: 98f210af30670812812866f80e714fb5ca79960069272b2c4e7d33e1a5e099c5
 ---
 
 # Contracts Index
@@ -35,7 +35,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.22.0
+- schema-version: 1.23.0
 - last-changed: 2026-06-16
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
@@ -48,8 +48,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Inventory
 - owner: application-team
 - surface: api
-- schema-version: 1.2.2
-- last-changed: 2026-06-12
+- schema-version: 1.2.3
+- last-changed: 2026-06-16
 - summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 
 
@@ -135,7 +135,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.15.0
+- schema-version: 1.16.1
 - last-changed: 2026-06-13
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
@@ -148,8 +148,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Env Contract — MES Dashboard
 - owner: platform-team
 - surface: runtime-config
-- schema-version: 1.0.11
-- last-changed: 2026-06-13
+- schema-version: 1.0.12
+- last-changed: 2026-06-16
 - breaking-change-policy: deprecate-2-minors
 - summary: Environment variable inventory, secret handling, and deployment sync policy.
 
