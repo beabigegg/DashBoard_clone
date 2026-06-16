@@ -989,20 +989,22 @@ onBeforeUnmount(() => {
       <section class="card ui-card">
         <div class="card-header ui-card-header">
           <div class="card-title ui-card-title">Hold Lot Details</div>
-          <div v-if="hasLotFilterText" class="flex items-center gap-2 text-xs text-text-muted">
-            <span>篩選: {{ lotFilterText }}</span>
-            <button type="button" class="text-brand-500 hover:underline" @click="clearMatrixFilter">清除</button>
+          <div class="flex items-center gap-3 ml-auto">
+            <div v-if="hasLotFilterText" class="flex items-center gap-2 text-xs text-text-muted">
+              <span>篩選: {{ lotFilterText }}</span>
+              <button type="button" class="text-brand-500 hover:underline" @click="clearMatrixFilter">清除</button>
+            </div>
+            <button
+              type="button"
+              class="ui-btn ui-btn--secondary ui-btn--sm"
+              :class="{ 'is-loading': exportLoading }"
+              :disabled="exportLoading || lotsLoading || pagination.total === 0"
+              @click="exportLots"
+            >
+              <LoadingSpinner v-if="exportLoading" size="sm" aria-hidden="true" />
+              {{ exportLoading ? '匯出中...' : '↓ 匯出 CSV' }}
+            </button>
           </div>
-          <button
-            type="button"
-            class="ui-btn ui-btn--secondary"
-            :class="{ 'is-loading': exportLoading }"
-            :disabled="exportLoading || lotsLoading || pagination.total === 0"
-            @click="exportLots"
-          >
-            <LoadingSpinner v-if="exportLoading" size="sm" aria-hidden="true" />
-            {{ exportLoading ? '匯出中...' : '↓ 匯出 CSV' }}
-          </button>
         </div>
         <div class="card-body ui-card-body lots-card-body">
           <ErrorBanner :message="lotsError" @dismiss="lotsError = ''" />
