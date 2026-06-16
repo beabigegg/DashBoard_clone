@@ -85,7 +85,7 @@ def _extract_available_filters_sql(
 ) -> dict:
     """Extract distinct filter options via DuckDB using only policy filters."""
     where = "WHERE " + " AND ".join(policy_conditions) if policy_conditions else ""
-    result: dict = {"workcenter_groups": [], "packages": [], "reasons": []}
+    result: dict = {"workcenter_groups": [], "packages": [], "reasons": [], "types": []}
 
     if "WORKCENTER_GROUP" in cols:
         sql = f'SELECT DISTINCT TRIM(CAST("WORKCENTER_GROUP" AS VARCHAR)) AS v FROM reject_src {where} ORDER BY 1'
@@ -105,6 +105,13 @@ def _extract_available_filters_sql(
         sql = f'SELECT DISTINCT TRIM(CAST("LOSSREASONNAME" AS VARCHAR)) AS v FROM reject_src {where} ORDER BY 1'
         rows = _fetch_dict_rows(conn, sql, policy_params)
         result["reasons"] = sorted(
+            {_normalize_text(r["v"]) for r in rows if _normalize_text(r.get("v"))}
+        )
+
+    if "PJ_TYPE" in cols:
+        sql = f'SELECT DISTINCT TRIM(CAST("PJ_TYPE" AS VARCHAR)) AS v FROM reject_src {where} ORDER BY 1'
+        rows = _fetch_dict_rows(conn, sql, policy_params)
+        result["types"] = sorted(
             {_normalize_text(r["v"]) for r in rows if _normalize_text(r.get("v"))}
         )
 
