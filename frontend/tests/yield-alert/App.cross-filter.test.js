@@ -331,8 +331,8 @@ describe('Yield Alert App URL and cross-filter behavior', () => {
     await nextTick();
 
     const sortButtons = wrapper.findAll('button.th-btn');
-    expect(sortButtons.length).toBe(3);
-    await sortButtons[0].trigger('click');
+    expect(sortButtons.length).toBe(4); // transaction_qty, scrap_qty, yield_pct, risk_score
+    await sortButtons[1].trigger('click'); // sortButtons[1] = scrap_qty (was [0] before 轉出數 was added)
     await nextTick();
     await nextTick();
 
