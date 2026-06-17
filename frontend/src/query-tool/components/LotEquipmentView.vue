@@ -328,40 +328,40 @@ function inputPlaceholder() {
         />
       </div>
     </section>
-  </div>
 
-  <Teleport to="body">
-    <div class="theme-query-tool">
-      <div
-        v-if="showTimelineModal"
-        class="lineage-modal-backdrop"
-        role="dialog"
-        aria-modal="true"
-        aria-label="LOT 生產 Timeline"
-        @keydown.esc="showTimelineModal = false"
-        @click.self="showTimelineModal = false"
-      >
-        <div class="lineage-modal-container">
-          <div class="lineage-modal-header">
-            <h2 class="lineage-modal-title">LOT 生產 Timeline</h2>
-            <button
-              type="button"
-              class="lineage-modal-close"
-              aria-label="關閉 Timeline 視窗"
-              title="關閉（Esc）"
-              @click="showTimelineModal = false"
-            >✕</button>
-          </div>
-          <div class="lineage-modal-body" style="padding: 16px;">
-            <LotTimeline
-              :history-rows="lotsRows"
-              :pagination="lotsPagination"
-            />
+    <Teleport to="body">
+      <div class="theme-query-tool">
+        <div
+          v-if="showTimelineModal"
+          class="lineage-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="LOT 生產 Timeline"
+          @keydown.esc="showTimelineModal = false"
+          @click.self="showTimelineModal = false"
+        >
+          <div class="lineage-modal-container">
+            <div class="lineage-modal-header">
+              <h2 class="lineage-modal-title">LOT 生產 Timeline</h2>
+              <button
+                type="button"
+                class="lineage-modal-close"
+                aria-label="關閉 Timeline 視窗"
+                title="關閉（Esc）"
+                @click="showTimelineModal = false"
+              >✕</button>
+            </div>
+            <div class="lineage-modal-body" style="padding: 16px;">
+              <LotTimeline
+                :history-rows="lotsRows"
+                :pagination="lotsPagination"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+  </div>
 </template>
 
 <style scoped>
