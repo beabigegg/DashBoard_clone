@@ -287,6 +287,68 @@
   font-size: 11px;
 }
 
+.theme-material-trace .multi-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  z-index: 200;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: theme('colors.white');
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.theme-material-trace .multi-select-search {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+  font-size: 13px;
+  outline: none;
+  background: theme('colors.surface.muted');
+  box-sizing: border-box;
+}
+
+.theme-material-trace .multi-select-options {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: theme('spacing.token.p4') 0;
+}
+
+.theme-material-trace .multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+  width: 100%;
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: theme('colors.text.primary');
+  cursor: pointer;
+  text-align: left;
+}
+
+.theme-material-trace .multi-select-option:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-material-trace .multi-select-empty {
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
+  font-size: 13px;
+  color: theme('colors.text.muted');
+}
+
+.theme-material-trace .multi-select-actions {
+  display: flex;
+  gap: 8px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p12');
+  border-top: 1px solid var(--border);
+}
+
 
 /* Flat-table layout: remove Result Card card-body padding so DataTable extends flush to card edges */
 .theme-material-trace .result-card-body {

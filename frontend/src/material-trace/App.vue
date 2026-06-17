@@ -7,7 +7,6 @@ import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 
 // ---- Local interfaces ----
 interface Pagination {
@@ -408,11 +407,6 @@ function onDocumentClick(e: MouseEvent) {
 
 <template>
   <div class="dashboard theme-material-trace" @click="onDocumentClick">
-    <PageHeader
-      title="原物料追溯查詢"
-      :show-refresh="false"
-    />
-
     <!-- Error / Warning Banners -->
     <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
     <div v-if="unresolvedWarning" class="warning-banner">{{ unresolvedWarning }}</div>
