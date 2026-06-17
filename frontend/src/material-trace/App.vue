@@ -399,7 +399,7 @@ onUnmounted(() => {
 
 // Close dropdown on click outside
 function onDocumentClick(e: MouseEvent) {
-  if (!(e.target as HTMLElement | null)?.closest('.multi-select')) {
+  if (!(e.target as HTMLElement | null)?.closest('.wc-select')) {
     workcenterDropdownOpen.value = false;
   }
 }
@@ -455,25 +455,25 @@ function onDocumentClick(e: MouseEvent) {
           <!-- Workcenter group filter -->
           <div class="filter-group">
             <label class="filter-label">站群組篩選</label>
-            <div class="multi-select" @click.stop>
+            <div class="wc-select" @click.stop>
               <button
-                class="multi-select-trigger"
+                class="wc-select-trigger"
                 @click="workcenterDropdownOpen = !workcenterDropdownOpen"
               >
-                <span class="multi-select-text">{{ workcenterTriggerText }}</span>
-                <span class="multi-select-arrow">&#9662;</span>
+                <span class="wc-select-text">{{ workcenterTriggerText }}</span>
+                <span class="wc-select-arrow">&#9662;</span>
               </button>
-              <div v-if="workcenterDropdownOpen" class="multi-select-dropdown">
+              <div v-if="workcenterDropdownOpen" class="wc-select-dropdown">
                 <input
                   v-model="workcenterSearch"
-                  class="multi-select-search"
+                  class="wc-select-search"
                   placeholder="搜尋站群組..."
                 />
-                <div class="multi-select-options">
+                <div class="wc-select-options">
                   <button
                     v-for="group in filteredWorkcenterOptions"
                     :key="group"
-                    class="multi-select-option"
+                    class="wc-select-option"
                     @click="toggleWorkcenterGroup(group)"
                   >
                     <input
@@ -483,11 +483,11 @@ function onDocumentClick(e: MouseEvent) {
                     />
                     {{ group }}
                   </button>
-                  <div v-if="filteredWorkcenterOptions.length === 0" class="multi-select-empty">
+                  <div v-if="filteredWorkcenterOptions.length === 0" class="wc-select-empty">
                     無符合的站群組
                   </div>
                 </div>
-                <div class="multi-select-actions">
+                <div class="wc-select-actions">
                   <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="selectAllWorkcenterGroups">全選</button>
                   <button class="ui-btn ui-btn--ghost ui-btn--sm" @click="clearWorkcenterGroups">清除</button>
                 </div>
