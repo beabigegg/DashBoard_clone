@@ -30,8 +30,8 @@ const LOT_SUB_TABS = Object.freeze([
   'jobs',
 ]);
 const PAGED_SUB_TABS = new Set(['history', 'materials', 'rejects', 'holds']);
-const DEFAULT_PER_PAGE = 25;
-const PAGE_SIZE_OPTIONS = Object.freeze([25, 50, 100, 200]);
+const DEFAULT_PER_PAGE = 200;
+const PAGE_SIZE_OPTIONS = Object.freeze([50, 100, 200, 500]);
 
 const ASSOCIATION_TABS = new Set(['materials', 'rejects', 'holds', 'jobs']);
 

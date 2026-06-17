@@ -17,6 +17,16 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  pagination: {
+    type: Object,
+    default: null,
+  },
+});
+
+const isTruncated = computed(() => {
+  if (!props.pagination) return false;
+  const { total, per_page } = props.pagination as { total?: number; per_page?: number };
+  return (total ?? 0) > (per_page ?? 0);
 });
 
 function safeDate(value: unknown): Date | null {
@@ -354,6 +364,13 @@ const timeRange = computed(() => {
           </template>
         </span>
       </div>
+    </div>
+
+    <div
+      v-if="isTruncated"
+      class="query-tool-warning"
+    >
+      ⚠️ Timeline 目前僅顯示前 {{ pagination?.per_page }} 筆資料（共 {{ pagination?.total }} 筆），部分 LOT 可能未顯示。請至下方歷程表格調大每頁筆數，或依站點篩選縮小範圍。
     </div>
 
     <div v-if="tracks.length === 0" class="placeholder">

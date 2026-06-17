@@ -272,6 +272,7 @@ const detailCountLabel = computed(() => {
           :history-rows="historyRows"
           :hold-rows="associationRows.holds || []"
           :material-rows="associationRows.materials || []"
+          :pagination="pagination.history"
         />
 
         <LotHistoryTable
