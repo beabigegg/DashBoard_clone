@@ -329,6 +329,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
   padding: 9px 12px;
   font-size: 13px;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .data-table-td--center { text-align: center; }

@@ -213,6 +213,7 @@ const subTabs = Object.keys(tabMeta);
       <LotTimeline
         v-if="activeSubTab === 'lots' && lotsRows.length > 0"
         :history-rows="lotsRows"
+        :pagination="lotsPagination"
       />
 
       <EquipmentJobsPanel

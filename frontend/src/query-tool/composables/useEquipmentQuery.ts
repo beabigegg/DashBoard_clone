@@ -24,8 +24,8 @@ interface EquipmentQueryInitial {
 }
 
 const EQUIPMENT_SUB_TABS = Object.freeze(['lots', 'jobs', 'rejects']);
-const DEFAULT_LOTS_PER_PAGE = 25;
-const PAGE_SIZE_OPTIONS = Object.freeze([25, 50, 100, 200]);
+const DEFAULT_LOTS_PER_PAGE = 200;
+const PAGE_SIZE_OPTIONS = Object.freeze([50, 100, 200, 500]);
 
 function normalizeSubTab(value: unknown): string {
   const tab = normalizeText(value).toLowerCase();
