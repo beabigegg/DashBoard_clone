@@ -197,6 +197,22 @@ function clearAllNodes() {
   emit('select-nodes', []);
 }
 
+function selectAllFiltered() {
+  const current = new Set(selectedSet.value);
+  filteredNodes.value.forEach((n) => current.add(n.cid));
+  emit('select-nodes', [...current]);
+}
+
+function deselectAllFiltered() {
+  const toRemove = new Set(filteredNodes.value.map((n) => n.cid));
+  const current = [...selectedSet.value].filter((cid) => !toRemove.has(cid));
+  emit('select-nodes', current);
+}
+
+const allFilteredSelected = computed(() =>
+  filteredNodes.value.length > 0 && filteredNodes.value.every((n) => selectedSet.value.has(n.cid)),
+);
+
 async function openModal() {
   showTreeModal.value = true;
   await nextTick();
@@ -258,14 +274,24 @@ function handleModalKeydown(event: KeyboardEvent) {
       <div class="lineage-node-filter-header">
         <span class="lineage-node-filter-title">節點篩選明細</span>
         <span class="lineage-node-filter-hint">勾選節點後，下方明細僅顯示所選批次</span>
-        <button
-          v-if="selectedContainerIds.length > 0"
-          type="button"
-          class="ui-btn ui-btn--ghost ui-btn--sm lineage-clear-btn"
-          @click="clearAllNodes"
-        >
-          清除全部
-        </button>
+        <div class="lineage-node-filter-actions">
+          <button
+            v-if="filteredNodes.length > 0"
+            type="button"
+            class="ui-btn ui-btn--ghost ui-btn--sm"
+            @click="allFilteredSelected ? deselectAllFiltered() : selectAllFiltered()"
+          >
+            {{ allFilteredSelected ? '取消全選' : '全選' }}
+          </button>
+          <button
+            v-if="selectedContainerIds.length > 0"
+            type="button"
+            class="ui-btn ui-btn--ghost ui-btn--sm lineage-clear-btn"
+            @click="clearAllNodes"
+          >
+            清除全部
+          </button>
+        </div>
       </div>
 
       <!-- Selected chips -->
@@ -349,6 +375,7 @@ function handleModalKeydown(event: KeyboardEvent) {
 
     <!-- Lineage tree modal -->
     <Teleport to="body">
+      <div class="theme-query-tool">
       <div
         v-if="showTreeModal"
         class="lineage-modal-backdrop"
@@ -390,6 +417,7 @@ function handleModalKeydown(event: KeyboardEvent) {
             />
           </div>
         </div>
+      </div>
       </div>
     </Teleport>
   </div>

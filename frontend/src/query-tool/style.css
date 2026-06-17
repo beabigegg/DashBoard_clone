@@ -491,8 +491,19 @@
   flex: 1;
 }
 
-.theme-query-tool .lineage-clear-btn {
+.theme-query-tool .lineage-node-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+.theme-query-tool .lineage-node-filter-actions .ui-btn {
+  font-size: 11px;
+}
+
+.theme-query-tool .lineage-clear-btn {
   flex-shrink: 0;
   font-size: 11px;
 }

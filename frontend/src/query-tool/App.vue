@@ -4,7 +4,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { replaceRuntimeHistory } from '../core/shell-navigation';
 import { useRequestGuard } from '../shared-composables/useRequestGuard';
 
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import EquipmentView from './components/EquipmentView.vue';
 import LotEquipmentView from './components/LotEquipmentView.vue';
 import LotTraceView from './components/LotTraceView.vue';
@@ -519,11 +518,6 @@ watch(
 
 <template>
   <div class="dashboard query-tool-page theme-query-tool">
-    <PageHeader
-      title="批次追蹤工具"
-      :show-refresh="false"
-    />
-
     <section class="card ui-card">
       <div class="card-header ui-card-header">
         <nav class="query-tool-tab-bar" aria-label="query-tool tabs">

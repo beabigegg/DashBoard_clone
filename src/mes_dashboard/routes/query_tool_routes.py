@@ -136,49 +136,49 @@ _QUERY_TOOL_RESOLVE_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-resolve",
     max_attempts_env="QT_RESOLVE_RATE_MAX_REQUESTS",
     window_seconds_env="QT_RESOLVE_RATE_WINDOW_SECONDS",
-    default_max_attempts=10,
+    default_max_attempts=30,
     default_window_seconds=60,
 )
 _QUERY_TOOL_HISTORY_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-history",
     max_attempts_env="QT_HISTORY_RATE_MAX_REQUESTS",
     window_seconds_env="QT_HISTORY_RATE_WINDOW_SECONDS",
-    default_max_attempts=20,
+    default_max_attempts=60,
     default_window_seconds=60,
 )
 _QUERY_TOOL_ASSOC_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-association",
     max_attempts_env="QT_ASSOC_RATE_MAX_REQUESTS",
     window_seconds_env="QT_ASSOC_RATE_WINDOW_SECONDS",
-    default_max_attempts=20,
+    default_max_attempts=60,
     default_window_seconds=60,
 )
 _QUERY_TOOL_ADJACENT_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-adjacent",
     max_attempts_env="QT_ADJACENT_RATE_MAX_REQUESTS",
     window_seconds_env="QT_ADJACENT_RATE_WINDOW_SECONDS",
-    default_max_attempts=20,
+    default_max_attempts=60,
     default_window_seconds=60,
 )
 _QUERY_TOOL_EQUIPMENT_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-equipment",
     max_attempts_env="QT_EQUIP_RATE_MAX_REQUESTS",
     window_seconds_env="QT_EQUIP_RATE_WINDOW_SECONDS",
-    default_max_attempts=10,
+    default_max_attempts=30,
     default_window_seconds=60,
 )
 _QUERY_TOOL_LOT_EQUIP_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-lot-equipment",
     max_attempts_env="QT_LOT_EQUIP_RATE_MAX_REQUESTS",
     window_seconds_env="QT_LOT_EQUIP_RATE_WINDOW_SECONDS",
-    default_max_attempts=10,
+    default_max_attempts=30,
     default_window_seconds=60,
 )
 _QUERY_TOOL_EXPORT_RATE_LIMIT = configured_rate_limit(
     bucket="query-tool-export",
     max_attempts_env="QT_EXPORT_RATE_MAX_REQUESTS",
     window_seconds_env="QT_EXPORT_RATE_WINDOW_SECONDS",
-    default_max_attempts=3,
+    default_max_attempts=10,
     default_window_seconds=60,
 )
 
