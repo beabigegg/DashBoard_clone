@@ -193,13 +193,13 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
 
     const timelineLotsCall = postCalls.find((call) => call.payload.query_type === 'lots');
     assert.equal(timelineLotsCall.payload.page, 1);
-    assert.equal(timelineLotsCall.payload.per_page, 25);
+    assert.equal(timelineLotsCall.payload.per_page, 200);
 
     const page2Ok = await equipment.queryLots({ page: 2 });
     assert.equal(page2Ok, true);
     const latestLotsCall = postCalls.filter((call) => call.payload.query_type === 'lots').at(-1);
     assert.equal(latestLotsCall.payload.page, 2);
-    assert.equal(latestLotsCall.payload.per_page, 25);
+    assert.equal(latestLotsCall.payload.per_page, 200);
     assert.equal(equipment.lotsPagination.value.page, 2);
 
     equipment.setSelectedEquipmentIds([]);
@@ -383,7 +383,7 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
     const historyParams = new URL(historyCall, 'http://local.test').searchParams;
     assert.equal(historyParams.get('container_ids'), 'CID-001,CID-002');
     assert.equal(historyParams.get('page'), '1');
-    assert.equal(historyParams.get('per_page'), '25');
+    assert.equal(historyParams.get('per_page'), '200');
 
     const page2 = await detail.setSubTabPage('history', 2);
     assert.equal(page2, true);
@@ -392,7 +392,7 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
     const page2Call = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
     const page2Params = new URL(page2Call, 'http://local.test').searchParams;
     assert.equal(page2Params.get('page'), '2');
-    assert.equal(page2Params.get('per_page'), '25');
+    assert.equal(page2Params.get('per_page'), '200');
 
     await detail.setSelectedWorkcenterGroups(['WB']);
     const latestHistoryCall = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
