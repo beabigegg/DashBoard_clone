@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../../shared-ui/components/MultiSelect.vue';
 import FilterToolbar from '../../shared-ui/components/FilterToolbar.vue';
 
-import EquipmentJobsPanel from './EquipmentJobsPanel.vue';
 import EquipmentLotsTable from './EquipmentLotsTable.vue';
 import EquipmentRejectsTable from './EquipmentRejectsTable.vue';
+import ExportButton from './ExportButton.vue';
+import LotJobsTable from './LotJobsTable.vue';
 import LotTimeline from './LotTimeline.vue';
 
 const props = defineProps({
@@ -86,6 +89,8 @@ const tabMeta = Object.freeze({
 });
 
 const subTabs = Object.keys(tabMeta);
+
+const showTimelineModal = ref(false);
 </script>
 
 <template>
@@ -164,67 +169,80 @@ const subTabs = Object.keys(tabMeta);
           </button>
         </div>
 
-      <EquipmentLotsTable
-        v-if="activeSubTab === 'lots'"
-        :rows="lotsRows"
-        :loading="loading.lots"
-        :error="errors.lots"
-        :export-disabled="!canExportSubTab('lots')"
-        :exporting="exporting.lots"
-        @export="emit('export-sub-tab', 'lots')"
-      />
-      <div
-        v-if="activeSubTab === 'lots' && (lotsPagination?.total || 0) > 0"
-        class="query-tool-pagination"
-      >
-        <span class="query-tool-muted">
-          第 {{ lotsPagination.page }} / {{ lotsPagination.total_pages }} 頁，共
-          {{ lotsPagination.total }} 筆
-        </span>
-        <label class="query-tool-page-size">
-          每頁
-          <select
-            :value="lotsPagination.per_page"
-            @change="emit('change-lots-page-size', Number(($event.target as HTMLSelectElement).value))"
-          >
-            <option v-for="size in pageSizeOptions" :key="(size as PropertyKey)" :value="size">{{ size }}</option>
-          </select>
-          筆
-        </label>
-        <div class="query-tool-pagination-actions">
+      <template v-if="activeSubTab === 'lots'">
+        <div v-if="lotsRows.length > 0" class="query-tool-section-header">
+          <span></span>
           <button
             type="button"
-            class="ui-btn ui-btn--ghost"
-            :disabled="loading.lots || lotsPagination.page <= 1"
-            @click="emit('change-lots-page', lotsPagination.page - 1)"
+            class="ui-btn ui-btn--ghost ui-btn--sm"
+            @click="showTimelineModal = true"
           >
-            上一頁
-          </button>
-          <button
-            type="button"
-            class="ui-btn ui-btn--ghost"
-            :disabled="loading.lots || lotsPagination.page >= lotsPagination.total_pages"
-            @click="emit('change-lots-page', lotsPagination.page + 1)"
-          >
-            下一頁
+            查看生產 Timeline
           </button>
         </div>
-      </div>
-      <LotTimeline
-        v-if="activeSubTab === 'lots' && lotsRows.length > 0"
-        :history-rows="lotsRows"
-        :pagination="lotsPagination"
-      />
+        <EquipmentLotsTable
+          :rows="lotsRows"
+          :loading="loading.lots"
+          :error="errors.lots"
+          :export-disabled="!canExportSubTab('lots')"
+          :exporting="exporting.lots"
+          @export="emit('export-sub-tab', 'lots')"
+        />
+        <div
+          v-if="(lotsPagination?.total || 0) > 0"
+          class="query-tool-pagination"
+        >
+          <span class="query-tool-muted">
+            第 {{ lotsPagination.page }} / {{ lotsPagination.total_pages }} 頁，共
+            {{ lotsPagination.total }} 筆
+          </span>
+          <label class="query-tool-page-size">
+            每頁
+            <select
+              :value="lotsPagination.per_page"
+              @change="emit('change-lots-page-size', Number(($event.target as HTMLSelectElement).value))"
+            >
+              <option v-for="size in pageSizeOptions" :key="(size as PropertyKey)" :value="size">{{ size }}</option>
+            </select>
+            筆
+          </label>
+          <div class="query-tool-pagination-actions">
+            <button
+              type="button"
+              class="ui-btn ui-btn--ghost"
+              :disabled="loading.lots || lotsPagination.page <= 1"
+              @click="emit('change-lots-page', lotsPagination.page - 1)"
+            >
+              上一頁
+            </button>
+            <button
+              type="button"
+              class="ui-btn ui-btn--ghost"
+              :disabled="loading.lots || lotsPagination.page >= lotsPagination.total_pages"
+              @click="emit('change-lots-page', lotsPagination.page + 1)"
+            >
+              下一頁
+            </button>
+          </div>
+        </div>
+      </template>
 
-      <EquipmentJobsPanel
-        v-if="activeSubTab === 'jobs'"
-        :rows="jobsRows"
-        :loading="loading.jobs"
-        :error="errors.jobs"
-        :export-disabled="!canExportSubTab('jobs')"
-        :exporting="exporting.jobs"
-        @export="emit('export-sub-tab', 'jobs')"
-      />
+      <template v-if="activeSubTab === 'jobs'">
+        <div class="query-tool-section-header">
+          <h4 class="card-title ui-card-title">維修紀錄</h4>
+          <ExportButton
+            :disabled="!canExportSubTab('jobs')"
+            :loading="exporting.jobs"
+            label="匯出維修紀錄"
+            @click="emit('export-sub-tab', 'jobs')"
+          />
+        </div>
+        <ErrorBanner :message="errors.jobs" />
+        <LotJobsTable
+          :rows="jobsRows"
+          :loading="loading.jobs"
+        />
+      </template>
 
       <EquipmentRejectsTable
         v-if="activeSubTab === 'rejects'"
@@ -238,6 +256,39 @@ const subTabs = Object.keys(tabMeta);
       </div>
     </section>
   </div>
+
+  <Teleport to="body">
+    <div class="theme-query-tool">
+      <div
+        v-if="showTimelineModal"
+        class="lineage-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-label="LOT 生產 Timeline"
+        @keydown.esc="showTimelineModal = false"
+        @click.self="showTimelineModal = false"
+      >
+        <div class="lineage-modal-container">
+          <div class="lineage-modal-header">
+            <h2 class="lineage-modal-title">LOT 生產 Timeline</h2>
+            <button
+              type="button"
+              class="lineage-modal-close"
+              aria-label="關閉 Timeline 視窗"
+              title="關閉（Esc）"
+              @click="showTimelineModal = false"
+            >✕</button>
+          </div>
+          <div class="lineage-modal-body" style="padding: 16px;">
+            <LotTimeline
+              :history-rows="lotsRows"
+              :pagination="lotsPagination"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

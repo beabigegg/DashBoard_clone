@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import ExportButton from './ExportButton.vue';
@@ -185,6 +185,8 @@ const activePagination = computed(() => {
   };
 });
 
+const showTimelineModal = ref(false);
+
 const activeQualityMeta = computed(() => props.qualityMeta?.[props.activeSubTab] || null);
 const shouldShowQualityWarning = computed(() => {
   const status = String(activeQualityMeta.value?.status || '').toLowerCase();
@@ -268,12 +270,16 @@ const detailCountLabel = computed(() => {
         </p>
 
         <div v-if="activeSubTab === 'history'" class="space-y-3">
-        <LotTimeline
-          :history-rows="historyRows"
-          :hold-rows="associationRows.holds || []"
-          :material-rows="associationRows.materials || []"
-          :pagination="pagination.history"
-        />
+        <div v-if="historyRows.length > 0" class="query-tool-section-header">
+          <span class="query-tool-muted">{{ historyRows.length }} 筆歷程</span>
+          <button
+            type="button"
+            class="ui-btn ui-btn--ghost ui-btn--sm"
+            @click="showTimelineModal = true"
+          >
+            查看生產 Timeline
+          </button>
+        </div>
 
         <LotHistoryTable
           :rows="historyRows"
@@ -347,5 +353,40 @@ const detailCountLabel = computed(() => {
       </div>
       </template>
     </div>
+
+    <Teleport to="body">
+      <div class="theme-query-tool">
+        <div
+          v-if="showTimelineModal"
+          class="lineage-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="LOT 生產 Timeline"
+          @keydown.esc="showTimelineModal = false"
+          @click.self="showTimelineModal = false"
+        >
+          <div class="lineage-modal-container">
+            <div class="lineage-modal-header">
+              <h2 class="lineage-modal-title">LOT 生產 Timeline</h2>
+              <button
+                type="button"
+                class="lineage-modal-close"
+                aria-label="關閉 Timeline 視窗"
+                title="關閉（Esc）"
+                @click="showTimelineModal = false"
+              >✕</button>
+            </div>
+            <div class="lineage-modal-body" style="padding: 16px;">
+              <LotTimeline
+                :history-rows="historyRows"
+                :hold-rows="associationRows.holds || []"
+                :material-rows="associationRows.materials || []"
+                :pagination="pagination.history"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
