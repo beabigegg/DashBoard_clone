@@ -97,6 +97,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertIs(kwargs['exclude_pb_diode'], True)
 
     def test_summary_missing_dates_returns_400(self):
+        # Endpoint now requires query_id; missing query_id → 400
         response = self.client.get('/api/reject-history/summary')
         payload = json.loads(response.data)
 
@@ -105,7 +106,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
     def test_summary_invalid_include_excluded_scrap_returns_400(self):
         response = self.client.get(
-            '/api/reject-history/summary?start_date=2026-02-01&end_date=2026-02-07'
+            '/api/reject-history/summary?query_id=test-id'
             '&include_excluded_scrap=invalid'
         )
         payload = json.loads(response.data)
@@ -115,7 +116,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
     def test_summary_invalid_exclude_material_scrap_returns_400(self):
         response = self.client.get(
-            '/api/reject-history/summary?start_date=2026-02-01&end_date=2026-02-07'
+            '/api/reject-history/summary?query_id=test-id'
             '&exclude_material_scrap=invalid'
         )
         payload = json.loads(response.data)
@@ -123,7 +124,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_summary')
+    @patch('mes_dashboard.routes.reject_history_routes.view_summary')
     def test_summary_passes_filters_and_meta(self, mock_summary):
         mock_summary.return_value = {
             'MOVEIN_QTY': 100,
@@ -134,23 +135,19 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
             'REJECT_SHARE_PCT': 66.7,
             'AFFECTED_LOT_COUNT': 8,
             'AFFECTED_WORKORDER_COUNT': 4,
-            'meta': {
-                'include_excluded_scrap': False,
-                'exclusion_applied': True,
-                'excluded_reason_count': 2,
-            },
         }
 
         response = self.client.get(
-            '/api/reject-history/summary?start_date=2026-02-01&end_date=2026-02-07'
+            '/api/reject-history/summary?query_id=test-id'
             '&workcenter_groups=WB&packages=PKG-A&reasons=R1&reasons=R2'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        self.assertEqual(payload['meta']['include_excluded_scrap'], False)
-        _, kwargs = mock_summary.call_args
+        self.assertIn('include_excluded_scrap', payload['meta'])
+        kwargs = mock_summary.call_args.kwargs
+        self.assertEqual(kwargs['query_id'], 'test-id')
         self.assertEqual(kwargs['workcenter_groups'], ['WB'])
         self.assertEqual(kwargs['packages'], ['PKG-A'])
         self.assertEqual(kwargs['reasons'], ['R1', 'R2'])
@@ -220,77 +217,73 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(payload['error']['code'], 'SERVICE_UNAVAILABLE')
         self.assertEqual(response.headers.get('Retry-After'), '30')
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_trend')
+    @patch('mes_dashboard.routes.reject_history_routes.view_trend')
     def test_trend_invalid_granularity_returns_400(self, mock_trend):
         mock_trend.side_effect = ValueError('Invalid granularity. Use day, week, or month')
 
         response = self.client.get(
-            '/api/reject-history/trend?start_date=2026-02-01&end_date=2026-02-07&granularity=hour'
+            '/api/reject-history/trend?query_id=test-id&granularity=hour'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
     def test_reason_pareto_defaults_top80(self, mock_pareto):
-        mock_pareto.return_value = {'items': [], 'metric_mode': 'reject_total', 'pareto_scope': 'top80', 'meta': {}}
+        mock_pareto.return_value = {'items': [], 'metric_mode': 'reject_total', 'pareto_scope': 'top80'}
 
-        response = self.client.get('/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07')
+        response = self.client.get('/api/reject-history/reason-pareto?query_id=test-id')
 
         self.assertEqual(response.status_code, 200)
-        _, kwargs = mock_pareto.call_args
+        kwargs = mock_pareto.call_args.kwargs
         self.assertEqual(kwargs['pareto_scope'], 'top80')
         self.assertEqual(kwargs['metric_mode'], 'reject_total')
         self.assertEqual(kwargs['dimension'], 'reason')
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
     def test_dimension_pareto_accepts_package(self, mock_pareto):
         mock_pareto.return_value = {
             'items': [{'reason': 'PKG-A', 'metric_value': 100, 'pct': 50, 'cumPct': 50}],
             'dimension': 'package',
             'metric_mode': 'reject_total',
             'pareto_scope': 'top80',
-            'meta': {},
         }
 
         response = self.client.get(
-            '/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&dimension=package&pareto_scope=all'
+            '/api/reject-history/reason-pareto?query_id=test-id&dimension=package&pareto_scope=all'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        _, kwargs = mock_pareto.call_args
+        kwargs = mock_pareto.call_args.kwargs
         self.assertEqual(kwargs['dimension'], 'package')
         self.assertEqual(kwargs['pareto_scope'], 'top80')
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
     def test_dimension_pareto_accepts_equipment(self, mock_pareto):
         mock_pareto.return_value = {
             'items': [{'reason': 'EQ-01', 'metric_value': 50, 'pct': 100, 'cumPct': 100}],
             'dimension': 'equipment',
             'metric_mode': 'reject_total',
             'pareto_scope': 'top80',
-            'meta': {},
         }
 
         response = self.client.get(
-            '/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07&dimension=equipment'
+            '/api/reject-history/reason-pareto?query_id=test-id&dimension=equipment'
         )
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        _, kwargs = mock_pareto.call_args
+        kwargs = mock_pareto.call_args.kwargs
         self.assertEqual(kwargs['dimension'], 'equipment')
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
     @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
     def test_dimension_pareto_with_query_id_passes_policy_flags_to_cached_path(
         self,
         mock_cached_pareto,
-        mock_sql_pareto,
     ):
         mock_cached_pareto.return_value = {
             'items': [{'reason': 'PKG-A', 'metric_value': 100, 'pct': 100, 'cumPct': 100}],
@@ -301,9 +294,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         response = self.client.get(
             '/api/reject-history/reason-pareto'
-            '?start_date=2026-02-01'
-            '&end_date=2026-02-07'
-            '&query_id=qid-001'
+            '?query_id=qid-001'
             '&dimension=package'
             '&pareto_scope=all'
             '&include_excluded_scrap=true'
@@ -314,14 +305,13 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload['success'])
-        _, kwargs = mock_cached_pareto.call_args
+        kwargs = mock_cached_pareto.call_args.kwargs
         self.assertEqual(kwargs['query_id'], 'qid-001')
         self.assertEqual(kwargs['dimension'], 'package')
         self.assertEqual(kwargs['pareto_scope'], 'top80')
         self.assertIs(kwargs['include_excluded_scrap'], True)
         self.assertIs(kwargs['exclude_material_scrap'], False)
         self.assertIs(kwargs['exclude_pb_diode'], False)
-        mock_sql_pareto.assert_not_called()
 
     @patch('mes_dashboard.routes.reject_history_routes.compute_batch_pareto')
     def test_batch_pareto_passes_multi_dimension_selection_params(self, mock_batch_pareto):
@@ -368,12 +358,12 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertFalse(payload['success'])
         self.assertEqual(payload['error']['code'], 'CACHE_MISS')
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_dimension_pareto')
+    @patch('mes_dashboard.routes.reject_history_routes.compute_dimension_pareto')
     def test_reason_pareto_memory_guard_returns_503(self, mock_pareto):
         mock_pareto.side_effect = MemoryError('目前服務記憶體負載較高')
 
         response = self.client.get(
-            '/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-07'
+            '/api/reject-history/reason-pareto?query_id=test-id'
         )
         payload = json.loads(response.data)
 
@@ -593,18 +583,16 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertIsNone(kwargs['pareto_dimension'])
         self.assertIsNone(kwargs['pareto_values'])
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_list')
+    @patch('mes_dashboard.routes.reject_history_routes.view_list')
     def test_list_route_preserves_pagination_contract(self, mock_list):
         mock_list.return_value = {
             'items': [{'CONTAINERNAME': 'LOT-001'}],
             'pagination': {'page': 2, 'perPage': 80, 'total': 160, 'totalPages': 2},
-            'meta': {'exclusion_applied': True},
         }
 
         response = self.client.get(
             '/api/reject-history/list'
-            '?start_date=2026-02-01'
-            '&end_date=2026-02-07'
+            '?query_id=test-id'
             '&page=2'
             '&per_page=80'
             '&metric_filter=reject'
@@ -618,16 +606,17 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertEqual(payload['data']['pagination']['perPage'], 80)
         self.assertEqual(payload['data']['pagination']['total'], 160)
         self.assertEqual(payload['data']['pagination']['totalPages'], 2)
-        _, kwargs = mock_list.call_args
+        kwargs = mock_list.call_args.kwargs
+        self.assertEqual(kwargs['query_id'], 'test-id')
         self.assertEqual(kwargs['page'], 2)
         self.assertEqual(kwargs['per_page'], 80)
         self.assertEqual(kwargs['metric_filter'], 'reject')
         self.assertEqual(kwargs['workcenter_groups'], ['WB'])
 
-    @patch('mes_dashboard.routes.reject_history_routes.query_list')
+    @patch('mes_dashboard.routes.reject_history_routes.view_list')
     @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(True, 6))
     def test_list_rate_limited_returns_429(self, _mock_limit, mock_list):
-        response = self.client.get('/api/reject-history/list?start_date=2026-02-01&end_date=2026-02-07')
+        response = self.client.get('/api/reject-history/list?query_id=test-id')
         payload = json.loads(response.data)
 
         self.assertEqual(response.status_code, 429)

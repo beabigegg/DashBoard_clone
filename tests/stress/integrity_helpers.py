@@ -97,10 +97,19 @@ class RowCountBaseline:
         if not path:
             return None
 
+        # reject_history /count migrated to spool-read: it requires a query_id
+        # from a prior POST /query rather than a raw date range.
+        probe_params = dict(params)
+        if service == "reject_history" and "query_id" not in probe_params:
+            qid = self._resolve_reject_query_id(params)
+            if qid is None:
+                return None
+            probe_params = {"query_id": qid}
+
         try:
             resp = requests.get(
                 f"{self._base_url}{path}",
-                params=params,
+                params=probe_params,
                 timeout=_TIMEOUT,
             )
             if resp.status_code != 200:
@@ -113,6 +122,26 @@ class RowCountBaseline:
             result = int(count)
             self._cache[cache_key] = result
             return result
+        except Exception:
+            return None
+
+    def _resolve_reject_query_id(self, params: dict) -> Optional[str]:
+        """POST /api/reject-history/query to obtain a query_id for the spool."""
+        body = {"mode": "date_range"}
+        for key in ("start_date", "end_date"):
+            if params.get(key):
+                body[key] = params[key]
+        try:
+            resp = requests.post(
+                f"{self._base_url}/api/reject-history/query",
+                json=body,
+                timeout=_TIMEOUT,
+            )
+            if resp.status_code not in (200, 202):
+                return None
+            payload = resp.json()
+            data = payload.get("data") or payload
+            return data.get("query_id") or payload.get("query_id")
         except Exception:
             return None
 

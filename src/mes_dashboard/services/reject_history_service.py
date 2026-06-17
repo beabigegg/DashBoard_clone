@@ -995,37 +995,225 @@ def _derive_raw_items(df: pd.DataFrame) -> list[dict[str, Any]]:
     return items
 
 
-def query_analytics(
+# ===========================================================================
+# Spool-read variants (query_id based)
+# ---------------------------------------------------------------------------
+# These read the DuckDB/Parquet spool produced by POST /api/reject-history/query
+# and never touch Oracle.  They replace the legacy direct-Oracle query_* helpers
+# above for the supplementary report endpoints.  Each returns ``None`` when the
+# spool is missing or expired, which the route maps to HTTP 410 (cache expired).
+#
+# apply_view() already performs all dimension/scrap filtering in DuckDB and
+# returns ``summary`` (8-field aggregate, identical shape to _derive_summary),
+# ``detail`` (paginated list rows) and ``analytics_raw`` (per-date/reason fact
+# table).  We reshape those into the historical endpoint response shapes here.
+# ===========================================================================
+
+
+def _apply_view(query_id: str, **kwargs: Any) -> Optional[dict[str, Any]]:
+    """Lazy wrapper around reject_dataset_cache.apply_view (avoids import cycle)."""
+    from mes_dashboard.services.reject_dataset_cache import apply_view
+    return apply_view(query_id=query_id, **kwargs)
+
+
+def _analytics_dataframe(result: dict[str, Any]) -> pd.DataFrame:
+    """Build a _derive_*-compatible DataFrame from apply_view's analytics_raw.
+
+    analytics_raw rows use lowercase ``bucket_date`` / ``reason`` keys; the
+    _derive_* helpers expect uppercase ``BUCKET_DATE`` / ``REASON`` columns.
+    """
+    raw = result.get("analytics_raw") or []
+    df = pd.DataFrame(raw)
+    if df.empty:
+        return df
+    return df.rename(columns={"bucket_date": "BUCKET_DATE", "reason": "REASON"})
+
+
+def _bucket_trend(df: pd.DataFrame, granularity: str) -> list[dict[str, Any]]:
+    """Re-bucket the daily analytics fact table into day/week/month trend items.
+
+    Week buckets start on Monday to match Oracle ``TRUNC(d, 'IW')``; month
+    buckets start on the 1st to match ``TRUNC(d, 'MM')``.
+    """
+    if df is None or df.empty:
+        return []
+    work = df.copy()
+    parsed = pd.to_datetime(work["BUCKET_DATE"], errors="coerce")
+    if granularity == "week":
+        bucket = parsed.dt.to_period("W-SUN").dt.start_time  # ISO week → Monday
+    elif granularity == "month":
+        bucket = parsed.dt.to_period("M").dt.start_time
+    else:
+        bucket = parsed.dt.normalize()
+    work["__bucket"] = bucket
+    grouped = work.groupby("__bucket", sort=True).agg(
+        MOVEIN_QTY=("MOVEIN_QTY", "sum"),
+        REJECT_TOTAL_QTY=("REJECT_TOTAL_QTY", "sum"),
+        DEFECT_QTY=("DEFECT_QTY", "sum"),
+    ).reset_index()
+
+    items: list[dict[str, Any]] = []
+    for _, row in grouped.iterrows():
+        movein = _as_int(row["MOVEIN_QTY"])
+        reject_total = _as_int(row["REJECT_TOTAL_QTY"])
+        defect = _as_int(row["DEFECT_QTY"])
+        items.append({
+            "bucket_date": _to_date_str(row["__bucket"]),
+            "MOVEIN_QTY": movein,
+            "REJECT_TOTAL_QTY": reject_total,
+            "DEFECT_QTY": defect,
+            "REJECT_RATE_PCT": round((reject_total / movein * 100) if movein else 0, 4),
+            "DEFECT_RATE_PCT": round((defect / movein * 100) if movein else 0, 4),
+        })
+    return items
+
+
+def view_summary(
     *,
-    start_date: str,
-    end_date: str,
-    metric_mode: str = "reject_total",
+    query_id: str,
     workcenter_groups: Optional[list[str]] = None,
     packages: Optional[list[str]] = None,
     reasons: Optional[list[str]] = None,
-    categories: Optional[list[str]] = None,
     include_excluded_scrap: bool = False,
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
-) -> dict[str, Any]:
-    """Single DB query → summary + trend + pareto (replaces 3 separate queries)."""
-    _validate_range(start_date, end_date)
-    normalized_metric = _normalize_text(metric_mode).lower() or "reject_total"
-    if normalized_metric not in VALID_METRIC_MODE:
-        raise ValueError("Invalid metric_mode. Use reject_total or defect")
-
-    where_clause, params, meta = _build_where_clause(
-        workcenter_groups=workcenter_groups,
+) -> Optional[dict[str, Any]]:
+    """Summary aggregate from spool. Returns None when spool is missing/expired."""
+    result = _apply_view(
+        query_id,
         packages=packages,
+        workcenter_groups=workcenter_groups,
         reasons=reasons,
-        categories=categories,
         include_excluded_scrap=include_excluded_scrap,
         exclude_material_scrap=exclude_material_scrap,
         exclude_pb_diode=exclude_pb_diode,
     )
-    sql = _prepare_sql("analytics", where_clause=where_clause)
-    df = read_sql_df(sql, _common_params(start_date, end_date, params))
+    if result is None:
+        return None
+    return dict(result.get("summary") or _derive_summary(pd.DataFrame()))
 
+
+def view_trend(
+    *,
+    query_id: str,
+    granularity: str = "day",
+    workcenter_groups: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> Optional[dict[str, Any]]:
+    """Trend (day/week/month) from spool. Returns None when spool missing/expired."""
+    normalized_granularity = _normalize_text(granularity).lower() or "day"
+    if normalized_granularity not in VALID_GRANULARITY:
+        raise ValueError("Invalid granularity. Use day, week, or month")
+    result = _apply_view(
+        query_id,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    if result is None:
+        return None
+    return {
+        "items": _bucket_trend(_analytics_dataframe(result), normalized_granularity),
+        "granularity": normalized_granularity,
+    }
+
+
+def view_list(
+    *,
+    query_id: str,
+    page: int = 1,
+    per_page: int = 50,
+    workcenter_groups: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
+    metric_filter: str = "all",
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> Optional[dict[str, Any]]:
+    """Paginated detail rows from spool. Returns None when spool missing/expired."""
+    result = _apply_view(
+        query_id,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        metric_filter=metric_filter,
+        page=page,
+        per_page=per_page,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    if result is None:
+        return None
+    detail = result.get("detail") or {}
+    return {
+        "items": detail.get("items") or [],
+        "pagination": detail.get("pagination") or {
+            "page": page, "perPage": per_page, "total": 0, "totalPages": 1,
+        },
+    }
+
+
+def view_count(
+    *,
+    query_id: str,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> Optional[int]:
+    """Row count from spool. Returns None when spool missing/expired."""
+    result = _apply_view(
+        query_id,
+        page=1,
+        per_page=1,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    if result is None:
+        return None
+    pagination = (result.get("detail") or {}).get("pagination") or {}
+    return _as_int(pagination.get("total"))
+
+
+def view_analytics(
+    *,
+    query_id: str,
+    metric_mode: str = "reject_total",
+    workcenter_groups: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
+    include_excluded_scrap: bool = False,
+    exclude_material_scrap: bool = True,
+    exclude_pb_diode: bool = True,
+) -> Optional[dict[str, Any]]:
+    """summary + trend + pareto + raw_items from spool (mirrors query_analytics).
+
+    Returns None when the spool is missing/expired.
+    """
+    normalized_metric = _normalize_text(metric_mode).lower() or "reject_total"
+    if normalized_metric not in VALID_METRIC_MODE:
+        raise ValueError("Invalid metric_mode. Use reject_total or defect")
+    result = _apply_view(
+        query_id,
+        packages=packages,
+        workcenter_groups=workcenter_groups,
+        reasons=reasons,
+        include_excluded_scrap=include_excluded_scrap,
+        exclude_material_scrap=exclude_material_scrap,
+        exclude_pb_diode=exclude_pb_diode,
+    )
+    if result is None:
+        return None
+    df = _analytics_dataframe(result)
     return {
         "summary": _derive_summary(df),
         "trend": {
@@ -1037,31 +1225,4 @@ def query_analytics(
             "metric_mode": normalized_metric,
         },
         "raw_items": _derive_raw_items(df),
-        "meta": meta,
     }
-
-
-def query_row_count(
-    *,
-    start_date: str,
-    end_date: str,
-    include_excluded_scrap: bool = False,
-    exclude_material_scrap: bool = True,
-    exclude_pb_diode: bool = True,
-) -> int:
-    """Return COUNT(*) for the given date range using the same filters as query_list.
-
-    Used by the integrity-probe count endpoint to establish a DB baseline for
-    comparison against the batch-merge API pipeline result.
-    """
-    _validate_range(start_date, end_date)
-    where_clause, params, _ = _build_where_clause(
-        include_excluded_scrap=include_excluded_scrap,
-        exclude_material_scrap=exclude_material_scrap,
-        exclude_pb_diode=exclude_pb_diode,
-    )
-    sql = _prepare_sql("count", where_clause=where_clause, base_variant="lot")
-    df = read_sql_df(sql, _common_params(start_date, end_date, params))
-    if df is not None and not df.empty:
-        return _as_int(df.iloc[0].get("ROW_COUNT"))
-    return 0

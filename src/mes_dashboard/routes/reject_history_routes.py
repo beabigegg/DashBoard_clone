@@ -41,12 +41,11 @@ from mes_dashboard.services.reject_history_service import (
     _list_to_csv,
     export_csv,
     get_filter_options,
-    query_analytics,
-    query_list,
-    query_row_count,
-    query_dimension_pareto,
-    query_summary,
-    query_trend,
+    view_analytics,
+    view_count,
+    view_list,
+    view_summary,
+    view_trend,
 )
 
 reject_history_bp = Blueprint("reject_history", __name__)
@@ -346,26 +345,26 @@ def api_reject_history_options():
 
 @reject_history_bp.route("/api/reject-history/summary", methods=["GET"])
 def api_reject_history_summary():
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return validation_error(date_error[0].get("error", "日期格式錯誤"))
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
         return validation_error(bool_error[0].get("error", "參數格式錯誤"))
 
     try:
-        result = query_summary(
-            start_date=start_date,
-            end_date=end_date,
+        result = view_summary(
+            query_id=query_id,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
             packages=_parse_multi_param("packages") or None,
             reasons=_parse_multi_param("reasons") or None,
-            categories=_parse_multi_param("categories") or None,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
         )
+        if result is None:
+            return cache_expired_error()
         data, meta = _extract_meta(
             result,
             include_excluded_scrap,
@@ -381,9 +380,9 @@ def api_reject_history_summary():
 
 @reject_history_bp.route("/api/reject-history/trend", methods=["GET"])
 def api_reject_history_trend():
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return validation_error(date_error[0].get("error", "日期格式錯誤"))
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
@@ -391,18 +390,18 @@ def api_reject_history_trend():
 
     granularity = request.args.get("granularity", "day").strip().lower() or "day"
     try:
-        result = query_trend(
-            start_date=start_date,
-            end_date=end_date,
+        result = view_trend(
+            query_id=query_id,
             granularity=granularity,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
             packages=_parse_multi_param("packages") or None,
             reasons=_parse_multi_param("reasons") or None,
-            categories=_parse_multi_param("categories") or None,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
         )
+        if result is None:
+            return cache_expired_error()
         data, meta = _extract_meta(
             result,
             include_excluded_scrap,
@@ -418,10 +417,6 @@ def api_reject_history_trend():
 
 @reject_history_bp.route("/api/reject-history/reason-pareto", methods=["GET"])
 def api_reject_history_reason_pareto():
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return validation_error(date_error[0].get("error", "日期格式錯誤"))
-
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
         return validation_error(bool_error[0].get("error", "參數格式錯誤"))
@@ -430,49 +425,27 @@ def api_reject_history_reason_pareto():
     pareto_scope = _REJECT_PARETO_SCOPE_FIXED
     dimension = request.args.get("dimension", "reason").strip().lower() or "reason"
     query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
 
     try:
-        # Prefer cache-based computation when query_id is available
-        if query_id:
-            result = compute_dimension_pareto(
-                query_id=query_id,
-                dimension=dimension,
-                metric_mode=metric_mode,
-                pareto_scope=pareto_scope,
-                packages=_parse_multi_param("packages") or None,
-                workcenter_groups=_parse_multi_param("workcenter_groups") or None,
-                reasons=_parse_multi_param("reasons") or None,
-                trend_dates=_parse_multi_param("trend_dates") or None,
-                include_excluded_scrap=include_excluded_scrap,
-                exclude_material_scrap=exclude_material_scrap,
-                exclude_pb_diode=exclude_pb_diode,
-            )
-            if result is not None:
-                pareto_meta = result.pop("_pareto_meta", None) or {}
-                return success_response(result, meta=pareto_meta)
-            # Cache expired, fall through to Oracle query
-
-        result = query_dimension_pareto(
-            start_date=start_date,
-            end_date=end_date,
+        result = compute_dimension_pareto(
+            query_id=query_id,
             dimension=dimension,
             metric_mode=metric_mode,
             pareto_scope=pareto_scope,
-            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
             packages=_parse_multi_param("packages") or None,
+            workcenter_groups=_parse_multi_param("workcenter_groups") or None,
             reasons=_parse_multi_param("reasons") or None,
-            categories=_parse_multi_param("categories") or None,
+            trend_dates=_parse_multi_param("trend_dates") or None,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
         )
-        data, meta = _extract_meta(
-            result,
-            include_excluded_scrap,
-            exclude_material_scrap,
-            exclude_pb_diode,
-        )
-        return success_response(data, meta=meta)
+        if result is None:
+            return cache_expired_error()
+        pareto_meta = result.pop("_pareto_meta", None) or {}
+        return success_response(result, meta=pareto_meta)
     except ValueError as exc:
         return validation_error(str(exc))
     except MemoryError as exc:
@@ -534,9 +507,9 @@ def api_reject_history_batch_pareto():
 @reject_history_bp.route("/api/reject-history/list", methods=["GET"])
 @_REJECT_HISTORY_LIST_RATE_LIMIT
 def api_reject_history_list():
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return validation_error(date_error[0].get("error", "日期格式錯誤"))
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
@@ -547,20 +520,20 @@ def api_reject_history_list():
     metric_filter = request.args.get("metric_filter", "all").strip().lower() or "all"
 
     try:
-        result = query_list(
-            start_date=start_date,
-            end_date=end_date,
+        result = view_list(
+            query_id=query_id,
             page=page,
             per_page=per_page,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
             packages=_parse_multi_param("packages") or None,
             reasons=_parse_multi_param("reasons") or None,
-            categories=_parse_multi_param("categories") or None,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
             metric_filter=metric_filter,
         )
+        if result is None:
+            return cache_expired_error()
         data, meta = _extract_meta(
             result,
             include_excluded_scrap,
@@ -615,9 +588,9 @@ def api_reject_history_export():
 
 @reject_history_bp.route("/api/reject-history/analytics", methods=["GET"])
 def api_reject_history_analytics():
-    start_date, end_date, date_error = _parse_date_range(required=True)
-    if date_error:
-        return validation_error(date_error[0].get("error", "日期格式錯誤"))
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
 
     bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
     if bool_error:
@@ -626,18 +599,18 @@ def api_reject_history_analytics():
     metric_mode = request.args.get("metric_mode", "reject_total").strip().lower() or "reject_total"
 
     try:
-        result = query_analytics(
-            start_date=start_date,
-            end_date=end_date,
+        result = view_analytics(
+            query_id=query_id,
             metric_mode=metric_mode,
             workcenter_groups=_parse_multi_param("workcenter_groups") or None,
             packages=_parse_multi_param("packages") or None,
             reasons=_parse_multi_param("reasons") or None,
-            categories=_parse_multi_param("categories") or None,
             include_excluded_scrap=include_excluded_scrap,
             exclude_material_scrap=exclude_material_scrap,
             exclude_pb_diode=exclude_pb_diode,
         )
+        if result is None:
+            return cache_expired_error()
         data, meta = _extract_meta(
             result,
             include_excluded_scrap,
@@ -781,14 +754,25 @@ def api_reject_history_query():
 def api_reject_history_count():
     """Row-count baseline for data integrity probes.
 
-    Returns COUNT(*) for the given date range using the same default filters
-    as the primary list query.  Intended for stress/integrity test use only.
+    Returns COUNT(*) for the spooled dataset identified by query_id, using the
+    same default scrap filters as the primary list query.  Intended for
+    stress/integrity test use only.
     """
-    start_date, end_date, err = _parse_date_range()
-    if err:
-        return err
+    query_id = request.args.get("query_id", "").strip()
+    if not query_id:
+        return validation_error("缺少必要參數: query_id")
+    bool_error, include_excluded_scrap, exclude_material_scrap, exclude_pb_diode = _parse_common_bools()
+    if bool_error:
+        return validation_error(bool_error[0].get("error", "參數格式錯誤"))
     try:
-        count = query_row_count(start_date=start_date, end_date=end_date)
+        count = view_count(
+            query_id=query_id,
+            include_excluded_scrap=include_excluded_scrap,
+            exclude_material_scrap=exclude_material_scrap,
+            exclude_pb_diode=exclude_pb_diode,
+        )
+        if count is None:
+            return cache_expired_error()
         return success_response({"count": count})
     except ValueError as exc:
         return validation_error(str(exc))

@@ -178,10 +178,14 @@ class TestRejectHistoryBasicE2E:
         )
 
     def test_summary_returns_data(self, app_server: str):
-        """GET /summary returns reject summary KPIs with non-zero values."""
+        """GET /summary (query_id) returns reject summary KPIs with non-zero values."""
+        query_id = _query_and_wait(
+            app_server,
+            {"mode": "date_range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
+        )
         resp = requests.get(
             f"{app_server}/api/reject-history/summary",
-            params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            params={"query_id": query_id},
             timeout=60,
         )
         assert resp.status_code == 200
@@ -194,10 +198,14 @@ class TestRejectHistoryBasicE2E:
         )
 
     def test_trend_returns_data(self, app_server: str):
-        """GET /trend returns reject trend with data points."""
+        """GET /trend (query_id) returns reject trend with data points."""
+        query_id = _query_and_wait(
+            app_server,
+            {"mode": "date_range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
+        )
         resp = requests.get(
             f"{app_server}/api/reject-history/trend",
-            params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            params={"query_id": query_id},
             timeout=60,
         )
         assert resp.status_code == 200
@@ -207,10 +215,14 @@ class TestRejectHistoryBasicE2E:
         assert len(items) > 0, "Reject history trend returned no data points for a 7-day range with known data"
 
     def test_reason_pareto_returns_data(self, app_server: str):
-        """GET /reason-pareto returns pareto analysis (empty is valid if no reason data)."""
+        """GET /reason-pareto (query_id) returns pareto analysis (empty valid if no reason data)."""
+        query_id = _query_and_wait(
+            app_server,
+            {"mode": "date_range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
+        )
         resp = requests.get(
             f"{app_server}/api/reject-history/reason-pareto",
-            params={"start_date": "2026-03-01", "end_date": "2026-03-07"},
+            params={"query_id": query_id},
             timeout=60,
         )
         assert resp.status_code == 200
@@ -221,15 +233,14 @@ class TestRejectHistoryBasicE2E:
         # Note: items may legitimately be empty if no reason codes are assigned in this period
 
     def test_list_returns_paginated_data(self, app_server: str):
-        """GET /list returns paginated reject records with actual rows."""
+        """GET /list (query_id) returns paginated reject records with actual rows."""
+        query_id = _query_and_wait(
+            app_server,
+            {"mode": "date_range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
+        )
         resp = requests.get(
             f"{app_server}/api/reject-history/list",
-            params={
-                "start_date": "2026-03-01",
-                "end_date": "2026-03-07",
-                "page": 1,
-                "per_page": 10,
-            },
+            params={"query_id": query_id, "page": 1, "per_page": 10},
             timeout=60,
         )
         assert resp.status_code == 200

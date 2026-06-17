@@ -178,7 +178,7 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
             },
         ),
         patch(
-            "mes_dashboard.routes.reject_history_routes.query_summary",
+            "mes_dashboard.routes.reject_history_routes.view_summary",
             return_value={
                 "MOVEIN_QTY": 100,
                 "REJECT_TOTAL_QTY": 10,
@@ -188,11 +188,10 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
                 "REJECT_SHARE_PCT": 83.3333,
                 "AFFECTED_LOT_COUNT": 5,
                 "AFFECTED_WORKORDER_COUNT": 3,
-                "meta": {"include_excluded_scrap": False},
             },
         ),
         patch(
-            "mes_dashboard.routes.reject_history_routes.query_trend",
+            "mes_dashboard.routes.reject_history_routes.view_trend",
             return_value={
                 "items": [
                     {
@@ -205,11 +204,10 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
                     }
                 ],
                 "granularity": "day",
-                "meta": {"include_excluded_scrap": False},
             },
         ),
         patch(
-            "mes_dashboard.routes.reject_history_routes.query_dimension_pareto",
+            "mes_dashboard.routes.reject_history_routes.compute_dimension_pareto",
             return_value={
                 "items": [
                     {
@@ -222,11 +220,10 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
                 ],
                 "metric_mode": "reject_total",
                 "pareto_scope": "top80",
-                "meta": {"include_excluded_scrap": False},
             },
         ),
         patch(
-            "mes_dashboard.routes.reject_history_routes.query_list",
+            "mes_dashboard.routes.reject_history_routes.view_list",
             return_value={
                 "items": [
                     {
@@ -239,7 +236,6 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
                     }
                 ],
                 "pagination": {"page": 1, "perPage": 50, "total": 1, "totalPages": 1},
-                "meta": {"include_excluded_scrap": False},
             },
         ),
         patch(
@@ -257,23 +253,23 @@ def test_reject_history_native_smoke_query_sections_and_export(client):
         assert options.get_json()["success"] is True
         assert options.get_json()["data"]["reasons"] == ["R1"]
 
-        summary = client.get("/api/reject-history/summary?start_date=2026-02-01&end_date=2026-02-11")
+        summary = client.get("/api/reject-history/summary?query_id=test-smoke-id")
         assert summary.status_code == 200
         summary_payload = summary.get_json()
         assert summary_payload["success"] is True
         assert summary_payload["data"]["REJECT_TOTAL_QTY"] == 10
 
-        trend = client.get("/api/reject-history/trend?start_date=2026-02-01&end_date=2026-02-11")
+        trend = client.get("/api/reject-history/trend?query_id=test-smoke-id")
         assert trend.status_code == 200
         assert trend.get_json()["success"] is True
         assert trend.get_json()["data"]["items"][0]["bucket_date"] == "2026-02-01"
 
-        pareto = client.get("/api/reject-history/reason-pareto?start_date=2026-02-01&end_date=2026-02-11")
+        pareto = client.get("/api/reject-history/reason-pareto?query_id=test-smoke-id")
         assert pareto.status_code == 200
         assert pareto.get_json()["success"] is True
         assert pareto.get_json()["data"]["items"][0]["reason"] == "R1"
 
-        detail = client.get("/api/reject-history/list?start_date=2026-02-01&end_date=2026-02-11")
+        detail = client.get("/api/reject-history/list?query_id=test-smoke-id")
         assert detail.status_code == 200
         assert detail.get_json()["success"] is True
         assert detail.get_json()["data"]["pagination"]["total"] == 1

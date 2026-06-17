@@ -299,12 +299,30 @@ class TestRejectHistoryStress:
         concurrent_users = min(stress_config["concurrent_users"], 8)
         timeout = stress_config["timeout"]
 
+        # Spool-read endpoints require a query_id from a prior POST /query.
+        # Resolve one up front so the concurrent workers exercise the real
+        # DuckDB spool path instead of all bouncing off a 400 (missing query_id).
+        query_id = ""
+        try:
+            qresp = requests.post(
+                f"{base_url}/api/reject-history/query",
+                json={"mode": "date_range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
+                timeout=timeout,
+            )
+            if qresp.status_code in (200, 202):
+                qpayload = qresp.json()
+                qdata = qpayload.get("data", qpayload)
+                query_id = qdata.get("query_id") or qpayload.get("query_id") or ""
+        except requests.RequestException:
+            query_id = ""
+
+        qs = f"query_id={query_id}"
         endpoints = [
             f"{base_url}/api/reject-history/options",
-            f"{base_url}/api/reject-history/summary?start_date=2026-03-01&end_date=2026-03-07",
-            f"{base_url}/api/reject-history/trend?start_date=2026-03-01&end_date=2026-03-07",
-            f"{base_url}/api/reject-history/reason-pareto?start_date=2026-03-01&end_date=2026-03-07",
-            f"{base_url}/api/reject-history/list?start_date=2026-03-01&end_date=2026-03-07&page=1&per_page=10",
+            f"{base_url}/api/reject-history/summary?{qs}",
+            f"{base_url}/api/reject-history/trend?{qs}",
+            f"{base_url}/api/reject-history/reason-pareto?{qs}",
+            f"{base_url}/api/reject-history/list?{qs}&page=1&per_page=10",
         ]
 
         def worker(worker_idx: int):
@@ -313,7 +331,7 @@ class TestRejectHistoryStress:
                 ok, duration, error = _request(
                     "GET", url, timeout=timeout,
                     # 404 = no data; 500 = Oracle query error under load (expected in stress)
-                    allowed_statuses={200, 400, 404, 429, 500, 503},
+                    allowed_statuses={200, 400, 404, 410, 429, 500, 503},
                 )
                 if ok:
                     result.add_success(duration)

@@ -125,12 +125,12 @@ ROUTE_CONTRACT_MATRIX: list[tuple[str, str, dict | None, str]] = [
     # ---- Reject history ----
     ("/api/reject-history/options", "GET", None, "envelope"),
     ("/api/reject-history/query", "POST", {"start_date": "2024-01-01", "end_date": "2024-01-03"}, "envelope"),
-    ("/api/reject-history/count", "GET", {"start_date": "2024-01-01", "end_date": "2024-01-03"}, "envelope"),
-    ("/api/reject-history/list", "GET", None, "envelope"),
-    ("/api/reject-history/summary", "GET", None, "envelope"),
-    ("/api/reject-history/trend", "GET", None, "envelope"),
-    ("/api/reject-history/analytics", "GET", None, "envelope"),
-    ("/api/reject-history/reason-pareto", "GET", None, "envelope"),
+    ("/api/reject-history/count", "GET", {"query_id": "test-id"}, "envelope"),
+    ("/api/reject-history/list", "GET", {"query_id": "test-id"}, "envelope"),
+    ("/api/reject-history/summary", "GET", {"query_id": "test-id"}, "envelope"),
+    ("/api/reject-history/trend", "GET", {"query_id": "test-id"}, "envelope"),
+    ("/api/reject-history/analytics", "GET", {"query_id": "test-id"}, "envelope"),
+    ("/api/reject-history/reason-pareto", "GET", {"query_id": "test-id"}, "envelope"),
     ("/api/reject-history/batch-pareto", "GET", None, "envelope"),
     ("/api/reject-history/view", "GET", None, "envelope"),
 
