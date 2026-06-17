@@ -204,7 +204,7 @@ def query_detail():
 
 @material_consumption_bp.route("/detail/page", methods=["GET"])
 def get_detail_page():
-    """GET /detail/page?query_id=X&page=N — paginated detail from spool."""
+    """GET /detail/page?query_id=X&page=N&sort_key=Y&sort_dir=asc — paginated detail from spool."""
     from flask import request
 
     query_id = request.args.get("query_id", "").strip()
@@ -213,12 +213,22 @@ def get_detail_page():
     except (ValueError, TypeError):
         page = 1
 
+    sort_key = request.args.get("sort_key", "").strip()
+    sort_dir = request.args.get("sort_dir", "asc").strip().lower()
+    if sort_dir not in ("asc", "desc"):
+        sort_dir = "asc"
+
     if not query_id:
         return validation_error("query_id 必填")
 
     svc = _svc()
     try:
-        result = svc.get_detail_page(query_id=query_id, page=page)
+        result = svc.get_detail_page(
+            query_id=query_id,
+            page=page,
+            sort_key=sort_key,
+            sort_dir=sort_dir,
+        )
         if result is None:
             return cache_expired_error("查詢已過期，請重新查詢")
         return success_response(result)

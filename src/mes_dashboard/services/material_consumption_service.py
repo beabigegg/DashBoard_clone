@@ -542,6 +542,8 @@ def get_detail_page(
     per_page: int = 20,
     *,
     pj_types: Optional[List[str]] = None,
+    sort_key: str = "",
+    sort_dir: str = "asc",
 ) -> Optional[Dict[str, Any]]:
     """Return paginated rows from detail spool via DuckDB.
 
@@ -552,7 +554,13 @@ def get_detail_page(
     )
 
     runtime = MaterialConsumptionDetailRuntime(query_id)
-    return runtime.get_page(page=page, per_page=per_page, pj_types=pj_types)
+    return runtime.get_page(
+        page=page,
+        per_page=per_page,
+        pj_types=pj_types,
+        sort_key=sort_key,
+        sort_dir=sort_dir,
+    )
 
 
 _MC_JOB_PREFIX = "async"

@@ -63,6 +63,7 @@ _DETAIL_COL_RENAME = {
 
 def _normalize_detail_df(df: Any) -> Any:
     """Rename and lowercase detail spool columns to match the frontend API contract."""
+    import pandas as pd  # local import — pandas is always available in this module
     df.columns = [_DETAIL_COL_RENAME.get(c, c.lower()) for c in df.columns]
     # Trim Oracle CHAR-padded PRODUCTLINENAME values (AC-6)
     if "productlinename" in df.columns:
@@ -70,7 +71,32 @@ def _normalize_detail_df(df: Any) -> Any:
             df["productlinename"]
             .apply(lambda v: v.strip() if isinstance(v, str) else v)
         )
+    # Normalize txn_date to ISO YYYY-MM-DD string.
+    # Flask's JSON encoder serializes Oracle DATE objects as RFC 2822 ("Tue, 16 Jun 2026 …"),
+    # which the frontend formatTxnDate helper cannot parse.  Convert here at the spool
+    # boundary so callers always receive a plain string.
+    if "txn_date" in df.columns:
+        df["txn_date"] = (
+            pd.to_datetime(df["txn_date"], errors="coerce")
+            .dt.strftime("%Y-%m-%d")
+        )
     return df
+
+
+# Safe ORDER BY column map: frontend API key → parquet column name.
+# Only these keys are accepted; anything else falls back to the default sort.
+_DETAIL_SORT_ALLOWLIST: Dict[str, str] = {
+    "material_part": "MATERIALPARTNAME",
+    "containername": "CONTAINERNAME",
+    "pj_workorder": "PJ_WORKORDER",
+    "workcentername": "WORKCENTERNAME",
+    "materiallotname": "MATERIALLOTNAME",
+    "qty_required": "QTYREQUIRED",
+    "qty_consumed": "QTYCONSUMED",
+    "pj_type": "pj_type",
+    "productlinename": "PRODUCTLINENAME",
+    "txn_date": "TXNDATE",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -321,10 +347,13 @@ class MaterialConsumptionDetailRuntime:
         per_page: int = 20,
         *,
         pj_types: Optional[List[str]] = None,
+        sort_key: str = "",
+        sort_dir: str = "asc",
     ) -> Optional[Dict[str, Any]]:
         """Return paginated rows from detail spool via DuckDB.
 
         Applies optional pj_types filter inline at DuckDB level.
+        sort_key must be a key from _DETAIL_SORT_ALLOWLIST; unknown keys use default order.
         Returns None if spool is unavailable.
         """
         self._resolve_path()
@@ -349,6 +378,14 @@ class MaterialConsumptionDetailRuntime:
                 pj_list = ", ".join(_sql_str_literal(p) for p in pj_types)
                 where_clause = f"WHERE \"pj_type\" IN ({pj_list})"
 
+            # Safe ORDER BY — only allowlisted columns accepted (prevents injection)
+            parquet_col = _DETAIL_SORT_ALLOWLIST.get((sort_key or "").lower())
+            if parquet_col:
+                safe_dir = "DESC" if (sort_dir or "").upper() == "DESC" else "ASC"
+                order_clause = f'ORDER BY "{parquet_col}" {safe_dir} NULLS LAST'
+            else:
+                order_clause = 'ORDER BY "TXNDATE" DESC NULLS LAST'
+
             total_row = conn.execute(f"SELECT COUNT(*) FROM detail_src {where_clause}").fetchone()
             total = int(total_row[0]) if total_row else 0
             total_pages = max(1, (total + safe_per_page - 1) // safe_per_page)
@@ -357,6 +394,7 @@ class MaterialConsumptionDetailRuntime:
 
             rows_df = conn.execute(
                 f"SELECT * FROM detail_src {where_clause} "
+                f"{order_clause} "
                 f"LIMIT {safe_per_page} OFFSET {offset}"
             ).df()
             conn.close()

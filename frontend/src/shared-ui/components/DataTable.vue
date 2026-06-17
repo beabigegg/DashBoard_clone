@@ -25,6 +25,10 @@ interface Props {
   pagination?: PaginationShape | null;
   serverSort?: boolean;
   emptyType?: string;
+  /** When set, overrides the internal sort-key display (use to reset indicator after new query). */
+  controlledSortKey?: string;
+  /** When set, overrides the internal sort-direction display. */
+  controlledSortDir?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +37,8 @@ const props = withDefaults(defineProps<Props>(), {
   pagination: null,
   serverSort: false,
   emptyType: 'no-data',
+  controlledSortKey: undefined,
+  controlledSortDir: undefined,
 });
 
 const emit = defineEmits<{
@@ -69,10 +75,18 @@ function handleSort(col: ColumnDefinition) {
   }
 }
 
+// Effective sort key/dir for display: prefer controlled props (server-driven), fall back to internal
+const effectiveSortKey = computed(() =>
+  props.controlledSortKey !== undefined ? props.controlledSortKey : sortKey.value
+)
+const effectiveSortDir = computed(() =>
+  props.controlledSortDir !== undefined ? props.controlledSortDir : sortDirection.value
+)
+
 function sortIcon(col: ColumnDefinition) {
   if (!col.sortable) return null
-  if (sortKey.value !== col.key) return ArrowUpDown
-  return sortDirection.value === 'asc' ? ArrowUp : ArrowDown
+  if (effectiveSortKey.value !== col.key) return ArrowUpDown
+  return effectiveSortDir.value === 'asc' ? ArrowUp : ArrowDown
 }
 
 // --- Expandable rows ---
@@ -119,8 +133,8 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
               ]"
               :style="col.width ? { width: col.width } : {}"
               :aria-sort="
-                col.sortable && sortKey === col.key
-                  ? sortDirection === 'asc'
+                col.sortable && effectiveSortKey === col.key
+                  ? effectiveSortDir === 'asc'
                     ? 'ascending'
                     : 'descending'
                   : col.sortable
@@ -135,7 +149,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
                   :is="sortIcon(col)"
                   v-if="sortIcon(col)"
                   class="data-table-sort-icon"
-                  :class="{ 'data-table-sort-icon--active': sortKey === col.key }"
+                  :class="{ 'data-table-sort-icon--active': effectiveSortKey === col.key }"
                   :size="14"
                 />
               </span>

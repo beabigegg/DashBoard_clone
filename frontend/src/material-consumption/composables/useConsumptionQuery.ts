@@ -43,7 +43,7 @@ export interface DetailRow {
   qty_required?: number;
   qty_consumed?: number;
   pj_type?: string;
-  PRODUCTLINENAME?: string | null;
+  productlinename?: string | null;
   txn_date?: string;
   [key: string]: unknown;
 }
@@ -302,19 +302,24 @@ export function useConsumptionQuery() {
   }
 
   /**
-   * fetchPage — GET /api/material-consumption/detail/page?query_id=X&page=N
+   * fetchPage — GET /api/material-consumption/detail/page?query_id=X&page=N[&sort_key=Y&sort_dir=Z]
    */
-  async function fetchPage(page: number): Promise<void> {
+  async function fetchPage(page: number, sortKey = '', sortDir = 'asc'): Promise<void> {
     if (!detailQueryId.value) return;
     isDetailLoading.value = true;
     detailError.value = '';
 
     try {
+      const params: Record<string, unknown> = { query_id: detailQueryId.value, page };
+      if (sortKey) {
+        params.sort_key = sortKey;
+        params.sort_dir = sortDir;
+      }
       const result = await apiGet<{
         rows: DetailRow[];
         pagination: DetailPagination;
       }>('/api/material-consumption/detail/page', {
-        params: { query_id: detailQueryId.value, page },
+        params,
         timeout: 30000,
       });
 

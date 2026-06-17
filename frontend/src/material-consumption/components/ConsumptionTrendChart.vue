@@ -25,17 +25,37 @@ export interface TrendItem {
   total_consumed: number;
 }
 
+export interface PartOption {
+  name: string;
+  description?: string | null;
+}
+
 // --- Props ---
 const props = withDefaults(
   defineProps<{
     trend?: TrendItem[];
     loading?: boolean;
+    partOptions?: PartOption[];
   }>(),
   {
     trend: () => [],
     loading: false,
+    partOptions: () => [],
   }
 );
+
+// Build label map: part name → "name — description" (fallback: just name)
+const partLabelMap = computed(() => {
+  const map = new Map<string, string>();
+  for (const p of props.partOptions) {
+    map.set(p.name, p.description ? `${p.name} — ${p.description}` : p.name);
+  }
+  return map;
+});
+
+function partLabel(name: string): string {
+  return partLabelMap.value.get(name) ?? name;
+}
 
 // --- Computed: pivot trend data into echarts series ---
 const chartOption = computed(() => {
@@ -61,11 +81,13 @@ const chartOption = computed(() => {
   const cappedParts = allParts.slice(0, MAX_SERIES);
 
   const series = cappedParts.map((part) => ({
-    name: part,
+    name: partLabel(part),
     type: 'line',
     smooth: true,
     data: periods.map((p) => partMap.get(part)?.get(p) ?? 0),
   }));
+
+  const legendLabels = cappedParts.map(partLabel);
 
   return {
     tooltip: {
@@ -83,7 +105,7 @@ const chartOption = computed(() => {
       },
     },
     legend: {
-      data: cappedParts,
+      data: legendLabels,
       bottom: 0,
       type: 'scroll',
     },

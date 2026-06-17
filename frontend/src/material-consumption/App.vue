@@ -12,7 +12,6 @@ import BlockLoadingState from '../shared-ui/components/BlockLoadingState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import ConsumptionTrendChart from './components/ConsumptionTrendChart.vue';
@@ -68,7 +67,10 @@ const activeTab = ref<'charts' | 'detail'>('charts');
 
 // --- Current query params (stored for re-submit detail) ---
 const currentQueryParams = ref<QueryParams | null>(null);
-const detailSubmitted = ref(false);
+
+// --- Server-side sort state (resets on new query; drives DuckDB ORDER BY) ---
+const activeSortKey = ref('');
+const activeSortDir = ref('asc');
 
 // --- Load filter options ---
 async function loadFilterOptions() {
@@ -96,9 +98,15 @@ async function loadFilterOptions() {
 // --- Handle query submit ---
 async function handleQuerySubmit(params: QueryParams) {
   currentQueryParams.value = params;
-  detailSubmitted.value = false;
   activeTab.value = 'charts';
+  // Reset sort state so header indicator clears on new query
+  activeSortKey.value = '';
+  activeSortDir.value = 'asc';
   await submitQuery(params);
+  // Auto-trigger detail query after summary succeeds (no extra button needed)
+  if (queryId.value) {
+    void submitDetail(params);
+  }
 }
 
 // --- Handle granularity change (NO re-query — AC-3 / MC-03) ---
@@ -115,23 +123,24 @@ async function handleTypeChange(types: string[]) {
   await applyView(currentGranularity.value, types.length > 0 ? types : undefined);
 }
 
-// --- Handle detail submit ---
-async function handleDetailSubmit() {
-  if (!currentQueryParams.value) return;
-  detailSubmitted.value = true;
-  await submitDetail(currentQueryParams.value);
-}
-
 // --- Handle reset ---
 function handleReset() {
   currentQueryParams.value = null;
-  detailSubmitted.value = false;
   currentTypes.value = [];
+  activeSortKey.value = '';
+  activeSortDir.value = 'asc';
 }
 
-// --- Handle page change ---
+// --- Handle page change (preserves current sort) ---
 async function handlePageChange(page: number) {
-  await fetchPage(page);
+  await fetchPage(page, activeSortKey.value, activeSortDir.value);
+}
+
+// --- Handle sort (server-side: re-fetch page 1 with new ORDER BY) ---
+async function handleSort(payload: { key: string; direction: string }) {
+  activeSortKey.value = payload.key;
+  activeSortDir.value = payload.direction;
+  await fetchPage(1, payload.key, payload.direction);
 }
 
 // --- Handle CSV export ---
@@ -148,7 +157,6 @@ onMounted(() => {
 
 <template>
   <div class="dashboard theme-material-consumption">
-    <PageHeader title="原物料用量查詢" :show-refresh="false" />
 
     <!-- Filter options error (inline) -->
     <ErrorBanner
@@ -286,6 +294,7 @@ onMounted(() => {
               v-else
               :trend="trend"
               :loading="false"
+              :part-options="partOptions"
             />
           </div>
         </div>
@@ -298,6 +307,7 @@ onMounted(() => {
               v-else
               :trend="trend"
               :loading="false"
+              :part-options="partOptions"
             />
           </div>
         </div>
@@ -317,11 +327,11 @@ onMounted(() => {
               :pagination="detailPagination"
               :loading="isDetailLoading"
               :is-async="isDetailAsync"
-              :query-submitted="detailSubmitted"
-              :query-params="currentQueryParams"
               :detail-query-id="detailQueryId"
-              @submit-detail="handleDetailSubmit"
+              :active-sort-key="activeSortKey"
+              :active-sort-dir="activeSortDir"
               @page-change="handlePageChange"
+              @sort="handleSort"
               @export-csv="handleExportCsv"
             />
           </div>

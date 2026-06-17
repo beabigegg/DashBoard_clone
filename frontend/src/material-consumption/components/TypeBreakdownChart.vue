@@ -22,17 +22,37 @@ export interface TrendItem {
   total_consumed: number;
 }
 
+export interface PartOption {
+  name: string;
+  description?: string | null;
+}
+
 // --- Props ---
 const props = withDefaults(
   defineProps<{
     trend?: TrendItem[];
     loading?: boolean;
+    partOptions?: PartOption[];
   }>(),
   {
     trend: () => [],
     loading: false,
+    partOptions: () => [],
   }
 );
+
+// Build label map: part name → "name — description" (fallback: just name)
+const partLabelMap = computed(() => {
+  const map = new Map<string, string>();
+  for (const p of props.partOptions) {
+    map.set(p.name, p.description ? `${p.name} — ${p.description}` : p.name);
+  }
+  return map;
+});
+
+function partLabel(name: string): string {
+  return partLabelMap.value.get(name) ?? name;
+}
 
 // --- Computed: pivot by material_part, express as 100% stacked percentage ---
 const chartOption = computed(() => {
@@ -61,7 +81,7 @@ const chartOption = computed(() => {
   }
 
   const series = parts.map((part) => ({
-    name: part,
+    name: partLabel(part),
     type: 'bar',
     stack: 'total',
     data: periods.map((p) => {
@@ -71,6 +91,8 @@ const chartOption = computed(() => {
     }),
     emphasis: { focus: 'series' },
   }));
+
+  const legendLabels = parts.map(partLabel);
 
   return {
     tooltip: {
@@ -85,7 +107,7 @@ const chartOption = computed(() => {
         return `<strong>${period}</strong><br>${lines.join('<br>')}`;
       },
     },
-    legend: { data: parts, bottom: 0, type: 'scroll' },
+    legend: { data: legendLabels, bottom: 0, type: 'scroll' },
     grid: { left: 48, right: 24, top: 22, bottom: 72, containLabel: false },
     xAxis: {
       type: 'category',
