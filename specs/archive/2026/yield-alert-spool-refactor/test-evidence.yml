@@ -1,0 +1,37 @@
+change-id: yield-alert-spool-refactor
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+  - contract
+runs:
+  - phase: collect
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose 2>&1 | tail -20
+    summary: specs/changes/yield-alert-spool-refactor/test-runs/20260616-214544/summary.json
+  - phase: targeted
+    status: passed
+    command: >-
+      cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose
+      tests/validation/useYieldAlert.validation.test.js tests/yield-alert/App.cross-filter.test.js
+      tests/abort/yield-alert-abort.test.js 2>&1 | tail -30
+    summary: specs/changes/yield-alert-spool-refactor/test-runs/20260616-214603/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose tests/validation/
+      tests/yield-alert/ tests/abort/ 2>&1 | tail -30
+    summary: specs/changes/yield-alert-spool-refactor/test-runs/20260616-214611/summary.json
+  - phase: contract
+    status: passed
+    command: conda run -n mes-dashboard pytest tests/contract/ --tb=short -q
+    summary: specs/changes/yield-alert-spool-refactor/test-runs/20260616-213111/summary.json
+  - phase: quality
+    status: passed
+    command: >-
+      conda run -n mes-dashboard ruff check src/mes_dashboard/services/yield_alert_dataset_cache.py
+      src/mes_dashboard/services/yield_alert_service.py src/mes_dashboard/routes/yield_alert_routes.py
+    summary: specs/changes/yield-alert-spool-refactor/test-runs/20260616-213332/summary.json
+final-status: passed

@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py -v --tb=short -q

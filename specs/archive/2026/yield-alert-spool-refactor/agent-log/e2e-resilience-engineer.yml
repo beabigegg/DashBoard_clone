@@ -1,0 +1,42 @@
+agent: e2e-resilience-engineer
+change-id: yield-alert-spool-refactor
+date: 2026-06-16
+status: done
+
+summary: >
+  Added 7 E2E and resilience tests to tests/e2e/test_yield_alert_e2e.py covering
+  AC-1 (process_type validation), AC-2 (spool-only trend/summary, 410 on miss),
+  and AC-4 (source_code key in alert rows). All tests use @pytest.mark.e2e and
+  the live-server api_base_url fixture (same pattern as existing tests).
+  Tests collect as 22 total (15 original + 7 new); all skip cleanly when no
+  live server is present (expected CI behavior for this marker).
+
+artifacts:
+  - type: test-files
+    pointer: "tests/e2e/test_yield_alert_e2e.py:291-490"
+  - type: scenarios-covered
+    pointer: >
+      AC-1 happy-path (GA% default),
+      AC-1 happy-path (GC% accepted),
+      AC-1 invalid-process-type returns 400 VALIDATION_ERROR,
+      AC-4 source_code key present in every alert row,
+      AC-2 trend endpoint serves from spool (200 on valid query_id),
+      AC-2 trend 410 on expired/missing spool (no Oracle fallback),
+      AC-2 summary 410 on expired/missing spool (no Oracle fallback)
+  - type: mutation-checks
+    pointer: "n/a (mutation testing not in scope for this agent run)"
+  - type: trace-artifacts
+    pointer: "n/a (no Playwright browser traces; all tests are server-API level)"
+
+marker-used: "@pytest.mark.e2e (matches existing tests in same file)"
+playwright-specs-added: false
+layer: mock API level — no; live-server API level — yes (same as existing e2e tests)
+
+notes: >
+  Tests 6 and 7 (410 resilience) do NOT require Oracle: the route returns 410
+  immediately for unknown query_id without touching the database.
+  test_trend_endpoint_uses_spool_only (test 5) uses _acquire_query_id helper
+  which skips if the server is busy (503) or unavailable.
+  No Playwright browser tests added — the browser journey (AC-1 GA%/GC% switch)
+  is covered by the existing TestYieldAlertBrowserE2E class and the new API-level
+  tests cover the acceptance criteria at the route boundary.

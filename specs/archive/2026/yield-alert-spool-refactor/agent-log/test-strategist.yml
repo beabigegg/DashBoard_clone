@@ -1,0 +1,22 @@
+change-id: yield-alert-spool-refactor
+timestamp: 2026-06-16
+agent: test-strategist
+status: complete
+
+artifacts:
+  - type: test-plan-path
+    pointer: "specs/changes/yield-alert-spool-refactor/test-plan.md"
+  - type: tdd-pairs
+    pointer: |
+      tests/test_yield_alert_dataset_cache.py → src/mes_dashboard/services/yield_alert_dataset_cache.py
+      tests/test_yield_alert_routes.py → src/mes_dashboard/routes/yield_alert_routes.py
+      tests/test_yield_alert_service.py → src/mes_dashboard/services/yield_alert_service.py
+      tests/e2e/test_yield_alert_e2e.py → frontend/src/yield-alert-center/ (browser e2e)
+      tests/stress/test_yield_alert_stress.py → src/mes_dashboard/services/yield_alert_dataset_cache.py
+      frontend/tests/validation/useYieldAlert.validation.test.js → frontend/src/yield-alert-center/useYieldAlertDuckDB.ts
+      frontend/tests/yield-alert/App.cross-filter.test.js → frontend/src/yield-alert-center/App.vue
+      frontend/tests/abort/yield-alert-abort.test.js → frontend/src/yield-alert-center/ (abort path)
+  - type: coverage-tiers
+    pointer: "unit (tier 0), contract (tier 1), integration (tier 1), e2e (tier 1), data-boundary (tier 1), resilience (tier 1), stress (tier 3), soak (tier 4)"
+  - type: mapping-completeness
+    pointer: "all 8 ACs covered; 2 existing tests flagged for update/delete (compute_reject_linkage removal, trend live-Oracle test)"
