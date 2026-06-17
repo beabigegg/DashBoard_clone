@@ -1,6 +1,6 @@
-# generated: 2026-06-16T23:52:10Z by cdd-kit 3.2.0
-# files: 874, src-lines: 255450, map-lines: 18977, compression: 13.5x
-# sources-digest: 9e5c44bb678f074bd3f8e9ce4e65cdd5b332497475d6347c1e2118662bd09773
+# generated: 2026-06-17T11:29:49Z by cdd-kit 3.2.0
+# files: 875, src-lines: 256193, map-lines: 19004, compression: 13.5x
+# sources-digest: 06a454dd00f2ae95c8698d98ffb51291da3f6bdba7d5e1679b50f8f8fb7fc4bd
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1109,7 +1109,7 @@ frontend/src/job-query/main.ts:  # 653 lines
     - { name: Equipment, lines: 22-27 }  # local
     - { name: JobRecord, lines: 28-28 }  # local
 
-frontend/src/material-consumption/App.vue:  # 341 lines
+frontend/src/material-consumption/App.vue:  # 351 lines
 
 frontend/src/material-consumption/__tests__/FilterPanel.test.ts:  # 133 lines
   imports:
@@ -1139,15 +1139,15 @@ frontend/src/material-consumption/__tests__/useConsumptionQuery.test.ts:  # 183 
     - { module: '../../core/api', items: [apiPost, apiGet], line: 19 }
     - { module: '../composables/useConsumptionQuery', items: [useConsumptionQuery], line: 20 }
 
-frontend/src/material-consumption/components/ConsumptionTrendChart.vue:  # 130 lines
+frontend/src/material-consumption/components/ConsumptionTrendChart.vue:  # 152 lines
 
-frontend/src/material-consumption/components/DetailTable.vue:  # 181 lines
+frontend/src/material-consumption/components/DetailTable.vue:  # 148 lines
 
 frontend/src/material-consumption/components/FilterPanel.vue:  # 212 lines
 
-frontend/src/material-consumption/components/TypeBreakdownChart.vue:  # 125 lines
+frontend/src/material-consumption/components/TypeBreakdownChart.vue:  # 147 lines
 
-frontend/src/material-consumption/composables/useConsumptionQuery.ts:  # 394 lines
+frontend/src/material-consumption/composables/useConsumptionQuery.ts:  # 399 lines
   imports:
     - { module: vue, items: [ref], line: 13 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 14 }
@@ -1155,7 +1155,7 @@ frontend/src/material-consumption/composables/useConsumptionQuery.ts:  # 394 lin
     - { name: POLL_INTERVAL_MS, line: 67 }
     - { name: POLL_MAX_ATTEMPTS, line: 68 }
   functions:
-    - { name: useConsumptionQuery, lines: 70-394 }
+    - { name: useConsumptionQuery, lines: 70-399 }
   interfaces:
     - { name: ConsumptionKpi, lines: 17-23 }
     - { name: TrendItem, lines: 25-29 }
@@ -1172,7 +1172,7 @@ frontend/src/material-consumption/main.ts:  # 5 lines
     - { module: './App.vue', items: ['default:App'], line: 2 }
     - { module: './style.css', items: [], line: 3 }
 
-frontend/src/material-trace/App.vue:  # 579 lines
+frontend/src/material-trace/App.vue:  # 573 lines
 
 frontend/src/material-trace/main.ts:  # 7 lines
   imports:
@@ -1544,7 +1544,7 @@ frontend/src/qc-gate/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/query-tool/App.vue:  # 705 lines
+frontend/src/query-tool/App.vue:  # 699 lines
 
 frontend/src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
 
@@ -1552,7 +1552,7 @@ frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 81 lines
 
 frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 260 lines
 
-frontend/src/query-tool/components/EquipmentView.vue:  # 246 lines
+frontend/src/query-tool/components/EquipmentView.vue:  # 298 lines
 
 frontend/src/query-tool/components/ExportButton.vue:  # 30 lines
 
@@ -1560,9 +1560,9 @@ frontend/src/query-tool/components/LineageTreeChart.vue:  # 1153 lines
 
 frontend/src/query-tool/components/LotAssociationTable.vue:  # 118 lines
 
-frontend/src/query-tool/components/LotDetail.vue:  # 350 lines
+frontend/src/query-tool/components/LotDetail.vue:  # 392 lines
 
-frontend/src/query-tool/components/LotEquipmentView.vue:  # 392 lines
+frontend/src/query-tool/components/LotEquipmentView.vue:  # 444 lines
 
 frontend/src/query-tool/components/LotHistoryTable.vue:  # 129 lines
 
@@ -1570,13 +1570,13 @@ frontend/src/query-tool/components/LotJobsTable.vue:  # 265 lines
 
 frontend/src/query-tool/components/LotRejectTable.vue:  # 218 lines
 
-frontend/src/query-tool/components/LotTimeline.vue:  # 382 lines
+frontend/src/query-tool/components/LotTimeline.vue:  # 399 lines
 
-frontend/src/query-tool/components/LotTraceView.vue:  # 391 lines
+frontend/src/query-tool/components/LotTraceView.vue:  # 419 lines
 
 frontend/src/query-tool/components/QueryBar.vue:  # 112 lines
 
-frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 396 lines
+frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 424 lines
 
 frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 406 lines
   imports:
@@ -2100,7 +2100,7 @@ frontend/src/shared-ui/components/BlockLoadingState.vue:  # 36 lines
 
 frontend/src/shared-ui/components/Chip.vue:  # 162 lines
 
-frontend/src/shared-ui/components/DataTable.vue:  # 369 lines
+frontend/src/shared-ui/components/DataTable.vue:  # 384 lines
 
 frontend/src/shared-ui/components/DataTableColumn.vue:  # 46 lines
 
@@ -4593,6 +4593,30 @@ src/mes_dashboard/core/worker_memory_guard.py:  # 512 lines
     - { name: stop_worker_memory_guard, lines: 494-499 }
     - { name: get_memory_guard_telemetry, lines: 502-512 }
 
+src/mes_dashboard/core/worker_pool_manager.py:  # 292 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 22 }
+    - { module: logging, items: [], line: 24 }
+    - { module: os, items: [], line: 25 }
+    - { module: shutil, items: [], line: 26 }
+    - { module: signal, items: [], line: 27 }
+    - { module: subprocess, items: [], line: 28 }
+    - { module: sys, items: [], line: 29 }
+    - { module: time, items: [], line: 30 }
+    - { module: typing, items: [Dict, List], line: 31 }
+  functions:
+    - { name: _per_queue_int, lines: 71-78 }
+    - { name: _build_queue_configs, lines: 81-90 }
+    - { name: _make_redis, lines: 97-104 }
+    - { name: _queue_depth, lines: 107-112 }
+    - { name: _reap, lines: 122-134 }
+    - { name: _local_count, lines: 137-139 }
+    - { name: _total_count, lines: 142-143 }
+    - { name: _resolve_rq_cmd, lines: 153-157 }
+    - { name: _spawn, lines: 160-175 }
+    - { name: _on_signal, lines: 185-195 }
+    - { name: run, lines: 202-288 }
+
 src/mes_dashboard/core/worker_recovery_policy.py:  # 220 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
@@ -4930,7 +4954,7 @@ src/mes_dashboard/routes/job_routes.py:  # 158 lines
     - { name: get_job, lines: 60-76 }  # @job_bp.route('/api/job/<job_id>', methods=['GET'])
     - { name: abandon_job, lines: 81-158 }  # @job_bp.route('/api/job/<job_id>/abandon', methods=['POST'])
 
-src/mes_dashboard/routes/material_consumption_routes.py:  # 267 lines
+src/mes_dashboard/routes/material_consumption_routes.py:  # 277 lines
   imports:
     - { module: __future__, items: [annotations], line: 23 }
     - { module: logging, items: [], line: 25 }
@@ -4944,9 +4968,9 @@ src/mes_dashboard/routes/material_consumption_routes.py:  # 267 lines
     - { name: query_summary, lines: 94-131 }  # @material_consumption_bp.route('/query', methods=['POST'])
     - { name: view_summary, lines: 135-161 }  # @material_consumption_bp.route('/view', methods=['GET'])
     - { name: query_detail, lines: 166-202 }  # @material_consumption_bp.route('/detail', methods=['POST'])
-    - { name: get_detail_page, lines: 206-227 }  # @material_consumption_bp.route('/detail/page', methods=['GET'])
-    - { name: get_job_status, lines: 231-239 }  # @material_consumption_bp.route('/detail/job/<job_id>', methods=['GET'])
-    - { name: export_csv, lines: 244-267 }  # @material_consumption_bp.route('/export', methods=['POST'])
+    - { name: get_detail_page, lines: 206-237 }  # @material_consumption_bp.route('/detail/page', methods=['GET'])
+    - { name: get_job_status, lines: 241-249 }  # @material_consumption_bp.route('/detail/job/<job_id>', methods=['GET'])
+    - { name: export_csv, lines: 254-277 }  # @material_consumption_bp.route('/export', methods=['POST'])
 
 src/mes_dashboard/routes/material_trace_routes.py:  # 273 lines
   imports:
@@ -5066,7 +5090,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
     - { name: get_equipment_recent_jobs_route, lines: 794-807 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 817-990 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 1003 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 987 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5082,33 +5106,33 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 1003 lines
     - { module: mes_dashboard.core.request_validation, items: [validate_optional_date_range], line: 28 }
     - { module: mes_dashboard.core.utils, items: [parse_bool_query], line: 29 }
     - { module: mes_dashboard.services.reject_dataset_cache, items: [apply_view, compute_batch_pareto, compute_dimension_pareto, execute_primary_query, export_csv_from_cache, _has_cached_df, _make_query_id, _CACHE_SCHEMA_VERSION], line: 30 }
-    - { module: mes_dashboard.services.reject_history_service, items: [_list_to_csv, export_csv, get_filter_options, query_analytics, query_list, query_row_count, query_dimension_pareto, query_summary, query_trend], line: 40 }
+    - { module: mes_dashboard.services.reject_history_service, items: [_list_to_csv, export_csv, get_filter_options, view_analytics, view_count, view_list, view_summary, view_trend], line: 40 }
   functions:
-    - { name: _default_date_range, lines: 98-101 }
-    - { name: _validate_primary_query_date_range, lines: 104-117 }
-    - { name: _parse_date_range, lines: 120-131 }
-    - { name: _get_request_args, lines: 134-138 }
-    - { name: _parse_multi_param, lines: 141-171 }
-    - { name: _overload_error, lines: 174-182 }
-    - { name: _normalized_list_for_cache, lines: 185-192 }
-    - { name: _extract_meta, lines: 195-206 }
-    - { name: _parse_common_bools, lines: 224-246 }
-    - { name: _parse_pareto_selection, lines: 249-264 }
-    - { name: _parse_multi_pareto_selections, lines: 267-273 }
-    - { name: api_reject_history_options, lines: 277-344 }  # @reject_history_bp.route('/api/reject-history/options', methods=['GET'])
-    - { name: api_reject_history_summary, lines: 348-379 }  # @reject_history_bp.route('/api/reject-history/summary', methods=['GET'])
-    - { name: api_reject_history_trend, lines: 383-416 }  # @reject_history_bp.route('/api/reject-history/trend', methods=['GET'])
-    - { name: api_reject_history_reason_pareto, lines: 420-483 }  # @reject_history_bp.route('/api/reject-history/reason-pareto', methods=['GET'])
-    - { name: api_reject_history_batch_pareto, lines: 487-531 }  # @reject_history_bp.route('/api/reject-history/batch-pareto', methods=['GET', 'POS...
-    - { name: api_reject_history_list, lines: 536-574 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
-    - { name: api_reject_history_export, lines: 579-613 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
-    - { name: api_reject_history_analytics, lines: 617-651 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
-    - { name: api_reject_history_query, lines: 661-777 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
-    - { name: api_reject_history_count, lines: 781-796 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
-    - { name: api_reject_history_job_status, lines: 801-807 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
-    - { name: _inject_reject_spool_info, lines: 814-827 }
-    - { name: api_reject_history_view, lines: 831-921 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 925-1003 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: _default_date_range, lines: 97-100 }
+    - { name: _validate_primary_query_date_range, lines: 103-116 }
+    - { name: _parse_date_range, lines: 119-130 }
+    - { name: _get_request_args, lines: 133-137 }
+    - { name: _parse_multi_param, lines: 140-170 }
+    - { name: _overload_error, lines: 173-181 }
+    - { name: _normalized_list_for_cache, lines: 184-191 }
+    - { name: _extract_meta, lines: 194-205 }
+    - { name: _parse_common_bools, lines: 223-245 }
+    - { name: _parse_pareto_selection, lines: 248-263 }
+    - { name: _parse_multi_pareto_selections, lines: 266-272 }
+    - { name: api_reject_history_options, lines: 276-343 }  # @reject_history_bp.route('/api/reject-history/options', methods=['GET'])
+    - { name: api_reject_history_summary, lines: 347-378 }  # @reject_history_bp.route('/api/reject-history/summary', methods=['GET'])
+    - { name: api_reject_history_trend, lines: 382-415 }  # @reject_history_bp.route('/api/reject-history/trend', methods=['GET'])
+    - { name: api_reject_history_reason_pareto, lines: 419-456 }  # @reject_history_bp.route('/api/reject-history/reason-pareto', methods=['GET'])
+    - { name: api_reject_history_batch_pareto, lines: 460-504 }  # @reject_history_bp.route('/api/reject-history/batch-pareto', methods=['GET', 'POS...
+    - { name: api_reject_history_list, lines: 509-547 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
+    - { name: api_reject_history_export, lines: 552-586 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
+    - { name: api_reject_history_analytics, lines: 590-624 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
+    - { name: api_reject_history_query, lines: 634-750 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
+    - { name: api_reject_history_count, lines: 754-780 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
+    - { name: api_reject_history_job_status, lines: 785-791 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
+    - { name: _inject_reject_spool_info, lines: 798-811 }
+    - { name: api_reject_history_view, lines: 815-905 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 909-987 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
 src/mes_dashboard/routes/resource_history_routes.py:  # 450 lines
   imports:
@@ -6201,7 +6225,7 @@ src/mes_dashboard/services/lineage_engine.py:  # 853 lines
     - { name: _to_edge_payload, lines: 68-86 }
     - { name: _build_parent_map, lines: 89-127 }
 
-src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 429 lines
+src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 467 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: csv, items: [], line: 17 }
@@ -6212,26 +6236,26 @@ src/mes_dashboard/services/material_consumption_duckdb_runtime.py:  # 429 lines
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 23 }
   classes:
     - name: MaterialConsumptionDetailRuntime
-      lines: 300-429
+      lines: 326-467
       methods:
-        - { name: __init__, lines: 303-306 }
-        - { name: _resolve_path, lines: 308-312 }
-        - { name: is_available, lines: 314-316 }
-        - { name: get_page, lines: 318-380 }
-        - { name: export_csv, lines: 382-429 }
+        - { name: __init__, lines: 329-332 }
+        - { name: _resolve_path, lines: 334-338 }
+        - { name: is_available, lines: 340-342 }
+        - { name: get_page, lines: 344-418 }
+        - { name: export_csv, lines: 420-467 }
   functions:
-    - { name: _normalize_detail_df, lines: 64-73 }
-    - { name: _granularity_bucket_expr, lines: 81-103 }
-    - { name: _sql_str_literal, lines: 106-107 }
-    - { name: _type_where, lines: 110-118 }
-    - { name: _fetch_dict_rows, lines: 121-126 }
-    - { name: regroup_summary, lines: 134-168 }
-    - { name: _query_kpi, lines: 171-196 }
-    - { name: _empty_kpi, lines: 199-206 }
-    - { name: _query_trend, lines: 209-250 }
-    - { name: _query_type_breakdown, lines: 253-292 }
+    - { name: _normalize_detail_df, lines: 64-83 }
+    - { name: _granularity_bucket_expr, lines: 107-129 }
+    - { name: _sql_str_literal, lines: 132-133 }
+    - { name: _type_where, lines: 136-144 }
+    - { name: _fetch_dict_rows, lines: 147-152 }
+    - { name: regroup_summary, lines: 160-194 }
+    - { name: _query_kpi, lines: 197-222 }
+    - { name: _empty_kpi, lines: 225-232 }
+    - { name: _query_trend, lines: 235-276 }
+    - { name: _query_type_breakdown, lines: 279-318 }
 
-src/mes_dashboard/services/material_consumption_service.py:  # 689 lines
+src/mes_dashboard/services/material_consumption_service.py:  # 697 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -6244,7 +6268,7 @@ src/mes_dashboard/services/material_consumption_service.py:  # 689 lines
     - { module: mes_dashboard.core.redis_client, items: [REDIS_ENABLED, get_redis_client], line: 29 }
     - { module: mes_dashboard.services.batch_query_engine, items: [compute_query_hash], line: 30 }
     - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 31 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 683 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 691 }
   constants:
     - { name: MATERIAL_CONSUMPTION_QUEUE, line: 39 }
   classes:
@@ -6269,12 +6293,12 @@ src/mes_dashboard/services/material_consumption_service.py:  # 689 lines
     - { name: get_summary, lines: 361-429 }
     - { name: apply_view, lines: 432-449 }
     - { name: get_detail_summary, lines: 452-536 }
-    - { name: get_detail_page, lines: 539-555 }
-    - { name: get_job_status, lines: 561-564 }
-    - { name: export_csv_stream, lines: 567-574 }
-    - { name: rq_material_consumption_job, lines: 582-633 }
-    - { name: enqueue_job, lines: 641-643 }
-    - { name: start_parts_cache_warmup, lines: 646-677 }
+    - { name: get_detail_page, lines: 539-563 }
+    - { name: get_job_status, lines: 569-572 }
+    - { name: export_csv_stream, lines: 575-582 }
+    - { name: rq_material_consumption_job, lines: 590-641 }
+    - { name: enqueue_job, lines: 649-651 }
+    - { name: start_parts_cache_warmup, lines: 654-685 }
 
 src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 175 lines
   imports:
@@ -7015,7 +7039,7 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 2039 lines
     - { name: compute_batch_pareto, lines: 1885-1978 }
     - { name: export_csv_from_cache, lines: 1986-2039 }
 
-src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
+src/mes_dashboard/services/reject_history_service.py:  # 1228 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: csv, items: [], line: 6 }
@@ -7065,8 +7089,14 @@ src/mes_dashboard/services/reject_history_service.py:  # 1067 lines
     - { name: _derive_trend, lines: 916-940 }
     - { name: _derive_pareto, lines: 943-977 }
     - { name: _derive_raw_items, lines: 980-995 }
-    - { name: query_analytics, lines: 998-1041 }
-    - { name: query_row_count, lines: 1044-1067 }
+    - { name: _apply_view, lines: 1013-1016 }
+    - { name: _analytics_dataframe, lines: 1019-1029 }
+    - { name: _bucket_trend, lines: 1032-1068 }
+    - { name: view_summary, lines: 1071-1093 }
+    - { name: view_trend, lines: 1096-1125 }
+    - { name: view_list, lines: 1128-1162 }
+    - { name: view_count, lines: 1165-1184 }
+    - { name: view_analytics, lines: 1187-1228 }
 
 src/mes_dashboard/services/reject_pareto_materialized.py:  # 807 lines
   imports:
@@ -8650,7 +8680,7 @@ tests/e2e/test_realtime_equipment_e2e.py:  # 218 lines
       methods:
         - { name: test_cache_data_consistency, lines: 196-218 }
 
-tests/e2e/test_reject_history_e2e.py:  # 368 lines
+tests/e2e/test_reject_history_e2e.py:  # 379 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: os, items: [], line: 6 }
@@ -8661,7 +8691,7 @@ tests/e2e/test_reject_history_e2e.py:  # 368 lines
     - { module: tests.e2e.browser_helpers, items: [goto_shell_route, wait_for_any_visible], line: 13 }
   classes:
     - name: TestRejectHistoryBasicE2E
-      lines: 92-240
+      lines: 92-251
       methods:
         - { name: test_options_returns_filter_data, lines: 95-100 }
         - { name: test_query_requires_mode, lines: 102-108 }
@@ -8669,20 +8699,20 @@ tests/e2e/test_reject_history_e2e.py:  # 368 lines
         - { name: test_view_requires_query_id, lines: 119-122 }
         - { name: test_view_expired_returns_410, lines: 124-133 }
         - { name: test_short_range_query_view_cycle, lines: 135-178 }
-        - { name: test_summary_returns_data, lines: 180-194 }
-        - { name: test_trend_returns_data, lines: 196-207 }
-        - { name: test_reason_pareto_returns_data, lines: 209-220 }
-        - { name: test_list_returns_paginated_data, lines: 223-240 }
+        - { name: test_summary_returns_data, lines: 180-198 }
+        - { name: test_trend_returns_data, lines: 200-215 }
+        - { name: test_reason_pareto_returns_data, lines: 217-232 }
+        - { name: test_list_returns_paginated_data, lines: 235-251 }
     - name: TestRejectHistoryLongRangeE2E
-      lines: 248-327
+      lines: 259-338
       methods:
-        - { name: test_query_190_day_range_respects_guardrail, lines: 251-279 }
-        - { name: test_query_then_view_returns_cached_result, lines: 281-306 }
-        - { name: test_query_then_export_cached_returns_csv, lines: 308-327 }
+        - { name: test_query_190_day_range_respects_guardrail, lines: 262-290 }
+        - { name: test_query_then_view_returns_cached_result, lines: 292-317 }
+        - { name: test_query_then_export_cached_returns_csv, lines: 319-338 }
     - name: TestRejectHistoryBrowserE2E
-      lines: 331-368
+      lines: 342-379
       methods:
-        - { name: test_reject_history_page_runs_primary_query, lines: 334-368 }
+        - { name: test_reject_history_page_runs_primary_query, lines: 345-379 }
   functions:
     - { name: _post_reject_query, lines: 16-44 }
     - { name: _poll_async_job, lines: 47-59 }
@@ -10012,7 +10042,7 @@ tests/stress/conftest.py:  # 218 lines
     - { name: pytest_terminal_summary, lines: 173-208 }
     - { name: pytest_configure, lines: 211-218 }
 
-tests/stress/integrity_helpers.py:  # 205 lines
+tests/stress/integrity_helpers.py:  # 234 lines
   imports:
     - { module: os, items: [], line: 9 }
     - { module: requests, items: [], line: 10 }
@@ -10024,15 +10054,16 @@ tests/stress/integrity_helpers.py:  # 205 lines
       methods:
         - { name: compute_verdict, lines: 32-65 }
     - name: RowCountBaseline
-      lines: 68-117
+      lines: 68-146
       methods:
         - { name: __init__, lines: 75-77 }
-        - { name: get, lines: 79-117 }
+        - { name: get, lines: 79-126 }
+        - { name: _resolve_reject_query_id, lines: 128-146 }
     - name: PaginationWalker
-      lines: 120-205
+      lines: 149-234
       methods:
-        - { name: __init__, lines: 127-129 }
-        - { name: walk, lines: 131-205 }
+        - { name: __init__, lines: 156-158 }
+        - { name: walk, lines: 160-234 }
 
 tests/stress/load_collector.py:  # 316 lines
   imports:
@@ -10214,7 +10245,7 @@ tests/stress/test_chunk_boundary.py:  # 395 lines
     - { name: _make_padded_payload, lines: 64-67 }
     - { name: _date_range, lines: 70-73 }
 
-tests/stress/test_cross_module_stress.py:  # 399 lines
+tests/stress/test_cross_module_stress.py:  # 417 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: concurrent.futures, items: [], line: 15 }
@@ -10240,13 +10271,13 @@ tests/stress/test_cross_module_stress.py:  # 399 lines
       methods:
         - { name: test_concurrent_alert_queries, lines: 250-286 }
     - name: TestRejectHistoryStress
-      lines: 291-332
+      lines: 291-350
       methods:
-        - { name: test_concurrent_analytics_queries, lines: 294-332 }
+        - { name: test_concurrent_analytics_queries, lines: 294-350 }
     - name: TestPostBurstRecovery
-      lines: 336-399
+      lines: 354-417
       methods:
-        - { name: test_health_stable_after_cross_module_burst, lines: 339-399 }
+        - { name: test_health_stable_after_cross_module_burst, lines: 357-417 }
   functions:
     - { name: _request, lines: 23-45 }
 
@@ -11393,7 +11424,7 @@ tests/test_anomaly_detection_sql_runtime.py:  # 91 lines
         - { name: test_hold_percentile_is_between_0_and_1, lines: 87-88 }
         - { name: test_deviation_threshold_is_positive, lines: 90-91 }
 
-tests/test_api_contract.py:  # 1100 lines
+tests/test_api_contract.py:  # 1059 lines
   imports:
     - { module: ast, items: [], line: 13 }
     - { module: unittest, items: [], line: 14 }
@@ -11530,10 +11561,6 @@ tests/test_api_contract.py:  # 1100 lines
         - { name: setUp, lines: 984-990 }
         - { name: test_202_response_shape_has_job_id_and_status_url, lines: 995-1030 }
         - { name: test_resource_history_query_short_span_returns_200_not_202, lines: 1032-1055 }
-    - name: TestNoSrcFilesModified
-      lines: 1062-1100
-      methods:
-        - { name: test_no_src_files_modified, lines: 1071-1100 }
   functions:
     - { name: _count_jsonify_in_file, lines: 46-63 }
 
@@ -15333,7 +15360,7 @@ tests/test_portal_shell_routes.py:  # 472 lines
     - { name: test_legacy_shell_contract_fallback_logs_warning, lines: 411-451 }
     - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 454-472 }
 
-tests/test_portal_shell_wave_b_native_smoke.py:  # 283 lines
+tests/test_portal_shell_wave_b_native_smoke.py:  # 279 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: io, items: [], line: 6 }
@@ -15347,7 +15374,7 @@ tests/test_portal_shell_wave_b_native_smoke.py:  # 283 lines
     - { name: _build_excel_file, lines: 31-46 }
     - { name: test_job_query_native_smoke_query_search_export, lines: 49-106 }
     - { name: test_query_tool_native_smoke_resolve_history_association, lines: 109-153 }
-    - { name: test_reject_history_native_smoke_query_sections_and_export, lines: 156-283 }
+    - { name: test_reject_history_native_smoke_query_sections_and_export, lines: 156-279 }
 
 tests/test_post_fork_reinit.py:  # 163 lines
   imports:
@@ -16610,7 +16637,7 @@ tests/test_reject_history_post_contract.py:  # 141 lines
     - { name: test_reject_view_native_bool_post, lines: 96-119 }
     - { name: test_reject_batch_pareto_get_still_works, lines: 122-141 }
 
-tests/test_reject_history_routes.py:  # 975 lines
+tests/test_reject_history_routes.py:  # 964 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -16628,65 +16655,65 @@ tests/test_reject_history_routes.py:  # 975 lines
       methods:
         - { name: test_reject_history_page_fallback_contains_vite_entry, lines: 32-42 }
     - name: TestRejectHistoryApiRoutes
-      lines: 45-776
+      lines: 45-765
       methods:
         - { name: test_options_uses_cache_hit_without_service_call, lines: 48-63 }
         - { name: test_options_passes_full_draft_filters, lines: 66-97 }
-        - { name: test_summary_missing_dates_returns_400, lines: 99-104 }
-        - { name: test_summary_invalid_include_excluded_scrap_returns_400, lines: 106-114 }
-        - { name: test_summary_invalid_exclude_material_scrap_returns_400, lines: 116-124 }
-        - { name: test_summary_passes_filters_and_meta, lines: 127-158 }
-        - { name: test_query_rejects_date_range_over_half_year, lines: 161-178 }
-        - { name: test_query_accepts_date_range_within_half_year, lines: 182-199 }
-        - { name: test_query_returns_503_when_async_enqueue_fails, lines: 203-221 }
-        - { name: test_trend_invalid_granularity_returns_400, lines: 224-233 }
-        - { name: test_reason_pareto_defaults_top80, lines: 236-245 }
-        - { name: test_dimension_pareto_accepts_package, lines: 248-266 }
-        - { name: test_dimension_pareto_accepts_equipment, lines: 269-286 }
-        - { name: test_dimension_pareto_with_query_id_passes_policy_flags_to_cached_path, lines: 290-324 }
-        - { name: test_batch_pareto_passes_multi_dimension_selection_params, lines: 327-360 }
-        - { name: test_batch_pareto_cache_miss_returns_400, lines: 363-369 }
-        - { name: test_reason_pareto_memory_guard_returns_503, lines: 372-384 }
-        - { name: test_batch_pareto_memory_guard_returns_503, lines: 387-397 }
-        - { name: test_view_memory_guard_returns_503, lines: 400-410 }
-        - { name: test_export_cached_memory_guard_returns_503, lines: 413-423 }
-        - { name: test_view_passes_pareto_multi_select_filters, lines: 426-449 }
-        - { name: test_view_cache_expired_returns_410, lines: 452-458 }
-        - { name: test_view_invalid_pareto_dimension_returns_400, lines: 461-472 }
-        - { name: test_view_passes_multi_dimension_selection_filters, lines: 475-498 }
-        - { name: test_view_sel_filters_take_precedence_over_legacy_dimension, lines: 501-522 }
-        - { name: test_export_cached_passes_pareto_multi_select_filters, lines: 526-545 }
-        - { name: test_export_cached_invalid_pareto_dimension_returns_400, lines: 548-559 }
-        - { name: test_export_cached_cache_expired_returns_410, lines: 562-568 }
-        - { name: test_export_cached_passes_multi_dimension_selection_filters, lines: 572-594 }
-        - { name: test_list_route_preserves_pagination_contract, lines: 597-625 }
-        - { name: test_list_rate_limited_returns_429, lines: 629-636 }
-        - { name: test_export_returns_csv_response, lines: 639-646 }
-        - { name: test_batch_pareto_exposes_materialized_metadata_on_hit, lines: 654-678 }
-        - { name: test_batch_pareto_exposes_fallback_metadata, lines: 681-700 }
-        - { name: test_batch_pareto_no_meta_when_absent, lines: 703-717 }
-        - { name: test_reason_pareto_exposes_materialized_metadata, lines: 720-742 }
-        - { name: test_batch_pareto_stale_fallback_reason, lines: 745-759 }
-        - { name: test_batch_pareto_build_failed_fallback_reason, lines: 762-776 }
+        - { name: test_summary_missing_dates_returns_400, lines: 99-105 }
+        - { name: test_summary_invalid_include_excluded_scrap_returns_400, lines: 107-115 }
+        - { name: test_summary_invalid_exclude_material_scrap_returns_400, lines: 117-125 }
+        - { name: test_summary_passes_filters_and_meta, lines: 128-155 }
+        - { name: test_query_rejects_date_range_over_half_year, lines: 158-175 }
+        - { name: test_query_accepts_date_range_within_half_year, lines: 179-196 }
+        - { name: test_query_returns_503_when_async_enqueue_fails, lines: 200-218 }
+        - { name: test_trend_invalid_granularity_returns_400, lines: 221-230 }
+        - { name: test_reason_pareto_defaults_top80, lines: 233-242 }
+        - { name: test_dimension_pareto_accepts_package, lines: 245-262 }
+        - { name: test_dimension_pareto_accepts_equipment, lines: 265-281 }
+        - { name: test_dimension_pareto_with_query_id_passes_policy_flags_to_cached_path, lines: 284-314 }
+        - { name: test_batch_pareto_passes_multi_dimension_selection_params, lines: 317-350 }
+        - { name: test_batch_pareto_cache_miss_returns_400, lines: 353-359 }
+        - { name: test_reason_pareto_memory_guard_returns_503, lines: 362-374 }
+        - { name: test_batch_pareto_memory_guard_returns_503, lines: 377-387 }
+        - { name: test_view_memory_guard_returns_503, lines: 390-400 }
+        - { name: test_export_cached_memory_guard_returns_503, lines: 403-413 }
+        - { name: test_view_passes_pareto_multi_select_filters, lines: 416-439 }
+        - { name: test_view_cache_expired_returns_410, lines: 442-448 }
+        - { name: test_view_invalid_pareto_dimension_returns_400, lines: 451-462 }
+        - { name: test_view_passes_multi_dimension_selection_filters, lines: 465-488 }
+        - { name: test_view_sel_filters_take_precedence_over_legacy_dimension, lines: 491-512 }
+        - { name: test_export_cached_passes_pareto_multi_select_filters, lines: 516-535 }
+        - { name: test_export_cached_invalid_pareto_dimension_returns_400, lines: 538-549 }
+        - { name: test_export_cached_cache_expired_returns_410, lines: 552-558 }
+        - { name: test_export_cached_passes_multi_dimension_selection_filters, lines: 562-584 }
+        - { name: test_list_route_preserves_pagination_contract, lines: 587-614 }
+        - { name: test_list_rate_limited_returns_429, lines: 618-625 }
+        - { name: test_export_returns_csv_response, lines: 628-635 }
+        - { name: test_batch_pareto_exposes_materialized_metadata_on_hit, lines: 643-667 }
+        - { name: test_batch_pareto_exposes_fallback_metadata, lines: 670-689 }
+        - { name: test_batch_pareto_no_meta_when_absent, lines: 692-706 }
+        - { name: test_reason_pareto_exposes_materialized_metadata, lines: 709-731 }
+        - { name: test_batch_pareto_stale_fallback_reason, lines: 734-748 }
+        - { name: test_batch_pareto_build_failed_fallback_reason, lines: 751-765 }
     - name: TestRejectHistoryEdgeCases
-      lines: 779-874
+      lines: 768-863
       methods:
-        - { name: test_job_status_not_found_returns_error_envelope, lines: 782-793 }
-        - { name: test_sync_200_small_range, lines: 797-818 }
-        - { name: test_nested_pareto_aggregates_shape, lines: 821-852 }
-        - { name: test_batch_pareto_post_json_reasons, lines: 855-867 }
-        - { name: test_options_returns_envelope, lines: 869-874 }
+        - { name: test_job_status_not_found_returns_error_envelope, lines: 771-782 }
+        - { name: test_sync_200_small_range, lines: 786-807 }
+        - { name: test_nested_pareto_aggregates_shape, lines: 810-841 }
+        - { name: test_batch_pareto_post_json_reasons, lines: 844-856 }
+        - { name: test_options_returns_envelope, lines: 858-863 }
     - name: TestRejectHistoryCsvMidStreamError
-      lines: 887-954
+      lines: 876-943
       methods:
-        - { name: test_sentinel_emitted_on_mid_stream_exception, lines: 890-902 }
-        - { name: test_no_sentinel_when_rows_complete_successfully, lines: 904-917 }
-        - { name: test_header_row_emitted_before_sentinel, lines: 919-932 }
-        - { name: test_export_csv_uses_sentinel_on_oracle_failure, lines: 934-954 }
+        - { name: test_sentinel_emitted_on_mid_stream_exception, lines: 879-891 }
+        - { name: test_no_sentinel_when_rows_complete_successfully, lines: 893-906 }
+        - { name: test_header_row_emitted_before_sentinel, lines: 908-921 }
+        - { name: test_export_csv_uses_sentinel_on_oracle_failure, lines: 923-943 }
     - name: TestResourceHistoryCsvMidStreamSentinel
-      lines: 957-975
+      lines: 946-964
       methods:
-        - { name: test_error_trailer_present_in_resource_history_export, lines: 960-975 }
+        - { name: test_error_trailer_present_in_resource_history_export, lines: 949-964 }
   functions:
     - { name: _login_as_admin, lines: 13-15 }
 
