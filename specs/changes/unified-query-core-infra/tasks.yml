@@ -1,0 +1,42 @@
+change-id: unified-query-core-infra
+status: in-progress
+tier: 1
+tier-floor-override: "All 3 modules ship with zero callers; concurrency stress (writer_lock, ThreadPoolExecutor, Oracle pool) deferred to first P1 domain migration per design.md Open Risks — no end-to-end load surface exists until P1 wires a domain."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "no HTTP endpoints exposed" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no UI surface" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done, note: "Added DUCKDB_JOB_DIR; deprecated 4 *_ASYNC_DAY_THRESHOLD vars; bumped schema-version to 1.0.14" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done, note: "Added Oracle→Arrow→DuckDB/parquet streaming boundary section with chunk invariants" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "classify_query_cost is infrastructure routing policy, not MES domain rule" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "no E2E surface; resilience covered under integration" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "data-boundary yes; monkey n/a" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "deferred to first P1 domain migration" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "IP-1..IP-3 new core modules implemented; IP-6 unit/contract tests; IP-7 integration test" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no frontend changes" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done, note: "env-contract.md, .env.example.template, env.schema.json all updated with DUCKDB_JOB_DIR" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "no new workflow needed; existing backend-tests.yml and contract-driven-gates.yml are sufficient" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI surface" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI surface" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "APPROVED after fixing: data schema-version 1.18.0→1.19.0, CHANGELOG [env 1.0.14] and [data 1.19.0] entries added" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "BLOCKED verdict: cdd-kit-gate tier-floor violation (concurrency surface needs tier 0 or tier-floor-override) + ruff F401 unused dataclasses.field in query_cost_policy.py. AC-1..AC-8 functionally verified; 62 targeted tests pass." }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed; ruff clean on 3 new modules; 62 tests pass" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "unit-mock-integration + contract-validate + cdd-kit-gate all green locally; pending CI runner on PR" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "lint (ruff) clean on new modules; type-check informational" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "integration_real Oracle pool test is nightly-only; no nightly gates defined for pre-merge" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

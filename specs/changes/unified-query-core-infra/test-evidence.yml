@@ -1,0 +1,52 @@
+change-id: unified-query-core-infra
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      pytest tests/test_oracle_arrow_reader.py tests/test_query_cost_policy.py tests/test_base_chunked_duckdb_job.py
+      tests/contract/test_env_duckdb_job_dir.py --collect-only -q
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201459/junit.xml'
+      --maxfail=1 --tb=short -ra
+    summary: specs/changes/unified-query-core-infra/test-runs/20260618-201459/summary.json
+    junit: specs/changes/unified-query-core-infra/test-runs/20260618-201459/junit.xml
+  - phase: targeted
+    status: passed
+    command: >-
+      pytest tests/test_oracle_arrow_reader.py tests/test_query_cost_policy.py tests/test_base_chunked_duckdb_job.py
+      tests/contract/test_env_duckdb_job_dir.py -v
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201506/junit.xml'
+      -q --maxfail=1 --tb=short -ra
+    summary: specs/changes/unified-query-core-infra/test-runs/20260618-201506/summary.json
+    junit: specs/changes/unified-query-core-infra/test-runs/20260618-201506/junit.xml
+  - phase: changed-area
+    status: passed
+    command: >-
+      pytest tests/test_oracle_arrow_reader.py tests/test_query_cost_policy.py tests/test_base_chunked_duckdb_job.py
+      tests/contract/test_env_duckdb_job_dir.py tests/contract/ -v
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201514/junit.xml'
+      -q --maxfail=1 --tb=short -ra
+    summary: specs/changes/unified-query-core-infra/test-runs/20260618-201514/summary.json
+    junit: specs/changes/unified-query-core-infra/test-runs/20260618-201514/junit.xml
+  - phase: contract
+    status: passed
+    command: >-
+      pytest tests/contract/ -v
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201708/junit.xml'
+      -q --maxfail=1 --tb=short -ra
+    summary: specs/changes/unified-query-core-infra/test-runs/20260618-201708/summary.json
+    junit: specs/changes/unified-query-core-infra/test-runs/20260618-201708/junit.xml
+  - phase: full
+    status: passed
+    command: >-
+      pytest tests/ --ignore=tests/e2e --ignore=tests/stress --ignore=tests/integration -v --tb=short -q
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201857/junit.xml'
+      --maxfail=1 -ra
+    summary: specs/changes/unified-query-core-infra/test-runs/20260618-201857/summary.json
+    junit: specs/changes/unified-query-core-infra/test-runs/20260618-201857/junit.xml
+final-status: passed

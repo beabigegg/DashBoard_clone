@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.18.0
+schema-version: 1.19.0
 last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1080,6 +1080,90 @@ Added by change `eap-alarm-analysis`. Spool namespace: `tmp/query_spool/eap_alar
 
 **Detail** (`GET /api/eap-alarm/detail`): `data` = `{rows: [{event_id: string, eqp_id: string, eqp_type: string, lot_id: string | null, alarm_text: string | null, alarm_category: string, alarm_time: string (ISO 8601), detail_params: object | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. `detail_params` is null or a JSON object of extra ALARM DETAIL parameters. Pagination: `per_page` max 200.
 
+
+## Oracle → pyarrow RecordBatch → DuckDB/parquet Streaming Boundary
+
+This section documents the row-level invariants and type-coercion semantics for
+the unified streaming pipeline introduced by `unified-query-core-infra`.
+
+### Pipeline Stages
+
+```
+Oracle cursor.fetchmany()
+    → per-row CHAR strip + null passthrough
+    → pyarrow.RecordBatch.from_arrays()
+    → [requires_cross_chunk_reduction=True]  DuckDB INSERT INTO raw (writer_lock)
+      [requires_cross_chunk_reduction=False] pyarrow.parquet.ParquetWriter append
+    → post_aggregate DuckDB SQL → COPY TO canonical parquet spool
+    → frontend read_parquet() in-memory DuckDB → JSON
+```
+
+### Invariants
+
+**No pandas in path.** Neither `OracleArrowReader` nor `BaseChunkedDuckDBJob` imports
+pandas. Data stays in Arrow / DuckDB format from Oracle fetch to parquet spool.
+The `test_no_pandas_import_in_new_modules` test enforces this (AC-7).
+
+**No row duplication across chunks.** Each row appears in exactly one chunk; chunk
+boundaries are defined by non-overlapping time ranges, ID batches, or row-count
+windows. Cross-chunk deduplication is NOT performed — chunk design must prevent
+overlap (enforced at `build_chunk_sql()` time by the subclass).
+
+**No row loss.** The Oracle cursor is exhausted fully within each chunk's connection
+context. Partial fetches (e.g. a mid-chunk connection drop) propagate as exceptions,
+leaving no orphaned rows. The caller retries the entire chunk or fails the job.
+
+**Empty chunk → zero RecordBatch yields.** When `cursor.fetchmany()` returns `[]`
+on the first call, `chunk_iter()` yields nothing and returns without error.
+Empty chunks are legal and do not indicate a failure condition.
+
+**Null values passthrough without error.** Oracle `None` values are passed to
+`pa.array()` which maps them to Arrow null. No row is dropped due to null fields.
+Columns with all-null values produce a valid `pa.array` of the inferred type or
+`pa.null()` if type cannot be inferred.
+
+**Oracle CHAR strip applied at boundary.** All `str` values returned by the Oracle
+cursor are `.strip()`-ed inside `OracleArrowReader.chunk_iter()` before the
+RecordBatch is built. This removes trailing space-padding from fixed-width CHAR
+columns. The strip is applied column-by-column regardless of declared SQL type;
+non-str values are passed through unchanged.
+
+**Oracle DATE midnight-UTC handling.** Oracle DATE columns carry no timezone
+information. A DATE value of `2024-01-15 00:00:00` is returned by the Oracle
+driver as a Python `datetime` with no tzinfo. Callers must NOT assume midnight
+means UTC midnight when displaying as a date — inspect H/M/S components via
+regex (per `frontend-patterns.md`) before converting to a display date. This
+boundary contract does NOT perform timezone conversion; that remains the
+responsibility of the frontend display layer.
+
+**DuckDB single-writer discipline.** When `requires_cross_chunk_reduction=True`,
+all RecordBatch INSERT operations into the job-temp `.duckdb` file are serialized
+under `BaseChunkedDuckDBJob._writer_lock`. Oracle fetch (I/O-bound) is the
+parallel stage; DuckDB write is serialized. Concurrent writes to a single DuckDB
+file without the lock will corrupt the file — this invariant must be preserved
+in any subclass override of `chunk_to_duckdb()`.
+
+**Job-temp DuckDB isolation.** The job-temp `.duckdb` file at
+`{DUCKDB_JOB_DIR}/{namespace}/{job_id}.duckdb` is deleted in a `finally` block
+on both success and failure. Crash survivors are reaped by TTL orphan cleanup.
+The job-temp directory (`DUCKDB_JOB_DIR`) must NOT overlap with the canonical
+parquet spool directory (`QUERY_SPOOL_DIR`).
+
+**Canonical spool format unchanged.** The parquet file produced by `post_aggregate()`
+uses the same schema and path convention as all existing spool namespaces. Frontend
+`/view` endpoints continue to read spool via in-memory DuckDB; no frontend changes
+are required by this pipeline change.
+
+### Breaking-Change Surface
+
+Adding, removing, or renaming columns in the `raw` table written by `chunk_to_duckdb()`
+is a breaking change for any domain using `requires_cross_chunk_reduction=True` —
+the `post_aggregate()` SQL must be updated atomically with the schema change, and
+the job-temp DuckDB directory must be cleared of any stale files. For the canonical
+parquet spool, the existing breaking-change policy (`_SCHEMA_VERSION` bump +
+`rm {namespace}/*.parquet`) applies unchanged.
+
+---
 
 ## CHANGELOG
 

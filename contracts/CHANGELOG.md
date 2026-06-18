@@ -12,6 +12,10 @@ a corresponding entry below.
 ### Added
 - eap-alarm-analysis: 7 new endpoints under `/api/eap-alarm/*` (POST /spool 202 async, GET /spool/status, GET /filter-options, GET /summary, GET /pareto, GET /trend, GET /detail). Spool namespace `eap_alarm` added to `/api/spool` whitelist. Schema `EapAlarmSpoolJobAccepted` added. Type B async; fine-filter views DuckDB-only. Additive; no existing endpoints changed.
 
+## [data 1.19.0] — 2026-06-18
+### Added
+- unified-query-core-infra: Oracle → pyarrow RecordBatch → DuckDB/parquet streaming boundary section — 9 invariants: no pandas in path, no row duplication across chunks, no row loss, empty-chunk handling (zero yields, no error), null passthrough, Oracle CHAR strip (`.strip()` in `chunk_iter()`), Oracle DATE midnight-UTC semantics (TZ conversion delegated to frontend), DuckDB single-writer discipline (writer_lock for cross-chunk reduction path), job-temp DuckDB isolation (`DUCKDB_JOB_DIR` must not overlap `QUERY_SPOOL_DIR`). Additive; no existing sections changed.
+
 ## [data 1.18.0] — 2026-06-18
 ### Added
 - eap-alarm-analysis: §3.17 EAP ALARM Spool Schema — 10-column parquet schema (EVENT_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE, ALARM_CATEGORY, ALARM_TIME, DETAIL_PARAMS, eqp_types_filter); 5 DuckDB-derived response shapes (filter-options, summary, pareto, trend, detail). Parquet cleanup + `_SCHEMA_VERSION` bump policy documented.
@@ -19,6 +23,12 @@ a corresponding entry below.
 ## [business 1.22.0] — 2026-06-18
 ### Added
 - eap-alarm-analysis: Rules EA-01..EA-07 — spool-key composition (date + eqp_types hash), DuckDB-only fine-filter derivation, LAST_UPDATE_TIME mandatory index filter, DETAIL from spool only, AlarmCategory fixed decode table (9 codes + "未知" fallback), spool schema version governance, EQP type closed enum (10 values).
+
+## [env 1.0.14] — 2026-06-18
+### Added
+- unified-query-core-infra: `DUCKDB_JOB_DIR` (string, default `tmp/duckdb_jobs`, storage scope, restart required) — directory for transient per-job DuckDB files created by `BaseChunkedDuckDBJob`. Must not overlap with `QUERY_SPOOL_DIR`. Use absolute path on Docker named volume.
+### Deprecated
+- unified-query-core-infra: `DOWNTIME_ASYNC_DAY_THRESHOLD`, `HOLD_ASYNC_DAY_THRESHOLD`, `RESOURCE_ASYNC_DAY_THRESHOLD`, `REJECT_ASYNC_DAY_THRESHOLD` — all deprecated (removal P5, deprecate-2-minors policy); runtime `DeprecationWarning` emitted by `classify_query_cost()` when any var is in `os.environ`. `REJECT_ASYNC_DAY_THRESHOLD` was previously undocumented in this contract; documented and simultaneously deprecated here.
 
 ## [env 1.0.13] — 2026-06-18
 ### Added

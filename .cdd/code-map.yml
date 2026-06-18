@@ -1,6 +1,6 @@
-# generated: 2026-06-18T08:32:44Z by cdd-kit 3.3.0
-# files: 897, src-lines: 260772, map-lines: 19292, compression: 13.5x
-# sources-digest: 1820d18ea1d0104978f5e896ce32db38161c597e56a9c54ae86a0759a71737d9
+# generated: 2026-06-18T12:42:37Z by cdd-kit 3.3.0
+# files: 905, src-lines: 262816, map-lines: 19557, compression: 13.4x
+# sources-digest: 887b30c5f3767ab61e40e05695d27d90eaf77c9bbdc8aa0bb3955b85e62b662d
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3152,7 +3152,7 @@ frontend/tests/shared-composables/useRequestGuard.test.js:  # 155 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
     - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
 
-frontend/tests/unit/eap-alarm-filter.test.js:  # 158 lines
+frontend/tests/unit/eap-alarm-filter.test.js:  # 142 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach], line: 11 }
     - { module: '../../src/eap-alarm/composables/useEapAlarmFilter.js', items: [useEapAlarmFilter], line: 12 }
@@ -3584,6 +3584,40 @@ src/mes_dashboard/core/__init__.py:  # 43 lines
     - { module: '.cache', items: [cache_get, cache_set, make_cache_key, CacheBackend, NoOpCache], line: 12 }
     - { module: '.utils', items: [get_days_back, build_filter_conditions, build_equipment_filter_sql, convert_datetime_fields, format_api_response], line: 13 }
     - { module: '.redis_client', items: [try_acquire_lock, release_lock, with_distributed_lock], line: 20 }
+
+src/mes_dashboard/core/base_chunked_duckdb_job.py:  # 302 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 25 }
+    - { module: logging, items: [], line: 27 }
+    - { module: os, items: [], line: 28 }
+    - { module: threading, items: [], line: 29 }
+    - { module: abc, items: [ABC, abstractmethod], line: 30 }
+    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 31 }
+    - { module: enum, items: [Enum], line: 32 }
+    - { module: pathlib, items: [Path], line: 33 }
+    - { module: typing, items: [Iterator], line: 34 }
+    - { module: pyarrow, items: [], line: 36 }
+    - { module: mes_dashboard.core.oracle_arrow_reader, items: [OracleArrowReader], line: 38 }
+  constants:
+    - { name: DUCKDB_JOB_DIR, line: 52 }
+  classes:
+    - name: ChunkStrategy
+      lines: 55-68
+    - name: BaseChunkedDuckDBJob
+      lines: 71-302
+      methods:
+        - { name: __init__, lines: 99-102 }
+        - { name: pre_query, lines: 109-115 }
+        - { name: build_chunk_sql, lines: 118-127 }
+        - { name: post_aggregate, lines: 130-144 }
+        - { name: chunk_to_duckdb, lines: 150-171 }
+        - { name: progress_report, lines: 173-184 }
+        - { name: run, lines: 190-227 }
+        - { name: _make_job_duckdb_path, lines: 233-238 }
+        - { name: _cleanup_job_duckdb, lines: 240-248 }
+        - { name: _fetch_chunk, lines: 250-255 }
+        - { name: _fan_out_reduction, lines: 257-276 }
+        - { name: _fan_out_append, lines: 278-302 }
 
 src/mes_dashboard/core/cache.py:  # 570 lines
   imports:
@@ -4182,6 +4216,24 @@ src/mes_dashboard/core/mysql_client.py:  # 101 lines
     - { name: check_mysql_health, lines: 80-89 }
     - { name: dispose_mysql_engine, lines: 92-101 }
 
+src/mes_dashboard/core/oracle_arrow_reader.py:  # 140 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 21 }
+    - { module: logging, items: [], line: 23 }
+    - { module: os, items: [], line: 24 }
+    - { module: re, items: [], line: 25 }
+    - { module: typing, items: [TYPE_CHECKING, Any, Dict, Iterator], line: 26 }
+    - { module: pyarrow, items: [], line: 28 }
+  classes:
+    - name: OracleArrowReader
+      lines: 55-140
+      methods:
+        - { name: _init_pool, lines: 70-96 }
+        - { name: chunk_iter, lines: 98-140 }
+  functions:
+    - { name: _strip_char, lines: 43-47 }
+    - { name: _coerce_row, lines: 50-52 }
+
 src/mes_dashboard/core/partial_failure_contract.py:  # 117 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
@@ -4210,6 +4262,23 @@ src/mes_dashboard/core/permissions.py:  # 90 lines
     - { name: _is_ajax_request, lines: 57-68 }
     - { name: login_required, lines: 71-78 }
     - { name: admin_required, lines: 81-90 }
+
+src/mes_dashboard/core/query_cost_policy.py:  # 163 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 19 }
+    - { module: os, items: [], line: 21 }
+    - { module: warnings, items: [], line: 22 }
+    - { module: dataclasses, items: [dataclass], line: 23 }
+    - { module: datetime, items: [date], line: 24 }
+    - { module: typing, items: [Callable, Literal, Optional], line: 25 }
+  classes:
+    - name: CostPolicy
+      lines: 70-81
+  functions:
+    - { name: _check_deprecated_threshold_env, lines: 57-66 }
+    - { name: classify_query_cost, lines: 84-142 }
+    - { name: _default_policy_for, lines: 149-153 }
+    - { name: _date_span_days, lines: 156-163 }
 
 src/mes_dashboard/core/query_quality_contract.py:  # 337 lines
   imports:
@@ -5955,7 +6024,7 @@ src/mes_dashboard/services/downtime_query_job_service.py:  # 126 lines
   functions:
     - { name: execute_downtime_query_job, lines: 46-112 }
 
-src/mes_dashboard/services/eap_alarm_cache.py:  # 70 lines
+src/mes_dashboard/services/eap_alarm_cache.py:  # 101 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -5967,26 +6036,28 @@ src/mes_dashboard/services/eap_alarm_cache.py:  # 70 lines
     - { name: EAP_ALARM_SPOOL_TTL, line: 28 }
   functions:
     - { name: make_eap_alarm_spool_key, lines: 34-60 }
-    - { name: get_eap_alarm_spool_path, lines: 65-70 }
+    - { name: decode_alarm_category, lines: 80-91 }
+    - { name: get_eap_alarm_spool_path, lines: 96-101 }
 
-src/mes_dashboard/services/eap_alarm_service.py:  # 389 lines
+src/mes_dashboard/services/eap_alarm_service.py:  # 410 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: json, items: [], line: 23 }
     - { module: logging, items: [], line: 24 }
     - { module: math, items: [], line: 25 }
     - { module: typing, items: [Any, Dict, List, Optional], line: 26 }
+    - { module: mes_dashboard.services.eap_alarm_cache, items: [decode_alarm_category], line: 28 }
   functions:
-    - { name: validate_eap_alarm_params, lines: 35-46 }
-    - { name: _get_duckdb_conn, lines: 51-53 }
-    - { name: _escape_like, lines: 56-57 }
-    - { name: _escape_sql, lines: 60-61 }
-    - { name: _build_filter_where, lines: 64-92 }
-    - { name: get_filter_options, lines: 97-137 }
-    - { name: get_summary, lines: 142-182 }
-    - { name: get_pareto, lines: 187-231 }
-    - { name: get_trend, lines: 236-293 }
-    - { name: get_detail, lines: 298-389 }
+    - { name: validate_eap_alarm_params, lines: 37-48 }
+    - { name: _get_duckdb_conn, lines: 53-55 }
+    - { name: _escape_like, lines: 58-59 }
+    - { name: _escape_sql, lines: 62-63 }
+    - { name: _build_filter_where, lines: 66-94 }
+    - { name: get_filter_options, lines: 99-139 }
+    - { name: get_summary, lines: 144-184 }
+    - { name: get_pareto, lines: 189-233 }
+    - { name: get_trend, lines: 238-314 }
+    - { name: get_detail, lines: 319-410 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -8055,20 +8126,20 @@ src/mes_dashboard/static/js/toast.js:  # 240 lines
 
 src/mes_dashboard/workers/__init__.py:  # 0 lines
 
-src/mes_dashboard/workers/eap_alarm_worker.py:  # 277 lines
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 289 lines
   imports:
     - { module: __future__, items: [annotations], line: 23 }
     - { module: logging, items: [], line: 25 }
     - { module: os, items: [], line: 26 }
     - { module: typing, items: [Any, Dict, List], line: 27 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 269 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 281 }
   constants:
     - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 31 }
     - { name: EAP_ALARM_WORKER_QUEUE, line: 34 }
     - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 35 }
   functions:
-    - { name: _build_equipment_filter, lines: 151-166 }
-    - { name: run_eap_alarm_query_job, lines: 169-265 }
+    - { name: _build_equipment_filter, lines: 143-158 }
+    - { name: run_eap_alarm_query_job, lines: 161-277 }
 
 tests/__init__.py:  # 0 lines
 
@@ -8151,6 +8222,31 @@ tests/contract/test_doctor_clean.py:  # 78 lines
       lines: 16-78
       methods:
         - { name: test_doctor_response_shape_zero_warnings, lines: 27-78 }
+
+tests/contract/test_env_duckdb_job_dir.py:  # 100 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 10 }
+    - { module: json, items: [], line: 12 }
+    - { module: pathlib, items: [Path], line: 13 }
+    - { module: pytest, items: [], line: 15 }
+  classes:
+    - name: TestDuckdbJobDirInEnvContract
+      lines: 26-45
+      methods:
+        - { name: test_duckdb_job_dir_in_env_contract, lines: 27-33 }
+        - { name: test_duckdb_job_dir_deprecation_notice_not_present, lines: 35-45 }
+    - name: TestDuckdbJobDirInEnvExample
+      lines: 48-66
+      methods:
+        - { name: test_duckdb_job_dir_in_env_example, lines: 49-54 }
+        - { name: test_duckdb_job_dir_example_line_contains_default, lines: 56-66 }
+    - name: TestDuckdbJobDirInEnvSchema
+      lines: 69-100
+      methods:
+        - { name: test_duckdb_job_dir_in_env_schema, lines: 70-76 }
+        - { name: test_duckdb_job_dir_schema_has_string_type, lines: 78-84 }
+        - { name: test_duckdb_job_dir_default_value_matches_design, lines: 86-94 }
+        - { name: test_duckdb_job_dir_schema_has_description, lines: 96-100 }
 
 tests/contract/test_gate_wiring.py:  # 50 lines
   imports:
@@ -9605,6 +9701,37 @@ tests/integration/test_multi_worker_concurrency.py:  # 620 lines
     - { name: _spawn_cache_workers, lines: 433-472 }
     - { name: test_container_filter_cache_lock_under_4_workers, lines: 475-538 }
     - { name: test_lock_holder_crash_releases_lock, lines: 541-620 }
+
+tests/integration/test_oracle_arrow_pool_lifecycle.py:  # 305 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: queue, items: [], line: 11 }
+    - { module: threading, items: [], line: 12 }
+    - { module: time, items: [], line: 13 }
+    - { module: pathlib, items: [Path], line: 14 }
+    - { module: typing, items: [Iterator], line: 15 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 16 }
+    - { module: pyarrow, items: [], line: 18 }
+    - { module: pytest, items: [], line: 19 }
+  classes:
+    - name: TestPoolExhaustionAndRecovery
+      lines: 82-138
+      methods:
+        - { name: test_pool_exhaustion_and_recovery, lines: 83-106 }
+        - { name: test_pool_exhaustion_timeout_raises, lines: 108-138 }
+    - name: TestWriterLockUnderConcurrentChunks
+      lines: 145-186
+      methods:
+        - { name: test_writer_lock_under_concurrent_chunks, lines: 146-186 }
+    - name: TestJobTempLifecycle
+      lines: 193-305
+      methods:
+        - { name: test_job_temp_lifecycle, lines: 194-243 }
+        - { name: test_mid_job_error_cleans_temp_and_conn, lines: 245-305 }
+  functions:
+    - { name: _fake_batch, lines: 28-29 }
+    - { name: _make_pool_with_maxsize, lines: 32-57 }
+    - { name: _make_reader_with_pool, lines: 60-75 }
 
 tests/integration/test_oracle_error_codes.py:  # 180 lines
   imports:
@@ -12082,6 +12209,48 @@ tests/test_auth_service.py:  # 230 lines
   functions:
     - { name: _ldap_defaults, lines: 19-22 }  # @pytest.fixture(autouse=True)
 
+tests/test_base_chunked_duckdb_job.py:  # 358 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 7 }
+    - { module: threading, items: [], line: 9 }
+    - { module: pathlib, items: [Path], line: 10 }
+    - { module: typing, items: [Generator], line: 11 }
+    - { module: unittest.mock, items: [MagicMock, call, patch], line: 12 }
+    - { module: pyarrow, items: [], line: 14 }
+    - { module: pytest, items: [], line: 15 }
+  classes:
+    - name: _RecordingJob
+      lines: 22-52
+      methods:
+        - { name: __init__, lines: 26-35 }
+        - { name: pre_query, lines: 37-38 }
+        - { name: build_chunk_sql, lines: 40-42 }
+        - { name: chunk_to_duckdb, lines: 44-45 }
+        - { name: post_aggregate, lines: 47-49 }
+        - { name: progress_report, lines: 51-52 }
+    - name: TestHookOrder
+      lines: 127-168
+      methods:
+        - { name: test_run_hook_order, lines: 128-140 }
+        - { name: test_progress_brackets, lines: 142-155 }
+        - { name: test_all_four_chunk_strategies_dispatch, lines: 158-168 }
+    - name: TestReductionPaths
+      lines: 175-291
+      methods:
+        - { name: test_false_reduction_path_no_writer_lock, lines: 176-211 }
+        - { name: test_true_reduction_path_uses_job_temp_duckdb, lines: 213-253 }
+        - { name: test_true_reduction_path_writer_lock_serialized, lines: 255-291 }
+    - name: TestJobTempLifecycle
+      lines: 298-358
+      methods:
+        - { name: test_job_temp_deleted_on_success, lines: 299-309 }
+        - { name: test_job_temp_deleted_on_error_in_post_aggregate, lines: 311-346 }
+        - { name: test_job_temp_not_created_for_false_reduction, lines: 348-358 }
+  functions:
+    - { name: _make_job, lines: 55-102 }
+    - { name: _fake_batch, lines: 109-110 }
+    - { name: _patch_reader, lines: 113-120 }
+
 tests/test_batch_query_engine.py:  # 1272 lines
   imports:
     - { module: json, items: [], line: 4 }
@@ -13292,7 +13461,7 @@ tests/test_eap_alarm_service.py:  # 217 lines
       lines: 203-217
       methods:
         - { name: test_schema_version_is_integer, lines: 206-210 }
-        - { name: test_schema_version_equals_one, lines: 212-217 }
+        - { name: test_schema_version_equals_two, lines: 212-217 }
 
 tests/test_env_contract.py:  # 292 lines
   imports:
@@ -15383,6 +15552,48 @@ tests/test_openspec_contracts.py:  # 257 lines
     - { name: _src_text, lines: 32-35 }
     - { name: _grep, lines: 38-39 }
 
+tests/test_oracle_arrow_reader.py:  # 283 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 8 }
+    - { module: importlib, items: [], line: 10 }
+    - { module: sys, items: [], line: 11 }
+    - { module: unittest.mock, items: [MagicMock, patch, PropertyMock], line: 12 }
+    - { module: pyarrow, items: [], line: 14 }
+    - { module: pytest, items: [], line: 15 }
+  classes:
+    - name: TestPoolForkSafety
+      lines: 48-62
+      methods:
+        - { name: test_pool_not_created_at_import, lines: 49-62 }
+    - name: TestChunkIterYieldsRecordBatches
+      lines: 65-97
+      methods:
+        - { name: test_chunk_iter_yields_record_batches, lines: 66-82 }
+        - { name: test_chunk_iter_correct_column_names, lines: 84-97 }
+    - name: TestConnectionLifecycle
+      lines: 100-151
+      methods:
+        - { name: test_conn_closed_on_success, lines: 101-114 }
+        - { name: test_conn_closed_on_exception, lines: 116-132 }
+        - { name: test_conn_closed_on_exception_in_record_batch_build, lines: 134-151 }
+    - name: TestEmptyAndNullHandling
+      lines: 154-204
+      methods:
+        - { name: test_empty_chunk_yields_no_batches, lines: 155-169 }
+        - { name: test_null_values_in_batch, lines: 171-188 }
+        - { name: test_empty_result_conn_still_closed, lines: 190-204 }
+    - name: TestOracleTypeCoercion
+      lines: 207-283
+      methods:
+        - { name: test_oracle_char_strip, lines: 208-222 }
+        - { name: test_oracle_char_strip_no_op_for_non_strings, lines: 224-238 }
+        - { name: test_oracle_date_midnight_passthrough, lines: 240-263 }
+        - { name: test_multiple_chunks_from_multiple_fetchmany_calls, lines: 265-283 }
+  functions:
+    - { name: _make_cursor, lines: 22-28 }
+    - { name: _make_conn, lines: 31-34 }
+    - { name: _make_pool, lines: 37-40 }
+
 tests/test_oracle_connection_leak.py:  # 201 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
@@ -15985,6 +16196,60 @@ tests/test_qc_gate_service.py:  # 150 lines
     - { name: test_get_qc_gate_summary_filters_classifies_and_orders, lines: 17-108 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping')
     - { name: test_get_qc_gate_summary_returns_empty_when_no_match, lines: 115-135 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping', return_va...
     - { name: test_get_qc_gate_summary_returns_empty_when_cache_missing, lines: 141-150 }  # @patch('mes_dashboard.services.qc_gate_service.get_cache_updated_at', return_valu...
+
+tests/test_query_cost_policy.py:  # 345 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 7 }
+    - { module: ast, items: [], line: 9 }
+    - { module: os, items: [], line: 10 }
+    - { module: warnings, items: [], line: 11 }
+    - { module: datetime, items: [date], line: 12 }
+    - { module: pathlib, items: [Path], line: 13 }
+    - { module: unittest.mock, items: [MagicMock], line: 14 }
+    - { module: pytest, items: [], line: 16 }
+  classes:
+    - name: TestL0SpoolHit
+      lines: 51-75
+      methods:
+        - { name: test_l0_spool_hit_returns_sync, lines: 52-54 }
+        - { name: test_l0_short_circuits_l1, lines: 56-59 }
+        - { name: test_l0_short_circuits_l2, lines: 61-68 }
+        - { name: test_l0_short_circuits_l3, lines: 70-75 }
+    - name: TestL1AlwaysAsyncDomain
+      lines: 82-102
+      methods:
+        - { name: test_l1_always_async_domain_returns_async, lines: 84-86 }
+        - { name: test_l1_does_not_short_circuit_when_spool_hit, lines: 88-91 }
+        - { name: test_l1_always_async_policy_flag, lines: 93-102 }
+    - name: TestL2DateSpan
+      lines: 109-169
+      methods:
+        - { name: test_l2_date_span_over_threshold, lines: 110-120 }
+        - { name: test_l2_date_span_at_threshold, lines: 122-132 }
+        - { name: test_l2_date_span_under_threshold, lines: 134-145 }
+        - { name: test_l2_string_dates_accepted, lines: 147-157 }
+        - { name: test_l2_missing_dates_skips_check, lines: 159-169 }
+    - name: TestL3RowCount
+      lines: 176-255
+      methods:
+        - { name: test_l3_rowcount_over_threshold, lines: 177-188 }
+        - { name: test_l3_rowcount_at_threshold, lines: 190-200 }
+        - { name: test_l3_rowcount_under_threshold, lines: 202-212 }
+        - { name: test_l3_row_count_fn_error_does_not_raise, lines: 214-226 }
+        - { name: test_l2_short_circuits_l3, lines: 228-241 }
+        - { name: test_all_under_threshold_returns_sync, lines: 243-255 }
+    - name: TestDeprecationWarning
+      lines: 262-296
+      methods:
+        - { name: test_deprecation_warning_for_async_threshold_env, lines: 269-279 }
+        - { name: test_no_deprecation_warning_without_env_var, lines: 281-296 }
+    - name: TestNoPandasAndNoCallers
+      lines: 311-345
+      methods:
+        - { name: test_no_pandas_import_in_new_modules, lines: 313-326 }
+        - { name: test_no_caller_outside_tests, lines: 328-345 }
+  functions:
+    - { name: _call, lines: 23-44 }
 
 tests/test_query_quality_contract.py:  # 103 lines
   imports:

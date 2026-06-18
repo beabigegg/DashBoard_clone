@@ -1,0 +1,19 @@
+agent: test-strategist
+change-id: unified-query-core-infra
+date: 2026-06-18
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/unified-query-core-infra/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_oracle_arrow_reader.py → src/mes_dashboard/core/oracle_arrow_reader.py" }
+  - { type: tdd-pairs, pointer: "tests/test_query_cost_policy.py → src/mes_dashboard/core/query_cost_policy.py" }
+  - { type: tdd-pairs, pointer: "tests/test_base_chunked_duckdb_job.py → src/mes_dashboard/core/base_chunked_duckdb_job.py" }
+  - { type: tdd-pairs, pointer: "tests/contract/test_env_duckdb_job_dir.py → contracts/env/ (3 files)" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_oracle_arrow_pool_lifecycle.py → oracle_arrow_reader.py + base_chunked_duckdb_job.py (nightly)" }
+  - { type: coverage-tiers, pointer: "unit, contract, data-boundary, resilience, integration" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-8 all mapped; no criterion left without a concrete test file" }
+
+notes: >
+  Pool fork-safety test (test_pool_not_created_at_import) identified as the sole guard
+  against ADR-0004 regression. Integration tests are nightly-lane only per project
+  test-layer governance. tasks 3.1, 3.2, 3.4 marked done.

@@ -1,0 +1,16 @@
+agent: change-classifier
+status: complete
+model: opus
+artifacts:
+  - { type: tier, pointer: "Tier 1" }
+  - { type: risk, pointer: "high" }
+  - { type: impact-radius, pointer: "cross-module" }
+  - { type: architecture-review-required, pointer: "yes — design.md required before planner" }
+  - { type: classification, pointer: "specs/changes/unified-query-core-infra/change-classification.md" }
+  - { type: context-manifest, pointer: "specs/changes/unified-query-core-infra/context-manifest.md" }
+notes:
+  - "Tier 1 (high-risk cross-module): foundational abstraction depended on by all P1-P5 migrations; design errors propagate system-wide."
+  - "Two open questions for spec-architect: (1) DUCKDB_JOB_DIR default path (vs QUERY_SPOOL_DIR); (2) Oracle pool singleton vs per-worker per ADR-0004 fork-safety."
+  - "CER-001 approved inline: architecture doc, ADR-0003, ADR-0004, batch_query_engine.py, global_concurrency, duckdb_runtime, query_spool_store added to Allowed Paths."
+  - "Tasks skipped: 2.1 (API), 2.2 (CSS), 2.5 (business), 3.3 (E2E), 3.5 (stress/soak), 4.2 (frontend), 5.1 (UI/UX), 5.2 (visual)."
+  - "ci-cd-gatekeeper added to agent order (not listed by classifier but ci-gates.md is always required)."

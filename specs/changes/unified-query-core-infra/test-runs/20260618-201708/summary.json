@@ -1,0 +1,16 @@
+{
+  "change_id": "unified-query-core-infra",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/contract/ -v --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201708/junit.xml' -q --maxfail=1 --tb=short -ra",
+  "duration_ms": 103663,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/unified-query-core-infra/test-runs/20260618-201708/summary.json",
+    "stdout": "specs/changes/unified-query-core-infra/test-runs/20260618-201708/stdout.log",
+    "stderr": "specs/changes/unified-query-core-infra/test-runs/20260618-201708/stderr.log",
+    "junit": "specs/changes/unified-query-core-infra/test-runs/20260618-201708/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

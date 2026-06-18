@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.13
+schema-version: 1.0.14
 last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
@@ -110,12 +110,12 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | DOWNTIME_ASYNC_ENABLED | feature-flag | all | no | no | true | true | application-team | true or false | yes | false = all downtime queries run synchronously regardless of date range |
-| DOWNTIME_ASYNC_DAY_THRESHOLD | async | all | no | no | 30 | 30 | application-team | positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when DOWNTIME_ASYNC_ENABLED=true | yes | uses default 30 |
+| DOWNTIME_ASYNC_DAY_THRESHOLD | async | all | no | no | 30 | 30 | application-team | **Deprecated** (removal P5); positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when DOWNTIME_ASYNC_ENABLED=true; migrate to `CostPolicy.day_threshold` via `classify_query_cost()` | yes | uses default 30 |
 | DOWNTIME_WORKER_QUEUE | async | all | no | no | downtime-query | downtime-query | application-team | non-empty string; RQ queue name for the downtime worker process | yes | uses default "downtime-query" |
 | DOWNTIME_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the downtime worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
 
 - `DOWNTIME_ASYNC_ENABLED`: Feature flag enabling the async RQ path for long downtime queries. When `false`, all `POST /api/downtime-analysis/query` calls run synchronously regardless of date span. Default `true`; set to `false` for emergency rollback without disabling the `DOWNTIME_BROWSER_DUCKDB` path. **Restart required** — module-level constant frozen at import. Added by change `downtime-rq-async`.
-- `DOWNTIME_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a downtime query is dispatched via RQ (when `DOWNTIME_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `30`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `downtime-rq-async`.
+- `DOWNTIME_ASYNC_DAY_THRESHOLD`: **Deprecated** — will be removed in P5 (deprecate-2-minors policy). A runtime `DeprecationWarning` is emitted by `classify_query_cost()` when this var is present in `os.environ`. Warning text: `"DOWNTIME_ASYNC_DAY_THRESHOLD is deprecated and will be removed in a future minor release (deprecate-2-minors policy). Use CostPolicy.day_threshold via classify_query_cost() instead."` Migrate to `CostPolicy(day_threshold=30)` passed to `classify_query_cost()`. Number of calendar days at or above which a downtime query is dispatched via RQ (when `DOWNTIME_ASYNC_ENABLED=true`). Default `30`. Added by change `downtime-rq-async`; deprecated by `unified-query-core-infra`.
 - `DOWNTIME_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes downtime jobs to. Must match the `--queues` argument of the running downtime worker process. Default `"downtime-query"`. Added by change `downtime-rq-async`.
 - `DOWNTIME_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ downtime job may run before the worker kills it. Must be set above the worst-case Oracle fetch duration for a 730-day range (≈ 1200 s observed on large datasets; default 1800 s provides 50% headroom). Added by change `downtime-rq-async`.
 
@@ -126,12 +126,12 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | HOLD_ASYNC_ENABLED | feature-flag | all | no | no | true | true | application-team | true or false | yes | false = all hold-history queries run synchronously regardless of date range |
-| HOLD_ASYNC_DAY_THRESHOLD | async | all | no | no | 90 | 90 | application-team | positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when HOLD_ASYNC_ENABLED=true | yes | uses default 90 |
+| HOLD_ASYNC_DAY_THRESHOLD | async | all | no | no | 90 | 90 | application-team | **Deprecated** (removal P5); positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when HOLD_ASYNC_ENABLED=true; migrate to `CostPolicy.day_threshold` via `classify_query_cost()` | yes | uses default 90 |
 | HOLD_WORKER_QUEUE | async | all | no | no | hold-history-query | hold-history-query | application-team | non-empty string; RQ queue name for the hold-history worker process | yes | uses default "hold-history-query" |
 | HOLD_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the hold-history worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
 
 - `HOLD_ASYNC_ENABLED`: Feature flag enabling the async RQ path for long hold-history queries. When `false`, all `POST /api/hold-history/query` calls run synchronously regardless of date span. Default `true`; set to `false` for emergency rollback. **Restart required** — module-level constant frozen at import. Added by change `hold-history-rq-async`.
-- `HOLD_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a hold-history query is dispatched via RQ (when `HOLD_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `90`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `hold-history-rq-async`.
+- `HOLD_ASYNC_DAY_THRESHOLD`: **Deprecated** — will be removed in P5 (deprecate-2-minors policy). A runtime `DeprecationWarning` is emitted by `classify_query_cost()` when this var is present in `os.environ`. Warning text: `"HOLD_ASYNC_DAY_THRESHOLD is deprecated and will be removed in a future minor release (deprecate-2-minors policy). Use CostPolicy.day_threshold via classify_query_cost() instead."` Migrate to `CostPolicy(day_threshold=90)`. Number of calendar days at or above which a hold-history query is dispatched via RQ (when `HOLD_ASYNC_ENABLED=true`). Default `90`. Added by change `hold-history-rq-async`; deprecated by `unified-query-core-infra`.
 - `HOLD_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes hold-history jobs to. Must match the `--queues` argument of the running hold-history worker process. Default `"hold-history-query"`. Added by change `hold-history-rq-async`.
 - `HOLD_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ hold-history job may run before the worker kills it. Default 1800 s. Added by change `hold-history-rq-async`.
 
@@ -142,16 +142,24 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | RESOURCE_ASYNC_ENABLED | feature-flag | all | no | no | true | true | application-team | true or false | yes | false = all resource-history queries run synchronously regardless of date range |
-| RESOURCE_ASYNC_DAY_THRESHOLD | async | all | no | no | 90 | 90 | application-team | positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when RESOURCE_ASYNC_ENABLED=true | yes | uses default 90 |
+| RESOURCE_ASYNC_DAY_THRESHOLD | async | all | no | no | 90 | 90 | application-team | **Deprecated** (removal P5); positive integer ≥ 1; queries spanning ≥ this many calendar days use the async RQ path when RESOURCE_ASYNC_ENABLED=true; migrate to `CostPolicy.day_threshold` via `classify_query_cost()` | yes | uses default 90 |
 | RESOURCE_WORKER_QUEUE | async | all | no | no | resource-history-query | resource-history-query | application-team | non-empty string; RQ queue name for the resource-history worker process | yes | uses default "resource-history-query" |
 | RESOURCE_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the resource-history worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
 
 - `RESOURCE_ASYNC_ENABLED`: Feature flag enabling the async RQ path for long resource-history queries. When `false`, all `POST /api/resource/history/query` calls run synchronously regardless of date span. Default `true`; set to `false` for emergency rollback. **Restart required** — module-level constant frozen at import. Added by change `resource-history-rq-async`.
-- `RESOURCE_ASYNC_DAY_THRESHOLD`: Number of calendar days at or above which a resource-history query is dispatched via RQ (when `RESOURCE_ASYNC_ENABLED=true`). Computed as `(end_date − start_date).days`. Default `90`. Set to a very large value (e.g. `99999`) as a secondary disable without a restart. Added by change `resource-history-rq-async`.
+- `RESOURCE_ASYNC_DAY_THRESHOLD`: **Deprecated** — will be removed in P5 (deprecate-2-minors policy). A runtime `DeprecationWarning` is emitted by `classify_query_cost()` when this var is present in `os.environ`. Warning text: `"RESOURCE_ASYNC_DAY_THRESHOLD is deprecated and will be removed in a future minor release (deprecate-2-minors policy). Use CostPolicy.day_threshold via classify_query_cost() instead."` Migrate to `CostPolicy(day_threshold=90)`. Number of calendar days at or above which a resource-history query is dispatched via RQ (when `RESOURCE_ASYNC_ENABLED=true`). Default `90`. Added by change `resource-history-rq-async`; deprecated by `unified-query-core-infra`.
 - `RESOURCE_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes resource-history jobs to. Must match the `--queues` argument of the running resource-history worker process. Default `"resource-history-query"`. Added by change `resource-history-rq-async`.
 - `RESOURCE_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ resource-history job may run before the worker kills it. Default 1800 s. Added by change `resource-history-rq-async`.
 
 **Worker env-var parity:** The `mes-dashboard-resource-history-worker.service` systemd unit MUST export the same `RESOURCE_*` env set as gunicorn (at minimum: `RESOURCE_ASYNC_ENABLED`, `RESOURCE_ASYNC_DAY_THRESHOLD`, `RESOURCE_WORKER_QUEUE`, `RESOURCE_JOB_TIMEOUT_SECONDS`). Env-var drift silently changes query routing. Added by change `resource-history-rq-async`.
+
+## Async Worker — Reject History Query (Threshold Deprecation)
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| REJECT_ASYNC_DAY_THRESHOLD | async | all | no | no | 10 | 10 | application-team | **Deprecated** (removal P5); positive integer ≥ 1; reject queries spanning > this many calendar days use the async RQ path; migrate to `CostPolicy.day_threshold` via `classify_query_cost()` | yes | uses default 10 |
+
+- `REJECT_ASYNC_DAY_THRESHOLD`: **Deprecated** — will be removed in P5 (deprecate-2-minors policy). A runtime `DeprecationWarning` is emitted by `classify_query_cost()` when this var is present in `os.environ`. Warning text: `"REJECT_ASYNC_DAY_THRESHOLD is deprecated and will be removed in a future minor release (deprecate-2-minors policy). Use CostPolicy.day_threshold via classify_query_cost() instead."` Migrate to `CostPolicy(day_threshold=10)`. Queries spanning more than this many calendar days use the RQ async path. Default `10`. Previously undocumented in this contract; documented here as part of deprecation by change `unified-query-core-infra`.
 
 ## Batch Query Engine — Row-Count Chunking
 
@@ -197,6 +205,14 @@ breaking-change-policy: deprecate-2-minors
 - `EAP_ALARM_SPOOL_DIR`: Directory for EAP ALARM parquet spool files. Relative paths resolve against CWD. Default `tmp/query_spool/eap_alarm`. Added by change `eap-alarm-analysis`.
 
 **Worker env-var parity:** The `mes-dashboard-eap-alarm-worker.service` systemd unit MUST export the same `EAP_ALARM_*` env set as gunicorn.
+
+## Unified Query Infrastructure — DuckDB Job Temp Directory
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| DUCKDB_JOB_DIR | storage | all | no | no | tmp/duckdb_jobs | /var/lib/mes/duckdb_jobs | application-team | directory path (relative resolved to CWD; use absolute for Docker) | yes | uses default path |
+
+- `DUCKDB_JOB_DIR`: Directory for transient per-job DuckDB files created by `BaseChunkedDuckDBJob`. Each job writes a `{namespace}/{job_id}.duckdb` file here during execution; the file is deleted in a `finally` block on job completion or failure (D7). Crash survivors are reaped by TTL orphan cleanup. Default `tmp/duckdb_jobs` (sibling of `QUERY_SPOOL_DIR` default `tmp/query_spool`; the default is computed as `{QUERY_SPOOL_DIR}/../duckdb_jobs`). Use an absolute path on a named volume in Docker. **Must not overlap with `QUERY_SPOOL_DIR`** — job-temp files are transient and must be physically separated from the persistent canonical parquet spool to prevent TTL/cleanup cross-contamination. Restart required — module-level constant in `base_chunked_duckdb_job.py` is frozen at import. Added by change `unified-query-core-infra`.
 
 ## Observability / Circuit Breaker
 
