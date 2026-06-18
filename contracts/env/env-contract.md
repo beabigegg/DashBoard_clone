@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.12
-last-changed: 2026-06-16
+schema-version: 1.0.13
+last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -180,6 +180,23 @@ breaking-change-policy: deprecate-2-minors
 | HOLD_OVERVIEW_EXPORT_MAX_ROWS | hold-overview | all | no | no | 10000 | 10000 | application-team | positive integer >= 1 | no | uses default 10000 |
 
 - `HOLD_OVERVIEW_EXPORT_MAX_ROWS`: Maximum number of rows returned by `GET/POST /api/hold-overview/lots` when `export=true`. The per-request cap is enforced in the service layer (both snapshot and Oracle paths) so the cap applies regardless of which path executes. Exports silently truncate when the filtered hold set exceeds this cap; raise the cap and add a UI warning banner if truncation becomes a production concern. Default `10000`. Added by change `hold-overview-export-csv`.
+
+
+## Async Worker — EAP ALARM Spool
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| EAP_ALARM_WORKER_QUEUE | async | all | no | no | eap-alarm-query | eap-alarm-query | application-team | non-empty string; RQ queue name for the EAP ALARM worker | yes | uses default |
+| EAP_ALARM_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); must exceed longest Oracle query duration | yes | uses default 1800 |
+| EAP_ALARM_SPOOL_TTL | cache | all | no | no | 72000 | 72000 | application-team | positive integer (seconds); minimum 3600 | yes | uses default 72000 |
+| EAP_ALARM_SPOOL_DIR | storage | all | no | no | tmp/query_spool/eap_alarm | /var/lib/mes/eap_alarm | application-team | directory path (relative resolved to CWD; use absolute for Docker) | yes | uses default path |
+
+- `EAP_ALARM_WORKER_QUEUE`: RQ queue name for EAP ALARM spool jobs. Must match `--queues` arg of the running EAP ALARM worker. Default `"eap-alarm-query"`. Added by change `eap-alarm-analysis`.
+- `EAP_ALARM_JOB_TIMEOUT_SECONDS`: Max seconds a single EAP ALARM RQ job may run. Default 1800 s. Added by change `eap-alarm-analysis`.
+- `EAP_ALARM_SPOOL_TTL`: Redis spool metadata TTL for EAP ALARM queries. Default 72000 s (20h). Added by change `eap-alarm-analysis`.
+- `EAP_ALARM_SPOOL_DIR`: Directory for EAP ALARM parquet spool files. Relative paths resolve against CWD. Default `tmp/query_spool/eap_alarm`. Added by change `eap-alarm-analysis`.
+
+**Worker env-var parity:** The `mes-dashboard-eap-alarm-worker.service` systemd unit MUST export the same `EAP_ALARM_*` env set as gunicorn.
 
 ## Observability / Circuit Breaker
 

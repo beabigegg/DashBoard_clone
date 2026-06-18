@@ -160,6 +160,20 @@
           "status": "dev"
         }
       ]
+    },
+    {
+      "admin_only": false,
+      "id": "eap-analysis",
+      "name": "EAP",
+      "order": 5,
+      "pages": [
+        {
+          "name": "EAP ALARM 分析",
+          "order": 1,
+          "route": "/eap-alarm",
+          "status": "released"
+        }
+      ]
     }
   ],
   "features": {

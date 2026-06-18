@@ -1,0 +1,19 @@
+agent: e2e-resilience-engineer
+change-id: eap-alarm-analysis
+run-date: 2026-06-18
+
+artifacts:
+  - type: test-files
+    pointer: "tests/integration/test_eap_alarm_resilience.py (modified: added test_inflight_abort)"
+  - type: test-files
+    pointer: "tests/integration/test_eap_alarm_data_boundary.py (modified: fixed _write_parquet for empty rows)"
+  - type: test-files
+    pointer: "tests/e2e/test_eap_alarm_e2e.py (created: 14 tests, pytest.mark.e2e, app_server fixture pattern)"
+  - type: test-files
+    pointer: "frontend/tests/playwright/eap-alarm.spec.js (verified, no changes needed)"
+  - type: scenarios-covered
+    pointer: "oracle-failure, redis-503, cold-spool-410 (5 endpoints), in-flight-abort, unknown-category, null-detail-params, null-lot-id, empty-alarm-text, large-alarm-text, zero-row-spool, detail-json-parse, summary-top-equipment, per-page-cap, spool-miss-400-guard, happy-path spool+filter+summary+pareto+trend+detail"
+  - type: mutation-checks
+    pointer: "n/a (no mutation framework configured in this repo)"
+  - type: trace-artifacts
+    pointer: "n/a (Playwright ran in offline/no-server mode; all 5 tests vacuously skipped via goto().catch+early-return guard as expected)"

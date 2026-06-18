@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.24
-last-changed: 2026-06-12
+schema-version: 1.3.25
+last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -26,7 +26,7 @@ breaking-change-policy: deprecate-2-minors
 | frontend-type-check | 1 | PR | informational | `cd frontend && npm run type-check` | application-team | — |
 | playwright-resilience | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/resilience/` | application-team | playwright trace |
 | playwright-data-boundary | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/data-boundary/` | application-team | playwright trace |
-| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js` | application-team | playwright trace |
+| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js tests/playwright/eap-alarm.spec.js` | application-team | playwright trace |
 | visual-regression | 2 | PR | informational | (TBD — Playwright screenshot diff) | application-team | screenshot diff |
 | nightly-integration | 3 | weekly schedule / dispatch | yes (nightly) | `pytest tests/integration/ --run-integration-real -m "integration_real or multi_worker" -x` | application-team | test report |
 | stress-load | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/stress/ -m "stress or load"` | platform-team | perf report |
@@ -413,6 +413,26 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 
 **Schema-version bump to 1.3.23 (patch)**: additive gate-compatibility note only; no gate tier, command, or status changed.
 
+
+### eap-alarm-analysis deploy/rollback checklist
+
+**Deploy checklist** (eap-alarm-analysis):
+1. Set env vars: `EAP_ALARM_WORKER_QUEUE`, `EAP_ALARM_JOB_TIMEOUT_SECONDS`, `EAP_ALARM_SPOOL_TTL`, `EAP_ALARM_SPOOL_DIR` (defaults in env-contract.md §Async Worker — EAP ALARM Spool).
+2. Start `mes-dashboard-eap-alarm-worker.service` systemd unit before deploying gunicorn.
+3. Verify `eap_alarm` in `spool_routes._ALLOWED_NAMESPACES` (checked by Tier 1 `unit-mock-integration` gate).
+4. Verify `tests/integration/test_spool_routes.py` parametrize covers `eap_alarm` (Tier 1).
+5. Playwright spec `tests/playwright/eap-alarm.spec.js` added to `playwright-critical-journeys` gate command.
+
+**Rollback checklist** (eap-alarm-analysis):
+1. Stop `mes-dashboard-eap-alarm-worker.service`. In-flight spool jobs are abandoned; 410 `CACHE_EXPIRED` is returned to the frontend (graceful).
+2. Hard rollback: `rm -f tmp/query_spool/eap_alarm/*.parquet`; restart gunicorn. Schema changes require parquet cleanup (per EA-06).
+3. No flag-off path: EAP ALARM spool is always-async (no sync fallback). Removing the routes module is the cleanest rollback.
+4. Nav update (portal-shell) is purely additive; no rollback needed unless the nav entry conflicts with a future "EAP" category owner.
+
+**No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1), `playwright-critical-journeys` (Tier 1), `playwright-resilience` (Tier 1), and `nightly-integration` (Tier 3) gate commands.
+
+**Schema-version bump to 1.3.25 (patch)**: additive deploy/rollback checklist + playwright gate spec addition. No gate tier, command, or status changed.
+
 ## Rollback Policy
 
 - 任何 Tier 1 gate 變紅後 main branch 不得合入新 PR，直到修復。
@@ -443,6 +463,9 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 gate tier, command, or status changed.
 
 ## CHANGELOG
+
+## [ci 1.3.25] — 2026-06-18
+- eap-alarm-analysis: Added deploy/rollback checklist for EAP ALARM worker (`EAP_ALARM_*` env vars, `mes-dashboard-eap-alarm-worker.service`, parquet cleanup). Added `tests/playwright/eap-alarm.spec.js` to `playwright-critical-journeys` gate. Added compatibility note (no new gate tier; all tests within existing Tier 1/3 commands). Additive; no existing gates changed.
 
 ## [ci 1.3.24]
 - response-shape-adr0007 (2026-06-15): Added `response-shape-validate` as a new required Tier 1 gate (`cdd-kit validate --contracts`) wired into `contract-driven-gates.yml`. Validates 158 API endpoint response samples against declared schemas.

@@ -1,0 +1,1 @@
+cd frontend && npm run test -- --run tests/unit/eap-alarm-filter.test.js 2>&1 | tail -20

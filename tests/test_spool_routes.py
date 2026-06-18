@@ -123,3 +123,16 @@ def test_resource_dataset_stays_in_allowed_namespaces():
         "'resource_dataset' must remain in spool_routes._ALLOWED_NAMESPACES "
         "(resource-history-rq-async reuses this namespace; removal causes HTTP 400)"
     )
+
+
+def test_eap_alarm_in_allowed_namespaces():
+    """eap_alarm namespace must be in spool_routes._ALLOWED_NAMESPACES.
+
+    Added by change eap-alarm-analysis. Required for GET /api/spool/eap_alarm/<query_id>.parquet
+    to work. Removal causes HTTP 400 for all EAP ALARM parquet downloads.
+    """
+    from mes_dashboard.routes import spool_routes
+    assert "eap_alarm" in spool_routes._ALLOWED_NAMESPACES, (
+        "'eap_alarm' must be in spool_routes._ALLOWED_NAMESPACES "
+        "(eap-alarm-analysis adds this namespace; removal causes HTTP 400)"
+    )

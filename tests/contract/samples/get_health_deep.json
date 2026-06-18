@@ -118,7 +118,7 @@
     "query_p99_ms": 0.0,
     "slow_query_count": 0,
     "slow_query_rate": 0.0,
-    "worker_pid": 720722
+    "worker_pid": 56027
   },
   "resilience": {
     "alerts": {
@@ -141,9 +141,9 @@
       "reason": "healthy"
     },
     "restart_churn": {
-      "count": 1,
+      "count": 0,
       "exceeded": false,
-      "last_completed_at": "2026-06-16T15:02:54.793325+00:00",
+      "last_completed_at": "2026-06-17T19:22:34.834432+00:00",
       "threshold": 3,
       "window_seconds": 600
     },
@@ -175,10 +175,10 @@
   },
   "status": "healthy",
   "system_memory": {
-    "available_mb": 4072.0,
+    "available_mb": 2399.0,
     "pressure": "normal",
-    "total_mb": 8542.0,
-    "used_pct": 52.3
+    "total_mb": 5640.0,
+    "used_pct": 57.5
   },
   "warnings": [
     "RQ Worker 離線，非同步查詢不可用"

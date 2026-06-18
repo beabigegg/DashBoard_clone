@@ -17,6 +17,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/production-history',
   '/material-consumption',
   '/downtime-analysis',
+  '/eap-alarm',
   '/login',
 ]);
 
@@ -275,6 +276,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '設備停機分析',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/eap-alarm': buildContract({
+    route: '/eap-alarm',
+    routeId: 'eap-alarm',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: 'EAP ALARM 分析',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

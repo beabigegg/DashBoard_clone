@@ -1,0 +1,56 @@
+agent: backend-engineer
+change-id: eap-alarm-analysis
+timestamp: 2026-06-18T10:05:00Z
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/eap_alarm_cache.py (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/eap_alarm_service.py (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/__init__.py (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/eap_alarm_worker.py (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/eap_alarm_routes.py (new)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/spool_routes.py:23 (add eap_alarm to _ALLOWED_NAMESPACES)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/__init__.py (import + register eap_alarm_bp)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/app.py:896 (import eap_alarm_worker for side-effect)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/rq_monitor_service.py:32 (add eap-alarm-query queue)"
+  - type: files-changed
+    pointer: "deploy/mes-dashboard-eap-alarm-worker.service (new)"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json (remove eap-alarm from in_scope_required_assets until frontend SPA built)"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/route_contracts.json (add /eap-alarm route)"
+  - type: tests-added
+    pointer: "tests/test_eap_alarm_service.py (unit: 20 tests covering EA-01/03/05/06/07)"
+  - type: tests-added
+    pointer: "tests/test_spool_routes.py::test_eap_alarm_in_allowed_namespaces"
+  - type: tests-added
+    pointer: "tests/integration/test_eap_alarm_rq_async.py (pytestmark=integration_real)"
+  - type: tests-added
+    pointer: "tests/integration/test_eap_alarm_resilience.py (pytestmark=integration)"
+  - type: tests-added
+    pointer: "tests/integration/test_eap_alarm_data_boundary.py (pytestmark=integration)"
+  - type: tests-added
+    pointer: "tests/test_rq_monitor_service.py: updated queue count 9→10 and total assertions"
+  - type: tests-added
+    pointer: "tests/test_portal_shell_routes.py: updated drawer_ids assertion to include eap-analysis"
+  - type: test-output
+    pointer: "collect: passed; targeted: passed; changed-area: passed (4030 passed, 131 skipped, 509 deselected)"
+  - type: contracts-touched
+    pointer: "contracts/api/api-contract.md: already authored (rows 248-254); no new edits required"
+
+known-risks:
+  - "eap-alarm.js removed from asset_readiness_manifest.json in_scope_required_assets — frontend-engineer must re-add when eap-alarm SPA is built (IP-11)"
+  - "Worker fork-safety: Oracle connections created post-fork inside run_eap_alarm_query_job (ADR-0004 compliant)"
+  - "DETAIL_PARAMS second Oracle query: fetches non-primary EAV params; if EAP tables are huge this doubles Oracle load per job — design.md Open Risk"
+  - "_SHELL_ROUTE_CONTRACT_MAP is module-level cached — tests that call create_app() multiple times share cached state; /eap-alarm added to route_contracts.json fixes this"
+
+next-reviewer: frontend-engineer

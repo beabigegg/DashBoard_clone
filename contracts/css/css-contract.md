@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.8.2
-last-changed: 2026-06-13
+schema-version: 1.9.0
+last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -140,11 +140,18 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 - 多種 loading 表現並存於同一區塊
 - **直接修改全域 `.ui-card` 的 overflow 屬性**：若需卡片內的彈出下拉，使用 scoped 修飾類別加上 `overflow: visible` override（見 Known Global Rule Interactions）
 
+
+**eap-alarm-analysis (2026-06-18)**: `frontend/src/eap-alarm/style.css` 全部 CSS 規則必須以 `.theme-eap-alarm` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行。Rule 4.5: `.theme-eap-alarm` must be batch-added to all `:is(.theme-X, …)` groups in `resource-shared/styles.css` via `sed` in the same PR. Rule 4.4: any `<Teleport to="body">` usage must wrap teleported content in `<div class="theme-eap-alarm">`.
+
 ## Visual Review Policy
 
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.9.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: Added `.theme-eap-alarm` scoping rule for `frontend/src/eap-alarm/style.css`. Enforced by `npm run css:check` Rule 6; zero unscoped top-level rules permitted. Rule 4.5 reminder added. Rule 4.4 (Teleport wrapper) applies.
 
 ## [css 1.6.0]
 - downtime-analysis-page (2026-06-01): Added rule 4.5 — `resource-shared/styles.css` `:is(.theme-X, …)` group maintenance: every new page theme must be added to all `:is()` groups via batch tool (`sed`); omission causes header/filter/section-card styles to silently fail. Rule 6 does not detect this gap. Evidence: `downtime-analysis-page` commit `1931d26`.

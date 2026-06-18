@@ -1,6 +1,6 @@
-# generated: 2026-06-17T11:29:49Z by cdd-kit 3.2.0
-# files: 875, src-lines: 256193, map-lines: 19004, compression: 13.5x
-# sources-digest: 06a454dd00f2ae95c8698d98ffb51291da3f6bdba7d5e1679b50f8f8fb7fc4bd
+# generated: 2026-06-18T02:22:59Z by cdd-kit 3.2.0
+# files: 897, src-lines: 260806, map-lines: 19297, compression: 13.5x
+# sources-digest: d755e1192a5341efb75bc31f734e8f678b091b330bb91386403f9ee09c0b0eb8
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -933,6 +933,45 @@ frontend/src/downtime-analysis/types.ts:  # 141 lines
   types:
     - { name: MatchSource, lines: 76-76 }
 
+frontend/src/eap-alarm/App.vue:  # 351 lines
+
+frontend/src/eap-alarm/DetailTable.vue:  # 131 lines
+
+frontend/src/eap-alarm/FilterBar.vue:  # 92 lines
+
+frontend/src/eap-alarm/FineFilterBar.vue:  # 98 lines
+
+frontend/src/eap-alarm/ParetoChart.vue:  # 140 lines
+
+frontend/src/eap-alarm/SummaryCards.vue:  # 50 lines
+
+frontend/src/eap-alarm/TrendChart.vue:  # 128 lines
+
+frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 164 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 8 }
+  constants:
+    - { name: EQP_TYPE_OPTIONS, line: 10 }
+  functions:
+    - { name: useEapAlarmFilter, lines: 15-164 }
+
+frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 251 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 7 }
+    - { module: '../../core/api', items: [apiGet], line: 8 }
+  constants:
+    - { name: DEFAULT_PER_PAGE, line: 10 }
+  functions:
+    - { name: useEapAlarmViews, lines: 12-251 }
+
+frontend/src/eap-alarm/main.js:  # 9 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../resource-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
+
 frontend/src/hold-detail/App.vue:  # 555 lines
 
 frontend/src/hold-detail/components/AgeDistribution.vue:  # 63 lines
@@ -1259,7 +1298,7 @@ frontend/src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/portal-shell/App.vue:  # 386 lines
+frontend/src/portal-shell/App.vue:  # 387 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
     - { module: lucide-vue-next, items: [Activity, AlertCircle, BarChart2, Briefcase, ChevronRight, Circle, Clock, Cpu, GitBranch, Layers, LayoutDashboard, LogOut, Monitor, Package, Search, Settings, TrendingDown, User], line: 4 }
@@ -1278,13 +1317,13 @@ frontend/src/portal-shell/App.vue:  # 386 lines
     - { module: './sidebarState.js', items: [buildSidebarUiState], line: 37 }
   functions:
     - { name: toShellPath, lines: 57-59 }
-    - { name: getPageIcon, lines: 67-83 }
-    - { name: isPortalShellRootPath, lines: 85-88 }
-    - { name: async handleLogout, lines: 106-109 }
-    - { name: closeSidebar, lines: 119-121 }
-    - { name: toggleSidebar, lines: 123-125 }
-    - { name: handleGlobalKeydown, lines: 127-134 }
-    - { name: async loadNavigation, lines: 136-197 }
+    - { name: getPageIcon, lines: 67-84 }
+    - { name: isPortalShellRootPath, lines: 86-89 }
+    - { name: async handleLogout, lines: 107-110 }
+    - { name: closeSidebar, lines: 120-122 }
+    - { name: toggleSidebar, lines: 124-126 }
+    - { name: handleGlobalKeydown, lines: 128-135 }
+    - { name: async loadNavigation, lines: 137-198 }
 
 frontend/src/portal-shell/components/AnomalyIndicator.vue:  # 58 lines
   imports:
@@ -1356,26 +1395,26 @@ frontend/src/portal-shell/navigationState.js:  # 166 lines
     - { name: normalizeNavigationDrawers, lines: 31-79 }
     - { name: buildDynamicNavigationState, lines: 81-166 }
 
-frontend/src/portal-shell/routeContracts.js:  # 386 lines
+frontend/src/portal-shell/routeContracts.js:  # 398 lines
   constants:
     - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
-    - { name: IN_SCOPE_ADMIN_ROUTES, line: 23 }
-    - { name: DEFERRED_ROUTES, line: 29 }
-    - { name: ALL_KNOWN_ROUTES, line: 31 }
-    - { name: ROUTE_CONTRACTS, line: 62 }
-    - { name: REQUIRED_FIELDS, line: 307 }
-    - { name: VALID_RENDER_MODES, line: 320 }
-    - { name: VALID_VISIBILITY_POLICIES, line: 321 }
-    - { name: VALID_SCOPES, line: 322 }
+    - { name: IN_SCOPE_ADMIN_ROUTES, line: 24 }
+    - { name: DEFERRED_ROUTES, line: 30 }
+    - { name: ALL_KNOWN_ROUTES, line: 32 }
+    - { name: ROUTE_CONTRACTS, line: 63 }
+    - { name: REQUIRED_FIELDS, line: 319 }
+    - { name: VALID_RENDER_MODES, line: 332 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 333 }
+    - { name: VALID_SCOPES, line: 334 }
   functions:
-    - { name: buildContract, lines: 37-60 }
-    - { name: normalizeRoutePath, lines: 324-330 }
-    - { name: getRouteContract, lines: 332-334 }
-    - { name: getRouteContractMap, lines: 336-338 }
-    - { name: getInScopeRoutes, lines: 340-342 }
-    - { name: getDeferredRoutes, lines: 344-346 }
-    - { name: getKnownRoutes, lines: 348-350 }
-    - { name: validateRouteContractMap, lines: 352-386 }
+    - { name: buildContract, lines: 38-61 }
+    - { name: normalizeRoutePath, lines: 336-342 }
+    - { name: getRouteContract, lines: 344-346 }
+    - { name: getRouteContractMap, lines: 348-350 }
+    - { name: getInScopeRoutes, lines: 352-354 }
+    - { name: getDeferredRoutes, lines: 356-358 }
+    - { name: getKnownRoutes, lines: 360-362 }
+    - { name: validateRouteContractMap, lines: 364-398 }
 
 frontend/src/portal-shell/routeQuery.js:  # 36 lines
   functions:
@@ -2781,6 +2820,23 @@ frontend/tests/playwright/downtime-analysis.spec.ts:  # 937 lines
     - { name: async waitForErrorBanner, lines: 231-248 }
     - { name: async waitForEmptyState, lines: 250-267 }
 
+frontend/tests/playwright/eap-alarm.spec.js:  # 388 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 12 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 13 }
+  constants:
+    - { name: MOCK_QUERY_ID, line: 15 }
+    - { name: MOCK_SPOOL_202, line: 17 }
+    - { name: MOCK_SPOOL_STATUS_FINISHED, line: 28 }
+    - { name: MOCK_FILTER_OPTIONS, line: 40 }
+    - { name: MOCK_SUMMARY, line: 53 }
+    - { name: MOCK_PARETO, line: 64 }
+    - { name: MOCK_TREND, line: 76 }
+    - { name: MOCK_DETAIL, line: 88 }
+  functions:
+    - { name: async setupEapAlarmMocks, lines: 128-196 }
+    - { name: async submitAndWaitForResults, lines: 202-237 }
+
 frontend/tests/playwright/hold-history-flat-table.spec.js:  # 313 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 14 }
@@ -3098,6 +3154,11 @@ frontend/tests/shared-composables/useRequestGuard.test.js:  # 155 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
     - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
 
+frontend/tests/unit/eap-alarm-filter.test.js:  # 158 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach], line: 11 }
+    - { module: '../../src/eap-alarm/composables/useEapAlarmFilter.js', items: [useEapAlarmFilter], line: 12 }
+
 frontend/tests/unwrap-api-result.test.js:  # 88 lines
   imports:
     - { module: vitest, items: [describe, it, expect], line: 12 }
@@ -3159,7 +3220,7 @@ frontend/tests/yield-alert/App.cross-filter.test.js:  # 454 lines
     - { name: MultiSelectStub, lines: 42-50 }
     - { name: buildViewPayload, lines: 52-86 }
 
-frontend/vite.config.ts:  # 70 lines
+frontend/vite.config.ts:  # 71 lines
   imports:
     - { module: vite, items: [defineConfig], line: 1 }
     - { module: 'node:path', items: [resolve], line: 2 }
@@ -3346,7 +3407,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1636 lines
+src/mes_dashboard/app.py:  # 1637 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3406,8 +3467,8 @@ src/mes_dashboard/app.py:  # 1636 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-746 }
-    - { name: create_app, lines: 755-1510 }
-    - { name: _register_error_handlers, lines: 1513-1636 }
+    - { name: create_app, lines: 755-1511 }
+    - { name: _register_error_handlers, lines: 1514-1637 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4638,7 +4699,7 @@ src/mes_dashboard/core/worker_recovery_policy.py:  # 220 lines
     - { name: evaluate_worker_recovery_state, lines: 95-156 }
     - { name: decide_restart_request, lines: 159-219 }
 
-src/mes_dashboard/routes/__init__.py:  # 82 lines
+src/mes_dashboard/routes/__init__.py:  # 85 lines
   imports:
     - { module: '.wip_routes', items: [wip_bp], line: 7 }
     - { module: '.resource_routes', items: [resource_bp], line: 8 }
@@ -4663,8 +4724,9 @@ src/mes_dashboard/routes/__init__.py:  # 82 lines
     - { module: '.job_routes', items: [job_bp], line: 27 }
     - { module: '.material_consumption_routes', items: [material_consumption_bp], line: 28 }
     - { module: '.downtime_analysis_routes', items: [downtime_analysis_bp], line: 29 }
+    - { module: '.eap_alarm_routes', items: [eap_alarm_bp], line: 30 }
   functions:
-    - { name: register_routes, lines: 32-55 }
+    - { name: register_routes, lines: 33-57 }
 
 src/mes_dashboard/routes/admin_routes.py:  # 1505 lines
   imports:
@@ -4797,6 +4859,29 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 534 lines
     - { name: api_export_equipment_detail, lines: 456-481 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
     - { name: api_export_event_detail, lines: 490-515 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
     - { name: _get_resource_lookup_safe, lines: 523-534 }
+
+src/mes_dashboard/routes/eap_alarm_routes.py:  # 369 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: logging, items: [], line: 20 }
+    - { module: os, items: [], line: 21 }
+    - { module: uuid, items: [], line: 22 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 23 }
+    - { module: flask, items: [Blueprint, request], line: 25 }
+    - { module: mes_dashboard.core.response, items: [cache_expired_error, error_response, internal_error, success_response, validation_error, SERVICE_UNAVAILABLE], line: 27 }
+  functions:
+    - { name: _parse_list_param, lines: 47-59 }
+    - { name: _parse_fine_filters, lines: 62-79 }
+    - { name: _get_spool_path, lines: 82-89 }
+    - { name: _require_query_id, lines: 92-97 }
+    - { name: _require_spool, lines: 100-105 }
+    - { name: api_eap_alarm_spool, lines: 111-209 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
+    - { name: api_eap_alarm_spool_status, lines: 215-237 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
+    - { name: api_eap_alarm_filter_options, lines: 243-261 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
+    - { name: api_eap_alarm_summary, lines: 267-285 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
+    - { name: api_eap_alarm_pareto, lines: 291-309 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
+    - { name: api_eap_alarm_trend, lines: 315-336 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
+    - { name: api_eap_alarm_detail, lines: 342-369 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5196,7 +5281,7 @@ src/mes_dashboard/routes/resource_routes.py:  # 475 lines
     - { name: api_resource_status_summary, lines: 390-431 }  # @resource_bp.route('/status/summary')
     - { name: api_resource_status_matrix, lines: 436-475 }  # @resource_bp.route('/status/matrix')
 
-src/mes_dashboard/routes/spool_routes.py:  # 109 lines
+src/mes_dashboard/routes/spool_routes.py:  # 110 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: re, items: [], line: 9 }
@@ -5205,7 +5290,7 @@ src/mes_dashboard/routes/spool_routes.py:  # 109 lines
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 14 }
     - { module: mes_dashboard.core.response, items: [validation_error], line: 15 }
   functions:
-    - { name: download_spool_parquet, lines: 34-109 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
+    - { name: download_spool_parquet, lines: 35-110 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
 
 src/mes_dashboard/routes/trace_routes.py:  # 1096 lines
   imports:
@@ -5871,6 +5956,40 @@ src/mes_dashboard/services/downtime_query_job_service.py:  # 126 lines
     - { name: DOWNTIME_JOB_TIMEOUT_SECONDS, line: 34 }
   functions:
     - { name: execute_downtime_query_job, lines: 46-112 }
+
+src/mes_dashboard/services/eap_alarm_cache.py:  # 95 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: hashlib, items: [], line: 14 }
+    - { module: os, items: [], line: 15 }
+    - { module: typing, items: [Optional], line: 16 }
+  constants:
+    - { name: EAP_ALARM_SPOOL_DIR, line: 22 }
+    - { name: EAP_ALARM_SPOOL_TTL, line: 25 }
+  functions:
+    - { name: decode_alarm_category, lines: 45-56 }
+    - { name: make_eap_alarm_spool_key, lines: 61-83 }
+    - { name: get_eap_alarm_spool_path, lines: 88-95 }
+
+src/mes_dashboard/services/eap_alarm_service.py:  # 468 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 16 }
+    - { module: json, items: [], line: 18 }
+    - { module: logging, items: [], line: 19 }
+    - { module: math, items: [], line: 20 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 21 }
+    - { module: mes_dashboard.services.eap_alarm_cache, items: [decode_alarm_category], line: 23 }
+  functions:
+    - { name: validate_eap_alarm_params, lines: 39-64 }
+    - { name: _get_duckdb_conn, lines: 69-72 }
+    - { name: _build_filter_where, lines: 75-120 }
+    - { name: _escape_like, lines: 123-125 }
+    - { name: _escape_sql, lines: 128-130 }
+    - { name: get_filter_options, lines: 135-192 }
+    - { name: get_summary, lines: 197-246 }
+    - { name: get_pareto, lines: 251-299 }
+    - { name: get_trend, lines: 304-367 }
+    - { name: get_detail, lines: 372-468 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -7442,7 +7561,7 @@ src/mes_dashboard/services/resource_service.py:  # 679 lines
     - { name: get_resource_status_summary, lines: 507-604 }
     - { name: get_workcenter_status_matrix, lines: 607-679 }
 
-src/mes_dashboard/services/rq_monitor_service.py:  # 250 lines
+src/mes_dashboard/services/rq_monitor_service.py:  # 251 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -7451,11 +7570,11 @@ src/mes_dashboard/services/rq_monitor_service.py:  # 250 lines
     - { module: typing, items: [Any, Dict, List], line: 14 }
     - { module: mes_dashboard.core.redis_client, items: [get_redis_client], line: 16 }
   functions:
-    - { name: _check_rq_installed, lines: 36-41 }
-    - { name: get_rq_worker_details, lines: 48-127 }
-    - { name: get_rq_queue_details, lines: 134-188 }
-    - { name: get_heavy_query_slot_status, lines: 195-208 }
-    - { name: get_rq_monitor_summary, lines: 215-250 }
+    - { name: _check_rq_installed, lines: 37-42 }
+    - { name: get_rq_worker_details, lines: 49-128 }
+    - { name: get_rq_queue_details, lines: 135-189 }
+    - { name: get_heavy_query_slot_status, lines: 196-209 }
+    - { name: get_rq_monitor_summary, lines: 216-251 }
 
 src/mes_dashboard/services/scrap_reason_exclusion_cache.py:  # 236 lines
   imports:
@@ -7937,6 +8056,24 @@ src/mes_dashboard/static/js/toast.js:  # 240 lines
   functions:
     - { name: Toast, lines: 15-240 }
 
+src/mes_dashboard/workers/__init__.py:  # 0 lines
+
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 268 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: json, items: [], line: 20 }
+    - { module: logging, items: [], line: 21 }
+    - { module: os, items: [], line: 22 }
+    - { module: uuid, items: [], line: 23 }
+    - { module: typing, items: [Any, Dict, List, Optional, Tuple], line: 24 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 260 }
+  constants:
+    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 29 }
+    - { name: EAP_ALARM_WORKER_QUEUE, line: 32 }
+    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 33 }
+  functions:
+    - { name: run_eap_alarm_query_job, lines: 78-256 }
+
 tests/__init__.py:  # 0 lines
 
 tests/conftest.py:  # 196 lines
@@ -8345,6 +8482,35 @@ tests/e2e/test_downtime_analysis_e2e.py:  # 863 lines
     - { name: redis_enabled, lines: 40-63 }  # @pytest.fixture
     - { name: _make_oracle_rows, lines: 66-106 }
     - { name: _make_job_rows, lines: 109-126 }
+
+tests/e2e/test_eap_alarm_e2e.py:  # 318 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 16 }
+    - { module: time, items: [], line: 18 }
+    - { module: pytest, items: [], line: 20 }
+    - { module: requests, items: [], line: 21 }
+  classes:
+    - name: TestEapAlarmSpoolE2E
+      lines: 103-318
+      methods:
+        - { name: test_post_spool_missing_date_from_returns_400, lines: 106-117 }
+        - { name: test_post_spool_empty_eqp_types_returns_400, lines: 119-131 }
+        - { name: test_post_spool_invalid_eqp_type_returns_400, lines: 133-145 }
+        - { name: test_post_spool_returns_202_async, lines: 147-156 }
+        - { name: test_spool_miss_filter_options_returns_410, lines: 158-168 }
+        - { name: test_spool_miss_summary_returns_410, lines: 170-178 }
+        - { name: test_spool_miss_detail_returns_410, lines: 180-188 }
+        - { name: test_filter_options_returns_structured_options, lines: 190-209 }
+        - { name: test_summary_returns_totals, lines: 211-228 }
+        - { name: test_pareto_returns_items_list, lines: 230-246 }
+        - { name: test_trend_returns_series_data, lines: 248-265 }
+        - { name: test_detail_returns_paginated_rows, lines: 267-285 }
+        - { name: test_detail_per_page_capped_at_200, lines: 287-299 }
+        - { name: test_detail_rows_contain_expected_fields, lines: 301-318 }
+  functions:
+    - { name: _post_spool, lines: 28-46 }
+    - { name: _poll_job_to_completion, lines: 49-67 }
+    - { name: _spool_and_get_query_id, lines: 70-95 }
 
 tests/e2e/test_global_connection.py:  # 155 lines
   imports:
@@ -9303,6 +9469,80 @@ tests/integration/test_downtime_rq_async.py:  # 341 lines
   functions:
     - { name: _reset_registry, lines: 36-39 }
     - { name: _reload_job_service, lines: 42-46 }
+
+tests/integration/test_eap_alarm_data_boundary.py:  # 254 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 16 }
+    - { module: json, items: [], line: 18 }
+    - { module: datetime, items: [datetime], line: 19 }
+    - { module: pyarrow, items: [], line: 21 }
+    - { module: pyarrow.parquet, items: [], line: 22 }
+    - { module: pytest, items: [], line: 23 }
+  functions:
+    - { name: _write_parquet, lines: 41-74 }
+    - { name: _base_row, lines: 77-91 }
+    - { name: test_unknown_alarm_category_code_fallback, lines: 96-108 }
+    - { name: test_null_detail_params, lines: 113-121 }
+    - { name: test_null_lot_id, lines: 126-134 }
+    - { name: test_empty_alarm_text_rows, lines: 139-151 }
+    - { name: test_null_alarm_text_excluded_from_filter_options, lines: 154-164 }
+    - { name: test_large_alarm_text, lines: 169-181 }
+    - { name: test_zero_row_spool, lines: 186-211 }
+    - { name: test_detail_params_json_object, lines: 216-225 }
+    - { name: test_summary_top_equipment, lines: 230-242 }
+    - { name: test_per_page_capped_at_200, lines: 247-254 }
+
+tests/integration/test_eap_alarm_resilience.py:  # 174 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: uuid, items: [], line: 14 }
+    - { module: unittest.mock, items: [patch], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  functions:
+    - { name: _make_app, lines: 22-24 }
+    - { name: test_oracle_failure_during_spool, lines: 29-63 }
+    - { name: test_redis_failure_returns_503, lines: 68-97 }
+    - { name: test_spool_miss_fine_filter_returns_410, lines: 109-124 }  # @pytest.mark.parametrize('endpoint', ['/api/eap-alarm/filter-options?query_id=exp...
+    - { name: test_inflight_abort, lines: 129-174 }
+
+tests/integration/test_eap_alarm_rq_async.py:  # 447 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: importlib, items: [], line: 17 }
+    - { module: json, items: [], line: 18 }
+    - { module: os, items: [], line: 19 }
+    - { module: pathlib, items: [], line: 20 }
+    - { module: uuid, items: [], line: 21 }
+    - { module: typing, items: [Any, Dict], line: 22 }
+    - { module: unittest.mock, items: [MagicMock, call, patch], line: 23 }
+    - { module: pandas, items: [], line: 25 }
+    - { module: pytest, items: [], line: 26 }
+  classes:
+    - name: TestEapAlarmSpoolTrigger
+      lines: 57-161
+      methods:
+        - { name: test_enqueue_to_eap_alarm_queue, lines: 60-117 }
+        - { name: test_post_spool_missing_date_returns_400, lines: 119-131 }
+        - { name: test_post_spool_invalid_eqp_type_returns_400, lines: 133-146 }
+        - { name: test_post_spool_empty_eqp_types_returns_400, lines: 148-161 }
+    - name: TestEapAlarmWorkerFn
+      lines: 168-338
+      methods:
+        - { name: _build_mock_df, lines: 171-183 }
+        - { name: test_worker_fn_writes_parquet_with_correct_columns, lines: 185-244 }
+        - { name: test_worker_fn_decodes_alarm_category, lines: 246-273 }
+        - { name: test_worker_fn_progress_milestones, lines: 275-311 }
+        - { name: test_worker_fn_oracle_sql_contains_last_update_time_predicate, lines: 313-338 }
+    - name: TestEapAlarmSpoolCacheHit
+      lines: 345-371
+      methods:
+        - { name: test_spool_cache_hit_returns_200, lines: 348-371 }
+  functions:
+    - { name: _reset_registry, lines: 35-38 }
+    - { name: _reload_eap_alarm_worker, lines: 41-45 }
+    - { name: _make_app, lines: 48-50 }
+    - { name: test_spool_miss_returns_410, lines: 378-391 }
+    - { name: test_detail_no_extra_oracle_query, lines: 398-447 }
 
 tests/integration/test_fixtures_smoke.py:  # 44 lines
   imports:
@@ -13006,6 +13246,58 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_memory_limit_applied, lines: 79-88 }
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
+
+tests/test_eap_alarm_service.py:  # 227 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: hashlib, items: [], line: 14 }
+    - { module: pytest, items: [], line: 16 }
+  classes:
+    - name: TestSpoolKeyComposition
+      lines: 21-71
+      methods:
+        - { name: test_key_format, lines: 24-28 }
+        - { name: test_hash_is_8_chars, lines: 30-37 }
+        - { name: test_sorted_eqp_types_gives_same_key, lines: 39-44 }
+        - { name: test_different_eqp_types_give_different_key, lines: 46-50 }
+        - { name: test_hash_matches_sha256_of_sorted_join, lines: 52-59 }
+        - { name: test_different_dates_give_different_key, lines: 61-65 }
+        - { name: test_schema_version_in_key, lines: 67-71 }
+    - name: TestMissingDateRangeRaisesValueError
+      lines: 76-107
+      methods:
+        - { name: test_missing_date_from_spool_key, lines: 79-82 }
+        - { name: test_missing_date_to_spool_key, lines: 84-87 }
+        - { name: test_empty_date_from_spool_key, lines: 89-92 }
+        - { name: test_missing_date_from_validate, lines: 94-97 }
+        - { name: test_missing_date_to_validate, lines: 99-102 }
+        - { name: test_both_dates_missing_validate, lines: 104-107 }
+    - name: TestEqpTypeAllowlist
+      lines: 112-145
+      methods:
+        - { name: test_all_ten_valid_types_no_error, lines: 117-119 }
+        - { name: test_single_valid_type_no_error, lines: 121-124 }
+        - { name: test_unknown_type_raises_value_error, lines: 126-129 }
+        - { name: test_lowercase_invalid, lines: 131-135 }
+        - { name: test_empty_list_raises_value_error, lines: 137-140 }
+        - { name: test_none_list_raises_value_error, lines: 142-145 }
+    - name: TestAlarmCategoryDecode
+      lines: 150-208
+      methods:
+        - { name: test_all_nine_known_codes, lines: 165-171 }
+        - { name: test_unknown_code_99_returns_unknown, lines: 173-175 }
+        - { name: test_unknown_code_255_returns_unknown, lines: 177-179 }
+        - { name: test_none_returns_unknown, lines: 181-183 }
+        - { name: test_string_code_coerced, lines: 185-188 }
+        - { name: test_string_unknown_code_returns_unknown, lines: 190-192 }
+        - { name: test_float_code_coerced, lines: 194-197 }
+        - { name: test_negative_code_returns_unknown, lines: 199-201 }
+        - { name: test_service_decode_matches_cache_decode, lines: 203-208 }
+    - name: TestSchemaVersionIsPinned
+      lines: 213-227
+      methods:
+        - { name: test_schema_version_is_integer, lines: 216-220 }
+        - { name: test_schema_version_equals_one, lines: 222-227 }
 
 tests/test_env_contract.py:  # 292 lines
   imports:
@@ -17695,7 +17987,7 @@ tests/test_spool_replay.py:  # 229 lines
     - { name: test_replay_snapshot_null_promotion_synthesis, lines: 137-202 }  # @pytest.mark.skipif(not _SNAPSHOTS, reason='no local spool snapshots captured')
     - { name: test_replay_snapshot_rejects_column_drift, lines: 207-229 }  # @pytest.mark.skipif(not _SNAPSHOTS, reason='no local spool snapshots captured')
 
-tests/test_spool_routes.py:  # 125 lines
+tests/test_spool_routes.py:  # 138 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: unittest.mock, items: [patch], line: 12 }
@@ -17712,6 +18004,7 @@ tests/test_spool_routes.py:  # 125 lines
     - { name: test_valid_spool_streams_parquet, lines: 75-88 }
     - { name: test_allowed_namespaces_pass_namespace_validation, lines: 101-111 }  # @pytest.mark.parametrize('ns', ['yield_alert_dataset', 'reject_dataset', 'resourc...
     - { name: test_resource_dataset_stays_in_allowed_namespaces, lines: 114-125 }
+    - { name: test_eap_alarm_in_allowed_namespaces, lines: 128-138 }
 
 tests/test_spool_warmup_scheduler.py:  # 201 lines
   imports:

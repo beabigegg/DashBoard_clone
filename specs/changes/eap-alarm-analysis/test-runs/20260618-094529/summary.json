@@ -1,0 +1,16 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/test_eap_alarm_service.py tests/test_spool_routes.py::test_eap_alarm_in_allowed_namespaces tests/integration/test_eap_alarm_rq_async.py tests/integration/test_eap_alarm_resilience.py tests/integration/test_eap_alarm_data_boundary.py -v --tb=short -m 'not integration_real' --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-094529/junit.xml' -q --maxfail=1 -ra",
+  "duration_ms": 2207,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-094529/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-094529/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-094529/stderr.log",
+    "junit": "specs/changes/eap-alarm-analysis/test-runs/20260618-094529/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -75,6 +75,7 @@ function getPageIcon(routePath) {
   if (r.includes('job')) return Briefcase;
   if (r.includes('trace')) return GitBranch;
   if (r.includes('material') || r.includes('consumption')) return Package;
+  if (r.includes('eap') || r.includes('alarm')) return AlertCircle;
   if (r.includes('downtime') || r.includes('analysis')) return BarChart2;
   if (r.includes('production') || r.includes('spc')) return Activity;
   if (r.includes('reject') || r.includes('history')) return Clock;

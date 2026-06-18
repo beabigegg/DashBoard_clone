@@ -1,0 +1,20 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "changed-area",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest tests/ -v --tb=short -m 'not (integration_real or stress or load or soak or multi_worker or e2e or local_e2e)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-095507/junit.xml' -q -ra",
+  "duration_ms": 236800,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.test_rq_monitor_service.TestGetRqQueueDetails::test_returns_queue_depth_per_queue",
+    "message": "AssertionError: assert 10 == 9\n +  where 10 = len([{'depth': 3, 'failed': 0, 'name': 'trace-events', 'started': 1}, {'depth': 1, 'failed': 0, 'name': 'reject-query', 'started': 1}, {'depth': 1, 'failed': 0, 'name': 'msd-analysis', 'started': 1}, {'depth': 1, 'failed': 0, 'name': 'production-history-query', 'started': 1}, {'depth': 1, 'failed': 0, 'name': 'yield-alert-query', 'started': 1}, {'depth': 1, 'failed': 0, 'name': 'material-consumption', 'started': 1}, ...])"
+  },
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-095507/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-095507/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-095507/stderr.log",
+    "junit": "specs/changes/eap-alarm-analysis/test-runs/20260618-095507/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

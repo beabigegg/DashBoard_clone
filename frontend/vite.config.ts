@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => ({
         'anomaly-overview': resolve(__dirname, 'src/anomaly-overview/index.html'),
         'material-consumption': resolve(__dirname, 'src/material-consumption/index.html'),
         'downtime-analysis': resolve(__dirname, 'src/downtime-analysis/index.html'),
+        'eap-alarm': resolve(__dirname, 'src/eap-alarm/index.html'),
       },
       output: {
         entryFileNames: '[name].js',

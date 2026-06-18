@@ -1,0 +1,1 @@
+pytest tests/test_eap_alarm_service.py tests/test_spool_routes.py::test_eap_alarm_in_allowed_namespaces -v --tb=short --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-094511/junit.xml' -q --maxfail=1 -ra

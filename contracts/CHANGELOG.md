@@ -8,6 +8,38 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.25.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: 7 new endpoints under `/api/eap-alarm/*` (POST /spool 202 async, GET /spool/status, GET /filter-options, GET /summary, GET /pareto, GET /trend, GET /detail). Spool namespace `eap_alarm` added to `/api/spool` whitelist. Schema `EapAlarmSpoolJobAccepted` added. Type B async; fine-filter views DuckDB-only. Additive; no existing endpoints changed.
+
+## [data 1.18.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: §3.17 EAP ALARM Spool Schema — 10-column parquet schema (EVENT_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE, ALARM_CATEGORY, ALARM_TIME, DETAIL_PARAMS, eqp_types_filter); 5 DuckDB-derived response shapes (filter-options, summary, pareto, trend, detail). Parquet cleanup + `_SCHEMA_VERSION` bump policy documented.
+
+## [business 1.22.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: Rules EA-01..EA-07 — spool-key composition (date + eqp_types hash), DuckDB-only fine-filter derivation, LAST_UPDATE_TIME mandatory index filter, DETAIL from spool only, AlarmCategory fixed decode table (9 codes + "未知" fallback), spool schema version governance, EQP type closed enum (10 values).
+
+## [env 1.0.13] — 2026-06-18
+### Added
+- eap-alarm-analysis: `EAP_ALARM_WORKER_QUEUE` (default `eap-alarm-query`), `EAP_ALARM_JOB_TIMEOUT_SECONDS` (default 1800), `EAP_ALARM_SPOOL_TTL` (default 72000), `EAP_ALARM_SPOOL_DIR` (default `tmp/query_spool/eap_alarm`). All optional; defaults usable without explicit configuration.
+
+## [css 1.9.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: `.theme-eap-alarm` scoping rule for `frontend/src/eap-alarm/style.css`. Enforced by `npm run css:check` Rule 6. Rule 4.4 (Teleport wrapper) and Rule 4.5 (`:is()` group maintenance) apply.
+
+## [css-inventory 1.2.6] — 2026-06-18
+### Added
+- eap-alarm-analysis: `frontend/src/eap-alarm/style.css` registered with `theme-eap-alarm` root.
+
+## [api-inventory 1.2.4] — 2026-06-18
+### Added
+- eap-alarm-analysis: `eap_alarm_routes.py` registered in standard-json table; Type B async spool pattern; DuckDB-only fine filters; spool namespace `eap_alarm`.
+
+## [ci 1.3.25] — 2026-06-18
+### Added
+- eap-alarm-analysis: Deploy/rollback checklist for EAP ALARM worker (`EAP_ALARM_*` env vars, `mes-dashboard-eap-alarm-worker.service`, parquet cleanup). `tests/playwright/eap-alarm.spec.js` added to `playwright-critical-journeys` gate.
+
 ## [api 1.24.0] — 2026-06-16
 ### Added
 - yield-alert-spool-refactor: `POST /api/yield-alert/query` gains required `process_type` param (`"GA%"` packaging | `"GC%"` point-test; default `"GA%"`; invalid value → 400 VALIDATION_ERROR). `GET /api/yield-alert/alerts` response gains `source_code` field (string|null, LOT ID from ERP_WIP_MOVETXN_DETAIL) in each alert row. Schema `YieldAlertAlertsResponse` added.

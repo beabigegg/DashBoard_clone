@@ -43,7 +43,7 @@
     },
     "direct_connections": {
       "total_since_start": 7,
-      "worker_pid": 720722
+      "worker_pid": 56027
     },
     "duckdb": {
       "memory_limit_state": "512MB",
@@ -56,7 +56,7 @@
       "domain_spool_hits": [],
       "domain_spool_misses": [
         {
-          "count": 6,
+          "count": 11,
           "domain": "reject_cache"
         },
         {
@@ -89,7 +89,7 @@
       "route_memory_errors": [],
       "route_rejects": [],
       "spool_hit_total": 0,
-      "spool_miss_total": 10
+      "spool_miss_total": 15
     },
     "process_caches": {
       "equipment_status": {
@@ -161,7 +161,7 @@
     },
     "spool_disk_usage": [
       {
-        "file_count": 3,
+        "file_count": 1,
         "namespace": "msd-events",
         "total_bytes": 0
       },
@@ -224,7 +224,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:15:44.476699"
+    "timestamp": "2026-06-18T10:08:13.910861"
   },
   "success": true
 }

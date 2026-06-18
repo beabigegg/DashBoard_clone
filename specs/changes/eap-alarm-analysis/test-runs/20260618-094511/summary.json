@@ -1,0 +1,16 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/test_eap_alarm_service.py tests/test_spool_routes.py::test_eap_alarm_in_allowed_namespaces -v --tb=short --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-094511/junit.xml' -q --maxfail=1 -ra",
+  "duration_ms": 11707,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-094511/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-094511/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-094511/stderr.log",
+    "junit": "specs/changes/eap-alarm-analysis/test-runs/20260618-094511/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

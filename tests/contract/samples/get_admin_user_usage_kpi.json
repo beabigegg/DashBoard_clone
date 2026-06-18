@@ -147,9 +147,41 @@
       {
         "department": "MBU1_AssEng Div 封裝工程處",
         "display_name": "ymirliu 劉念萱",
-        "duration_sec": null,
+        "duration_sec": 17817,
+        "login_time": "2026-06-17 07:22:21.128000",
+        "status": "ended",
+        "username": "92367"
+      },
+      {
+        "department": "Development",
+        "display_name": "Local User (testuser)",
+        "duration_sec": 2576,
+        "login_time": "2026-06-16 21:31:14.182000",
+        "status": "ended",
+        "username": "testuser"
+      },
+      {
+        "department": "Development",
+        "display_name": "Local User (testuser)",
+        "duration_sec": 165,
+        "login_time": "2026-06-16 21:24:37.714000",
+        "status": "ended",
+        "username": "testuser"
+      },
+      {
+        "department": "Development",
+        "display_name": "Local User (testuser)",
+        "duration_sec": 134,
+        "login_time": "2026-06-16 21:18:34.534000",
+        "status": "ended",
+        "username": "testuser"
+      },
+      {
+        "department": "MBU1_AssEng Div 封裝工程處",
+        "display_name": "ymirliu 劉念萱",
+        "duration_sec": 5257,
         "login_time": "2026-06-16 18:52:32.121000",
-        "status": "active",
+        "status": "ended",
         "username": "92367"
       },
       {
@@ -271,38 +303,6 @@
         "login_time": "2026-06-13 21:52:46.952000",
         "status": "ended",
         "username": "92367"
-      },
-      {
-        "department": "MBU1_AssEng Div 封裝工程處",
-        "display_name": "ymirliu 劉念萱",
-        "duration_sec": 129,
-        "login_time": "2026-06-13 21:49:34.518000",
-        "status": "ended",
-        "username": "92367"
-      },
-      {
-        "department": "MBU1_AssEng Div 封裝工程處",
-        "display_name": "ymirliu 劉念萱",
-        "duration_sec": 4338,
-        "login_time": "2026-06-13 20:36:13.383000",
-        "status": "ended",
-        "username": "92367"
-      },
-      {
-        "department": "MBU1_AssEng Div 封裝工程處",
-        "display_name": "ymirliu 劉念萱",
-        "duration_sec": 4918,
-        "login_time": "2026-06-13 19:13:12.024000",
-        "status": "ended",
-        "username": "92367"
-      },
-      {
-        "department": "MBU1_AssEng Div 封裝工程處",
-        "display_name": "ymirliu 劉念萱",
-        "duration_sec": null,
-        "login_time": "2026-06-13 18:30:35.941000",
-        "status": "ended",
-        "username": "92367"
       }
     ],
     "source": "mysql",
@@ -310,7 +310,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:15:44.665676"
+    "timestamp": "2026-06-18T10:08:14.108851"
   },
   "success": true
 }

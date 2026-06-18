@@ -27,6 +27,7 @@ from .production_history_routes import production_history_bp
 from .job_routes import job_bp
 from .material_consumption_routes import material_consumption_bp
 from .downtime_analysis_routes import downtime_analysis_bp
+from .eap_alarm_routes import eap_alarm_bp
 
 
 def register_routes(app) -> None:
@@ -53,6 +54,7 @@ def register_routes(app) -> None:
     app.register_blueprint(job_bp)
     app.register_blueprint(material_consumption_bp)
     app.register_blueprint(downtime_analysis_bp)
+    app.register_blueprint(eap_alarm_bp)
 
 __all__ = [
     'wip_bp',
@@ -78,5 +80,6 @@ __all__ = [
     'job_bp',
     'material_consumption_bp',
     'downtime_analysis_bp',
+    'eap_alarm_bp',
     'register_routes',
 ]

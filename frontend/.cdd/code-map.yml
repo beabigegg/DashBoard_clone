@@ -1,13 +1,16 @@
-# generated: 2026-05-20T06:26:50Z by cdd-kit 2.0.20
-# files: 351, src-lines: 64708, map-lines: 2754, compression: 23.5x
-# sources-digest: f0015804670202473cbae922ec4a3f6244bc0f790961ca1ab756aa7c4b982e99
-playwright.config.js:  # 28 lines
+# generated: 2026-06-18T02:14:49Z by cdd-kit 3.2.0
+# files: 406, src-lines: 80234, map-lines: 3233, compression: 24.8x
+# sources-digest: e6e6c742a0690131fb42db4e25cfa4a8ba7780ecb8d01fd5ac8901529678e3f0
+playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
+    - { module: module, items: [createRequire], line: 2 }
+    - { module: fs, items: [readFileSync], line: 3 }
+    - { module: path, items: [resolve], line: 4 }
 
 postcss.config.js:  # 6 lines
 
-scripts/css-governance-check.js:  # 362 lines
+scripts/css-governance-check.js:  # 374 lines
   imports:
     - { module: fs, items: [readFileSync, readdirSync, statSync], line: 15 }
     - { module: path, items: [join, relative], line: 16 }
@@ -17,25 +20,25 @@ scripts/css-governance-check.js:  # 362 lines
     - { name: SRC_DIR, line: 21 }
     - { name: EXEMPT_CSS, line: 24 }
     - { name: CHART_HEX_ALLOWED, line: 33 }
-    - { name: HEX_COLOR_RE, line: 47 }
-    - { name: SPACING_PX_RE, line: 48 }
-    - { name: CHART_IMPORT_RE, line: 49 }
+    - { name: HEX_COLOR_RE, line: 48 }
+    - { name: SPACING_PX_RE, line: 49 }
+    - { name: CHART_IMPORT_RE, line: 50 }
   functions:
-    - { name: walk, lines: 51-61 }
-    - { name: relPath, lines: 63-65 }
-    - { name: isExemptCss, lines: 67-70 }
-    - { name: classifyHexUsage, lines: 72-79 }
-    - { name: findUnscopedTopLevelRules, lines: 89-193 }
-    - { name: isFeatureCss, lines: 198-202 }
-    - { name: checkCssFile, lines: 204-261 }
-    - { name: checkVueFile, lines: 265-308 }
-    - { name: checkJsFile, lines: 310-335 }
+    - { name: walk, lines: 52-62 }
+    - { name: relPath, lines: 64-66 }
+    - { name: isExemptCss, lines: 68-71 }
+    - { name: classifyHexUsage, lines: 73-80 }
+    - { name: findUnscopedTopLevelRules, lines: 90-194 }
+    - { name: isFeatureCss, lines: 199-203 }
+    - { name: checkCssFile, lines: 205-272 }
+    - { name: checkVueFile, lines: 276-319 }
+    - { name: checkJsFile, lines: 321-346 }
 
 scripts/ts-resolver-loader.mjs:  # 50 lines
   imports:
     - { module: 'node:fs', items: [existsSync], line: 12 }
     - { module: 'node:url', items: [fileURLToPath, pathToFileURL], line: 13 }
-    - { module: 'node:path', items: [resolve, dirname], line: 14 }
+    - { module: 'node:path', items: ['resolve:pathResolve', dirname], line: 14 }
   functions:
     - { name: async resolve, lines: 16-50 }
 
@@ -403,7 +406,7 @@ src/anomaly-overview/main.js:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-src/core/api.ts:  # 396 lines
+src/core/api.ts:  # 401 lines
   imports:
     - { module: './types.js', items: [ApiResponse], line: 3 }
   constants:
@@ -416,16 +419,16 @@ src/core/api.ts:  # 396 lines
     - { name: buildUrlWithParams, lines: 104-133 }
     - { name: isExternalMesApiBridge, lines: 135-138 }
     - { name: createAbortSignal, lines: 145-179 }
-    - { name: _buildDedupKey, lines: 187-196 }
-    - { name: async parseResponsePayload, lines: 198-211 }
-    - { name: async _fetchJsonRaw, lines: 213-251 }
-    - { name: async fetchJson, lines: 253-279 }
-    - { name: async apiGet, lines: 281-289 }
-    - { name: async apiPost, lines: 291-319 }
-    - { name: async apiUpload, lines: 321-343 }
-    - { name: _inFlightSize, lines: 348-350 }
-    - { name: _clearInFlight, lines: 355-357 }
-    - { name: ensureMesApiAvailable, lines: 359-396 }
+    - { name: _buildDedupKey, lines: 190-194 }
+    - { name: async parseResponsePayload, lines: 196-209 }
+    - { name: async _fetchJsonRaw, lines: 211-249 }
+    - { name: async fetchJson, lines: 251-284 }
+    - { name: async apiGet, lines: 286-294 }
+    - { name: async apiPost, lines: 296-324 }
+    - { name: async apiUpload, lines: 326-348 }
+    - { name: _inFlightSize, lines: 353-355 }
+    - { name: _clearInFlight, lines: 360-362 }
+    - { name: ensureMesApiAvailable, lines: 364-401 }
   interfaces:
     - { name: FetchOptions, lines: 32-39 }
     - { name: MesApiBridge, lines: 42-46 }  # local
@@ -564,7 +567,19 @@ src/core/field-contracts.ts:  # 40 lines
   interfaces:
     - { name: FieldContract, lines: 7-12 }
 
-src/core/index.ts:  # 207 lines
+src/core/hold-navigation-state.ts:  # 99 lines
+  constants:
+    - { name: STORAGE_KEY, line: 5 }
+  functions:
+    - { name: storeHoldNavigationState, lines: 37-65 }
+    - { name: loadHoldNavigationState, lines: 67-78 }
+    - { name: peekHoldNavigationState, lines: 81-91 }
+    - { name: clearHoldNavigationState, lines: 93-99 }
+  interfaces:
+    - { name: HoldNavigationState, lines: 7-23 }
+    - { name: HoldPanelFilters, lines: 25-35 }
+
+src/core/index.ts:  # 215 lines
 
 src/core/pending-jobs-registry.ts:  # 105 lines
   imports:
@@ -586,7 +601,7 @@ src/core/post-export.ts:  # 45 lines
   functions:
     - { name: async postExport, lines: 15-45 }
 
-src/core/reject-history-filters.ts:  # 358 lines
+src/core/reject-history-filters.ts:  # 366 lines
   constants:
     - { name: PRIMARY_QUERY_MAX_DAYS, line: 32 }
   functions:
@@ -600,7 +615,7 @@ src/core/reject-history-filters.ts:  # 358 lines
     - { name: buildRejectCommonQueryParams, lines: 213-232 }
     - { name: parseMultiLineInput, lines: 234-250 }
     - { name: validateDateRange, lines: 252-273 }
-    - { name: buildViewParams, lines: 301-358 }
+    - { name: buildViewParams, lines: 303-366 }
   interfaces:
     - { name: RejectFilterInput, lines: 34-45 }
     - { name: RejectFilterSnapshot, lines: 47-57 }
@@ -610,27 +625,27 @@ src/core/reject-history-filters.ts:  # 358 lines
     - { name: RejectOptionsRequestParams, lines: 177-186 }
     - { name: RejectCommonQueryParams, lines: 205-207 }
     - { name: BuildRejectCommonQueryOptions, lines: 209-211 }
-    - { name: ViewParamsOptions, lines: 275-299 }
+    - { name: ViewParamsOptions, lines: 275-301 }
 
-src/core/resource-history-filters.ts:  # 240 lines
+src/core/resource-history-filters.ts:  # 247 lines
   functions:
     - { name: normalizeText, lines: 1-6 }
     - { name: normalizeBoolean, lines: 8-13 }
     - { name: normalizeArray, lines: 15-30 }
     - { name: applyUpstreamResourceFilters, lines: 43-64 }
-    - { name: toResourceFilterSnapshot, lines: 91-103 }
-    - { name: deriveResourceFamilyOptions, lines: 105-119 }
-    - { name: deriveResourceMachineOptions, lines: 126-144 }
-    - { name: pruneResourceFilterSelections, lines: 160-204 }
-    - { name: buildResourceHistoryQueryParams, lines: 218-240 }
+    - { name: toResourceFilterSnapshot, lines: 93-106 }
+    - { name: deriveResourceFamilyOptions, lines: 108-122 }
+    - { name: deriveResourceMachineOptions, lines: 129-147 }
+    - { name: pruneResourceFilterSelections, lines: 163-207 }
+    - { name: buildResourceHistoryQueryParams, lines: 222-247 }
   interfaces:
     - { name: ResourceItem, lines: 32-41 }
-    - { name: ResourceFilterInput, lines: 66-77 }
-    - { name: ResourceFilterSnapshot, lines: 79-89 }
-    - { name: MachineOption, lines: 121-124 }
-    - { name: PruneResourceFilterOptions, lines: 146-149 }
-    - { name: PruneResourceFilterResult, lines: 151-158 }
-    - { name: ResourceHistoryQueryParams, lines: 206-216 }
+    - { name: ResourceFilterInput, lines: 66-78 }
+    - { name: ResourceFilterSnapshot, lines: 80-91 }
+    - { name: MachineOption, lines: 124-127 }
+    - { name: PruneResourceFilterOptions, lines: 149-152 }
+    - { name: PruneResourceFilterResult, lines: 154-161 }
+    - { name: ResourceHistoryQueryParams, lines: 209-220 }
 
 src/core/risk-score.ts:  # 55 lines
   functions:
@@ -725,7 +740,239 @@ src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-src/hold-detail/App.vue:  # 493 lines
+src/downtime-analysis/App.vue:  # 550 lines
+
+src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: fs, items: [readFileSync], line: 3 }
+    - { module: url, items: [fileURLToPath], line: 4 }
+    - { module: path, items: [dirname, join], line: 5 }
+  constants:
+    - { name: CSS_FILE, line: 10 }
+  functions:
+    - { name: findUnscopedTopLevelRules, lines: 19-116 }
+
+src/downtime-analysis/__tests__/formatDowntimeDate.test.ts:  # 95 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, afterEach], line: 1 }
+    - { module: '../formatDowntimeDate', items: [formatDowntimeDate, formatDowntimeDateOnly], line: 2 }
+
+src/downtime-analysis/__tests__/useBigCategory.test.ts:  # 157 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 1 }
+    - { module: '../composables/useBigCategory', items: [getBigCategory, ALL_BIG_CATEGORIES, BIG_CATEGORY_MAP, useBigCategory], line: 2 }
+
+src/downtime-analysis/__tests__/useDowntimeDuckDB.test.ts:  # 812 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 17 }
+  constants:
+    - { name: BASE_EVENTS_FIXTURE, line: 67 }
+    - { name: JOB_BRIDGE_FIXTURE, line: 142 }
+    - { name: PATH_B_AMBIGUOUS_EVENTS, line: 205 }
+    - { name: PATH_B_AMBIGUOUS_JOBS, line: 217 }
+    - { name: TAXONOMY_FIXTURE, line: 263 }
+  functions:
+    - { name: async importComposable, lines: 299-302 }
+    - { name: applyTaxonomy, lines: 324-334 }
+    - { name: crossShiftMerge, lines: 349-416 }
+    - { name: bridgeJobs, lines: 428-489 }
+  interfaces:
+    - { name: RawBaseEvent, lines: 21-29 }  # local
+    - { name: RawJobBridge, lines: 31-48 }  # local
+    - { name: TaxonomyShape, lines: 50-55 }  # local
+    - { name: MergedEvent, lines: 338-347 }  # local
+    - { name: BridgedEvent, lines: 420-426 }  # local
+
+src/downtime-analysis/__tests__/useFilterState.test.ts:  # 161 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 1 }
+    - { module: '../composables/useFilterState', items: [useFilterState], line: 2 }
+
+src/downtime-analysis/components/BigCategoryChart.vue:  # 103 lines
+
+src/downtime-analysis/components/DailyTrendChart.vue:  # 110 lines
+
+src/downtime-analysis/components/EquipmentDetail.vue:  # 85 lines
+
+src/downtime-analysis/components/EventDetail.vue:  # 141 lines
+
+src/downtime-analysis/components/FilterBar.vue:  # 213 lines
+
+src/downtime-analysis/components/KpiCards.vue:  # 107 lines
+
+src/downtime-analysis/components/MachineEventRows.vue:  # 149 lines
+
+src/downtime-analysis/components/StatusMachineJobTable.vue:  # 215 lines
+
+src/downtime-analysis/components/TopReasonsTable.vue:  # 49 lines
+
+src/downtime-analysis/components/__tests__/MachineEventRows.test.ts:  # 111 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 8 }
+    - { module: '@vue/test-utils', items: [mount], line: 9 }
+    - { module: vue, items: [nextTick], line: 10 }
+    - { module: '../MachineEventRows.vue', items: ['default:MachineEventRows'], line: 13 }
+    - { module: '../../types', items: [TierThreeEntry, EventDetailRow], line: 14 }
+  constants:
+    - { name: EVENTS_WRAPPER_KEY, line: 17 }
+  functions:
+    - { name: makeEventRow, lines: 21-36 }
+
+src/downtime-analysis/components/__tests__/StatusMachineJobTable.test.ts:  # 189 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 8 }
+    - { module: '@vue/test-utils', items: [mount], line: 9 }
+    - { module: vue, items: [nextTick], line: 10 }
+    - { module: '../StatusMachineJobTable.vue', items: ['default:StatusMachineJobTable'], line: 13 }
+    - { module: '../../types', items: [EquipmentDetailRow, ChartFilter, TierThreeEntry, DowntimeKpiShape], line: 14 }
+  functions:
+    - { name: makeEquipmentRow, lines: 16-33 }
+
+src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
+  constants:
+    - { name: BIG_CATEGORY_MAP, line: 10 }
+    - { name: PREFIX_CATEGORIES, line: 37 }
+    - { name: FALLBACK_CATEGORY, line: 41 }
+    - { name: ALL_BIG_CATEGORIES, line: 79 }
+  functions:
+    - { name: getBigCategory, lines: 49-74 }
+    - { name: useBigCategory, lines: 94-100 }
+
+src/downtime-analysis/composables/useDowntimeData.ts:  # 683 lines
+  imports:
+    - { module: vue, items: [ref, reactive], line: 1 }
+    - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 3 }
+    - { module: '../types', items: [DowntimeKpiShape, DailyTrendRow, BigCategoryRow, TopReasonRow, EquipmentDetailRow, EventDetailRow, Pagination, FilterOptions, ChartFilter], line: 4 }
+    - { module: './useDowntimeDuckDB', items: [TaxonomyShape], line: 15 }
+  constants:
+    - { name: API_TIMEOUT, line: 17 }
+  functions:
+    - { name: useDowntimeData, lines: 58-683 }
+  interfaces:
+    - { name: DowntimeAsyncJobProgress, lines: 20-27 }
+    - { name: SummaryData, lines: 29-34 }  # local
+    - { name: EventDetailData, lines: 36-39 }  # local
+
+src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1090 lines
+  imports:
+    - { module: vue, items: [ref, readonly], line: 27 }
+    - { module: '../../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 28 }
+    - { module: '../../core/duckdb-client', items: [DuckDBClient], line: 29 }
+  constants:
+    - { name: MERGE_GAP_SECONDS, line: 157 }
+    - { name: CROSS_SHIFT_MERGE_SQL, line: 164 }
+    - { name: JOB_BRIDGE_SQL, line: 234 }
+  functions:
+    - { name: sf, lines: 443-446 }
+    - { name: nullableStr, lines: 448-453 }
+    - { name: nullableFloat, lines: 455-458 }
+    - { name: toIsoString, lines: 460-471 }
+    - { name: applyTaxonomyMapping, lines: 481-494 }
+    - { name: buildFilterClause, lines: 500-524 }
+    - { name: interpolateParams, lines: 532-541 }
+    - { name: rowsToCsv, lines: 545-559 }
+    - { name: downloadCsv, lines: 561-572 }
+    - { name: useDowntimeDuckDB, lines: 576-1090 }
+  interfaces:
+    - { name: TaxonomyShape, lines: 33-38 }
+    - { name: DowntimeFilters, lines: 40-45 }
+    - { name: KpiResult, lines: 47-54 }
+    - { name: DailyTrendRow, lines: 56-62 }
+    - { name: BigCategoryRow, lines: 64-69 }
+    - { name: ResourceLookupEntry, lines: 71-75 }
+    - { name: EquipmentDetailRow, lines: 77-87 }
+    - { name: EquipmentDetailResult, lines: 89-95 }
+    - { name: EventDetailJobEnrichment, lines: 97-114 }
+    - { name: EventDetailRow, lines: 116-127 }
+    - { name: EventDetailResult, lines: 129-135 }
+    - { name: TopReasonRow, lines: 137-142 }
+  types:
+    - { name: ComposableState, lines: 144-144 }
+    - { name: DuckdbErrorKind, lines: 152-152 }
+
+src/downtime-analysis/composables/useFilterState.ts:  # 104 lines
+  imports:
+    - { module: vue, items: [reactive, computed], line: 1 }
+    - { module: '../types', items: [FilterState], line: 2 }
+  constants:
+    - { name: DEFAULT_STATE, line: 4 }
+  functions:
+    - { name: useFilterState, lines: 26-104 }
+
+src/downtime-analysis/constants.ts:  # 11 lines
+  constants:
+    - { name: STATUS_COLORS, line: 7 }
+
+src/downtime-analysis/formatDowntimeDate.ts:  # 50 lines
+  functions:
+    - { name: formatDowntimeDate, lines: 11-24 }
+    - { name: formatDowntimeDateOnly, lines: 30-50 }
+
+src/downtime-analysis/main.ts:  # 6 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+
+src/downtime-analysis/types.ts:  # 141 lines
+  interfaces:
+    - { name: DowntimeKpiShape, lines: 1-8 }
+    - { name: DailyTrendRow, lines: 10-16 }
+    - { name: BigCategoryRow, lines: 18-23 }
+    - { name: TopReasonRow, lines: 25-32 }
+    - { name: EquipmentDetailRow, lines: 34-48 }
+    - { name: JobEnrichment, lines: 50-74 }
+    - { name: EventDetailRow, lines: 78-90 }
+    - { name: Pagination, lines: 92-97 }
+    - { name: FilterOptions, lines: 99-106 }
+    - { name: FilterState, lines: 108-121 }
+    - { name: ChartFilter, lines: 127-130 }
+    - { name: TierThreeEntry, lines: 136-141 }
+  types:
+    - { name: MatchSource, lines: 76-76 }
+
+src/eap-alarm/App.vue:  # 336 lines
+
+src/eap-alarm/DetailTable.vue:  # 131 lines
+
+src/eap-alarm/FilterBar.vue:  # 92 lines
+
+src/eap-alarm/FineFilterBar.vue:  # 95 lines
+
+src/eap-alarm/ParetoChart.vue:  # 138 lines
+
+src/eap-alarm/SummaryCards.vue:  # 50 lines
+
+src/eap-alarm/TrendChart.vue:  # 126 lines
+
+src/eap-alarm/composables/useEapAlarmFilter.js:  # 164 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 8 }
+  constants:
+    - { name: EQP_TYPE_OPTIONS, line: 10 }
+  functions:
+    - { name: useEapAlarmFilter, lines: 15-164 }
+
+src/eap-alarm/composables/useEapAlarmViews.js:  # 251 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 7 }
+    - { module: '../../core/api', items: [apiGet], line: 8 }
+  constants:
+    - { name: DEFAULT_PER_PAGE, line: 10 }
+  functions:
+    - { name: useEapAlarmViews, lines: 12-251 }
+
+src/eap-alarm/main.js:  # 9 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: '../resource-shared/styles.css', items: [], line: 4 }
+    - { module: './style.css', items: [], line: 5 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
+
+src/hold-detail/App.vue:  # 555 lines
 
 src/hold-detail/components/AgeDistribution.vue:  # 63 lines
 
@@ -740,15 +987,15 @@ src/hold-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-src/hold-history/App.vue:  # 1109 lines
+src/hold-history/App.vue:  # 1287 lines
 
 src/hold-history/components/DailyTrend.vue:  # 145 lines
 
-src/hold-history/components/DetailTable.vue:  # 331 lines
+src/hold-history/components/DetailTable.vue:  # 321 lines
 
 src/hold-history/components/DurationChart.vue:  # 130 lines
 
-src/hold-history/components/FilterBar.vue:  # 148 lines
+src/hold-history/components/FilterBar.vue:  # 179 lines
 
 src/hold-history/components/FilterIndicator.vue:  # 34 lines
 
@@ -756,7 +1003,7 @@ src/hold-history/components/ReasonPareto.vue:  # 155 lines
 
 src/hold-history/components/RecordTypeFilter.vue:  # 87 lines
 
-src/hold-history/components/SummaryCards.vue:  # 248 lines
+src/hold-history/components/SummaryCards.vue:  # 247 lines
 
 src/hold-history/main.ts:  # 9 lines
   imports:
@@ -776,27 +1023,28 @@ src/hold-history/useAutoRefresh.ts:  # 107 lines
     - { name: UseAutoRefreshOptions, lines: 17-20 }
     - { name: UseAutoRefreshReturn, lines: 22-28 }
 
-src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
+src/hold-history/useHoldHistoryDuckDB.ts:  # 587 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer, DuckDBClient], line: 15 }
   constants:
-    - { name: TABLE_NAME, line: 127 }
+    - { name: TABLE_NAME, line: 129 }
+    - { name: SORT_COL_WHITELIST, line: 384 }
   functions:
-    - { name: qs, lines: 131-133 }
-    - { name: qid, lines: 135-137 }
-    - { name: sf, lines: 139-142 }
-    - { name: toRows, lines: 145-147 }
-    - { name: buildRecordTypeConditions, lines: 151-174 }
-    - { name: buildHoldTypeCondition, lines: 176-180 }
-    - { name: buildDurationCondition, lines: 182-189 }
-    - { name: buildBaseConditions, lines: 198-205 }
-    - { name: buildWhere, lines: 207-209 }
-    - { name: async queryTrend, lines: 213-267 }
-    - { name: async queryReasonPareto, lines: 271-303 }
-    - { name: async queryDuration, lines: 307-377 }
-    - { name: async queryList, lines: 389-462 }
-    - { name: useHoldHistoryDuckDB, lines: 466-559 }
+    - { name: qs, lines: 133-135 }
+    - { name: qid, lines: 137-139 }
+    - { name: sf, lines: 141-144 }
+    - { name: toRows, lines: 147-149 }
+    - { name: buildRecordTypeConditions, lines: 153-176 }
+    - { name: buildHoldTypeCondition, lines: 178-182 }
+    - { name: buildDurationCondition, lines: 184-191 }
+    - { name: buildBaseConditions, lines: 200-207 }
+    - { name: buildWhere, lines: 209-211 }
+    - { name: async queryTrend, lines: 215-269 }
+    - { name: async queryReasonPareto, lines: 273-305 }
+    - { name: async queryDuration, lines: 309-379 }
+    - { name: async queryList, lines: 413-486 }
+    - { name: useHoldHistoryDuckDB, lines: 490-587 }
   interfaces:
     - { name: TrendDayMetrics, lines: 20-26 }
     - { name: TrendDay, lines: 29-34 }
@@ -809,11 +1057,11 @@ src/hold-history/useHoldHistoryDuckDB.ts:  # 559 lines
     - { name: HoldListItem, lines: 81-97 }
     - { name: ListResult, lines: 100-103 }
     - { name: ComputeViewResult, lines: 106-111 }
-    - { name: ComputeViewParams, lines: 114-123 }
-    - { name: BaseConditionParams, lines: 191-196 }  # local
-    - { name: QueryListParams, lines: 381-387 }  # local
+    - { name: ComputeViewParams, lines: 114-125 }
+    - { name: BaseConditionParams, lines: 193-198 }  # local
+    - { name: QueryListParams, lines: 403-411 }  # local
 
-src/hold-overview/App.vue:  # 958 lines
+src/hold-overview/App.vue:  # 1043 lines
 
 src/hold-overview/components/FilterBar.vue:  # 103 lines
 
@@ -822,6 +1070,15 @@ src/hold-overview/components/FilterIndicator.vue:  # 77 lines
 src/hold-overview/components/HoldMatrix.vue:  # 151 lines
 
 src/hold-overview/components/HoldTreeMap.vue:  # 237 lines
+
+src/hold-overview/csvExport.ts:  # 88 lines
+  constants:
+    - { name: CSV_HEADERS, line: 15 }
+    - { name: CSV_KEYS, line: 32 }
+  functions:
+    - { name: _toCsvField, lines: 52-57 }
+    - { name: _buildCsv, lines: 63-72 }
+    - { name: _downloadCsv, lines: 78-88 }
 
 src/hold-overview/main.ts:  # 10 lines
   imports:
@@ -832,7 +1089,7 @@ src/hold-overview/main.ts:  # 10 lines
     - { module: './style.css', items: [], line: 6 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-src/job-query/App.vue:  # 221 lines
+src/job-query/App.vue:  # 215 lines
 
 src/job-query/composables/useJobQueryData.ts:  # 371 lines
   imports:
@@ -891,18 +1148,20 @@ src/job-query/main.ts:  # 653 lines
     - { name: Equipment, lines: 22-27 }  # local
     - { name: JobRecord, lines: 28-28 }  # local
 
-src/material-consumption/App.vue:  # 323 lines
+src/material-consumption/App.vue:  # 351 lines
 
-src/material-consumption/__tests__/FilterPanel.test.ts:  # 101 lines
+src/material-consumption/__tests__/FilterPanel.test.ts:  # 133 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 10 }
     - { module: '@vue/test-utils', items: [mount], line: 11 }
     - { module: vue, items: [defineComponent, nextTick], line: 12 }
     - { module: '../components/FilterPanel.vue', items: ['default:FilterPanel'], line: 13 }
+  constants:
+    - { name: DEFAULT_PART_OPTIONS, line: 33 }
   functions:
-    - { name: mountPanel, lines: 29-38 }
+    - { name: mountPanel, lines: 39-47 }
 
-src/material-consumption/__tests__/TrendChart.test.ts:  # 109 lines
+src/material-consumption/__tests__/TrendChart.test.ts:  # 96 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 10 }
     - { module: '@vue/test-utils', items: [mount], line: 11 }
@@ -910,7 +1169,7 @@ src/material-consumption/__tests__/TrendChart.test.ts:  # 109 lines
     - { module: '../components/ConsumptionTrendChart.vue', items: ['default:ConsumptionTrendChart'], line: 13 }
   functions:
     - { name: makeTrendData, lines: 34-39 }
-    - { name: mountChart, lines: 41-49 }
+    - { name: mountChart, lines: 41-48 }
 
 src/material-consumption/__tests__/useConsumptionQuery.test.ts:  # 183 lines
   imports:
@@ -919,32 +1178,32 @@ src/material-consumption/__tests__/useConsumptionQuery.test.ts:  # 183 lines
     - { module: '../../core/api', items: [apiPost, apiGet], line: 19 }
     - { module: '../composables/useConsumptionQuery', items: [useConsumptionQuery], line: 20 }
 
-src/material-consumption/components/ConsumptionTrendChart.vue:  # 164 lines
+src/material-consumption/components/ConsumptionTrendChart.vue:  # 152 lines
 
-src/material-consumption/components/DetailTable.vue:  # 151 lines
+src/material-consumption/components/DetailTable.vue:  # 148 lines
 
-src/material-consumption/components/FilterPanel.vue:  # 218 lines
+src/material-consumption/components/FilterPanel.vue:  # 212 lines
 
-src/material-consumption/components/TypeBreakdownChart.vue:  # 128 lines
+src/material-consumption/components/TypeBreakdownChart.vue:  # 147 lines
 
-src/material-consumption/composables/useConsumptionQuery.ts:  # 394 lines
+src/material-consumption/composables/useConsumptionQuery.ts:  # 399 lines
   imports:
     - { module: vue, items: [ref], line: 13 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 14 }
   constants:
-    - { name: POLL_INTERVAL_MS, line: 66 }
-    - { name: POLL_MAX_ATTEMPTS, line: 67 }
+    - { name: POLL_INTERVAL_MS, line: 67 }
+    - { name: POLL_MAX_ATTEMPTS, line: 68 }
   functions:
-    - { name: useConsumptionQuery, lines: 69-394 }
+    - { name: useConsumptionQuery, lines: 70-399 }
   interfaces:
     - { name: ConsumptionKpi, lines: 17-23 }
     - { name: TrendItem, lines: 25-29 }
     - { name: TypeBreakdownItem, lines: 31-35 }
-    - { name: DetailRow, lines: 37-48 }
-    - { name: DetailPagination, lines: 50-55 }
-    - { name: QueryParams, lines: 59-64 }
+    - { name: DetailRow, lines: 37-49 }
+    - { name: DetailPagination, lines: 51-56 }
+    - { name: QueryParams, lines: 60-65 }
   types:
-    - { name: Granularity, lines: 57-57 }
+    - { name: Granularity, lines: 58-58 }
 
 src/material-consumption/main.ts:  # 5 lines
   imports:
@@ -952,7 +1211,7 @@ src/material-consumption/main.ts:  # 5 lines
     - { module: './App.vue', items: ['default:App'], line: 2 }
     - { module: './style.css', items: [], line: 3 }
 
-src/material-trace/App.vue:  # 579 lines
+src/material-trace/App.vue:  # 573 lines
 
 src/material-trace/main.ts:  # 7 lines
   imports:
@@ -961,7 +1220,7 @@ src/material-trace/main.ts:  # 7 lines
     - { module: '../wip-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-src/mid-section-defect/App.vue:  # 940 lines
+src/mid-section-defect/App.vue:  # 941 lines
 
 src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
   imports:
@@ -987,7 +1246,7 @@ src/mid-section-defect/components/DetailTable.vue:  # 177 lines
     - { name: formatCell, lines: 88-93 }
     - { name: getSuspectHits, lines: 95-114 }
 
-src/mid-section-defect/components/FilterBar.vue:  # 216 lines
+src/mid-section-defect/components/FilterBar.vue:  # 208 lines
   imports:
     - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 2 }
   functions:
@@ -1039,33 +1298,32 @@ src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-src/portal-shell/App.vue:  # 346 lines
+src/portal-shell/App.vue:  # 387 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
-    - { module: lucide-vue-next, items: [ChevronRight], line: 4 }
-    - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 5 }
-    - { module: vue-router, items: [useRoute, useRouter], line: 6 }
-    - { module: '../shared-composables/useAiChat.js', items: [useAiChat], line: 8 }
-    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 9 }
-    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 10 }
-    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 11 }
-    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 12 }
-    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 13 }
-    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 14 }
-    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 15 }
-    - { module: './sidebarState.js', items: [SIDEBAR_STORAGE_KEY, buildSidebarUiState, isMobileViewport, parseSidebarCollapsedPreference, serializeSidebarCollapsedPreference], line: 16 }
+    - { module: lucide-vue-next, items: [Activity, AlertCircle, BarChart2, Briefcase, ChevronRight, Circle, Clock, Cpu, GitBranch, Layers, LayoutDashboard, LogOut, Monitor, Package, Search, Settings, TrendingDown, User], line: 4 }
+    - { module: vue, items: [computed, onMounted, onUnmounted, ref, watch], line: 24 }
+    - { module: vue-router, items: [useRoute, useRouter], line: 25 }
+    - { module: '../shared-composables/useAiChat.js', items: [useAiChat], line: 27 }
+    - { module: '../shared-composables/usePageUpdateBadge.js', items: [provideUpdateBadge], line: 28 }
+    - { module: '../shared-ui/components/DataUpdateBadge.vue', items: ['default:DataUpdateBadge'], line: 29 }
+    - { module: '../shared-ui/components/AiChatPanel.vue', items: ['default:AiChatPanel'], line: 30 }
+    - { module: '../shared-ui/components/AiChatTrigger.vue', items: ['default:AiChatTrigger'], line: 31 }
+    - { module: './components/AnomalyIndicator.vue', items: ['default:AnomalyIndicator'], line: 32 }
+    - { module: './components/HealthStatus.vue', items: ['default:HealthStatus'], line: 33 }
+    - { module: './composables/useAuth.js', items: [onlineCount, useAuth], line: 34 }
+    - { module: './router.js', items: [consumeNavigationNotice, setAuthState, syncNavigationRoutes], line: 35 }
+    - { module: './routeContracts.js', items: [normalizeRoutePath], line: 36 }
+    - { module: './sidebarState.js', items: [buildSidebarUiState], line: 37 }
   functions:
-    - { name: toShellPath, lines: 42-44 }
-    - { name: isPortalShellRootPath, lines: 46-49 }
-    - { name: async handleLogout, lines: 67-70 }
-    - { name: restoreSidebarPreference, lines: 87-94 }
-    - { name: persistSidebarPreference, lines: 96-105 }
-    - { name: checkViewport, lines: 107-112 }
-    - { name: closeMobileSidebar, lines: 114-116 }
-    - { name: toggleSidebar, lines: 118-125 }
-    - { name: handleViewportResize, lines: 127-129 }
-    - { name: handleGlobalKeydown, lines: 131-138 }
-    - { name: async loadNavigation, lines: 140-200 }
+    - { name: toShellPath, lines: 57-59 }
+    - { name: getPageIcon, lines: 67-84 }
+    - { name: isPortalShellRootPath, lines: 86-89 }
+    - { name: async handleLogout, lines: 107-110 }
+    - { name: closeSidebar, lines: 120-122 }
+    - { name: toggleSidebar, lines: 124-126 }
+    - { name: handleGlobalKeydown, lines: 128-135 }
+    - { name: async loadNavigation, lines: 137-198 }
 
 src/portal-shell/components/AnomalyIndicator.vue:  # 58 lines
   imports:
@@ -1118,12 +1376,12 @@ src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-src/portal-shell/nativeModuleRegistry.js:  # 101 lines
+src/portal-shell/nativeModuleRegistry.js:  # 105 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 99-101 }
+    - { name: getNativeModuleLoader, lines: 103-105 }
 
 src/portal-shell/navigationState.js:  # 166 lines
   imports:
@@ -1137,26 +1395,26 @@ src/portal-shell/navigationState.js:  # 166 lines
     - { name: normalizeNavigationDrawers, lines: 31-79 }
     - { name: buildDynamicNavigationState, lines: 81-166 }
 
-src/portal-shell/routeContracts.js:  # 374 lines
+src/portal-shell/routeContracts.js:  # 398 lines
   constants:
     - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
-    - { name: IN_SCOPE_ADMIN_ROUTES, line: 22 }
-    - { name: DEFERRED_ROUTES, line: 28 }
-    - { name: ALL_KNOWN_ROUTES, line: 30 }
-    - { name: ROUTE_CONTRACTS, line: 61 }
-    - { name: REQUIRED_FIELDS, line: 295 }
-    - { name: VALID_RENDER_MODES, line: 308 }
-    - { name: VALID_VISIBILITY_POLICIES, line: 309 }
-    - { name: VALID_SCOPES, line: 310 }
+    - { name: IN_SCOPE_ADMIN_ROUTES, line: 24 }
+    - { name: DEFERRED_ROUTES, line: 30 }
+    - { name: ALL_KNOWN_ROUTES, line: 32 }
+    - { name: ROUTE_CONTRACTS, line: 63 }
+    - { name: REQUIRED_FIELDS, line: 319 }
+    - { name: VALID_RENDER_MODES, line: 332 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 333 }
+    - { name: VALID_SCOPES, line: 334 }
   functions:
-    - { name: buildContract, lines: 36-59 }
-    - { name: normalizeRoutePath, lines: 312-318 }
-    - { name: getRouteContract, lines: 320-322 }
-    - { name: getRouteContractMap, lines: 324-326 }
-    - { name: getInScopeRoutes, lines: 328-330 }
-    - { name: getDeferredRoutes, lines: 332-334 }
-    - { name: getKnownRoutes, lines: 336-338 }
-    - { name: validateRouteContractMap, lines: 340-374 }
+    - { name: buildContract, lines: 38-61 }
+    - { name: normalizeRoutePath, lines: 336-342 }
+    - { name: getRouteContract, lines: 344-346 }
+    - { name: getRouteContractMap, lines: 348-350 }
+    - { name: getInScopeRoutes, lines: 352-354 }
+    - { name: getDeferredRoutes, lines: 356-358 }
+    - { name: getKnownRoutes, lines: 360-362 }
+    - { name: validateRouteContractMap, lines: 364-398 }
 
 src/portal-shell/routeQuery.js:  # 36 lines
   functions:
@@ -1179,7 +1437,7 @@ src/portal-shell/router.js:  # 151 lines
     - { name: consumeNavigationNotice, lines: 100-104 }
     - { name: setAuthState, lines: 110-113 }
 
-src/portal-shell/sidebarState.js:  # 34 lines
+src/portal-shell/sidebarState.js:  # 26 lines
   constants:
     - { name: SIDEBAR_STORAGE_KEY, line: 1 }
     - { name: MOBILE_BREAKPOINT, line: 2 }
@@ -1187,7 +1445,7 @@ src/portal-shell/sidebarState.js:  # 34 lines
     - { name: isMobileViewport, lines: 4-6 }
     - { name: parseSidebarCollapsedPreference, lines: 8-10 }
     - { name: serializeSidebarCollapsedPreference, lines: 12-14 }
-    - { name: buildSidebarUiState, lines: 16-34 }
+    - { name: buildSidebarUiState, lines: 16-26 }
 
 src/portal-shell/views/LoginPage.vue:  # 288 lines
   imports:
@@ -1222,32 +1480,32 @@ src/portal/main.js:  # 160 lines
   imports:
     - { module: './portal.css', items: [], line: 1 }
 
-src/production-history/App.vue:  # 563 lines
+src/production-history/App.vue:  # 570 lines
 
-src/production-history/components/ProductionDetailTable.vue:  # 102 lines
+src/production-history/components/ProductionDetailTable.vue:  # 106 lines
 
 src/production-history/components/ProductionMatrix.vue:  # 245 lines
 
-src/production-history/composables/useFirstTierFilters.ts:  # 365 lines
+src/production-history/composables/useFirstTierFilters.ts:  # 372 lines
   imports:
     - { module: vue, items: [reactive, ref, watch], line: 22 }
     - { module: '../../core/api', items: [apiGet], line: 23 }
   constants:
-    - { name: DEFAULT_DEBOUNCE_MS, line: 91 }
+    - { name: DEFAULT_DEBOUNCE_MS, line: 98 }
   functions:
-    - { name: parseWildcardInput, lines: 72-87 }
-    - { name: useFirstTierFilters, lines: 102-348 }
-    - { name: _buildUrl, lines: 352-365 }
+    - { name: parseWildcardInput, lines: 75-94 }
+    - { name: useFirstTierFilters, lines: 109-355 }
+    - { name: _buildUrl, lines: 359-372 }
   interfaces:
     - { name: CachedFilterSelection, lines: 28-33 }
     - { name: FilterOptionsResponse, lines: 42-51 }
     - { name: ApiErrorLike, lines: 53-56 }  # local
-    - { name: UseFirstTierFiltersOptions, lines: 93-100 }
+    - { name: UseFirstTierFiltersOptions, lines: 100-107 }
   types:
     - { name: CachedFilterField, lines: 35-35 }
     - { name: WildcardField, lines: 39-39 }
 
-src/production-history/composables/useProductionHistory.ts:  # 637 lines
+src/production-history/composables/useProductionHistory.ts:  # 656 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiPost], line: 2 }
@@ -1256,9 +1514,9 @@ src/production-history/composables/useProductionHistory.ts:  # 637 lines
   constants:
     - { name: API_TIMEOUT, line: 6 }
   functions:
-    - { name: validateQueryMode, lines: 167-185 }
-    - { name: buildModePayload, lines: 196-217 }
-    - { name: useProductionHistory, lines: 245-637 }
+    - { name: validateQueryMode, lines: 167-181 }
+    - { name: buildModePayload, lines: 192-213 }
+    - { name: useProductionHistory, lines: 241-656 }
   interfaces:
     - { name: MatrixFilter, lines: 11-16 }
     - { name: SupplementaryFilter, lines: 25-28 }
@@ -1272,9 +1530,9 @@ src/production-history/composables/useProductionHistory.ts:  # 637 lines
     - { name: JobProgressState, lines: 113-119 }
     - { name: QueryParams, lines: 125-140 }
     - { name: ModeValidationInput, lines: 150-159 }
-    - { name: QueryResponseEnvelope, lines: 221-225 }  # local
-    - { name: QueryResponseData, lines: 227-234 }  # local
-    - { name: ApiErrorLike, lines: 236-243 }  # local
+    - { name: QueryResponseEnvelope, lines: 217-221 }  # local
+    - { name: QueryResponseData, lines: 223-230 }  # local
+    - { name: ApiErrorLike, lines: 232-239 }  # local
   types:
     - { name: SupplementaryFilterField, lines: 31-31 }
     - { name: MatrixTree, lines: 104-104 }
@@ -1289,7 +1547,7 @@ src/production-history/main.ts:  # 7 lines
     - { module: '../resource-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-src/qc-gate/App.vue:  # 160 lines
+src/qc-gate/App.vue:  # 138 lines
 
 src/qc-gate/components/LotTable.vue:  # 119 lines
 
@@ -1325,15 +1583,15 @@ src/qc-gate/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-src/query-tool/App.vue:  # 705 lines
+src/query-tool/App.vue:  # 699 lines
 
 src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
 
-src/query-tool/components/EquipmentLotsTable.vue:  # 80 lines
+src/query-tool/components/EquipmentLotsTable.vue:  # 81 lines
 
-src/query-tool/components/EquipmentRejectsTable.vue:  # 256 lines
+src/query-tool/components/EquipmentRejectsTable.vue:  # 260 lines
 
-src/query-tool/components/EquipmentView.vue:  # 246 lines
+src/query-tool/components/EquipmentView.vue:  # 298 lines
 
 src/query-tool/components/ExportButton.vue:  # 30 lines
 
@@ -1341,23 +1599,23 @@ src/query-tool/components/LineageTreeChart.vue:  # 1153 lines
 
 src/query-tool/components/LotAssociationTable.vue:  # 118 lines
 
-src/query-tool/components/LotDetail.vue:  # 350 lines
+src/query-tool/components/LotDetail.vue:  # 392 lines
 
-src/query-tool/components/LotEquipmentView.vue:  # 392 lines
+src/query-tool/components/LotEquipmentView.vue:  # 444 lines
 
-src/query-tool/components/LotHistoryTable.vue:  # 128 lines
+src/query-tool/components/LotHistoryTable.vue:  # 129 lines
 
 src/query-tool/components/LotJobsTable.vue:  # 265 lines
 
 src/query-tool/components/LotRejectTable.vue:  # 218 lines
 
-src/query-tool/components/LotTimeline.vue:  # 382 lines
+src/query-tool/components/LotTimeline.vue:  # 399 lines
 
-src/query-tool/components/LotTraceView.vue:  # 391 lines
+src/query-tool/components/LotTraceView.vue:  # 419 lines
 
 src/query-tool/components/QueryBar.vue:  # 112 lines
 
-src/query-tool/components/SerialReverseTraceView.vue:  # 396 lines
+src/query-tool/components/SerialReverseTraceView.vue:  # 424 lines
 
 src/query-tool/composables/useEquipmentQuery.ts:  # 406 lines
   imports:
@@ -1516,11 +1774,11 @@ src/query-tool/utils/values.ts:  # 93 lines
     - { name: formatCellValue, lines: 74-82 }
     - { name: hashColor, lines: 84-93 }
 
-src/reject-history/App.vue:  # 1522 lines
+src/reject-history/App.vue:  # 1570 lines
 
-src/reject-history/components/DetailTable.vue:  # 163 lines
+src/reject-history/components/DetailTable.vue:  # 182 lines
 
-src/reject-history/components/FilterPanel.vue:  # 295 lines
+src/reject-history/components/FilterPanel.vue:  # 309 lines
 
 src/reject-history/components/ParetoGrid.vue:  # 51 lines
 
@@ -1538,29 +1796,29 @@ src/reject-history/main.ts:  # 9 lines
     - { module: './style.css', items: [], line: 5 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
 
-src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
+src/reject-history/useRejectHistoryDuckDB.ts:  # 804 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported], line: 15 }
   constants:
-    - { name: TABLE_NAME, line: 170 }
-    - { name: DIM_TO_COLUMN, line: 173 }
+    - { name: TABLE_NAME, line: 174 }
+    - { name: DIM_TO_COLUMN, line: 177 }
   functions:
-    - { name: getCsrfToken, lines: 181-185 }
-    - { name: async fetchParquetBuffer, lines: 187-201 }
-    - { name: qs, lines: 205-207 }
-    - { name: qid, lines: 209-211 }
-    - { name: normValueExpr, lines: 213-216 }
-    - { name: buildPolicyConditions, lines: 225-262 }
-    - { name: buildUserConditions, lines: 272-308 }
-    - { name: buildWhereClause, lines: 310-312 }
-    - { name: async queryAnalyticsRaw, lines: 316-336 }
-    - { name: buildSummaryFromAnalytics, lines: 338-358 }
-    - { name: async queryDetail, lines: 367-460 }
-    - { name: async queryBatchPareto, lines: 468-558 }
-    - { name: async queryAvailableFilters, lines: 560-589 }
-    - { name: async querySummaryDirect, lines: 591-641 }
-    - { name: useRejectHistoryDuckDB, lines: 645-764 }
+    - { name: getCsrfToken, lines: 185-189 }
+    - { name: async fetchParquetBuffer, lines: 191-205 }
+    - { name: qs, lines: 209-211 }
+    - { name: qid, lines: 213-215 }
+    - { name: normValueExpr, lines: 217-220 }
+    - { name: buildPolicyConditions, lines: 229-266 }
+    - { name: buildUserConditions, lines: 277-319 }
+    - { name: buildWhereClause, lines: 321-323 }
+    - { name: async queryAnalyticsRaw, lines: 327-347 }
+    - { name: buildSummaryFromAnalytics, lines: 349-369 }
+    - { name: async queryDetail, lines: 386-482 }
+    - { name: async queryBatchPareto, lines: 490-585 }
+    - { name: async queryAvailableFilters, lines: 587-623 }
+    - { name: async querySummaryDirect, lines: 625-675 }
+    - { name: useRejectHistoryDuckDB, lines: 679-804 }
   interfaces:
     - { name: AnalyticsRawRow, lines: 20-28 }
     - { name: SummaryData, lines: 31-40 }
@@ -1570,27 +1828,27 @@ src/reject-history/useRejectHistoryDuckDB.ts:  # 764 lines
     - { name: ParetoItem, lines: 88-97 }
     - { name: ParetoDimension, lines: 100-104 }
     - { name: BatchParetoResult, lines: 107-112 }
-    - { name: AvailableFilters, lines: 115-119 }
-    - { name: ComputeViewResult, lines: 122-128 }
-    - { name: PolicyFilters, lines: 131-136 }
-    - { name: ComputeViewParams, lines: 142-155 }
-    - { name: DuckDBClient, lines: 161-166 }  # local
-    - { name: PolicyConditionParams, lines: 218-223 }  # local
-    - { name: UserConditionParams, lines: 264-270 }  # local
-    - { name: QueryDetailParams, lines: 360-365 }  # local
-    - { name: QueryBatchParetoParams, lines: 462-466 }  # local
+    - { name: AvailableFilters, lines: 115-120 }
+    - { name: ComputeViewResult, lines: 123-129 }
+    - { name: PolicyFilters, lines: 132-137 }
+    - { name: ComputeViewParams, lines: 143-159 }
+    - { name: DuckDBClient, lines: 165-170 }  # local
+    - { name: PolicyConditionParams, lines: 222-227 }  # local
+    - { name: UserConditionParams, lines: 268-275 }  # local
+    - { name: QueryDetailParams, lines: 377-384 }  # local
+    - { name: QueryBatchParetoParams, lines: 484-488 }  # local
   types:
-    - { name: ParetoSelections, lines: 139-139 }
+    - { name: ParetoSelections, lines: 140-140 }
 
-src/resource-history/App.vue:  # 776 lines
+src/resource-history/App.vue:  # 982 lines
 
-src/resource-history/components/ComparisonChart.vue:  # 97 lines
+src/resource-history/components/ComparisonChart.vue:  # 105 lines
 
-src/resource-history/components/DetailSection.vue:  # 300 lines
+src/resource-history/components/DetailSection.vue:  # 349 lines
 
-src/resource-history/components/FilterBar.vue:  # 163 lines
+src/resource-history/components/FilterBar.vue:  # 183 lines
 
-src/resource-history/components/HeatmapChart.vue:  # 161 lines
+src/resource-history/components/HeatmapChart.vue:  # 170 lines
 
 src/resource-history/components/KpiCards.vue:  # 96 lines
 
@@ -1606,7 +1864,7 @@ src/resource-history/main.ts:  # 9 lines
     - { module: './style.css', items: [], line: 5 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 6 }
 
-src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
+src/resource-history/useResourceHistoryDuckDB.ts:  # 581 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 14 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 15 }
@@ -1614,22 +1872,23 @@ src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
   constants:
     - { name: TABLE_NAME, line: 18 }
   functions:
-    - { name: qid, lines: 136-138 }
-    - { name: granularityExpr, lines: 140-152 }
-    - { name: sf, lines: 158-161 }
-    - { name: calcOuPct, lines: 163-166 }
-    - { name: calcAvailPct, lines: 168-172 }
-    - { name: statusPct, lines: 174-176 }
-    - { name: buildKpiFromRow, lines: 178-207 }
-    - { name: emptyKpi, lines: 209-222 }
-    - { name: async queryKpi, lines: 226-241 }
-    - { name: async queryTrend, lines: 243-281 }
-    - { name: async queryByHistoryId, lines: 283-299 }
-    - { name: async queryByHistoryIdAndDate, lines: 301-318 }
-    - { name: deriveHeatmap, lines: 322-358 }
-    - { name: deriveComparison, lines: 360-383 }
-    - { name: deriveDetail, lines: 385-430 }
-    - { name: useResourceHistoryDuckDB, lines: 434-515 }
+    - { name: qid, lines: 160-162 }
+    - { name: granularityExpr, lines: 164-176 }
+    - { name: sf, lines: 182-185 }
+    - { name: calcOuPct, lines: 187-190 }
+    - { name: calcAvailPct, lines: 192-196 }
+    - { name: statusPct, lines: 198-200 }
+    - { name: buildKpiFromRow, lines: 202-231 }
+    - { name: emptyKpi, lines: 233-246 }
+    - { name: async queryKpi, lines: 250-265 }
+    - { name: async queryTrend, lines: 267-305 }
+    - { name: async queryByHistoryId, lines: 307-323 }
+    - { name: async queryByHistoryIdAndDate, lines: 325-344 }
+    - { name: deriveHeatmap, lines: 348-384 }
+    - { name: deriveComparison, lines: 386-409 }
+    - { name: deriveDetail, lines: 411-456 }
+    - { name: deriveDetailByDate, lines: 458-495 }
+    - { name: useResourceHistoryDuckDB, lines: 499-581 }
   interfaces:
     - { name: ResourceMeta, lines: 22-27 }  # local
     - { name: LocalKpi, lines: 33-53 }  # local
@@ -1637,14 +1896,15 @@ src/resource-history/useResourceHistoryDuckDB.ts:  # 515 lines
     - { name: HeatmapItem, lines: 69-76 }  # local
     - { name: ComparisonItem, lines: 78-83 }  # local
     - { name: DetailItem, lines: 85-109 }  # local
-    - { name: SummaryResult, lines: 111-116 }  # local
-    - { name: DetailResult, lines: 118-123 }  # local
-    - { name: ComputeViewResult, lines: 125-128 }  # local
-    - { name: ComputeViewOptions, lines: 130-132 }  # local
+    - { name: DetailByDateItem, lines: 111-132 }  # local
+    - { name: SummaryResult, lines: 134-139 }  # local
+    - { name: DetailResult, lines: 141-146 }  # local
+    - { name: ComputeViewResult, lines: 148-152 }  # local
+    - { name: ComputeViewOptions, lines: 154-156 }  # local
   types:
     - { name: ResourceMetadataMap, lines: 29-29 }  # local
 
-src/resource-shared/components/HierarchyTable.vue:  # 362 lines
+src/resource-shared/components/HierarchyTable.vue:  # 416 lines
 
 src/resource-shared/components/MultiSelect.vue:  # 193 lines
 
@@ -1662,19 +1922,36 @@ src/resource-shared/constants.ts:  # 79 lines
 
 src/resource-shared/index.ts:  # 13 lines
 
-src/resource-status/App.vue:  # 680 lines
+src/resource-status/App.vue:  # 834 lines
 
-src/resource-status/components/EquipmentCard.vue:  # 120 lines
+src/resource-status/components/EquipmentCard.vue:  # 136 lines
 
-src/resource-status/components/EquipmentGrid.vue:  # 83 lines
+src/resource-status/components/EquipmentGrid.vue:  # 84 lines
 
-src/resource-status/components/FilterBar.vue:  # 119 lines
+src/resource-status/components/FilterBar.vue:  # 139 lines
 
-src/resource-status/components/FloatingTooltip.vue:  # 358 lines
+src/resource-status/components/FloatingTooltip.vue:  # 407 lines
 
-src/resource-status/components/MatrixSection.vue:  # 457 lines
+src/resource-status/components/MaintenanceAlerts.vue:  # 159 lines
+
+src/resource-status/components/MatrixSection.vue:  # 476 lines
+
+src/resource-status/components/OuHeatmap.vue:  # 136 lines
 
 src/resource-status/components/StatusHeader.vue:  # 45 lines
+
+src/resource-status/components/WorkcenterOuRings.vue:  # 151 lines
+
+src/resource-status/composables/useCrossFilter.ts:  # 92 lines
+  imports:
+    - { module: vue, items: [computed, ref, ComputedRef, Ref], line: 1 }
+  functions:
+    - { name: useCrossFilter, lines: 43-92 }
+  interfaces:
+    - { name: CrossFilterSelection, lines: 7-14 }
+    - { name: UseCrossFilterReturn, lines: 18-41 }
+  types:
+    - { name: CrossFilterSource, lines: 5-5 }
 
 src/resource-status/main.ts:  # 7 lines
   imports:
@@ -1707,7 +1984,7 @@ src/shared-composables/useAiChat.ts:  # 202 lines
   types:
     - { name: MessageRole, lines: 4-4 }
 
-src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
+src/shared-composables/useAsyncJobPolling.ts:  # 106 lines
   imports:
     - { module: '../core/api.js', items: [apiGet], line: 1 }
   constants:
@@ -1715,17 +1992,17 @@ src/shared-composables/useAsyncJobPolling.ts:  # 104 lines
     - { name: JOB_POLL_MAX_MS, line: 4 }
   functions:
     - { name: sleep, lines: 6-8 }
-    - { name: async pollJobUntilComplete, lines: 50-94 }
-    - { name: useAsyncJobPolling, lines: 100-104 }
+    - { name: async pollJobUntilComplete, lines: 52-96 }
+    - { name: useAsyncJobPolling, lines: 102-106 }
   interfaces:
-    - { name: JobStatusResponse, lines: 10-16 }
-    - { name: PollOptions, lines: 18-23 }
-    - { name: AsyncJobPollingComposable, lines: 25-27 }
-    - { name: JobError, lines: 29-31 }  # local
+    - { name: JobStatusResponse, lines: 10-18 }
+    - { name: PollOptions, lines: 20-25 }
+    - { name: AsyncJobPollingComposable, lines: 27-29 }
+    - { name: JobError, lines: 31-33 }  # local
 
 src/shared-composables/useAutoRefresh.ts:  # 23 lines
   imports:
-    - { module: '../wip-shared/composables/useAutoRefresh', items: [useAutoRefresh], line: 1 }
+    - { module: '../wip-shared/composables/useAutoRefresh', items: ['useAutoRefresh:useAutoRefreshBase'], line: 1 }
   functions:
     - { name: useAutoRefresh, lines: 21-23 }
   interfaces:
@@ -1734,7 +2011,7 @@ src/shared-composables/useAutoRefresh.ts:  # 23 lines
 
 src/shared-composables/useAutocomplete.ts:  # 33 lines
   imports:
-    - { module: '../wip-shared/composables/useAutocomplete', items: [useAutocomplete], line: 1 }
+    - { module: '../wip-shared/composables/useAutocomplete', items: ['useAutocomplete:useAutocompleteBase'], line: 1 }
   functions:
     - { name: useAutocomplete, lines: 31-33 }
   interfaces:
@@ -1759,6 +2036,19 @@ src/shared-composables/useFilterOrchestrator.ts:  # 229 lines
   types:
     - { name: FieldTrigger, lines: 5-5 }
     - { name: DependencyAction, lines: 6-6 }
+
+src/shared-composables/usePageUpdateBadge.ts:  # 59 lines
+  imports:
+    - { module: vue, items: [InjectionKey, inject, onUnmounted, provide, reactive, watch, WatchSource], line: 1 }
+  constants:
+    - { name: UPDATE_BADGE_KEY, line: 17 }
+  functions:
+    - { name: provideUpdateBadge, lines: 19-28 }
+    - { name: useUpdateBadge, lines: 30-32 }
+    - { name: bindUpdateBadge, lines: 38-59 }
+  interfaces:
+    - { name: UpdateBadgeState, lines: 3-8 }  # local
+    - { name: BindOptions, lines: 10-15 }  # local
 
 src/shared-composables/usePaginationState.ts:  # 66 lines
   imports:
@@ -1800,7 +2090,7 @@ src/shared-composables/useSortableTable.ts:  # 115 lines
     - { name: SortType, lines: 5-5 }
     - { name: DataRow, lines: 7-7 }
 
-src/shared-composables/useTraceProgress.ts:  # 531 lines
+src/shared-composables/useTraceProgress.ts:  # 564 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 1 }
     - { module: vue, items: [Ref], line: 2 }
@@ -1815,7 +2105,7 @@ src/shared-composables/useTraceProgress.ts:  # 531 lines
     - { name: normalizeSeedContainerIds, lines: 76-105 }
     - { name: collectAllContainerIds, lines: 107-152 }
     - { name: async consumeNDJSONStream, lines: 159-211 }
-    - { name: useTraceProgress, lines: 213-531 }
+    - { name: useTraceProgress, lines: 213-564 }
   interfaces:
     - { name: TraceProgressOptions, lines: 22-24 }
     - { name: StageError, lines: 26-29 }
@@ -1843,13 +2133,17 @@ src/shared-ui/components/AiChatPanel.vue:  # 410 lines
 
 src/shared-ui/components/AiChatTrigger.vue:  # 72 lines
 
+src/shared-ui/components/AsyncQueryProgress.vue:  # 130 lines
+
 src/shared-ui/components/BlockLoadingState.vue:  # 36 lines
 
 src/shared-ui/components/Chip.vue:  # 162 lines
 
-src/shared-ui/components/DataTable.vue:  # 369 lines
+src/shared-ui/components/DataTable.vue:  # 384 lines
 
 src/shared-ui/components/DataTableColumn.vue:  # 46 lines
+
+src/shared-ui/components/DataUpdateBadge.vue:  # 138 lines
 
 src/shared-ui/components/EmptyState.vue:  # 54 lines
 
@@ -1861,7 +2155,7 @@ src/shared-ui/components/LoadingOverlay.vue:  # 39 lines
 
 src/shared-ui/components/LoadingSpinner.vue:  # 51 lines
 
-src/shared-ui/components/MultiSelect.vue:  # 256 lines
+src/shared-ui/components/MultiSelect.vue:  # 359 lines
 
 src/shared-ui/components/PageHeader.vue:  # 88 lines
 
@@ -1873,28 +2167,31 @@ src/shared-ui/components/SkeletonLoader.vue:  # 153 lines
 
 src/shared-ui/components/StatusBadge.vue:  # 57 lines
 
-src/shared-ui/components/SummaryCard.vue:  # 228 lines
+src/shared-ui/components/SummaryCard.vue:  # 211 lines
 
 src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
 src/shared-ui/components/TimelineChart.vue:  # 566 lines
 
-src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 180 lines
+src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 199 lines
   imports:
-    - { module: vitest, items: [describe, it, expect, vi, beforeEach], line: 11 }
-    - { module: '@vue/test-utils', items: [mount], line: 12 }
-    - { module: vue, items: [nextTick, defineComponent], line: 13 }
-    - { module: '../MultiSelect.vue', items: ['default:MultiSelect'], line: 14 }
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 15 }
+    - { module: '@vue/test-utils', items: [mount], line: 16 }
+    - { module: vue, items: [nextTick, defineComponent], line: 17 }
+    - { module: '../MultiSelect.vue', items: ['default:MultiSelect'], line: 18 }
   constants:
-    - { name: DEFAULT_OPTIONS, line: 25 }
+    - { name: DEFAULT_OPTIONS, line: 29 }
   functions:
-    - { name: mountSelect, lines: 27-37 }
+    - { name: mountSelect, lines: 31-41 }
+    - { name: getDropdown, lines: 44-46 }
+    - { name: getOptions, lines: 47-49 }
+    - { name: getCloseBtn, lines: 50-52 }
 
-src/shared-ui/index.ts:  # 22 lines
+src/shared-ui/index.ts:  # 24 lines
 
-src/wip-detail/App.vue:  # 598 lines
+src/wip-detail/App.vue:  # 594 lines
 
-src/wip-detail/components/FilterPanel.vue:  # 163 lines
+src/wip-detail/components/FilterPanel.vue:  # 204 lines
 
 src/wip-detail/components/LotDetailPanel.vue:  # 198 lines
 
@@ -1909,13 +2206,15 @@ src/wip-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-src/wip-overview/App.vue:  # 563 lines
+src/wip-overview/App.vue:  # 579 lines
 
-src/wip-overview/components/FilterPanel.vue:  # 164 lines
+src/wip-overview/components/FilterPanel.vue:  # 204 lines
 
-src/wip-overview/components/MatrixTable.vue:  # 134 lines
+src/wip-overview/components/MatrixTable.vue:  # 185 lines
 
 src/wip-overview/components/StatusCards.vue:  # 59 lines
+
+src/wip-overview/components/WipDistributionCharts.vue:  # 244 lines
 
 src/wip-overview/main.ts:  # 8 lines
   imports:
@@ -1976,7 +2275,7 @@ src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-src/yield-alert-center/App.vue:  # 985 lines
+src/yield-alert-center/App.vue:  # 1062 lines
 
 src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
@@ -1984,7 +2283,7 @@ src/yield-alert-center/YieldPackageChart.vue:  # 128 lines
 
 src/yield-alert-center/YieldStationChart.vue:  # 94 lines
 
-src/yield-alert-center/YieldTrendChart.vue:  # 104 lines
+src/yield-alert-center/YieldTrendChart.vue:  # 132 lines
 
 src/yield-alert-center/main.ts:  # 10 lines
   imports:
@@ -1995,7 +2294,7 @@ src/yield-alert-center/main.ts:  # 10 lines
     - { module: './style.css', items: [], line: 6 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-src/yield-alert-center/useYieldAlertDuckDB.ts:  # 678 lines
+src/yield-alert-center/useYieldAlertDuckDB.ts:  # 706 lines
   imports:
     - { module: vue, items: [ref, readonly, Ref], line: 15 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported, DuckDBClient], line: 16 }
@@ -2007,33 +2306,33 @@ src/yield-alert-center/useYieldAlertDuckDB.ts:  # 678 lines
   functions:
     - { name: getCsrfToken, lines: 19-21 }
     - { name: async fetchParquetBuffer, lines: 23-37 }
-    - { name: qs, lines: 161-164 }
-    - { name: qid, lines: 166-168 }
-    - { name: granularityExpr, lines: 170-178 }
-    - { name: buildDimensionWhere, lines: 180-196 }
-    - { name: buildReasonExclusionWhere, lines: 198-209 }
-    - { name: sf, lines: 211-214 }
-    - { name: async querySummary, lines: 218-248 }
-    - { name: async queryTrend, lines: 250-292 }
-    - { name: async queryHeatmap, lines: 294-344 }
-    - { name: async queryStationSummary, lines: 346-387 }
-    - { name: async queryPackageSummary, lines: 389-427 }
-    - { name: async queryAlerts, lines: 429-564 }
-    - { name: async queryFilterOptions, lines: 566-589 }
-    - { name: useYieldAlertDuckDB, lines: 593-678 }
+    - { name: qs, lines: 162-165 }
+    - { name: qid, lines: 167-169 }
+    - { name: granularityExpr, lines: 171-179 }
+    - { name: buildDimensionWhere, lines: 181-197 }
+    - { name: buildReasonExclusionWhere, lines: 199-210 }
+    - { name: sf, lines: 212-215 }
+    - { name: async querySummary, lines: 219-249 }
+    - { name: async queryTrend, lines: 251-318 }
+    - { name: async queryHeatmap, lines: 320-370 }
+    - { name: async queryStationSummary, lines: 372-413 }
+    - { name: async queryPackageSummary, lines: 415-453 }
+    - { name: async queryAlerts, lines: 455-592 }
+    - { name: async queryFilterOptions, lines: 594-617 }
+    - { name: useYieldAlertDuckDB, lines: 621-706 }
   interfaces:
     - { name: SummaryResult, lines: 56-60 }  # local
     - { name: TrendItem, lines: 62-67 }  # local
     - { name: HeatmapItem, lines: 69-76 }  # local
     - { name: StationItem, lines: 78-84 }  # local
     - { name: PackageItem, lines: 86-91 }  # local
-    - { name: AlertItem, lines: 93-114 }  # local
-    - { name: AlertsResult, lines: 116-121 }  # local
-    - { name: FilterOptions, lines: 123-125 }  # local
-    - { name: ComputeViewParams, lines: 127-137 }  # local
-    - { name: WhereParams, lines: 139-142 }  # local
-    - { name: TrendWhereParams, lines: 144-146 }  # local
-    - { name: AlertQueryParams, lines: 148-157 }  # local
+    - { name: AlertItem, lines: 93-115 }  # local
+    - { name: AlertsResult, lines: 117-122 }  # local
+    - { name: FilterOptions, lines: 124-126 }  # local
+    - { name: ComputeViewParams, lines: 128-138 }  # local
+    - { name: WhereParams, lines: 140-143 }  # local
+    - { name: TrendWhereParams, lines: 145-147 }  # local
+    - { name: AlertQueryParams, lines: 149-158 }  # local
 
 src/yield-alert-center/utils.ts:  # 52 lines
   functions:
@@ -2041,7 +2340,7 @@ src/yield-alert-center/utils.ts:  # 52 lines
     - { name: toQueryParams, lines: 21-38 }
     - { name: buildDrilldownNotice, lines: 40-52 }
 
-tailwind.config.js:  # 257 lines
+tailwind.config.js:  # 259 lines
 
 tests/abort/production-history-abort.test.js:  # 209 lines
   imports:
@@ -2070,6 +2369,12 @@ tests/components/ActionButton.test.js:  # 98 lines
     - { module: '@vue/test-utils', items: [mount], line: 19 }
     - { module: '../../src/query-tool/components/ExportButton.vue', items: ['default:ExportButton'], line: 20 }
 
+tests/components/AsyncQueryProgress.test.js:  # 150 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 20 }
+    - { module: '@vue/test-utils', items: [mount], line: 21 }
+    - { module: '../../src/shared-ui/components/AsyncQueryProgress.vue', items: ['default:AsyncQueryProgress'], line: 22 }
+
 tests/components/DataTable.test.js:  # 76 lines
   imports:
     - { module: vitest, items: [describe, it, expect], line: 10 }
@@ -2082,11 +2387,11 @@ tests/components/DateRangePicker.test.js:  # 68 lines
   functions:
     - { name: isRangeExceeded, lines: 29-36 }
 
-tests/components/FilterPanel.test.js:  # 198 lines
+tests/components/FilterPanel.test.js:  # 215 lines
   imports:
-    - { module: vitest, items: [describe, it, expect, vi], line: 16 }
-    - { module: '@vue/test-utils', items: [shallowMount], line: 17 }
-    - { module: '../../src/wip-overview/components/FilterPanel.vue', items: ['default:FilterPanel'], line: 18 }
+    - { module: vitest, items: [describe, it, expect, vi], line: 20 }
+    - { module: '@vue/test-utils', items: [shallowMount], line: 21 }
+    - { module: '../../src/wip-overview/components/FilterPanel.vue', items: ['default:FilterPanel'], line: 22 }
 
 tests/components/HoldMatrix.test.js:  # 125 lines
   imports:
@@ -2137,11 +2442,19 @@ tests/components/ProductionDetailTable.test.js:  # 70 lines
   functions:
     - { name: makeRow, lines: 17-36 }
 
-tests/core/api-dedup.test.js:  # 172 lines
+tests/core/api-dedup.test.js:  # 174 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 12 }
   functions:
     - { name: makeOkResponse, lines: 25-33 }
+
+tests/hold-overview/csv-export.test.js:  # 190 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 14 }
+    - { module: '../../src/hold-overview/csvExport.ts', items: [_buildCsv, _downloadCsv], line: 15 }
+  constants:
+    - { name: EXPECTED_HEADERS, line: 18 }
+    - { name: SAMPLE_LOT, line: 35 }
 
 tests/legacy/admin-dashboard.test.js:  # 89 lines
   imports:
@@ -2280,7 +2593,7 @@ tests/legacy/portal-shell-route-query.test.js:  # 29 lines
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
     - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 4 }
 
-tests/legacy/portal-shell-sidebar.test.js:  # 96 lines
+tests/legacy/portal-shell-sidebar.test.js:  # 76 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
@@ -2366,11 +2679,21 @@ tests/legacy/resource-history.test.js:  # 132 lines
     - { name: calcAvailPct, lines: 28-32 }
     - { name: statusPct, lines: 34-36 }
 
-tests/legacy/resource-status.test.js:  # 114 lines
+tests/legacy/resource-status.test.js:  # 438 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
     - { module: '../../src/resource-shared/constants.js', items: [normalizeStatus, resolveOuBadgeClass, getStatusDisplay, STATUS_DISPLAY_MAP, STATUS_AGGREGATION, MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS], line: 4 }
+    - { module: '@vue/server-renderer', items: [renderToString], line: 123 }
+    - { module: vue, items: [createSSRApp, defineComponent, h], line: 124 }
+  functions:
+    - { name: async ssrRender, lines: 127-130 }
+    - { name: EquipmentCardStub, lines: 133-154 }
+    - { name: MultiSelectStub, lines: 194-210 }
+    - { name: FilterBarStub, lines: 213-238 }
+    - { name: calcOuPct, lines: 319-328 }
+    - { name: buildPackageAwareHierarchy, lines: 331-368 }
+    - { name: MatrixSectionStub, lines: 371-404 }
 
 tests/legacy/shell-navigation.test.js:  # 89 lines
   imports:
@@ -2392,7 +2715,7 @@ tests/legacy/yield-alert-center-shell-contract.test.js:  # 26 lines
     - { module: '../../src/portal-shell/routeQuery.js', items: [buildLaunchHref], line: 5 }
     - { module: '../../src/portal-shell/routeContracts.js', items: [getRouteContract], line: 6 }
 
-tests/legacy/yield-alert-center-utils.test.js:  # 33 lines
+tests/legacy/yield-alert-center-utils.test.js:  # 56 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
@@ -2405,7 +2728,7 @@ tests/pending-jobs-registry.test.js:  # 177 lines
   functions:
     - { name: makeLocalStorageStub, lines: 20-29 }
 
-tests/playwright/_auth.js:  # 177 lines
+tests/playwright/_auth.js:  # 207 lines
   constants:
     - { name: BASE_URL, line: 12 }
     - { name: USERNAME, line: 13 }
@@ -2415,7 +2738,7 @@ tests/playwright/_auth.js:  # 177 lines
     - { name: async loginViaApi, lines: 54-72 }
     - { name: async mockApiError, lines: 89-122 }
     - { name: async waitForIdleUi, lines: 132-146 }
-    - { name: async navigateViaSidebar, lines: 161-177 }
+    - { name: async navigateViaSidebar, lines: 161-207 }
 
 tests/playwright/data-boundary/empty-result.spec.js:  # 174 lines
   imports:
@@ -2439,6 +2762,16 @@ tests/playwright/data-boundary/hold-history-today-snapshot.spec.js:  # 125 lines
     - { name: makeTodayPayload, lines: 19-40 }
     - { name: async switchToTodayMode, lines: 42-49 }
 
+tests/playwright/data-boundary/hold-overview-export-csv.spec.js:  # 137 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 12 }
+    - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar], line: 13 }
+  constants:
+    - { name: BASE_META, line: 15 }
+    - { name: NULL_FIELD_LOT, line: 28 }
+  functions:
+    - { name: makeExportPayload, lines: 17-26 }
+
 tests/playwright/data-boundary/malformed-input.spec.js:  # 190 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 16 }
@@ -2456,51 +2789,118 @@ tests/playwright/data-boundary/resource-history-progress-malformed.spec.js:  # 1
   functions:
     - { name: async setupResourceHistoryWithMalformedProgress, lines: 32-72 }
 
-tests/playwright/hold-history-flat-table.spec.js:  # 81 lines
+tests/playwright/downtime-analysis.spec.js:  # 629 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 10 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+    - { module: '@playwright/test', items: [test, expect], line: 14 }
+  constants:
+    - { name: BASE_URL, line: 16 }
+    - { name: PAGE_URL, line: 17 }
+    - { name: MOCK_OPTIONS, line: 19 }
+    - { name: MOCK_QUERY_RESULT, line: 32 }
+    - { name: MOCK_EVENT_DETAIL_WITH_NONE, line: 61 }
+    - { name: MOCK_EQUIPMENT_DETAIL, line: 107 }
+    - { name: MOCK_EVENT_DETAIL_TIER3, line: 141 }
 
-tests/playwright/hold-overview.spec.js:  # 66 lines
+tests/playwright/downtime-analysis.spec.ts:  # 937 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 35 }
+  constants:
+    - { name: PAGE_URL, line: 41 }
+    - { name: DOWNTIME_PAGE_HEADING, line: 42 }
+    - { name: ERROR_BANNER_SELECTORS, line: 45 }
+    - { name: EMPTY_STATE_SELECTORS, line: 57 }
+    - { name: PARQUET_CONTENT_TYPE, line: 80 }
+    - { name: EMPTY_PARQUET_BYTES, line: 82 }
+    - { name: MOCK_OPTIONS, line: 84 }
+    - { name: MOCK_QUERY_RESULT_DUCKDB, line: 102 }
+    - { name: MOCK_QUERY_RESULT_LEGACY, line: 131 }
+  functions:
+    - { name: async setupBaseRoutes, lines: 164-196 }
+    - { name: async setupDuckDBRoutes, lines: 202-225 }
+    - { name: async waitForErrorBanner, lines: 231-248 }
+    - { name: async waitForEmptyState, lines: 250-267 }
+
+tests/playwright/eap-alarm.spec.js:  # 388 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 12 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 13 }
+  constants:
+    - { name: MOCK_QUERY_ID, line: 15 }
+    - { name: MOCK_SPOOL_202, line: 17 }
+    - { name: MOCK_SPOOL_STATUS_FINISHED, line: 28 }
+    - { name: MOCK_FILTER_OPTIONS, line: 40 }
+    - { name: MOCK_SUMMARY, line: 53 }
+    - { name: MOCK_PARETO, line: 64 }
+    - { name: MOCK_TREND, line: 76 }
+    - { name: MOCK_DETAIL, line: 88 }
+  functions:
+    - { name: async setupEapAlarmMocks, lines: 128-196 }
+    - { name: async submitAndWaitForResults, lines: 202-237 }
+
+tests/playwright/hold-history-flat-table.spec.js:  # 313 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 14 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 15 }
+  constants:
+    - { name: MOCK_CONFIG, line: 21 }
+    - { name: MOCK_SYNC_QUERY_RESULT, line: 26 }
+    - { name: MOCK_ASYNC_202_RESPONSE, line: 40 }
+    - { name: MOCK_JOB_STATUS_RUNNING, line: 50 }
+    - { name: MOCK_JOB_STATUS_COMPLETED, line: 60 }
+    - { name: MOCK_VIEW_RESULT, line: 78 }
+  functions:
+    - { name: async setupBaseRoutes, lines: 91-123 }
+
+tests/playwright/hold-overview.spec.js:  # 167 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 7 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 8 }
 
-tests/playwright/job-abandon-on-unload.spec.js:  # 133 lines
+tests/playwright/job-abandon-on-unload.spec.js:  # 130 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 13 }
-    - { module: './_auth.js', items: [loginViaApi, BASE_URL], line: 14 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, BASE_URL], line: 14 }
 
-tests/playwright/material-consumption-data-boundary.spec.ts:  # 180 lines
+tests/playwright/material-consumption-data-boundary.spec.ts:  # 187 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect, Page], line: 13 }
+    - { module: '@playwright/test', items: [test, expect, Page], line: 18 }
   constants:
-    - { name: BASE_URL, line: 15 }
-    - { name: PAGE_URL, line: 16 }
-    - { name: MOCK_FILTER_OPTIONS, line: 18 }
+    - { name: BASE_URL, line: 20 }
+    - { name: PAGE_URL, line: 21 }
+    - { name: PARTS_21, line: 24 }
+    - { name: MOCK_FILTER_OPTIONS, line: 26 }
+    - { name: MOCK_PORTAL_NAV, line: 34 }
   functions:
-    - { name: async setupBasicMocks, lines: 28-32 }
+    - { name: async setupBasicMocks, lines: 52-78 }
+    - { name: async selectParts, lines: 80-89 }
 
-tests/playwright/material-consumption-resilience.spec.ts:  # 155 lines
+tests/playwright/material-consumption-resilience.spec.ts:  # 204 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 12 }
   constants:
-    - { name: BASE_URL, line: 14 }
-    - { name: PAGE_URL, line: 15 }
-    - { name: MOCK_FILTER_OPTIONS, line: 17 }
-    - { name: MOCK_QUERY_RESULT, line: 27 }
+    - { name: AUTH_MOCKS, line: 14 }
+    - { name: MOCK_PORTAL_NAV, line: 30 }
+    - { name: BASE_URL, line: 62 }
+    - { name: PAGE_URL, line: 63 }
+    - { name: MOCK_FILTER_OPTIONS, line: 65 }
+    - { name: MOCK_QUERY_RESULT, line: 73 }
+  functions:
+    - { name: async selectParts, lines: 19-28 }
+    - { name: async setupAuthMocks, lines: 48-60 }
 
-tests/playwright/material-consumption.spec.ts:  # 299 lines
+tests/playwright/material-consumption.spec.ts:  # 367 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 15 }
   constants:
     - { name: BASE_URL, line: 17 }
     - { name: PAGE_URL, line: 18 }
     - { name: MOCK_FILTER_OPTIONS, line: 20 }
-    - { name: MOCK_QUERY_RESULT, line: 30 }
-    - { name: MOCK_VIEW_MONTH, line: 55 }
+    - { name: MOCK_QUERY_RESULT, line: 31 }
+    - { name: MOCK_VIEW_MONTH, line: 56 }
+    - { name: MOCK_PORTAL_NAV, line: 77 }
   functions:
-    - { name: async setupMockRoutes, lines: 76-88 }
+    - { name: async setupMockRoutes, lines: 102-136 }
+    - { name: async selectParts, lines: 143-155 }
 
 tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
   imports:
@@ -2529,7 +2929,7 @@ tests/playwright/production-history-multi-line-input.spec.ts:  # 155 lines
     - { name: async installMocks, lines: 42-84 }
     - { name: async switchToIdentifierTab, lines: 89-94 }
 
-tests/playwright/production-history-pruning-feedback.spec.ts:  # 99 lines
+tests/playwright/production-history-pruning-feedback.spec.ts:  # 103 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 10 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
@@ -2570,17 +2970,34 @@ tests/playwright/query-tool.spec.js:  # 78 lines
   constants:
     - { name: DUMMY_LOT_ID, line: 11 }
 
-tests/playwright/reject-history.spec.js:  # 134 lines
+tests/playwright/reject-history.spec.js:  # 274 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 8 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
+    - { module: '@playwright/test', items: [test, expect], line: 9 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 10 }
+  constants:
+    - { name: MOCK_QUERY_ID, line: 21 }
+    - { name: MOCK_SYNC_RESULT, line: 23 }
+    - { name: MOCK_VIEW_RESULT, line: 82 }
+    - { name: MOCK_BATCH_PARETO_RESULT, line: 97 }
   functions:
-    - { name: defaultDateRange, lines: 11-18 }
+    - { name: defaultDateRange, lines: 12-19 }
+    - { name: async setupRejectHistoryMocks, lines: 109-157 }
 
-tests/playwright/reject-material-flat-table.spec.js:  # 126 lines
+tests/playwright/reject-material-flat-table.spec.js:  # 336 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 10 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+    - { module: '@playwright/test', items: [test, expect], line: 11 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 12 }
+  constants:
+    - { name: MOCK_QUERY_ID, line: 18 }
+    - { name: MOCK_DETAIL_ITEMS, line: 20 }
+    - { name: MOCK_SYNC_QUERY_RESULT, line: 51 }
+    - { name: MOCK_VIEW_RESULT, line: 81 }
+    - { name: MOCK_BATCH_PARETO, line: 96 }
+    - { name: MOCK_MATERIAL_TRACE_ROWS, line: 232 }
+    - { name: MOCK_MATERIAL_TRACE_RESULT, line: 250 }
+  functions:
+    - { name: async setupRejectHistoryMocks, lines: 108-146 }
+    - { name: async setupMaterialTraceMocks, lines: 262-290 }
 
 tests/playwright/resilience/api-failure.spec.js:  # 204 lines
   imports:
@@ -2591,7 +3008,7 @@ tests/playwright/resilience/api-failure.spec.js:  # 204 lines
   functions:
     - { name: async waitForErrorFeedback, lines: 27-36 }
 
-tests/playwright/resilience/browser-history.spec.js:  # 233 lines
+tests/playwright/resilience/browser-history.spec.js:  # 240 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 13 }
     - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar], line: 14 }
@@ -2626,6 +3043,29 @@ tests/playwright/resilience/slow-network.spec.js:  # 141 lines
   functions:
     - { name: async setupRejectHistoryWithSlowQuery, lines: 16-43 }
 
+tests/playwright/resource-history-async.spec.ts:  # 452 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 23 }
+  constants:
+    - { name: BASE_URL, line: 29 }
+    - { name: PAGE_URL, line: 30 }
+    - { name: JOB_ID_ASYNC, line: 32 }
+    - { name: JOB_ID_FAILED, line: 33 }
+    - { name: QUERY_ID, line: 34 }
+    - { name: STATUS_URL_ASYNC, line: 37 }
+    - { name: STATUS_URL_FAILED, line: 38 }
+    - { name: MOCK_META, line: 41 }
+    - { name: MOCK_OPTIONS, line: 47 }
+    - { name: MOCK_202_RESPONSE, line: 59 }
+    - { name: MOCK_202_FAILED_RESPONSE, line: 70 }
+    - { name: MOCK_JOB_STARTED, line: 81 }
+    - { name: MOCK_JOB_FINISHED, line: 96 }
+    - { name: MOCK_JOB_FAILED, line: 111 }
+    - { name: MOCK_VIEW_RESPONSE, line: 129 }
+    - { name: MOCK_200_SYNC_RESPONSE, line: 160 }
+  functions:
+    - { name: async registerCatchAllRoutes, lines: 186-241 }
+
 tests/playwright/wip-matrix-drilldown.spec.js:  # 111 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 10 }
@@ -2656,12 +3096,45 @@ tests/query-tool/useLotDetail.pagination.test.js:  # 90 lines
   functions:
     - { name: setupWindowMesApi, lines: 5-16 }
 
+tests/resource-status/App.cross-filter.test.ts:  # 450 lines
+  imports:
+    - { module: vitest, items: [beforeEach, describe, it, expect, vi], line: 2 }
+    - { module: vue, items: [defineComponent, nextTick, ref], line: 3 }
+    - { module: '@vue/test-utils', items: [mount, shallowMount], line: 4 }
+  constants:
+    - { name: EQUIPMENT_LIST, line: 138 }
+  functions:
+    - { name: FilterBarStub, lines: 34-37 }
+    - { name: ErrorBannerStub, lines: 39-43 }
+    - { name: SummaryCardGroupStub, lines: 45-48 }
+    - { name: SummaryCardStub, lines: 50-55 }
+    - { name: WorkcenterOuRingsStub, lines: 57-62 }
+    - { name: OuHeatmapStub, lines: 64-69 }
+    - { name: MaintenanceAlertsStub, lines: 71-76 }
+    - { name: MatrixSectionStub, lines: 78-83 }
+    - { name: EquipmentGridStub, lines: 85-90 }
+    - { name: FloatingTooltipStub, lines: 92-97 }
+    - { name: LoadingOverlayStub, lines: 99-103 }
+    - { name: makeEq, lines: 107-136 }
+    - { name: buildApiResponses, lines: 146-168 }
+    - { name: async mountApp, lines: 170-199 }
+
+tests/resource-status/useCrossFilter.test.ts:  # 269 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: vue, items: [ref], line: 3 }
+    - { module: '../../src/resource-status/composables/useCrossFilter', items: [useCrossFilter], line: 5 }
+  constants:
+    - { name: FIXTURE_EQUIPMENT, line: 40 }
+  functions:
+    - { name: makeEq, lines: 9-38 }
+
 tests/schema-guard.test.js:  # 157 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 13 }
     - { module: '../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 14 }
 
-tests/shared-composables/useAsyncJobPolling.test.js:  # 237 lines
+tests/shared-composables/useAsyncJobPolling.test.js:  # 290 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 12 }
     - { module: '../../src/shared-composables/useAsyncJobPolling.ts', items: [pollJobUntilComplete, useAsyncJobPolling], line: 13 }
@@ -2681,31 +3154,37 @@ tests/shared-composables/useRequestGuard.test.js:  # 155 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
     - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
 
+tests/unit/eap-alarm-filter.test.js:  # 158 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach], line: 11 }
+    - { module: '../../src/eap-alarm/composables/useEapAlarmFilter.js', items: [useEapAlarmFilter], line: 12 }
+
 tests/unwrap-api-result.test.js:  # 88 lines
   imports:
     - { module: vitest, items: [describe, it, expect], line: 12 }
     - { module: '../src/core/unwrap-api-result.js', items: [unwrapApiResult, unwrapApiData], line: 13 }
 
-tests/validation/useHoldOverview.validation.test.js:  # 287 lines
+tests/validation/useHoldOverview.validation.test.js:  # 360 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
     - { module: '../../src/core/endpoint-schemas.js', items: [HOLD_OVERVIEW_SUMMARY_SCHEMA, HOLD_OVERVIEW_TREEMAP_SCHEMA], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 20 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 20 }
+    - { module: '../../src/hold-overview/csvExport.ts', items: [_buildCsv], line: 297 }
 
 tests/validation/useMaterialTrace.validation.test.js:  # 220 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 17 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 18 }
     - { module: '../../src/core/endpoint-schemas.js', items: [MATERIAL_TRACE_SPOOL_SCHEMA, MATERIAL_TRACE_QUERY_SCHEMA], line: 19 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 23 }
 
-tests/validation/useProductionHistory.validation.test.js:  # 537 lines
+tests/validation/useProductionHistory.validation.test.js:  # 554 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 16 }
     - { module: '../../src/core/endpoint-schemas.js', items: [PRODUCTION_HISTORY_QUERY_SCHEMA, PRODUCTION_HISTORY_TYPE_OPTIONS_SCHEMA, PRODUCTION_HISTORY_COUNT_SCHEMA, PRODUCTION_HISTORY_FILTER_OPTIONS_SCHEMA], line: 17 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 23 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 23 }
     - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, _buildUrl, useFirstTierFilters], line: 24 }
     - { module: '../../src/production-history/composables/useProductionHistory.ts', items: [validateQueryMode, buildModePayload, useProductionHistory], line: 29 }
 
@@ -2714,14 +3193,14 @@ tests/validation/useRejectHistory.validation.test.js:  # 205 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
     - { module: '../../src/core/endpoint-schemas.js', items: [REJECT_HISTORY_SUMMARY_SCHEMA, REJECT_HISTORY_OPTIONS_SCHEMA], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 20 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 20 }
 
-tests/validation/useYieldAlert.validation.test.js:  # 216 lines
+tests/validation/useYieldAlert.validation.test.js:  # 291 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, detectUnknownEnvelope, _resetWarned], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, _resetWarned], line: 17 }
-    - { module: '../../src/core/dev-warnings.js', items: [detectSpoolContentType], line: 189 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 17 }
+    - { module: '../../src/core/dev-warnings.js', items: [detectSpoolContentType], line: 264 }
   constants:
     - { name: SUMMARY_SHAPE, line: 75 }
     - { name: TREND_ITEM_SHAPE, line: 81 }
@@ -2732,7 +3211,7 @@ tests/validation/wip-url-params.test.js:  # 86 lines
     - { module: vitest, items: [describe, it, expect], line: 10 }
     - { module: '../../src/core/wip-derive', items: [buildWipOverviewQueryParams], line: 11 }
 
-tests/yield-alert/App.cross-filter.test.js:  # 353 lines
+tests/yield-alert/App.cross-filter.test.js:  # 454 lines
   imports:
     - { module: vitest, items: [beforeEach, describe, expect, it, vi], line: 2 }
     - { module: vue, items: [defineComponent, nextTick, ref], line: 3 }
@@ -2741,7 +3220,7 @@ tests/yield-alert/App.cross-filter.test.js:  # 353 lines
     - { name: MultiSelectStub, lines: 42-50 }
     - { name: buildViewPayload, lines: 52-86 }
 
-vite.config.ts:  # 69 lines
+vite.config.ts:  # 71 lines
   imports:
     - { module: vite, items: [defineConfig], line: 1 }
     - { module: 'node:path', items: [resolve], line: 2 }

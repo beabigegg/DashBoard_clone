@@ -1,0 +1,16 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/ -v --tb=short -m 'not (integration_real or stress or load or soak or multi_worker or e2e or local_e2e)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-095947/junit.xml' -q -ra",
+  "duration_ms": 253917,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-095947/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-095947/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-095947/stderr.log",
+    "junit": "specs/changes/eap-alarm-analysis/test-runs/20260618-095947/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

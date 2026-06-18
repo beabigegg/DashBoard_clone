@@ -1,0 +1,58 @@
+agent: frontend-engineer
+change-id: eap-alarm-analysis
+date: 2026-06-18
+status: complete
+
+summary: |
+  Implemented the EAP ALARM Analysis frontend SPA under frontend/src/eap-alarm/,
+  added "EAP" top-level nav category to portal-shell, updated all modernization
+  manifests, batch-added .theme-eap-alarm to all resource-shared/styles.css :is()
+  groups, registered the SPA in vite.config.ts, and wrote unit + Playwright tests.
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/App.vue:1-200" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/FilterBar.vue:1-70" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/FineFilterBar.vue:1-65" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/SummaryCards.vue:1-45" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/ParetoChart.vue:1-120" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/TrendChart.vue:1-100" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/DetailTable.vue:1-100" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/composables/useEapAlarmFilter.js:1-165" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/composables/useEapAlarmViews.js:1-200" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/main.js:1-9" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/index.html:1-12" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/style.css:1-175" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/routeContracts.js (added /eap-alarm route contract)" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/App.vue (added eap/alarm icon mapping)" }
+  - { type: files-changed, pointer: "frontend/src/resource-shared/styles.css (batch-added .theme-eap-alarm to all :is() groups)" }
+  - { type: files-changed, pointer: "frontend/vite.config.ts (added eap-alarm entry)" }
+  - { type: files-changed, pointer: "data/page_status.json (added eap-analysis drawer + EAP ALARM page)" }
+  - { type: files-changed, pointer: "docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json" }
+  - { type: files-changed, pointer: "docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json" }
+  - { type: files-changed, pointer: "frontend/tests/unit/eap-alarm-filter.test.js (14 unit tests)" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/eap-alarm.spec.js (5 Playwright tests)" }
+  - { type: components-affected, pointer: "FilterBar, FineFilterBar, SummaryCards, ParetoChart, TrendChart, DetailTable, App (eap-alarm SPA)" }
+  - { type: accessibility-audit, pointer: "aria-label on expand buttons; aria-live on AsyncQueryProgress; required field labels with filter-required span" }
+
+test-phases-run:
+  - phase: collect
+    result: pass
+  - phase: targeted
+    result: pass (14/14 unit tests)
+  - phase: changed-area
+    result: pass (type-check + css:check)
+  - phase: quality
+    result: pass (0 CSS errors)
+
+build-result: "eap-alarm.js 22.10 kB gzip:7.67 kB — within budget"
+
+notes: |
+  - css-inventory.md already had eap-alarm entry (pre-authored).
+  - api-inventory.md already had EAP alarm entries (pre-authored).
+  - Tailwind content path ./src/**/*.{vue,js,...} already covers eap-alarm/.
+  - DataTable built-in #expand slot used for detail_params row expansion.
+  - Rule 4.6 (LoadingOverlay + AsyncQueryProgress coexistence): LoadingOverlay only shown
+    when queryLoading && !jobProgress.active per css-contract 4.6.
+  - 2px vertical badge padding in style.css produces WARN (not ERROR) — pre-existing
+    pattern across 73+ other rules; not a blocker.
+  - IP-16 (test_navigation_contract.py backend test) is in scope for backend-engineer.

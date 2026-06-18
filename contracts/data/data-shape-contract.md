@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.17.0
-last-changed: 2026-06-16
+schema-version: 1.18.0
+last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1047,7 +1047,45 @@ Added by change `yield-alert-spool-refactor`. Spool namespace: `tmp/query_spool/
 
 ---
 
+### §3.17 EAP ALARM Spool Schema
+
+Added by change `eap-alarm-analysis`. Spool namespace: `tmp/query_spool/eap_alarm/`. Governed by `_SCHEMA_VERSION` in `eap_alarm_cache.py`. All shapes wrapped in standard `success_response` envelope (§1.1).
+
+#### Parquet column schema
+
+| column | type | nullable | notes |
+|---|---|---|---|
+| EVENT_ID | VARCHAR | no | Primary key from DWH.EAP_EVENT |
+| EQP_ID | VARCHAR | no | Equipment ID (EQUIPMENT_ID from EAP_EVENT) |
+| EQP_TYPE | VARCHAR | no | Equipment type prefix (e.g. GDBA, GCBA) |
+| LOT_ID | VARCHAR | yes | LOT_ID from EAP_EVENT; NULL if no lot in context |
+| ALARM_TEXT | VARCHAR | yes | AlarmText from EAP_EVENT_DETAIL (EAV param); NULL if not present |
+| ALARM_CATEGORY_CODE | INTEGER | yes | Raw category code from EAP_EVENT_DETAIL; NULL if not present |
+| ALARM_CATEGORY | VARCHAR | no | Decoded label per EA-05 decode table; unknown code → "未知" |
+| ALARM_TIME | TIMESTAMP | no | LAST_UPDATE_TIME from EAP_EVENT |
+| DETAIL_PARAMS | VARCHAR | yes | JSON string of remaining EAP_EVENT_DETAIL params (excluding AlarmText, AlarmCategory, AlarmCode used as columns); NULL if no extra params |
+| eqp_types_filter | VARCHAR | no | Coarse-filter hash for partition reuse validation |
+
+**Breaking-change surface:** column add/remove/rename to `eap_alarm` parquet orphans existing files. `rm -f tmp/query_spool/eap_alarm/*.parquet` required on both deploy and rollback. Bump `_SCHEMA_VERSION` in the same commit.
+
+#### Response shapes (DuckDB-derived; all fine-filter aware)
+
+**Filter options** (`GET /api/eap-alarm/filter-options`): `data` = `{alarm_text_options: string[], alarm_category_options: {code: int, label: string}[], equipment_id_options: string[]}`. All derived from DuckDB spool; no Oracle re-query.
+
+**Summary** (`GET /api/eap-alarm/summary`): `data` = `{total_alarm_count: int, affected_equipment_count: int, affected_lot_count: int, top_equipment: {eqp_id: string, alarm_count: int} | null}`.
+
+**Pareto** (`GET /api/eap-alarm/pareto`): `data` = `{items: [{alarm_text: string, count: int, cumulative_pct: float}], total: int}`. Sorted descending by count; top-50 returned.
+
+**Trend** (`GET /api/eap-alarm/trend`): `data` = `{labels: string[], series: [{eqp_type: string, data: int[]}]}`. `labels` length matches `data` length per series. `granularity` param: `day` (ISO date YYYY-MM-DD) or `hour` (ISO datetime YYYY-MM-DD HH:00).
+
+**Detail** (`GET /api/eap-alarm/detail`): `data` = `{rows: [{event_id: string, eqp_id: string, eqp_type: string, lot_id: string | null, alarm_text: string | null, alarm_category: string, alarm_time: string (ISO 8601), detail_params: object | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. `detail_params` is null or a JSON object of extra ALARM DETAIL parameters. Pagination: `per_page` max 200.
+
+
 ## CHANGELOG
+
+## [data 1.18.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: Added §3.17 (EAP ALARM Spool Schema) documenting 10-column parquet schema (EVENT_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE, ALARM_CATEGORY, ALARM_TIME, DETAIL_PARAMS, eqp_types_filter), breaking-change surface rule (parquet cleanup + _SCHEMA_VERSION bump on schema change), and 5 DuckDB-derived response shapes (filter-options, summary, pareto, trend, detail). Additive; no existing spool schemas changed.
 
 ## [data 1.17.0] — 2026-06-16
 ### Added

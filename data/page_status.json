@@ -133,6 +133,13 @@
       "status": "released",
       "drawer_id": "drawer-2",
       "order": 6
+    },
+    {
+      "route": "/eap-alarm",
+      "name": "EAP ALARM 分析",
+      "status": "released",
+      "drawer_id": "eap-analysis",
+      "order": 1
     }
   ],
   "api_public": true,
@@ -177,6 +184,12 @@
       "id": "test",
       "name": "test",
       "order": 1,
+      "admin_only": false
+    },
+    {
+      "id": "eap-analysis",
+      "name": "EAP",
+      "order": 5,
       "admin_only": false
     }
   ]

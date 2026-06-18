@@ -275,6 +275,12 @@
       "canonical_shell_path": "/portal-shell/downtime-analysis",
       "rollback_strategy": "fallback_to_legacy_route",
       "compatibility_policy": "redirect_to_shell_when_spa_enabled"
+    },
+    {
+      "route": "/eap-alarm",
+      "scope": "in_scope",
+      "status": "released",
+      "notes": "EAP ALARM Analysis (eap-alarm-analysis change)"
     }
   ]
 }

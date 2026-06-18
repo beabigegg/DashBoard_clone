@@ -1,0 +1,20 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "changed-area",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest tests/ -v --tb=short -m 'not (integration_real or stress or load or soak or multi_worker or e2e or local_e2e)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-094542/junit.xml' -q -ra",
+  "duration_ms": 6618,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.contract.test_capture_samples.TestCaptureSamples::test_capture_runs_without_error",
+    "message": "AssertionError: capture_samples.py exited with 1\n  stdout: \n  stderr: 2026-06-18 09:45:48 [INFO] mes_dashboard.log_store: Log store initialized at logs/admin_logs.sqlite\n  2026-06-18 09:45:48 [DEBUG] mes_dashboard: SQLite log handler registered\n  2026-06-18 09:45:48 [WARNING] mes_dashboard: QUERY_SPOOL_DIR is a relative path ('tmp/query_spool' → /home/egg/Project/DashBoard_vite/tmp/query_spool).  Relative paths resolve against the process working directory, which may differ across Gunicorn worke..."
+  },
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-094542/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-094542/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-094542/stderr.log",
+    "junit": "specs/changes/eap-alarm-analysis/test-runs/20260618-094542/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

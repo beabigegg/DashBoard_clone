@@ -24,6 +24,7 @@ _ALLOWED_NAMESPACES = frozenset({
     "hold_dataset",
     "downtime_analysis_base_events",
     "downtime_analysis_job_bridge",
+    "eap_alarm",
 })
 
 # query_id must be 1-64 hex characters (SHA256 prefix)

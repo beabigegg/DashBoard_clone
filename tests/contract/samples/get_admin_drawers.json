@@ -36,12 +36,18 @@
         "id": "dev-tools",
         "name": "開發工具",
         "order": 4
+      },
+      {
+        "admin_only": false,
+        "id": "eap-analysis",
+        "name": "EAP",
+        "order": 5
       }
     ]
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:15:44.668781"
+    "timestamp": "2026-06-18T10:08:14.112936"
   },
   "success": true
 }

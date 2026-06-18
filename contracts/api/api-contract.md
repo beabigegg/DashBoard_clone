@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.24.0
-last-changed: 2026-06-16
+schema-version: 1.25.0
+last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -67,7 +67,7 @@ breaking-change-policy: deprecate-2-minors
 > 雙方法端點（GET+POST 均接受）在下表中各自列出一行；POST body 為 GET query params 的 JSON 等效。
 
 | method | path | auth | request schema | response schema | errors | tests |
-|---| --- |---|---|---|---|---|
+|---|---|---|---|---|---|---|
 | POST | /api/auth/login | public | JSON {username,password} | AuthSessionResponse | 400/401/429 | route tests |
 | POST | /api/auth/logout | public | — | AckResponse | — | route tests |
 | GET | /api/auth/me | public | — | AuthMeResponse | — | route tests |
@@ -76,7 +76,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /health/deep | none | — | HealthPayload | — | smoke tests |
 | GET | /api/job/{job_id} | required | ?prefix= | JobStatusResponse | 400/404 | route tests |
 | POST | /api/job/{job_id}/abandon | required | JSON body | AckResponse | 403/404/409 | route tests |
-| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace ∈ {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge} | application/octet-stream (parquet) | 400/410 | route tests |
+| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm} | application/octet-stream (parquet) | 400/410 | route tests |
 | GET | /api/wip/overview/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/summary | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
@@ -245,6 +245,13 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/get_table_info | required | — | GenericSuccessResponse | 500 | route tests |
 | POST | /api/get_table_columns | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/query_table | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/eap-alarm/spool | required | JSON body {date_from, date_to, eqp_types[]} | EapAlarmSpoolJobAccepted | 202/400/500 | route tests |
+| GET | /api/eap-alarm/spool/status | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/filter-options | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/summary | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/pareto | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/trend | required | ?query_id=&granularity=(day or hour, default day)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/detail | required | ?query_id=&page=&per_page=(max 200)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 
 ## 5. Routing & Naming
 
@@ -261,7 +268,7 @@ breaking-change-policy: deprecate-2-minors
 
 **Type A — 同步 re-query on 410：** view miss → 410 `cache_expired` → client 同步重新觸發 `execute_primary_query()`。適用：`hold_history_routes.py`、`resource_history_routes.py`。
 
-**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` when `RESOURCE_ASYNC_ENABLED=true`）。
+**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` when `RESOURCE_ASYNC_ENABLED=true`）、`eap_alarm_routes.py`（all date ranges; always async when worker available; no threshold — Type B only, no sync fallback path）。
 
 ## 8. API Inventory Governance
 
@@ -436,11 +443,18 @@ breaking-change-policy: deprecate-2-minors
   - Additive; existing paginated callers that do not send `export` receive identical responses. No existing fields removed or renamed. No new error codes.
   - Sole consumer: `frontend/src/hold-overview/`. No external partners or mobile consumers known.
 
+
+- **eap-alarm-analysis (2026-06-18)**: New endpoint family `/api/eap-alarm/*` (7 endpoints). All auth required; Type B async (POST /spool → 202 → poll /api/job/<id>?prefix=eap-alarm). Spool key: `eap_alarm:{date_from}:{date_to}:{sorted_eqp_types_hash}`; namespace `eap_alarm` added to `_ALLOWED_NAMESPACES`. Fine-filter options (alarm_text, alarm_category, equipment_id) derived from DuckDB spool only — no Oracle re-query (EA-02). AlarmCategory decoded server-side per EA-05 decode table. Navigation: new "EAP" top-level category in portal shell. Additive; no existing endpoints changed.
+
 ## Breaking Change Policy
 
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
 ## CHANGELOG
+
+## [api 1.25.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: 7 new endpoints under `/api/eap-alarm/*` (POST /spool 202 async, GET /spool/status, GET /filter-options, GET /summary, GET /pareto, GET /trend, GET /detail). Spool namespace `eap_alarm` added to `/api/spool` whitelist. Type B async; fine-filter views DuckDB-only (no Oracle re-query post-spool). New schema `EapAlarmSpoolJobAccepted`. Additive; no existing endpoints changed.
 
 ## [api 1.24.0] — 2026-06-16
 ### Added
@@ -943,3 +957,11 @@ Tier-B — every `4xx`/`5xx` error envelope; see `contracts/api/error-format.md 
   }
 }
 ```
+
+### EapAlarmSpoolJobAccepted
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| async | boolean | yes |  | 202 async branch indicator |
+| job_id | string | yes |  | RQ job identifier |
+| status_url | string | yes |  | polling URL |
+| query_id | string | no |  | spool key |

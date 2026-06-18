@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- --run tests/unit/eap-alarm-filter.test.js 2>&1 | tail -20",
+  "duration_ms": 657,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-095011/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-095011/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-095011/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

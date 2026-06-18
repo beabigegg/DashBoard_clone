@@ -1,0 +1,11 @@
+agent: implementation-planner
+change-id: eap-alarm-analysis
+status: complete
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/eap-alarm-analysis/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer, e2e-resilience-engineer" }
+  - { type: scope-summary, pointer: "20 required changes (IP-1..IP-20); additive RQ-async + DuckDB spool-read pipeline; 7 endpoints; new EAP nav category" }
+notes:
+  - "design.md present and filled (ADR-0008); Architecture Review satisfied — not blocked."
+  - "Flagged queue-name discrepancy: ci-gates.md uses default 'eap-alarm' but env-contract.md (source of truth) uses 'eap-alarm-query'."
+  - "Namespace eap_alarm (spool) vs eap-alarm-query (RQ queue) kept distinct."

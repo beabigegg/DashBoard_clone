@@ -1,11 +1,11 @@
 {
   "data": {
     "after": {
-      "count": 24283,
+      "count": 21288,
       "size_bytes": 13144064
     },
     "before": {
-      "count": 24283,
+      "count": 21288,
       "size_bytes": 13144064
     },
     "deleted": 0,
@@ -13,7 +13,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:15:44.426207"
+    "timestamp": "2026-06-18T10:08:13.858535"
   },
   "success": true
 }

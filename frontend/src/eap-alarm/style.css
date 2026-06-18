@@ -1,0 +1,233 @@
+/* EAP ALARM Analysis — all rules scoped under .theme-eap-alarm (css-contract Rule 6) */
+
+.theme-eap-alarm .eap-alarm-header {
+  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+}
+
+/* ── Filter panel ─────────────────────────────────────────────────────────── */
+
+.theme-eap-alarm .filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p16');
+  align-items: flex-end;
+}
+
+.theme-eap-alarm .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p6');
+  min-width: 160px;
+}
+
+.theme-eap-alarm .filter-group-wide {
+  min-width: 280px;
+  flex: 1;
+}
+
+.theme-eap-alarm .filter-group-full {
+  width: 100%;
+}
+
+.theme-eap-alarm .filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme('colors.token.h475569');
+}
+
+.theme-eap-alarm .filter-required {
+  color: theme('colors.state.danger');
+  margin-left: 2px;
+}
+
+.theme-eap-alarm .filter-input {
+  height: 36px;
+  padding: 0 theme('spacing.token.p10');
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: theme('colors.token.hffffff');
+  color: theme('colors.token.h1e293b');
+}
+
+.theme-eap-alarm .filter-input:focus {
+  outline: none;
+  border-color: theme('colors.brand.500');
+  box-shadow: 0 0 0 2px theme('colors.brand.100');
+}
+
+.theme-eap-alarm .filter-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: theme('spacing.token.p12');
+  flex-wrap: wrap;
+  padding-top: theme('spacing.token.p6');
+}
+
+.theme-eap-alarm .filter-actions {
+  display: flex;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-eap-alarm .filter-hint {
+  font-size: 11px;
+  color: theme('colors.token.h94a3b8');
+  flex: 1;
+}
+
+/* Override overflow for filter card containing MultiSelect dropdowns (css-contract Known Global Rule Interactions) */
+.theme-eap-alarm .filter-query-card {
+  overflow: visible;
+}
+
+/* ── Fine filter panel ────────────────────────────────────────────────────── */
+
+.theme-eap-alarm .fine-filter-panel {
+  overflow: visible;
+}
+
+.theme-eap-alarm .fine-filter-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p16');
+  align-items: flex-start;
+}
+
+.theme-eap-alarm .fine-filter-body .filter-group {
+  min-width: 200px;
+  flex: 1;
+}
+
+.theme-eap-alarm .fine-filter-badge {
+  font-size: 11px;
+  font-weight: 400;
+  color: theme('colors.token.h64748b');
+  margin-left: theme('spacing.token.p8');
+  padding: 2px theme('spacing.token.p6');
+  background: theme('colors.token.hf1f5f9');
+  border-radius: 4px;
+}
+
+/* ── Charts row ───────────────────────────────────────────────────────────── */
+
+.theme-eap-alarm .charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: theme('spacing.token.p16');
+}
+
+@media (max-width: 900px) {
+  .theme-eap-alarm .charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.theme-eap-alarm .pareto-chart-body {
+  height: 320px;
+  position: relative;
+}
+
+.theme-eap-alarm .pareto-chart {
+  width: 100%;
+  height: 300px;
+}
+
+.theme-eap-alarm .pareto-loading,
+.theme-eap-alarm .pareto-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 280px;
+  color: theme('colors.token.h94a3b8');
+  font-size: 14px;
+}
+
+.theme-eap-alarm .pareto-total-badge {
+  font-size: 12px;
+  font-weight: 400;
+  color: theme('colors.token.h64748b');
+  margin-left: theme('spacing.token.p8');
+}
+
+.theme-eap-alarm .trend-chart-body {
+  height: 320px;
+  position: relative;
+}
+
+.theme-eap-alarm .trend-chart {
+  width: 100%;
+  height: 300px;
+}
+
+.theme-eap-alarm .trend-loading,
+.theme-eap-alarm .trend-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 280px;
+  color: theme('colors.token.h94a3b8');
+  font-size: 14px;
+}
+
+.theme-eap-alarm .trend-granularity-toggle {
+  display: flex;
+  gap: theme('spacing.token.p4');
+}
+
+/* ── Detail table ─────────────────────────────────────────────────────────── */
+
+.theme-eap-alarm .detail-card-body {
+  padding: 0;
+}
+
+.theme-eap-alarm .detail-count-badge {
+  font-size: 12px;
+  font-weight: 400;
+  color: theme('colors.token.h64748b');
+  margin-left: theme('spacing.token.p8');
+}
+
+.theme-eap-alarm .cell-nowrap {
+  white-space: nowrap;
+}
+
+.theme-eap-alarm .alarm-text-cell {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.theme-eap-alarm .detail-params-expand {
+  padding: theme('spacing.token.p10') theme('spacing.token.p12');
+  background: theme('colors.token.hf8fafc');
+  border-top: 1px solid var(--border);
+}
+
+.theme-eap-alarm .detail-params-pre {
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: theme('colors.token.h1e293b');
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.theme-eap-alarm .detail-params-none {
+  font-size: 12px;
+  color: theme('colors.token.h94a3b8');
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+}
+
+/* ── Page layout ──────────────────────────────────────────────────────────── */
+
+.theme-eap-alarm .page-content {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p16');
+  padding: theme('spacing.token.p16') 0;
+}

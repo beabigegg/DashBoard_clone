@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.21.0
-last-changed: 2026-06-16
+schema-version: 1.22.0
+last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -285,6 +285,34 @@ breaking-change-policy: deprecate-2-minors
 | BQE-06 | Count-vs-paged consistency under non-concurrent reads | The `SELECT COUNT(*)` and paged fetches are executed without intervening DDL or concurrent data changes. Under concurrent data inserts between count and a paged fetch, the engine may see more or fewer rows than the count — this is an accepted and documented limitation. The completeness guarantee (BQE-01) applies only to non-concurrent scenarios. | resilience tests |
 | BQE-07 | `downtime_analysis_service` raw-spool output | (Updated by `downtime-browser-duckdb`.) Flag ON: `query_downtime_dataset_raw()` uses one whole-dataset BQE chunk to write two raw namespaces (`downtime_analysis_base_events`, `downtime_analysis_job_bridge`); server does NOT run reductions. Flag OFF (legacy): `query_downtime_dataset()` continues to use `BatchQueryEngine → execute_plan → merge_chunks_to_spool` into the enriched `downtime_analysis_events` namespace. ADR-0003 permanent exclusion from `USE_ROW_COUNT_CHUNKING` applies to both paths. | `tests/test_downtime_analysis_service.py::TestRawSpoolWriter`; integration tests |
 
+
+## EAP ALARM Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| EA-01 | Spool-key composition | EAP ALARM spool key is `eap_alarm:{date_from}:{date_to}:{sorted_eqp_types_hash}` where `sorted_eqp_types_hash = sha256(sorted(','.join(sorted(eqp_types))))[:8]`. Same coarse-filter (same date range + same EQP type set) reuses existing parquet; no Oracle re-query. | unit tests |
+| EA-02 | Fine-filter derivation from DuckDB only | After spool is built, all fine-filter options (alarm_text distinct list, alarm_category decoded list, equipment_id distinct list) are derived from the DuckDB spool. Any change in fine-filter selection triggers DuckDB recompute only — never a new Oracle query. | resilience tests |
+| EA-03 | LAST_UPDATE_TIME mandatory index filter | Every Oracle query against `DWH.EAP_EVENT` MUST include `LAST_UPDATE_TIME BETWEEN :date_from AND :date_to` predicate (index-driven). Full-table scans are forbidden. Missing or unbounded LAST_UPDATE_TIME → 400 `VALIDATION_ERROR`. | unit + integration tests |
+| EA-04 | DETAIL data from spool only | EAP_EVENT_DETAIL parameters are JOIN-loaded into the parquet spool at query time. Detail row expansion in the UI reads from the spool. No additional Oracle query is issued. | integration tests |
+| EA-05 | AlarmCategory decode table | AlarmCategory integer code is decoded to a display label using the fixed table below. Unknown code → `"未知"` fallback (never crashes). Decode applied at spool-load time; parquet stores decoded label alongside raw code. | unit tests |
+| EA-06 | Spool schema version | `eap_alarm_cache.py` contains integer `_SCHEMA_VERSION` that participates in the spool cache key. Bumping orphans stale parquets by key. Schema-breaking rollback requires `rm -f tmp/query_spool/eap_alarm/*.parquet`. Column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. | constant-pin test |
+| EA-07 | EQP type allowlist | `eqp_types` values are validated against the closed enum: `{GDBA, GCBA, GWBA, GWBK, GPRA, GTMH, GWMT, GDSD, GWAC, GPTA}`. Value outside this set → 400 `VALIDATION_ERROR`. Empty list → 400 `VALIDATION_ERROR`. | route tests |
+
+### AlarmCategory Decode Table (EA-05)
+
+| code | display label |
+|---:|---|
+| 0 | 非分類 |
+| 1 | 設備 |
+| 2 | 製程 |
+| 3 | 視覺 |
+| 4 | 機械 |
+| 5 | 電子 |
+| 6 | 通知/供料 |
+| 7 | 品質 |
+| 64 | 繼續錯誤 |
+| _any other_ | 未知 |
+
 ## Change Policy
 
 任何業務邏輯變更必須：
@@ -294,6 +322,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.22.0] — 2026-06-18
+### Added
+- eap-alarm-analysis: Added EAP ALARM Rules section (EA-01..EA-07) — spool-key composition, DuckDB-only fine-filter derivation, LAST_UPDATE_TIME mandatory index filter, DETAIL from spool only, AlarmCategory fixed decode table (9 codes + unknown fallback), spool schema version governance, EQP type closed enum (10 values). AlarmCategory Decode Table block added. Additive; no existing rules changed.
 
 ## [business 1.21.0] — 2026-06-16
 ### Added

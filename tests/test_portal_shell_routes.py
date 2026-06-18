@@ -164,7 +164,7 @@ def test_navigation_drawer_and_page_order_deterministic_non_admin():
     payload = json.loads(response.data.decode("utf-8"))
 
     drawer_ids = [drawer["id"] for drawer in payload["drawers"]]
-    assert drawer_ids == ["reports", "drawer-2", "drawer", "drawer-3"]
+    assert drawer_ids == ["reports", "drawer-2", "drawer", "drawer-3", "eap-analysis"]
 
     reports_routes = [page["route"] for page in payload["drawers"][0]["pages"]]
     assert reports_routes == ["/wip-overview", "/hold-overview", "/resource", "/qc-gate"]

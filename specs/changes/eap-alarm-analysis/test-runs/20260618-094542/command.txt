@@ -1,0 +1,1 @@
+pytest tests/ -v --tb=short -m 'not (integration_real or stress or load or soak or multi_worker or e2e or local_e2e)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-094542/junit.xml' -q -ra

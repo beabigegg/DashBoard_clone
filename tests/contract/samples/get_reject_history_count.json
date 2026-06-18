@@ -1,4 +1,11 @@
 {
-  "error": "缺少必要參數: start_date, end_date",
+  "error": {
+    "code": "CACHE_EXPIRED",
+    "message": "快取資料已過期，請稍後再試"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-06-18T10:07:00.494552"
+  },
   "success": false
 }

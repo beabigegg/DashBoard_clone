@@ -1,0 +1,9 @@
+change-id: eap-alarm-analysis
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-18T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3" }
+  - { type: gate-promotions, pointer: "none — all new tests land in existing gate commands" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow file edits required; ci-gate-contract.md §1.3.25 already registered eap-alarm.spec.js in playwright-critical-journeys)" }
+  - { type: required-status-checks, pointer: "unit-mock-integration, frontend-unit, css-governance, response-shape-validate, playwright-critical-journeys, playwright-resilience, playwright-data-boundary" }

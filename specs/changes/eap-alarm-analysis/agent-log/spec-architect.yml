@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0008-eap-alarm-coarse-spool-detail-join.md" }
+  - { type: affected-areas, pointer: "routes, services, workers, spool namespace, portal-shell nav, frontend eap-alarm, deploy systemd, docs/migration" }
+  - { type: decision-summary, pointer: "coarse-only spool key + DETAIL JOIN at load time; DuckDB-only fine filters; always-async, no sync fallback" }
+  - { type: risks-noted, pointer: "0 high, 5 medium (fork-safety, DETAIL_PARAMS bloat, fuzzy-filter cost, namespace-drift, code-map staleness)" }

@@ -1,0 +1,30 @@
+change-id: eap-alarm-analysis
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test -- --run tests/unit/eap-alarm-filter.test.js 2>&1 | tail -20
+    summary: specs/changes/eap-alarm-analysis/test-runs/20260618-095004/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npm run test -- --run tests/unit/eap-alarm-filter.test.js 2>&1 | tail -20
+    summary: specs/changes/eap-alarm-analysis/test-runs/20260618-095011/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      pytest tests/ -v --tb=short -m 'not (integration_real or stress or load or soak or multi_worker or e2e or
+      local_e2e)' -x
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-095947/junit.xml'
+      -q -ra
+    summary: specs/changes/eap-alarm-analysis/test-runs/20260618-095947/summary.json
+    junit: specs/changes/eap-alarm-analysis/test-runs/20260618-095947/junit.xml
+  - phase: quality
+    status: passed
+    command: cd frontend && npm run css:check 2>&1 | tail -3
+    summary: specs/changes/eap-alarm-analysis/test-runs/20260618-095030/summary.json
+final-status: passed

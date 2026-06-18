@@ -1,0 +1,43 @@
+[Unit]
+Description=MES Dashboard EAP ALARM Query Worker (RQ, Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/opt/mes-dashboard/.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+
+# EAP ALARM worker env-var parity (env-contract §Async Worker — EAP ALARM Spool)
+# Note: use eap-alarm-query (hyphen) as RQ queue name; eap_alarm (underscore) is spool namespace
+Environment="EAP_ALARM_WORKER_QUEUE=eap-alarm-query"
+Environment="EAP_ALARM_JOB_TIMEOUT_SECONDS=1800"
+Environment="EAP_ALARM_SPOOL_TTL=72000"
+Environment="EAP_ALARM_SPOOL_DIR=tmp/query_spool/eap_alarm"
+
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${EAP_ALARM_WORKER_QUEUE:-eap-alarm-query}" --url "${REDIS_URL:-redis://localhost:6379/0}"'
+
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-dashboard-eap-alarm-worker
+
+# Memory protection: EAP ALARM worker handles Oracle JOIN + parquet writes.
+MemoryHigh=3G
+MemoryMax=4G
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/mes-dashboard/logs /opt/mes-dashboard/tmp
+
+[Install]
+WantedBy=multi-user.target

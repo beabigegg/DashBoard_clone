@@ -152,14 +152,14 @@ class TestGetRqQueueDetails:
 
         # trace-events, reject-query, msd-analysis, production-history-query,
         # yield-alert-query, material-consumption, downtime-query, hold-history-query,
-        # resource-history-query
-        assert len(result["queues"]) == 9
+        # resource-history-query, eap-alarm-query
+        assert len(result["queues"]) == 10
         assert result["queues"][0]["name"] == "trace-events"
         assert result["queues"][0]["depth"] == 3
         assert result["queues"][1]["name"] == "reject-query"
         assert result["queues"][1]["depth"] == 1
-        assert result["total_queued"] == 11  # 3 + 1×8
-        assert result["total_started"] == 9  # 1 per queue × 9 queues
+        assert result["total_queued"] == 12  # 3 + 1×9
+        assert result["total_started"] == 10  # 1 per queue × 10 queues
         assert result["total_failed"] == 0
 
     def test_hold_history_queue_in_queue_names(self):
@@ -175,8 +175,8 @@ class TestGetRqQueueDetails:
              patch.object(svc, "get_redis_client", return_value=mock_conn), \
              patch("rq.Queue", side_effect=Exception("Redis error")):
             result = svc.get_rq_queue_details()
-        # Should still return entries with zero values (now 9 queues including resource-history-query)
-        assert len(result["queues"]) == 9
+        # Should still return entries with zero values (now 10 queues including eap-alarm-query)
+        assert len(result["queues"]) == 10
         assert result["total_queued"] == 0
 
 

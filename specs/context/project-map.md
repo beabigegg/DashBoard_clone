@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 197
-visible-files: 956
+visible-dirs: 196
+visible-files: 929
 omitted-dirs: 60
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -59,6 +59,7 @@ DashBoard_vite/
 |   |   |-- 010e00414068858a
 |   |   |-- 0199bae5456ba1ac
 |   |   |-- 01cb19e636d04082
+|   |   |-- 0252574dd854487b
 |   |   |-- 02bca2c9d2f8566d
 |   |   |-- 03d72be617fe07b9
 |   |   |-- 0478f49b48ee4a27
@@ -86,6 +87,8 @@ DashBoard_vite/
 |   |   |-- 17a6952f61650689
 |   |   |-- 1968d36e3319a49f
 |   |   |-- 1ae1a5c44c5de27d
+|   |   |-- 1b488e9c0e7c5031
+|   |   |-- 1bfae4d4f286c3d1
 |   |   |-- 1cc56ed5fc92eb40
 |   |   |-- 1fa576bc7d285941
 |   |   |-- 1fcb892092629696
@@ -100,10 +103,7 @@ DashBoard_vite/
 |   |   |-- 253e6c94fab987bc
 |   |   |-- 25d84cf88b9bff0e
 |   |   |-- 25db02c884e47e34
-|   |   |-- 263226a93d9fd720
-|   |   |-- 267688019eacc507
-|   |   |-- 27091f72d62819f4
-|   |   \-- ... (210 more entries truncated; cap=50)
+|   |   \-- ... (236 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -646,29 +646,13 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260616_162413.log
-|   |   |-- error_20260616_162413.log
-|   |   |-- rq_downtime_worker_20260616_162413.log
-|   |   |-- rq_hold_hist_worker_20260616_162413.log
-|   |   |-- rq_msd_worker_20260616_162413.log
-|   |   |-- rq_prod_hist_worker_20260616_162413.log
-|   |   |-- rq_reject_worker_20260616_162413.log
-|   |   |-- rq_resource_worker_20260616_162413.log
-|   |   |-- rq_warmup_worker_20260616_162413.log
-|   |   |-- rq_worker_20260616_162413.log
-|   |   |-- rq_yield_alert_worker_20260616_162413.log
-|   |   \-- watchdog_20260616_162413.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
 |   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
-|   |-- metrics_history.sqlite-shm
-|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
 |   |-- rq_hold_hist_worker.log
 |   |-- rq_hold_history_worker.log
@@ -768,6 +752,7 @@ DashBoard_vite/
 |       |   |-- utils.py
 |       |   |-- watchdog_logging.py
 |       |   |-- worker_memory_guard.py
+|       |   |-- worker_pool_manager.py
 |       |   \-- worker_recovery_policy.py
 |       |-- routes/
 |       |   |-- __init__.py
@@ -1150,22 +1135,19 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- downtime_analysis_base_events/
-|   |   |   \-- bc3802278bb91642.parquet
-|   |   |-- downtime_analysis_job_bridge/
-|   |   |   \-- bc3802278bb91642.parquet
 |   |   |-- hold_dataset/
-|   |   |   |-- 0fff9d37f176e65b.parquet
-|   |   |   |-- 40be78accbd0c5d8.parquet
-|   |   |   \-- cd9458b8df889ddc.parquet
+|   |   |   \-- 6ffe102a864ef841.parquet
+|   |   |-- msd-events/
+|   |   |   \-- tmp4xbqftpt.parquet
 |   |   |-- reject_dataset/
-|   |   |   \-- 780f45126cc24a21.parquet
+|   |   |   |-- 780f45126cc24a21.parquet
+|   |   |   \-- dc5ded03236fee8a.parquet
 |   |   |-- resource_dataset/
-|   |   |   \-- 43cd1f41156e6df9.parquet
+|   |   |   \-- b3caccc0d62f0d16.parquet
 |   |   |-- resource_oee/
-|   |   |   \-- 650224c8a52a6725.parquet
+|   |   |   \-- a11096b24a07cf11.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- d3f85ef923d43773.parquet
+|   |   |   \-- bfb72201660e420f.parquet
 |   |   |-- probe_10707.json
 |   |   |-- probe_10745.json
 |   |   |-- probe_10829.json
@@ -1205,21 +1187,11 @@ DashBoard_vite/
 |   |   |-- probe_166786.json
 |   |   |-- probe_169446.json
 |   |   |-- probe_174363.json
-|   |   \-- ... (189 more entries truncated; cap=50)
+|   |   |-- probe_176417.json
+|   |   \-- ... (264 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
-|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_downtime_worker.pid
-|   |-- rq_hold_hist_worker.pid
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_resource_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_warmup_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

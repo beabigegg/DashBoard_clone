@@ -1,0 +1,20 @@
+{
+  "change_id": "eap-alarm-analysis",
+  "phase": "changed-area",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest tests/ -v --tb=short -m 'not (integration_real or stress or load or soak or multi_worker or e2e or local_e2e)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/eap-alarm-analysis/test-runs/20260618-094916/junit.xml' -q -ra",
+  "duration_ms": 215490,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.test_portal_shell_routes::test_navigation_drawer_and_page_order_deterministic_non_admin",
+    "message": "AssertionError: assert ['reports', '...eap-analysis'] == ['reports', '...', 'drawer-3']\n  \n  Left contains one more item: 'eap-analysis'\n  \n  Full diff:\n    [\n        'reports',\n        'drawer-2',...\n  \n  ...Full output truncated (4 lines hidden), use '-vv' to show"
+  },
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-analysis/test-runs/20260618-094916/summary.json",
+    "stdout": "specs/changes/eap-alarm-analysis/test-runs/20260618-094916/stdout.log",
+    "stderr": "specs/changes/eap-alarm-analysis/test-runs/20260618-094916/stderr.log",
+    "junit": "specs/changes/eap-alarm-analysis/test-runs/20260618-094916/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

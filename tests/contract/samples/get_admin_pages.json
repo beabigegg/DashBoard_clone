@@ -134,12 +134,19 @@
         "order": 6,
         "route": "/downtime-analysis",
         "status": "released"
+      },
+      {
+        "drawer_id": "eap-analysis",
+        "name": "EAP ALARM 分析",
+        "order": 1,
+        "route": "/eap-alarm",
+        "status": "released"
       }
     ]
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:15:44.667628"
+    "timestamp": "2026-06-18T10:08:14.111692"
   },
   "success": true
 }

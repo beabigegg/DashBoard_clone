@@ -1,11 +1,11 @@
 {
   "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "缺少必要參數: start_date, end_date"
+    "code": "CACHE_EXPIRED",
+    "message": "快取資料已過期，請稍後再試"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:14:30.194707"
+    "timestamp": "2026-06-18T10:07:00.486850"
   },
   "success": false
 }

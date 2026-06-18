@@ -2,33 +2,33 @@
   "data": {
     "byWipStatus": {
       "hold": {
-        "lots": 126,
-        "qtyPcs": 9385783
+        "lots": 145,
+        "qtyPcs": 11048137
       },
       "nonQualityHold": {
-        "lots": 80,
-        "qtyPcs": 7156761
+        "lots": 95,
+        "qtyPcs": 8433158
       },
       "qualityHold": {
-        "lots": 46,
-        "qtyPcs": 2229022
+        "lots": 50,
+        "qtyPcs": 2614979
       },
       "queue": {
-        "lots": 8862,
-        "qtyPcs": 752973346
+        "lots": 9041,
+        "qtyPcs": 741969446
       },
       "run": {
-        "lots": 816,
-        "qtyPcs": 88421229
+        "lots": 836,
+        "qtyPcs": 77302146
       }
     },
-    "dataUpdateDate": "2026-06-16 22:02:48",
-    "totalLots": 9804,
-    "totalQtyPcs": 850780358
+    "dataUpdateDate": "2026-06-18 09:55:06",
+    "totalLots": 10022,
+    "totalQtyPcs": 830319729
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:14:10.651944"
+    "timestamp": "2026-06-18T10:06:40.496307"
   },
   "success": true
 }

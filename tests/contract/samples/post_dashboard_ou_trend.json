@@ -1,26 +1,6 @@
 {
   "data": [
     {
-      "date": "2026-06-09",
-      "egt_hours": 48.0,
-      "ou_pct": 69.7,
-      "prd_hours": 25796.4,
-      "sby_hours": 9759.8,
-      "sdt_hours": 696.2,
-      "total_hours": 47064.0,
-      "udt_hours": 711.4
-    },
-    {
-      "date": "2026-06-10",
-      "egt_hours": 70.4,
-      "ou_pct": 69.75,
-      "prd_hours": 25721.6,
-      "sby_hours": 9596.4,
-      "sdt_hours": 802.6,
-      "total_hours": 47064.0,
-      "udt_hours": 683.7
-    },
-    {
       "date": "2026-06-11",
       "egt_hours": 93.2,
       "ou_pct": 69.65,
@@ -63,17 +43,37 @@
     {
       "date": "2026-06-15",
       "egt_hours": 72.0,
-      "ou_pct": 68.35,
-      "prd_hours": 25130.6,
+      "ou_pct": 68.37,
+      "prd_hours": 25157.6,
       "sby_hours": 9780.4,
       "sdt_hours": 880.0,
-      "total_hours": 47030.7,
+      "total_hours": 47057.8,
       "udt_hours": 906.2
+    },
+    {
+      "date": "2026-06-16",
+      "egt_hours": 72.6,
+      "ou_pct": 69.74,
+      "prd_hours": 25679.0,
+      "sby_hours": 9554.3,
+      "sdt_hours": 792.5,
+      "total_hours": 47015.4,
+      "udt_hours": 722.5
+    },
+    {
+      "date": "2026-06-17",
+      "egt_hours": 37.6,
+      "ou_pct": 72.7,
+      "prd_hours": 20892.4,
+      "sby_hours": 6260.4,
+      "sdt_hours": 888.4,
+      "total_hours": 34756.8,
+      "udt_hours": 657.5
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-16T22:15:43.919350"
+    "timestamp": "2026-06-18T10:08:13.177459"
   },
   "success": true
 }
