@@ -110,6 +110,8 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `context-manifest.md` Allowed Paths must use directory-level paths, not glob patterns — see docs/cdd-kit-patterns.md
 - `cdd-kit validate --contracts` requires `pip install jsonschema` before the step in CI (not bundled); also required locally when `response-samples.json` exists — see docs/cdd-kit-patterns.md
 - Response schema cells must be bare identifiers (`/^[A-Za-z][A-Za-z0-9_]*/`); Tier-A tables require `| field | type | required |` headers; `dataPath` only for inner-payload schemas; regen `contracts/openapi.json` after every endpoint-table or schema edit — see contracts/api/api-contract.md §Schema Authoring Rules
+- New concurrency-critical modules with zero callers: add `tier-floor-override` to `tasks.yml` frontmatter (≥20 chars, stating deferred-stress rationale) to satisfy the cdd-kit Tier-0 floor without declaring Tier 0 prematurely — see docs/cdd-kit-patterns.md
+- Pre-commit hook scans all staged `specs/changes/*/` dirs; stage only the completed change's directory, not all of `specs/changes/` — unfilled template placeholders in sibling dirs fail the hook — see docs/cdd-kit-patterns.md
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md` for full detail:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS — see docs/architecture/frontend-patterns.md

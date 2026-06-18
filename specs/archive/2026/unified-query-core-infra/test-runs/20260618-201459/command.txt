@@ -1,0 +1,1 @@
+pytest tests/test_oracle_arrow_reader.py tests/test_query_cost_policy.py tests/test_base_chunked_duckdb_job.py tests/contract/test_env_duckdb_job_dir.py --collect-only -q --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/unified-query-core-infra/test-runs/20260618-201459/junit.xml' --maxfail=1 --tb=short -ra

@@ -1,0 +1,20 @@
+agent: contract-reviewer
+status: complete
+model: sonnet
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/env/env-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/env/.env.example.template" }
+  - { type: contracts-reviewed, pointer: "contracts/env/env.schema.json" }
+  - { type: contracts-reviewed, pointer: "contracts/data/data-shape-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/ci/ci-gate-contract.md" }
+  - { type: version-bumps, pointer: "env-contract: 1.0.13 → 1.0.14 (correct); data-shape-contract: 1.18.0 → 1.19.0 (fixed by main Claude)" }
+notes:
+  - "Initial review: BLOCKED on 3 CHANGELOG/version issues"
+  - "B1 fixed: contracts/CHANGELOG.md [env 1.0.14] entry added"
+  - "B2 fixed: contracts/data/data-shape-contract.md schema-version 1.18.0 → 1.19.0"
+  - "B3 fixed: contracts/CHANGELOG.md [data 1.19.0] entry added"
+  - "APPROVED after fixes: DUCKDB_JOB_DIR default (tmp/duckdb_jobs) is Docker-portable, D4 consistent"
+  - "*_ASYNC_DAY_THRESHOLD actual count is 4 (not 7 as estimated): DOWNTIME, HOLD, RESOURCE, REJECT — all deprecated, not removed"
+  - "REJECT_ASYNC_DAY_THRESHOLD was previously undocumented in contract; now documented + deprecated simultaneously"
+  - "No API, CSS, business rule drift; CI contract unmodified"
+  - "No breaking changes; all additive or deprecations (removal deferred P5)"

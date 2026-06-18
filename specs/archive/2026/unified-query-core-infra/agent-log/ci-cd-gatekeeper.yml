@@ -1,0 +1,26 @@
+change-id: unified-query-core-infra
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-18T08:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3" }
+  - { type: gate-promotions, pointer: "n/a (no gate moved between tiers; existing gates confirmed sufficient)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow file modified; existing backend-tests.yml and contract-driven-gates.yml are sufficient)" }
+  - { type: required-status-checks, pointer: "unit-mock-integration, contract-validate, cdd-kit-gate, lint" }
+next-action: none
+notes: >
+  Pure new-module addition (3 core/ files). backend-tests.yml wildcard
+  `tests/ --ignore=tests/e2e --ignore=tests/stress` picks up all 4 new
+  test files without edits. Path filter `core/**` + `tests/**` already
+  triggers the workflow. Nightly integration_real test for Oracle pool
+  lifecycle runs under nightly-integration-real job on schedule only (no
+  real Oracle in PR runners). No new workflow file needed.
+files-read:
+  - specs/changes/unified-query-core-infra/context-manifest.md
+  - specs/changes/unified-query-core-infra/change-classification.md
+  - specs/changes/unified-query-core-infra/implementation-plan.md
+  - contracts/ci/ci-gate-contract.md
+  - .github/workflows/backend-tests.yml
+  - .github/workflows/contract-driven-gates.yml
+  - specs/templates/ci-gates.md
+  - specs/changes/unified-query-core-infra/tasks.yml

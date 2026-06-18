@@ -71,3 +71,33 @@ Evidence: `migrate-shared-ui-ts` — initial manifest used glob patterns and fai
 The same applies locally: if `tests/contract/response-samples.json` exists and `jsonschema` is absent, `cdd-kit validate` exits non-zero with "jsonschema package is not installed" — even in conda envs where it is absent.
 
 Evidence: `response-shape-adr0007` — CI run 27599574084 "Validate contracts and gates" step; fixed by commit `bf7ba1e`.
+
+## `tier-floor-override` for Zero-Caller Concurrency Modules
+
+**When a new module introduces a concurrency surface (ThreadPoolExecutor, Oracle session pool, `_writer_lock`) but ships with zero callers**, `cdd-kit gate` will flag a Tier-0 floor violation because concurrency surface automatically triggers the critical-tier floor. Re-classifying to Tier 0 is incorrect at this stage — no end-to-end load surface exists yet, so stress/soak tests would be untestable.
+
+The correct resolution is to add a `tier-floor-override` key to `tasks.yml` frontmatter with a ≥20-character audit reason explaining that stress is deferred to the first domain migration:
+
+```yaml
+tier-floor-override: "Modules ship with zero callers; concurrency stress deferred to first domain migration when a real caller exists."
+```
+
+`cdd-kit gate` records the override in `agent-log/audit.yml` and continues. The override is invalidated automatically once a domain migration wires a real caller — at that point the domain change must declare Tier 0 or include the appropriate stress gates.
+
+Evidence: `unified-query-core-infra` — gate blocked on `writer_lock`/`ThreadPoolExecutor`/Oracle pool surface with Tier 1 classification; resolved by `tier-floor-override` in `tasks.yml:4`; audit.yml recorded `declared-tier:1 / floor-tier:0 / bypassed-by:tier-floor-override`.
+
+## Git Staging Scope for `specs/changes/`
+
+**The pre-commit hook runs `cdd-kit gate --strict` on every `specs/changes/<id>/` directory that appears in the git staged diff.** If you stage `specs/changes/` broadly (e.g., `git add specs/changes/`), the hook also validates sibling scaffold directories that contain unfilled template placeholders, causing it to fail on a change unrelated to your current work.
+
+Always stage only the specific completed change:
+
+```bash
+# Wrong — picks up all sibling scaffolds
+git add specs/changes/
+
+# Correct
+git add specs/changes/unified-query-core-infra/
+```
+
+Evidence: `unified-query-core-infra` close — pre-commit hook failed on `specs/changes/downtime-duckdb-join-migration/` (scaffolded but inactive, unfilled `<change-id>` placeholders); resolved by re-staging only `specs/changes/unified-query-core-infra/`.

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 9d08ad0e18308c3b15325163d324dda3d4f37d750f6daa4ef2ec32fd1e5be88f
+inputs-digest: 627da88855fe36684834184d9e48e08540ccda35c25b1fd3b1d968e1cc3e1329
 ---
 
 # Contracts Index
@@ -135,7 +135,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.18.0
+- schema-version: 1.19.0
 - last-changed: 2026-06-18
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
@@ -148,7 +148,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Env Contract — MES Dashboard
 - owner: platform-team
 - surface: runtime-config
-- schema-version: 1.0.13
+- schema-version: 1.0.14
 - last-changed: 2026-06-18
 - breaking-change-policy: deprecate-2-minors
 - summary: Environment variable inventory, secret handling, and deployment sync policy.

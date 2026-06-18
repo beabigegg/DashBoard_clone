@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "none (reused ADR-0003 + ADR-0004; no new boundary decision requiring an ADR)" }
+  - { type: affected-areas, pointer: "core query infra: base_chunked_duckdb_job, query_cost_policy, oracle_arrow_reader; env + data-shape contracts" }
+  - { type: decision-summary, pointer: "Oracle parallel chunk -> Arrow -> DuckDB -> parquet spool via template method; per-worker post-fork Oracle pool (ADR-0004); DUCKDB_JOB_DIR sibling of QUERY_SPOOL_DIR" }
+  - { type: risks-noted, pointer: "3 medium (Oracle session quota, pool ceiling reuse, ADR-0003 design-time-only seam safety), 0 high" }
