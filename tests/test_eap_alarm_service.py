@@ -24,16 +24,16 @@ class TestSpoolKeyComposition:
     def test_key_format(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, _SCHEMA_VERSION
         key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA", "GCBA"])
-        assert key.startswith("eap_alarm:2025-01-01:2025-01-07:")
-        assert f":v{_SCHEMA_VERSION}" in key
+        assert key.startswith("eap_alarm_2025-01-01_2025-01-07_")
+        assert f"_v{_SCHEMA_VERSION}" in key
 
     def test_hash_is_8_chars(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
-        parts = key.split(":")
-        # format: eap_alarm:{date_from}:{date_to}:{hash8}:v{version}
-        assert len(parts) == 5
-        hash_part = parts[3]
+        parts = key.split("_")
+        # format: eap_alarm_{date_from}_{date_to}_{hash8}_v{version}
+        # split by _ gives: ['eap', 'alarm', '2025-01-01', '2025-01-07', '{hash8}', 'v{version}']
+        hash_part = parts[4]
         assert len(hash_part) == 8
 
     def test_sorted_eqp_types_gives_same_key(self):
@@ -56,7 +56,7 @@ class TestSpoolKeyComposition:
         key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", eqp_types)
         expected_type_string = ",".join(sorted(eqp_types))
         expected_hash = hashlib.sha256(expected_type_string.encode("utf-8")).hexdigest()[:8]
-        assert f":{expected_hash}:" in key
+        assert f"_{expected_hash}_" in key
 
     def test_different_dates_give_different_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key

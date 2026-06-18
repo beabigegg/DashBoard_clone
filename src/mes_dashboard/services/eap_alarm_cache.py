@@ -65,7 +65,11 @@ def make_eap_alarm_spool_key(
 ) -> str:
     """Build the deterministic spool key for a coarse EAP ALARM query (EA-01).
 
-    Format: ``eap_alarm:{date_from}:{date_to}:{sorted_eqp_types_hash8}:v{schema_version}``
+    Format: ``eap_alarm_{date_from}_{date_to}_{sorted_eqp_types_hash8}_v{schema_version}``
+
+    Uses underscores (not colons) so the key passes query_spool_store's
+    _VALID_ID_RE = r"^[A-Za-z0-9._-]{4,128}$" and can be used directly as
+    a Redis metadata key and parquet filename without secondary sanitization.
 
     The hash covers the sorted, comma-joined EQP-type list so that any
     permutation of the same type set maps to the same key.
@@ -80,16 +84,14 @@ def make_eap_alarm_spool_key(
     type_string = ",".join(sorted_types)
     type_hash = hashlib.sha256(type_string.encode("utf-8")).hexdigest()[:8]
 
-    return f"eap_alarm:{date_from}:{date_to}:{type_hash}:v{_SCHEMA_VERSION}"
+    return f"eap_alarm_{date_from}_{date_to}_{type_hash}_v{_SCHEMA_VERSION}"
 
 
 # ── Spool file path helpers ───────────────────────────────────────────────────
 
 def get_eap_alarm_spool_path(spool_key: str) -> str:
     """Return the absolute parquet file path for a given spool key."""
-    # Sanitize key for use as filename
-    safe_key = spool_key.replace(":", "_").replace("/", "_")
     spool_dir = EAP_ALARM_SPOOL_DIR
     if not os.path.isabs(spool_dir):
         spool_dir = os.path.join(os.getcwd(), spool_dir)
-    return os.path.join(spool_dir, f"{safe_key}.parquet")
+    return os.path.join(spool_dir, f"{spool_key}.parquet")
