@@ -2,20 +2,13 @@
 import { nextTick } from 'vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 
-interface AlarmCategoryOption {
-  code: number;
-  label: string;
-}
-
 interface FineFilter {
   alarm_text: string[];
-  alarm_category: string[];
   eqp_id: string[];
 }
 
 interface FilterOptions {
   alarm_text_options: string[];
-  alarm_category_options: AlarmCategoryOption[];
   equipment_id_options: string[];
 }
 
@@ -33,17 +26,11 @@ function onAlarmTextChange(values: string[]): void {
   emit('change');
 }
 
-function onAlarmCategoryChange(values: string[]): void {
-  props.fineFilter.alarm_category = values;
-  emit('change');
-}
-
 function onEqpIdChange(values: string[]): void {
   props.fineFilter.eqp_id = values;
   emit('change');
 }
 
-// WAI-ARIA combobox close: return focus via nextTick (frontend-patterns.md)
 function handleMultiSelectClose(event: Event): void {
   const trigger = event.target as HTMLElement | null;
   if (trigger) {
@@ -66,18 +53,6 @@ function handleMultiSelectClose(event: Event): void {
           placeholder="全部 ALARM 訊息"
           searchable
           @update:model-value="onAlarmTextChange"
-          @dropdown-close="handleMultiSelectClose"
-        />
-      </div>
-
-      <div class="filter-group">
-        <label class="filter-label">ALARM 類別</label>
-        <MultiSelect
-          :model-value="fineFilter.alarm_category"
-          :options="filterOptions.alarm_category_options.map((o) => o.label)"
-          placeholder="全部類別"
-          searchable
-          @update:model-value="onAlarmCategoryChange"
           @dropdown-close="handleMultiSelectClose"
         />
       </div>

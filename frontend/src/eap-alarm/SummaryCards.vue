@@ -2,16 +2,11 @@
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 
-interface TopEquipment {
-  eqp_id: string;
-  alarm_count: number;
-}
-
 interface SummaryData {
   total_alarm_count: number;
   affected_equipment_count: number;
-  affected_lot_count: number;
-  top_equipment: TopEquipment | null;
+  unresolved_count: number;
+  avg_duration_minutes: number | null;
 }
 
 defineProps<{
@@ -23,7 +18,7 @@ defineProps<{
 <template>
   <SummaryCardGroup :columns="4">
     <SummaryCard
-      label="總 ALARM 數"
+      label="ALARM 發生次數"
       :value="summary.total_alarm_count"
       format="number"
       accent="danger"
@@ -35,16 +30,15 @@ defineProps<{
       accent="info"
     />
     <SummaryCard
-      label="受影響 LOT 數"
-      :value="summary.affected_lot_count"
-      format="number"
-      accent="neutral"
-    />
-    <SummaryCard
-      :label="summary.top_equipment ? `最多 ALARM 機台：${summary.top_equipment.eqp_id}` : '最多 ALARM 機台'"
-      :value="summary.top_equipment ? summary.top_equipment.alarm_count : 0"
+      label="尚未解除"
+      :value="summary.unresolved_count"
       format="number"
       accent="warning"
+    />
+    <SummaryCard
+      label="平均排除時間（分鐘）"
+      :value="summary.avg_duration_minutes ?? '—'"
+      accent="neutral"
     />
   </SummaryCardGroup>
 </template>

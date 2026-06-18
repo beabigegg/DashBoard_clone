@@ -26,7 +26,7 @@ const SERIES_COLORS = Object.freeze([
 ]);
 
 interface TrendSeries {
-  eqp_type: string;
+  alarm_text: string;
   data: number[];
 }
 
@@ -53,7 +53,7 @@ const chartOption = computed(() => {
       axisPointer: { type: 'cross' },
     },
     legend: {
-      data: seriesData.map((s) => s.eqp_type),
+      data: seriesData.map((s) => s.alarm_text),
       bottom: 0,
       type: 'scroll',
     },
@@ -78,7 +78,7 @@ const chartOption = computed(() => {
       },
     },
     series: seriesData.map((s, i) => ({
-      name: s.eqp_type,
+      name: s.alarm_text,
       type: 'line',
       data: s.data,
       smooth: false,

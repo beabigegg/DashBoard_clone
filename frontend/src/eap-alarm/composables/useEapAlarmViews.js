@@ -25,8 +25,8 @@ export function useEapAlarmViews() {
   const summary = reactive({
     total_alarm_count: 0,
     affected_equipment_count: 0,
-    affected_lot_count: 0,
-    top_equipment: null,
+    unresolved_count: 0,
+    avg_duration_minutes: null,
   });
 
   // ── Pareto ─────────────────────────────────────────────────────────────────
@@ -57,16 +57,16 @@ export function useEapAlarmViews() {
   const detailPage = ref(1);
   const detailPerPage = ref(DEFAULT_PER_PAGE);
 
-  // ── Request staleness ────────────────────────────────────────────────────
-  let _activeRequestId = 0;
+  // ── Request staleness (per-endpoint to avoid cross-fetch cancellation) ──
+  const _activeRequestId = { summary: 0, pareto: 0, trend: 0 };
 
-  function nextRequestId() {
-    _activeRequestId += 1;
-    return _activeRequestId;
+  function nextRequestId(key) {
+    _activeRequestId[key] += 1;
+    return _activeRequestId[key];
   }
 
-  function isStale(id) {
-    return id !== _activeRequestId;
+  function isStale(key, id) {
+    return id !== _activeRequestId[key];
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -88,8 +88,8 @@ export function useEapAlarmViews() {
   function resetAll() {
     summary.total_alarm_count = 0;
     summary.affected_equipment_count = 0;
-    summary.affected_lot_count = 0;
-    summary.top_equipment = null;
+    summary.unresolved_count = 0;
+    summary.avg_duration_minutes = null;
     pareto.items = [];
     pareto.total = 0;
     trend.labels = [];
@@ -125,25 +125,25 @@ export function useEapAlarmViews() {
   async function fetchSummary(queryId, fineParams) {
     if (!queryId) return;
     loading.summary = true;
-    const requestId = nextRequestId();
+    const requestId = nextRequestId('summary');
     try {
       const params = { query_id: queryId, ...fineParams };
       const qs = buildQueryParams(params);
       const resp = await apiGet(`/api/eap-alarm/summary${qs}`);
-      if (isStale(requestId)) return;
+      if (isStale('summary', requestId)) return;
       const data = resp?.data;
       if (data) {
         summary.total_alarm_count = data.total_alarm_count ?? 0;
         summary.affected_equipment_count = data.affected_equipment_count ?? 0;
-        summary.affected_lot_count = data.affected_lot_count ?? 0;
-        summary.top_equipment = data.top_equipment ?? null;
+        summary.unresolved_count = data.unresolved_count ?? 0;
+        summary.avg_duration_minutes = data.avg_duration_minutes ?? null;
       }
     } catch (err) {
-      if (isStale(requestId)) return;
+      if (isStale('summary', requestId)) return;
       const msg = String(err?.message || '取得摘要失敗');
       if (err?.name !== 'AbortError') error.value = msg;
     } finally {
-      if (!isStale(requestId)) loading.summary = false;
+      if (!isStale('summary', requestId)) loading.summary = false;
     }
   }
 
@@ -152,22 +152,22 @@ export function useEapAlarmViews() {
   async function fetchPareto(queryId, fineParams) {
     if (!queryId) return;
     loading.pareto = true;
-    const requestId = nextRequestId();
+    const requestId = nextRequestId('pareto');
     try {
       const params = { query_id: queryId, ...fineParams };
       const qs = buildQueryParams(params);
       const resp = await apiGet(`/api/eap-alarm/pareto${qs}`);
-      if (isStale(requestId)) return;
+      if (isStale('pareto', requestId)) return;
       const data = resp?.data;
       if (data) {
         pareto.items = Array.isArray(data.items) ? data.items : [];
         pareto.total = data.total ?? 0;
       }
     } catch (err) {
-      if (isStale(requestId)) return;
+      if (isStale('pareto', requestId)) return;
       if (err?.name !== 'AbortError') error.value = String(err?.message || '取得 Pareto 失敗');
     } finally {
-      if (!isStale(requestId)) loading.pareto = false;
+      if (!isStale('pareto', requestId)) loading.pareto = false;
     }
   }
 
@@ -176,22 +176,22 @@ export function useEapAlarmViews() {
   async function fetchTrend(queryId, fineParams, granularity = 'day') {
     if (!queryId) return;
     loading.trend = true;
-    const requestId = nextRequestId();
+    const requestId = nextRequestId('trend');
     try {
       const params = { query_id: queryId, granularity, ...fineParams };
       const qs = buildQueryParams(params);
       const resp = await apiGet(`/api/eap-alarm/trend${qs}`);
-      if (isStale(requestId)) return;
+      if (isStale('trend', requestId)) return;
       const data = resp?.data;
       if (data) {
         trend.labels = Array.isArray(data.labels) ? data.labels : [];
         trend.series = Array.isArray(data.series) ? data.series : [];
       }
     } catch (err) {
-      if (isStale(requestId)) return;
+      if (isStale('trend', requestId)) return;
       if (err?.name !== 'AbortError') error.value = String(err?.message || '取得趨勢失敗');
     } finally {
-      if (!isStale(requestId)) loading.trend = false;
+      if (!isStale('trend', requestId)) loading.trend = false;
     }
   }
 

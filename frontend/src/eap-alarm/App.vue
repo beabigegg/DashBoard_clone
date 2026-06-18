@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
-import { apiPost } from '../core/api';
+import { apiPost, apiGet } from '../core/api';
 import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling';
 
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
@@ -19,9 +19,28 @@ import DetailTable from './DetailTable.vue';
 import { useEapAlarmFilter } from './composables/useEapAlarmFilter';
 import { useEapAlarmViews } from './composables/useEapAlarmViews';
 
+// ── Resource filter options (from /api/resource/status/options) ──────────────
+const resourceOptions = reactive({
+  families: [] as string[],
+  resources: [] as Array<{ id: string; name: string; family: string; workcenterGroup: string }>,
+});
+
+async function loadResourceOptions(): Promise<void> {
+  try {
+    const result = await apiGet('/api/resource/status/options', { timeout: 30000 });
+    const data = (result as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    if (!data) return;
+    resourceOptions.families = Array.isArray(data.families) ? (data.families as string[]) : [];
+    resourceOptions.resources = Array.isArray(data.resources)
+      ? (data.resources as typeof resourceOptions.resources)
+      : [];
+  } catch {
+    // non-fatal: filter stays empty
+  }
+}
+
 // ── Composables ────────────────────────────────────────────────────────────────
 const {
-  EQP_TYPE_OPTIONS,
   coarseFilter,
   fineFilter,
   filterOptions,
@@ -78,11 +97,12 @@ const hasNoResults = computed(
 // ── Initial mount ─────────────────────────────────────────────────────────────
 onMounted(() => {
   setDefaultDateRange();
+  loadResourceOptions();
 });
 
 // ── Fine filter watcher: re-fetch views on change ────────────────────────────
 watch(
-  () => [fineFilter.alarm_text, fineFilter.alarm_category, fineFilter.eqp_id],
+  () => [fineFilter.alarm_text, fineFilter.eqp_id],
   async () => {
     if (!queryId.value) return;
     const params = buildFineFilterParams();
@@ -104,7 +124,7 @@ function validateCoarseFilter(): string {
   if (!coarseFilter.date_from) return '請填入開始日期';
   if (!coarseFilter.date_to) return '請填入結束日期';
   if (coarseFilter.date_from > coarseFilter.date_to) return '開始日期不能晚於結束日期';
-  if (coarseFilter.eqp_types.length === 0) return '請至少選擇一種機台類型';
+  if (coarseFilter.machines.length === 0) return '請至少選擇一台機台（或先透過型號篩選再查詢）';
   return '';
 }
 
@@ -131,7 +151,7 @@ async function handleSubmit(): Promise<void> {
     const body = {
       date_from: coarseFilter.date_from,
       date_to: coarseFilter.date_to,
-      eqp_types: coarseFilter.eqp_types,
+      machines: coarseFilter.machines,
     };
 
     const resp = await apiPost('/api/eap-alarm/spool', body, { timeout: 60000 });
@@ -208,7 +228,7 @@ async function _loadAfterSpool(qId: string): Promise<void> {
 
 function handleClear(): void {
   cancelAsyncJob();
-  coarseFilter.eqp_types = [...EQP_TYPE_OPTIONS];
+  coarseFilter.machines = [];
   errorMessage.value = '';
   queryLoading.value = false;
   queryId.value = '';
@@ -285,7 +305,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
         <!-- Coarse filter bar -->
         <FilterBar
           :filters="coarseFilter"
-          :eqp-type-options="EQP_TYPE_OPTIONS"
+          :resource-options="resourceOptions"
           :loading="{ querying: queryLoading }"
           @submit="handleSubmit"
           @clear="handleClear"

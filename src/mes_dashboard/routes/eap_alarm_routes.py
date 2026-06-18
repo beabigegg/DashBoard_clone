@@ -126,22 +126,22 @@ def api_eap_alarm_spool():
 
     date_from = str(body.get("date_from") or "").strip()
     date_to = str(body.get("date_to") or "").strip()
-    eqp_types_raw = body.get("eqp_types", [])
-    if not isinstance(eqp_types_raw, list):
-        eqp_types_raw = [eqp_types_raw] if eqp_types_raw else []
-    eqp_types = [str(t).strip() for t in eqp_types_raw if str(t).strip()]
+    machines_raw = body.get("machines", [])
+    if not isinstance(machines_raw, list):
+        machines_raw = [machines_raw] if machines_raw else []
+    machines = [str(m).strip() for m in machines_raw if str(m).strip()]
 
-    # Validate params (EA-03, EA-07)
+    # Validate params (EA-03)
     try:
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        validate_eap_alarm_params(date_from, date_to, eqp_types)
+        validate_eap_alarm_params(date_from, date_to, machines)
     except ValueError as exc:
         return validation_error(str(exc))
 
     # Build spool key to check for cache hit
     try:
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        spool_key = make_eap_alarm_spool_key(date_from, date_to, eqp_types)
+        spool_key = make_eap_alarm_spool_key(date_from, date_to, machines)
     except ValueError as exc:
         return validation_error(str(exc))
 
@@ -177,7 +177,7 @@ def api_eap_alarm_spool():
                 "job_id": job_id,
                 "date_from": date_from,
                 "date_to": date_to,
-                "eqp_types": eqp_types,
+                "machines": machines,
             },
             prefix=_JOB_PREFIX,
             job_timeout=EAP_ALARM_JOB_TIMEOUT_SECONDS,
@@ -198,7 +198,7 @@ def api_eap_alarm_spool():
             {
                 "async": True,
                 "job_id": job_id_result,
-                "status_url": f"/api/eap-alarm/spool/status?query_id={spool_key}",
+                "status_url": f"/api/eap-alarm/spool/status?job_id={job_id}",
                 "query_id": spool_key,
             },
             status_code=202,

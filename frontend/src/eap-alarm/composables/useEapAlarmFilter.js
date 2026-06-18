@@ -7,37 +7,29 @@
  */
 import { reactive, ref } from 'vue';
 
-const EQP_TYPE_OPTIONS = Object.freeze([
-  'GDBA', 'GCBA', 'GWBA', 'GWBK', 'GPRA',
-  'GTMH', 'GWMT', 'GDSD', 'GWAC', 'GPTA',
-]);
-
 export function useEapAlarmFilter() {
   // ── Coarse filter (triggers spool) ──────────────────────────────────────────
   const coarseFilter = reactive({
     date_from: '',
     date_to: '',
-    eqp_types: [...EQP_TYPE_OPTIONS], // default: all selected
+    machines: [], // RESOURCENAME list; populated at submit time from resource filter
   });
 
   // ── Fine filter (DuckDB only, no Oracle re-query) ──────────────────────────
   const fineFilter = reactive({
     alarm_text: [],
-    alarm_category: [],
     eqp_id: [],
   });
 
   // ── Fine filter options (populated after spool) ──────────────────────────
   const filterOptions = reactive({
     alarm_text_options: [],
-    alarm_category_options: [], // [{code, label}]
     equipment_id_options: [],
   });
 
   // ── Snapshot-diff: tracks last committed fine filter to detect changes ───
   let _lastCommitted = {
     alarm_text: [],
-    alarm_category: [],
     eqp_id: [],
   };
 
@@ -52,15 +44,12 @@ export function useEapAlarmFilter() {
 
   function resetFineFilter() {
     fineFilter.alarm_text = [];
-    fineFilter.alarm_category = [];
     fineFilter.eqp_id = [];
-    // Re-sync _lastCommitted on reset
     _syncLastCommitted();
   }
 
   function resetFilterOptions() {
     filterOptions.alarm_text_options = [];
-    filterOptions.alarm_category_options = [];
     filterOptions.equipment_id_options = [];
   }
 
@@ -71,7 +60,6 @@ export function useEapAlarmFilter() {
   function _syncLastCommitted() {
     _lastCommitted = {
       alarm_text: [...fineFilter.alarm_text],
-      alarm_category: [...fineFilter.alarm_category],
       eqp_id: [...fineFilter.eqp_id],
     };
   }
@@ -84,14 +72,9 @@ export function useEapAlarmFilter() {
     filterOptions.alarm_text_options = Array.isArray(options.alarm_text_options)
       ? options.alarm_text_options
       : [];
-    filterOptions.alarm_category_options = Array.isArray(options.alarm_category_options)
-      ? options.alarm_category_options
-      : [];
     filterOptions.equipment_id_options = Array.isArray(options.equipment_id_options)
       ? options.equipment_id_options
       : [];
-
-    // Snapshot-diff rule: re-sync _lastCommitted from selection after fetchFilterOptions
     _syncLastCommitted();
   }
 
@@ -104,11 +87,7 @@ export function useEapAlarmFilter() {
     const b = fineFilter;
     const arrEq = (x, y) =>
       x.length === y.length && x.every((v, i) => v === y[i]);
-    return (
-      !arrEq(a.alarm_text, b.alarm_text) ||
-      !arrEq(a.alarm_category, b.alarm_category) ||
-      !arrEq(a.eqp_id, b.eqp_id)
-    );
+    return !arrEq(a.alarm_text, b.alarm_text) || !arrEq(a.eqp_id, b.eqp_id);
   }
 
   function commitFineFilter() {
@@ -119,9 +98,6 @@ export function useEapAlarmFilter() {
     const params = { query_id: queryId.value };
     if (fineFilter.alarm_text.length > 0) {
       params['alarm_text[]'] = fineFilter.alarm_text;
-    }
-    if (fineFilter.alarm_category.length > 0) {
-      params['alarm_category[]'] = fineFilter.alarm_category;
     }
     if (fineFilter.eqp_id.length > 0) {
       params['equipment_id[]'] = fineFilter.eqp_id;
@@ -146,7 +122,6 @@ export function useEapAlarmFilter() {
   }
 
   return {
-    EQP_TYPE_OPTIONS,
     coarseFilter,
     fineFilter,
     filterOptions,

@@ -1,6 +1,6 @@
-# generated: 2026-06-18T02:47:31Z by cdd-kit 3.3.0
-# files: 897, src-lines: 260827, map-lines: 19297, compression: 13.5x
-# sources-digest: ec0faea3e71bd1170ae27beb9bcb33716d73647fcad4602cbe66de5cb4009cf0
+# generated: 2026-06-18T08:32:44Z by cdd-kit 3.3.0
+# files: 897, src-lines: 260772, map-lines: 19292, compression: 13.5x
+# sources-digest: 1820d18ea1d0104978f5e896ce32db38161c597e56a9c54ae86a0759a71737d9
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -933,27 +933,25 @@ frontend/src/downtime-analysis/types.ts:  # 141 lines
   types:
     - { name: MatchSource, lines: 76-76 }
 
-frontend/src/eap-alarm/App.vue:  # 351 lines
+frontend/src/eap-alarm/App.vue:  # 371 lines
 
-frontend/src/eap-alarm/DetailTable.vue:  # 131 lines
+frontend/src/eap-alarm/DetailTable.vue:  # 142 lines
 
-frontend/src/eap-alarm/FilterBar.vue:  # 92 lines
+frontend/src/eap-alarm/FilterBar.vue:  # 168 lines
 
-frontend/src/eap-alarm/FineFilterBar.vue:  # 98 lines
+frontend/src/eap-alarm/FineFilterBar.vue:  # 73 lines
 
 frontend/src/eap-alarm/ParetoChart.vue:  # 140 lines
 
-frontend/src/eap-alarm/SummaryCards.vue:  # 50 lines
+frontend/src/eap-alarm/SummaryCards.vue:  # 44 lines
 
 frontend/src/eap-alarm/TrendChart.vue:  # 128 lines
 
-frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 164 lines
+frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 139 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 8 }
-  constants:
-    - { name: EQP_TYPE_OPTIONS, line: 10 }
   functions:
-    - { name: useEapAlarmFilter, lines: 15-164 }
+    - { name: useEapAlarmFilter, lines: 10-139 }
 
 frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 251 lines
   imports:
@@ -1376,12 +1374,12 @@ frontend/src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-frontend/src/portal-shell/nativeModuleRegistry.js:  # 105 lines
+frontend/src/portal-shell/nativeModuleRegistry.js:  # 109 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 103-105 }
+    - { name: getNativeModuleLoader, lines: 107-109 }
 
 frontend/src/portal-shell/navigationState.js:  # 166 lines
   imports:
@@ -4550,7 +4548,7 @@ src/mes_dashboard/core/spool_warmup_scheduler.py:  # 291 lines
     - { name: init_warmup_scheduler, lines: 252-282 }
     - { name: stop_warmup_scheduler, lines: 285-291 }
 
-src/mes_dashboard/core/sync_worker.py:  # 588 lines
+src/mes_dashboard/core/sync_worker.py:  # 583 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -4565,26 +4563,26 @@ src/mes_dashboard/core/sync_worker.py:  # 588 lines
     - { name: MYSQL_SYNC_ENABLED, line: 27 }
   classes:
     - name: SyncWorker
-      lines: 39-524
+      lines: 39-519
       methods:
         - { name: __init__, lines: 42-58 }
         - { name: start, lines: 60-71 }
         - { name: stop, lines: 73-77 }
         - { name: _run, lines: 79-102 }
-        - { name: _ensure_mysql_tables, lines: 108-225 }
-        - { name: _run_login_session_migration, lines: 234-295 }
-        - { name: _sync_logs, lines: 301-346 }
-        - { name: _sync_metrics, lines: 352-445 }
-        - { name: _sync_login_sessions, lines: 451-505 }
-        - { name: _cleanup_orphan_sessions, lines: 511-515 }
-        - { name: _cleanup_synced, lines: 521-524 }
+        - { name: _ensure_mysql_tables, lines: 108-220 }
+        - { name: _run_login_session_migration, lines: 229-290 }
+        - { name: _sync_logs, lines: 296-341 }
+        - { name: _sync_metrics, lines: 347-440 }
+        - { name: _sync_login_sessions, lines: 446-500 }
+        - { name: _cleanup_orphan_sessions, lines: 506-510 }
+        - { name: _cleanup_synced, lines: 516-519 }
   functions:
-    - { name: _is_deadlock, lines: 531-535 }
-    - { name: _parse_ts, lines: 538-545 }
-    - { name: start_sync_worker, lines: 557-561 }
-    - { name: stop_sync_worker, lines: 564-568 }
-    - { name: record_sync_completed, lines: 571-574 }
-    - { name: get_sync_worker_status, lines: 577-588 }
+    - { name: _is_deadlock, lines: 526-530 }
+    - { name: _parse_ts, lines: 533-540 }
+    - { name: start_sync_worker, lines: 552-556 }
+    - { name: stop_sync_worker, lines: 559-563 }
+    - { name: record_sync_completed, lines: 566-569 }
+    - { name: get_sync_worker_status, lines: 572-583 }
 
 src/mes_dashboard/core/utils.py:  # 274 lines
   imports:
@@ -5957,39 +5955,38 @@ src/mes_dashboard/services/downtime_query_job_service.py:  # 126 lines
   functions:
     - { name: execute_downtime_query_job, lines: 46-112 }
 
-src/mes_dashboard/services/eap_alarm_cache.py:  # 95 lines
+src/mes_dashboard/services/eap_alarm_cache.py:  # 70 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
-    - { module: os, items: [], line: 15 }
-    - { module: typing, items: [Optional], line: 16 }
+    - { module: logging, items: [], line: 15 }
+    - { module: os, items: [], line: 16 }
+    - { module: typing, items: [Optional], line: 17 }
   constants:
-    - { name: EAP_ALARM_SPOOL_DIR, line: 22 }
-    - { name: EAP_ALARM_SPOOL_TTL, line: 25 }
+    - { name: EAP_ALARM_SPOOL_DIR, line: 25 }
+    - { name: EAP_ALARM_SPOOL_TTL, line: 28 }
   functions:
-    - { name: decode_alarm_category, lines: 45-56 }
-    - { name: make_eap_alarm_spool_key, lines: 61-83 }
-    - { name: get_eap_alarm_spool_path, lines: 88-95 }
+    - { name: make_eap_alarm_spool_key, lines: 34-60 }
+    - { name: get_eap_alarm_spool_path, lines: 65-70 }
 
-src/mes_dashboard/services/eap_alarm_service.py:  # 468 lines
+src/mes_dashboard/services/eap_alarm_service.py:  # 389 lines
   imports:
-    - { module: __future__, items: [annotations], line: 16 }
-    - { module: json, items: [], line: 18 }
-    - { module: logging, items: [], line: 19 }
-    - { module: math, items: [], line: 20 }
-    - { module: typing, items: [Any, Dict, List, Optional], line: 21 }
-    - { module: mes_dashboard.services.eap_alarm_cache, items: [decode_alarm_category], line: 23 }
+    - { module: __future__, items: [annotations], line: 21 }
+    - { module: json, items: [], line: 23 }
+    - { module: logging, items: [], line: 24 }
+    - { module: math, items: [], line: 25 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 26 }
   functions:
-    - { name: validate_eap_alarm_params, lines: 39-64 }
-    - { name: _get_duckdb_conn, lines: 69-72 }
-    - { name: _build_filter_where, lines: 75-120 }
-    - { name: _escape_like, lines: 123-125 }
-    - { name: _escape_sql, lines: 128-130 }
-    - { name: get_filter_options, lines: 135-192 }
-    - { name: get_summary, lines: 197-246 }
-    - { name: get_pareto, lines: 251-299 }
-    - { name: get_trend, lines: 304-367 }
-    - { name: get_detail, lines: 372-468 }
+    - { name: validate_eap_alarm_params, lines: 35-46 }
+    - { name: _get_duckdb_conn, lines: 51-53 }
+    - { name: _escape_like, lines: 56-57 }
+    - { name: _escape_sql, lines: 60-61 }
+    - { name: _build_filter_where, lines: 64-92 }
+    - { name: get_filter_options, lines: 97-137 }
+    - { name: get_summary, lines: 142-182 }
+    - { name: get_pareto, lines: 187-231 }
+    - { name: get_trend, lines: 236-293 }
+    - { name: get_detail, lines: 298-389 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -8058,21 +8055,20 @@ src/mes_dashboard/static/js/toast.js:  # 240 lines
 
 src/mes_dashboard/workers/__init__.py:  # 0 lines
 
-src/mes_dashboard/workers/eap_alarm_worker.py:  # 268 lines
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 277 lines
   imports:
-    - { module: __future__, items: [annotations], line: 18 }
-    - { module: json, items: [], line: 20 }
-    - { module: logging, items: [], line: 21 }
-    - { module: os, items: [], line: 22 }
-    - { module: uuid, items: [], line: 23 }
-    - { module: typing, items: [Any, Dict, List, Optional, Tuple], line: 24 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 260 }
+    - { module: __future__, items: [annotations], line: 23 }
+    - { module: logging, items: [], line: 25 }
+    - { module: os, items: [], line: 26 }
+    - { module: typing, items: [Any, Dict, List], line: 27 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 269 }
   constants:
-    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 29 }
-    - { name: EAP_ALARM_WORKER_QUEUE, line: 32 }
-    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 33 }
+    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 31 }
+    - { name: EAP_ALARM_WORKER_QUEUE, line: 34 }
+    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 35 }
   functions:
-    - { name: run_eap_alarm_query_job, lines: 78-256 }
+    - { name: _build_equipment_filter, lines: 151-166 }
+    - { name: run_eap_alarm_query_job, lines: 169-265 }
 
 tests/__init__.py:  # 0 lines
 
@@ -13247,7 +13243,7 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
 
-tests/test_eap_alarm_service.py:  # 227 lines
+tests/test_eap_alarm_service.py:  # 217 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -13258,8 +13254,8 @@ tests/test_eap_alarm_service.py:  # 227 lines
       methods:
         - { name: test_key_format, lines: 24-28 }
         - { name: test_hash_is_8_chars, lines: 30-37 }
-        - { name: test_sorted_eqp_types_gives_same_key, lines: 39-44 }
-        - { name: test_different_eqp_types_give_different_key, lines: 46-50 }
+        - { name: test_sorted_machines_gives_same_key, lines: 39-44 }
+        - { name: test_different_machines_give_different_key, lines: 46-50 }
         - { name: test_hash_matches_sha256_of_sorted_join, lines: 52-59 }
         - { name: test_different_dates_give_different_key, lines: 61-65 }
         - { name: test_schema_version_in_key, lines: 67-71 }
@@ -13272,32 +13268,31 @@ tests/test_eap_alarm_service.py:  # 227 lines
         - { name: test_missing_date_from_validate, lines: 94-97 }
         - { name: test_missing_date_to_validate, lines: 99-102 }
         - { name: test_both_dates_missing_validate, lines: 104-107 }
-    - name: TestEqpTypeAllowlist
-      lines: 112-145
+    - name: TestMachinesValidation
+      lines: 112-136
       methods:
-        - { name: test_all_ten_valid_types_no_error, lines: 117-119 }
-        - { name: test_single_valid_type_no_error, lines: 121-124 }
-        - { name: test_unknown_type_raises_value_error, lines: 126-129 }
-        - { name: test_lowercase_invalid, lines: 131-135 }
-        - { name: test_empty_list_raises_value_error, lines: 137-140 }
-        - { name: test_none_list_raises_value_error, lines: 142-145 }
+        - { name: test_single_valid_machine_no_error, lines: 115-117 }
+        - { name: test_multiple_valid_machines_no_error, lines: 119-121 }
+        - { name: test_empty_list_raises_value_error, lines: 123-126 }
+        - { name: test_none_raises_value_error, lines: 128-131 }
+        - { name: test_empty_string_in_list_raises_value_error, lines: 133-136 }
     - name: TestAlarmCategoryDecode
-      lines: 150-208
+      lines: 141-198
       methods:
-        - { name: test_all_nine_known_codes, lines: 165-171 }
-        - { name: test_unknown_code_99_returns_unknown, lines: 173-175 }
-        - { name: test_unknown_code_255_returns_unknown, lines: 177-179 }
-        - { name: test_none_returns_unknown, lines: 181-183 }
-        - { name: test_string_code_coerced, lines: 185-188 }
-        - { name: test_string_unknown_code_returns_unknown, lines: 190-192 }
-        - { name: test_float_code_coerced, lines: 194-197 }
-        - { name: test_negative_code_returns_unknown, lines: 199-201 }
-        - { name: test_service_decode_matches_cache_decode, lines: 203-208 }
+        - { name: test_all_nine_known_codes, lines: 156-162 }
+        - { name: test_unknown_code_99_returns_unknown, lines: 164-166 }
+        - { name: test_unknown_code_255_returns_unknown, lines: 168-170 }
+        - { name: test_none_returns_unknown, lines: 172-174 }
+        - { name: test_string_code_coerced, lines: 176-179 }
+        - { name: test_string_unknown_code_returns_unknown, lines: 181-183 }
+        - { name: test_float_code_coerced, lines: 185-188 }
+        - { name: test_negative_code_returns_unknown, lines: 190-192 }
+        - { name: test_service_decode_matches_cache_decode, lines: 194-198 }
     - name: TestSchemaVersionIsPinned
-      lines: 213-227
+      lines: 203-217
       methods:
-        - { name: test_schema_version_is_integer, lines: 216-220 }
-        - { name: test_schema_version_equals_one, lines: 222-227 }
+        - { name: test_schema_version_is_integer, lines: 206-210 }
+        - { name: test_schema_version_equals_one, lines: 212-217 }
 
 tests/test_env_contract.py:  # 292 lines
   imports:

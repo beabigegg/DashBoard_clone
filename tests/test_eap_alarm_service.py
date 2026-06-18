@@ -2,9 +2,9 @@
 """Unit tests for EAP ALARM service and cache modules.
 
 Tests:
-  - test_spool_key_composition: SHA-256 hash, deterministic, sorted eqp_types
+  - test_spool_key_composition: SHA-256 hash, deterministic, sorted machines
   - test_missing_date_range_raises_value_error: missing date_from/date_to → ValueError
-  - test_eqp_type_allowlist: unknown/empty eqp_types → ValueError; all 10 valid → ok
+  - test_machines_validation: empty/invalid machines → ValueError; valid list → ok
   - test_alarm_category_decode: 9 codes; code 99 → "未知"; None → "未知"
   - test_schema_version_is_pinned: _SCHEMA_VERSION == 1
 """
@@ -23,51 +23,51 @@ class TestSpoolKeyComposition:
 
     def test_key_format(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, _SCHEMA_VERSION
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA", "GCBA"])
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212", "GWBK-0246"])
         assert key.startswith("eap_alarm_2025-01-01_2025-01-07_")
         assert f"_v{_SCHEMA_VERSION}" in key
 
     def test_hash_is_8_chars(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212"])
         parts = key.split("_")
         # format: eap_alarm_{date_from}_{date_to}_{hash8}_v{version}
         # split by _ gives: ['eap', 'alarm', '2025-01-01', '2025-01-07', '{hash8}', 'v{version}']
         hash_part = parts[4]
         assert len(hash_part) == 8
 
-    def test_sorted_eqp_types_gives_same_key(self):
-        """Same EQP type set in any order must produce the same key (EA-01)."""
+    def test_sorted_machines_gives_same_key(self):
+        """Same machine set in any order must produce the same key (EA-01)."""
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA", "GDBA", "GWBA"])
-        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA", "GWBA", "GCBA"])
+        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA-0001", "GDBA-0212", "GWBA-0003"])
+        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA-0212", "GWBA-0003", "GCBA-0001"])
         assert key1 == key2
 
-    def test_different_eqp_types_give_different_key(self):
+    def test_different_machines_give_different_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA"])
-        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA"])
+        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA-0212"])
+        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA-0001"])
         assert key1 != key2
 
     def test_hash_matches_sha256_of_sorted_join(self):
-        """Verify hash computation: sha256(sorted(','.join(sorted(eqp_types))))[:8]."""
+        """Verify hash computation: sha256(','.join(sorted(machines)))[:8]."""
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        eqp_types = ["GCBA", "GDBA"]
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", eqp_types)
-        expected_type_string = ",".join(sorted(eqp_types))
-        expected_hash = hashlib.sha256(expected_type_string.encode("utf-8")).hexdigest()[:8]
+        machines = ["GCBA-0001", "GDBA-0212"]
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", machines)
+        expected_string = ",".join(sorted(machines))
+        expected_hash = hashlib.sha256(expected_string.encode("utf-8")).hexdigest()[:8]
         assert f"_{expected_hash}_" in key
 
     def test_different_dates_give_different_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
-        key2 = make_eap_alarm_spool_key("2025-01-02", "2025-01-07", ["GDBA"])
+        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212"])
+        key2 = make_eap_alarm_spool_key("2025-01-02", "2025-01-07", ["GDBA-0212"])
         assert key1 != key2
 
     def test_schema_version_in_key(self):
         """EA-06: Schema version participates in spool key."""
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, _SCHEMA_VERSION
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212"])
         assert f"v{_SCHEMA_VERSION}" in key
 
 
@@ -79,70 +79,61 @@ class TestMissingDateRangeRaisesValueError:
     def test_missing_date_from_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            make_eap_alarm_spool_key(None, "2025-01-07", ["GDBA"])
+            make_eap_alarm_spool_key(None, "2025-01-07", ["GDBA-0212"])
 
     def test_missing_date_to_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            make_eap_alarm_spool_key("2025-01-01", None, ["GDBA"])
+            make_eap_alarm_spool_key("2025-01-01", None, ["GDBA-0212"])
 
     def test_empty_date_from_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         with pytest.raises(ValueError):
-            make_eap_alarm_spool_key("", "2025-01-07", ["GDBA"])
+            make_eap_alarm_spool_key("", "2025-01-07", ["GDBA-0212"])
 
     def test_missing_date_from_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            validate_eap_alarm_params(None, "2025-01-07", ["GDBA"])
+            validate_eap_alarm_params(None, "2025-01-07", ["GDBA-0212"])
 
     def test_missing_date_to_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            validate_eap_alarm_params("2025-01-01", "", ["GDBA"])
+            validate_eap_alarm_params("2025-01-01", "", ["GDBA-0212"])
 
     def test_both_dates_missing_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError):
-            validate_eap_alarm_params(None, None, ["GDBA"])
+            validate_eap_alarm_params(None, None, ["GDBA-0212"])
 
 
-# ── test_eqp_type_allowlist ───────────────────────────────────────────────────
+# ── test_machines_validation ──────────────────────────────────────────────────
 
-class TestEqpTypeAllowlist:
-    """EA-07: EQP type closed enum validation."""
+class TestMachinesValidation:
+    """machines param: empty/None → ValueError; valid RESOURCENAME list → ok."""
 
-    _ALL_VALID = ["GDBA", "GCBA", "GWBA", "GWBK", "GPRA", "GTMH", "GWMT", "GDSD", "GWAC", "GPTA"]
-
-    def test_all_ten_valid_types_no_error(self):
+    def test_single_valid_machine_no_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        validate_eap_alarm_params("2025-01-01", "2025-01-07", self._ALL_VALID)
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GWBK-0246"])
 
-    def test_single_valid_type_no_error(self):
+    def test_multiple_valid_machines_no_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        for t in self._ALL_VALID:
-            validate_eap_alarm_params("2025-01-01", "2025-01-07", [t])
-
-    def test_unknown_type_raises_value_error(self):
-        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="invalid eqp_types"):
-            validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GDBA", "UNKNOWN_TYPE"])
-
-    def test_lowercase_invalid(self):
-        """EQP types are case-sensitive uppercase only."""
-        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="invalid eqp_types"):
-            validate_eap_alarm_params("2025-01-01", "2025-01-07", ["gdba"])
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GDBA-0212", "GWBK-0246", "GWBA-0101"])
 
     def test_empty_list_raises_value_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="eqp_types must be non-empty"):
+        with pytest.raises(ValueError, match="machines must be non-empty"):
             validate_eap_alarm_params("2025-01-01", "2025-01-07", [])
 
-    def test_none_list_raises_value_error(self):
+    def test_none_raises_value_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="eqp_types must be non-empty"):
+        with pytest.raises(ValueError, match="machines must be non-empty"):
             validate_eap_alarm_params("2025-01-01", "2025-01-07", None)
+
+    def test_empty_string_in_list_raises_value_error(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        with pytest.raises(ValueError, match="invalid machine values"):
+            validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GDBA-0212", ""])
 
 
 # ── test_alarm_category_decode ────────────────────────────────────────────────
@@ -204,7 +195,6 @@ class TestAlarmCategoryDecode:
         """eap_alarm_service re-exports decode_alarm_category from cache."""
         from mes_dashboard.services.eap_alarm_cache import decode_alarm_category as cache_decode
         from mes_dashboard.services.eap_alarm_service import decode_alarm_category as svc_decode  # noqa: F401
-        # Both must be the same function (service imports from cache)
         assert cache_decode(64) == "繼續錯誤"
 
 
