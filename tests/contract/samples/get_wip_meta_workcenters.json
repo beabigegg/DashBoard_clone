@@ -1,75 +1,79 @@
 {
   "data": [
     {
-      "lot_count": 56,
+      "lot_count": 79,
       "name": "點測"
     },
     {
-      "lot_count": 1891,
+      "lot_count": 10,
+      "name": "已CP入庫"
+    },
+    {
+      "lot_count": 1978,
       "name": "切割"
     },
     {
-      "lot_count": 870,
+      "lot_count": 915,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 72,
+      "lot_count": 81,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 355,
+      "lot_count": 351,
       "name": "焊接_WB"
     },
     {
-      "lot_count": 61,
+      "lot_count": 54,
       "name": "焊接_WB"
     },
     {
-      "lot_count": 106,
+      "lot_count": 107,
       "name": "焊接_DW"
     },
     {
-      "lot_count": 13,
+      "lot_count": 7,
       "name": "焊接_DW"
     },
     {
-      "lot_count": 516,
+      "lot_count": 524,
       "name": "成型"
     },
     {
-      "lot_count": 180,
+      "lot_count": 279,
       "name": "成型"
     },
     {
-      "lot_count": 433,
+      "lot_count": 340,
       "name": "去膠"
     },
     {
-      "lot_count": 459,
+      "lot_count": 431,
       "name": "水吹砂"
     },
     {
-      "lot_count": 450,
+      "lot_count": 458,
       "name": "電鍍"
     },
     {
-      "lot_count": 52,
+      "lot_count": 36,
       "name": "電鍍"
     },
     {
-      "lot_count": 218,
+      "lot_count": 231,
       "name": "電鍍"
     },
     {
-      "lot_count": 55,
+      "lot_count": 43,
       "name": "電鍍"
     },
     {
-      "lot_count": 256,
+      "lot_count": 290,
       "name": "移印"
     },
     {
-      "lot_count": 229,
+      "lot_count": 310,
       "name": "切彎腳"
     },
     {
@@ -77,29 +81,29 @@
       "name": "可靠性"
     },
     {
-      "lot_count": 3505,
+      "lot_count": 3410,
       "name": "TMTT"
     },
     {
-      "lot_count": 42,
+      "lot_count": 39,
       "name": "預備站"
     },
     {
-      "lot_count": 132,
+      "lot_count": 48,
       "name": "品檢"
     },
     {
-      "lot_count": 7,
+      "lot_count": 3,
       "name": "FQC"
     },
     {
-      "lot_count": 46,
+      "lot_count": 27,
       "name": "成品入庫"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T10:06:41.207969"
+    "timestamp": "2026-06-18T20:19:01.400359"
   },
   "success": true
 }

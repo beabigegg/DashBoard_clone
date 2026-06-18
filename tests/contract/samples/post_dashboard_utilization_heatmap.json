@@ -105,11 +105,11 @@
       "workcenter": "TMTT"
     },
     {
-      "avail_hours": 2266.5,
+      "avail_hours": 2305.1,
       "date": "2026-06-17",
       "group": "測試",
-      "prd_hours": 1856.2,
-      "prd_pct": 81.89,
+      "prd_hours": 1858.7,
+      "prd_pct": 80.64,
       "workcenter": "TMTT"
     },
     {
@@ -161,11 +161,11 @@
       "workcenter": "切割"
     },
     {
-      "avail_hours": 1384.1,
+      "avail_hours": 1384.8,
       "date": "2026-06-17",
       "group": "切割",
-      "prd_hours": 1149.7,
-      "prd_pct": 83.07,
+      "prd_hours": 1150.5,
+      "prd_pct": 83.08,
       "workcenter": "切割"
     },
     {
@@ -217,11 +217,11 @@
       "workcenter": "切彎腳"
     },
     {
-      "avail_hours": 462.7,
+      "avail_hours": 486.7,
       "date": "2026-06-17",
       "group": "切彎腳",
       "prd_hours": 345.6,
-      "prd_pct": 74.69,
+      "prd_pct": 71.0,
       "workcenter": "切彎腳"
     },
     {
@@ -329,11 +329,11 @@
       "workcenter": "成型"
     },
     {
-      "avail_hours": 1859.9,
+      "avail_hours": 3504.0,
       "date": "2026-06-17",
       "group": "成型",
-      "prd_hours": 133.0,
-      "prd_pct": 7.15,
+      "prd_hours": 145.1,
+      "prd_pct": 4.14,
       "workcenter": "成型"
     },
     {
@@ -385,11 +385,11 @@
       "workcenter": "成型_料"
     },
     {
-      "avail_hours": 868.0,
+      "avail_hours": 868.2,
       "date": "2026-06-17",
       "group": "成型",
       "prd_hours": 673.1,
-      "prd_pct": 77.54,
+      "prd_pct": 77.53,
       "workcenter": "成型_料"
     },
     {
@@ -553,11 +553,11 @@
       "workcenter": "水吹砂"
     },
     {
-      "avail_hours": 381.6,
+      "avail_hours": 406.1,
       "date": "2026-06-17",
       "group": "水吹砂",
-      "prd_hours": 319.2,
-      "prd_pct": 83.65,
+      "prd_hours": 343.7,
+      "prd_pct": 84.63,
       "workcenter": "水吹砂"
     },
     {
@@ -665,11 +665,11 @@
       "workcenter": "焊_DB_料"
     },
     {
-      "avail_hours": 324.0,
+      "avail_hours": 336.0,
       "date": "2026-06-17",
       "group": "焊接_DB",
       "prd_hours": 131.5,
-      "prd_pct": 40.59,
+      "prd_pct": 39.14,
       "workcenter": "焊_DB_料"
     },
     {
@@ -721,11 +721,11 @@
       "workcenter": "焊_WB_料"
     },
     {
-      "avail_hours": 346.1,
+      "avail_hours": 382.1,
       "date": "2026-06-17",
       "group": "焊接_WB",
       "prd_hours": 203.9,
-      "prd_pct": 58.91,
+      "prd_pct": 53.36,
       "workcenter": "焊_WB_料"
     },
     {
@@ -777,11 +777,11 @@
       "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 3006.3,
+      "avail_hours": 3054.5,
       "date": "2026-06-17",
       "group": "焊接_DB",
-      "prd_hours": 2726.5,
-      "prd_pct": 90.7,
+      "prd_hours": 2726.8,
+      "prd_pct": 89.27,
       "workcenter": "焊接_DB"
     },
     {
@@ -833,11 +833,11 @@
       "workcenter": "焊接_DW"
     },
     {
-      "avail_hours": 3743.8,
+      "avail_hours": 4008.0,
       "date": "2026-06-17",
       "group": "焊接_DW",
-      "prd_hours": 2259.8,
-      "prd_pct": 60.36,
+      "prd_hours": 2295.8,
+      "prd_pct": 57.28,
       "workcenter": "焊接_DW"
     },
     {
@@ -889,11 +889,11 @@
       "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 4039.3,
+      "avail_hours": 4197.4,
       "date": "2026-06-17",
       "group": "焊接_WB",
-      "prd_hours": 2962.1,
-      "prd_pct": 73.33,
+      "prd_hours": 2976.2,
+      "prd_pct": 70.91,
       "workcenter": "焊接_WB"
     },
     {
@@ -945,7 +945,7 @@
       "workcenter": "移印"
     },
     {
-      "avail_hours": 567.1,
+      "avail_hours": 567.2,
       "date": "2026-06-17",
       "group": "移印",
       "prd_hours": 496.8,
@@ -1057,17 +1057,17 @@
       "workcenter": "點測"
     },
     {
-      "avail_hours": 392.6,
+      "avail_hours": 404.6,
       "date": "2026-06-17",
       "group": null,
-      "prd_hours": 381.5,
-      "prd_pct": 97.17,
+      "prd_hours": 393.5,
+      "prd_pct": 97.25,
       "workcenter": "點測"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T10:08:13.523601"
+    "timestamp": "2026-06-18T20:20:33.470670"
   },
   "success": true
 }

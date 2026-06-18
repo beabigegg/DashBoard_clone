@@ -16,6 +16,10 @@
         "size_bytes": 0
       },
       {
+        "path": "logs/rq_eap_alarm_worker.log",
+        "size_bytes": 0
+      },
+      {
         "path": "logs/rq_hold_hist_worker.log",
         "size_bytes": 0
       },
@@ -61,15 +65,15 @@
       }
     ],
     "mysql": {
-      "dashboard_logs_rows": 520891,
-      "dashboard_metrics_snapshots_rows": 189774,
+      "dashboard_logs_rows": 524756,
+      "dashboard_metrics_snapshots_rows": 191474,
       "enabled": true,
       "healthy": true
     },
     "sqlite_files": [
       {
         "path": "logs/admin_logs.sqlite",
-        "size_bytes": 13144064
+        "size_bytes": 15327232
       },
       {
         "path": "logs/login_sessions.sqlite",
@@ -80,11 +84,11 @@
         "size_bytes": 176128
       }
     ],
-    "total_bytes": 13344768
+    "total_bytes": 15527936
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T10:08:14.088804"
+    "timestamp": "2026-06-18T20:20:33.843957"
   },
   "success": true
 }

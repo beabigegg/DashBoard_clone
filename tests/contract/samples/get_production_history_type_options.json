@@ -2493,6 +2493,7 @@
       "PE-BAT54TB89",
       "PE-BAV99-AU",
       "PE-BAW56W-AU",
+      "PE-BC846A-AU",
       "PE-BC847B-AU",
       "PE-BC847BS-AU",
       "PE-BC847C",
@@ -5240,7 +5241,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T10:07:34.702642"
+    "timestamp": "2026-06-18T20:19:54.636676"
   },
   "success": true
 }
