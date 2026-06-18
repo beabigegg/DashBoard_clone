@@ -162,6 +162,7 @@ class SyncWorker:
                 heavy_query_guard_reject_total INT,
                 heavy_query_memory_error_total INT,
                 heavy_query_async_fallback_total INT,
+                online_count INT,
                 INDEX idx_ts (ts)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
@@ -189,33 +190,27 @@ class SyncWorker:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
         ]
-        metric_migration_columns = [
-            "heavy_query_guard_reject_total INT",
-            "heavy_query_memory_error_total INT",
-            "heavy_query_async_fallback_total INT",
-            "service_rss_bytes BIGINT",
-        ]
-
         try:
             with get_mysql_connection() as conn:
                 for ddl in ddl_statements:
                     conn.execute(text(ddl))
-                for column_spec in metric_migration_columns:
-                    try:
-                        conn.execute(
-                            text(
-                                f"ALTER TABLE dashboard_metrics_snapshots "
-                                f"ADD COLUMN {column_spec}"
-                            )
-                        )
-                    except Exception:
-                        # Tolerate duplicate-column errors for existing deployments.
-                        pass
-                # Add online_count column to metrics snapshots if not present
+                # Add online_count column for existing deployments that predate the column.
+                # Use INFORMATION_SCHEMA pre-check to avoid ALTER TABLE raising 1060 (duplicate
+                # column), which leaves the SQLAlchemy Connection in a pending-rollback state and
+                # causes a misleading warning on every startup.
                 try:
-                    conn.execute(
-                        text("ALTER TABLE dashboard_metrics_snapshots ADD COLUMN online_count INT")
-                    )
+                    already_exists = conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                            "WHERE TABLE_SCHEMA = DATABASE() "
+                            "AND TABLE_NAME = 'dashboard_metrics_snapshots' "
+                            "AND COLUMN_NAME = 'online_count'"
+                        )
+                    ).scalar()
+                    if not already_exists:
+                        conn.execute(
+                            text("ALTER TABLE dashboard_metrics_snapshots ADD COLUMN online_count INT")
+                        )
                 except Exception:
                     pass
                 # One-time migration v2: truncate stale login sessions table
