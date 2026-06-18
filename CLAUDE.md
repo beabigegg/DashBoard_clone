@@ -119,6 +119,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Snapshot-diff filter composables must re-sync `_lastCommitted` from `selection` after every `fetchFilterOptions` — see docs/architecture/frontend-patterns.md
 - Oracle DATE midnight UTC columns: inspect H/M/S via regex before `new Date()` to avoid ±8h TZ shift — see docs/architecture/frontend-patterns.md
 - WAI-ARIA combobox close must `nextTick(() => triggerEl.focus())` to return keyboard focus — see docs/architecture/frontend-patterns.md
+- `fetchAllViews()` fan-out: use a per-endpoint staleness dict (`{ summary: 0, pareto: 0, … }`) not a shared counter — shared counter clears all in-flight flags on the first response — see docs/architecture/frontend-patterns.md
 
 **CSS architecture** — see `docs/architecture/css-patterns.md` and `contracts/css/css-contract.md`:
 - All feature CSS must be scoped under `.theme-<name>`; unscoped rules bleed permanently (enforced by `css:check` Rule 6) — see docs/architecture/css-patterns.md

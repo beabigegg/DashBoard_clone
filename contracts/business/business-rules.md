@@ -297,6 +297,7 @@ breaking-change-policy: deprecate-2-minors
 | EA-05 | AlarmCategory decode table | AlarmCategory integer code is decoded to a display label using the fixed table below. Unknown code → `"未知"` fallback (never crashes). Decode applied at spool-load time; parquet stores decoded label alongside raw code. | unit tests |
 | EA-06 | Spool schema version | `eap_alarm_cache.py` contains integer `_SCHEMA_VERSION` that participates in the spool cache key. Bumping orphans stale parquets by key. Schema-breaking rollback requires `rm -f tmp/query_spool/eap_alarm/*.parquet`. Column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. | constant-pin test |
 | EA-07 | EQP type allowlist | `eqp_types` values are validated against the closed enum: `{GDBA, GCBA, GWBA, GWBK, GPRA, GTMH, GWMT, GDSD, GWAC, GPTA}`. Value outside this set → 400 `VALIDATION_ERROR`. Empty list → 400 `VALIDATION_ERROR`. | route tests |
+| EA-ALCD | SECS/GEM ALCD sign convention | Oracle `DWH.EAP_EVENT.ALCD < 0` = SET event; `ALCD >= 0` = CLEAR event. Worker filters `ALCD < 0` for SET rows and joins CLEAR via `RESOURCEID + ALARMID + timestamp window`. Full-table scans without EA-03's `LAST_UPDATE_TIME` index predicate are forbidden. | unit + integration tests |
 
 ### AlarmCategory Decode Table (EA-05)
 

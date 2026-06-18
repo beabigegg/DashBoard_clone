@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 196
-visible-files: 929
-omitted-dirs: 60
-truncated-dirs: 5
+visible-dirs: 184
+visible-files: 971
+omitted-dirs: 61
+truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -67,6 +67,7 @@ DashBoard_vite/
 |   |   |-- 04f75a340f5aee98
 |   |   |-- 05c158cd4e4da3b0
 |   |   |-- 06e37be44b7c2558
+|   |   |-- 080fe7d7b77357e4
 |   |   |-- 08fea481e286d665
 |   |   |-- 09af02b32eace3be
 |   |   |-- 0a24b457adbbced2
@@ -101,9 +102,8 @@ DashBoard_vite/
 |   |   |-- 2513622121cc3cd3
 |   |   |-- 252e65ed0ede4ad2
 |   |   |-- 253e6c94fab987bc
-|   |   |-- 25d84cf88b9bff0e
-|   |   |-- 25db02c884e47e34
-|   |   \-- ... (236 more entries truncated; cap=50)
+|   |   |-- 25971344fbd495b6
+|   |   \-- ... (245 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -152,6 +152,7 @@ DashBoard_vite/
 |   \-- table_schema_info.json
 |-- deploy/
 |   |-- mes-dashboard-downtime-worker.service
+|   |-- mes-dashboard-eap-alarm-worker.service
 |   |-- mes-dashboard-hold-history-worker.service
 |   |-- mes-dashboard-material-consumption-worker.service
 |   |-- mes-dashboard-msd-worker.service
@@ -167,13 +168,15 @@ DashBoard_vite/
 |   |   |-- 0004-gunicorn-preload-app-fork-safety.md
 |   |   |-- 0005-resource-history-canonical-spool-key.md
 |   |   |-- 0006-duckdb-prewarm-via-rq-queue.md
-|   |   \-- 0007-downtime-browser-duckdb-compute-relocation.md
+|   |   |-- 0007-downtime-browser-duckdb-compute-relocation.md
+|   |   \-- 0008-eap-alarm-coarse-spool-detail-join.md
 |   |-- architecture/
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
 |   |   |-- css-patterns.md
 |   |   |-- frontend-patterns.md
 |   |   |-- modernization-policy.md
+|   |   |-- query-dataflow-unification.md
 |   |   |-- service-patterns.md
 |   |   \-- test-discipline.md
 |   |-- migration/
@@ -201,6 +204,8 @@ DashBoard_vite/
 |   \-- real_infra_stability_report.md
 |-- frontend/
 |   |-- .cdd/
+|   |   |-- code-graph.index.json
+|   |   |-- code-map.index.json
 |   |   \-- code-map.yml
 |   |-- logs/
 |   |   \-- admin_logs.sqlite
@@ -281,6 +286,19 @@ DashBoard_vite/
 |   |   |   |-- main.ts
 |   |   |   |-- style.css
 |   |   |   \-- types.ts
+|   |   |-- eap-alarm/
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- App.vue
+|   |   |   |-- DetailTable.vue
+|   |   |   |-- FilterBar.vue
+|   |   |   |-- FineFilterBar.vue
+|   |   |   |-- index.html
+|   |   |   |-- main.js
+|   |   |   |-- ParetoChart.vue
+|   |   |   |-- style.css
+|   |   |   |-- SummaryCards.vue
+|   |   |   \-- TrendChart.vue
 |   |   |-- hold-detail/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -473,62 +491,6 @@ DashBoard_vite/
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
 |   |-- test-results/
-|   |   |-- hold-overview-Hold-Overvie-3e04b-nders-the-Hold-Matrix-table-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-3e04b-nders-the-Hold-Matrix-table-chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-52f47-em-navigates-to-hold-detail-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-52f47-em-navigates-to-hold-detail-chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-5a7ee-old-Lot-Details-card-header-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-5a7ee-old-Lot-Details-card-header-chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-61b73-th-correct-filename-pattern-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-61b73-th-correct-filename-pattern-chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-81357-d-ui-card-inside-card-body--chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-81357-d-ui-card-inside-card-body--chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-d0b74-ry-cards-after-initial-load-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-d0b74-ry-cards-after-initial-load-chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-f2749-te-during-in-flight-request-chromium/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- hold-overview-Hold-Overvie-f2749-te-during-in-flight-request-chromium-retry1/
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
 |   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
@@ -593,6 +555,7 @@ DashBoard_vite/
 |   |   |   |-- _auth.js
 |   |   |   |-- downtime-analysis.spec.js
 |   |   |   |-- downtime-analysis.spec.ts
+|   |   |   |-- eap-alarm.spec.js
 |   |   |   |-- hold-history-flat-table.spec.js
 |   |   |   |-- hold-overview.spec.js
 |   |   |   |-- job-abandon-on-unload.spec.js
@@ -622,6 +585,8 @@ DashBoard_vite/
 |   |   |   |-- useAsyncJobPolling.test.js
 |   |   |   |-- useAutoRefresh.test.js
 |   |   |   \-- useRequestGuard.test.js
+|   |   |-- unit/
+|   |   |   \-- eap-alarm-filter.test.js
 |   |   |-- validation/
 |   |   |   |-- useHoldOverview.validation.test.js
 |   |   |   |-- useMaterialTrace.validation.test.js
@@ -646,14 +611,70 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
+|   |   |-- access_20260618_123652.log
+|   |   |-- access_20260618_131749.log
+|   |   |-- access_20260618_141551.log
+|   |   |-- access_20260618_142357.log
+|   |   |-- access_20260618_150838.log
+|   |   |-- access_20260618_155457.log
+|   |   |-- access_20260618_162349.log
+|   |   |-- access_20260618_171510.log
+|   |   |-- access_20260618_173359.log
+|   |   |-- access_20260618_174422.log
+|   |   |-- error_20260618_161504.log
+|   |   |-- error_20260618_162349.log
+|   |   |-- error_20260618_162452.log
+|   |   |-- error_20260618_162757.log
+|   |   |-- error_20260618_165613.log
+|   |   |-- error_20260618_171510.log
+|   |   |-- error_20260618_171624.log
+|   |   |-- error_20260618_173359.log
+|   |   |-- error_20260618_174422.log
+|   |   |-- error_20260618_174857.log
+|   |   |-- rq_downtime_worker_20260618_161504.log
+|   |   |-- rq_downtime_worker_20260618_162349.log
+|   |   |-- rq_downtime_worker_20260618_162452.log
+|   |   |-- rq_downtime_worker_20260618_162757.log
+|   |   |-- rq_downtime_worker_20260618_165613.log
+|   |   |-- rq_downtime_worker_20260618_171510.log
+|   |   |-- rq_downtime_worker_20260618_171624.log
+|   |   |-- rq_downtime_worker_20260618_173359.log
+|   |   |-- rq_downtime_worker_20260618_174422.log
+|   |   |-- rq_downtime_worker_20260618_174857.log
+|   |   |-- rq_eap_alarm_worker_20260618_161504.log
+|   |   |-- rq_eap_alarm_worker_20260618_162349.log
+|   |   |-- rq_eap_alarm_worker_20260618_162452.log
+|   |   |-- rq_eap_alarm_worker_20260618_162757.log
+|   |   |-- rq_eap_alarm_worker_20260618_165613.log
+|   |   |-- rq_eap_alarm_worker_20260618_171510.log
+|   |   |-- rq_eap_alarm_worker_20260618_171624.log
+|   |   |-- rq_eap_alarm_worker_20260618_173359.log
+|   |   |-- rq_eap_alarm_worker_20260618_174422.log
+|   |   |-- rq_eap_alarm_worker_20260618_174857.log
+|   |   |-- rq_hold_hist_worker_20260618_161504.log
+|   |   |-- rq_hold_hist_worker_20260618_162349.log
+|   |   |-- rq_hold_hist_worker_20260618_162452.log
+|   |   |-- rq_hold_hist_worker_20260618_162757.log
+|   |   |-- rq_hold_hist_worker_20260618_165613.log
+|   |   |-- rq_hold_hist_worker_20260618_171510.log
+|   |   |-- rq_hold_hist_worker_20260618_171624.log
+|   |   |-- rq_hold_hist_worker_20260618_173359.log
+|   |   |-- rq_hold_hist_worker_20260618_174422.log
+|   |   |-- rq_hold_hist_worker_20260618_174857.log
+|   |   \-- ... (80 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
 |   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
+|   |-- rq_eap_alarm_worker.log
 |   |-- rq_hold_hist_worker.log
 |   |-- rq_hold_history_worker.log
 |   |-- rq_msd_worker.log
@@ -761,6 +782,7 @@ DashBoard_vite/
 |       |   |-- analytics_routes.py
 |       |   |-- dashboard_routes.py
 |       |   |-- downtime_analysis_routes.py
+|       |   |-- eap_alarm_routes.py
 |       |   |-- health_routes.py
 |       |   |-- hold_history_routes.py
 |       |   |-- hold_overview_routes.py
@@ -805,6 +827,8 @@ DashBoard_vite/
 |       |   |-- downtime_analysis_duckdb_cache.py
 |       |   |-- downtime_analysis_service.py
 |       |   |-- downtime_query_job_service.py
+|       |   |-- eap_alarm_cache.py
+|       |   |-- eap_alarm_service.py
 |       |   |-- event_fetcher.py
 |       |   |-- filter_cache.py
 |       |   |-- hold_dataset_cache.py
@@ -831,9 +855,7 @@ DashBoard_vite/
 |       |   |-- production_history_sql_runtime.py
 |       |   |-- qc_gate_service.py
 |       |   |-- query_tool_service.py
-|       |   |-- query_tool_sql_runtime.py
-|       |   |-- realtime_equipment_cache.py
-|       |   \-- ... (25 more entries truncated; cap=50)
+|       |   \-- ... (27 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -888,6 +910,9 @@ DashBoard_vite/
 |       |   |-- job_query.html
 |       |   |-- portal.html
 |       |   \-- query_tool.html
+|       |-- workers/
+|       |   |-- __init__.py
+|       |   \-- eap_alarm_worker.py
 |       |-- __init__.py
 |       |-- __main__.py
 |       |-- app.py
@@ -965,6 +990,7 @@ DashBoard_vite/
 |   |   |-- test_anomaly_overview_e2e.py
 |   |   |-- test_cache_e2e.py
 |   |   |-- test_downtime_analysis_e2e.py
+|   |   |-- test_eap_alarm_e2e.py
 |   |   |-- test_global_connection.py
 |   |   |-- test_hold_history_e2e.py
 |   |   |-- test_hold_overview_e2e.py
@@ -1002,6 +1028,9 @@ DashBoard_vite/
 |   |   |-- _oracle_xe_fixture.py
 |   |   |-- conftest.py
 |   |   |-- test_downtime_rq_async.py
+|   |   |-- test_eap_alarm_data_boundary.py
+|   |   |-- test_eap_alarm_resilience.py
+|   |   |-- test_eap_alarm_rq_async.py
 |   |   |-- test_fixtures_smoke.py
 |   |   |-- test_hold_history_rq_async.py
 |   |   |-- test_multi_worker_concurrency.py
@@ -1124,7 +1153,7 @@ DashBoard_vite/
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
 |   |-- test_dashboard_routes.py
-|   \-- ... (170 more entries truncated; cap=50)
+|   \-- ... (171 more entries truncated; cap=50)
 |-- tmp/
 |   |-- query_spool/
 |   |   |-- anomaly_hold_dataset/
@@ -1135,34 +1164,43 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- eap_alarm/
+|   |   |   |-- eap_alarm_2026-06-11_2026-06-17_711322d9_v2.parquet
+|   |   |   |-- eap_alarm_2026-06-11_2026-06-17_7903fc6d_v2.parquet
+|   |   |   |-- eap_alarm_2026-06-11_2026-06-17_bb60cb54_v1.parquet
+|   |   |   |-- eap_alarm_2026-06-11_2026-06-17_e2ab2388_v2.parquet
+|   |   |   |-- eap_alarm_2026-06-11_2026-06-17_ee314671_v1.parquet
+|   |   |   |-- eap_alarm_2026-06-11_2026-06-17_f278e5a6_v2.parquet
+|   |   |   \-- eap_alarm_2026-06-16_2026-06-18_0fe70b23_v1.parquet
 |   |   |-- hold_dataset/
-|   |   |   \-- 6ffe102a864ef841.parquet
-|   |   |-- msd-events/
-|   |   |   \-- tmp4xbqftpt.parquet
-|   |   |-- reject_dataset/
-|   |   |   |-- 780f45126cc24a21.parquet
-|   |   |   \-- dc5ded03236fee8a.parquet
+|   |   |   \-- 1424ea60fc29457e.parquet
 |   |   |-- resource_dataset/
-|   |   |   \-- b3caccc0d62f0d16.parquet
+|   |   |   \-- 637b2a8a5367a382.parquet
 |   |   |-- resource_oee/
-|   |   |   \-- a11096b24a07cf11.parquet
-|   |   |-- yield_alert_dataset/
-|   |   |   \-- bfb72201660e420f.parquet
+|   |   |   \-- 040897b20c97a022.parquet
+|   |   |-- probe_100033.json
+|   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
 |   |   |-- probe_10745.json
 |   |   |-- probe_10829.json
 |   |   |-- probe_10884.json
 |   |   |-- probe_11974.json
 |   |   |-- probe_11981.json
+|   |   |-- probe_123416.json
+|   |   |-- probe_125764.json
 |   |   |-- probe_13508.json
 |   |   |-- probe_13615.json
+|   |   |-- probe_138558.json
 |   |   |-- probe_140108.json
 |   |   |-- probe_141416.json
+|   |   |-- probe_143237.json
 |   |   |-- probe_143339.json
 |   |   |-- probe_143569.json
+|   |   |-- probe_144766.json
 |   |   |-- probe_145959.json
 |   |   |-- probe_14801.json
 |   |   |-- probe_14806.json
+|   |   |-- probe_149639.json
 |   |   |-- probe_152438.json
 |   |   |-- probe_154582.json
 |   |   |-- probe_155676.json
@@ -1172,23 +1210,17 @@ DashBoard_vite/
 |   |   |-- probe_157201.json
 |   |   |-- probe_15833.json
 |   |   |-- probe_159479.json
+|   |   |-- probe_159555.json
 |   |   |-- probe_160566.json
 |   |   |-- probe_160571.json
 |   |   |-- probe_161771.json
 |   |   |-- probe_162015.json
+|   |   |-- probe_162076.json
 |   |   |-- probe_162216.json
 |   |   |-- probe_163309.json
 |   |   |-- probe_163320.json
 |   |   |-- probe_163610.json
-|   |   |-- probe_164709.json
-|   |   |-- probe_164716.json
-|   |   |-- probe_165674.json
-|   |   |-- probe_166780.json
-|   |   |-- probe_166786.json
-|   |   |-- probe_169446.json
-|   |   |-- probe_174363.json
-|   |   |-- probe_176417.json
-|   |   \-- ... (264 more entries truncated; cap=50)
+|   |   \-- ... (319 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   \-- resource_history.duckdb
