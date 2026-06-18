@@ -90,6 +90,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../downtime-analysis/App.vue'),
     [() => import('../resource-shared/styles.css'), () => import('../downtime-analysis/style.css')],
   ),
+  '/eap-alarm': createNativeLoader(
+    () => import('../eap-alarm/App.vue'),
+    [() => import('../resource-shared/styles.css'), () => import('../eap-alarm/style.css')],
+  ),
   '/admin/dashboard': createNativeLoader(
     () => import('../admin-dashboard/App.vue'),
     [() => import('../styles/tailwind.css'), () => import('../admin-dashboard/style.css')],
