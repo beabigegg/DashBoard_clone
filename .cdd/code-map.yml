@@ -1,6 +1,6 @@
-# generated: 2026-06-18T02:22:59Z by cdd-kit 3.2.0
-# files: 897, src-lines: 260806, map-lines: 19297, compression: 13.5x
-# sources-digest: d755e1192a5341efb75bc31f734e8f678b091b330bb91386403f9ee09c0b0eb8
+# generated: 2026-06-18T02:47:31Z by cdd-kit 3.3.0
+# files: 897, src-lines: 260827, map-lines: 19297, compression: 13.5x
+# sources-digest: ec0faea3e71bd1170ae27beb9bcb33716d73647fcad4602cbe66de5cb4009cf0
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3407,7 +3407,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1637 lines
+src/mes_dashboard/app.py:  # 1658 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3467,8 +3467,8 @@ src/mes_dashboard/app.py:  # 1637 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-746 }
-    - { name: create_app, lines: 755-1511 }
-    - { name: _register_error_handlers, lines: 1514-1637 }
+    - { name: create_app, lines: 755-1532 }
+    - { name: _register_error_handlers, lines: 1535-1658 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:

@@ -1444,6 +1444,27 @@ def create_app(config_name: str | None = None) -> Flask:
             200,
         ))
 
+    @app.route('/eap-alarm')
+    def eap_alarm_page():
+        """EAP ALARM analysis page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/eap-alarm')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "eap-alarm.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'eap-alarm.html')
+
+        return missing_in_scope_asset_response('/eap-alarm', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>EAP ALARM 分析</title>"
+            "<script type=\"module\" src=\"/static/dist/eap-alarm.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
+
     # ========================================================
     # Table Query APIs (for table_data_viewer)
     # ========================================================

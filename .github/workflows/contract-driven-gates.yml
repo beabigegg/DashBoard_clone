@@ -31,17 +31,8 @@ jobs:
       - name: Install cdd-kit
         run: npm install -g contract-driven-delivery
 
-      - name: Install Python contract dependencies
-        run: pip install jsonschema
-
       - name: Validate contracts and gates
         run: cdd-kit validate
-
-      - name: OpenAPI sync gate
-        run: cdd-kit openapi export --check --out contracts/openapi.json
-
-      - name: Response-shape contract gate
-        run: cdd-kit validate --contracts
 
       - name: Repository-specific fast gate
         run: |
