@@ -37,34 +37,39 @@ EAP_ALARM_JOB_TTL_SECONDS: int = max(
 _JOB_PREFIX = "eap-alarm"
 
 # ── Oracle SQL template (EA-03/EA-04) ─────────────────────────────────────────
-# LAST_UPDATE_TIME BETWEEN is mandatory; grouping by ROWID pivots EAV DETAIL rows.
+# EAP_EVENT columns: SEQ_ID, EQUIPMENT_ID, LOT_ID, PN, EVENT_NAME, EVENT_REF_ID,
+#   EVENT_TYPE, LAST_UPDATE_TIME, EVENT_DATE
+# No EQUIPMENT_TYPE column — EQP type is SUBSTR(EQUIPMENT_ID, 1, 4).
+# ALARM_TEXT maps to EVENT_NAME directly (numeric alarm codes like '267', '8480').
+# ALARM_CATEGORY_CODE has no source column — persisted as NULL.
 _EAP_EVENT_SQL_TEMPLATE = """\
 SELECT
-    e.ROWID AS EVENT_ID,
+    TO_CHAR(e.SEQ_ID) AS EVENT_ID,
     e.EQUIPMENT_ID AS EQP_ID,
-    e.EQUIPMENT_TYPE AS EQP_TYPE,
+    SUBSTR(e.EQUIPMENT_ID, 1, 4) AS EQP_TYPE,
     e.LOT_ID,
-    MAX(CASE WHEN d.PARAM_NAME = 'AlarmText' THEN d.PARAM_VALUE END) AS ALARM_TEXT,
-    MAX(CASE WHEN d.PARAM_NAME = 'AlarmCategory'
-             THEN TO_NUMBER(d.PARAM_VALUE) END) AS ALARM_CATEGORY_CODE,
-    MIN(e.LAST_UPDATE_TIME) AS ALARM_TIME
+    e.EVENT_NAME AS ALARM_TEXT,
+    NULL AS ALARM_CATEGORY_CODE,
+    e.LAST_UPDATE_TIME AS ALARM_TIME
 FROM DWH.EAP_EVENT e
-LEFT JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
-WHERE e.LAST_UPDATE_TIME BETWEEN :date_from AND :date_to
-  AND e.EQUIPMENT_TYPE IN ({eqp_placeholders})
-GROUP BY e.ROWID, e.EQUIPMENT_ID, e.EQUIPMENT_TYPE, e.LOT_ID
+WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
+                              AND TO_DATE(:date_to, 'YYYY-MM-DD') + 1
+  AND SUBSTR(e.EQUIPMENT_ID, 1, 4) IN ({eqp_placeholders})
+  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'
 """
 
-# DETAIL_PARAMS: all non-primary params (excludes AlarmText, AlarmCategory, AlarmCode)
-_EXCLUDED_DETAIL_PARAMS = {"AlarmText", "AlarmCategory", "AlarmCode"}
+# DETAIL_PARAMS: all EAP_EVENT_DETAIL parameters for each event.
+# EAP_EVENT_DETAIL columns: SEQ_ID, PARAMETER_NAME, PARAMETER_VALUE, PARAMETER_ID
+_EXCLUDED_DETAIL_PARAMS: set = set()  # no parameters to exclude in current schema
 
 _DETAIL_PARAMS_SQL_TEMPLATE = """\
-SELECT e.ROWID AS EVENT_ID, d.PARAM_NAME, d.PARAM_VALUE
+SELECT TO_CHAR(e.SEQ_ID) AS EVENT_ID, d.PARAMETER_NAME, d.PARAMETER_VALUE
 FROM DWH.EAP_EVENT e
-LEFT JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
-WHERE e.LAST_UPDATE_TIME BETWEEN :date_from AND :date_to
-  AND e.EQUIPMENT_TYPE IN ({eqp_placeholders})
-  AND d.PARAM_NAME NOT IN ('AlarmText', 'AlarmCategory', 'AlarmCode')
+JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
+WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
+                              AND TO_DATE(:date_to, 'YYYY-MM-DD') + 1
+  AND SUBSTR(e.EQUIPMENT_ID, 1, 4) IN ({eqp_placeholders})
+  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'
 """
 
 # Parquet columns order per §3.17
@@ -164,8 +169,8 @@ def run_eap_alarm_query_job(
                 detail_map: Dict[str, Dict[str, str]] = {}
                 for _, row in detail_df.iterrows():
                     eid = str(row["EVENT_ID"]) if row["EVENT_ID"] is not None else None
-                    pname = str(row["PARAM_NAME"]) if row["PARAM_NAME"] is not None else None
-                    pval = str(row["PARAM_VALUE"]) if row["PARAM_VALUE"] is not None else None
+                    pname = str(row["PARAMETER_NAME"]) if row["PARAMETER_NAME"] is not None else None
+                    pval = str(row["PARAMETER_VALUE"]) if row["PARAMETER_VALUE"] is not None else None
                     if eid and pname:
                         if eid not in detail_map:
                             detail_map[eid] = {}
