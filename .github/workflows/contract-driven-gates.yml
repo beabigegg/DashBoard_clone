@@ -31,8 +31,11 @@ jobs:
       - name: Install cdd-kit
         run: npm install -g contract-driven-delivery
 
+      - name: Install jsonschema (required for cdd-kit validate --contracts)
+        run: pip install jsonschema
+
       - name: Validate contracts and gates
-        run: cdd-kit validate
+        run: cdd-kit validate --contracts
 
       - name: Repository-specific fast gate
         run: |

@@ -20,15 +20,13 @@ describe('useEapAlarmFilter', () => {
     filter = useEapAlarmFilter();
   });
 
-  it('initializes with all EQP types selected', () => {
-    expect(filter.coarseFilter.eqp_types).toHaveLength(10);
-    expect(filter.coarseFilter.eqp_types).toContain('GDBA');
-    expect(filter.coarseFilter.eqp_types).toContain('GPTA');
+  it('initializes coarse filter with empty machines list', () => {
+    expect(Array.isArray(filter.coarseFilter.machines)).toBe(true);
+    expect(filter.coarseFilter.machines).toHaveLength(0);
   });
 
   it('initializes fine filter as empty', () => {
     expect(filter.fineFilter.alarm_text).toHaveLength(0);
-    expect(filter.fineFilter.alarm_category).toHaveLength(0);
     expect(filter.fineFilter.eqp_id).toHaveLength(0);
   });
 
@@ -43,12 +41,10 @@ describe('useEapAlarmFilter', () => {
     it('applyFilterOptions re-syncs _lastCommitted from current fine filter selection', () => {
       // Set fine filter before calling applyFilterOptions
       filter.fineFilter.alarm_text = ['ALARM_A', 'ALARM_B'];
-      filter.fineFilter.alarm_category = ['設備警告'];
       filter.fineFilter.eqp_id = ['EQ-01'];
 
       const mockOptions = {
         alarm_text_options: ['ALARM_A', 'ALARM_B', 'ALARM_C'],
-        alarm_category_options: [{ code: 1, label: '設備警告' }, { code: 2, label: '通訊錯誤' }],
         equipment_id_options: ['EQ-01', 'EQ-02'],
       };
 
@@ -56,7 +52,6 @@ describe('useEapAlarmFilter', () => {
 
       // Filter options should be applied
       expect(filter.filterOptions.alarm_text_options).toEqual(['ALARM_A', 'ALARM_B', 'ALARM_C']);
-      expect(filter.filterOptions.alarm_category_options).toHaveLength(2);
       expect(filter.filterOptions.equipment_id_options).toEqual(['EQ-01', 'EQ-02']);
 
       // hasFineFilterChanged() should return false right after applyFilterOptions
@@ -68,7 +63,6 @@ describe('useEapAlarmFilter', () => {
       filter.fineFilter.alarm_text = ['TEST'];
       filter.applyFilterOptions({
         alarm_text_options: ['TEST', 'OTHER'],
-        alarm_category_options: [],
         equipment_id_options: [],
       });
       // _lastCommitted re-synced: no change
@@ -78,10 +72,9 @@ describe('useEapAlarmFilter', () => {
     it('hasFineFilterChanged returns true when fine filter changes after re-sync', () => {
       filter.applyFilterOptions({
         alarm_text_options: ['ALARM_A'],
-        alarm_category_options: [],
         equipment_id_options: [],
       });
-      // _lastCommitted = {alarm_text: [], alarm_category: [], eqp_id: []}
+      // _lastCommitted = {alarm_text: [], eqp_id: []}
 
       // Now change the fine filter
       filter.fineFilter.alarm_text = ['ALARM_A'];
@@ -91,7 +84,6 @@ describe('useEapAlarmFilter', () => {
 
     it('resetFineFilter re-syncs _lastCommitted', () => {
       filter.fineFilter.alarm_text = ['ALARM_A'];
-      filter.fineFilter.alarm_category = ['類別X'];
 
       filter.resetFineFilter();
 
@@ -117,7 +109,6 @@ describe('useEapAlarmFilter', () => {
       const params = filter.buildFineFilterParams();
       expect(params.query_id).toBe('q-001');
       expect(params['alarm_text[]']).toBeUndefined();
-      expect(params['alarm_category[]']).toBeUndefined();
       expect(params['equipment_id[]']).toBeUndefined();
     });
 
@@ -126,13 +117,6 @@ describe('useEapAlarmFilter', () => {
       filter.fineFilter.alarm_text = ['ALARM_A', 'ALARM_B'];
       const params = filter.buildFineFilterParams();
       expect(params['alarm_text[]']).toEqual(['ALARM_A', 'ALARM_B']);
-    });
-
-    it('includes alarm_category array when filter is set', () => {
-      filter.setQueryId('q-003');
-      filter.fineFilter.alarm_category = ['設備警告'];
-      const params = filter.buildFineFilterParams();
-      expect(params['alarm_category[]']).toEqual(['設備警告']);
     });
 
     it('includes eqp_id array as equipment_id when filter is set', () => {
