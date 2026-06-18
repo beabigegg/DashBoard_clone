@@ -62,6 +62,37 @@ def make_eap_alarm_spool_key(
 
 # ── Spool file path helpers ───────────────────────────────────────────────────
 
+# ── EA-05: AlarmCategory decode table ────────────────────────────────────────
+
+_ALARM_CATEGORY_MAP: dict[int, str] = {
+    0: "非分類",
+    1: "設備",
+    2: "製程",
+    3: "視覺",
+    4: "機械",
+    5: "電子",
+    6: "通知/供料",
+    7: "品質",
+    64: "繼續錯誤",
+}
+
+
+def decode_alarm_category(code) -> str:
+    """Decode ALARM_CATEGORY_CODE (EA-05) to a human-readable label.
+
+    Accepts int, float, or string; returns "未知" for None or unknown codes.
+    """
+    if code is None:
+        return "未知"
+    try:
+        code_int = int(float(code))
+    except (TypeError, ValueError):
+        return "未知"
+    return _ALARM_CATEGORY_MAP.get(code_int, "未知")
+
+
+# ── Spool file path helpers ───────────────────────────────────────────────────
+
 def get_eap_alarm_spool_path(spool_key: str) -> str:
     """Return the absolute parquet file path for a given spool key."""
     spool_dir = EAP_ALARM_SPOOL_DIR

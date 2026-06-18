@@ -25,6 +25,8 @@ import logging
 import math
 from typing import Any, Dict, List, Optional
 
+from mes_dashboard.services.eap_alarm_cache import decode_alarm_category  # noqa: F401
+
 logger = logging.getLogger("mes_dashboard.eap_alarm_service")
 
 _DETAIL_PER_PAGE_MAX = 200

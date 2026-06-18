@@ -209,9 +209,9 @@ class TestSchemaVersionIsPinned:
             f"_SCHEMA_VERSION must be int, got {type(cache_mod._SCHEMA_VERSION)}"
         )
 
-    def test_schema_version_equals_one(self):
+    def test_schema_version_equals_two(self):
         import mes_dashboard.services.eap_alarm_cache as cache_mod
-        assert cache_mod._SCHEMA_VERSION == 1, (
-            f"_SCHEMA_VERSION pin test: expected 1, got {cache_mod._SCHEMA_VERSION}. "
+        assert cache_mod._SCHEMA_VERSION == 2, (
+            f"_SCHEMA_VERSION pin test: expected 2, got {cache_mod._SCHEMA_VERSION}. "
             "If you changed the parquet schema, bump the version AND update this assertion."
         )
