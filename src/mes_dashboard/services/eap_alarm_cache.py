@@ -12,8 +12,12 @@ Governs:
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
 import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # ── EA-06: schema version — bump on any parquet column add/remove/rename ──────
 _SCHEMA_VERSION: int = 1
@@ -85,6 +89,47 @@ def make_eap_alarm_spool_key(
     type_hash = hashlib.sha256(type_string.encode("utf-8")).hexdigest()[:8]
 
     return f"eap_alarm_{date_from}_{date_to}_{type_hash}_v{_SCHEMA_VERSION}"
+
+
+# ── Equipment ID expansion from Redis cache ───────────────────────────────────
+
+def get_equipment_ids_for_types(
+    eqp_types: list[str],
+    redis_client=None,
+) -> list[str] | None:
+    """Return EQUIPMENT_ID list for the given EQP type prefixes from the Redis
+    equipment-status cache (e.g. ['GDBA','GWBK'] → ['GDBA-0212','GDBA-0229',...]).
+
+    Reads ``{prefix}:equipment_status:data`` (written by realtime_equipment_cache).
+    Returns None on any cache miss or error so callers can fall back to SUBSTR.
+
+    The result is used to build ``EQUIPMENT_ID IN (...)`` Oracle clauses which
+    can use the C_TEST_EQUIPMENT_ID index, unlike SUBSTR-based filters.
+    """
+    try:
+        if redis_client is None:
+            from mes_dashboard.core.redis_client import get_redis_client
+            redis_client = get_redis_client()
+
+        from mes_dashboard.core.redis_client import get_key_prefix
+        from mes_dashboard.config.constants import EQUIPMENT_STATUS_DATA_KEY
+
+        data_key = f"{get_key_prefix()}:{EQUIPMENT_STATUS_DATA_KEY}"
+        raw = redis_client.get(data_key)
+        if not raw:
+            return None
+
+        records: list[dict] = json.loads(raw)
+        type_set = set(eqp_types)
+        ids = [
+            r["EQUIPMENTID"]
+            for r in records
+            if r.get("EQUIPMENTID") and r["EQUIPMENTID"][:4] in type_set
+        ]
+        return ids if ids else None
+    except Exception as exc:
+        logger.warning("get_equipment_ids_for_types: cache miss, falling back to SUBSTR: %s", exc)
+        return None
 
 
 # ── Spool file path helpers ───────────────────────────────────────────────────

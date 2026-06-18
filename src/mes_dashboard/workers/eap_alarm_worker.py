@@ -39,9 +39,9 @@ _JOB_PREFIX = "eap-alarm"
 # ── Oracle SQL template (EA-03/EA-04) ─────────────────────────────────────────
 # EAP_EVENT columns: SEQ_ID, EQUIPMENT_ID, LOT_ID, PN, EVENT_NAME, EVENT_REF_ID,
 #   EVENT_TYPE, LAST_UPDATE_TIME, EVENT_DATE
-# No EQUIPMENT_TYPE column — EQP type is SUBSTR(EQUIPMENT_ID, 1, 4).
 # ALARM_TEXT maps to EVENT_NAME directly (numeric alarm codes like '267', '8480').
 # ALARM_CATEGORY_CODE has no source column — persisted as NULL.
+# {equipment_filter} is filled at runtime; see _build_equipment_filter().
 _EAP_EVENT_SQL_TEMPLATE = """\
 SELECT
     TO_CHAR(e.SEQ_ID) AS EVENT_ID,
@@ -54,7 +54,7 @@ SELECT
 FROM DWH.EAP_EVENT e
 WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
                               AND TO_DATE(:date_to, 'YYYY-MM-DD') + 1
-  AND SUBSTR(e.EQUIPMENT_ID, 1, 4) IN ({eqp_placeholders})
+  AND {equipment_filter}
   AND e.EVENT_TYPE = 'EQP_SECS_ALARM'
 """
 
@@ -68,7 +68,7 @@ FROM DWH.EAP_EVENT e
 JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
 WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
                               AND TO_DATE(:date_to, 'YYYY-MM-DD') + 1
-  AND SUBSTR(e.EQUIPMENT_ID, 1, 4) IN ({eqp_placeholders})
+  AND {equipment_filter}
   AND e.EVENT_TYPE = 'EQP_SECS_ALARM'
 """
 
@@ -120,12 +120,31 @@ def run_eap_alarm_query_job(
         sorted_types = sorted(eqp_types)
         type_hash = hashlib.sha256(",".join(sorted_types).encode("utf-8")).hexdigest()[:8]
 
-        # Build Oracle query with bind variables
-        n = len(eqp_types)
-        eqp_placeholders = ", ".join(f":eqp{i}" for i in range(n))
-        eqp_params: Dict[str, Any] = {f"eqp{i}": t for i, t in enumerate(eqp_types)}
+        # Build Oracle equipment filter — prefer EQUIPMENT_ID IN (...) via Redis
+        # cache so Oracle can use the C_TEST_EQUIPMENT_ID index; fall back to
+        # SUBSTR(EQUIPMENT_ID,1,4) IN (...) when cache is cold.
+        from mes_dashboard.services.eap_alarm_cache import get_equipment_ids_for_types
+        equipment_ids = get_equipment_ids_for_types(eqp_types)
 
-        sql = _EAP_EVENT_SQL_TEMPLATE.format(eqp_placeholders=eqp_placeholders)
+        if equipment_ids:
+            logger.info(
+                "eap_alarm_worker: using cache-expanded filter (%d equipment IDs) job_id=%s",
+                len(equipment_ids), job_id,
+            )
+            placeholders = ", ".join(f":r{i}" for i in range(len(equipment_ids)))
+            equipment_filter = f"e.EQUIPMENT_ID IN ({placeholders})"
+            eqp_params: Dict[str, Any] = {f"r{i}": eid for i, eid in enumerate(equipment_ids)}
+        else:
+            logger.info(
+                "eap_alarm_worker: cache cold, using SUBSTR filter for %s job_id=%s",
+                eqp_types, job_id,
+            )
+            n = len(eqp_types)
+            placeholders = ", ".join(f":eqp{i}" for i in range(n))
+            equipment_filter = f"SUBSTR(e.EQUIPMENT_ID, 1, 4) IN ({placeholders})"
+            eqp_params = {f"eqp{i}": t for i, t in enumerate(eqp_types)}
+
+        sql = _EAP_EVENT_SQL_TEMPLATE.format(equipment_filter=equipment_filter)
         params: Dict[str, Any] = {"date_from": date_from, "date_to": date_to, **eqp_params}
 
         # Post-fork Oracle connection (ADR-0004)
@@ -156,7 +175,7 @@ def run_eap_alarm_query_job(
         # Fetch DETAIL_PARAMS (extra EAV params, excluding AlarmText/AlarmCategory/AlarmCode)
         # Build per-event DETAIL_PARAMS JSON string
         try:
-            detail_sql = _DETAIL_PARAMS_SQL_TEMPLATE.format(eqp_placeholders=eqp_placeholders)
+            detail_sql = _DETAIL_PARAMS_SQL_TEMPLATE.format(equipment_filter=equipment_filter)
             detail_df = read_sql_df_slow(
                 detail_sql,
                 params=params,
