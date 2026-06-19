@@ -497,16 +497,21 @@ class TestProductionHistoryQueryModeContract(unittest.TestCase):
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
 
-    @patch("mes_dashboard.routes.production_history_routes.query_production_history")
-    def test_query_payload_dates_optional_with_identifier_tokens(self, mock_query):
-        """Endpoint accepts a payload with omitted start_date/end_date when identifier token present."""
-        mock_query.return_value = {
-            "dataset_id": "ph-ctr1",
-            "detail": {"rows": [], "pagination": {"page": 1, "per_page": 25, "total_rows": 0, "total_pages": 0}},
-            "matrix": {"tree": [], "month_columns": []},
-            "filter_options": {"pj_types": []},
-            "meta": {"ttl_seconds": 3600, "expires_at": 9999999999, "row_count": 0},
-        }
+    @patch(
+        "mes_dashboard.services.production_history_job_service.enqueue_production_history_query",
+        return_value=("job-ph-test-123", None),
+    )
+    @patch(
+        "mes_dashboard.services.async_query_job_service.is_async_available",
+        return_value=True,
+    )
+    def test_query_payload_dates_optional_with_identifier_tokens(self, mock_async, mock_enqueue):
+        """Endpoint accepts a payload with omitted start_date/end_date when identifier token present.
+
+        Uses the legacy async enqueue path (202) so the test is resilient in environments
+        without Redis (CI). The key contract is that omitting dates in identifier mode
+        does NOT return 400 — async dispatch still succeeds.
+        """
         response = self.client.post(
             "/api/production-history/query",
             json={"lot_ids": ["GA001AB"]},
