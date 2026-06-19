@@ -59,3 +59,4 @@
 | hold-overview-export-csv | 2026 | 2026-06-16 | specs/archive/2026/hold-overview-export-csv/ |
 | yield-alert-spool-refactor | 2026 | 2026-06-17 | specs/archive/2026/yield-alert-spool-refactor/ |
 | eap-alarm-analysis | 2026 | 2026-06-18 | specs/archive/2026/eap-alarm-analysis/ |
+| unified-query-core-infra | 2026 | 2026-06-18 | specs/archive/2026/unified-query-core-infra/ |
