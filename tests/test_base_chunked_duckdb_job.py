@@ -3,6 +3,8 @@
 AC-1: run() invokes hooks in order; all 4 ChunkStrategy values dispatch.
 AC-2: two reduction paths (requires_cross_chunk_reduction True/False).
 AC-5 (unit): job-temp DuckDB deleted on success and on error.
+IP-1: _fan_out_append per-chunk parquet sink; _make_chunk_parquet_dir;
+      empty-chunk safety; parallel no-collision; seam fixture (cross-chunk).
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ from typing import Generator
 from unittest.mock import MagicMock, call, patch
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 
@@ -356,3 +359,249 @@ class TestJobTempLifecycle:
         # DUCKDB_JOB_DIR should be empty (no temp file created).
         duckdb_files = list(tmp_path.rglob("*.duckdb"))
         assert duckdb_files == [], "False reduction path must not create a job-temp DuckDB"
+
+
+# ---------------------------------------------------------------------------
+# IP-1: _fan_out_append parquet sink tests
+# ---------------------------------------------------------------------------
+
+_MINIMAL_SCHEMA = pa.schema([pa.field("id", pa.int32()), pa.field("val", pa.utf8())])
+
+
+def _make_batch(ids, vals):
+    """Create a minimal RecordBatch with int32 id and utf8 val columns."""
+    return pa.RecordBatch.from_arrays(
+        [pa.array(ids, type=pa.int32()), pa.array(vals, type=pa.utf8())],
+        schema=_MINIMAL_SCHEMA,
+    )
+
+
+class TestMakeChunkParquetDir:
+    def test_make_chunk_parquet_dir_creates_dir(self, tmp_path, monkeypatch):
+        """_make_chunk_parquet_dir creates {DUCKDB_JOB_DIR}/{namespace}/{job_id}/."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(job_id="dir-test-001")
+        chunk_dir = job._make_chunk_parquet_dir("dir-test-001")
+        assert chunk_dir.exists(), "chunk_dir must be created"
+        assert chunk_dir == tmp_path / "test_ns" / "dir-test-001"
+
+    def test_make_chunk_parquet_dir_idempotent(self, tmp_path, monkeypatch):
+        """Calling _make_chunk_parquet_dir twice does not raise (exist_ok=True)."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(job_id="idem-test-001")
+        job._make_chunk_parquet_dir("idem-test-001")
+        job._make_chunk_parquet_dir("idem-test-001")  # must not raise
+
+
+class TestFanOutAppendSink:
+    def test_fan_out_append_writes_per_chunk_parquet(self, tmp_path, monkeypatch):
+        """Single chunk yielding one batch → chunk-0000-0000.parquet written."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, n_chunks=1, job_id="sink-001")
+
+        batch = _make_batch([1, 2], ["SET", "CLEAR"])
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.return_value = iter([batch])
+        job._reader = mock_reader
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        job._fan_out_append([{"idx": 0}])
+
+        expected = chunk_dir / "chunk-0000-0000.parquet"
+        assert expected.exists(), f"Expected parquet file not found: {expected}"
+
+        table = pq.read_table(str(expected))
+        assert table.num_rows == 2
+        assert table.schema.equals(_MINIMAL_SCHEMA)
+
+    def test_fan_out_append_parallel_no_file_collision(self, tmp_path, monkeypatch):
+        """Two chunks in parallel each yield 1 batch → 2 distinct parquet files."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, n_chunks=2, job_id="parallel-001")
+        job.max_parallel = 2
+
+        call_count = [0]
+
+        def _side_effect(sql, params):
+            """Return a distinct batch per call."""
+            n = call_count[0]
+            call_count[0] += 1
+            return iter([_make_batch([n * 10 + 1], [f"row-{n}"])])
+
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.side_effect = _side_effect
+        job._reader = mock_reader
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        job._fan_out_append([{"idx": 0}, {"idx": 1}])
+
+        parquets = sorted(chunk_dir.glob("chunk-*.parquet"))
+        assert len(parquets) == 2, f"Expected 2 parquet files, got: {parquets}"
+        # Paths must be distinct
+        assert parquets[0] != parquets[1]
+
+    def test_fan_out_append_empty_chunks_leaves_dir_present(self, tmp_path, monkeypatch):
+        """Empty chunks list → chunk_dir still exists; glob returns [] (no crash)."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, n_chunks=0, job_id="empty-001")
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.return_value = iter([])
+        job._reader = mock_reader
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        job._fan_out_append([])  # empty list
+
+        assert chunk_dir.exists(), "chunk_dir must exist even when no chunks"
+        parquets = list(chunk_dir.glob("chunk-*.parquet"))
+        assert parquets == [], "No parquet files expected for empty chunk list"
+
+    def test_fan_out_append_zero_batch_chunk_leaves_dir_present(self, tmp_path, monkeypatch):
+        """Chunk with zero batches → chunk_dir present, no parquet file written."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, n_chunks=1, job_id="zerobatch-001")
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.return_value = iter([])  # yields nothing
+        job._reader = mock_reader
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        job._fan_out_append([{"idx": 0}])
+
+        assert chunk_dir.exists()
+        parquets = list(chunk_dir.glob("chunk-*.parquet"))
+        assert parquets == []
+
+    def test_fan_out_append_seam_fixture(self, tmp_path, monkeypatch):
+        """Cross-seam: chunk-0 has SET row, chunk-1 has CLEAR row.
+
+        After _fan_out_append, both parquets exist.  A DuckDB read_parquet over
+        the glob recovers both rows — proving post_aggregate can see cross-seam data.
+        """
+        import duckdb
+
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, n_chunks=2, job_id="seam-001")
+        job.max_parallel = 1  # serial for determinism
+
+        batches = [
+            _make_batch([101], ["SET"]),    # chunk 0
+            _make_batch([102], ["CLEAR"]),  # chunk 1
+        ]
+        call_count = [0]
+
+        def _side_effect(sql, params):
+            n = call_count[0]
+            call_count[0] += 1
+            return iter([batches[n]])
+
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.side_effect = _side_effect
+        job._reader = mock_reader
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        job._fan_out_append([{"idx": 0}, {"idx": 1}])
+
+        parquets = sorted(chunk_dir.glob("chunk-*.parquet"))
+        assert len(parquets) == 2, f"Expected 2 parquet files, got: {parquets}"
+
+        # Verify cross-seam row recovery via DuckDB glob
+        glob_pattern = str(chunk_dir / "chunk-*.parquet")
+        con = duckdb.connect(":memory:")
+        try:
+            result = con.execute(
+                f"SELECT id, val FROM read_parquet('{glob_pattern}') ORDER BY id"
+            ).fetchall()
+        finally:
+            con.close()
+
+        assert len(result) == 2, f"Expected 2 rows from glob, got: {result}"
+        assert result[0] == (101, "SET")
+        assert result[1] == (102, "CLEAR")
+
+    def test_fan_out_append_chunk_indices_distinct(self, tmp_path, monkeypatch):
+        """Three chunks each with 2 batches → 6 distinct parquet filenames."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, n_chunks=3, job_id="idx-001")
+        job.max_parallel = 1
+
+        def _side_effect(sql, params):
+            return iter([_make_batch([1], ["a"]), _make_batch([2], ["b"])])
+
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.side_effect = _side_effect
+        job._reader = mock_reader
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+        job._fan_out_append([{"idx": i} for i in range(3)])
+
+        parquets = sorted(chunk_dir.glob("chunk-*.parquet"))
+        assert len(parquets) == 6, f"Expected 6 parquet files, got {len(parquets)}: {parquets}"
+        names = [p.name for p in parquets]
+        assert names == [
+            "chunk-0000-0000.parquet",
+            "chunk-0000-0001.parquet",
+            "chunk-0001-0000.parquet",
+            "chunk-0001-0001.parquet",
+            "chunk-0002-0000.parquet",
+            "chunk-0002-0001.parquet",
+        ]
+
+
+class TestCleanupChunkParquetDir:
+    def test_cleanup_chunk_parquet_dir_removes_dir(self, tmp_path, monkeypatch):
+        """_cleanup_chunk_parquet_dir removes the chunk dir tree."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(job_id="cleanup-001")
+
+        chunk_dir = job._make_chunk_parquet_dir("cleanup-001")
+        # Write a dummy file to ensure tree is non-empty.
+        (chunk_dir / "chunk-0000-0000.parquet").touch()
+        assert chunk_dir.exists()
+
+        job._cleanup_chunk_parquet_dir("cleanup-001")
+        assert not chunk_dir.exists(), "chunk_dir must be removed after cleanup"
+
+    def test_cleanup_chunk_parquet_dir_noop_when_absent(self, tmp_path, monkeypatch):
+        """_cleanup_chunk_parquet_dir does not raise when dir does not exist."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(job_id="noop-001")
+        # Do NOT create the dir.
+        job._cleanup_chunk_parquet_dir("noop-001")  # must not raise
+
+    def test_run_cleans_up_chunk_parquet_dir_on_success(self, tmp_path, monkeypatch):
+        """After run() completes successfully, chunk parquet dir is removed."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, job_id="runclean-001")
+
+        batch = _make_batch([1], ["SET"])
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.return_value = iter([batch])
+        job._reader = mock_reader
+
+        job.run()
+
+        # Chunk dir must be cleaned up after run().
+        chunk_dir = tmp_path / "test_ns" / "runclean-001"
+        assert not chunk_dir.exists(), f"Chunk dir must be removed after run(): {chunk_dir}"
+
+    def test_run_cleans_up_chunk_parquet_dir_on_error(self, tmp_path, monkeypatch):
+        """After run() fails in post_aggregate, chunk parquet dir is still removed."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        job = _make_job(requires_cross_chunk_reduction=False, job_id="errclean-001")
+
+        batch = _make_batch([1], ["SET"])
+        mock_reader = MagicMock()
+        mock_reader.chunk_iter.return_value = iter([batch])
+        job._reader = mock_reader
+
+        def _failing_post_aggregate(job_duckdb_path):
+            raise RuntimeError("post_aggregate failure")
+
+        job.post_aggregate = _failing_post_aggregate
+
+        with pytest.raises(RuntimeError, match="post_aggregate failure"):
+            job.run()
+
+        chunk_dir = tmp_path / "test_ns" / "errclean-001"
+        assert not chunk_dir.exists(), (
+            "Chunk dir must be removed even when post_aggregate raises"
+        )

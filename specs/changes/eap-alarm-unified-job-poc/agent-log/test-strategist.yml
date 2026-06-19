@@ -1,0 +1,29 @@
+agent: test-strategist
+change-id: eap-alarm-unified-job-poc
+timestamp: 2026-06-19T00:00:00Z
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/eap-alarm-unified-job-poc/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_base_chunked_duckdb_job.py → src/mes_dashboard/core/base_chunked_duckdb_job.py (IP-1 sink)" }
+  - { type: tdd-pairs, pointer: "tests/test_eap_alarm_service.py → src/mes_dashboard/workers/eap_alarm_worker.py (EapAlarmJob)" }
+  - { type: tdd-pairs, pointer: "tests/test_async_query_job_service.py → src/mes_dashboard/services/async_query_job_service.py (enqueue_query_job)" }
+  - { type: tdd-pairs, pointer: "tests/contract/test_env_eap_alarm_flag.py → contracts/env/env-contract.md + env.schema.json (new file)" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_eap_alarm_rq_async.py → flag ON vs OFF parquet diff parity" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_rowcount_flag_parity.py → AC-8 flag-OFF zero regression" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, data-boundary, resilience, e2e, stress, soak" }
+  - { type: mapping-completeness, pointer: "all 8 ACs covered; AC-1 covered at both unit (mock-seam D6) and integration (parquet diff); AC-6 covered at integration + resilience + soak" }
+
+notes: |
+  Key gaps found in existing tests:
+  1. test_base_chunked_duckdb_job.py::test_false_reduction_path_no_writer_lock records calls but
+     asserts NO parquet files — the IP-1 base sink edit requires this test to be updated in the
+     same step or it will pass incorrectly both before and after the change.
+  2. test_eap_alarm_rq_async.py::test_worker_fn_progress_milestones pins the legacy 6-stage
+     milestone sequence; will fail after EapAlarmJob coarse-bracket is enabled — must be updated
+     to assert 5/15/90/100 when flag=ON (or parametrized to test both paths).
+  3. tests/contract/test_env_eap_alarm_flag.py does not yet exist; must be created (AC-7).
+  4. test_rowcount_flag_parity.py covers 7 domains but not eap_alarm; the eap_alarm row must
+     be added explicitly (AC-8).
+  5. enqueue_query_job return shape must be pinned in test_async_query_job_service.py before
+     IP-6 (route) consumes it — return-shape drift is the most likely route/service bug.

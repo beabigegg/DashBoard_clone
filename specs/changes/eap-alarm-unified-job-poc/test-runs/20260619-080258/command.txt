@@ -1,0 +1,1 @@
+conda run -n mes-dashboard ruff check src/mes_dashboard/services/job_registry.py src/mes_dashboard/services/async_query_job_service.py src/mes_dashboard/workers/eap_alarm_worker.py src/mes_dashboard/routes/eap_alarm_routes.py

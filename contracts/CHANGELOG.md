@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.26] — 2026-06-19
+### Added
+- eap-alarm-unified-job-poc: Gate-compatibility note for P1 migration — all new test files (test_base_chunked_duckdb_job extensions, test_eap_alarm_service extensions, test_async_query_job_service extensions, tests/integration/ eap_alarm cases, tests/stress/ eap_alarm cases, tests/contract/test_env_eap_alarm_flag.py) covered by existing gate commands; no new workflow file or gate tier needed. Feature flag default `off` means zero behavioral change until explicitly enabled. Additive; no existing gates changed.
+
+## [env 1.0.15] — 2026-06-19
+### Added
+- eap-alarm-unified-job-poc: `EAP_ALARM_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `EapAlarmJob` path (BaseChunkedDuckDBJob template method) vs legacy `run_eap_alarm_query_job`. Default `off` ensures zero regression on deploy (AC-8). Pinned by env-contract test (AC-7).
+
+## [business 1.23.0] — 2026-06-19
+### Added
+- eap-alarm-unified-job-poc: ASYNC-06 (always-async 503 rule — `always_async=True` + `sync_fallback_allowed=False` + async queue unavailable → HTTP 503 SERVICE_UNAVAILABLE + Retry-After; never silent sync downgrade; rationale: eap_alarm query durations exceed safe sync timeout bounds). EA-ASYNC (eap_alarm unified routing rule — flag-ON uses `enqueue_query_job` with `sync_fallback_allowed=False`; flag-OFF uses legacy `run_eap_alarm_query_job` unchanged; AC-8 coexistence gate). Three new Decision Table rows (flag-ON async-available, flag-ON async-unavailable, flag-OFF legacy). Additive; no existing rules changed.
+
+## [api error-format 1.2.0] — 2026-06-19
+### Added
+- eap-alarm-unified-job-poc: New Special Case — 503 Async Unavailable (always-async domain): `always_async=True` + `sync_fallback_allowed=False` + queue unavailable → 503 SERVICE_UNAVAILABLE + `Retry-After` header; standard error body; no silent sync fallback. Distinct from existing 503 DB Unavailable. Additive; existing error codes unchanged. Cross-reference: business-rules.md ASYNC-06.
+
 ## [api 1.25.0] — 2026-06-18
 ### Added
 - eap-alarm-analysis: 7 new endpoints under `/api/eap-alarm/*` (POST /spool 202 async, GET /spool/status, GET /filter-options, GET /summary, GET /pareto, GET /trend, GET /detail). Spool namespace `eap_alarm` added to `/api/spool` whitelist. Schema `EapAlarmSpoolJobAccepted` added. Type B async; fine-filter views DuckDB-only. Additive; no existing endpoints changed.

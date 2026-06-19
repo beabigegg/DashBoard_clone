@@ -1,6 +1,6 @@
-# generated: 2026-06-18T12:42:37Z by cdd-kit 3.3.0
-# files: 905, src-lines: 262816, map-lines: 19557, compression: 13.4x
-# sources-digest: 887b30c5f3767ab61e40e05695d27d90eaf77c9bbdc8aa0bb3955b85e62b662d
+# generated: 2026-06-19T00:24:15Z by cdd-kit 3.3.0
+# files: 906, src-lines: 263740, map-lines: 19652, compression: 13.4x
+# sources-digest: cc3f19e2e79f90656e380d0ce4274d2994514ea12d8a012fcd1fc6bb4cebec96
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3585,39 +3585,43 @@ src/mes_dashboard/core/__init__.py:  # 43 lines
     - { module: '.utils', items: [get_days_back, build_filter_conditions, build_equipment_filter_sql, convert_datetime_fields, format_api_response], line: 13 }
     - { module: '.redis_client', items: [try_acquire_lock, release_lock, with_distributed_lock], line: 20 }
 
-src/mes_dashboard/core/base_chunked_duckdb_job.py:  # 302 lines
+src/mes_dashboard/core/base_chunked_duckdb_job.py:  # 336 lines
   imports:
     - { module: __future__, items: [annotations], line: 25 }
     - { module: logging, items: [], line: 27 }
     - { module: os, items: [], line: 28 }
-    - { module: threading, items: [], line: 29 }
-    - { module: abc, items: [ABC, abstractmethod], line: 30 }
-    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 31 }
-    - { module: enum, items: [Enum], line: 32 }
-    - { module: pathlib, items: [Path], line: 33 }
-    - { module: typing, items: [Iterator], line: 34 }
-    - { module: pyarrow, items: [], line: 36 }
-    - { module: mes_dashboard.core.oracle_arrow_reader, items: [OracleArrowReader], line: 38 }
+    - { module: shutil, items: [], line: 29 }
+    - { module: threading, items: [], line: 30 }
+    - { module: abc, items: [ABC, abstractmethod], line: 31 }
+    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 32 }
+    - { module: enum, items: [Enum], line: 33 }
+    - { module: pathlib, items: [Path], line: 34 }
+    - { module: typing, items: [Iterator], line: 35 }
+    - { module: pyarrow, items: [], line: 37 }
+    - { module: pyarrow.parquet, items: [], line: 38 }
+    - { module: mes_dashboard.core.oracle_arrow_reader, items: [OracleArrowReader], line: 40 }
   constants:
-    - { name: DUCKDB_JOB_DIR, line: 52 }
+    - { name: DUCKDB_JOB_DIR, line: 54 }
   classes:
     - name: ChunkStrategy
-      lines: 55-68
+      lines: 57-70
     - name: BaseChunkedDuckDBJob
-      lines: 71-302
+      lines: 73-336
       methods:
-        - { name: __init__, lines: 99-102 }
-        - { name: pre_query, lines: 109-115 }
-        - { name: build_chunk_sql, lines: 118-127 }
-        - { name: post_aggregate, lines: 130-144 }
-        - { name: chunk_to_duckdb, lines: 150-171 }
-        - { name: progress_report, lines: 173-184 }
-        - { name: run, lines: 190-227 }
-        - { name: _make_job_duckdb_path, lines: 233-238 }
-        - { name: _cleanup_job_duckdb, lines: 240-248 }
-        - { name: _fetch_chunk, lines: 250-255 }
-        - { name: _fan_out_reduction, lines: 257-276 }
-        - { name: _fan_out_append, lines: 278-302 }
+        - { name: __init__, lines: 101-104 }
+        - { name: pre_query, lines: 111-117 }
+        - { name: build_chunk_sql, lines: 120-129 }
+        - { name: post_aggregate, lines: 132-146 }
+        - { name: chunk_to_duckdb, lines: 152-173 }
+        - { name: progress_report, lines: 175-186 }
+        - { name: run, lines: 192-232 }
+        - { name: _make_job_duckdb_path, lines: 238-243 }
+        - { name: _cleanup_job_duckdb, lines: 245-253 }
+        - { name: _make_chunk_parquet_dir, lines: 255-264 }
+        - { name: _cleanup_chunk_parquet_dir, lines: 266-275 }
+        - { name: _fetch_chunk, lines: 277-282 }
+        - { name: _fan_out_reduction, lines: 284-303 }
+        - { name: _fan_out_append, lines: 305-336 }
 
 src/mes_dashboard/core/cache.py:  # 570 lines
   imports:
@@ -4927,7 +4931,7 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 534 lines
     - { name: api_export_event_detail, lines: 490-515 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
     - { name: _get_resource_lookup_safe, lines: 523-534 }
 
-src/mes_dashboard/routes/eap_alarm_routes.py:  # 369 lines
+src/mes_dashboard/routes/eap_alarm_routes.py:  # 392 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
     - { module: logging, items: [], line: 20 }
@@ -4937,18 +4941,18 @@ src/mes_dashboard/routes/eap_alarm_routes.py:  # 369 lines
     - { module: flask, items: [Blueprint, request], line: 25 }
     - { module: mes_dashboard.core.response, items: [cache_expired_error, error_response, internal_error, success_response, validation_error, SERVICE_UNAVAILABLE], line: 27 }
   functions:
-    - { name: _parse_list_param, lines: 47-59 }
-    - { name: _parse_fine_filters, lines: 62-79 }
-    - { name: _get_spool_path, lines: 82-89 }
-    - { name: _require_query_id, lines: 92-97 }
-    - { name: _require_spool, lines: 100-105 }
-    - { name: api_eap_alarm_spool, lines: 111-209 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
-    - { name: api_eap_alarm_spool_status, lines: 215-237 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
-    - { name: api_eap_alarm_filter_options, lines: 243-261 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
-    - { name: api_eap_alarm_summary, lines: 267-285 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
-    - { name: api_eap_alarm_pareto, lines: 291-309 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
-    - { name: api_eap_alarm_trend, lines: 315-336 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
-    - { name: api_eap_alarm_detail, lines: 342-369 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
+    - { name: _parse_list_param, lines: 50-62 }
+    - { name: _parse_fine_filters, lines: 65-82 }
+    - { name: _get_spool_path, lines: 85-92 }
+    - { name: _require_query_id, lines: 95-100 }
+    - { name: _require_spool, lines: 103-108 }
+    - { name: api_eap_alarm_spool, lines: 114-232 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
+    - { name: api_eap_alarm_spool_status, lines: 238-260 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
+    - { name: api_eap_alarm_filter_options, lines: 266-284 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
+    - { name: api_eap_alarm_summary, lines: 290-308 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
+    - { name: api_eap_alarm_pareto, lines: 314-332 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
+    - { name: api_eap_alarm_trend, lines: 338-359 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
+    - { name: api_eap_alarm_detail, lines: 365-392 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5746,7 +5750,7 @@ src/mes_dashboard/services/anomaly_detection_sql_runtime.py:  # 1169 lines
     - { name: get_cached_summary, lines: 1153-1155 }
     - { name: get_cached_detail, lines: 1158-1169 }
 
-src/mes_dashboard/services/async_query_job_service.py:  # 378 lines
+src/mes_dashboard/services/async_query_job_service.py:  # 416 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: logging, items: [], line: 13 }
@@ -5771,6 +5775,7 @@ src/mes_dashboard/services/async_query_job_service.py:  # 378 lines
     - { name: complete_job, lines: 284-329 }
     - { name: get_failed_job_count, lines: 332-334 }
     - { name: enqueue_job_dynamic, lines: 341-378 }
+    - { name: enqueue_query_job, lines: 381-416 }
 
 src/mes_dashboard/services/auth_service.py:  # 212 lines
   imports:
@@ -6354,18 +6359,18 @@ src/mes_dashboard/services/job_query_service.py:  # 557 lines
     - { name: export_jobs_with_history, lines: 398-491 }
     - { name: get_export_data, lines: 494-557 }
 
-src/mes_dashboard/services/job_registry.py:  # 78 lines
+src/mes_dashboard/services/job_registry.py:  # 82 lines
   imports:
     - { module: __future__, items: [annotations], line: 19 }
-    - { module: dataclasses, items: [dataclass, field], line: 21 }
+    - { module: dataclasses, items: [dataclass], line: 21 }
     - { module: typing, items: [Any, Callable, Dict, List, Optional], line: 22 }
   classes:
     - name: JobTypeConfig
-      lines: 26-45
+      lines: 26-49
   functions:
-    - { name: register_job_type, lines: 59-65 }
-    - { name: get_job_type_config, lines: 68-73 }
-    - { name: list_registered_job_types, lines: 76-78 }
+    - { name: register_job_type, lines: 63-69 }
+    - { name: get_job_type_config, lines: 72-77 }
+    - { name: list_registered_job_types, lines: 80-82 }
 
 src/mes_dashboard/services/lineage_engine.py:  # 853 lines
   imports:
@@ -8126,20 +8131,34 @@ src/mes_dashboard/static/js/toast.js:  # 240 lines
 
 src/mes_dashboard/workers/__init__.py:  # 0 lines
 
-src/mes_dashboard/workers/eap_alarm_worker.py:  # 289 lines
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 528 lines
   imports:
     - { module: __future__, items: [annotations], line: 23 }
-    - { module: logging, items: [], line: 25 }
-    - { module: os, items: [], line: 26 }
-    - { module: typing, items: [Any, Dict, List], line: 27 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 281 }
+    - { module: hashlib, items: [], line: 25 }
+    - { module: logging, items: [], line: 26 }
+    - { module: os, items: [], line: 27 }
+    - { module: datetime, items: [datetime, timedelta], line: 28 }
+    - { module: pathlib, items: [Path], line: 29 }
+    - { module: typing, items: [Any, Dict, List], line: 30 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 32 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 519 }
   constants:
-    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 31 }
-    - { name: EAP_ALARM_WORKER_QUEUE, line: 34 }
-    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 35 }
+    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 36 }
+    - { name: EAP_ALARM_WORKER_QUEUE, line: 39 }
+    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 40 }
+  classes:
+    - name: EapAlarmJob
+      lines: 285-480
+      methods:
+        - { name: __init__, lines: 298-308 }
+        - { name: pre_query, lines: 310-356 }
+        - { name: build_chunk_sql, lines: 358-369 }
+        - { name: post_aggregate, lines: 371-475 }
+        - { name: progress_report, lines: 477-480 }
   functions:
-    - { name: _build_equipment_filter, lines: 143-158 }
-    - { name: run_eap_alarm_query_job, lines: 161-277 }
+    - { name: _build_equipment_filter, lines: 148-163 }
+    - { name: run_eap_alarm_query_job, lines: 166-282 }
+    - { name: execute_eap_alarm_unified_job, lines: 483-515 }
 
 tests/__init__.py:  # 0 lines
 
@@ -12034,7 +12053,7 @@ tests/test_async_job_timeout.py:  # 227 lines
     - { name: _meta_key_full, lines: 62-65 }
     - { name: _seed_job, lines: 68-83 }
 
-tests/test_async_query_job_service.py:  # 661 lines
+tests/test_async_query_job_service.py:  # 732 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: time, items: [], line: 14 }
@@ -12102,6 +12121,13 @@ tests/test_async_query_job_service.py:  # 661 lines
         - { name: test_get_job_status_returns_dataset_id_when_present, lines: 610-630 }
         - { name: test_complete_job_stores_dataset_id, lines: 632-642 }
         - { name: test_completed_stages_empty_not_in_result, lines: 644-661 }
+    - name: TestEnqueueQueryJob
+      lines: 668-732
+      methods:
+        - { name: test_always_async_unavailable_returns_503_hint, lines: 671-687 }
+        - { name: test_always_async_available_proceeds, lines: 689-706 }
+        - { name: test_sync_fallback_allowed_skips_503_even_when_unavailable, lines: 708-724 }
+        - { name: test_unknown_job_type_returns_none_no_503, lines: 726-732 }
   functions:
     - { name: _reset_rq_cache, lines: 25-31 }
 
@@ -12209,47 +12235,70 @@ tests/test_auth_service.py:  # 230 lines
   functions:
     - { name: _ldap_defaults, lines: 19-22 }  # @pytest.fixture(autouse=True)
 
-tests/test_base_chunked_duckdb_job.py:  # 358 lines
+tests/test_base_chunked_duckdb_job.py:  # 607 lines
   imports:
-    - { module: __future__, items: [annotations], line: 7 }
-    - { module: threading, items: [], line: 9 }
-    - { module: pathlib, items: [Path], line: 10 }
-    - { module: typing, items: [Generator], line: 11 }
-    - { module: unittest.mock, items: [MagicMock, call, patch], line: 12 }
-    - { module: pyarrow, items: [], line: 14 }
-    - { module: pytest, items: [], line: 15 }
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: threading, items: [], line: 11 }
+    - { module: pathlib, items: [Path], line: 12 }
+    - { module: typing, items: [Generator], line: 13 }
+    - { module: unittest.mock, items: [MagicMock, call, patch], line: 14 }
+    - { module: pyarrow, items: [], line: 16 }
+    - { module: pyarrow.parquet, items: [], line: 17 }
+    - { module: pytest, items: [], line: 18 }
   classes:
     - name: _RecordingJob
-      lines: 22-52
+      lines: 25-55
       methods:
-        - { name: __init__, lines: 26-35 }
-        - { name: pre_query, lines: 37-38 }
-        - { name: build_chunk_sql, lines: 40-42 }
-        - { name: chunk_to_duckdb, lines: 44-45 }
-        - { name: post_aggregate, lines: 47-49 }
-        - { name: progress_report, lines: 51-52 }
+        - { name: __init__, lines: 29-38 }
+        - { name: pre_query, lines: 40-41 }
+        - { name: build_chunk_sql, lines: 43-45 }
+        - { name: chunk_to_duckdb, lines: 47-48 }
+        - { name: post_aggregate, lines: 50-52 }
+        - { name: progress_report, lines: 54-55 }
     - name: TestHookOrder
-      lines: 127-168
+      lines: 130-171
       methods:
-        - { name: test_run_hook_order, lines: 128-140 }
-        - { name: test_progress_brackets, lines: 142-155 }
-        - { name: test_all_four_chunk_strategies_dispatch, lines: 158-168 }
+        - { name: test_run_hook_order, lines: 131-143 }
+        - { name: test_progress_brackets, lines: 145-158 }
+        - { name: test_all_four_chunk_strategies_dispatch, lines: 161-171 }
     - name: TestReductionPaths
-      lines: 175-291
+      lines: 178-294
       methods:
-        - { name: test_false_reduction_path_no_writer_lock, lines: 176-211 }
-        - { name: test_true_reduction_path_uses_job_temp_duckdb, lines: 213-253 }
-        - { name: test_true_reduction_path_writer_lock_serialized, lines: 255-291 }
+        - { name: test_false_reduction_path_no_writer_lock, lines: 179-214 }
+        - { name: test_true_reduction_path_uses_job_temp_duckdb, lines: 216-256 }
+        - { name: test_true_reduction_path_writer_lock_serialized, lines: 258-294 }
     - name: TestJobTempLifecycle
-      lines: 298-358
+      lines: 301-361
       methods:
-        - { name: test_job_temp_deleted_on_success, lines: 299-309 }
-        - { name: test_job_temp_deleted_on_error_in_post_aggregate, lines: 311-346 }
-        - { name: test_job_temp_not_created_for_false_reduction, lines: 348-358 }
+        - { name: test_job_temp_deleted_on_success, lines: 302-312 }
+        - { name: test_job_temp_deleted_on_error_in_post_aggregate, lines: 314-349 }
+        - { name: test_job_temp_not_created_for_false_reduction, lines: 351-361 }
+    - name: TestMakeChunkParquetDir
+      lines: 379-393
+      methods:
+        - { name: test_make_chunk_parquet_dir_creates_dir, lines: 380-386 }
+        - { name: test_make_chunk_parquet_dir_idempotent, lines: 388-393 }
+    - name: TestFanOutAppendSink
+      lines: 396-546
+      methods:
+        - { name: test_fan_out_append_writes_per_chunk_parquet, lines: 397-415 }
+        - { name: test_fan_out_append_parallel_no_file_collision, lines: 417-441 }
+        - { name: test_fan_out_append_empty_chunks_leaves_dir_present, lines: 443-456 }
+        - { name: test_fan_out_append_zero_batch_chunk_leaves_dir_present, lines: 458-471 }
+        - { name: test_fan_out_append_seam_fixture, lines: 473-518 }
+        - { name: test_fan_out_append_chunk_indices_distinct, lines: 520-546 }
+    - name: TestCleanupChunkParquetDir
+      lines: 549-607
+      methods:
+        - { name: test_cleanup_chunk_parquet_dir_removes_dir, lines: 550-561 }
+        - { name: test_cleanup_chunk_parquet_dir_noop_when_absent, lines: 563-568 }
+        - { name: test_run_cleans_up_chunk_parquet_dir_on_success, lines: 570-584 }
+        - { name: test_run_cleans_up_chunk_parquet_dir_on_error, lines: 586-607 }
   functions:
-    - { name: _make_job, lines: 55-102 }
-    - { name: _fake_batch, lines: 109-110 }
-    - { name: _patch_reader, lines: 113-120 }
+    - { name: _make_job, lines: 58-105 }
+    - { name: _fake_batch, lines: 112-113 }
+    - { name: _patch_reader, lines: 116-123 }
+    - { name: _make_batch, lines: 371-376 }
 
 tests/test_batch_query_engine.py:  # 1272 lines
   imports:
@@ -13463,6 +13512,46 @@ tests/test_eap_alarm_service.py:  # 217 lines
         - { name: test_schema_version_is_integer, lines: 206-210 }
         - { name: test_schema_version_equals_two, lines: 212-217 }
 
+tests/test_eap_alarm_unified_job.py:  # 211 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 3 }
+    - { module: json, items: [], line: 5 }
+    - { module: pathlib, items: [Path], line: 6 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 7 }
+    - { module: pandas, items: [], line: 9 }
+    - { module: pyarrow, items: [], line: 10 }
+    - { module: pyarrow.parquet, items: [], line: 11 }
+    - { module: pytest, items: [], line: 12 }
+  classes:
+    - name: TestEapAlarmJobPreQuery
+      lines: 15-49
+      methods:
+        - { name: test_pre_query_emits_daily_pairs, lines: 18-34 }
+        - { name: test_pre_query_single_day, lines: 36-49 }
+    - name: TestEapAlarmJobBuildChunkSql
+      lines: 52-81
+      methods:
+        - { name: _make_job, lines: 55-62 }
+        - { name: test_events_sql, lines: 64-72 }
+        - { name: test_detail_sql, lines: 74-81 }
+    - name: TestEapAlarmJobPostAggregate
+      lines: 84-170
+      methods:
+        - { name: _make_events_table, lines: 87-95 }
+        - { name: _make_detail_table, lines: 97-102 }
+        - { name: test_post_aggregate_pairs_set_clear, lines: 104-135 }
+        - { name: test_post_aggregate_empty_events, lines: 137-170 }
+    - name: TestEapAlarmRouteFlag
+      lines: 173-195
+      methods:
+        - { name: test_flag_off_by_default, lines: 176-181 }
+        - { name: test_flag_on_via_env, lines: 183-188 }
+        - { name: test_flag_true_string, lines: 190-195 }
+    - name: TestEapAlarmJobProgressReport
+      lines: 198-211
+      methods:
+        - { name: test_progress_report_uses_eap_alarm_prefix, lines: 201-211 }
+
 tests/test_env_contract.py:  # 292 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
@@ -14534,7 +14623,7 @@ tests/test_job_query_service.py:  # 294 lines
         - { name: test_partial_failure_in_meta, lines: 275-285 }
         - { name: test_no_partial_failure_no_meta_key, lines: 287-294 }
 
-tests/test_job_registry.py:  # 238 lines
+tests/test_job_registry.py:  # 280 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pytest, items: [], line: 9 }
@@ -14557,6 +14646,12 @@ tests/test_job_registry.py:  # 238 lines
       lines: 179-238
       methods:
         - { name: test_each_service_registers_exactly_one_job_type, lines: 180-238 }
+    - name: TestAlwaysAsyncField
+      lines: 245-280
+      methods:
+        - { name: test_job_type_config_always_async_defaults_false, lines: 246-254 }
+        - { name: test_job_type_config_always_async_true, lines: 256-265 }
+        - { name: test_eap_alarm_registered_with_always_async_true, lines: 267-280 }
   functions:
     - { name: reset_registry, lines: 18-22 }  # @pytest.fixture(autouse=True)
 
@@ -16197,7 +16292,7 @@ tests/test_qc_gate_service.py:  # 150 lines
     - { name: test_get_qc_gate_summary_returns_empty_when_no_match, lines: 115-135 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping', return_va...
     - { name: test_get_qc_gate_summary_returns_empty_when_cache_missing, lines: 141-150 }  # @patch('mes_dashboard.services.qc_gate_service.get_cache_updated_at', return_valu...
 
-tests/test_query_cost_policy.py:  # 345 lines
+tests/test_query_cost_policy.py:  # 358 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: ast, items: [], line: 9 }
@@ -16244,10 +16339,10 @@ tests/test_query_cost_policy.py:  # 345 lines
         - { name: test_deprecation_warning_for_async_threshold_env, lines: 269-279 }
         - { name: test_no_deprecation_warning_without_env_var, lines: 281-296 }
     - name: TestNoPandasAndNoCallers
-      lines: 311-345
+      lines: 311-358
       methods:
         - { name: test_no_pandas_import_in_new_modules, lines: 313-326 }
-        - { name: test_no_caller_outside_tests, lines: 328-345 }
+        - { name: test_no_caller_outside_tests, lines: 328-358 }
   functions:
     - { name: _call, lines: 23-44 }
 

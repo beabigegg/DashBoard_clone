@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/test_eap_alarm_unified_job.py tests/test_job_registry.py tests/test_async_query_job_service.py tests/test_base_chunked_duckdb_job.py -v

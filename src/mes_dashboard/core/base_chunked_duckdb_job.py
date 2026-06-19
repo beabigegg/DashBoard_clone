@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -34,6 +35,7 @@ from pathlib import Path
 from typing import Iterator
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from mes_dashboard.core.oracle_arrow_reader import OracleArrowReader
 
@@ -225,6 +227,9 @@ class BaseChunkedDuckDBJob(ABC):
             # D7: delete job-temp DuckDB on completion or error
             if job_duckdb_path is not None:
                 self._cleanup_job_duckdb(job_duckdb_path)
+            # Append path: clean up per-chunk parquet dir
+            if not self.requires_cross_chunk_reduction:
+                self._cleanup_chunk_parquet_dir(self.job_id)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -246,6 +251,28 @@ class BaseChunkedDuckDBJob(ABC):
                 logger.debug("Deleted job-temp DuckDB: %s", path)
         except Exception as exc:
             logger.warning("Failed to delete job-temp DuckDB %s: %s", path, exc)
+
+    def _make_chunk_parquet_dir(self, job_id: str) -> Path:
+        """Return (and create) the per-job chunk parquet dir.
+
+        Path: {DUCKDB_JOB_DIR}/{namespace}/{job_id}/
+        Mirror of _make_job_duckdb_path style.
+        """
+        base = Path(os.environ.get("DUCKDB_JOB_DIR", DUCKDB_JOB_DIR))
+        chunk_dir = base / self.namespace / job_id
+        chunk_dir.mkdir(parents=True, exist_ok=True)
+        return chunk_dir
+
+    def _cleanup_chunk_parquet_dir(self, job_id: str) -> None:
+        """Remove the per-job chunk parquet directory tree if it exists."""
+        try:
+            base = Path(os.environ.get("DUCKDB_JOB_DIR", DUCKDB_JOB_DIR))
+            chunk_dir = base / self.namespace / job_id
+            if chunk_dir.exists():
+                shutil.rmtree(chunk_dir, ignore_errors=True)
+                logger.debug("Deleted chunk parquet dir: %s", chunk_dir)
+        except Exception as exc:
+            logger.warning("Failed to delete chunk parquet dir for job %s: %s", job_id, exc)
 
     def _fetch_chunk(
         self, chunk_params: dict
@@ -276,25 +303,32 @@ class BaseChunkedDuckDBJob(ABC):
                         raise exc
 
     def _fan_out_append(self, chunks: list[dict]) -> None:
-        """Fan-out: fetch chunks in parallel; each chunk handled independently.
+        """Fan-out: fetch chunks in parallel; write each batch to per-chunk parquet files.
 
-        For requires_cross_chunk_reduction=False domains, subclasses write
-        each batch directly to parquet via an overridden chunk_to_duckdb or
-        a separate method.  The default implementation here yields to
-        post_aggregate for merging.
+        For requires_cross_chunk_reduction=False domains. Each chunk thread writes its own
+        {chunk_dir}/chunk-{chunk_idx:04d}-{batch_idx:04d}.parquet files (no _writer_lock
+        needed — each thread writes to distinct paths).
+        post_aggregate receives job_duckdb_path=None and globs chunk_dir for parquets.
+
+        Empty-chunk / zero-batch case: chunk_dir is created and left present so
+        post_aggregate can safely glob to an empty list without error.
         """
+        chunk_dir = self._make_chunk_parquet_dir(self.job_id)
         effective = min(self.max_parallel, len(chunks)) if chunks else 1
 
-        def _fetch_chunk_batches(chunk_params: dict) -> list[pa.RecordBatch]:
-            return list(self._fetch_chunk(chunk_params))
+        def _fetch_and_write(chunk_idx: int, chunk_params: dict) -> None:
+            for batch_idx, batch in enumerate(self._fetch_chunk(chunk_params)):
+                path = chunk_dir / f"chunk-{chunk_idx:04d}-{batch_idx:04d}.parquet"
+                pq.write_table(pa.Table.from_batches([batch]), path)
 
         if effective <= 1 or len(chunks) <= 1:
-            for cp in chunks:
-                list(self._fetch_chunk(cp))  # consumed; post_aggregate handles
+            for chunk_idx, cp in enumerate(chunks):
+                _fetch_and_write(chunk_idx, cp)
         else:
             with ThreadPoolExecutor(max_workers=effective) as executor:
                 futures = {
-                    executor.submit(_fetch_chunk_batches, cp): cp for cp in chunks
+                    executor.submit(_fetch_and_write, chunk_idx, cp): cp
+                    for chunk_idx, cp in enumerate(chunks)
                 }
                 for fut in as_completed(futures):
                     exc = fut.exception()

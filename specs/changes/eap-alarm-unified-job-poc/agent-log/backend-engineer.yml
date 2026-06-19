@@ -1,0 +1,38 @@
+agent: backend-engineer
+change-id: eap-alarm-unified-job-poc
+date: 2026-06-19
+phases-completed: [IP-3, IP-4, IP-5, IP-6, IP-7]
+
+summary: |
+  Implemented IP-3 through IP-7 of the eap-alarm-unified-job-poc change.
+  Added always_async field to JobTypeConfig, added enqueue_query_job() with D3
+  503 decision tree, implemented EapAlarmJob subclass with TIME chunking +
+  post_aggregate EAV pivot + SET/CLEAR pairing, added feature flag gating in
+  eap_alarm_routes.py, and wrote all IP-7 unit tests. All 89 tests pass.
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/job_registry.py:44-50"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/async_query_job_service.py:379-423"
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/eap_alarm_worker.py:1-10,280-460"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/eap_alarm_routes.py:39-44,158-230"
+  - type: tests-added
+    pointer: "tests/test_job_registry.py::TestAlwaysAsyncField"
+  - type: tests-added
+    pointer: "tests/test_async_query_job_service.py::TestEnqueueQueryJob"
+  - type: tests-added
+    pointer: "tests/test_eap_alarm_unified_job.py (new file, 5 test classes)"
+  - type: test-output
+    pointer: "89 passed in 0.54s (collect/targeted/changed-area/quality all passed)"
+  - type: contracts-touched
+    pointer: "n/a (IP-2 contracts already done by contract-reviewer; no new contract changes in IP-3 through IP-7)"
+
+known-risks:
+  - "EapAlarmJob._reader is inherited from BaseChunkedDuckDBJob.__init__ which sets self._reader = OracleArrowReader(); this requires Oracle drivers at runtime (test-isolated by patching)"
+  - "post_aggregate runs _make_chunk_parquet_dir(self.job_id) which creates dir with exist_ok=True — correct since run() _fan_out_append already created it; cleanup still happens in run() finally block"
+  - "run_eap_alarm_query_job remains in the module untouched for AC-8 zero-regression; flag-OFF route references it directly via local import"
+
+next-reviewer: stress-soak-engineer (IP-8), ci-cd-gatekeeper (IP-9)

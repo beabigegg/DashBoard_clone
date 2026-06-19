@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.25
+schema-version: 1.3.26
 last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
@@ -432,6 +432,18 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 **No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1), `playwright-critical-journeys` (Tier 1), `playwright-resilience` (Tier 1), and `nightly-integration` (Tier 3) gate commands.
 
 **Schema-version bump to 1.3.25 (patch)**: additive deploy/rollback checklist + playwright gate spec addition. No gate tier, command, or status changed.
+
+### eap-alarm-unified-job-poc gate compatibility note
+
+`eap-alarm-unified-job-poc` (P1 migration) adds new test files (`test_base_chunked_duckdb_job.py` extensions, `test_eap_alarm_service.py` extensions, `test_async_query_job_service.py` extensions, integration tests in `tests/integration/`, stress/soak in `tests/stress/`) and one new contract test (`tests/contract/test_env_eap_alarm_flag.py`). All new files fall within existing gate commands:
+- `backend-tests.yml` unit-and-integration-tests already discovers `tests/` root and `tests/integration/` (new tests added automatically).
+- `stress-tests.yml` already runs `tests/stress/ -m stress --run-stress` (new `test_async_job_stress.py` eap_alarm cases picked up).
+- `soak-tests.yml` already runs `tests/integration/test_soak_workload.py` (no new command needed).
+- `e2e-tests.yml` already runs `tests/e2e/ -m e2e` (new `test_eap_alarm_e2e.py` cases picked up).
+
+**No new gate tier, command, or workflow file required.** Feature flag `EAP_ALARM_USE_UNIFIED_JOB=off` default means zero behavioral change for all gate runs until flag is explicitly set to `on`.
+
+**Schema-version bump to 1.3.26 (patch)**: additive gate-compatibility note for P1 migration. No gate tier, command, or status changed.
 
 ## Rollback Policy
 

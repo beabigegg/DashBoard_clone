@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.14
-last-changed: 2026-06-18
+schema-version: 1.0.15
+last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -78,6 +78,9 @@ breaking-change-policy: deprecate-2-minors
 | PROD_HISTORY_ENABLED | feature | all | no | no | — | true | application-team | true or false | yes | production-history 端點 404 |
 | REGISTER_INTERNAL_METRICS | feature | dev | no | no | False | False | platform-team | True or False — production MUST NOT set True | yes | internal metrics blueprint 掛載 |
 | INTERNAL_METRICS_ENABLED | feature | dev | no | no | 0 | 0 | platform-team | 0 or 1 — production MUST NOT set 1 | no | handler guard |
+| EAP_ALARM_USE_UNIFIED_JOB | feature | all | no | no | off | off | application-team | off/on or false/true or 0/1; selects unified EapAlarmJob path (on) vs legacy run_eap_alarm_query_job (off). Restart required. | yes | uses default off |
+
+- `EAP_ALARM_USE_UNIFIED_JOB`: Feature flag enabling the unified `EapAlarmJob` path (`BaseChunkedDuckDBJob` template method). When `on`/`true`/`1`, the eap_alarm route enqueues via `enqueue_query_job` + `EapAlarmJob`; the always-async 503 decision tree applies (`sync_fallback_allowed=False`). When `off` (default)/`false`/`0`, the legacy `run_eap_alarm_query_job` path is used unchanged (AC-8 zero-regression guarantee). Module-level constant frozen at import — restart required. `monkeypatch.setattr()` required in tests (not `setenv`). Must be `off` in production until AC-1 parity tests pass. Added by change `eap-alarm-unified-job-poc`.
 
 ## Cache Tuning — Resource History
 

@@ -326,7 +326,17 @@ class TestNoPandasAndNoCallers:
                     )
 
     def test_no_caller_outside_tests(self):
-        """AC-7: grep src/ for the 3 new module names — expect zero matches."""
+        """AC-7: grep src/ for the 3 new module names — expect zero matches (with P1 allowlist).
+
+        P1 (eap-alarm-unified-job-poc) wires the first real caller of base_chunked_duckdb_job:
+          eap_alarm_worker.py — approved caller since EapAlarmJob inherits BaseChunkedDuckDBJob.
+        oracle_arrow_reader and query_cost_policy remain zero-caller outside their own file.
+        """
+        # P1+ approved callers per module stem.  Extend as each Px migration lands.
+        _APPROVED_CALLERS: dict = {
+            "base_chunked_duckdb_job": {"eap_alarm_worker"},
+        }
+
         src_dir = _REPO_ROOT / "src/mes_dashboard"
         new_module_stems = {
             "oracle_arrow_reader",
@@ -339,7 +349,10 @@ class TestNoPandasAndNoCallers:
                 continue
             text = py_file.read_text(encoding="utf-8", errors="ignore")
             for stem in new_module_stems:
+                if py_file.stem in _APPROVED_CALLERS.get(stem, set()):
+                    continue  # P1+ approved caller — intentional usage
                 assert stem not in text, (
                     f"Found caller of {stem} in {py_file.relative_to(_REPO_ROOT)} "
-                    f"— new modules must ship with zero callers until P1 (AC-7)"
+                    f"— new modules must ship with zero callers until their Px migration (AC-7). "
+                    f"If this is intentional, add {py_file.stem!r} to _APPROVED_CALLERS[{stem!r}]."
                 )

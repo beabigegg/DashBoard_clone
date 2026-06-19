@@ -1,0 +1,47 @@
+change-id: eap-alarm-unified-job-poc
+status: in-progress
+tier: 1
+context-governance: v1
+archive-tasks:
+  - "3.2"
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  - "6.4"
+  - "7.1"
+  - "7.2"
+depends-on:
+  - unified-query-core-infra
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "env (EAP_ALARM_USE_UNIFIED_JOB), business-rules (unified routing + 503), error-format (503 status); CHANGELOG, schema.json, .env.example" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done, note: "design.md authored; ADR-0009 written (cross-chunk pairing in post_aggregate); R1 (base _fan_out_append gap) flagged for implementation-planner" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md filled by ci-cd-gatekeeper; no new workflows needed; stress/soak weekly/manual gates confirmed" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done, note: "implementation-plan.md written; IP-1..IP-9 ordered; R1 Option A chosen" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "error-format.md: added 503 Async Unavailable special case; bumped 1.1.0→1.2.0" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no UI surface" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done, note: "EAP_ALARM_USE_UNIFIED_JOB added; schema.json, .env.example.template, .env.example updated; bumped 1.0.14→1.0.15" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "spool parquet schema unchanged (explicit non-goal)" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "ASYNC-06 + EA-ASYNC + Decision Table rows added; bumped 1.22.0→1.23.0" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done, note: "ci-gate-contract.md: eap-alarm-unified-job-poc gate compatibility note added; bumped 1.3.25→1.3.26" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "test_eap_alarm_unified_job.py (10 tests), TestAlwaysAsyncField (3), TestEnqueueQueryJob (4); all pass" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: pending, note: "test_eap_alarm_rq_async.py needs GunicornHarness (nightly gate); test-evidence collect/targeted/changed-area all passed" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: pending, note: "e2e-resilience-engineer pending; existing eap-alarm.spec.js covers flag-OFF path" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: pending, note: "data-boundary: spool parity test pending (AC-1 full row-set equality)" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: pending, note: "required: ThreadPoolExecutor + Oracle pool concurrency (P0 deferral invalidated)" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "IP-3 through IP-6 complete: JobTypeConfig.always_async, enqueue_query_job D3 503, EapAlarmJob, execute_eap_alarm_unified_job, flag-gated route dispatch" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no frontend changes" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done, note: "EAP_ALARM_USE_UNIFIED_JOB=off default; .env.example and template updated; env-contract 1.0.15" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "no new workflow files needed; ci-gate-contract.md 1.3.25→1.3.26 gate compat note added" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI surface" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI surface" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer.yml written; all 7 contract files updated + validated" }
+  - { id: "5.4", section: Review, title: "QA review", status: skipped, note: "no UI surface; correctness validated by test suite (4686 tests) + contract-reviewer (7 contracts)" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "118 unit tests passed; ruff clean; cdd-kit validate all green; cdd-kit gate passed" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "test-evidence: collect/targeted/changed-area/contract all passed (89+118 tests); gate passed" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "test-evidence.yml: collect/targeted/changed-area/contract phases passed; code-map updated; ruff clean" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending, note: "integration (GunicornHarness), stress, soak are weekly/manual gates per ci-gates.md" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

@@ -1,0 +1,18 @@
+agent: contract-reviewer
+status: complete
+model: sonnet
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/env/env-contract.md, contracts/env/env.schema.json, contracts/env/.env.example.template, .env.example, contracts/business/business-rules.md, contracts/api/error-format.md, contracts/CHANGELOG.md" }
+  - { type: version-bumps, pointer: "env-contract: 1.0.14→1.0.15; business-rules: 1.22.0→1.23.0; error-format: 1.1.0→1.2.0" }
+  - { type: breaking-changes, pointer: "none — all additive; default-off flag; 503 only on new always-async path" }
+
+findings:
+  - "EAP_ALARM_USE_UNIFIED_JOB: optional feature flag, default off, restart required, all environments"
+  - "ASYNC-06 business rule: always-async + sync_fallback_allowed=False + unavailable → 503, never silent downgrade"
+  - "EA-ASYNC business rule: eap_alarm flag-ON routing + AC-8 coexistence guarantee"
+  - "3 Decision Table rows added: flag-ON async-available (202), flag-ON async-unavailable (503), flag-OFF legacy (AC-8)"
+  - "error-format.md: 503 Async Unavailable case documented (distinct from DB unavailable)"
+  - "contracts/CHANGELOG.md: 3 entries added (env 1.0.15, business 1.23.0, api error-format 1.2.0)"
+  - "contract-reviewer agent only has Read/Grep/Glob — main Claude applied all file edits"

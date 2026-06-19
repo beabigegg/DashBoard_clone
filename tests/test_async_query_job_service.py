@@ -659,3 +659,74 @@ class TestMultiStageProgress:
         assert result is not None
         assert "stage" not in result
         assert "completed_stages" not in result
+
+
+# ---------------------------------------------------------------------------
+# TestEnqueueQueryJob — AC-4: enqueue_query_job D3 503 decision tree
+# ---------------------------------------------------------------------------
+
+class TestEnqueueQueryJob:
+    """AC-4: enqueue_query_job D3 503 decision tree."""
+
+    def test_always_async_unavailable_returns_503_hint(self, monkeypatch):
+        """When always_async=True + sync_fallback_allowed=False + async unavailable → (None, err, 503)."""
+        from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type
+        from mes_dashboard.services import async_query_job_service as svc
+        register_job_type(JobTypeConfig(
+            job_type="_test_always_async",
+            queue_name="test-queue",
+            worker_fn=lambda: None,
+            always_async=True,
+        ))
+        monkeypatch.setattr(svc, "is_async_available", lambda: False)
+        job_id, err, hint = svc.enqueue_query_job(
+            "_test_always_async", "testuser", {}, sync_fallback_allowed=False
+        )
+        assert job_id is None
+        assert hint == 503
+        assert err is not None
+
+    def test_always_async_available_proceeds(self, monkeypatch):
+        """When always_async=True + sync_fallback_allowed=False + async available → proceeds to enqueue."""
+        from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type
+        from mes_dashboard.services import async_query_job_service as svc
+        register_job_type(JobTypeConfig(
+            job_type="_test_always_async_avail",
+            queue_name="test-queue",
+            worker_fn=lambda: None,
+            always_async=True,
+        ))
+        monkeypatch.setattr(svc, "is_async_available", lambda: True)
+        monkeypatch.setattr(svc, "enqueue_job_dynamic", lambda *a, **kw: ("test-job-id", None))
+        job_id, err, hint = svc.enqueue_query_job(
+            "_test_always_async_avail", "testuser", {}, sync_fallback_allowed=False
+        )
+        assert job_id == "test-job-id"
+        assert hint is None
+        assert err is None
+
+    def test_sync_fallback_allowed_skips_503_even_when_unavailable(self, monkeypatch):
+        """When sync_fallback_allowed=True, always_async check is skipped."""
+        from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type
+        from mes_dashboard.services import async_query_job_service as svc
+        register_job_type(JobTypeConfig(
+            job_type="_test_fallback_ok",
+            queue_name="test-queue",
+            worker_fn=lambda: None,
+            always_async=True,
+        ))
+        monkeypatch.setattr(svc, "is_async_available", lambda: False)
+        monkeypatch.setattr(svc, "enqueue_job_dynamic", lambda *a, **kw: ("test-job-id", None))
+        job_id, err, hint = svc.enqueue_query_job(
+            "_test_fallback_ok", "testuser", {}, sync_fallback_allowed=True
+        )
+        assert job_id == "test-job-id"
+        assert hint is None
+
+    def test_unknown_job_type_returns_none_no_503(self, monkeypatch):
+        """Unknown job type returns (None, err, None) — not a 503."""
+        from mes_dashboard.services import async_query_job_service as svc
+        job_id, err, hint = svc.enqueue_query_job("_nonexistent_type", "user", {}, sync_fallback_allowed=False)
+        assert job_id is None
+        assert hint is None  # not 503 — just unknown type
+        assert "_nonexistent_type" in err

@@ -1,0 +1,15 @@
+agent: implementation-planner
+status: complete
+model: opus
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/eap-alarm-unified-job-poc/implementation-plan.md" }
+
+findings:
+  - "R1 resolved: Option A (extend base class _fan_out_append with per-chunk parquet sink) — reusable by P2+ migrations"
+  - "Execution order: IP-1 → IP-2 → IP-3 → IP-4 → IP-5 → IP-6 → IP-7 → IP-8 → IP-9"
+  - "sync_fallback_allowed is per-call arg; always_async is registry field (do not invert)"
+  - "enqueue_query_job return shape must be pinned by test-strategist before IP-6 route consumes it"
+  - "No _SCHEMA_VERSION bump; no change to spool key/path helpers (parity invariant)"
+  - "EAV pivot pandas→DuckDB in post_aggregate: AC-1 requires full business-key row-set equality (not count-only)"

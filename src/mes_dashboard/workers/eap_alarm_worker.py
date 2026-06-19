@@ -22,9 +22,14 @@ Module-level register_job_type() fires at import time (job-registry-central).
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List
+
+from mes_dashboard.core.base_chunked_duckdb_job import BaseChunkedDuckDBJob, ChunkStrategy
 
 logger = logging.getLogger("mes_dashboard.eap_alarm_worker")
 
@@ -277,13 +282,247 @@ def run_eap_alarm_query_job(
         raise
 
 
+class EapAlarmJob(BaseChunkedDuckDBJob):
+    """Unified chunked Oracle→DuckDB job for EAP ALARM (BaseChunkedDuckDBJob template method).
+
+    ChunkStrategy: TIME (one pair of Oracle queries per day: events + detail).
+    requires_cross_chunk_reduction=False: SET/CLEAR pairing is deferred to post_aggregate
+    which reads ALL chunk parquets together (ADR-0009, cross-seam safe).
+    """
+
+    namespace = "eap_alarm"
+    chunk_strategy = ChunkStrategy.TIME
+    requires_cross_chunk_reduction = False
+    max_parallel = 3
+
+    def __init__(self, job_id: str, params: dict) -> None:
+        super().__init__(job_id)
+        self.params = params
+        self._spool_key: str = ""
+        self._spool_path: str = ""
+        self._machines_hash: str = ""
+        self._equipment_filter: str = ""
+        self._eqp_params: dict = {}
+        self._machines: List[str] = []
+        self._date_from: str = ""
+        self._date_to: str = ""
+
+    def pre_query(self) -> None:
+        """Parse params, compute spool key, build daily chunk pairs."""
+        date_from = str(self.params.get("date_from", "")).strip()
+        date_to = str(self.params.get("date_to", "")).strip()
+        machines = list(self.params.get("machines", []))
+
+        self._date_from = date_from
+        self._date_to = date_to
+        self._machines = machines
+
+        self._machines_hash = hashlib.sha256(
+            ",".join(sorted(machines)).encode("utf-8")
+        ).hexdigest()[:8]
+
+        self._equipment_filter, self._eqp_params = _build_equipment_filter(machines)
+
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, get_eap_alarm_spool_path
+        self._spool_key = make_eap_alarm_spool_key(date_from, date_to, machines)
+        self._spool_path = get_eap_alarm_spool_path(self._spool_key)
+
+        # Build daily chunk pairs: one "events" chunk + one "detail" chunk per day
+        start = datetime.strptime(date_from, "%Y-%m-%d")
+        end = datetime.strptime(date_to, "%Y-%m-%d")
+        chunks = []
+        current = start
+        while current <= end:
+            day_str = current.strftime("%Y-%m-%d")
+            next_day_str = (current + timedelta(days=1)).strftime("%Y-%m-%d")
+            base_params: Dict[str, Any] = {
+                "date_from": day_str,
+                "date_to": next_day_str,
+                **self._eqp_params,
+            }
+            chunks.append({
+                "kind": "events",
+                "date_from": day_str,
+                "date_to": next_day_str,
+                "base_params": base_params,
+            })
+            chunks.append({
+                "kind": "detail",
+                "date_from": day_str,
+                "date_to": next_day_str,
+                "base_params": base_params,
+            })
+            current += timedelta(days=1)
+        self._chunks = chunks
+
+    def build_chunk_sql(self, chunk_params: dict) -> tuple[str, dict]:
+        """Return (sql, binds) for the given chunk kind."""
+        if chunk_params["kind"] == "events":
+            return (
+                _EAP_EVENT_SQL_TEMPLATE.format(equipment_filter=self._equipment_filter),
+                chunk_params["base_params"],
+            )
+        else:
+            return (
+                _DETAIL_SQL_TEMPLATE.format(equipment_filter=self._equipment_filter),
+                chunk_params["base_params"],
+            )
+
+    def post_aggregate(self, job_duckdb_path: "str | None") -> str:
+        """Read all chunk parquets, run EAV pivot + SET/CLEAR pairing, write spool."""
+        import json
+        import duckdb
+        import pandas as pd
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        chunk_dir = self._make_chunk_parquet_dir(self.job_id)
+        all_parquets = sorted(chunk_dir.glob("chunk-*.parquet"))
+
+        # Separate events vs detail parquets by chunk index parity
+        # _chunks layout: [events_day0, detail_day0, events_day1, detail_day1, ...]
+        # chunk-{chunk_idx:04d}-{batch_idx:04d}.parquet
+        events_parquets = []
+        detail_parquets = []
+        for p in all_parquets:
+            name = p.name  # e.g. chunk-0000-0000.parquet
+            parts = name.split("-")
+            # parts: ['chunk', '0000', '0000.parquet']
+            chunk_idx = int(parts[1])
+            kind = self._chunks[chunk_idx]["kind"]
+            if kind == "events":
+                events_parquets.append(p)
+            else:
+                detail_parquets.append(p)
+
+        # Read events
+        if events_parquets:
+            events_tables = [pq.read_table(str(p)) for p in events_parquets]
+            events_combined = pa.concat_tables(events_tables)
+            events_df = events_combined.to_pandas()
+        else:
+            events_df = pd.DataFrame(
+                columns=["EVENT_ID", "EQP_ID", "EQP_TYPE", "LOT_ID", "ALARM_ID", "ALARM_TIME"]
+            )
+
+        # Read detail
+        if detail_parquets:
+            detail_tables = [pq.read_table(str(p)) for p in detail_parquets]
+            detail_combined = pa.concat_tables(detail_tables)
+            detail_raw_df = detail_combined.to_pandas()
+        else:
+            detail_raw_df = pd.DataFrame(
+                columns=["EVENT_ID", "PARAMETER_NAME", "PARAMETER_VALUE"]
+            )
+
+        # EAV pivot in Python (same logic as run_eap_alarm_query_job)
+        if not detail_raw_df.empty:
+            records = []
+            for eid, grp in detail_raw_df.groupby("EVENT_ID"):
+                d = dict(zip(grp["PARAMETER_NAME"], grp["PARAMETER_VALUE"]))
+                records.append({
+                    "EVENT_ID":          str(eid),
+                    "ALARM_CODE_STR":    d.get("AlarmCode"),
+                    "ALARM_TEXT_DETAIL": d.get("AlarmText"),
+                    "DETAIL_PARAMS":     json.dumps(d, ensure_ascii=False),
+                })
+            detail_pivot_df = pd.DataFrame(records)
+        else:
+            detail_pivot_df = pd.DataFrame(
+                columns=["EVENT_ID", "ALARM_CODE_STR", "ALARM_TEXT_DETAIL", "DETAIL_PARAMS"]
+            )
+
+        os.makedirs(os.path.dirname(self._spool_path), exist_ok=True)
+
+        con = duckdb.connect()
+        try:
+            con.register("events_raw", events_df)
+            con.register("detail_pivot", detail_pivot_df)
+
+            pair_sql = _PAIR_SQL.format(machines_hash=self._machines_hash)
+
+            if events_df.empty:
+                con.execute(
+                    f"COPY (SELECT * FROM ({pair_sql}) t WHERE FALSE) TO '{self._spool_path}'"
+                    " (FORMAT PARQUET, CODEC 'SNAPPY')"
+                )
+                row_count = 0
+            else:
+                con.execute(
+                    f"COPY ({pair_sql}) TO '{self._spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')"
+                )
+                row_count = con.execute(
+                    f"SELECT COUNT(*) FROM read_parquet('{self._spool_path}')"
+                ).fetchone()[0]
+        finally:
+            con.close()
+
+        logger.info(
+            "EapAlarmJob.post_aggregate: parquet written path=%s rows=%d job_id=%s",
+            self._spool_path, row_count, self.job_id,
+        )
+
+        try:
+            from mes_dashboard.core.query_spool_store import register_spool_file
+            from mes_dashboard.services.eap_alarm_cache import EAP_ALARM_SPOOL_TTL
+            register_spool_file(
+                "eap_alarm", self._spool_key, Path(self._spool_path),
+                row_count, ttl_seconds=EAP_ALARM_SPOOL_TTL,
+            )
+        except Exception as reg_exc:
+            logger.warning("EapAlarmJob.post_aggregate: spool registration failed: %s", reg_exc)
+
+        return self._spool_path
+
+    def progress_report(self, pct: int) -> None:
+        """Report progress via async_query_job_service (lazy import to avoid circular)."""
+        from mes_dashboard.services.async_query_job_service import update_job_progress
+        update_job_progress("eap-alarm", self.job_id, pct=str(pct))
+
+
+def execute_eap_alarm_unified_job(
+    job_id: str,
+    date_from: str,
+    date_to: str,
+    machines: list,
+) -> None:
+    """RQ entry point for EapAlarmJob (EAP_ALARM_USE_UNIFIED_JOB=on path).
+
+    Called by RQ worker process. Creates EapAlarmJob and runs the template method.
+    """
+    from mes_dashboard.rq_worker_preload import ensure_rq_logging
+    ensure_rq_logging()
+
+    from mes_dashboard.services.async_query_job_service import complete_job
+
+    logger.info("execute_eap_alarm_unified_job: started job_id=%s", job_id)
+    try:
+        job = EapAlarmJob(
+            job_id=job_id,
+            params={"date_from": date_from, "date_to": date_to, "machines": machines},
+        )
+        spool_path = job.run()
+        complete_job("eap-alarm", job_id, query_id=job._spool_key)
+        logger.info(
+            "execute_eap_alarm_unified_job: completed job_id=%s spool_path=%s",
+            job_id, spool_path,
+        )
+    except Exception as exc:
+        logger.error(
+            "execute_eap_alarm_unified_job: failed job_id=%s: %s", job_id, exc, exc_info=True
+        )
+        complete_job("eap-alarm", job_id, error=str(exc))
+        raise
+
+
 # ── Central job registry ───────────────────────────────────────────────────────
 from mes_dashboard.services.job_registry import JobTypeConfig, register_job_type  # noqa: E402
 
 register_job_type(JobTypeConfig(
     job_type="eap-alarm",
     queue_name=EAP_ALARM_WORKER_QUEUE,
-    worker_fn=run_eap_alarm_query_job,
+    worker_fn=execute_eap_alarm_unified_job,
     timeout_seconds=EAP_ALARM_JOB_TIMEOUT_SECONDS,
     ttl_seconds=EAP_ALARM_JOB_TTL_SECONDS,
+    always_async=True,
 ))

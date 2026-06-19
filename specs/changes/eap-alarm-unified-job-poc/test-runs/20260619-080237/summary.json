@@ -1,0 +1,18 @@
+{
+  "change_id": "eap-alarm-unified-job-poc",
+  "phase": "quality",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "conda run -n mes-dashboard ruff check src/mes_dashboard/services/job_registry.py src/mes_dashboard/services/async_query_job_service.py src/mes_dashboard/workers/eap_alarm_worker.py src/mes_dashboard/routes/eap_alarm_routes.py",
+  "duration_ms": 1782,
+  "first_failure": {
+    "kind": "unknown",
+    "message": "ERROR conda.cli.main_run:execute(127): `conda run ruff check src/mes_dashboard/services/job_registry.py src/mes_dashboard/services/async_query_job_service.py src/mes_dashboard/workers/eap_alarm_worker.py src/mes_dashboard/routes/eap_alarm_routes.py` failed. (See above for error)"
+  },
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080237/summary.json",
+    "stdout": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080237/stdout.log",
+    "stderr": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080237/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

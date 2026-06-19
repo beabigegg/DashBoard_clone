@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.22.0
-last-changed: 2026-06-18
+schema-version: 1.23.0
+last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -40,6 +40,7 @@ breaking-change-policy: deprecate-2-minors
 | ASYNC-03 | Job abandon | `POST /api/job/<job_id>/abandon` idempotent；已 terminal 的 job 回傳 409；已放棄的 job 回傳 200 | route tests |
 | ASYNC-04 | Job ownership | 若 job metadata 含 `owner`，caller 必須提供匹配的 `owner` 值；否則 403 `FORBIDDEN` | route tests |
 | ASYNC-05 | Progress milestone semantics | Services that call `update_job_progress(pct, stage)` MUST follow the canonical milestone map: `pct=0` (job start), `pct=30` (Oracle query issued, `stage="querying"`), `pct=100` (data written to spool, `stage="complete"`). Intermediate milestones are additive; omitting them for a service is permitted. Services that do not call `update_job_progress` omit `pct`/`stage` entirely from the job status payload. Consumer (`AsyncQueryProgress.vue`) MUST treat absent `pct` as indeterminate (show spinner, not 0%). | unit tests (backend pct-milestone, frontend composable) |
+| ASYNC-06 | Always-async 503 on forced sync | When `JobTypeConfig.always_async=True` AND `sync_fallback_allowed=False` AND async queue unavailable: the request MUST receive HTTP 503 `SERVICE_UNAVAILABLE` with a `Retry-After` header. It MUST NOT be silently downgraded to synchronous execution. Rationale: always-async domains (e.g. eap_alarm) have query durations that exceed safe synchronous timeout bounds; a partial synchronous result would be incorrect and misleading. Cross-reference: error-format.md §503 Async Unavailable. | `tests/test_async_query_job_service.py` (AC-4) |
 
 ## Hold-History Rules
 
@@ -244,6 +245,9 @@ breaking-change-policy: deprecate-2-minors
 | Downtime query: days < threshold, OR DOWNTIME_ASYNC_ENABLED=false, OR worker unavailable | HTTP 200 sync | ASYNC-DA-01 | resilience |
 | Resource-history query: days ≥ RESOURCE_ASYNC_DAY_THRESHOLD + RESOURCE_ASYNC_ENABLED=true + worker available | HTTP 202 async job | RH-09 | route tests |
 | Resource-history query: days < threshold, OR RESOURCE_ASYNC_ENABLED=false, OR worker unavailable | HTTP 200 sync | RH-09 | resilience |
+| EAP ALARM query: `EAP_ALARM_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (EapAlarmJob) | EA-ASYNC, ASYNC-06 | route tests |
+| EAP ALARM query: `EAP_ALARM_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 SERVICE_UNAVAILABLE + Retry-After | EA-ASYNC, ASYNC-06 | resilience tests |
+| EAP ALARM query: `EAP_ALARM_USE_UNIFIED_JOB=off` (default) | unchanged legacy path (run_eap_alarm_query_job) | EA-ASYNC, AC-8 | regression tests |
 
 ## Material Consumption Rules
 
@@ -298,6 +302,7 @@ breaking-change-policy: deprecate-2-minors
 | EA-06 | Spool schema version | `eap_alarm_cache.py` contains integer `_SCHEMA_VERSION` that participates in the spool cache key. Bumping orphans stale parquets by key. Schema-breaking rollback requires `rm -f tmp/query_spool/eap_alarm/*.parquet`. Column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. | constant-pin test |
 | EA-07 | EQP type allowlist | `eqp_types` values are validated against the closed enum: `{GDBA, GCBA, GWBA, GWBK, GPRA, GTMH, GWMT, GDSD, GWAC, GPTA}`. Value outside this set → 400 `VALIDATION_ERROR`. Empty list → 400 `VALIDATION_ERROR`. | route tests |
 | EA-ALCD | SECS/GEM ALCD sign convention | Oracle `DWH.EAP_EVENT.ALCD < 0` = SET event; `ALCD >= 0` = CLEAR event. Worker filters `ALCD < 0` for SET rows and joins CLEAR via `RESOURCEID + ALARMID + timestamp window`. Full-table scans without EA-03's `LAST_UPDATE_TIME` index predicate are forbidden. | unit + integration tests |
+| EA-ASYNC | EAP ALARM unified job routing | `eap_alarm` is an always-async domain (`JobTypeConfig.always_async=True`). When `EAP_ALARM_USE_UNIFIED_JOB=on`, route enqueues via `enqueue_query_job("eap-alarm", ..., sync_fallback_allowed=False)`. Queue unavailable → HTTP 503 (ASYNC-06; never silent sync fallback). Queue available → HTTP 202. When flag is `off` (default), the legacy `run_eap_alarm_query_job` path is used unchanged (AC-8 zero-regression). ADR-0009: SET/CLEAR pairing deferred to `post_aggregate` (cross-seam safe). | `tests/test_async_query_job_service.py`, `tests/integration/test_eap_alarm_rq_async.py` |
 
 ### AlarmCategory Decode Table (EA-05)
 

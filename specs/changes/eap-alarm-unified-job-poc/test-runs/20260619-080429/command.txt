@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/test_eap_alarm_unified_job.py tests/test_job_registry.py::TestAlwaysAsyncField tests/test_async_query_job_service.py::TestEnqueueQueryJob -v

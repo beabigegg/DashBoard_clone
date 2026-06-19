@@ -1,0 +1,16 @@
+agent: change-classifier
+status: complete
+model: opus
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: classification, pointer: "specs/changes/eap-alarm-unified-job-poc/change-classification.md" }
+  - { type: context-manifest, pointer: "specs/changes/eap-alarm-unified-job-poc/context-manifest.md" }
+
+findings:
+  - "Tier 1, high risk, cross-module impact"
+  - "Architecture Review Required: first-in-class BaseChunkedDuckDBJob POC — design.md required before implementation"
+  - "P0 tier-floor-override invalidated by P1 wiring a real caller; stress/soak now required"
+  - "Open question resolved: always-async domain must 503 on forced-sync, never silently downgrade"
+  - "Stress-soak-report.md required (ThreadPoolExecutor concurrency surface with real Oracle caller)"
+  - "8 acceptance criteria defined; AC-1/AC-8 establish the parity-testing template for all P2+ migrations"

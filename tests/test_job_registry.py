@@ -236,3 +236,45 @@ class TestJobServiceRegistrations:
             f"Expected: {expected_types}\n"
             f"Got: {set(registered)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestAlwaysAsyncField — IP-3: always_async field on JobTypeConfig
+# ---------------------------------------------------------------------------
+
+class TestAlwaysAsyncField:
+    def test_job_type_config_always_async_defaults_false(self):
+        """always_async defaults to False when not specified."""
+        from mes_dashboard.services.job_registry import JobTypeConfig
+        config = JobTypeConfig(
+            job_type="test-default",
+            queue_name="test-q",
+            worker_fn=lambda: None,
+        )
+        assert config.always_async is False
+
+    def test_job_type_config_always_async_true(self):
+        """always_async can be set to True."""
+        from mes_dashboard.services.job_registry import JobTypeConfig
+        config = JobTypeConfig(
+            job_type="test-always",
+            queue_name="test-q",
+            worker_fn=lambda: None,
+            always_async=True,
+        )
+        assert config.always_async is True
+
+    def test_eap_alarm_registered_with_always_async_true(self):
+        """eap-alarm registration must have always_async=True."""
+        import importlib
+        import mes_dashboard.services.job_registry as jr
+        import mes_dashboard.workers.eap_alarm_worker as w
+
+        # Re-register against the currently-cleared registry
+        importlib.reload(w)
+
+        config = jr.get_job_type_config("eap-alarm")
+        assert config is not None, "eap-alarm job type not registered"
+        assert config.always_async is True, (
+            f"Expected always_async=True, got {config.always_async}"
+        )

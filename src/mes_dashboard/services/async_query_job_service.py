@@ -376,3 +376,41 @@ def enqueue_job_dynamic(
         job_timeout=config.timeout_seconds,
         result_ttl=config.ttl_seconds,
     )
+
+
+def enqueue_query_job(
+    job_type: str,
+    owner: str,
+    params: Dict[str, Any],
+    *,
+    sync_fallback_allowed: bool = True,
+    job_id: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str], Optional[int]]:
+    """Unified entry-point for async job dispatch with D3 503 decision tree.
+
+    D3 decision tree:
+    - config.always_async=True AND sync_fallback_allowed=False AND async unavailable
+      → (None, "async queue unavailable", 503)
+    - Otherwise → delegate to enqueue_job_dynamic; status_hint=None
+
+    Returns:
+        (job_id, None, None) on success.
+        (None, error_str, 503) when always-async domain blocks on queue unavailable.
+        (None, error_str, None) on other failures.
+    """
+    config = get_job_type_config(job_type)
+    if config is None:
+        return None, f"Unknown job type: {job_type!r}", None
+
+    # D3: always-async + sync_fallback_allowed=False + queue unavailable → 503
+    if config.always_async and not sync_fallback_allowed and not is_async_available():
+        logger.warning(
+            "enqueue_query_job: always-async job type %r blocked (queue unavailable, sync fallback not allowed)",
+            job_type,
+        )
+        return None, "async queue unavailable", 503
+
+    result_job_id, err = enqueue_job_dynamic(job_type, owner, params, job_id=job_id)
+    if result_job_id is None:
+        return None, err, None
+    return result_job_id, None, None

@@ -1,0 +1,15 @@
+change-id: eap-alarm-unified-job-poc
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-19T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (unit-mock-integration, cdd-gate, eap-alarm-e2e), 2 (type-check), 3 (nightly-integration, oracle-fault-injection), 4 (stress-load, soak)" }
+  - { type: gate-promotions, pointer: "none — all gates reuse existing tiers; no tier change" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; all new tests fall within existing backend-tests.yml, stress-tests.yml, soak-tests.yml, e2e-tests.yml commands)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests (backend-tests.yml), response-shape-validate (contract-driven-gates.yml), cdd-kit gate eap-alarm-unified-job-poc" }
+next-action: none
+notes: >
+  ci-gate-contract.md requires a schema-version patch bump (additive note for
+  eap-alarm-unified-job-poc) in the same PR as the implementation. No workflow
+  YAML edits are needed. Three mandatory ci-gates.md section headers verified
+  present at lines 21, 46, 55.

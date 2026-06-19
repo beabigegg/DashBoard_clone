@@ -18,7 +18,7 @@ Consumers query the registry via get_job_type_config() or list_registered_job_ty
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 
@@ -43,6 +43,10 @@ class JobTypeConfig:
 
     should_enqueue: Optional[Callable[[Dict[str, Any]], bool]] = None
     """Optional guard: called with params dict; job is skipped when it returns False."""
+
+    always_async: bool = False
+    """When True, sync fallback is never permitted for this job type (ASYNC-06 rule).
+    Used by enqueue_query_job() D3 503 decision tree."""
 
 
 # ---------------------------------------------------------------------------

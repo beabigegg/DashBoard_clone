@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-unified-job-poc",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard ruff check src/mes_dashboard/services/job_registry.py src/mes_dashboard/services/async_query_job_service.py src/mes_dashboard/workers/eap_alarm_worker.py src/mes_dashboard/routes/eap_alarm_routes.py",
+  "duration_ms": 1884,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080258/summary.json",
+    "stdout": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080258/stdout.log",
+    "stderr": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080258/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-unified-job-poc",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/test_async_query_job_service.py tests/test_base_chunked_duckdb_job.py tests/test_eap_alarm_unified_job.py tests/test_job_registry.py -q --maxfail=1 --tb=short -ra",
+  "duration_ms": 3582,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080225/summary.json",
+    "stdout": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080225/stdout.log",
+    "stderr": "specs/changes/eap-alarm-unified-job-poc/test-runs/20260619-080225/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -40,6 +40,9 @@ _EAP_ALARM_RETRY_AFTER_SECONDS = int(
     os.getenv("EAP_ALARM_RETRY_AFTER_SECONDS", "30")
 )
 _JOB_PREFIX = "eap-alarm"
+_EAP_ALARM_USE_UNIFIED_JOB: bool = os.getenv(
+    "EAP_ALARM_USE_UNIFIED_JOB", "off"
+).lower().strip() in ("on", "true", "1")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -157,35 +160,55 @@ def api_eap_alarm_spool():
 
     # Enqueue RQ job
     try:
-        from mes_dashboard.services.async_query_job_service import is_async_available, enqueue_job
-        from mes_dashboard.workers.eap_alarm_worker import (
-            run_eap_alarm_query_job,
-            EAP_ALARM_WORKER_QUEUE,
-            EAP_ALARM_JOB_TIMEOUT_SECONDS,
-            EAP_ALARM_JOB_TTL_SECONDS,
-        )
         from mes_dashboard.core.permissions import get_owner_token
 
         job_id = f"eap-alarm-{uuid.uuid4().hex[:12]}"
 
-        job_id_result, err = enqueue_job(
-            queue_name=EAP_ALARM_WORKER_QUEUE,
-            worker_fn=run_eap_alarm_query_job,
-            owner=get_owner_token(),
-            job_id=job_id,
-            kwargs={
-                "job_id": job_id,
-                "date_from": date_from,
-                "date_to": date_to,
-                "machines": machines,
-            },
-            prefix=_JOB_PREFIX,
-            job_timeout=EAP_ALARM_JOB_TIMEOUT_SECONDS,
-            result_ttl=EAP_ALARM_JOB_TTL_SECONDS,
-        )
+        if _EAP_ALARM_USE_UNIFIED_JOB:
+            from mes_dashboard.services.async_query_job_service import enqueue_query_job
+            import mes_dashboard.workers.eap_alarm_worker  # noqa: F401 — triggers registration
+
+            job_id_result, err, status_hint = enqueue_query_job(
+                "eap-alarm",
+                owner=get_owner_token(),
+                params={
+                    "job_id": job_id,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "machines": machines,
+                },
+                sync_fallback_allowed=False,
+                job_id=job_id,
+            )
+        else:
+            from mes_dashboard.services.async_query_job_service import enqueue_job
+            from mes_dashboard.workers.eap_alarm_worker import (
+                run_eap_alarm_query_job,
+                EAP_ALARM_WORKER_QUEUE,
+                EAP_ALARM_JOB_TIMEOUT_SECONDS,
+                EAP_ALARM_JOB_TTL_SECONDS,
+            )
+            job_id_result, err = enqueue_job(
+                queue_name=EAP_ALARM_WORKER_QUEUE,
+                worker_fn=run_eap_alarm_query_job,
+                owner=get_owner_token(),
+                job_id=job_id,
+                kwargs={
+                    "job_id": job_id,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "machines": machines,
+                },
+                prefix=_JOB_PREFIX,
+                job_timeout=EAP_ALARM_JOB_TIMEOUT_SECONDS,
+                result_ttl=EAP_ALARM_JOB_TTL_SECONDS,
+            )
+            status_hint = None
 
         if job_id_result is None:
-            logger.warning("eap_alarm_routes: async enqueue failed: %s", err)
+            logger.warning(
+                "eap_alarm_routes: async enqueue failed (hint=%s): %s", status_hint, err
+            )
             return error_response(
                 SERVICE_UNAVAILABLE,
                 "背景查詢服務不可用，請稍後再試",

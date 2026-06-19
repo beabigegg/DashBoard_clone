@@ -1,0 +1,6 @@
+artifacts:
+  - { type: design-written, pointer: "specs/changes/eap-alarm-unified-job-poc/design.md" }
+  - { type: adr-written, pointer: "docs/adr/0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md" }
+  - { type: affected-areas, pointer: "eap_alarm worker, job_registry, async_query_job_service, eap_alarm route, feature flag" }
+  - { type: decision-summary, pointer: "EapAlarmJob on BaseChunkedDuckDBJob; TIME chunk; reduction-flag False but pairing deferred to post_aggregate; flag-gated route dispatch; always_async=>503 on forced sync" }
+  - { type: risks-noted, pointer: "1 high (P0 _fan_out_append discards batches, needs append sink), 1 medium (cross-chunk pairing glob), 1 low (progress granularity)" }

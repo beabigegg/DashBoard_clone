@@ -3,8 +3,8 @@ contract: api-error-format
 summary: Standard error payload shape, safety rules, and reusable error code table.
 owner: application-team
 surface: api
-schema-version: 1.1.0
-last-changed: 2026-05-05
+schema-version: 1.2.0
+last-changed: 2026-06-19
 ---
 
 # API Error Format
@@ -61,6 +61,7 @@ last-changed: 2026-05-05
 - **410 Cache Expired（Type A）：** view miss → 410 `CACHE_EXPIRED` → client 同步重觸發查詢。適用：hold-history、resource-history。
 - **202 Async Job：** spool miss + RQ available → 202 `{async: true, job_id, status_url, ...}`。適用：reject-history、yield-alert、production-history、trace、material-trace。
 - **503 DB Unavailable：** DB 連線失敗時回傳 503 `SERVICE_UNAVAILABLE` with `detail: "database_unavailable"`。
+- **503 Async Unavailable (always-async domain)：** When an always-async domain (`JobTypeConfig.always_async=True`) receives a request AND the async queue is unavailable AND `sync_fallback_allowed=False`: route returns 503 `SERVICE_UNAVAILABLE` with `Retry-After: <seconds>` header. Body uses standard error shape with `code: "SERVICE_UNAVAILABLE"`. MUST NOT be silently downgraded to synchronous execution. Applies to: `eap_alarm` domain (when `EAP_ALARM_USE_UNIFIED_JOB=on`). Cross-reference: business-rules.md ASYNC-06. Added by change `eap-alarm-unified-job-poc`.
 
 ## Schemas
 
