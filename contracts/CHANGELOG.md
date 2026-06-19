@@ -8,13 +8,29 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.22.0] — 2026-06-19
+### Added
+- material-trace-streaming-migration: §3.20 spool-schema-UNCHANGED assertion for `material_trace` namespace. 13-column set identical between legacy `pd.concat` and unified `MaterialTraceJob` streaming paths (AC-4). No parquet cleanup on deploy/rollback. Additive; no existing schemas changed.
+
+## [ci 1.3.29] — 2026-06-19
+### Added
+- material-trace-streaming-migration: Gate-compatibility note for P4 migration — new `MaterialTraceJob` in `material_trace_duckdb_runtime.py` + entry fn `execute_material_trace_unified_job` in `material_trace_service.py` covered by existing `unit-mock-integration` gate commands. Reuses existing `trace-events` RQ queue and worker service; no new systemd unit, no new workflow file, no gate tier change. Feature flag `MATERIAL_TRACE_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. Additive; no existing gates changed.
+
 ## [ci 1.3.28] — 2026-06-19
 ### Added
 - resource-history-migration: Gate-compatibility note for P3 migration — two new worker modules (`resource_history_base_worker`, `resource_history_oee_worker`) reuse existing `resource-history-query` queue and worker service; no new workflow file or gate tier. Feature flag `RESOURCE_HISTORY_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. Additive; no existing gates changed.
 
+## [env 1.0.18] — 2026-06-19
+### Added
+- material-trace-streaming-migration: `MATERIAL_TRACE_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `MaterialTraceJob` path (BaseChunkedDuckDBJob template method, P4 migration) vs legacy `_execute_batched_query_to_parquet` path. `always_async=True`; `sync_fallback_allowed=False`; async unavailable → 503. Spool namespace `material_trace` and parquet schema unchanged. Default `off` ensures zero regression on deploy (AC-1). Additive; no existing flags changed.
+
 ## [env 1.0.17] — 2026-06-19
 ### Added
 - resource-history-migration: `RESOURCE_HISTORY_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `ResourceHistoryBaseJob` + `ResourceHistoryOeeJob` paths (BaseChunkedDuckDBJob template method, P3 migration) vs legacy `export_csv` Oracle read + pandas iterrows path. `always_async=True` for both; `sync_fallback_allowed=False`; degraded → 503. Default `off` ensures zero regression on deploy (AC-1). Additive; no existing flags changed.
+
+## [business 1.26.0] — 2026-06-19
+### Added
+- material-trace-streaming-migration: ASYNC-10 (unified-job dispatch for material-trace domain — `MATERIAL_TRACE_USE_UNIFIED_JOB=on` routes to `MaterialTraceJob` via `enqueue_query_job("material-trace-unified", always_async=True, sync_fallback_allowed=False)`; async unavailable → 503, no sync fallback; ID-list 1000/batch chunking; post_aggregate DISTINCT on exact 4-col key; WORKCENTER_GROUP enrichment inline; spool namespace+schema unchanged; flag-off uses legacy `_execute_batched_query_to_parquet` unchanged). ASYNC-11 (heavy-query semaphore role re-statement: no code change, semantics-only). Three new Decision Table rows (material-trace flag-on/async-available, flag-on/async-unavailable, flag-off). Additive; no existing rules changed.
 
 ## [business 1.25.0] — 2026-06-19
 ### Added

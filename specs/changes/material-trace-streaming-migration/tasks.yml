@@ -1,0 +1,45 @@
+change-id: material-trace-streaming-migration
+status: in-progress
+tier: 1
+tier-floor-override: "Tier 1 is appropriate: MaterialTraceJob is a standalone thin wrapper (no BaseChunkedDuckDBJob inheritance chain), live production callers exist (not zero-caller new module), stress gates S-1/S-2 are scaffolded for weekly gate, flag default=off bounds blast radius to zero until AC-4 nightly parity + AC-5 soak evidence confirm safe promotion. Re-classify Tier 0 only if soak evidence shows heap linearity."
+context-governance: v1
+archive-tasks:
+  - "3.2"
+  - "3.5"
+  - "6.4"
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 1, high risk, cross-module; design.md required; 9 agents required; stress-soak-report.md required" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "IP-1: env; IP-2: business-rules; IP-8: ci-gate-contract note; API/data/CSS confirmed none" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done, note: "design.md written; requires_cross_chunk_reduction=False (row-level dedup, not cross-chunk aggregation per ADR-0003); D1-D4 captured" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written; no new workflow; nightly integration + weekly stress/soak deferred" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done, note: "implementation-plan.md written; 8 IP steps; test-plan.md written" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "confirmed no change by contract-reviewer; 503 already documented; api-contract 1.25.0 unchanged" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no UI surface" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done, note: "env-contract.md 1.0.18; env.schema.json enum+default; .env.example.template; [env 1.0.18] internal CHANGELOG added (F-1 fix)" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done, note: "data-shape-contract.md 1.22.0; §3.20 UNCHANGED assertion added (13-col set identical); [data 1.22.0] in CHANGELOG (F-2 fix)" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "business-rules.md 1.26.0; ASYNC-10 (dispatch), ASYNC-11 (semaphore D3); 3 flag-behavior rows; CHANGELOG" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done, note: "ci-gate-contract.md 1.3.29; additive gate-compat note; CHANGELOG" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "collect/targeted/changed-area/contract all pass; 16 AC tests + 11 contract tests; ruff clean" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: pending, note: "test_material_trace_rq_async.py written (12 tests pass); GunicornHarness parity deferred nightly" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "12 integration resilience tests: R-1 Oracle fault, R-2 503 no-fallback, R-3 2500 IDs dedup; all pass" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "AC-8 TestMaterialTrace1000IdBoundary in test_chunk_boundary.py; 999/1000/1001/2000/2001/5000 IDs" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: pending, note: "S-1 concurrency-cap + S-2 heap-sublinear scaffolded; stress-soak-report.md written; weekly gate deferred" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "MaterialTraceJob + execute_material_trace_unified_job + register + flag dispatch; 44 tests pass; ruff clean" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no frontend changes" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done, note: "MATERIAL_TRACE_USE_UNIFIED_JOB=off default; env-contract + schema + template updated" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "no new workflow files; ci-gate-contract.md additive note" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI surface" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI surface" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "APPROVED; F-1+F-2 both fixed; env 1.0.18 + data 1.22.0 + business 1.26.0 + ci 1.3.29; contracts validate pass" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "APPROVED FOR MERGE (flag=off); AC-1..AC-8 all covered; 9/9 agents complete; nightly/soak deferred correctly" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed; ruff clean; contracts validate pass" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "collect/targeted/changed-area/contract phases pass; 12+16+11 tests pass" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "integration resilience (12) + stress scaffold (S-1/S-2) pass; context-scan deferred" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending, note: "integration (GunicornHarness), soak are nightly/weekly gates per ci-gates.md" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

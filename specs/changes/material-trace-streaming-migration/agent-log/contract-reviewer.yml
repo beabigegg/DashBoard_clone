@@ -1,0 +1,18 @@
+agent: contract-reviewer
+status: complete
+model: sonnet
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/env/env-contract.md, contracts/env/env.schema.json, contracts/env/.env.example.template, contracts/business/business-rules.md, contracts/api/api-contract.md, contracts/data/data-shape-contract.md, contracts/ci/ci-gate-contract.md, contracts/CHANGELOG.md" }
+
+findings:
+  - "F-1 BLOCKING (fixed): env-contract.md internal CHANGELOG missing [env 1.0.18] — added above [env 1.0.17]"
+  - "F-2 INFORMATIONAL (fixed): data-shape-contract.md missing §3.20 UNCHANGED assertion — added, bumped 1.21.0→1.22.0, [data 1.22.0] in contracts/CHANGELOG.md"
+  - "api-contract.md: no change (503 already documented for async-unavailable); material_trace spool not in /api/spool whitelist (pre-existing, trace_routes.py serves it)"
+  - "business-rules.md 1.26.0: ASYNC-10 + ASYNC-11 + 3 decision table rows — complete"
+  - "ci-gate-contract.md 1.3.29: additive note only — complete"
+  - "env.schema.json: enum+default present — complete"
+  - "All breaking-change risks: zero (flag default=off, additive only)"
+
+verdict: approved-with-notes (blocking finding fixed before merge)

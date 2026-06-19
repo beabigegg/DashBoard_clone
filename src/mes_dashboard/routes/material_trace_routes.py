@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 
 from flask import Blueprint, Response, stream_with_context
@@ -45,6 +46,12 @@ _FORWARD_MODES = {"lot", "workorder"}
 _FORWARD_INPUT_LIMIT = 200
 _REVERSE_INPUT_LIMIT = 50
 _MAX_PER_PAGE = 200
+
+# Feature flag: unified MaterialTraceJob pipeline (material-trace-streaming-migration)
+# Module-level constant frozen at import; monkeypatch.setattr() required in tests (not setenv).
+MATERIAL_TRACE_USE_UNIFIED_JOB: bool = os.getenv(
+    "MATERIAL_TRACE_USE_UNIFIED_JOB", "off"
+).lower().strip() in ("on", "true", "1")
 
 # ============================================================
 # Rate Limiting
@@ -148,34 +155,86 @@ def api_material_trace_query():
         except Exception as _spool_exc:
             logger.debug("material_trace spool hit check failed: %s", _spool_exc)
 
-        # ── Spool miss — enqueue async RQ job ───────────────────────────────
+        # ── Spool miss — dispatch to unified or legacy path ─────────────────
         try:
             from mes_dashboard.core.permissions import get_owner_token
             generated_job_id = f"mtrace-{uuid.uuid4().hex[:12]}"
-            job_id, err = enqueue_job(
-                queue_name=MATERIAL_TRACE_QUEUE,
-                worker_fn=rq_material_trace_job,
-                owner=get_owner_token(),
-                prefix="material_trace",
-                job_id=generated_job_id,
-                kwargs={
-                    "job_id": generated_job_id,
-                    "mode": mode,
-                    "values": values,
-                    "workcenter_groups": workcenter_groups,
-                },
-            )
-            if job_id is not None:
-                return success_response(
-                    {
-                        "async": True,
-                        "job_id": job_id,
-                        "status_url": f"/api/material-trace/job/{job_id}",
-                        "query_hash": query_hash,
-                    },
-                    status_code=202,
+            owner = get_owner_token()
+
+            if MATERIAL_TRACE_USE_UNIFIED_JOB:
+                # ── Unified path (flag=on): always-async, 503 if unavailable (D4)
+                from mes_dashboard.services.async_query_job_service import (
+                    enqueue_query_job,
+                    is_async_available,
                 )
-            logger.warning("material_trace async enqueue failed (%s)", err)
+                import mes_dashboard.services.material_trace_service  # noqa: F401 — triggers registration
+                if not is_async_available():
+                    logger.warning(
+                        "material_trace unified: async unavailable, returning 503 (no sync fallback, D4)"
+                    )
+                    return error_response(
+                        SERVICE_UNAVAILABLE,
+                        "背景查詢服務不可用，請稍後再試",
+                        status_code=503,
+                        headers={"Retry-After": "30"},
+                    )
+                job_id_result, err, status_hint = enqueue_query_job(
+                    "material-trace-unified",
+                    owner=owner,
+                    params={
+                        "job_id": generated_job_id,
+                        "mode": mode,
+                        "values": values,
+                        "workcenter_groups": workcenter_groups,
+                    },
+                    sync_fallback_allowed=False,
+                    job_id=generated_job_id,
+                )
+                if job_id_result is not None:
+                    return success_response(
+                        {
+                            "async": True,
+                            "job_id": job_id_result,
+                            "status_url": f"/api/material-trace/job/{job_id_result}",
+                            "query_hash": query_hash,
+                        },
+                        status_code=202,
+                    )
+                logger.warning(
+                    "material_trace unified enqueue failed (hint=%s): %s", status_hint, err
+                )
+                return error_response(
+                    SERVICE_UNAVAILABLE,
+                    "背景查詢服務不可用，請稍後再試",
+                    status_code=503,
+                    headers={"Retry-After": "30"},
+                )
+            else:
+                # ── Legacy path (flag=off): enqueue rq_material_trace_job (unchanged)
+                job_id, err = enqueue_job(
+                    queue_name=MATERIAL_TRACE_QUEUE,
+                    worker_fn=rq_material_trace_job,
+                    owner=owner,
+                    prefix="material_trace",
+                    job_id=generated_job_id,
+                    kwargs={
+                        "job_id": generated_job_id,
+                        "mode": mode,
+                        "values": values,
+                        "workcenter_groups": workcenter_groups,
+                    },
+                )
+                if job_id is not None:
+                    return success_response(
+                        {
+                            "async": True,
+                            "job_id": job_id,
+                            "status_url": f"/api/material-trace/job/{job_id}",
+                            "query_hash": query_hash,
+                        },
+                        status_code=202,
+                    )
+                logger.warning("material_trace async enqueue failed (%s)", err)
         except Exception as _enqueue_exc:
             logger.warning("material_trace enqueue error: %s", _enqueue_exc)
         return error_response(

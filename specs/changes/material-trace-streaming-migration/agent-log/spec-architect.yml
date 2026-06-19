@@ -1,0 +1,15 @@
+agent: spec-architect
+status: complete
+model: opus
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: design, pointer: "specs/changes/material-trace-streaming-migration/design.md" }
+
+findings:
+  - "D1: requires_cross_chunk_reduction=False — _execute_batched_query (L191-240) chunks by Oracle IN-list (1000/batch), then pd.concat + drop_duplicates on [CONTAINERID, MATERIALLOTNAME, WORKCENTERNAME, TXNDATE]. No SUM/COUNT/GROUP BY across batches. Per ADR-0003: row-uniform dedup is seam-safe for ID_LIST parallel chunking."
+  - "D2: post-hoc _check_memory_guard() removal is safe — DuckDB on-disk spill is the structural replacement."
+  - "D3: semaphore semantics shift from protect-sync-path to limit-RQ-concurrency-to-Oracle — no code change; doc/contract update only."
+  - "D4: 503 (no silent fallback) when flag=on + RQ unavailable — per eap-alarm-unified-job-poc precedent."
+  - "Risk: dedup-key fidelity in post_aggregate DISTINCT; WORKCENTER_GROUP enrichment placement; Decimal→float/CHAR coercion; spool-key determinism via make_route_query_hash."
+  - "No ADR required."

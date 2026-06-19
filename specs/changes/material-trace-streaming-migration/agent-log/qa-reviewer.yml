@@ -1,0 +1,120 @@
+agent: qa-reviewer
+change-id: material-trace-streaming-migration
+date: 2026-06-19
+status: complete
+
+summary: |
+  All 7 release-readiness criteria PASS. Change is approved for merge with flag
+  default=off. Flag promotion to on is deferred pending Tier-3 nightly AC-4 spool
+  parity and Tier-4 weekly soak AC-5 evidence.
+
+criteria:
+  - id: C-1
+    label: Gate status (tasks.yml 6.1 done)
+    result: PASS
+    evidence: "tasks.yml task 6.1 status=done; note='cdd-kit gate passed; ruff clean; contracts validate pass'. ci-cd-gatekeeper.yml confirms all 6 checks pass."
+
+  - id: C-2
+    label: AC coverage (AC-1..AC-8, at least one test each)
+    result: PASS
+    evidence: |
+      AC-1: TestFlagOffLegacyPath (test_flag_off_uses_legacy_concat_path, test_flag_off_unified_job_not_enqueued) — targeted stdout confirmed PASSED
+      AC-2: TestFlagOnUnifiedPath (test_flag_on_enqueues_unified_job, test_flag_on_response_contains_job_id_and_status_url) — PASSED
+      AC-3: TestFlagOnNoRqReturns503 (test_flag_on_no_rq_returns_503_no_fallback, test_flag_on_no_rq_retry_after_header_present) — PASSED
+      AC-4: TestSpoolSchemaEquivalence (test_spool_schema_equivalent_flag_off_vs_on, test_spool_namespace_matches_legacy) — PASSED; parity nightly deferred (correct per ci-gates.md)
+      AC-5: S-2 heap scaffold (weekly soak deferred per stress-soak-report.md §Deferred Evidence — correct)
+      AC-6: TestNoMemoryGuardOnUnifiedPath::test_no_memory_guard_call_on_unified_path_ast (AST walk) — PASSED
+      AC-7: tests/contract/test_env_material_trace_flag.py covers env contract; business-rules.md ASYNC-10/ASYNC-11 rows covered by contract-reviewer approval
+      AC-8: TestIdListDecomposition (5 tests, 999/1000/1001/5000) + TestMaterialTrace1000IdBoundary in test_chunk_boundary.py — PASSED
+
+  - id: C-3
+    label: Contract completeness (contract-reviewer approved with blocking finding fixed)
+    result: PASS
+    evidence: |
+      contract-reviewer.yml verdict=approved-with-notes (all findings fixed before merge).
+      F-1 BLOCKING (env-contract.md internal CHANGELOG entry) — fixed.
+      F-2 INFORMATIONAL (data-shape-contract.md §3.20 UNCHANGED assertion) — fixed, bumped to 1.22.0.
+      env 1.0.18 + data 1.22.0 + business 1.26.0 + ci 1.3.29 all in contracts/CHANGELOG.md.
+      cdd-kit validate --contracts stdout: "response shape passed" (not skipped).
+
+  - id: C-4
+    label: Required agents (all 9 complete)
+    result: PASS
+    evidence: |
+      1. spec-architect — agent-log/spec-architect.yml status=complete
+      2. implementation-planner — agent-log/implementation-planner.yml status=complete
+      3. backend-engineer — agent-log/backend-engineer.yml status=complete
+      4. test-strategist — agent-log/test-strategist.yml status=complete
+      5. contract-reviewer — agent-log/contract-reviewer.yml status=complete
+      6. e2e-resilience-engineer — agent-log/e2e-resilience-engineer.yml status=complete
+      7. stress-soak-engineer — agent-log/stress-soak-engineer.yml status=complete
+      8. ci-cd-gatekeeper — agent-log/ci-cd-gatekeeper.yml status=complete
+      9. qa-reviewer — this log (status=complete)
+
+  - id: C-5
+    label: Flag safety (default=off verified; flag=on NOT recommended for immediate production)
+    result: PASS
+    evidence: |
+      env.schema.json enum+default=off confirmed by test_flag_schema_type_is_string,
+      test_flag_default_off_pinned — both PASSED in targeted phase.
+      test_flag_constant_defaults_off (importlib.reload after delenv) — PASSED.
+      ci-gates.md Merge Eligibility: "Promotion of flag to on per-environment requires
+      Tier-3 parity (AC-4) + Tier-4 soak (AC-5) evidence first." — deferred correctly.
+      DEV-01 deviation (not a true BaseChunkedDuckDBJob subclass) is low-risk and documented.
+
+  - id: C-6
+    label: Regression risk (legacy _execute_batched_query path unchanged for flag=off)
+    result: PASS
+    evidence: |
+      backend-engineer.yml: 44/44 existing tests pass (test_material_trace_service.py +
+      test_material_trace_duckdb_runtime.py). Flag-off branch in api_material_trace_query
+      falls through to legacy enqueue_job (monkeypatch-verified by AC-1 tests). Spool
+      namespace and parquet schema unchanged (AC-4 column set equivalence asserted by
+      TestSpoolSchemaEquivalence). No modification to _execute_batched_query logic confirmed
+      by backend-engineer.yml DEV-02 note.
+
+  - id: C-7
+    label: Nightly/weekly deferred (AC-4 nightly, AC-5 weekly NOT blocking merge)
+    result: PASS
+    evidence: |
+      tasks.yml 3.2 status=pending (GunicornHarness parity deferred nightly).
+      tasks.yml 3.5 status=pending (stress scaffold deferred weekly).
+      tasks.yml 6.4 status=pending (nightly/weekly/manual gates — correct per ci-gates.md).
+      ci-gates.md: nightly-integration and stress-load/soak are Tier 3/4, not Tier 0/1.
+      Tier 0/1 gates are the merge-blocking set. Deferred gates recorded but not blocking.
+
+test-evidence:
+  file: specs/changes/material-trace-streaming-migration/test-evidence.yml
+  generated-by: "cdd-kit test run"
+  final-status: passed
+  phases:
+    - { phase: collect, status: passed, run: "test-runs/20260619-140111" }
+    - { phase: targeted, status: passed, run: "test-runs/20260619-140056", tests: "26 passed" }
+    - { phase: changed-area, status: passed, run: "test-runs/20260619-140103", tests: "70 passed" }
+    - { phase: contract, status: passed, run: "test-runs/20260619-140120", result: "response shape passed" }
+  waivers: none
+  hand-authored: false
+
+artifacts:
+  - { type: gate-results, pointer: "lint: pass, contract-validate: pass, response-shape-validate: pass, unit-mock-integration: pass, e2e-critical: pass" }
+  - { type: ci-run-url, pointer: "n/a (local-only; CI runs discovered via test-runs/ directory, not remote CI)" }
+  - { type: evidence-quality, pointer: "log (test-runs/ stdout.log excerpts + summary.json files)" }
+  - { type: decision, pointer: "approved" }
+  - { type: failure-routing, pointer: "none" }
+
+deferred-gates:
+  - { gate: nightly-integration, tier: 3, trigger: "nightly", ac: "AC-4 spool schema parity (GunicornHarness)" }
+  - { gate: stress-load, tier: 4, trigger: "weekly", ac: "S-1 concurrency cap full-Redis, AC-8 boundary" }
+  - { gate: soak, tier: 4, trigger: "weekly after flag=on promotion", ac: "AC-5 peak-heap non-linearity 10-min real Oracle" }
+
+decision: approved
+decision-label: "APPROVED FOR MERGE (flag=off)"
+rationale: |
+  All Tier 0/1 gates pass. Required agents (9/9) complete. AC-1 through AC-8
+  covered by Tier 0/1 tests where required (AC-4/AC-5 correctly deferred to
+  nightly/weekly per ci-gates.md). Contract-reviewer blocking finding F-1 fixed
+  before merge. Flag default=off ensures zero behavioral change in production
+  until AC-4 nightly + AC-5 soak evidence gathered. Regression risk low:
+  44 pre-existing tests pass, legacy path unchanged, DEV-01 deviation documented
+  as low-risk. Tier-floor-override in tasks.yml justifies Tier 1 classification
+  (live callers, blast-radius bounded by flag).

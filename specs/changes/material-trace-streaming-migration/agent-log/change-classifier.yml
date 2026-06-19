@@ -1,0 +1,16 @@
+agent: change-classifier
+status: complete
+model: opus
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: classification, pointer: "specs/changes/material-trace-streaming-migration/change-classification.md" }
+  - { type: context-manifest, pointer: "specs/changes/material-trace-streaming-migration/context-manifest.md" }
+
+findings:
+  - tier: 1 (high risk, cross-module; flag-default-off bounds blast radius)
+  - open-question: whether material-trace has cross-lot aggregation requiring requires_cross_chunk_reduction=True — must be resolved by spec-architect
+  - CER-001: approved (spec-architect needs material_trace_service.py, global_concurrency.py, base_chunked_duckdb_job.py, query-dataflow-unification.md)
+  - stress-soak-report.md required: peak-heap non-linearity claim (AC-5) needs durable evidence
+  - design.md required: Architecture Review = yes; ADR-0003/0009 pattern
+  - tasks skipped: 2.2 (CSS), 4.2 (frontend), 5.1 (UI/UX), 5.2 (visual) — no UI surface

@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.21.0
+schema-version: 1.22.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1191,7 +1191,26 @@ Any future column rename, addition, or removal in either namespace **must** bump
 
 ---
 
+### §3.20 Material Trace Spool Schema — UNCHANGED Assertion (P4 Migration)
+
+**Change: material-trace-streaming-migration (P4 BaseChunkedDuckDBJob migration)**
+
+The `material_trace` spool parquet schema is **explicitly unchanged** by this migration. The unified `MaterialTraceJob` streaming path writes the identical column set as the legacy `_execute_batched_query` + `pd.concat` path. This is a non-goal verified by AC-4 parity tests.
+
+`material_trace` spool columns (13, both legacy and unified paths):
+`CONTAINERNAME`, `PJ_WORKORDER`, `WORKCENTER_GROUP`, `WORKCENTERNAME`, `MATERIALPARTNAME`, `MATERIALLOTNAME`, `VENDORLOTNUMBER`, `QTYREQUIRED`, `QTYCONSUMED`, `EQUIPMENTNAME`, `TXNDATE`, `PRIMARY_CATEGORY`, `SECONDARY_CATEGORY`.
+
+The unified path uses `_EXPORT_COLS` in `material_trace_duckdb_runtime.py`; the legacy path uses `_CSV_COLUMNS.keys()` in `material_trace_service.py`. Both lists contain the same 13 columns in the same order (confirmed by AC-4 set-equality test). No `_SCHEMA_VERSION` bump required; no parquet cleanup on deploy/rollback.
+
+Any future column rename, addition, or removal **must** bump `_SCHEMA_VERSION` (or equivalent) and require parquet cleanup per the standard breaking-change policy.
+
+---
+
 ## CHANGELOG
+
+## [data 1.22.0] — 2026-06-19
+### Added
+- material-trace-streaming-migration: §3.20 (spool-schema-UNCHANGED assertion for `material_trace` namespace). Explicit non-goal: P4 migration does not change spool parquet schema. 13-column set identical between legacy and unified paths (AC-4). No parquet cleanup required on deploy/rollback. Additive; no existing schemas changed.
 
 ## [data 1.21.0] — 2026-06-19
 ### Added

@@ -1,0 +1,19 @@
+agent: implementation-planner
+status: complete
+model: opus
+timestamp: 2026-06-19
+
+artifacts:
+  - { type: implementation-plan, pointer: "specs/changes/material-trace-streaming-migration/implementation-plan.md" }
+  - { type: test-plan, pointer: "specs/changes/material-trace-streaming-migration/test-plan.md" }
+  - { type: ci-gates, pointer: "specs/changes/material-trace-streaming-migration/ci-gates.md" }
+
+findings:
+  - "8 IP steps (IP-1..IP-8) ordered with file-level plan and AC mapping"
+  - "namespace=material_trace must match legacy _mt_spool_id spool namespace"
+  - "dedup-key risk: post_aggregate DISTINCT on exact 4-col key [CONTAINERID, MATERIALLOTNAME, WORKCENTERNAME, TXNDATE]"
+  - "WORKCENTER_GROUP enrichment must happen inside DuckDB stage to match spool column set+order"
+  - "Decimal->float coercion at L302 must be reproduced in Arrow path"
+  - "make_route_query_hash (L800-816) must remain the spool-key function"
+  - "no new workflow files; ci-gate-contract.md additive note needed (IP-8)"
+  - "IP-7 (unit/contract tests) owner: test-strategist"

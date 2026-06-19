@@ -1,0 +1,26 @@
+change-id: material-trace-streaming-migration
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-19T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3, 4" }
+  - { type: gate-promotions, pointer: "n/a (no gate promotions; all new tests fall within existing gate commands)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files changed; additive only)" }
+  - { type: required-status-checks, pointer: "lint, contract-validate, response-shape-validate, unit-mock-integration, e2e-critical" }
+next-action: none
+notes: >
+  All 6 checks PASS. ci-gates.md is complete and compliant.
+  Required section headers present (workflow L24, promotion policy L34, rollback policy L39).
+  Gate table covers all change-relevant Tier 0/1 gates (lint T0, contract-validate T0,
+  response-shape-validate T1, unit-mock-integration T1, e2e-critical T1 conditional).
+  Nightly/weekly deferred gates listed (nightly-integration T3, stress-load T4, soak T4).
+  Rollback policy is detailed (4-step, restart rationale, no-spool-cleanup rationale, orphan cleanup).
+  Promotion policy references AC-4/AC-5 evidence gate for flag promotion to on.
+  ci-gate-contract.md additive note at L526-549; schema-version bumped to 1.3.29; CHANGELOG L553-555.
+  No existing gate inventory rows modified.
+  Cross-reference in ci-gates.md Notes (resource-history-migration L502-524) verified accurate.
+files-read:
+  - specs/changes/material-trace-streaming-migration/context-manifest.md
+  - specs/changes/material-trace-streaming-migration/ci-gates.md
+  - specs/changes/material-trace-streaming-migration/change-classification.md
+  - contracts/ci/ci-gate-contract.md

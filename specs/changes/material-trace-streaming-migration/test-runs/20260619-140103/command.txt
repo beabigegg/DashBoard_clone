@@ -1,0 +1,1 @@
+pytest tests/test_material_trace_service.py tests/test_material_trace_duckdb_runtime.py tests/test_material_trace_unified_job.py tests/contract/test_env_material_trace_flag.py -v --tb=short 2>&1 | tail -30

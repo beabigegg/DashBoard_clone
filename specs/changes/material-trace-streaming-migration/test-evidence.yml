@@ -1,0 +1,30 @@
+change-id: material-trace-streaming-migration
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: pytest --collect-only -q tests/ 2>&1 | tail -5
+    summary: specs/changes/material-trace-streaming-migration/test-runs/20260619-140111/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      pytest tests/test_material_trace_service.py tests/test_material_trace_duckdb_runtime.py
+      tests/test_material_trace_unified_job.py tests/contract/test_env_material_trace_flag.py -v --tb=short 2>&1 | tail
+      -30
+    summary: specs/changes/material-trace-streaming-migration/test-runs/20260619-140103/summary.json
+  - phase: targeted
+    status: passed
+    command: >-
+      pytest tests/test_material_trace_unified_job.py tests/contract/test_env_material_trace_flag.py -v --tb=short 2>&1
+      | tail -60
+    summary: specs/changes/material-trace-streaming-migration/test-runs/20260619-140056/summary.json
+  - phase: contract
+    status: passed
+    command: cdd-kit validate --contracts 2>&1
+    summary: specs/changes/material-trace-streaming-migration/test-runs/20260619-140120/summary.json
+final-status: passed

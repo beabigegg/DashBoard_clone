@@ -1,6 +1,6 @@
-# generated: 2026-06-19T04:36:44Z by cdd-kit 3.3.0
-# files: 916, src-lines: 266182, map-lines: 19966, compression: 13.3x
-# sources-digest: 882bd3ea3642a84eb8648dd84c3db98e69c59aacf4c72a9477f9a9356483bfc6
+# generated: 2026-06-19T06:23:18Z by cdd-kit 3.3.0
+# files: 919, src-lines: 268489, map-lines: 20141, compression: 13.3x
+# sources-digest: 86cf19ee80efcb21d11d742024e7d6c797d4d3ecce02a849f267b58fc0162780
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -5128,27 +5128,30 @@ src/mes_dashboard/routes/material_consumption_routes.py:  # 277 lines
     - { name: get_job_status, lines: 241-249 }  # @material_consumption_bp.route('/detail/job/<job_id>', methods=['GET'])
     - { name: export_csv, lines: 254-277 }  # @material_consumption_bp.route('/export', methods=['POST'])
 
-src/mes_dashboard/routes/material_trace_routes.py:  # 273 lines
+src/mes_dashboard/routes/material_trace_routes.py:  # 332 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
-    - { module: uuid, items: [], line: 7 }
-    - { module: flask, items: [Blueprint, Response, stream_with_context], line: 9 }
-    - { module: mes_dashboard.core.heavy_query_telemetry, items: [record_memory_error], line: 11 }
-    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 12 }
-    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 13 }
-    - { module: mes_dashboard.core.response, items: [SERVICE_UNAVAILABLE, error_response, internal_error, not_found_error, service_unavailable_error, success_response, validation_error], line: 14 }
-    - { module: mes_dashboard.services.container_resolution_policy, items: [validate_resolution_request], line: 23 }
-    - { module: mes_dashboard.services.filter_cache, items: [get_workcenter_groups], line: 26 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job, get_job_status], line: 27 }
-    - { module: mes_dashboard.services.material_trace_duckdb_runtime, items: [MaterialTraceDuckdbRuntime], line: 28 }
-    - { module: mes_dashboard.services.material_trace_service, items: [MATERIAL_TRACE_QUEUE, make_route_query_hash, rq_material_trace_job], line: 29 }
+    - { module: os, items: [], line: 7 }
+    - { module: uuid, items: [], line: 8 }
+    - { module: flask, items: [Blueprint, Response, stream_with_context], line: 10 }
+    - { module: mes_dashboard.core.heavy_query_telemetry, items: [record_memory_error], line: 12 }
+    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 13 }
+    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 14 }
+    - { module: mes_dashboard.core.response, items: [SERVICE_UNAVAILABLE, error_response, internal_error, not_found_error, service_unavailable_error, success_response, validation_error], line: 15 }
+    - { module: mes_dashboard.services.container_resolution_policy, items: [validate_resolution_request], line: 24 }
+    - { module: mes_dashboard.services.filter_cache, items: [get_workcenter_groups], line: 27 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job, get_job_status], line: 28 }
+    - { module: mes_dashboard.services.material_trace_duckdb_runtime, items: [MaterialTraceDuckdbRuntime], line: 29 }
+    - { module: mes_dashboard.services.material_trace_service, items: [MATERIAL_TRACE_QUEUE, make_route_query_hash, rq_material_trace_job], line: 30 }
+  constants:
+    - { name: MATERIAL_TRACE_USE_UNIFIED_JOB, line: 52 }
   functions:
-    - { name: _validate_query_params, lines: 74-115 }
-    - { name: api_material_trace_query, lines: 125-199 }  # @material_trace_bp.route('/api/material-trace/query', methods=['POST'])
-    - { name: api_material_trace_job_status, lines: 204-209 }  # @material_trace_bp.route('/api/material-trace/job/<job_id>', methods=['GET'])
-    - { name: api_material_trace_export, lines: 214-261 }  # @material_trace_bp.route('/api/material-trace/export', methods=['POST'])
-    - { name: api_material_trace_filter_options, lines: 265-273 }  # @material_trace_bp.route('/api/material-trace/filter-options', methods=['GET'])
+    - { name: _validate_query_params, lines: 81-122 }
+    - { name: api_material_trace_query, lines: 132-258 }  # @material_trace_bp.route('/api/material-trace/query', methods=['POST'])
+    - { name: api_material_trace_job_status, lines: 263-268 }  # @material_trace_bp.route('/api/material-trace/job/<job_id>', methods=['GET'])
+    - { name: api_material_trace_export, lines: 273-320 }  # @material_trace_bp.route('/api/material-trace/export', methods=['POST'])
+    - { name: api_material_trace_filter_options, lines: 324-332 }  # @material_trace_bp.route('/api/material-trace/filter-options', methods=['GET'])
 
 src/mes_dashboard/routes/mid_section_defect_routes.py:  # 287 lines
   imports:
@@ -6493,25 +6496,33 @@ src/mes_dashboard/services/material_consumption_service.py:  # 697 lines
     - { name: enqueue_job, lines: 649-651 }
     - { name: start_parts_cache_warmup, lines: 654-685 }
 
-src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 175 lines
+src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 503 lines
   imports:
-    - { module: __future__, items: [annotations], line: 8 }
-    - { module: csv, items: [], line: 10 }
-    - { module: io, items: [], line: 11 }
-    - { module: logging, items: [], line: 12 }
-    - { module: pathlib, items: [Path], line: 13 }
-    - { module: typing, items: [Any, Dict, Generator, Optional], line: 14 }
+    - { module: __future__, items: [annotations], line: 11 }
+    - { module: csv, items: [], line: 13 }
+    - { module: io, items: [], line: 14 }
+    - { module: logging, items: [], line: 15 }
+    - { module: pathlib, items: [Path], line: 16 }
+    - { module: typing, items: [Any, Dict, Generator, List, Optional], line: 17 }
   classes:
     - name: MaterialTraceDuckdbRuntime
-      lines: 44-175
+      lines: 47-178
       methods:
-        - { name: __init__, lines: 47-50 }
-        - { name: _resolve_path, lines: 52-57 }
-        - { name: is_available, lines: 59-68 }
-        - { name: get_page, lines: 70-125 }
-        - { name: export_csv, lines: 127-175 }
+        - { name: __init__, lines: 50-53 }
+        - { name: _resolve_path, lines: 55-60 }
+        - { name: is_available, lines: 62-71 }
+        - { name: get_page, lines: 73-128 }
+        - { name: export_csv, lines: 130-178 }
+    - name: MaterialTraceJob
+      lines: 185-503
+      methods:
+        - { name: __init__, lines: 212-221 }
+        - { name: pre_query, lines: 223-284 }
+        - { name: build_chunk_sql, lines: 286-317 }
+        - { name: post_aggregate, lines: 319-444 }
+        - { name: run, lines: 446-503 }
 
-src/mes_dashboard/services/material_trace_service.py:  # 957 lines
+src/mes_dashboard/services/material_trace_service.py:  # 1015 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: csv, items: [], line: 6 }
@@ -6564,6 +6575,7 @@ src/mes_dashboard/services/material_trace_service.py:  # 957 lines
     - { name: make_route_query_hash, lines: 800-816 }
     - { name: execute_to_spool, lines: 819-916 }
     - { name: rq_material_trace_job, lines: 919-945 }
+    - { name: execute_material_trace_unified_job, lines: 964-1007 }
 
 src/mes_dashboard/services/mid_section_defect_service.py:  # 3164 lines
   imports:
@@ -8375,6 +8387,33 @@ tests/contract/test_env_duckdb_job_dir.py:  # 100 lines
         - { name: test_duckdb_job_dir_default_value_matches_design, lines: 86-94 }
         - { name: test_duckdb_job_dir_schema_has_description, lines: 96-100 }
 
+tests/contract/test_env_material_trace_flag.py:  # 119 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: json, items: [], line: 14 }
+    - { module: pathlib, items: [Path], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  classes:
+    - name: TestMaterialTraceFlagInEnvContract
+      lines: 28-48
+      methods:
+        - { name: test_flag_in_env_contract_md, lines: 31-36 }
+        - { name: test_flag_documented_with_default_off_in_contract_md, lines: 38-48 }
+    - name: TestMaterialTraceFlagInEnvExample
+      lines: 51-75
+      methods:
+        - { name: test_flag_in_env_example_template, lines: 54-59 }
+        - { name: test_flag_example_default_is_off, lines: 61-75 }
+    - name: TestMaterialTraceFlagInEnvSchema
+      lines: 78-119
+      methods:
+        - { name: _schema, lines: 81-82 }
+        - { name: test_flag_default_off_pinned, lines: 84-91 }
+        - { name: test_flag_schema_has_enum, lines: 93-98 }
+        - { name: test_flag_schema_enum_contains_off_and_on, lines: 100-105 }
+        - { name: test_flag_schema_type_is_string, lines: 107-112 }
+        - { name: test_flag_schema_has_description, lines: 114-119 }
+
 tests/contract/test_gate_wiring.py:  # 50 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
@@ -8860,7 +8899,7 @@ tests/e2e/test_job_query_e2e.py:  # 143 lines
       methods:
         - { name: test_job_query_page_restores_url_and_runs_query, lines: 110-143 }
 
-tests/e2e/test_material_trace_e2e.py:  # 180 lines
+tests/e2e/test_material_trace_e2e.py:  # 182 lines
   imports:
     - { module: time, items: [], line: 11 }
     - { module: pytest, items: [], line: 13 }
@@ -8878,9 +8917,9 @@ tests/e2e/test_material_trace_e2e.py:  # 180 lines
         - { name: test_query_rejects_too_many_values, lines: 83-90 }
         - { name: test_query_with_valid_params_succeeds, lines: 92-139 }
     - name: TestMaterialTraceBrowserE2E
-      lines: 143-180
+      lines: 145-182
       methods:
-        - { name: test_material_trace_page_executes_forward_query, lines: 146-180 }
+        - { name: test_material_trace_page_executes_forward_query, lines: 148-182 }
   functions:
     - { name: _poll_material_trace_until_ready, lines: 20-42 }
 
@@ -9800,6 +9839,48 @@ tests/integration/test_hold_history_rq_async.py:  # 470 lines
     - { name: _reset_registry, lines: 36-39 }
     - { name: _reload_hold_job_service, lines: 42-46 }
 
+tests/integration/test_material_trace_rq_async.py:  # 874 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 23 }
+    - { module: os, items: [], line: 25 }
+    - { module: pathlib, items: [], line: 26 }
+    - { module: shutil, items: [], line: 27 }
+    - { module: tempfile, items: [], line: 28 }
+    - { module: uuid, items: [], line: 29 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 30 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 31 }
+    - { module: pyarrow, items: [], line: 33 }
+    - { module: pyarrow.parquet, items: [], line: 34 }
+    - { module: pytest, items: [], line: 35 }
+  classes:
+    - name: TestOracleFaultMidStream
+      lines: 98-342
+      methods:
+        - { name: test_oracle_fault_job_status_failed, lines: 108-193 }
+        - { name: test_oracle_fault_no_orphan_chunk_parquets, lines: 195-273 }
+        - { name: test_oracle_fault_no_spool_registration, lines: 275-342 }
+    - name: TestRedisUnavailableReturns503
+      lines: 349-499
+      methods:
+        - { name: test_redis_unavailable_returns_503, lines: 358-406 }
+        - { name: test_redis_unavailable_no_legacy_fallback, lines: 408-451 }
+        - { name: test_flag_on_async_available_enqueues_returns_202, lines: 453-499 }
+    - name: TestLargeIDListDecomposition
+      lines: 506-749
+      methods:
+        - { name: test_2500_ids_decompose_into_3_batches, lines: 518-557 }
+        - { name: test_2500_ids_merged_no_duplicates_real_duckdb, lines: 559-672 }
+        - { name: test_duplicate_input_ids_produce_no_extra_rows, lines: 674-749 }
+    - name: TestFlagOffLegacyPathSmoke
+      lines: 755-873
+      methods:
+        - { name: test_flag_off_validation_path_returns_400, lines: 763-783 }
+        - { name: test_flag_off_enqueues_legacy_job_returns_202, lines: 785-832 }
+        - { name: test_flag_off_enqueue_exception_returns_503_no_partial, lines: 834-873 }
+  functions:
+    - { name: _make_app, lines: 44-46 }
+    - { name: _make_arrow_batch, lines: 70-91 }
+
 tests/integration/test_multi_worker_concurrency.py:  # 620 lines
   imports:
     - { module: __future__, items: [annotations], line: 22 }
@@ -10703,7 +10784,7 @@ tests/stress/test_async_job_stress.py:  # 311 lines
     - { name: _production_history_payload, lines: 34-47 }
     - { name: _yield_alert_payload, lines: 50-52 }
 
-tests/stress/test_chunk_boundary.py:  # 395 lines
+tests/stress/test_chunk_boundary.py:  # 485 lines
   imports:
     - { module: os, items: [], line: 16 }
     - { module: time, items: [], line: 17 }
@@ -10750,6 +10831,12 @@ tests/stress/test_chunk_boundary.py:  # 395 lines
         - { name: test_production_history_tie_stable_across_chunks, lines: 367-375 }
         - { name: test_reject_dataset_tie_stable, lines: 377-385 }
         - { name: test_hold_dataset_tie_stable, lines: 387-395 }
+    - name: TestMaterialTrace1000IdBoundary
+      lines: 412-485
+      methods:
+        - { name: _decompose_by_ids, lines: 425-436 }
+        - { name: test_material_trace_1000_id_boundary, lines: 446-477 }
+        - { name: test_material_trace_empty_id_list_produces_one_batch, lines: 479-485 }
   functions:
     - { name: _post, lines: 31-47 }
     - { name: _get, lines: 50-61 }
@@ -11049,26 +11136,54 @@ tests/stress/test_material_consumption_stress.py:  # 92 lines
     - { name: test_summary_aggregate_large_table_under_5s, lines: 43-60 }  # @pytest.mark.stress
     - { name: test_concurrent_granularity_switches_cache_only, lines: 64-92 }  # @pytest.mark.stress
 
-tests/stress/test_material_trace_stress.py:  # 118 lines
+tests/stress/test_material_trace_stress.py:  # 429 lines
   imports:
-    - { module: __future__, items: [annotations], line: 8 }
-    - { module: concurrent.futures, items: [], line: 10 }
-    - { module: os, items: [], line: 11 }
-    - { module: time, items: [], line: 12 }
-    - { module: pytest, items: [], line: 14 }
-    - { module: requests, items: [], line: 15 }
-    - { module: tests.stress.conftest, items: [StressTestResult], line: 17 }
+    - { module: __future__, items: [annotations], line: 26 }
+    - { module: concurrent.futures, items: [], line: 28 }
+    - { module: os, items: [], line: 29 }
+    - { module: tempfile, items: [], line: 30 }
+    - { module: threading, items: [], line: 31 }
+    - { module: time, items: [], line: 32 }
+    - { module: tracemalloc, items: [], line: 33 }
+    - { module: pathlib, items: [Path], line: 34 }
+    - { module: typing, items: [List, Tuple], line: 35 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 36 }
+    - { module: pyarrow, items: [], line: 38 }
+    - { module: pyarrow.parquet, items: [], line: 39 }
+    - { module: pytest, items: [], line: 40 }
+    - { module: requests, items: [], line: 41 }
+    - { module: tests.stress.conftest, items: [StressTestResult], line: 43 }
   classes:
     - name: TestMaterialTraceQueryStress
-      lines: 22-71
+      lines: 48-97
       methods:
-        - { name: _run_query, lines: 26-46 }
-        - { name: test_concurrent_queries_success_rate, lines: 48-71 }
+        - { name: _run_query, lines: 52-72 }
+        - { name: test_concurrent_queries_success_rate, lines: 74-97 }
     - name: TestMaterialTracePaginationStress
-      lines: 76-118
+      lines: 102-144
       methods:
-        - { name: _run_page, lines: 80-95 }
-        - { name: test_pagination_under_load, lines: 97-118 }
+        - { name: _run_page, lines: 106-121 }
+        - { name: test_pagination_under_load, lines: 123-144 }
+    - name: _InProcessSemaphoreCap
+      lines: 164-195
+      methods:
+        - { name: __init__, lines: 172-179 }
+        - { name: acquire, lines: 181-190 }
+        - { name: release, lines: 192-195 }
+    - name: TestRQToOracleConcurrencyCap
+      lines: 199-274
+      methods:
+        - { name: _worker, lines: 213-243 }
+        - { name: test_rq_to_oracle_concurrency_cap, lines: 245-274 }
+    - name: TestPeakHeapSublinearAcrossChunkSizes
+      lines: 359-429
+      methods:
+        - { name: test_peak_heap_sublinear_across_chunk_sizes, lines: 375-401 }
+        - { name: test_peak_heap_intermediate_chunk_count, lines: 403-429 }
+  functions:
+    - { name: _make_mock_oracle_batch, lines: 304-328 }
+    - { name: _materialize_chunks_via_duckdb, lines: 331-343 }
+    - { name: _measure_peak_heap_kb, lines: 346-354 }
 
 tests/stress/test_mid_section_defect_stress.py:  # 117 lines
   imports:
@@ -15324,6 +15439,66 @@ tests/test_material_trace_service.py:  # 664 lines
   functions:
     - { name: _make_material_df, lines: 46-64 }
     - { name: _make_resolve_df, lines: 67-72 }
+
+tests/test_material_trace_unified_job.py:  # 466 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: ast, items: [], line: 14 }
+    - { module: importlib, items: [], line: 15 }
+    - { module: json, items: [], line: 16 }
+    - { module: pathlib, items: [Path], line: 17 }
+    - { module: typing, items: [Any], line: 18 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 19 }
+    - { module: pytest, items: [], line: 21 }
+    - { module: mes_dashboard, items: [create_app], line: 23 }
+    - { module: mes_dashboard.core.cache, items: [NoOpCache], line: 24 }
+    - { module: mes_dashboard.core.rate_limit, items: [reset_rate_limits_for_tests], line: 25 }
+  classes:
+    - name: TestFlagOffLegacyPath
+      lines: 87-140
+      methods:
+        - { name: test_flag_off_uses_legacy_concat_path, lines: 90-114 }
+        - { name: test_flag_off_unified_job_not_enqueued, lines: 116-140 }
+    - name: TestFlagOnUnifiedPath
+      lines: 147-216
+      methods:
+        - { name: test_flag_on_enqueues_unified_job, lines: 150-187 }
+        - { name: test_flag_on_response_contains_job_id_and_status_url, lines: 189-216 }
+    - name: TestFlagOnNoRqReturns503
+      lines: 223-283
+      methods:
+        - { name: test_flag_on_no_rq_returns_503_no_fallback, lines: 226-259 }
+        - { name: test_flag_on_no_rq_retry_after_header_present, lines: 261-283 }
+    - name: TestSpoolSchemaEquivalence
+      lines: 290-312
+      methods:
+        - { name: test_spool_schema_equivalent_flag_off_vs_on, lines: 293-305 }
+        - { name: test_spool_namespace_matches_legacy, lines: 307-312 }
+    - name: TestNoMemoryGuardOnUnifiedPath
+      lines: 319-346
+      methods:
+        - { name: test_no_memory_guard_call_on_unified_path_ast, lines: 322-346 }
+    - name: TestIdListDecomposition
+      lines: 353-423
+      methods:
+        - { name: _make_job, lines: 356-378 }
+        - { name: test_id_list_decomposes_1000_per_batch, lines: 380-387 }
+        - { name: test_each_batch_has_at_most_1000_ids, lines: 389-398 }
+        - { name: test_batch_size_boundary_exactly_1000, lines: 400-405 }
+        - { name: test_batch_size_1001_splits_into_two, lines: 407-415 }
+        - { name: test_material_lot_mode_also_decomposes_at_1000, lines: 417-423 }
+    - name: TestFlagDefaultOff
+      lines: 430-466
+      methods:
+        - { name: test_flag_constant_defaults_off, lines: 433-444 }
+        - { name: test_flag_off_string_resolves_false, lines: 446-455 }
+        - { name: test_flag_on_string_resolves_true, lines: 457-466 }
+  functions:
+    - { name: app, lines: 33-38 }  # @pytest.fixture
+    - { name: client, lines: 42-43 }  # @pytest.fixture
+    - { name: _reset_rate_limits, lines: 47-50 }  # @pytest.fixture(autouse=True)
+    - { name: _post_query, lines: 57-64 }
+    - { name: _patch_spool_miss, lines: 71-80 }
 
 tests/test_merge_chunks_properties.py:  # 348 lines
   imports:

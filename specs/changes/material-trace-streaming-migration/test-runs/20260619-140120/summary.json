@@ -1,0 +1,15 @@
+{
+  "change_id": "material-trace-streaming-migration",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts 2>&1",
+  "duration_ms": 1447,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/material-trace-streaming-migration/test-runs/20260619-140120/summary.json",
+    "stdout": "specs/changes/material-trace-streaming-migration/test-runs/20260619-140120/stdout.log",
+    "stderr": "specs/changes/material-trace-streaming-migration/test-runs/20260619-140120/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

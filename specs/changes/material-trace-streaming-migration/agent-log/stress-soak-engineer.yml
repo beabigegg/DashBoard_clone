@@ -1,0 +1,35 @@
+agent: stress-soak-engineer
+change-id: material-trace-streaming-migration
+date: 2026-06-19
+status: complete
+
+summary: |
+  Reviewed existing stress files; both lacked coverage for concurrency cap and
+  1000-ID material-trace boundary.  Extended test_material_trace_stress.py with
+  S-1 (semaphore cap, in-process mock) and S-2 (AC-5 tracemalloc heap scaffold).
+  Added TestMaterialTrace1000IdBoundary to test_chunk_boundary.py with 7 parametrized
+  probes at 999/1000/1001/2000/2001/5000/empty.  All 10 new tests pass under --run-stress.
+  Pre-merge baseline (8 non-stress tests) unchanged at 8 passed.
+  stress-soak-report.md written per change-classification.md requirement.
+
+gaps-found:
+  - test_material_trace_stress.py had no concurrency-cap test (S-1 gap)
+  - test_material_trace_stress.py had no heap measurement for AC-5 (S-2 gap)
+  - test_chunk_boundary.py had no material-trace-specific 1000-ID boundary test;
+    only reject-history endpoints were probed (ID batch probes at L258-274)
+  - test-plan.md references test_chunk_boundary.py::test_material_trace_1000_id_boundary
+    (AC-8) which did not exist; now added as TestMaterialTrace1000IdBoundary
+
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_material_trace_stress.py" }
+  - { type: runner-config-path, pointer: "tests/stress/test_chunk_boundary.py" }
+  - { type: runner, pointer: "pytest (--run-stress flag, weekly Tier-4 gate)" }
+  - { type: pass-criteria-cited, pointer: "peak_concurrent<=3; peak(N=5)/peak(N=1)<1.5; all 5 workers complete; all batches <=1000 IDs" }
+  - { type: artifacts-location, pointer: "specs/changes/material-trace-streaming-migration/stress-soak-report.md" }
+
+deferred:
+  - Full 10-minute soak (test_soak_workload.py::test_material_trace_peak_heap_nonlinear)
+    requires MATERIAL_TRACE_USE_UNIFIED_JOB=on in production-equivalent env.
+    Deferred to weekly gate after flag promotion (ci-gates.md soak tier 4).
+  - Tier-3 AC-4 parity (spool schema equivalence flag-off vs flag-on) deferred to nightly.
+  - Production RSS leak measurement (< 2%/24h) deferred to full soak run.

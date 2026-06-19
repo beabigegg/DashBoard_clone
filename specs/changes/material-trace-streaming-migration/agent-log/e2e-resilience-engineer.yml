@@ -1,0 +1,56 @@
+agent: e2e-resilience-engineer
+change-id: material-trace-streaming-migration
+date: 2026-06-19
+status: complete
+
+summary: |
+  Reviewed test_material_trace_e2e.py (pre-existing) and wrote new resilience
+  integration tests in test_material_trace_rq_async.py.  The e2e file had no
+  flag-off smoke tests; the new integration file covers all three required
+  resilience scenarios (R-1, R-2, R-3) plus flag-off AC-1 smoke.
+
+gap-analysis:
+  - test_material_trace_e2e.py had no flag=off smoke test (gap confirmed).
+  - No file existed at tests/integration/test_material_trace_rq_async.py (gap confirmed).
+  - Flag-off smoke tests added to tests/integration/test_material_trace_rq_async.py
+    (not tests/e2e/) because all files in tests/e2e/ inherit the "e2e" directory
+    keyword and are skipped by conftest without --run-e2e, making integration-marked
+    tests in that directory unreachable with --run-integration alone.
+
+decisions:
+  - R-1 Oracle fault: monkeypatched OracleArrowReader.chunk_iter to raise after one
+    batch. execute_material_trace_unified_job catches all exceptions and calls
+    complete_job(error=), so the test asserts on error_calls rather than expecting
+    an exception to propagate.
+  - R-2 Redis check: is_async_available() is a local import inside the route
+    function.  Patched at service module level
+    (mes_dashboard.services.async_query_job_service.is_async_available) which is
+    the canonical location; the route imports from that module at call time.
+  - R-3 large IDs: DuckDB operations run against real temp files (tmp_path).
+    Oracle is mocked at OracleArrowReader.chunk_iter. Tests verify batch count,
+    spool rowcount, CONTAINERID uniqueness, and chunk-dir cleanup.
+  - Flag-off smoke: three tests verify AC-1 (validation returns 400, legacy
+    enqueue_job called with queue_name/worker_fn, enqueue exception → 503).
+    Uses monkeypatch.setattr on the module-level constant per test-discipline rule.
+
+run-results:
+  - 12 integration tests PASSED with --run-integration (0 failures, 0 errors)
+  - Specified task command (pytest -m "not integration and not e2e") → 0 selected,
+    0 failures (correct: all tests carry integration or e2e marks)
+
+artifacts:
+  - type: test-files
+    pointer: "tests/integration/test_material_trace_rq_async.py"
+  - type: test-files
+    pointer: "tests/e2e/test_material_trace_e2e.py (pre-existing; no new tests added — flag-off smoke moved to integration file)"
+  - type: scenarios-covered
+    pointer: >
+      R-1 Oracle fault mid-stream (job FAILED status, no orphan chunks, no spool registration);
+      R-2 Redis unavailable flag=on (503, no enqueue, no legacy fallback, positive control 202);
+      R-3 2500-ID decomposition (3 batches, 1000/1000/500, no duplicates in DuckDB merge,
+          chunk cleanup, spool registration);
+      Flag-off smoke AC-1 (validation 400, legacy enqueue_job 202, enqueue exception 503)
+  - type: mutation-checks
+    pointer: "n/a (mutation tooling not configured; assertions use per-kwarg call_args inspection per test-discipline rule)"
+  - type: trace-artifacts
+    pointer: "n/a (integration tests; no GunicornHarness subprocess; no browser traces)"

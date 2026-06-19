@@ -1,1 +1,0 @@
-pytest -m 'not (e2e or integration_real or stress or load or soak or multi_worker)' --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual -x -q 2>&1 | tail -30

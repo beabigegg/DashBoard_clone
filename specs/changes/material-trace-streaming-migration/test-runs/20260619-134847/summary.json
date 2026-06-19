@@ -1,0 +1,16 @@
+{
+  "change_id": "material-trace-streaming-migration",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest --collect-only -q tests/ --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/material-trace-streaming-migration/test-runs/20260619-134847/junit.xml' --maxfail=1 --tb=short -ra",
+  "duration_ms": 3464,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/material-trace-streaming-migration/test-runs/20260619-134847/summary.json",
+    "stdout": "specs/changes/material-trace-streaming-migration/test-runs/20260619-134847/stdout.log",
+    "stderr": "specs/changes/material-trace-streaming-migration/test-runs/20260619-134847/stderr.log",
+    "junit": "specs/changes/material-trace-streaming-migration/test-runs/20260619-134847/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

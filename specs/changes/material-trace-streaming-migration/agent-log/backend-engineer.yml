@@ -1,0 +1,65 @@
+agent: backend-engineer
+change-id: material-trace-streaming-migration
+date: 2026-06-19
+status: complete
+
+summary: |
+  Implemented all IP-1 through IP-6 and IP-8 steps for material-trace-streaming-migration
+  (P4 migration). Added MATERIAL_TRACE_USE_UNIFIED_JOB feature flag (default off) with
+  full contract coverage, new MaterialTraceJob class, RQ entry function, route dispatch,
+  and contract CHANGELOG/gate-compatibility notes. All existing tests pass (44/44); ruff
+  and contract validation clean.
+
+artifacts:
+  - type: files-changed
+    pointer: "contracts/env/env-contract.md (schema-version 1.0.17 → 1.0.18, added MATERIAL_TRACE_USE_UNIFIED_JOB row + bullet)"
+  - type: files-changed
+    pointer: "contracts/env/env.schema.json (added MATERIAL_TRACE_USE_UNIFIED_JOB property with enum+default)"
+  - type: files-changed
+    pointer: "contracts/env/.env.example.template (added MATERIAL_TRACE_USE_UNIFIED_JOB=off)"
+  - type: files-changed
+    pointer: "contracts/business/business-rules.md (schema-version 1.25.0 → 1.26.0, ASYNC-10 + ASYNC-11 + 3 decision table rows)"
+  - type: files-changed
+    pointer: "contracts/CHANGELOG.md (entries: ci 1.3.29, env 1.0.18, business 1.26.0)"
+  - type: files-changed
+    pointer: "contracts/ci/ci-gate-contract.md (schema-version 1.3.28 → 1.3.29, material-trace-streaming-migration gate-compat note)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/material_trace_duckdb_runtime.py (added MaterialTraceJob class: pre_query/build_chunk_sql/post_aggregate/run, IP-3/IP-6)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/material_trace_service.py (added execute_material_trace_unified_job + register_job_type('material-trace-unified'), IP-4)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/material_trace_routes.py (added os import + MATERIAL_TRACE_USE_UNIFIED_JOB constant + flag-branch dispatch in api_material_trace_query, IP-5)"
+  - type: tests-added
+    pointer: "n/a (test files tests/test_material_trace_unified_job.py and tests/contract/test_env_material_trace_flag.py are owned by test-strategist per IP-7; existing 44 tests all pass)"
+  - type: test-output
+    pointer: "44 passed in 0.46s (tests/test_material_trace_service.py + tests/test_material_trace_duckdb_runtime.py)"
+  - type: contracts-touched
+    pointer: "contracts/env/env-contract.md, contracts/env/env.schema.json, contracts/env/.env.example.template, contracts/business/business-rules.md, contracts/CHANGELOG.md, contracts/ci/ci-gate-contract.md"
+
+deviations:
+  - id: DEV-01
+    step: IP-3
+    description: >
+      MaterialTraceJob is NOT a true BaseChunkedDuckDBJob subclass (abstract base class
+      requires concrete pre_query() signature returning None, not QueryPlan). Instead it
+      implements the same streaming pattern with its own run() method that calls
+      pre_query() -> chunked Oracle fetch via OracleArrowReader -> post_aggregate().
+      The interface contract (namespace, chunk_strategy=ID_LIST, requires_cross_chunk_reduction=False,
+      no _check_memory_guard) is preserved. All design.md D1/D2/D3/D4 decisions honored.
+    risk: low — behavior identical, only class hierarchy differs
+
+  - id: DEV-02
+    step: IP-3 build_chunk_sql
+    description: >
+      SQL is built using QueryBuilder.build() (same as legacy _execute_batched_query_to_parquet).
+      The allow_patterns=False branch for lot-mode resolved CONTAINERIDs calls
+      _add_exact_or_pattern_condition with exact IDs (no wildcards) — same semantics as legacy.
+
+known-risks:
+  - The DISTINCT dedup key exactly matches legacy L237-238 [CONTAINERID, MATERIALLOTNAME, WORKCENTERNAME, TXNDATE].
+  - Arrow decimal128→float64 coercion is applied per-batch in run() (pa.types.is_decimal check).
+  - WORKCENTER_GROUP enrichment applied in post_aggregate() via DuckDB LEFT JOIN on mapping dict.
+  - Spool key computed via make_route_query_hash (same as legacy execute_to_spool) — idempotency preserved.
+  - Module-level flag MATERIAL_TRACE_USE_UNIFIED_JOB frozen at import; test with monkeypatch.setattr, not setenv.
+
+next-reviewer: test-strategist (IP-7 — tests/test_material_trace_unified_job.py + tests/contract/test_env_material_trace_flag.py)

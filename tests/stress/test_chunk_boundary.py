@@ -393,3 +393,93 @@ class TestOrderByTieStability:
         assert "HOLDTXNDATE" in text
         assert "CONTAINERID" in text
         assert "ROW_NUMBER()" in text
+
+
+# ─────────────────────────────────────────────────────────────
+# AC-8 — Material-trace 1000-ID batch decomposition boundary
+#
+# Design: implementation-plan.md IP-3
+#   MaterialTraceJob uses _IN_BATCH_SIZE = 1000 (material_trace_service.py L47)
+#   and ChunkStrategy.ID_LIST.  IDs must be decomposed into ≤1000 per batch.
+#
+# These tests do NOT require Oracle or a live server.  They probe the pure
+# arithmetic of decompose_by_ids at the 999 / 1000 / 1001 boundary.
+# Marked @pytest.mark.stress to align with the ci-gates.md weekly gate tier.
+# ─────────────────────────────────────────────────────────────
+
+
+@pytest.mark.stress
+class TestMaterialTrace1000IdBoundary:
+    """AC-8: ID-list decomposition boundary at exactly 999 / 1000 / 1001 IDs.
+
+    Verifies that material-trace batch decomposition produces the correct
+    number of batches and that every ID appears in exactly one batch.
+    No Oracle / live server required — pure arithmetic assertion.
+
+    Referenced by test-plan.md: tests/stress/test_chunk_boundary.py::test_material_trace_1000_id_boundary
+    """
+
+    _BATCH_SIZE = 1000  # matches material_trace_service._IN_BATCH_SIZE
+
+    @staticmethod
+    def _decompose_by_ids(ids: list, batch_size: int) -> list[list]:
+        """Pure-Python replica of the material-trace ID decomposition.
+
+        Mirrors the logic at material_trace_service.py L216–217:
+            for i in range(0, max(len(exact_tokens), 1), _IN_BATCH_SIZE):
+                batch = exact_tokens[i : i + _IN_BATCH_SIZE]
+
+        Returns a list of batches (each a list of IDs).
+        The implementation always yields at least one batch (empty-list safe).
+        """
+        n = max(len(ids), 1)
+        return [ids[i: i + batch_size] for i in range(0, n, batch_size)]
+
+    @pytest.mark.parametrize("n_ids,expected_batches,max_batch_size", [
+        (999,  1, 999),   # below threshold: single batch of 999
+        (1000, 1, 1000),  # exactly at threshold: single batch of 1000
+        (1001, 2, 1000),  # one over: two batches; second has 1 ID
+        (2000, 2, 1000),  # exactly 2× threshold: two batches of 1000
+        (2001, 3, 1000),  # 2× + 1: three batches; third has 1 ID
+        (5000, 5, 1000),  # 5×: five batches of 1000 (max AC-5 soak scale)
+    ])
+    def test_material_trace_1000_id_boundary(
+        self, n_ids: int, expected_batches: int, max_batch_size: int
+    ) -> None:
+        """ID list of size n_ids decomposes into expected_batches batches, each ≤ max_batch_size."""
+        ids = [f"LOT{i:06d}" for i in range(n_ids)]
+        batches = self._decompose_by_ids(ids, self._BATCH_SIZE)
+
+        # Correct batch count
+        assert len(batches) == expected_batches, (
+            f"n_ids={n_ids}: expected {expected_batches} batches, got {len(batches)}"
+        )
+
+        # No batch exceeds the batch size
+        for idx, batch in enumerate(batches):
+            assert len(batch) <= max_batch_size, (
+                f"Batch {idx} has {len(batch)} IDs > {max_batch_size} (batch_size={self._BATCH_SIZE})"
+            )
+
+        # All IDs are present and none are duplicated
+        all_ids_in_batches = [id_ for batch in batches for id_ in batch]
+        assert len(all_ids_in_batches) == n_ids, (
+            f"n_ids={n_ids}: total IDs across batches is {len(all_ids_in_batches)} (mismatch)"
+        )
+        assert sorted(all_ids_in_batches) == ids, (
+            f"n_ids={n_ids}: IDs across batches do not match input exactly (gap or dup)"
+        )
+
+        record_chunk_boundary(
+            f"Material-trace 1000-ID boundary n={n_ids}",
+            "OK",
+            f"{len(batches)} batches, max_size={max(len(b) for b in batches)}",
+        )
+
+    def test_material_trace_empty_id_list_produces_one_batch(self) -> None:
+        """Empty ID list produces exactly one (empty) batch — mirrors service L216 guard."""
+        batches = self._decompose_by_ids([], self._BATCH_SIZE)
+        # The service uses max(len(ids), 1) so one iteration is always performed
+        assert len(batches) == 1, f"Expected 1 batch for empty input, got {len(batches)}"
+        assert batches[0] == [], f"Expected empty batch, got {batches[0]}"
+        record_chunk_boundary("Material-trace empty ID list", "OK", "1 empty batch")

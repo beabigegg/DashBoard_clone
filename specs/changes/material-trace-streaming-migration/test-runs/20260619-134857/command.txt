@@ -1,0 +1,1 @@
+pytest tests/test_material_trace_service.py -v --tb=short 2>&1 | tail -40

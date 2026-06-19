@@ -1,0 +1,61 @@
+agent: test-strategist
+status: complete
+files-read:
+  - path: specs/changes/material-trace-streaming-migration/context-manifest.md
+    lines: full
+  - path: specs/changes/material-trace-streaming-migration/test-plan.md
+    lines: full
+  - path: specs/changes/material-trace-streaming-migration/implementation-plan.md
+    lines: full
+  - path: .cdd/code-map.yml
+    lines: material_trace_routes (5131-5154), material_trace_service (6525-6579), material_trace_duckdb_runtime (6499-6523)
+  - path: src/mes_dashboard/routes/material_trace_routes.py
+    lines: grep-only (flag constant L52, api_material_trace_query L132-258, lazy import block L164-211)
+  - path: src/mes_dashboard/services/material_trace_duckdb_runtime.py
+    lines: grep-only (MaterialTraceJob class L185-503, pre_query L223-284, _EXPORT_COLS L24)
+  - path: src/mes_dashboard/services/material_trace_service.py
+    lines: grep-only (_CSV_COLUMNS L53, _check_memory_guard L175, _execute_batched_query L191, make_route_query_hash L800)
+  - path: tests/integration/test_eap_alarm_rq_async.py
+    lines: grep-only (monkeypatch pattern, _make_app fixture)
+  - path: tests/integration/test_rowcount_flag_parity.py
+    lines: grep-only (monkeypatch.setattr module-level constant pattern)
+  - path: tests/test_material_trace_routes.py
+    lines: grep-only (fixtures, spool-miss pattern, enqueue_job patch)
+  - path: tests/contract/test_env_duckdb_job_dir.py
+    lines: full (contract test template)
+  - path: contracts/env/env.schema.json
+    lines: MATERIAL_TRACE_USE_UNIFIED_JOB entry (L40-45)
+  - path: contracts/env/env-contract.md
+    lines: L85 (flag row)
+  - path: contracts/env/.env.example.template
+    lines: L37-39 (flag entry)
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/material-trace-streaming-migration/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_material_trace_unified_job.py → src/mes_dashboard/routes/material_trace_routes.py + src/mes_dashboard/services/material_trace_duckdb_runtime.py" }
+  - { type: tdd-pairs, pointer: "tests/contract/test_env_material_trace_flag.py → contracts/env/env.schema.json + contracts/env/env-contract.md + contracts/env/.env.example.template" }
+  - { type: coverage-tiers, pointer: "unit (AC-1/2/3/4/6/8/flag-default), contract (AC-7)" }
+  - { type: mapping-completeness, pointer: "all Tier-1 AC rows covered; AC-5 (soak) and stress deferred to nightly/weekly per test-plan.md" }
+findings: |
+  16 test functions written across 7 classes in tests/test_material_trace_unified_job.py.
+  11 contract assertions written across 3 classes in tests/contract/test_env_material_trace_flag.py.
+
+  Key implementation decisions:
+  1. AC-1/2/3 route tests use monkeypatch.setattr(routes_mod, "MATERIAL_TRACE_USE_UNIFIED_JOB", ...) — NOT setenv
+     (module-level constant frozen at import; reload-based tests isolated to TestFlagDefaultOff class).
+  2. is_async_available / enqueue_query_job are lazily imported inside the flag-on branch; patch target is
+     "mes_dashboard.services.async_query_job_service.<fn>" (source attribute), not routes module.
+  3. AC-4 (spool schema equivalence) compares set(_EXPORT_COLS) from duckdb_runtime vs set(_CSV_COLUMNS.keys())
+     from material_trace_service — proves column identity without running Oracle.
+  4. AC-6 (no _check_memory_guard) uses ast.parse() + ast.walk() over material_trace_duckdb_runtime.py
+     per test-discipline rule — structural proof, not runtime assertion.
+  5. AC-8 (1000/batch decomposition) uses "workorder" and "material_lot" modes to avoid _resolve_container_ids
+     Oracle call; pre_query() called explicitly after __init__ (not called by __init__, called by run()).
+  6. TestFlagDefaultOff uses importlib.reload(routes_mod) after monkeypatch.delenv — safe in isolation,
+     side-effect is module state refresh; separate test class prevents cross-test pollution.
+  7. All contract files (env-contract.md, .env.example.template, env.schema.json) already contain
+     MATERIAL_TRACE_USE_UNIFIED_JOB with default='off' — contract tests expected to pass immediately.
+
+next-action: |
+  Run targeted phase:
+    conda run -n mes-dashboard pytest tests/test_material_trace_unified_job.py tests/contract/test_env_material_trace_flag.py -v --tb=short
+  Then run changed-area phase per implementation-plan.md Test Execution Plan.

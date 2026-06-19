@@ -955,3 +955,61 @@ register_job_type(JobTypeConfig(
     queue_name="trace-events",
     worker_fn=rq_material_trace_job,
 ))
+
+
+# ---------------------------------------------------------------------------
+# Unified job entry function (material-trace-streaming-migration)
+# ---------------------------------------------------------------------------
+
+def execute_material_trace_unified_job(job_id: str, **params) -> None:
+    """RQ worker entry for the unified MaterialTraceJob pipeline.
+
+    Called by the RQ worker when MATERIAL_TRACE_USE_UNIFIED_JOB=on routes
+    the query to the unified BaseChunkedDuckDBJob streaming pipeline.
+    Uses MaterialTraceJob (Oracle -> Arrow -> DuckDB -> parquet spool).
+    Never calls _check_memory_guard() - DuckDB on-disk spill is the structural
+    replacement (D2/IP-6).
+    """
+    _PREFIX = "material_trace"
+    try:
+        from mes_dashboard.services.async_query_job_service import (
+            update_job_progress,
+            complete_job,
+        )
+        from mes_dashboard.services.material_trace_duckdb_runtime import MaterialTraceJob
+
+        update_job_progress(_PREFIX, job_id, status="running", pct=5, message="初始化...")
+        job = MaterialTraceJob(job_id=job_id, params=params)
+        update_job_progress(_PREFIX, job_id, status="running", pct=15, message="查詢中...")
+        spool_path = job.run()
+        update_job_progress(_PREFIX, job_id, status="running", pct=90, message="寫入 spool")
+
+        query_hash = job._query_hash
+        if spool_path:
+            import pyarrow.parquet as _pq
+            row_count = _pq.read_metadata(spool_path).num_rows
+        else:
+            row_count = 0
+
+        complete_job(_PREFIX, job_id, query_id=query_hash)
+        logger.info(
+            "execute_material_trace_unified_job: complete (job_id=%s query_hash=%s rows=%d)",
+            job_id, query_hash, row_count,
+        )
+    except Exception as exc:
+        logger.error(
+            "execute_material_trace_unified_job failed (job_id=%s): %s", job_id, exc
+        )
+        try:
+            from mes_dashboard.services.async_query_job_service import complete_job
+            complete_job("material_trace", job_id, error=str(exc))
+        except Exception:
+            pass
+
+
+register_job_type(JobTypeConfig(
+    job_type="material-trace-unified",
+    queue_name=MATERIAL_TRACE_QUEUE,
+    worker_fn=execute_material_trace_unified_job,
+    always_async=True,
+))

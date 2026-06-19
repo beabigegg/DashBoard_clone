@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.25.0
+schema-version: 1.26.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -44,6 +44,8 @@ breaking-change-policy: deprecate-2-minors
 | ASYNC-07 | Unified-job dispatch (production_history + reject) | When `PRODUCTION_HISTORY_USE_UNIFIED_JOB=on` OR `REJECT_HISTORY_USE_UNIFIED_JOB=on`, the respective route MUST enqueue via `enqueue_query_job("<domain>_unified", ..., sync_fallback_allowed=True)` with `JobTypeConfig.always_async=False`. Queue unavailable: the route MAY fall back to legacy path or return 503 (sync_fallback_allowed=True means no forced 503). Queue available → HTTP 202. Flag `off` (default): the legacy enqueue path runs verbatim (AC-8 zero-regression). Both domain flags are independent per-domain rollback handles. Added by change `production-reject-history-migration`. | `tests/test_async_query_job_service.py::TestProductionHistoryUnifiedJobRegistry`, `tests/test_async_query_job_service.py::TestRejectHistoryUnifiedJobRegistry` |
 | ASYNC-08 | OOM guard shift (reject domain) | The unified job worker path (`reject_history_worker.py`) writes raw rows to the canonical spool via DuckDB COPY: no pandas heap allocation occurs, so no post-hoc memory check can trigger. Pre-emptive OOM protection: DuckDB on-disk spill (`DUCKDB_JOB_DIR`) handles memory pressure at the storage layer before any Python heap pressure. The legacy flag=off path retains its existing memory-pressure checks (`_enforce_interactive_memory_guard`, RSS-pressure guard) unchanged — no regression. The `TestOomGuardAbsence` test verifies that the new worker modules and the legacy source files contain no `if len(df)…: raise` or `memory_usage`-as-IF-condition raise patterns; the legacy path uses RSS-pressure and helper delegation (not these patterns), so the test confirms both paths are free of that specific guard class. Added by change `production-reject-history-migration`. | `tests/test_reject_history_unified_job.py::TestOomGuardAbsence` |
 | ASYNC-09 | Dual-job unified execution (resource-history domain) | When `RESOURCE_HISTORY_USE_UNIFIED_JOB=on`, the export route MUST enqueue TWO separate RQ jobs: (1) `ResourceHistoryBaseJob` (`resource-history-base`, `requires_cross_chunk_reduction=False`) writing to `resource_dataset` spool, and (2) `ResourceHistoryOeeJob` (`resource-history-oee`, `requires_cross_chunk_reduction=True`) writing to `resource_oee` spool. Both jobs use `always_async=True` and `sync_fallback_allowed=False`. When the async queue is unavailable the route returns HTTP 503 with Retry-After (no silent sync downgrade). The OEE job computes ratio-of-SUMs (`yield = ΣTRACKOUT/(ΣTRACKOUT+ΣNG)`) across all chunks via job-temp DuckDB `post_aggregate`; per-chunk pre-aggregation is not used (ADR-0003 cross-chunk reduction). Each OEE chunk's `:reject_start`/`:reject_end` binds are widened ±30 days around the chunk's production dates to prevent boundary-NG loss. Flag `off` (default): the legacy `export_csv` Oracle read + pandas iterrows path is used unchanged (AC-1 zero-regression). Spool parquet schemas for `resource_dataset` and `resource_oee` are identical to the legacy path (§3.19 data-shape-UNCHANGED). Added by change `resource-history-migration`. | `tests/test_resource_history_unified_job.py`, `tests/test_resource_history_job_service.py` |
+| ASYNC-10 | Unified-job dispatch (material-trace domain) | When `MATERIAL_TRACE_USE_UNIFIED_JOB=on`, the `api_material_trace_query` route MUST dispatch via `enqueue_query_job("material-trace-unified", ..., sync_fallback_allowed=False)` with `JobTypeConfig.always_async=True`. If the async queue is unavailable, the route MUST return HTTP 503 SERVICE_UNAVAILABLE with Retry-After — no silent sync fallback (D4 decision: the in-request legacy pandas path is the OOM risk the flag exists to eliminate). Queue available → HTTP 202 with `{async, job_id, status_url, query_hash}`. The `MaterialTraceJob` (BaseChunkedDuckDBJob, `chunk_strategy=ID_LIST`, `requires_cross_chunk_reduction=False`) uses ID-list batching (1000/batch, `_IN_BATCH_SIZE=1000`), Arrow-to-DuckDB streaming, and `post_aggregate` DISTINCT on `[CONTAINERID, MATERIALLOTNAME, WORKCENTERNAME, TXNDATE]` (exact 4-column dedup key from legacy L238). WORKCENTER_GROUP enrichment is applied inside `post_aggregate` before COPY TO spool. Spool namespace `material_trace` and parquet schema are unchanged — frontend `/view` and CSV export need no change. Flag `off` (default): the legacy `_execute_batched_query_to_parquet` streaming path is used verbatim (AC-1 zero-regression). Added by change `material-trace-streaming-migration`. | `tests/test_material_trace_unified_job.py` |
+| ASYNC-11 | Heavy-query semaphore role re-statement (D3) | `global_concurrency.acquire_heavy_query_slot` (Lua CAS over a Redis sorted set, `HEAVY_QUERY_MAX_CONCURRENT` default 3, fail-open) has no code change in this migration. Its semantic role shifts from "throttle synchronous slow queries blocking gunicorn workers" to "cap concurrent RQ heavy jobs hitting Oracle simultaneously". Per-job chunk fan-out is bounded separately by `BaseChunkedDuckDBJob.max_parallel` (default 3). No new env var, no CAS logic change. This rule documents the semantic shift only; no implementation change is required. Added by change `material-trace-streaming-migration`. | — (semantics-only, no test) |
 
 ## Hold-History Rules
 
@@ -257,6 +259,9 @@ breaking-change-policy: deprecate-2-minors
 | Reject History query: `REJECT_HISTORY_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (RejectHistoryJob) | ASYNC-07 | route tests |
 | Reject History query: `REJECT_HISTORY_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 (sync_fallback_allowed=True) | ASYNC-07 | resilience tests |
 | Reject History query: `REJECT_HISTORY_USE_UNIFIED_JOB=off` (default) | legacy path unchanged | ASYNC-07, AC-8 | regression tests |
+| Material Trace query: `MATERIAL_TRACE_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (MaterialTraceJob, always_async=True) | ASYNC-10 | route tests |
+| Material Trace query: `MATERIAL_TRACE_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 SERVICE_UNAVAILABLE + Retry-After; no sync fallback (D4) | ASYNC-10, ASYNC-06 | resilience tests |
+| Material Trace query: `MATERIAL_TRACE_USE_UNIFIED_JOB=off` (default) | legacy path unchanged (_execute_batched_query_to_parquet) | ASYNC-10, AC-1 | regression tests |
 
 ## Material Consumption Rules
 
@@ -337,6 +342,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.26.0] — 2026-06-19
+### Added
+- material-trace-streaming-migration: ASYNC-10 (unified-job dispatch for material-trace domain — `MATERIAL_TRACE_USE_UNIFIED_JOB=on` routes to `MaterialTraceJob` via `enqueue_query_job("material-trace-unified", always_async=True, sync_fallback_allowed=False)`; async unavailable → 503, no sync fallback; ID-list 1000/batch chunking; post_aggregate DISTINCT on exact 4-col key; WORKCENTER_GROUP enrichment inline; spool namespace+schema unchanged). ASYNC-11 (heavy-query semaphore role re-statement: `global_concurrency.acquire_heavy_query_slot` semantics shift to cap concurrent RQ Oracle jobs; no code change). Three new Decision Table rows (material-trace flag-on/async-available, flag-on/async-unavailable, flag-off paths). Additive; no existing rules changed.
 
 ## [business 1.25.0] — 2026-06-19
 ### Added
