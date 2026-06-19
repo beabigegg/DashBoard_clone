@@ -43,7 +43,7 @@
     },
     "direct_connections": {
       "total_since_start": 7,
-      "worker_pid": 211919
+      "worker_pid": 255566
     },
     "duckdb": {
       "memory_limit_state": "512MB",
@@ -161,54 +161,14 @@
     },
     "spool_disk_usage": [
       {
-        "file_count": 1,
-        "namespace": "anomaly_reject_dataset",
-        "total_bytes": 3897602
-      },
-      {
-        "file_count": 1,
-        "namespace": "anomaly_resource_dataset",
-        "total_bytes": 1866580
-      },
-      {
-        "file_count": 1,
-        "namespace": "anomaly_hold_dataset",
-        "total_bytes": 314973
-      },
-      {
-        "file_count": 7,
-        "namespace": "eap_alarm",
-        "total_bytes": 480974
-      },
-      {
-        "file_count": 1,
-        "namespace": "anomaly_yield_dataset",
-        "total_bytes": 13709537
-      },
-      {
-        "file_count": 1,
-        "namespace": "hold_dataset",
-        "total_bytes": 314973
-      },
-      {
         "file_count": 0,
         "namespace": "downtime_analysis",
         "total_bytes": 0
       },
       {
-        "file_count": 1,
-        "namespace": "resource_dataset",
-        "total_bytes": 1866580
-      },
-      {
         "file_count": 0,
         "namespace": "production_history",
         "total_bytes": 0
-      },
-      {
-        "file_count": 1,
-        "namespace": "resource_oee",
-        "total_bytes": 496663
       }
     ],
     "worker_memory_guard": {
@@ -259,7 +219,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T20:20:33.677680"
+    "timestamp": "2026-06-19T08:12:20.583391"
   },
   "success": true
 }

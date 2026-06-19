@@ -1,87 +1,83 @@
 {
   "data": [
     {
-      "lot_count": 79,
+      "lot_count": 80,
       "name": "點測"
     },
     {
-      "lot_count": 10,
-      "name": "已CP入庫"
-    },
-    {
-      "lot_count": 1978,
+      "lot_count": 1832,
       "name": "切割"
     },
     {
-      "lot_count": 915,
+      "lot_count": 895,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 81,
+      "lot_count": 82,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 351,
+      "lot_count": 346,
       "name": "焊接_WB"
-    },
-    {
-      "lot_count": 54,
-      "name": "焊接_WB"
-    },
-    {
-      "lot_count": 107,
-      "name": "焊接_DW"
-    },
-    {
-      "lot_count": 7,
-      "name": "焊接_DW"
-    },
-    {
-      "lot_count": 524,
-      "name": "成型"
-    },
-    {
-      "lot_count": 279,
-      "name": "成型"
-    },
-    {
-      "lot_count": 340,
-      "name": "去膠"
-    },
-    {
-      "lot_count": 431,
-      "name": "水吹砂"
-    },
-    {
-      "lot_count": 458,
-      "name": "電鍍"
-    },
-    {
-      "lot_count": 36,
-      "name": "電鍍"
-    },
-    {
-      "lot_count": 231,
-      "name": "電鍍"
     },
     {
       "lot_count": 43,
+      "name": "焊接_WB"
+    },
+    {
+      "lot_count": 103,
+      "name": "焊接_DW"
+    },
+    {
+      "lot_count": 10,
+      "name": "焊接_DW"
+    },
+    {
+      "lot_count": 479,
+      "name": "成型"
+    },
+    {
+      "lot_count": 348,
+      "name": "成型"
+    },
+    {
+      "lot_count": 315,
+      "name": "去膠"
+    },
+    {
+      "lot_count": 496,
+      "name": "水吹砂"
+    },
+    {
+      "lot_count": 420,
       "name": "電鍍"
     },
     {
-      "lot_count": 290,
+      "lot_count": 28,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 174,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 31,
+      "name": "電鍍"
+    },
+    {
+      "lot_count": 314,
       "name": "移印"
     },
     {
-      "lot_count": 310,
+      "lot_count": 328,
       "name": "切彎腳"
     },
     {
-      "lot_count": 18,
+      "lot_count": 20,
       "name": "可靠性"
     },
     {
-      "lot_count": 3410,
+      "lot_count": 3514,
       "name": "TMTT"
     },
     {
@@ -89,21 +85,21 @@
       "name": "預備站"
     },
     {
-      "lot_count": 48,
+      "lot_count": 164,
       "name": "品檢"
     },
     {
-      "lot_count": 3,
+      "lot_count": 6,
       "name": "FQC"
     },
     {
-      "lot_count": 27,
+      "lot_count": 29,
       "name": "成品入庫"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T20:19:01.400359"
+    "timestamp": "2026-06-19T08:10:49.079899"
   },
   "success": true
 }

@@ -1,19 +1,19 @@
 {
   "data": {
     "after": {
-      "count": 29262,
-      "size_bytes": 15327232
+      "count": 36540,
+      "size_bytes": 15704064
     },
     "before": {
-      "count": 29262,
-      "size_bytes": 15327232
+      "count": 36540,
+      "size_bytes": 15704064
     },
     "deleted": 0,
     "mysql_deleted": 0
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T20:20:33.629302"
+    "timestamp": "2026-06-19T08:12:20.534935"
   },
   "success": true
 }

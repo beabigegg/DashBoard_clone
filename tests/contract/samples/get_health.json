@@ -193,10 +193,10 @@
     "running": false
   },
   "system_memory": {
-    "available_mb": 3894.0,
+    "available_mb": 3908.0,
     "pressure": "normal",
-    "total_mb": 7956.0,
-    "used_pct": 51.1
+    "total_mb": 7706.0,
+    "used_pct": 49.3
   },
   "warnings": [
     "Equipment status cache not loaded",

@@ -1,16 +1,6 @@
 {
   "data": [
     {
-      "date": "2026-06-11",
-      "egt_hours": 93.2,
-      "ou_pct": 69.65,
-      "prd_hours": 25736.0,
-      "sby_hours": 9598.9,
-      "sdt_hours": 792.1,
-      "total_hours": 47064.0,
-      "udt_hours": 732.4
-    },
-    {
       "date": "2026-06-12",
       "egt_hours": 96.0,
       "ou_pct": 69.81,
@@ -69,11 +59,21 @@
       "sdt_hours": 912.6,
       "total_hours": 46825.5,
       "udt_hours": 681.5
+    },
+    {
+      "date": "2026-06-18",
+      "egt_hours": 0.0,
+      "ou_pct": 79.78,
+      "prd_hours": 14676.1,
+      "sby_hours": 2502.9,
+      "sdt_hours": 657.3,
+      "total_hours": 19660.6,
+      "udt_hours": 558.3
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T20:20:33.118156"
+    "timestamp": "2026-06-19T08:12:20.030986"
   },
   "success": true
 }

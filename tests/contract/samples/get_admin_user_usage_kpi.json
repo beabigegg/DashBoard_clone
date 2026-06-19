@@ -157,7 +157,7 @@
         "display_name": "ymirliu 劉念萱",
         "duration_sec": null,
         "login_time": "2026-06-18 10:33:50.969000",
-        "status": "active",
+        "status": "ended",
         "username": "92367"
       },
       {
@@ -310,7 +310,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-18T20:20:33.862603"
+    "timestamp": "2026-06-19T08:12:20.788448"
   },
   "success": true
 }
