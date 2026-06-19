@@ -1,6 +1,6 @@
 {
   "data": {
-    "csrf_token": "wcN2I02CttigfQ9N7SzC3tL1JDbzDv2LWNiyBk27KcI",
+    "csrf_token": "8q6pV49RMrsquey7553Dtszr06Lhv47HPbpXRK9zbkM",
     "department": "Development",
     "displayName": "Local User (testuser)",
     "is_admin": true,
@@ -11,7 +11,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T12:15:54.469465"
+    "timestamp": "2026-06-19T14:55:50.755119"
   },
   "success": true
 }

@@ -1,0 +1,15 @@
+agent: e2e-resilience-engineer
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: test-files, pointer: "tests/integration/test_downtime_rq_async.py (8 new tests: TestDowntimeJobOracleFaultInjection, TestDowntimeJobWorkerRestart, TestDowntimeJobSpillToDisk, TestDowntimeFlagParity)" }
+  - { type: test-files, pointer: "tests/e2e/test_downtime_analysis_e2e.py (read-only; AC-8 coverage confirmed, no new tests added)" }
+
+findings:
+  - "AC-8: TestFeatureFlagFallback::test_flag_off_returns_legacy_shape PASSES — flag-off default E2E unmodified"
+  - "POTENTIAL BUG (AC-3 blocker before flag promotion): _derive_job_columns may drop fragment_count from non-empty bridge output; documented in test_flag_on_off_spool_row_set_equal with assertion guard — qa-reviewer must confirm whether fragment_count is in §3.21 spool or just intermediate"
+  - "Pre-existing E2E failures (load_downtime_events attr, 410 on disabled Redis) are unrelated to this change"
+  - "Legacy _enrich_events_df retains 9 intermediate residual columns not in §3.21 canonical schema"
+  - "12/12 integration tests pass"

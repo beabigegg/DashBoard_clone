@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.26.1
+schema-version: 1.27.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -262,6 +262,9 @@ breaking-change-policy: deprecate-2-minors
 | Material Trace query: `MATERIAL_TRACE_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (MaterialTraceJob, always_async=True) | ASYNC-10 | route tests |
 | Material Trace query: `MATERIAL_TRACE_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 SERVICE_UNAVAILABLE + Retry-After; no sync fallback (D4) | ASYNC-10, ASYNC-06 | resilience tests |
 | Material Trace query: `MATERIAL_TRACE_USE_UNIFIED_JOB=off` (default) | legacy path unchanged (_execute_batched_query_to_parquet) | ASYNC-10, AC-1 | regression tests |
+| Downtime query: `DOWNTIME_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (DowntimeJob, always_async=True) | DDA-01, ASYNC-06 | route tests |
+| Downtime query: `DOWNTIME_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 SERVICE_UNAVAILABLE + Retry-After; no sync fallback | DDA-01, ASYNC-06 | resilience tests |
+| Downtime query: `DOWNTIME_USE_UNIFIED_JOB=off` (default) | legacy path unchanged (_bridge_jobid Path B pd.merge) | DDA-01, AC-8 | regression tests |
 
 ## Material Consumption Rules
 
@@ -289,6 +292,7 @@ breaking-change-policy: deprecate-2-minors
 | DA-10 | Browser memory ceiling | If DuckDB-WASM init, parquet fetch, or a reduction query fails (or estimated buffer exceeds the `duckdb-activation-policy.ts` ceiling), the composable raises a visible error banner offering a narrower date range. Zero-row result (valid empty) is explicitly distinguished from load/compute failure. Never a silent empty render (CLAUDE.md Type-A). | browser: `test_wasm_init_failure_shows_error_banner_not_empty_table`; `test_parquet_fetch_404_shows_error_banner` |
 | DA-11 | Two-parquet atomicity | Server writes both `base_events.parquet` and `job_bridge.parquet` or neither. A `base_events` spool hit with a missing/expired `job_bridge` spool is a server-side error; never silently returns empty join. Browser raises a visible error if either parquet fetch returns 404/410. | `tests/test_downtime_analysis_service.py::TestTwoParquetAtomicity::test_base_hit_jobs_miss_raises_loudly` |
 | DA-12 | BQE-07 raw-spool output | `query_downtime_dataset_raw()` (flag-ON path) writes one whole-dataset BQE chunk to two raw namespaces (`downtime_analysis_base_events`, `downtime_analysis_job_bridge`); no `USE_ROW_COUNT_CHUNKING` (ADR-0003 permanent exclusion). Server does not call `_merge_cross_shift_events`, `_bridge_jobid`, or `_enrich_events_df` on the request path; those reductions run in the browser. | `tests/test_downtime_analysis_service.py::TestRawSpoolWriter` |
+| DDA-01 | DowntimeJob RESOURCEID+time-overlap DuckDB bridge (unified job path) | When `DOWNTIME_USE_UNIFIED_JOB=on`, `DowntimeJob` (BaseChunkedDuckDBJob, `requires_cross_chunk_reduction=True`, `chunk_strategy=SINGLE` per RESOURCEID group) streams `base_events` (keyed by HISTORYID) and `job_data` (keyed by RESOURCEID) as Arrow batches into a shared job-temp DuckDB holding tables `base_raw` and `job_raw`. `post_aggregate` runs: (a) cross-shift 60s-gap merge over `base_raw` grouped by `(HISTORYID, OLDSTATUSNAME, OLDREASONNAME)` (DA-02 algorithm in DuckDB SQL); (b) Path A equi-join (`SHIFT.JOBID IS NOT NULL`); (c) Path B RANGE JOIN time-overlap bridge (`JOIN ON base.HISTORYID = job.RESOURCEID AND job.eff_end > base.event_start AND job.CREATEDATE < base.event_end`, NOT ASOF JOIN — ADR-0010) with `overlap_s = epoch(LEAST(event_end,eff_end) - GREATEST(event_start,CREATEDATE))`, winner by `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY overlap_s DESC, CREATEDATE ASC, JOBID ASC)`, `match_ambiguous=true` when runner-up overlap ≥ 80% of winner; (d) COPY TO unchanged `query_downtime_dataset` spool parquet (§3.21). Chunking by RESOURCEID group ensures ADR-0003's no-cross-row-reduction-at-chunk-seam invariant: each machine's events join only to that machine's jobs; chunk seams never split a HISTORYID. The N×M Cartesian `pd.merge(events_b, jobs_b, how='left')` never reaches Python heap — DuckDB on-disk spill handles candidate fan-out. Flag `off` (default): legacy `execute_downtime_query_job` → `_bridge_jobid` Path B `pd.merge` unchanged (AC-8 zero-regression). Spool output schema: §3.21 (20-column set identical for both paths, including `fragment_count` and `job_id`). | `tests/test_downtime_unified_job.py::TestDowntimeJobPostAggregate` |
 | ASYNC-DA-01 | Async threshold gate | When `DOWNTIME_BROWSER_DUCKDB=true` AND `DOWNTIME_ASYNC_ENABLED=true` (env, default true) AND date range (calendar days) ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` (env, default 30) AND RQ worker available: route to async path → HTTP 202 `{async: true, job_id, status_url}`. Short queries (< threshold), disabled flag, unavailable worker, OR `DOWNTIME_BROWSER_DUCKDB=false`: synchronous path → HTTP 200 (no behavior change for existing callers). Async path requires `DOWNTIME_BROWSER_DUCKDB=true` because the worker fn writes raw-spool parquets (browser-DuckDB format). Worker dispatched via `enqueue_job_dynamic()` + `register_job_type()` (Phase 2). Cross-references: DA-11, DA-12, ADR-0003, ADR-0007, ASYNC-02. | unit tests (threshold boundary); route tests (202 vs 200) |
 
 ## Batch Query Engine Rules
@@ -348,6 +352,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.27.0] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration: DDA-01 (DowntimeJob RESOURCEID+time-overlap DuckDB bridge — `DOWNTIME_USE_UNIFIED_JOB=on` streams base_events + job_data Arrow batches into two-table job-temp DuckDB, runs cross-shift 60s-gap merge + RANGE JOIN time-overlap bridge in post_aggregate (ADR-0010; NOT ASOF JOIN); `COPY TO` unchanged query_downtime_dataset spool (§3.21). `requires_cross_chunk_reduction=True`, `chunk_strategy=SINGLE` per RESOURCEID group, ADR-0003 preserved. N×M Cartesian pd.merge eliminated; DuckDB on-disk spill absorbs candidate fan-out. Flag `off`: legacy _bridge_jobid Path B unchanged (AC-8). Three new Decision Table rows. Additive; no existing rules changed.
 
 ## [business 1.26.1] — 2026-06-19
 ### Added

@@ -353,7 +353,7 @@ class TestNoMemoryGuardOnUnifiedPath:
 class TestIdListDecomposition:
     """AC-8: MaterialTraceJob.pre_query() (via __init__) decomposes IDs at 1000/batch."""
 
-    def _make_job(self, mode: str, values: list[str]) -> "MaterialTraceJob":
+    def _make_job(self, mode: str, values: list[str]) -> "MaterialTraceJob":  # noqa: F821
         """Instantiate MaterialTraceJob and call pre_query() with mocked external deps.
 
         pre_query() lazily imports from material_trace_service and filter_cache.

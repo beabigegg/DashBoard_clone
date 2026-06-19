@@ -341,9 +341,11 @@ class TestNoPandasAndNoCallers:
                 "resource_history_base_worker",
                 "resource_history_oee_worker",
                 "material_trace_duckdb_runtime",
+                "downtime_worker",
             },
             "oracle_arrow_reader": {
                 "material_trace_duckdb_runtime",
+                "downtime_worker",
             },
         }
 

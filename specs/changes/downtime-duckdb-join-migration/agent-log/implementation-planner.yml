@@ -1,0 +1,15 @@
+agent: implementation-planner
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/downtime-duckdb-join-migration/implementation-plan.md" }
+  - { type: ip-steps, pointer: "IP-1..IP-11; owner agents mapped; ACs per step" }
+  - { type: test-ladder, pointer: "collect/targeted/changed-area/contract phases defined" }
+
+findings:
+  - "R1 resolution: backend-engineer must override chunk_to_duckdb to route base_raw/job_raw by chunk_params['kind']"
+  - "R3 decision point: try SQL LAG/LEAD for cross-shift merge first; fallback to pandas over reduced base_raw if 60s-gap walk not byte-faithful; bridge JOIN must leave Python either way"
+  - "parity must be full row-set equality on (event_id, job_id, match_source) — count-only test would miss winner-selection regression"
+  - "APPROVED_CALLERS + job-registry count updates are required in same PR (CLAUDE.md rule)"

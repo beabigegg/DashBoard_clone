@@ -83,7 +83,6 @@ class TestResourceHistoryBaseJob:
 
     def test_always_async_registered(self):
         """Base job is registered with always_async=True."""
-        import importlib
         import mes_dashboard.workers.resource_history_base_worker as _w
         importlib.reload(_w)
         from mes_dashboard.services.job_registry import get_job_type_config
@@ -137,7 +136,6 @@ class TestResourceHistoryOeeJob:
 
     def test_always_async_registered(self):
         """OEE job is registered with always_async=True."""
-        import importlib
         import mes_dashboard.workers.resource_history_oee_worker as _w
         importlib.reload(_w)
         from mes_dashboard.services.job_registry import get_job_type_config
@@ -342,7 +340,9 @@ class TestSpoolSchemaUnchanged:
 
     def test_base_parquet_columns_match_legacy_schema(self, tmp_path, monkeypatch):
         """ResourceHistoryBaseJob writes parquet with legacy resource_dataset column set."""
-        import duckdb, pyarrow as pa, pyarrow.parquet as pq
+        import duckdb
+        import pyarrow as pa
+        import pyarrow.parquet as pq
 
         # Write a minimal parquet with the expected columns
         spool_file = tmp_path / "base.parquet"
@@ -378,7 +378,9 @@ class TestSpoolSchemaUnchanged:
 
     def test_oee_parquet_columns_match_legacy_schema(self, tmp_path):
         """ResourceHistoryOeeJob post_aggregate writes parquet with OEE column set."""
-        import duckdb, pyarrow as pa, pyarrow.parquet as pq
+        import duckdb
+        import pyarrow as pa
+        import pyarrow.parquet as pq
 
         spool_file = tmp_path / "oee.parquet"
         schema = pa.schema([

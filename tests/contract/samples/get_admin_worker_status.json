@@ -195,12 +195,12 @@
         "state_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart_state.json"
       }
     },
-    "worker_pid": 310858,
-    "worker_start_time": "2026-06-19T04:15:53.070000+00:00"
+    "worker_pid": 333397,
+    "worker_start_time": "2026-06-19T06:55:49.310000+00:00"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T12:17:24.943240"
+    "timestamp": "2026-06-19T14:57:22.256678"
   },
   "success": true
 }

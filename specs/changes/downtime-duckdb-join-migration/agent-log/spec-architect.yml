@@ -1,0 +1,17 @@
+agent: spec-architect
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: design-written, pointer: "specs/changes/downtime-duckdb-join-migration/design.md" }
+  - { type: adr-written, pointer: "docs/adr/0010-downtime-duckdb-time-overlap-join.md" }
+  - { type: affected-areas, pointer: "downtime_analysis_service._bridge_jobid Path B, new downtime_worker.py, downtime_query_job_service, job_registry, downtime_analysis_routes" }
+  - { type: decision-summary, pointer: "requires_cross_chunk_reduction=True (two-table JOIN, opposite of ADR-0009/eap-alarm); RANGE JOIN+window (not ASOF); per-RESOURCEID-group SINGLE-strategy chunking; post_aggregate cross-shift merge+bridge JOIN in DuckDB" }
+
+findings:
+  - "R1 (high): base chunk_to_duckdb infers one raw table; DowntimeJob must override to route base_raw/job_raw by chunk_params['kind']"
+  - "R2 (medium): per-RESOURCEID grouping does not help a hot single machine; stress test must exercise worst-case RESOURCEID"
+  - "R3 (medium): cross-shift merge (60s-gap walk) is a pandas behavioral reimplementation in SQL; parity test must pin both fragment directions; fallback: keep merge in pandas if SQL form intractable"
+  - "R4 (low): ADR-0003 BQE-03 spool sort key reconciliation still applies"
+  - "scope clarification: _bridge_jobid runs in query_downtime_dataset (sync view-build path), NOT query_downtime_dataset_raw (browser-DuckDB two-spool path); migration targets only the former"

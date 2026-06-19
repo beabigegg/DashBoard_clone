@@ -1,0 +1,1 @@
+python -m pytest --collect-only -q tests/test_downtime_unified_job.py tests/test_job_registry.py tests/test_query_cost_policy.py --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/junit.xml' --maxfail=1 --tb=short -ra

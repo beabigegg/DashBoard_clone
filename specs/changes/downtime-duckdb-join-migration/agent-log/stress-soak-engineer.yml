@@ -1,0 +1,15 @@
+agent: stress-soak-engineer
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: stress-tests, pointer: "tests/stress/test_downtime_analysis_stress.py:TestDowntimeJobOomCeiling (3 tests)" }
+  - { type: stress-report, pointer: "specs/changes/downtime-duckdb-join-migration/stress-soak-report.md" }
+
+findings:
+  - "AC-5: 10k×1k (64MB limit) + 50k×5k (128MB limit) stress tests confirm DuckDB on-disk spill; no Python heap OOM"
+  - "R2 design risk confirmed: hot RESOURCEID (50k×5k = 250M candidates) spills but bounds RSS at 1GB; 6GB production host can run 3 concurrent workers within headroom"
+  - "duckdb.connect patch must target mes_dashboard.workers.downtime_worker.duckdb.connect (function-scope import)"
+  - "Soak test deferred to weekly cadence (test_soak_workload.py extension point documented in stress-soak-report.md)"
+  - "stress tests are @pytest.mark.stress — not pre-merge; run weekly"

@@ -1,0 +1,25 @@
+agent: backend-engineer
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: new-file, pointer: "src/mes_dashboard/workers/downtime_worker.py" }
+  - { type: new-file, pointer: "src/mes_dashboard/sql/downtime_analysis/bridge_join.sql" }
+  - { type: new-file, pointer: "src/mes_dashboard/sql/downtime_analysis/cross_shift_merge.sql" }
+  - { type: modified, pointer: "src/mes_dashboard/services/downtime_query_job_service.py" }
+  - { type: modified, pointer: "src/mes_dashboard/routes/downtime_analysis_routes.py" }
+  - { type: modified, pointer: "tests/test_query_cost_policy.py" }
+  - { type: modified, pointer: "tests/test_job_registry.py" }
+  - { type: new-file, pointer: "tests/test_downtime_unified_job.py" }
+  - { type: test-evidence, pointer: "collect/targeted/changed-area all pass; 18/18 unit tests" }
+
+findings:
+  - "R3 decision: cross_shift_merge.sql uses DuckDB LAG/SUM window walk reusing proven _CROSS_SHIFT_MERGE_SQL constant; pandas fallback path included"
+  - "R1 override: chunk_to_duckdb disabled (RuntimeError); _fan_out_reduction overridden to route base_raw/job_raw by chunk_params['kind']"
+  - "bridge_join.sql uses RANGE JOIN + LEAD(overlap_s) for 80% ambiguity flag (NOT ASOF JOIN — ADR-0010)"
+  - "bridge_join.sql Path A dedup uses DISTINCT ON (JOBID) — requires DuckDB >=0.8"
+  - "Redis-optional: store_spooled_df returns empty string when Redis unavailable; acceptable per existing design"
+  - "_APPROVED_CALLERS: downtime_worker added for both oracle_arrow_reader and base_chunked_duckdb_job"
+  - "test_job_registry.py: count 9→10; downtime-unified in expected set"
+  - "R2 (hot RESOURCEID) and AC-3 parity: deferred to stress-soak-engineer and e2e-resilience-engineer"

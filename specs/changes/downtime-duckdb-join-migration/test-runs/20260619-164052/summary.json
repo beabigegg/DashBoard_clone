@@ -1,0 +1,16 @@
+{
+  "change_id": "downtime-duckdb-join-migration",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest --collect-only -q tests/test_downtime_unified_job.py tests/test_job_registry.py tests/test_query_cost_policy.py --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/junit.xml' --maxfail=1 --tb=short -ra",
+  "duration_ms": 6602,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/summary.json",
+    "stdout": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/stdout.log",
+    "stderr": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/stderr.log",
+    "junit": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

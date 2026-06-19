@@ -8,9 +8,25 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [env 1.0.19] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration: `DOWNTIME_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `DowntimeJob` path (BaseChunkedDuckDBJob template method, P5 migration) vs legacy `_bridge_jobid` Path B `pd.merge`. `always_async=True`; `sync_fallback_allowed=False`; async unavailable → 503 + Retry-After (no sync fallback). Streams base_events + job_data Arrow batches into two-table job-temp DuckDB; cross-shift 60s-gap merge + RESOURCEID+time-overlap RANGE JOIN bridge in `post_aggregate` (ADR-0010); `COPY TO` unchanged spool parquet. Chunked per-RESOURCEID group (`requires_cross_chunk_reduction=True`, `chunk_strategy=SINGLE`; ADR-0003 preserved). Spool namespace `query_downtime_dataset` and parquet schema unchanged. Default `off` ensures zero regression on deploy (AC-8). Additive; no existing flags changed.
+
+## [data 1.23.0] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration: §3.21 (Downtime Analysis Enriched Spool Schema — UNCHANGED Assertion for P5 migration). Documents the `query_downtime_dataset` enriched bridged-spool column set (18 columns). Asserts both legacy `_bridge_jobid` Path B and unified `DowntimeJob` paths produce identical column sets. OUT OF SCOPE: `query_downtime_dataset_raw` two-spool path (§3.13) — different column set. No parquet cleanup on deploy/rollback. Additive.
+
+## [business 1.27.0] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration: DDA-01 (DowntimeJob RESOURCEID+time-overlap DuckDB bridge). RANGE JOIN + window function (ADR-0010; NOT ASOF JOIN). `requires_cross_chunk_reduction=True`, per-RESOURCEID-group SINGLE chunking, ADR-0003 preserved. Three new Decision Table rows. Additive; no existing rules changed.
+
 ## [data 1.22.0] — 2026-06-19
 ### Added
 - material-trace-streaming-migration: §3.20 spool-schema-UNCHANGED assertion for `material_trace` namespace. 13-column set identical between legacy `pd.concat` and unified `MaterialTraceJob` streaming paths (AC-4). No parquet cleanup on deploy/rollback. Additive; no existing schemas changed.
+
+## [ci 1.3.30] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration: Gate-compatibility note for P5 migration — DowntimeJob(BaseChunkedDuckDBJob) reuses downtime-query queue; DOWNTIME_USE_UNIFIED_JOB=off default means zero behavioral change until explicitly set; stress-soak-report.md required before flag promotion; no new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.29] — 2026-06-19
 ### Added

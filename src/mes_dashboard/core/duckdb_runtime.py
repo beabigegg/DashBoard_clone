@@ -146,11 +146,10 @@ def get_duckdb_telemetry() -> dict:
         except OSError:
             pass
 
-    connection_ok = False
     try:
         conn = create_heavy_query_connection()
         conn.close()
-        connection_ok = True
+
     except Exception:
         pass
 

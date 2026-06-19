@@ -304,7 +304,7 @@ def get_trend(
 
         labels = sorted(label_set.keys())
         series = [
-            {"alarm_text": at, "data": [text_counts[at].get(l, 0) for l in labels]}
+            {"alarm_text": at, "data": [text_counts[at].get(lbl, 0) for lbl in labels]}
             for at in top_texts
             if at in text_counts
         ]

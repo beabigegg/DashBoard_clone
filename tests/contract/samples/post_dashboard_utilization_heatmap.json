@@ -777,11 +777,11 @@
       "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 3093.9,
+      "avail_hours": 3097.4,
       "date": "2026-06-18",
       "group": "焊接_DB",
-      "prd_hours": 2698.0,
-      "prd_pct": 87.2,
+      "prd_hours": 2701.4,
+      "prd_pct": 87.22,
       "workcenter": "焊接_DB"
     },
     {
@@ -1067,7 +1067,7 @@
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T12:17:24.534714"
+    "timestamp": "2026-06-19T14:57:21.858818"
   },
   "success": true
 }

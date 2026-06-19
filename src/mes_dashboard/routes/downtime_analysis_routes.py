@@ -74,6 +74,17 @@ _ASYNC_DAY_THRESHOLD: int = int(os.getenv("DOWNTIME_ASYNC_DAY_THRESHOLD", "30"))
 _ASYNC_WORKER_QUEUE: str = os.getenv("DOWNTIME_WORKER_QUEUE", "downtime-query")
 _JOB_TIMEOUT: int = int(os.getenv("DOWNTIME_JOB_TIMEOUT_SECONDS", "1800"))
 
+# ── Unified DuckDB job flag (downtime-duckdb-join-migration, P5) ──────────────
+# DOWNTIME_USE_UNIFIED_JOB=on → enqueue DowntimeJob (BaseChunkedDuckDBJob) via
+# the 'downtime-unified' job type (DuckDB bridge JOIN, OOM elimination).
+# DOWNTIME_USE_UNIFIED_JOB=off (default) → legacy query_downtime_dataset path.
+# Frozen at import time; tests must use monkeypatch.setattr().
+# Legacy _bridge_jobid Path B is NOT deleted while this flag exists (AC-8).
+from mes_dashboard.core.feature_flags import resolve_bool_flag as _resolve_bool_flag  # noqa: E402
+_DOWNTIME_USE_UNIFIED_JOB: bool = _resolve_bool_flag(
+    "DOWNTIME_USE_UNIFIED_JOB", default=False
+)
+
 
 # ============================================================
 # Validation helpers
@@ -282,8 +293,45 @@ def api_downtime_query():
                 is_key=is_key,
                 is_monitor=is_monitor,
             )
+        elif _DOWNTIME_USE_UNIFIED_JOB:
+            # Unified DuckDB job path (DOWNTIME_USE_UNIFIED_JOB=on):
+            # Enqueue DowntimeJob (BaseChunkedDuckDBJob) via 'downtime-unified'.
+            # This path requires is_async_available() because DowntimeJob always_async=True.
+            if not is_async_available():
+                return internal_error(
+                    "DOWNTIME_USE_UNIFIED_JOB=on requires RQ worker; "
+                    "no worker available (503)."
+                )
+            query_params = dict(
+                start_date=start_date,
+                end_date=end_date,
+                workcenter_groups=workcenter_groups,
+                families=families,
+                resource_ids=resource_ids,
+                package_groups=package_groups,
+                big_categories=big_categories,
+                status_types=status_types,
+                is_production=is_production,
+                is_key=is_key,
+                is_monitor=is_monitor,
+            )
+            job_id, err = enqueue_job_dynamic(
+                "downtime-unified",
+                owner=get_owner_token(),
+                params=query_params,
+            )
+            if job_id is None:
+                return internal_error(err or "Failed to enqueue downtime-unified job")
+            return success_response(
+                {
+                    "async": True,
+                    "job_id": job_id,
+                    "status_url": f"/api/job/{job_id}?prefix=downtime",
+                },
+                status_code=202,
+            )
         else:
-            # Legacy enriched-spool path (flag OFF / rollback target):
+            # Legacy enriched-spool path (flag OFF / rollback target, AC-8):
             # returns {query_id, summary, daily_trend, big_category, top_reasons}.
             result = query_downtime_dataset(
                 start_date=start_date,

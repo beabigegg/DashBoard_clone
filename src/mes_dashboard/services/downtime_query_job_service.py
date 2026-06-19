@@ -4,7 +4,11 @@
 Bridges downtime primary queries to the RQ background worker.
 
 Public API:
-  execute_downtime_query_job(*, job_id, owner, **query_params)  <- RQ worker entry point
+  execute_downtime_query_job(*, job_id, owner, **query_params)  <- RQ worker entry point (legacy)
+
+Feature flag: DOWNTIME_USE_UNIFIED_JOB (default off, env-contract 1.x.x).
+  OFF → legacy execute_downtime_query_job path (AC-8 preserved byte-for-byte).
+  ON  → DowntimeJob (BaseChunkedDuckDBJob) unified path.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ import logging
 import os
 from typing import Any
 
+from mes_dashboard.core.feature_flags import resolve_bool_flag
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     update_job_progress,
@@ -33,6 +38,13 @@ DOWNTIME_WORKER_QUEUE = os.getenv(
 DOWNTIME_JOB_TTL_SECONDS = int(os.getenv("DOWNTIME_JOB_TTL_SECONDS", "3600"))
 DOWNTIME_JOB_TIMEOUT_SECONDS = int(
     os.getenv("DOWNTIME_JOB_TIMEOUT_SECONDS", "1800")
+)
+
+# Feature flag: frozen at import time.
+# Tests must use monkeypatch.setattr(downtime_query_job_service, '_DOWNTIME_USE_UNIFIED_JOB', ...)
+# rather than monkeypatch.setenv (env vars are read at import; setenv after-the-fact has no effect).
+_DOWNTIME_USE_UNIFIED_JOB: bool = resolve_bool_flag(
+    "DOWNTIME_USE_UNIFIED_JOB", default=False
 )
 
 # Prefix used for Redis meta keys: downtime:job:{job_id}:meta

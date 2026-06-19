@@ -178,14 +178,18 @@ class TestEnqueueJobDynamic:
 
 class TestJobServiceRegistrations:
     def test_each_service_registers_exactly_one_job_type(self):
-        """AC-4: importing all 8 job services registers exactly 8 distinct job types."""
+        """AC-4: importing all job services registers exactly N distinct job types.
+
+        Updated for downtime-duckdb-join-migration (P5): downtime_worker registers
+        'downtime-unified' bringing the total to 10.
+        """
         import mes_dashboard.services.job_registry as jr
 
         # Reset the registry cleanly (autouse fixture already did, but import order
         # may add entries during the module load cycle; we must import after reset).
         jr._REGISTRY.clear()
 
-        # Import all 8 job services that call register_job_type at module end.
+        # Import all job services that call register_job_type at module end.
         # Using importlib.reload is not required since we cleared _REGISTRY and
         # the registration side-effect runs on the first import per process.
         # To force re-registration after clearing, we re-execute the module-level
@@ -204,6 +208,7 @@ class TestJobServiceRegistrations:
         import mes_dashboard.services.msd_lineage_job_service as msd_lin
         import mes_dashboard.services.material_consumption_service as mcs
         import mes_dashboard.services.material_trace_service as mts
+        import mes_dashboard.workers.downtime_worker as dtw  # downtime-duckdb-join-migration
 
         # Reload each to re-execute module-level register_job_type calls
         # against the cleared _REGISTRY.
@@ -215,10 +220,11 @@ class TestJobServiceRegistrations:
         importlib.reload(msd_lin)
         importlib.reload(mcs)
         importlib.reload(mts)
+        importlib.reload(dtw)
 
         registered = jr.list_registered_job_types()
-        assert len(registered) == 9, (
-            f"Expected 9 registered job types, got {len(registered)}: {registered}"
+        assert len(registered) == 10, (
+            f"Expected 10 registered job types, got {len(registered)}: {registered}"
         )
 
         expected_types = {
@@ -231,6 +237,7 @@ class TestJobServiceRegistrations:
             "material-consumption",
             "material-trace",
             "material-trace-unified",
+            "downtime-unified",  # downtime-duckdb-join-migration (P5)
         }
         assert set(registered) == expected_types, (
             f"Registered types mismatch.\n"

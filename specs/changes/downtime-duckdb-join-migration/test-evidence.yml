@@ -1,0 +1,39 @@
+change-id: downtime-duckdb-join-migration
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      python -m pytest --collect-only -q tests/test_downtime_unified_job.py tests/test_job_registry.py
+      tests/test_query_cost_policy.py
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/junit.xml'
+      --maxfail=1 --tb=short -ra
+    summary: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/summary.json
+    junit: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164052/junit.xml
+  - phase: targeted
+    status: passed
+    command: >-
+      python -m pytest tests/test_downtime_unified_job.py -q --tb=short -ra
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164358/junit.xml'
+      --maxfail=1
+    summary: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164358/summary.json
+    junit: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164358/junit.xml
+  - phase: changed-area
+    status: passed
+    command: >-
+      python -m pytest tests/test_downtime_unified_job.py tests/test_job_registry.py tests/test_query_cost_policy.py -q
+      --tb=short -ra
+      --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164406/junit.xml'
+      --maxfail=1
+    summary: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164406/summary.json
+    junit: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164406/junit.xml
+  - phase: quality
+    status: passed
+    command: ruff check .
+    summary: specs/changes/downtime-duckdb-join-migration/test-runs/20260619-171702/summary.json
+final-status: passed

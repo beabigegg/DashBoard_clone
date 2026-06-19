@@ -139,7 +139,7 @@ class TestSchemaCoverage:
             if r["response_schema"].startswith("→ ")
         ]
         assert not violators, (
-            f"Endpoints still using arrow prefix in schema column:\n"
+            "Endpoints still using arrow prefix in schema column:\n"
             + "\n".join(violators)
         )
 
@@ -161,6 +161,6 @@ class TestSchemaCoverage:
             if "success_response" in r["response_schema"]
         ]
         assert not violators, (
-            f"Endpoints still using 'success_response' prose in schema column:\n"
+            "Endpoints still using 'success_response' prose in schema column:\n"
             + "\n".join(violators)
         )

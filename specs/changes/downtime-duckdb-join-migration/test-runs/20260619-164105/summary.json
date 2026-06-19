@@ -1,0 +1,20 @@
+{
+  "change_id": "downtime-duckdb-join-migration",
+  "phase": "targeted",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "python -m pytest tests/test_downtime_unified_job.py -q --maxfail=1 --tb=short -ra --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164105/junit.xml'",
+  "duration_ms": 3907,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.test_downtime_unified_job.TestDowntimeFlagDispatch::test_flag_off_calls_legacy_path",
+    "message": "AssertionError: Expected 'query_downtime_dataset' to have been called once. Called 0 times."
+  },
+  "artifacts": {
+    "summary": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164105/summary.json",
+    "stdout": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164105/stdout.log",
+    "stderr": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164105/stderr.log",
+    "junit": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-164105/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

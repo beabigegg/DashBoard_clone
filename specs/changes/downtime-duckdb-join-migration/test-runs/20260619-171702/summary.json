@@ -1,0 +1,15 @@
+{
+  "change_id": "downtime-duckdb-join-migration",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "ruff check .",
+  "duration_ms": 19,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-171702/summary.json",
+    "stdout": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-171702/stdout.log",
+    "stderr": "specs/changes/downtime-duckdb-join-migration/test-runs/20260619-171702/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

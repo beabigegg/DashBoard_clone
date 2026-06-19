@@ -1,0 +1,12 @@
+- type: tier-floor-override
+  change-id: downtime-duckdb-join-migration
+  timestamp: '2026-06-19T09:17:19.617Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - migration
+    - query
+  reason: >-
+    DowntimeJob flag=off by default; Tier-0 deferred until stress-soak-report.md evidence collected
+    and flag promoted to on

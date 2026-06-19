@@ -63,7 +63,7 @@ class TestProductionHistoryJobEnqueue:
 
         spool_dir = tmp_path / "spool" / "production_history"
         spool_dir.mkdir(parents=True, exist_ok=True)
-        spool_path = str(spool_dir / f"ph-int-test.parquet")
+        spool_path = str(spool_dir / "ph-int-test.parquet")
 
         job = ProductionHistoryJob(job_id, params=params)
         job._spool_key = "ph-int-test"

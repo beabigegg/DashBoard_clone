@@ -128,7 +128,7 @@ class TestRunPrewarmJobGate:
     def test_loaded_at_today_causes_refresh_skip(self):
         """When _try_reuse_existing returns True (today's cache), Oracle load must not be called."""
         from mes_dashboard.services import resource_history_duckdb_cache as m
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
 
         with patch.object(m, "_try_reuse_existing", return_value=True) as mock_reuse, \
              patch.object(m, "_try_lock") as mock_lock, \

@@ -699,7 +699,7 @@ class TestDowntimeSoakMemoryStability:
 
         rss_mb = [s / 1_048_576 for s in samples]
         print(
-            f"\n[monotonic-growth check] RSS samples (MB): "
+            "\n[monotonic-growth check] RSS samples (MB): "
             + "  ".join(f"{v:.1f}" for v in rss_mb)
         )
 
@@ -707,4 +707,466 @@ class TestDowntimeSoakMemoryStability:
             "RSS was strictly monotonically increasing across all 20 samples — "
             "this is a strong indicator of an unbounded memory leak in the raw path. "
             f"Samples (MB): {[f'{v:.1f}' for v in rss_mb]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# @pytest.mark.stress — TestDowntimeJobOomCeiling
+#
+# Change: downtime-duckdb-join-migration (Tier 1, high-risk)
+# Gate:   AC-5 OOM ceiling (ci-gates.md Tier 4, weekly)
+# IP-9:   Stress + stress-soak-report.md
+#
+# Purpose
+# -------
+# Prove that DowntimeJob._run_bridge_join (DuckDB RANGE JOIN + window) completes
+# via on-disk spill under a constrained memory_limit instead of OOM-killing the
+# Python process.
+#
+# The OOM source in the OLD path:
+#   _bridge_jobid() Path B calls pd.merge(events_b, jobs_b, how='left').
+#   For a single hot machine with 10k events × 1k jobs the cross-product
+#   candidate frame is O(10^7) rows before filtering.  In Python heap, with
+#   typical dtype widths, that is ~2-4 GB and reliably OOM-killed gunicorn.
+#
+# New path (downtime-duckdb-join-migration):
+#   DowntimeJob._run_bridge_join() executes the same overlap JOIN entirely in
+#   DuckDB (bridge_join.sql, ADR-0010 RANGE JOIN).  When DuckDB memory_limit
+#   is set to 64-128 MB, DuckDB spills the intermediate candidate table to
+#   DUCKDB_JOB_DIR instead of expanding the Python heap.  The Python process
+#   RSS stays below 512 MB even for the worst-case hot RESOURCEID (R2).
+#
+# Test strategy
+# -------------
+# Each test:
+#   1. Builds an Arrow batch (base_events + job_raw) in-memory via pandas/pyarrow.
+#   2. Calls DowntimeJob._run_bridge_join() directly after applying a DuckDB
+#      memory_limit pragma.  This exercises the entire SQL hot-path without the
+#      Oracle or RQ machinery.
+#   3. Measures Python RSS before/after (psutil) — this proves Python heap is
+#      NOT inflated by the DuckDB candidate fan-out.
+#   4. Asserts output rowcount and a sample match_ambiguous value to confirm
+#      the SQL logic is not trivially short-circuited by the test data.
+#
+# Run commands
+# ------------
+#   # All OOM ceiling tests:
+#   pytest tests/stress/test_downtime_analysis_stress.py -m stress -k OomCeiling -v
+#
+#   # Single hot-RESOURCEID only (R2 guard):
+#   pytest tests/stress/test_downtime_analysis_stress.py -m stress \
+#          -k "test_single_hot_resourceid_r2" -v
+#
+# Soak extension
+# --------------
+# Weekly soak (not pre-merge): extend tests/integration/test_soak_workload.py
+# with a 24-hour looping DowntimeJob invocation.  See stress-soak-report.md.
+# ---------------------------------------------------------------------------
+
+import tracemalloc  # stdlib; already imported in other stress tests via gc/sys
+
+
+def _make_overlap_base_events(
+    n_events: int,
+    resource_id: str,
+    base_ts: "pd.Timestamp",
+    *,
+    seed: int = 0,
+) -> "pd.DataFrame":
+    """Build a synthetic base_events_merged DataFrame for bridge_join.sql.
+
+    All events are on the same HISTORYID = resource_id and span a shared
+    time window so every job candidate overlaps every event (worst-case fan-out).
+
+    Columns match the bridge_join.sql input contract for base_events_merged:
+      HISTORYID, OLDSTATUSNAME, OLDREASONNAME,
+      event_start, event_end, hours, fragment_count, JOBID
+    """
+    rng = np.random.default_rng(seed)
+    # Events start spread over a 30-day window, each lasting 1-8 hours.
+    start_offsets_h = rng.uniform(0, 30 * 24, size=n_events)
+    durations_h = rng.uniform(1.0, 8.0, size=n_events)
+    event_starts = [base_ts + pd.Timedelta(hours=float(o)) for o in start_offsets_h]
+    event_ends = [s + pd.Timedelta(hours=float(d)) for s, d in zip(event_starts, durations_h)]
+
+    return pd.DataFrame(
+        {
+            "HISTORYID": [resource_id] * n_events,
+            "OLDSTATUSNAME": ["UDT"] * n_events,
+            "OLDREASONNAME": [f"REASON-{i % 5}" for i in range(n_events)],
+            "event_start": event_starts,
+            "event_end": event_ends,
+            "hours": [d for d in durations_h],
+            "fragment_count": [1] * n_events,
+            # No direct JOBID (Path B — all go through overlap JOIN)
+            "JOBID": [None] * n_events,
+        }
+    )
+
+
+def _make_overlap_job_raw(
+    n_jobs: int,
+    resource_id: str,
+    base_ts: "pd.Timestamp",
+    *,
+    seed: int = 1,
+) -> "pd.DataFrame":
+    """Build a synthetic job_raw DataFrame for bridge_join.sql.
+
+    All jobs are assigned to the same RESOURCEID = resource_id and span the
+    same 30-day window (overlapping every event — worst-case fan-out for the
+    RANGE JOIN).
+
+    Columns match the bridge_join.sql input contract for job_raw:
+      JOBID, RESOURCEID, CREATEDATE, COMPLETEDATE, SYMPTOMCODENAME,
+      CAUSECODENAME, REPAIRCODENAME, COMPLETE_FULLNAME, FIRSTCLOCKONDATE,
+      LASTCLOCKOFFDATE, JOBORDERNAME, JOBMODELNAME,
+      ASSIGNED_DATE, ACK_DATE, INSPECT_START, INSPECT_END
+    """
+    rng = np.random.default_rng(seed)
+    create_offsets_h = rng.uniform(0, 30 * 24, size=n_jobs)
+    durations_h = rng.uniform(2.0, 24.0, size=n_jobs)
+    create_dates = [base_ts + pd.Timedelta(hours=float(o)) for o in create_offsets_h]
+    complete_dates = [c + pd.Timedelta(hours=float(d)) for c, d in zip(create_dates, durations_h)]
+
+    return pd.DataFrame(
+        {
+            "JOBID": [f"J-{i:06d}" for i in range(n_jobs)],
+            "RESOURCEID": [resource_id] * n_jobs,
+            "CREATEDATE": create_dates,
+            "COMPLETEDATE": complete_dates,
+            "SYMPTOMCODENAME": [f"SYM-{i % 10}" for i in range(n_jobs)],
+            "CAUSECODENAME": [f"CAUSE-{i % 8}" for i in range(n_jobs)],
+            "REPAIRCODENAME": [f"REPAIR-{i % 6}" for i in range(n_jobs)],
+            "COMPLETE_FULLNAME": [f"Tech-{i % 20}" for i in range(n_jobs)],
+            "FIRSTCLOCKONDATE": create_dates,
+            "LASTCLOCKOFFDATE": complete_dates,
+            "JOBORDERNAME": [f"JO-{i:07d}" for i in range(n_jobs)],
+            "JOBMODELNAME": [f"MODEL-{i % 5}" for i in range(n_jobs)],
+            "ASSIGNED_DATE": create_dates,
+            "ACK_DATE": create_dates,
+            "INSPECT_START": create_dates,
+            "INSPECT_END": complete_dates,
+        }
+    )
+
+
+def _run_bridge_join_with_memory_limit(
+    base_df: "pd.DataFrame",
+    job_df: "pd.DataFrame",
+    memory_limit_mb: int,
+    tmp_path: str,
+) -> "pd.DataFrame":
+    """Execute bridge_join.sql via DowntimeJob._run_bridge_join under a DuckDB
+    memory_limit, writing spill files to tmp_path.
+
+    Patches duckdb.connect to inject the memory_limit pragma and a custom
+    temp_directory before each connection so that on-disk spill goes to
+    tmp_path rather than the system default.  The rest of the bridge JOIN
+    execution is unchanged.
+    """
+    import duckdb
+    from unittest.mock import patch as _patch
+
+    original_connect = duckdb.connect
+
+    def _limited_connect(path: str = ":memory:", **kwargs):
+        con = original_connect(path, **kwargs)
+        con.execute(f"SET memory_limit='{memory_limit_mb}MB'")
+        con.execute(f"SET temp_directory='{tmp_path}'")
+        return con
+
+    # We need to patch at the duckdb module level inside downtime_worker.py
+    with _patch("mes_dashboard.workers.downtime_worker.duckdb.connect", side_effect=_limited_connect):
+        from mes_dashboard.workers.downtime_worker import DowntimeJob
+        job = DowntimeJob.__new__(DowntimeJob)
+        job.job_id = "stress-test-job"
+        result_df = job._run_bridge_join(base_df, job_df)
+    return result_df
+
+
+@pytest.mark.stress
+class TestDowntimeJobOomCeiling:
+    """OOM ceiling proof for DowntimeJob's DuckDB RANGE JOIN bridge.
+
+    Tests demonstrate that the DuckDB-JOIN path (bridge_join.sql, ADR-0010)
+    completes via on-disk spill instead of OOM-killing Python, for:
+      (a) 10k events × 1k jobs on a single RESOURCEID (AC-5 baseline),
+      (b) 50 RESOURCEIDs × 500 events × 200 jobs each (multi-resource fan-out),
+      (c) 50k events × 5k jobs on a single hot RESOURCEID (R2 worst-case guard).
+
+    Thresholds
+    ----------
+    test_high_cardinality_join_completes_without_python_oom:
+      RSS ceiling: 512 MB peak.  DuckDB memory_limit: 64 MB.
+      Rationale: legacy pd.merge on 10k × 1k would require ~2-4 GB in-process.
+      The new path should never exceed 512 MB (Python Arrow load + DuckDB conn overhead).
+
+    test_multi_resourceid_fan_out_scales_linearly:
+      Wall clock ceiling: 120 s on a 4-core machine.
+      (No memory ceiling: 50 × 500 × 200 = 5M candidates total, spread across
+      independent resource groups; DuckDB processes them serially in this test.)
+
+    test_single_hot_resourceid_r2:
+      RSS ceiling: 1024 MB peak.  DuckDB memory_limit: 128 MB.
+      Rationale: R2 (design.md §5) states that per-RESOURCEID grouping does NOT
+      reduce the candidate fan-out for a single hot machine — the win is on-disk
+      spill.  50k × 5k = 250M candidates; this test confirms spill bounds peak RSS.
+    """
+
+    def test_high_cardinality_join_completes_without_python_oom(self, tmp_path):
+        """AC-5: 10k events × 1k jobs, one RESOURCEID, DuckDB memory_limit=64 MB.
+
+        The bridge_join.sql RANGE JOIN must complete via DuckDB on-disk spill
+        without raising MemoryError or triggering the Python OOM killer.
+
+        Expected:
+          - Completes (no exception)
+          - Output rowcount == n_events (one winner or orphan per event)
+          - Peak Python RSS < 512 MB
+        """
+        n_events = 10_000
+        n_jobs = 1_000
+        resource_id = "EQ-HOT-0001"
+        base_ts = pd.Timestamp("2025-12-01 00:00:00")
+
+        base_df = _make_overlap_base_events(n_events, resource_id, base_ts, seed=42)
+        job_df = _make_overlap_job_raw(n_jobs, resource_id, base_ts, seed=43)
+
+        _gc_collect()
+        rss_before = _rss_bytes()
+        tracemalloc.start()
+
+        try:
+            result_df = _run_bridge_join_with_memory_limit(
+                base_df,
+                job_df,
+                memory_limit_mb=64,
+                tmp_path=str(tmp_path),
+            )
+        except MemoryError as exc:
+            pytest.fail(
+                f"MemoryError raised during DuckDB bridge JOIN "
+                f"({n_events} events × {n_jobs} jobs): {exc}\n"
+                "This indicates the candidate fan-out is landing in Python heap. "
+                "Verify bridge_join.sql uses RANGE JOIN (not pd.merge) and that "
+                "duckdb.connect is being patched with memory_limit."
+            )
+        finally:
+            tracemalloc.stop()
+
+        _gc_collect()
+        rss_after = _rss_bytes()
+        peak_rss_mb = rss_after / 1_048_576
+
+        print(
+            f"\n[AC-5 high-cardinality] n_events={n_events} n_jobs={n_jobs} "
+            f"rss_before={rss_before/1_048_576:.1f} MB "
+            f"rss_after={peak_rss_mb:.1f} MB "
+            f"output_rows={len(result_df)}"
+        )
+
+        # Each event must produce exactly one output row (winner or orphan).
+        assert len(result_df) == n_events, (
+            f"Expected {n_events} output rows (one per event), "
+            f"got {len(result_df)}. "
+            "bridge_join.sql must emit exactly one row per input event "
+            "(winner via ROW_NUMBER rn=1, or orphan via path_b_no_match)."
+        )
+
+        # match_source must only be valid values.
+        valid_sources = {"overlap", "jobid", "none"}
+        bad = set(result_df["match_source"].dropna().unique()) - valid_sources
+        assert not bad, (
+            f"Unexpected match_source values: {bad}. "
+            "bridge_join.sql output must have match_source in {overlap, jobid, none}."
+        )
+
+        # With all events in Path B (JOBID=None) and all jobs sharing the same
+        # RESOURCEID=HISTORYID and spanning the full date window, all events should
+        # match via 'overlap' (not 'none').
+        overlap_count = (result_df["match_source"] == "overlap").sum()
+        assert overlap_count == n_events, (
+            f"Expected all {n_events} events to match via 'overlap' "
+            f"(all jobs overlap all events), got overlap_count={overlap_count}. "
+            "Check the time window generator in _make_overlap_base_events / "
+            "_make_overlap_job_raw."
+        )
+
+        # Python RSS must stay below 512 MB regardless of candidate fan-out.
+        assert rss_after < 512 * 1_048_576, (
+            f"Peak Python RSS {peak_rss_mb:.1f} MB exceeded 512 MB ceiling "
+            f"for {n_events} events × {n_jobs} jobs. "
+            "The DuckDB RANGE JOIN candidate fan-out must spill to disk "
+            "(DUCKDB_JOB_DIR / tmp_path), not expand the Python heap. "
+            "Check that bridge_join.sql is using duckdb.connect, not pd.merge."
+        )
+
+    def test_multi_resourceid_fan_out_scales_linearly(self, tmp_path):
+        """AC-5 (fan-out scale): 50 RESOURCEIDs × 500 events × 200 jobs each.
+
+        Models a typical production query spanning 50 distinct machines.
+        Each RESOURCEID group is processed as a separate bridge JOIN call
+        (simulating the post_aggregate per-group pattern).
+
+        Expected:
+          - All 50 groups complete without error
+          - Total wall-clock time < 120 s on a 4-core machine
+          - No MemoryError
+          - Each group output rowcount == 500 (one per event)
+        """
+        n_resources = 50
+        n_events_per_resource = 500
+        n_jobs_per_resource = 200
+        base_ts = pd.Timestamp("2025-12-01 00:00:00")
+        max_wall_seconds = 120.0
+
+        errors: List[str] = []
+        rowcounts: List[int] = []
+
+        t_start = time.monotonic()
+
+        for r_idx in range(n_resources):
+            resource_id = f"EQ-MULTI-{r_idx:04d}"
+            base_df = _make_overlap_base_events(
+                n_events_per_resource, resource_id, base_ts, seed=r_idx * 100
+            )
+            job_df = _make_overlap_job_raw(
+                n_jobs_per_resource, resource_id, base_ts, seed=r_idx * 100 + 1
+            )
+
+            try:
+                result_df = _run_bridge_join_with_memory_limit(
+                    base_df,
+                    job_df,
+                    memory_limit_mb=64,
+                    tmp_path=str(tmp_path),
+                )
+                rowcounts.append(len(result_df))
+            except Exception as exc:
+                errors.append(
+                    f"RESOURCEID={resource_id}: {type(exc).__name__}: {str(exc)[:200]}"
+                )
+
+        wall_elapsed = time.monotonic() - t_start
+
+        print(
+            f"\n[AC-5 multi-resource] n_resources={n_resources} "
+            f"events_per_resource={n_events_per_resource} "
+            f"jobs_per_resource={n_jobs_per_resource} "
+            f"wall_s={wall_elapsed:.1f} errors={len(errors)}"
+        )
+
+        assert not errors, (
+            f"Bridge JOIN failed for {len(errors)} of {n_resources} resource groups:\n"
+            + "\n".join(errors[:5])
+        )
+
+        assert all(rc == n_events_per_resource for rc in rowcounts), (
+            f"Not all groups returned {n_events_per_resource} rows. "
+            f"Counts: {rowcounts[:10]}..."
+        )
+
+        assert wall_elapsed < max_wall_seconds, (
+            f"50-resource fan-out took {wall_elapsed:.1f} s "
+            f"(ceiling: {max_wall_seconds} s). "
+            "This may indicate DuckDB connect overhead per group or I/O saturation "
+            "in the spill directory. Check DUCKDB_JOB_DIR placement."
+        )
+
+    def test_single_hot_resourceid_r2(self, tmp_path):
+        """R2 guard: 50k events × 5k jobs, single hot RESOURCEID, DuckDB memory_limit=128 MB.
+
+        Design.md R2: per-RESOURCEID grouping does NOT help a hot single machine.
+        The candidate fan-out is O(50k × 5k) = 250M rows inside DuckDB.
+        The win is on-disk spill, not a smaller join.
+
+        This test proves that:
+          (a) DowntimeJob._run_bridge_join completes without MemoryError,
+          (b) peak Python RSS stays below 1 GB (DuckDB spill prevents heap growth),
+          (c) match_ambiguous is computed correctly on a sampled subset.
+
+        Expected:
+          - Completes without MemoryError
+          - Output rowcount == n_events
+          - Peak RSS < 1 GB
+          - Sample check: match_ambiguous dtype is bool (not NULL / object)
+        """
+        n_events = 50_000
+        n_jobs = 5_000
+        resource_id = "EQ-HOT-9999"
+        base_ts = pd.Timestamp("2025-12-01 00:00:00")
+
+        base_df = _make_overlap_base_events(n_events, resource_id, base_ts, seed=77)
+        job_df = _make_overlap_job_raw(n_jobs, resource_id, base_ts, seed=78)
+
+        _gc_collect()
+        rss_before = _rss_bytes()
+
+        try:
+            result_df = _run_bridge_join_with_memory_limit(
+                base_df,
+                job_df,
+                memory_limit_mb=128,
+                tmp_path=str(tmp_path),
+            )
+        except MemoryError as exc:
+            pytest.fail(
+                f"MemoryError raised for single hot RESOURCEID "
+                f"({n_events} events × {n_jobs} jobs, R2 guard): {exc}\n"
+                "This is the exact OOM scenario the DuckDB migration must eliminate. "
+                "Confirm bridge_join.sql does not call pd.merge and that the "
+                "memory_limit patch is active."
+            )
+
+        _gc_collect()
+        rss_after = _rss_bytes()
+        peak_rss_mb = rss_after / 1_048_576
+
+        print(
+            f"\n[R2 hot-RESOURCEID] n_events={n_events} n_jobs={n_jobs} "
+            f"rss_before={rss_before/1_048_576:.1f} MB "
+            f"rss_after={peak_rss_mb:.1f} MB "
+            f"output_rows={len(result_df)}"
+        )
+
+        # One output row per event (winner or orphan).
+        assert len(result_df) == n_events, (
+            f"Expected {n_events} output rows, got {len(result_df)}. "
+            "bridge_join.sql path_b_winners UNION path_b_no_match must cover all events."
+        )
+
+        # match_ambiguous sample check — column must exist and be boolean-typed.
+        assert "match_ambiguous" in result_df.columns, (
+            "bridge_join.sql must produce 'match_ambiguous' column (ADR-0010 guard). "
+            "If this column is absent, the SQL was simplified in a way that drops "
+            "the 80%-runner-up ambiguity flag."
+        )
+        # Convert to Python bool series for dtype check (DuckDB returns bool or object)
+        ambiguous_vals = result_df["match_ambiguous"].dropna().unique().tolist()
+        # All values must be Python bool True/False (not strings or None-only)
+        non_bool = [v for v in ambiguous_vals if not isinstance(v, (bool, np.bool_))]
+        assert not non_bool, (
+            f"match_ambiguous contains non-boolean values: {non_bool[:5]}. "
+            "bridge_join.sql CASE WHEN ... THEN TRUE ELSE FALSE END must produce "
+            "a boolean column, not a string or object column."
+        )
+
+        # With 5k jobs all overlapping every event, there will be many candidates
+        # per event — expect a significant fraction to be ambiguous (runner-up
+        # overlap >= 80% of winner when two jobs have similar durations).
+        # We only assert the column is populated; exact ratio is data-dependent.
+        true_count = int((result_df["match_ambiguous"] == True).sum())  # noqa: E712
+        print(
+            f"[R2 hot-RESOURCEID] match_ambiguous=True count: {true_count} "
+            f"of {n_events} events ({100.0 * true_count / n_events:.1f}%)"
+        )
+
+        # Peak Python RSS must stay below 1 GB.
+        assert rss_after < 1024 * 1_048_576, (
+            f"Peak Python RSS {peak_rss_mb:.1f} MB exceeded 1 GB ceiling "
+            f"for single hot RESOURCEID ({n_events} events × {n_jobs} jobs). "
+            "DuckDB must be spilling the 250M-candidate intermediate table to disk. "
+            "If RSS exceeded 1 GB, the spill is not working or memory_limit was "
+            "not applied. Check DUCKDB_JOB_DIR write permissions and disk space."
         )

@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.29
+schema-version: 1.3.30
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -445,6 +445,39 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 
 **Schema-version bump to 1.3.26 (patch)**: additive gate-compatibility note for P1 migration. No gate tier, command, or status changed.
 
+## downtime-duckdb-join-migration Gate Compatibility Note
+
+**P5 migration — new `DowntimeJob(BaseChunkedDuckDBJob)` + feature flag (default `off`):**
+
+- New `DowntimeJob` class added in `src/mes_dashboard/workers/downtime_worker.py` (job type `downtime_unified`). Covered by existing `unit-mock-integration` gate (`tests/test_base_chunked_duckdb_job.py` extensions, `tests/test_query_cost_policy.py` `_APPROVED_CALLERS` stem addition — auto-discovered).
+- New contract test: `tests/contract/test_env_downtime_flag.py` (AC-6 env-contract pin for `DOWNTIME_USE_UNIFIED_JOB` default `off`) — auto-discovered by `unit-mock-integration` gate.
+- New integration tests: `tests/integration/test_downtime_rq_async.py`, `tests/integration/test_rowcount_flag_parity.py` — skipped pre-merge (`integration_real` marker); covered by existing `nightly-integration` gate.
+- New stress test: `tests/stress/test_downtime_analysis_stress.py` — covered by existing `stress-load` gate (`tests/stress/ -m "stress or load"`).
+- New E2E test: `tests/e2e/test_downtime_analysis_e2e.py` — covered by existing `e2e-tests.yml` (`tests/e2e/ -m e2e`); starts informational.
+- Feature flag `DOWNTIME_USE_UNIFIED_JOB=off` (default) ensures zero behavioral change under all gate runs until explicitly set.
+- Reuses existing `downtime-query` RQ queue and `mes-dashboard-downtime-query-worker.service` — no new systemd unit, no new workflow file, no gate tier change. Additive; no existing gates changed.
+- `chunk_strategy=RESOURCEID` (per-RESOURCEID group) with `requires_cross_chunk_reduction=True`; `ROW_COUNT` and `TIME` chunking explicitly prohibited (ADR-0003).
+- `stress-soak-report.md` authored by stress-soak-engineer required before flag promotion to `on` in production (not before merge).
+
+**Deploy checklist:**
+1. No new worker service required — reuses existing `mes-dashboard-downtime-query-worker.service` and `downtime-query` queue.
+2. Verify `downtime-query` queue and worker remain healthy after deploy.
+3. Confirm `DOWNTIME_USE_UNIFIED_JOB` reads as `off` in ALL processes (gunicorn + worker) before promoting to `on`. Flag is a module-level constant frozen at boot; `kill -HUP` alone is insufficient.
+4. Worker env-var parity: `mes-dashboard-downtime-query-worker.service` MUST export `DOWNTIME_USE_UNIFIED_JOB` with the same value as gunicorn.
+5. Run `tests/test_base_chunked_duckdb_job.py`, `tests/test_query_cost_policy.py`, and `tests/contract/test_env_downtime_flag.py` green before promoting flag.
+6. Obtain sign-off on `stress-soak-report.md` (DuckDB on-disk spill under 184k-row fixture, no Python heap OOM) before promoting flag to `on` in production.
+
+**Rollback checklist:**
+1. Set `DOWNTIME_USE_UNIFIED_JOB=off`.
+2. **Restart** gunicorn and the `downtime-query` worker — env vars are module-level constants frozen at boot; `kill -HUP` is insufficient.
+3. No spool cleanup required: `DowntimeJob` writes to the existing `downtime_analysis_base_events` and `downtime_analysis_job_bridge` namespaces; spool schema is unchanged between unified-job and legacy paths.
+4. Hard rollback (revert PR): in-flight `DowntimeJob` tasks are abandoned; frontend receives HTTP 410 (`CACHE_EXPIRED`) and retries gracefully on next user query.
+5. Schema-breaking spool rollback only (if `_SCHEMA_VERSION` was bumped): `rm -f tmp/query_spool/downtime_analysis_base_events/*.parquet tmp/query_spool/downtime_analysis_job_bridge/*.parquet`.
+
+**No new gate tier or command**: all new tests fall within existing `unit-mock-integration` (Tier 1), `nightly-integration` (Tier 3), `stress-load` (Tier 4), and `e2e-tests.yml` (informational Tier 1) gate commands.
+
+**Schema-version bump to 1.3.30 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
+
 ## Rollback Policy
 
 - 任何 Tier 1 gate 變紅後 main branch 不得合入新 PR，直到修復。
@@ -549,6 +582,9 @@ gate tier, command, or status changed.
 **Schema-version bump to 1.3.29 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
 
 ## CHANGELOG
+
+## [ci 1.3.30] — 2026-06-19
+- downtime-duckdb-join-migration: Gate-compatibility note for P5 migration — `DowntimeJob(BaseChunkedDuckDBJob)` + `execute_downtime_unified_job`; reuses `downtime-query` queue and existing worker service; `chunk_strategy=RESOURCEID` with `requires_cross_chunk_reduction=True` (ADR-0003 compliance). Feature flag `DOWNTIME_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. `stress-soak-report.md` required before flag promotion. No new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.29] — 2026-06-19
 - material-trace-streaming-migration: Gate-compatibility note for P4 migration — `MaterialTraceJob` + `execute_material_trace_unified_job` in existing service/runtime files; reuses `trace-events` queue and existing worker service; no new workflow file or gate tier. Feature flag `MATERIAL_TRACE_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. Additive; no existing gates changed.

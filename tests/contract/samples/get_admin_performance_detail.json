@@ -43,7 +43,7 @@
     },
     "direct_connections": {
       "total_since_start": 6,
-      "worker_pid": 310858
+      "worker_pid": 333397
     },
     "duckdb": {
       "memory_limit_state": "512MB",
@@ -161,7 +161,7 @@
     },
     "spool_disk_usage": [
       {
-        "file_count": 2,
+        "file_count": 3,
         "namespace": "msd-events",
         "total_bytes": 0
       },
@@ -219,7 +219,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T12:17:24.763153"
+    "timestamp": "2026-06-19T14:57:22.081208"
   },
   "success": true
 }

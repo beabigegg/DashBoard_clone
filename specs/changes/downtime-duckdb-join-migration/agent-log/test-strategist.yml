@@ -1,0 +1,14 @@
+agent: test-strategist
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/downtime-duckdb-join-migration/test-plan.md" }
+  - { type: ac-coverage, pointer: "all 8 ACs mapped; unit (AC-2,4,7,8 spool-key) pre-merge; contract (AC-6) pre-merge; parity (AC-3) nightly; stress (AC-5) weekly" }
+
+findings:
+  - "ADR-0010 guard test: test_match_ambiguous_true_when_runner_up_gte_80pct required (pins ASOF-vs-RANGE regression)"
+  - "AC-3 full row-set equality on (event_id, job_id, match_source) — count-only passes while silently regressing"
+  - "AC-6 env-contract: follows tests/contract/test_env_material_trace_flag.py pattern in new tests/contract/test_env_downtime_unified_flag.py"
+  - "E2E: verify existing test_downtime_analysis_e2e.py flag-OFF path (no modification needed)"

@@ -139,6 +139,8 @@ class TestMaterialTraceE2E:
         )
 
 
+
+
 @pytest.mark.e2e
 class TestMaterialTraceBrowserE2E:
     """Browser E2E for the material-trace page workflow."""

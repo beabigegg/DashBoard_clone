@@ -1,0 +1,16 @@
+agent: contract-reviewer
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/env/env-contract.md (1.0.18→1.0.19), contracts/env/env.schema.json, contracts/env/.env.example.template, .env.example" }
+  - { type: contracts-reviewed, pointer: "contracts/data/data-shape-contract.md (1.22.0→1.23.0 §3.21), contracts/business/business-rules.md (1.26.1→1.27.0 DDA-01+3 Decision Table rows)" }
+  - { type: version-bumps, pointer: "env 1.0.18→1.0.19; data 1.22.0→1.23.0; business 1.26.1→1.27.0; ci 1.3.29→1.3.30 (by ci-cd-gatekeeper)" }
+  - { type: breaking-changes, pointer: "none; all additive; DOWNTIME_USE_UNIFIED_JOB defaults off" }
+
+findings:
+  - "DA-03 already documents JOBID bridge algorithm; new DDA-01 documents the unified-job DuckDB implementation locus specifically"
+  - "§3.21 scope is query_downtime_dataset ONLY; query_downtime_dataset_raw (§3.13, browser path) OUT OF SCOPE — blanket UNCHANGED would be false contract"
+  - "Worker env-var parity required: mes-dashboard-downtime-worker.service must export DOWNTIME_USE_UNIFIED_JOB same value as gunicorn"
+  - "env.schema.json enum validation: cdd-kit validate --contracts will machine-enforce the enum values"

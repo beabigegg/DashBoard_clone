@@ -358,7 +358,7 @@ class TestChunkSeam:
 class TestOrderByTieStability:
     """Verify that the ORDER BY keys documented in BQE-03 are present in paged SQL files."""
 
-    def _sql_path(self, relative: str) -> "Path":
+    def _sql_path(self, relative: str) -> "Path":  # noqa: F821
         import os
         from pathlib import Path
         base = Path(__file__).resolve().parent.parent.parent

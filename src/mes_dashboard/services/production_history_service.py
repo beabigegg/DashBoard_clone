@@ -41,7 +41,6 @@ from mes_dashboard.core.query_spool_store import (
 )
 from mes_dashboard.services.batch_query_engine import (
     _USE_ROW_COUNT_CHUNKING,
-    BATCH_QUERY_ROWS_PER_CHUNK,
     compute_query_hash,
     decompose_by_row_count,
     decompose_by_time_range,

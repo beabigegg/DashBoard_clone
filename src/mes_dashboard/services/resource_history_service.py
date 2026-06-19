@@ -18,7 +18,7 @@ import csv
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, List, Any, Generator
 
 import pandas as pd

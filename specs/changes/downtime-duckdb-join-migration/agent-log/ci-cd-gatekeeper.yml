@@ -1,0 +1,10 @@
+agent: ci-cd-gatekeeper
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3, 4" }
+  - { type: gate-promotions, pointer: "none — downtime-e2e starts informational at Tier 1; promotion to required follows standard Informational Gate Promotion Policy" }
+  - { type: workflow-files-changed, pointer: "contracts/ci/ci-gate-contract.md (schema-version 1.3.29 → 1.3.30, additive compatibility note)" }
+  - { type: required-status-checks, pointer: "lint, contract-validate, response-shape-validate, unit-mock-integration, cdd-gate" }

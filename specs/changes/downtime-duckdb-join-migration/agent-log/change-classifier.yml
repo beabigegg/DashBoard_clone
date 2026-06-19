@@ -1,0 +1,17 @@
+agent: change-classifier
+change-id: downtime-duckdb-join-migration
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: classification, pointer: "specs/changes/downtime-duckdb-join-migration/change-classification.md" }
+  - { type: context-manifest, pointer: "specs/changes/downtime-duckdb-join-migration/context-manifest.md" }
+
+findings:
+  - "Tier 1, high risk, cross-module; XL difficulty"
+  - "Architecture Review Required: design.md required before implementation (RESOURCEID grouping model + DuckDB time-overlap JOIN strategy)"
+  - "stress-soak-report.md required: this is the #1 OOM risk point; durable memory-ceiling evidence needed"
+  - "9 required agents: spec-architect, implementation-planner, backend-engineer, test-strategist, contract-reviewer, e2e-resilience-engineer, stress-soak-engineer, ci-cd-gatekeeper, qa-reviewer"
+  - "CER-001 approved: eap_alarm_worker.py + ADR-0009 + ADR-0008 as reference implementation"
+  - "8 ACs: AC-1 flag-off zero-regression, AC-2 no pd.merge, AC-3 flag-parity, AC-4 ADR-0003 preserved, AC-5 OOM stress proof, AC-6 env contract, AC-7 bridge semantics, AC-8 non-goals upheld"
+  - "Tasks skipped: 2.1 (API verify-only), 2.2 (CSS/UI), 3.4 (monkey), 4.2 (frontend), 5.1 (UI/UX), 5.2 (visual)"

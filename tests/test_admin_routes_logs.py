@@ -59,7 +59,8 @@ class TestApiLogsSqliteIncludesSynced:
     def test_api_logs_sqlite_only_includes_synced(self, client, auth_patches):
         """When MySQL is disabled, synced rows must appear in the response."""
         from mes_dashboard.core.log_store import LogStore
-        import tempfile, os
+        import tempfile
+        import os
 
         fd, db_path = tempfile.mkstemp(suffix=".db")
         os.close(fd)

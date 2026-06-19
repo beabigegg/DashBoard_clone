@@ -1425,7 +1425,8 @@ class TestRawSpoolWriter:
         }
 
         # Make a query_id with schema_version=1 and another with schema_version=2
-        import hashlib, json
+        import hashlib
+        import json
         from mes_dashboard.config.constants import DOWNTIME_BRIDGE_VERSION
 
         def _make_qid(sv):

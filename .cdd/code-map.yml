@@ -1,6 +1,6 @@
-# generated: 2026-06-19T06:23:18Z by cdd-kit 3.3.0
-# files: 919, src-lines: 268489, map-lines: 20141, compression: 13.3x
-# sources-digest: 86cf19ee80efcb21d11d742024e7d6c797d4d3ecce02a849f267b58fc0162780
+# generated: 2026-06-19T09:18:57Z by cdd-kit 3.3.0
+# files: 922, src-lines: 271667, map-lines: 20294, compression: 13.4x
+# sources-digest: b25d37c89a9a14b30672bba2ae9de31ad316feba4b8f6b1d64456e9c3ea5efd9
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3895,7 +3895,7 @@ src/mes_dashboard/core/database.py:  # 1190 lines
     - { name: get_table_data, lines: 988-1072 }
     - { name: get_table_column_metadata, lines: 1075-1190 }
 
-src/mes_dashboard/core/duckdb_runtime.py:  # 182 lines
+src/mes_dashboard/core/duckdb_runtime.py:  # 181 lines
   imports:
     - { module: __future__, items: [annotations], line: 29 }
     - { module: logging, items: [], line: 31 }
@@ -3914,8 +3914,8 @@ src/mes_dashboard/core/duckdb_runtime.py:  # 182 lines
     - { name: _str_env, lines: 45-46 }
     - { name: _int_env, lines: 49-56 }
     - { name: create_heavy_query_connection, lines: 87-124 }
-    - { name: get_duckdb_telemetry, lines: 127-160 }
-    - { name: assert_spool_path, lines: 163-182 }
+    - { name: get_duckdb_telemetry, lines: 127-159 }
+    - { name: assert_spool_path, lines: 162-181 }
 
 src/mes_dashboard/core/exceptions.py:  # 97 lines
   imports:
@@ -4908,7 +4908,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 534 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 582 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: os, items: [], line: 19 }
@@ -4919,17 +4919,18 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 534 lines
     - { module: mes_dashboard.services.downtime_analysis_service, items: [apply_view, export_equipment_detail_csv, export_event_detail_csv, get_filter_options, query_downtime_dataset, query_downtime_dataset_raw], line: 32 }
     - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 40 }
     - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 44 }
+    - { module: mes_dashboard.core.feature_flags, items: [_resolve_bool_flag], line: 83 }
   functions:
-    - { name: _validate_dates, lines: 83-98 }
-    - { name: _csv_param, lines: 101-106 }
-    - { name: api_downtime_options, lines: 115-147 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 156-303 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 312-345 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 354-398 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 407-447 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 456-481 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 490-515 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 523-534 }
+    - { name: _validate_dates, lines: 94-109 }
+    - { name: _csv_param, lines: 112-117 }
+    - { name: api_downtime_options, lines: 126-158 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
+    - { name: api_downtime_query, lines: 167-351 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 360-393 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 402-446 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 455-495 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 504-529 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 538-563 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 571-582 }
 
 src/mes_dashboard/routes/eap_alarm_routes.py:  # 392 lines
   imports:
@@ -6017,21 +6018,22 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1840 lines
     - { name: export_equipment_detail_csv, lines: 1735-1778 }
     - { name: export_event_detail_csv, lines: 1781-1840 }
 
-src/mes_dashboard/services/downtime_query_job_service.py:  # 126 lines
+src/mes_dashboard/services/downtime_query_job_service.py:  # 138 lines
   imports:
-    - { module: __future__, items: [annotations], line: 10 }
-    - { module: logging, items: [], line: 12 }
-    - { module: os, items: [], line: 13 }
-    - { module: typing, items: [Any], line: 14 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, update_job_progress], line: 16 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 118 }
+    - { module: __future__, items: [annotations], line: 14 }
+    - { module: logging, items: [], line: 16 }
+    - { module: os, items: [], line: 17 }
+    - { module: typing, items: [Any], line: 18 }
+    - { module: mes_dashboard.core.feature_flags, items: [resolve_bool_flag], line: 20 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, update_job_progress], line: 21 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 130 }
   constants:
-    - { name: DOWNTIME_ASYNC_ENABLED, line: 26 }
-    - { name: DOWNTIME_WORKER_QUEUE, line: 30 }
-    - { name: DOWNTIME_JOB_TTL_SECONDS, line: 33 }
-    - { name: DOWNTIME_JOB_TIMEOUT_SECONDS, line: 34 }
+    - { name: DOWNTIME_ASYNC_ENABLED, line: 31 }
+    - { name: DOWNTIME_WORKER_QUEUE, line: 35 }
+    - { name: DOWNTIME_JOB_TTL_SECONDS, line: 38 }
+    - { name: DOWNTIME_JOB_TIMEOUT_SECONDS, line: 39 }
   functions:
-    - { name: execute_downtime_query_job, lines: 46-112 }
+    - { name: execute_downtime_query_job, lines: 58-124 }
 
 src/mes_dashboard/services/eap_alarm_cache.py:  # 101 lines
   imports:
@@ -6847,7 +6849,7 @@ src/mes_dashboard/services/production_history_job_service.py:  # 151 lines
     - { name: enqueue_production_history_query, lines: 62-86 }
     - { name: execute_production_history_job, lines: 93-139 }
 
-src/mes_dashboard/services/production_history_service.py:  # 753 lines
+src/mes_dashboard/services/production_history_service.py:  # 752 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: logging, items: [], line: 17 }
@@ -6861,29 +6863,29 @@ src/mes_dashboard/services/production_history_service.py:  # 753 lines
     - { module: mes_dashboard.core.request_validation, items: [WildcardToken, parse_wildcard_tokens], line: 27 }
     - { module: mes_dashboard.core.global_concurrency, items: [acquire_heavy_query_slot, release_heavy_query_slot], line: 31 }
     - { module: mes_dashboard.core.query_spool_store, items: [QUERY_SPOOL_DIR, QUERY_SPOOL_TTL_SECONDS, get_spool_file_path, get_spool_metadata, register_spool_file], line: 35 }
-    - { module: mes_dashboard.services.batch_query_engine, items: [_USE_ROW_COUNT_CHUNKING, BATCH_QUERY_ROWS_PER_CHUNK, compute_query_hash, decompose_by_row_count, decompose_by_time_range, execute_plan, get_batch_progress, merge_chunks_to_spool], line: 42 }
-    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 52 }
+    - { module: mes_dashboard.services.batch_query_engine, items: [_USE_ROW_COUNT_CHUNKING, compute_query_hash, decompose_by_row_count, decompose_by_time_range, execute_plan, get_batch_progress, merge_chunks_to_spool], line: 42 }
+    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 51 }
   constants:
-    - { name: MAX_DATE_RANGE_DAYS, line: 63 }
-    - { name: ENGINE_GRAIN_DAYS, line: 64 }
-    - { name: MAX_ROWS_PER_CHUNK, line: 65 }
-    - { name: MAX_PARENT_TRACE_DEPTH, line: 66 }
-    - { name: DEFAULT_PAGE_SIZE, line: 68 }
+    - { name: MAX_DATE_RANGE_DAYS, line: 62 }
+    - { name: ENGINE_GRAIN_DAYS, line: 63 }
+    - { name: MAX_ROWS_PER_CHUNK, line: 64 }
+    - { name: MAX_PARENT_TRACE_DEPTH, line: 65 }
+    - { name: DEFAULT_PAGE_SIZE, line: 67 }
   functions:
-    - { name: _parse_date, lines: 75-79 }
-    - { name: _end_date_exclusive, lines: 82-84 }
-    - { name: validate_query_params, lines: 89-195 }
-    - { name: _build_extra_filters, lines: 200-297 }
-    - { name: _make_chunk_query_fn, lines: 302-338 }
-    - { name: _make_paged_query_fn, lines: 341-369 }
-    - { name: _resolve_lot_ids_with_trace, lines: 374-439 }
-    - { name: _resolve_container_ids_by_names, lines: 442-466 }
-    - { name: get_type_options, lines: 475-482 }
-    - { name: query_production_history, lines: 487-569 }
-    - { name: _make_dataset_id, lines: 572-604 }
-    - { name: _run_oracle_to_spool, lines: 607-688 }
-    - { name: make_canonical_spool_id, lines: 702-712 }
-    - { name: query_row_count, lines: 715-753 }
+    - { name: _parse_date, lines: 74-78 }
+    - { name: _end_date_exclusive, lines: 81-83 }
+    - { name: validate_query_params, lines: 88-194 }
+    - { name: _build_extra_filters, lines: 199-296 }
+    - { name: _make_chunk_query_fn, lines: 301-337 }
+    - { name: _make_paged_query_fn, lines: 340-368 }
+    - { name: _resolve_lot_ids_with_trace, lines: 373-438 }
+    - { name: _resolve_container_ids_by_names, lines: 441-465 }
+    - { name: get_type_options, lines: 474-481 }
+    - { name: query_production_history, lines: 486-568 }
+    - { name: _make_dataset_id, lines: 571-603 }
+    - { name: _run_oracle_to_spool, lines: 606-687 }
+    - { name: make_canonical_spool_id, lines: 701-711 }
+    - { name: query_row_count, lines: 714-752 }
 
 src/mes_dashboard/services/production_history_sql_runtime.py:  # 1071 lines
   imports:
@@ -7533,7 +7535,7 @@ src/mes_dashboard/services/resource_history_service.py:  # 1227 lines
     - { module: logging, items: [], line: 18 }
     - { module: os, items: [], line: 19 }
     - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 20 }
-    - { module: datetime, items: [date, datetime, timedelta], line: 21 }
+    - { module: datetime, items: [datetime], line: 21 }
     - { module: typing, items: [Optional, Dict, List, Any, Generator], line: 22 }
     - { module: pandas, items: [], line: 24 }
     - { module: mes_dashboard.core.database, items: [read_sql_df], line: 26 }
@@ -8146,6 +8148,41 @@ src/mes_dashboard/static/js/toast.js:  # 240 lines
 
 src/mes_dashboard/workers/__init__.py:  # 0 lines
 
+src/mes_dashboard/workers/downtime_worker.py:  # 747 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 31 }
+    - { module: logging, items: [], line: 33 }
+    - { module: os, items: [], line: 34 }
+    - { module: pathlib, items: [Path], line: 35 }
+    - { module: typing, items: [Any, Dict, List], line: 36 }
+    - { module: pyarrow, items: [], line: 38 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 40 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 738 }
+  constants:
+    - { name: DOWNTIME_WORKER_QUEUE, line: 47 }
+    - { name: DOWNTIME_JOB_TTL_SECONDS, line: 48 }
+    - { name: DOWNTIME_JOB_TIMEOUT_SECONDS, line: 49 }
+  classes:
+    - name: DowntimeJob
+      lines: 167-693
+      methods:
+        - { name: __init__, lines: 187-192 }
+        - { name: pre_query, lines: 198-248 }
+        - { name: build_chunk_sql, lines: 254-282 }
+        - { name: chunk_to_duckdb, lines: 288-304 }
+        - { name: _chunk_to_duckdb_routed, lines: 306-345 }
+        - { name: _fan_out_reduction, lines: 347-373 }
+        - { name: post_aggregate, lines: 379-471 }
+        - { name: _read_table_safe, lines: 477-496 }
+        - { name: _run_cross_shift_merge, lines: 498-541 }
+        - { name: _run_bridge_join, lines: 543-588 }
+        - { name: _derive_job_columns, lines: 590-662 }
+        - { name: _write_spool, lines: 664-688 }
+        - { name: progress_report, lines: 690-693 }
+  functions:
+    - { name: _build_in_filter, lines: 140-164 }
+    - { name: execute_downtime_unified_job, lines: 700-732 }
+
 src/mes_dashboard/workers/eap_alarm_worker.py:  # 528 lines
   imports:
     - { module: __future__, items: [annotations], line: 23 }
@@ -8361,6 +8398,30 @@ tests/contract/test_doctor_clean.py:  # 78 lines
       lines: 16-78
       methods:
         - { name: test_doctor_response_shape_zero_warnings, lines: 27-78 }
+
+tests/contract/test_env_downtime_unified_flag.py:  # 93 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: json, items: [], line: 14 }
+    - { module: pathlib, items: [Path], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  classes:
+    - name: TestDowntimeUnifiedFlagInEnvContract
+      lines: 28-46
+      methods:
+        - { name: test_flag_in_env_contract_md, lines: 31-36 }
+        - { name: test_flag_documented_with_default_off_in_contract_md, lines: 38-46 }
+    - name: TestDowntimeUnifiedFlagInEnvExample
+      lines: 49-65
+      methods:
+        - { name: test_flag_in_env_example_template, lines: 52-57 }
+        - { name: test_flag_default_is_off_in_env_example_template, lines: 59-65 }
+    - name: TestDowntimeUnifiedFlagInSchema
+      lines: 68-93
+      methods:
+        - { name: test_flag_in_schema_json, lines: 71-76 }
+        - { name: test_flag_default_is_off_in_schema, lines: 78-85 }
+        - { name: test_flag_enum_includes_off_and_on, lines: 87-93 }
 
 tests/contract/test_env_duckdb_job_dir.py:  # 100 lines
   imports:
@@ -9702,7 +9763,7 @@ tests/integration/conftest.py:  # 375 lines
     - { name: _wait_for_health, lines: 294-313 }
     - { name: oracle_xe_app, lines: 336-375 }  # @pytest.fixture()
 
-tests/integration/test_downtime_rq_async.py:  # 341 lines
+tests/integration/test_downtime_rq_async.py:  # 1254 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: importlib, items: [], line: 19 }
@@ -9724,6 +9785,30 @@ tests/integration/test_downtime_rq_async.py:  # 341 lines
       methods:
         - { name: test_worker_fn_parity_vs_sync, lines: 180-287 }
         - { name: test_worker_fn_da11_failure_does_not_call_complete_job, lines: 289-341 }
+    - name: TestDowntimeJobOracleFaultInjection
+      lines: 348-545
+      methods:
+        - { name: test_oracle_fault_mid_chunk_no_partial_spool, lines: 360-492 }
+        - { name: test_oracle_fault_first_chunk_no_duckdb_created, lines: 494-545 }
+    - name: TestDowntimeJobWorkerRestart
+      lines: 552-646
+      methods:
+        - { name: test_inflight_job_aborted_returns_410_or_failed, lines: 570-598 }
+        - { name: test_inflight_job_worker_crash_status_is_failed, lines: 600-646 }
+    - name: TestDowntimeJobSpillToDisk
+      lines: 653-893
+      methods:
+        - { name: _make_base_df, lines: 668-694 }
+        - { name: _make_job_df, lines: 697-729 }
+        - { name: test_bridge_join_completes_under_constrained_memory, lines: 731-841 }
+        - { name: test_post_aggregate_empty_tables_returns_empty_spool, lines: 843-893 }
+    - name: TestDowntimeFlagParity
+      lines: 900-1254
+      methods:
+        - { name: _make_seeded_base_df, lines: 918-942 }
+        - { name: _make_seeded_job_df, lines: 945-969 }
+        - { name: test_flag_on_off_spool_schema_equal, lines: 971-1057 }
+        - { name: test_flag_on_off_spool_row_set_equal, lines: 1060-1254 }
   functions:
     - { name: _reset_registry, lines: 36-39 }
     - { name: _reload_job_service, lines: 42-46 }
@@ -10925,7 +11010,7 @@ tests/stress/test_data_integrity.py:  # 475 lines
     - { name: _post, lines: 37-42 }
     - { name: _get, lines: 45-50 }
 
-tests/stress/test_downtime_analysis_stress.py:  # 710 lines
+tests/stress/test_downtime_analysis_stress.py:  # 1172 lines
   imports:
     - { module: __future__, items: [annotations], line: 39 }
     - { module: concurrent.futures, items: [], line: 41 }
@@ -10939,6 +11024,7 @@ tests/stress/test_downtime_analysis_stress.py:  # 710 lines
     - { module: pandas, items: [], line: 50 }
     - { module: psutil, items: [], line: 51 }
     - { module: pytest, items: [], line: 52 }
+    - { module: tracemalloc, items: [], line: 766 }
   classes:
     - name: TestDowntimeRawSpoolMemory
       lines: 352-591
@@ -10953,6 +11039,12 @@ tests/stress/test_downtime_analysis_stress.py:  # 710 lines
       methods:
         - { name: test_fifty_repeated_queries_memory_stable, lines: 621-666 }
         - { name: test_rss_samples_show_no_monotonic_growth_trend, lines: 668-710 }
+    - name: TestDowntimeJobOomCeiling
+      lines: 889-1172
+      methods:
+        - { name: test_high_cardinality_join_completes_without_python_oom, lines: 917-1003 }
+        - { name: test_multi_resourceid_fan_out_scales_linearly, lines: 1005-1075 }
+        - { name: test_single_hot_resourceid_r2, lines: 1077-1172 }
   functions:
     - { name: _make_base_events_df, lines: 103-143 }
     - { name: _make_job_bridge_df, lines: 146-175 }
@@ -10962,6 +11054,9 @@ tests/stress/test_downtime_analysis_stress.py:  # 710 lines
     - { name: _get_large_dfs, lines: 319-329 }
     - { name: _rss_bytes, lines: 336-338 }
     - { name: _gc_collect, lines: 341-344 }
+    - { name: _make_overlap_base_events, lines: 769-804 }
+    - { name: _make_overlap_job_raw, lines: 807-851 }
+    - { name: _run_bridge_join_with_memory_limit, lines: 854-885 }
 
 tests/stress/test_frontend_stress.py:  # 493 lines
   imports:
@@ -11358,7 +11453,7 @@ tests/test_admin_routes.py:  # 197 lines
     - { name: test_update_page_status, lines: 164-176 }
     - { name: test_user_usage_kpi_no_500_mysql_unavailable, lines: 181-197 }
 
-tests/test_admin_routes_logs.py:  # 352 lines
+tests/test_admin_routes_logs.py:  # 353 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: unittest.mock, items: [patch, MagicMock], line: 11 }
@@ -11366,30 +11461,30 @@ tests/test_admin_routes_logs.py:  # 352 lines
     - { module: mes_dashboard.app, items: [create_app], line: 15 }
   classes:
     - name: TestApiLogsSqliteIncludesSynced
-      lines: 56-95
+      lines: 56-96
       methods:
-        - { name: test_api_logs_sqlite_only_includes_synced, lines: 59-95 }
+        - { name: test_api_logs_sqlite_only_includes_synced, lines: 59-96 }
     - name: TestMergePagination
-      lines: 98-207
+      lines: 99-208
       methods:
-        - { name: _run_paginated, lines: 101-127 }
-        - { name: _make_rows, lines: 129-135 }
-        - { name: test_merge_pagination_offset_zero, lines: 137-146 }
-        - { name: test_merge_pagination_across_source_boundary, lines: 148-157 }
-        - { name: test_merge_pagination_offset_exceeds_total, lines: 159-168 }
-        - { name: test_merge_pagination_total_is_combined, lines: 170-178 }
-        - { name: test_merge_pagination_mysql_empty, lines: 180-188 }
-        - { name: test_merge_pagination_sqlite_empty, lines: 190-198 }
-        - { name: test_merge_pagination_both_empty, lines: 200-207 }
+        - { name: _run_paginated, lines: 102-128 }
+        - { name: _make_rows, lines: 130-136 }
+        - { name: test_merge_pagination_offset_zero, lines: 138-147 }
+        - { name: test_merge_pagination_across_source_boundary, lines: 149-158 }
+        - { name: test_merge_pagination_offset_exceeds_total, lines: 160-169 }
+        - { name: test_merge_pagination_total_is_combined, lines: 171-179 }
+        - { name: test_merge_pagination_mysql_empty, lines: 181-189 }
+        - { name: test_merge_pagination_sqlite_empty, lines: 191-199 }
+        - { name: test_merge_pagination_both_empty, lines: 201-208 }
     - name: TestApiLogsNoMysql
-      lines: 210-233
+      lines: 211-234
       methods:
-        - { name: test_api_logs_no_500_mysql_not_configured, lines: 213-233 }
+        - { name: test_api_logs_no_500_mysql_not_configured, lines: 214-234 }
     - name: TestApiLogsMergedSort
-      lines: 236-352
+      lines: 237-353
       methods:
-        - { name: test_same_minute_rows_interleave_by_datetime, lines: 239-294 }
-        - { name: test_unparseable_timestamp_falls_to_bottom, lines: 296-352 }
+        - { name: test_same_minute_rows_interleave_by_datetime, lines: 240-295 }
+        - { name: test_unparseable_timestamp_falls_to_bottom, lines: 297-353 }
   functions:
     - { name: app, lines: 19-22 }  # @pytest.fixture
     - { name: client, lines: 26-27 }  # @pytest.fixture
@@ -13506,7 +13601,7 @@ tests/test_downtime_analysis_routes.py:  # 833 lines
     - { name: _mock_view_result, lines: 47-56 }
     - { name: _mock_raw_result, lines: 469-481 }
 
-tests/test_downtime_analysis_service.py:  # 1951 lines
+tests/test_downtime_analysis_service.py:  # 1952 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: hashlib, items: [], line: 17 }
@@ -13638,7 +13733,7 @@ tests/test_downtime_analysis_service.py:  # 1951 lines
         - { name: test_spool_column_schema_matches_previous_path, lines: 1179-1203 }
         - { name: test_execute_plan_merge_chunks_to_spool_called, lines: 1205-1248 }
     - name: TestRawSpoolWriter
-      lines: 1256-1474
+      lines: 1256-1475
       methods:
         - { name: _patch_flag_on, lines: 1259-1262 }
         - { name: _make_base_df, lines: 1264-1274 }
@@ -13646,48 +13741,106 @@ tests/test_downtime_analysis_service.py:  # 1951 lines
         - { name: test_base_events_parquet_written_without_merge, lines: 1297-1346 }
         - { name: test_job_bridge_parquet_written_raw, lines: 1348-1380 }
         - { name: test_merge_cross_shift_not_called_on_request_path, lines: 1382-1411 }
-        - { name: test_schema_version_in_cache_key, lines: 1413-1445 }
-        - { name: test_result_has_base_spool_url, lines: 1447-1474 }
+        - { name: test_schema_version_in_cache_key, lines: 1413-1446 }
+        - { name: test_result_has_base_spool_url, lines: 1448-1475 }
     - name: TestTaxonomyBuilder
-      lines: 1482-1527
+      lines: 1483-1528
       methods:
-        - { name: test_taxonomy_json_shape_has_map_prefixes_egt_fallback, lines: 1485-1492 }
-        - { name: test_taxonomy_map_covers_all_nine_buckets, lines: 1494-1504 }
-        - { name: test_taxonomy_egt_category_is_工程, lines: 1506-1509 }
-        - { name: test_taxonomy_fallback_is_other, lines: 1511-1514 }
-        - { name: test_taxonomy_prefixes_includes_tmtt, lines: 1516-1520 }
-        - { name: test_taxonomy_map_is_list_of_pairs, lines: 1522-1527 }
+        - { name: test_taxonomy_json_shape_has_map_prefixes_egt_fallback, lines: 1486-1493 }
+        - { name: test_taxonomy_map_covers_all_nine_buckets, lines: 1495-1505 }
+        - { name: test_taxonomy_egt_category_is_工程, lines: 1507-1510 }
+        - { name: test_taxonomy_fallback_is_other, lines: 1512-1515 }
+        - { name: test_taxonomy_prefixes_includes_tmtt, lines: 1517-1521 }
+        - { name: test_taxonomy_map_is_list_of_pairs, lines: 1523-1528 }
     - name: TestTwoParquetAtomicity
-      lines: 1535-1556
+      lines: 1536-1557
       methods:
-        - { name: test_base_hit_jobs_miss_raises_loudly, lines: 1538-1556 }
+        - { name: test_base_hit_jobs_miss_raises_loudly, lines: 1539-1557 }
     - name: TestDataBoundary
-      lines: 1564-1826
+      lines: 1565-1827
       methods:
-        - { name: _patch_flag_on, lines: 1573-1576 }
-        - { name: test_empty_base_events_handled, lines: 1581-1619 }
-        - { name: test_char_trailing_space_in_oldreasonname, lines: 1624-1643 }
-        - { name: test_char_trailing_space_tmtt_prefix, lines: 1645-1653 }
-        - { name: test_null_oldreasonname_uses_fallback, lines: 1658-1666 }
-        - { name: test_empty_string_reason_uses_fallback, lines: 1668-1675 }
-        - { name: test_cross_midnight_event_in_base_spool, lines: 1680-1750 }
-        - { name: test_no_overlap_job_bridge_written_raw, lines: 1755-1826 }
+        - { name: _patch_flag_on, lines: 1574-1577 }
+        - { name: test_empty_base_events_handled, lines: 1582-1620 }
+        - { name: test_char_trailing_space_in_oldreasonname, lines: 1625-1644 }
+        - { name: test_char_trailing_space_tmtt_prefix, lines: 1646-1654 }
+        - { name: test_null_oldreasonname_uses_fallback, lines: 1659-1667 }
+        - { name: test_empty_string_reason_uses_fallback, lines: 1669-1676 }
+        - { name: test_cross_midnight_event_in_base_spool, lines: 1681-1751 }
+        - { name: test_no_overlap_job_bridge_written_raw, lines: 1756-1827 }
     - name: TestDowntimeAsyncWorker
-      lines: 1834-1913
+      lines: 1835-1914
       methods:
-        - { name: test_pct_milestones_sequence, lines: 1841-1878 }
-        - { name: test_atomicity_base_hit_bridge_miss_raises_500, lines: 1880-1913 }
+        - { name: test_pct_milestones_sequence, lines: 1842-1879 }
+        - { name: test_atomicity_base_hit_bridge_miss_raises_500, lines: 1881-1914 }
     - name: TestDowntimeAsyncEnvVars
-      lines: 1921-1951
+      lines: 1922-1952
       methods:
-        - { name: test_default_async_enabled_true, lines: 1928-1933 }
-        - { name: test_default_day_threshold_30, lines: 1935-1939 }
-        - { name: test_default_worker_queue, lines: 1941-1946 }
-        - { name: test_default_job_timeout, lines: 1948-1951 }
+        - { name: test_default_async_enabled_true, lines: 1929-1934 }
+        - { name: test_default_day_threshold_30, lines: 1936-1940 }
+        - { name: test_default_worker_queue, lines: 1942-1947 }
+        - { name: test_default_job_timeout, lines: 1949-1952 }
   functions:
     - { name: _ts, lines: 41-43 }
     - { name: _shift_row, lines: 46-63 }
     - { name: _job_row, lines: 66-93 }
+
+tests/test_downtime_unified_job.py:  # 887 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: os, items: [], line: 14 }
+    - { module: tempfile, items: [], line: 15 }
+    - { module: datetime, items: [datetime], line: 16 }
+    - { module: pathlib, items: [Path], line: 17 }
+    - { module: typing, items: [Any, Dict], line: 18 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 19 }
+    - { module: pandas, items: [], line: 21 }
+    - { module: pyarrow, items: [], line: 22 }
+    - { module: pytest, items: [], line: 23 }
+  classes:
+    - name: TestDowntimeJobPreQuery
+      lines: 71-133
+      methods:
+        - { name: test_pre_query_returns_base_and_job_chunks, lines: 74-96 }
+        - { name: test_pre_query_sets_spool_key, lines: 98-112 }
+        - { name: test_pre_query_chunks_have_date_range, lines: 114-133 }
+    - name: TestDowntimeJobChunkToDb
+      lines: 141-258
+      methods:
+        - { name: test_base_chunk_routes_to_base_raw_table, lines: 144-171 }
+        - { name: test_job_chunk_routes_to_job_raw_table, lines: 173-209 }
+        - { name: test_multiple_base_chunks_accumulate, lines: 211-236 }
+        - { name: test_unknown_kind_raises_value_error, lines: 238-247 }
+        - { name: test_chunk_to_duckdb_raises_runtime_error, lines: 249-258 }
+    - name: TestDowntimeJobPostAggregate
+      lines: 319-683
+      methods:
+        - { name: _make_job, lines: 322-349 }
+        - { name: test_winner_selection_largest_overlap, lines: 354-382 }
+        - { name: test_match_ambiguous_false_when_runner_up_lt_80pct, lines: 387-411 }
+        - { name: test_match_ambiguous_true_when_runner_up_gte_80pct, lines: 416-486 }
+        - { name: test_orphan_event_match_source_none, lines: 491-533 }
+        - { name: test_path_a_jobid_direct_match, lines: 538-587 }
+        - { name: test_cross_shift_merge_59s_gap_merges, lines: 592-639 }
+        - { name: test_cross_shift_merge_61s_gap_stays_separate, lines: 644-683 }
+    - name: TestDowntimeFlagDispatch
+      lines: 691-763
+      methods:
+        - { name: _setup_app, lines: 695-700 }
+        - { name: test_flag_off_calls_legacy_path, lines: 702-727 }
+        - { name: test_flag_on_routes_to_unified_job, lines: 729-763 }
+    - name: TestDowntimeJobSpoolKey
+      lines: 771-811
+      methods:
+        - { name: test_spool_key_matches_legacy_for_same_params, lines: 774-811 }
+    - name: TestDowntimeJobSpoolColumnParity
+      lines: 814-887
+      methods:
+        - { name: test_canonical_column_count, lines: 828-836 }
+        - { name: test_derive_job_columns_preserves_fragment_count, lines: 838-887 }
+  functions:
+    - { name: _ts, lines: 29-31 }
+    - { name: _make_base_batch, lines: 34-46 }
+    - { name: _make_job_batch, lines: 49-63 }
 
 tests/test_duckdb_runtime.py:  # 115 lines
   imports:
@@ -14887,7 +15040,7 @@ tests/test_job_query_service.py:  # 294 lines
         - { name: test_partial_failure_in_meta, lines: 275-285 }
         - { name: test_no_partial_failure_no_meta_key, lines: 287-294 }
 
-tests/test_job_registry.py:  # 280 lines
+tests/test_job_registry.py:  # 288 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pytest, items: [], line: 9 }
@@ -14907,15 +15060,15 @@ tests/test_job_registry.py:  # 280 lines
         - { name: test_returns_error_tuple_for_unregistered_type, lines: 129-141 }
         - { name: test_respects_should_enqueue_false, lines: 143-172 }
     - name: TestJobServiceRegistrations
-      lines: 179-238
+      lines: 179-246
       methods:
-        - { name: test_each_service_registers_exactly_one_job_type, lines: 180-238 }
+        - { name: test_each_service_registers_exactly_one_job_type, lines: 180-246 }
     - name: TestAlwaysAsyncField
-      lines: 245-280
+      lines: 253-288
       methods:
-        - { name: test_job_type_config_always_async_defaults_false, lines: 246-254 }
-        - { name: test_job_type_config_always_async_true, lines: 256-265 }
-        - { name: test_eap_alarm_registered_with_always_async_true, lines: 267-280 }
+        - { name: test_job_type_config_always_async_defaults_false, lines: 254-262 }
+        - { name: test_job_type_config_always_async_true, lines: 264-273 }
+        - { name: test_eap_alarm_registered_with_always_async_true, lines: 275-288 }
   functions:
     - { name: reset_registry, lines: 18-22 }  # @pytest.fixture(autouse=True)
 
@@ -16658,7 +16811,7 @@ tests/test_qc_gate_service.py:  # 150 lines
     - { name: test_get_qc_gate_summary_returns_empty_when_no_match, lines: 115-135 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping', return_va...
     - { name: test_get_qc_gate_summary_returns_empty_when_cache_missing, lines: 141-150 }  # @patch('mes_dashboard.services.qc_gate_service.get_cache_updated_at', return_valu...
 
-tests/test_query_cost_policy.py:  # 364 lines
+tests/test_query_cost_policy.py:  # 370 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: ast, items: [], line: 9 }
@@ -16705,10 +16858,10 @@ tests/test_query_cost_policy.py:  # 364 lines
         - { name: test_deprecation_warning_for_async_threshold_env, lines: 269-279 }
         - { name: test_no_deprecation_warning_without_env_var, lines: 281-296 }
     - name: TestNoPandasAndNoCallers
-      lines: 311-364
+      lines: 311-370
       methods:
         - { name: test_no_pandas_import_in_new_modules, lines: 313-326 }
-        - { name: test_no_caller_outside_tests, lines: 328-364 }
+        - { name: test_no_caller_outside_tests, lines: 328-370 }
   functions:
     - { name: _call, lines: 23-44 }
 
@@ -18434,7 +18587,7 @@ tests/test_resource_history_sql_runtime.py:  # 307 lines
         - { name: test_date_filter_injected_when_superset_used, lines: 207-281 }
         - { name: test_range_outside_warmup_window_returns_spool_miss, lines: 283-307 }
 
-tests/test_resource_history_unified_job.py:  # 405 lines
+tests/test_resource_history_unified_job.py:  # 407 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: importlib, items: [], line: 11 }
@@ -18447,39 +18600,39 @@ tests/test_resource_history_unified_job.py:  # 405 lines
     - { module: pytest, items: [], line: 19 }
   classes:
     - name: TestResourceHistoryBaseJob
-      lines: 46-92
+      lines: 46-91
       methods:
         - { name: test_requires_cross_chunk_reduction_is_false, lines: 47-50 }
         - { name: test_chunk_strategy_is_time, lines: 52-56 }
         - { name: test_build_chunk_sql_binds_date_range, lines: 58-77 }
         - { name: test_namespace_is_resource_dataset, lines: 79-82 }
-        - { name: test_always_async_registered, lines: 84-92 }
+        - { name: test_always_async_registered, lines: 84-91 }
     - name: TestResourceHistoryOeeJob
-      lines: 99-146
+      lines: 98-144
       methods:
-        - { name: test_requires_cross_chunk_reduction_is_true, lines: 100-103 }
-        - { name: test_build_chunk_sql_extends_reject_window_30d_before_chunk_start, lines: 105-117 }
-        - { name: test_build_chunk_sql_extends_reject_window_30d_after_chunk_end, lines: 119-131 }
-        - { name: test_namespace_is_resource_oee, lines: 133-136 }
-        - { name: test_always_async_registered, lines: 138-146 }
+        - { name: test_requires_cross_chunk_reduction_is_true, lines: 99-102 }
+        - { name: test_build_chunk_sql_extends_reject_window_30d_before_chunk_start, lines: 104-116 }
+        - { name: test_build_chunk_sql_extends_reject_window_30d_after_chunk_end, lines: 118-130 }
+        - { name: test_namespace_is_resource_oee, lines: 132-135 }
+        - { name: test_always_async_registered, lines: 137-144 }
     - name: TestOeeChunkSeamParity
-      lines: 153-255
+      lines: 151-253
       methods:
-        - { name: _make_chunk_params, lines: 156-157 }
-        - { name: test_ng_event_at_chunk_boundary_captured_in_output, lines: 159-171 }
-        - { name: test_ng_event_within_30d_window_captured, lines: 173-186 }
-        - { name: test_ng_event_beyond_30d_window_excluded, lines: 188-200 }
-        - { name: test_oee_ratio_of_sums_matches_single_pass_within_1e6, lines: 202-255 }
+        - { name: _make_chunk_params, lines: 154-155 }
+        - { name: test_ng_event_at_chunk_boundary_captured_in_output, lines: 157-169 }
+        - { name: test_ng_event_within_30d_window_captured, lines: 171-184 }
+        - { name: test_ng_event_beyond_30d_window_excluded, lines: 186-198 }
+        - { name: test_oee_ratio_of_sums_matches_single_pass_within_1e6, lines: 200-253 }
     - name: TestIterrowsReplacement
-      lines: 262-323
+      lines: 260-321
       methods:
-        - { name: test_duckdb_join_output_matches_iterrows_output, lines: 265-304 }
-        - { name: test_duckdb_join_handles_zero_denominator, lines: 306-323 }
+        - { name: test_duckdb_join_output_matches_iterrows_output, lines: 263-302 }
+        - { name: test_duckdb_join_handles_zero_denominator, lines: 304-321 }
     - name: TestSpoolSchemaUnchanged
-      lines: 330-405
+      lines: 328-407
       methods:
-        - { name: test_base_parquet_columns_match_legacy_schema, lines: 343-377 }
-        - { name: test_oee_parquet_columns_match_legacy_schema, lines: 379-405 }
+        - { name: test_base_parquet_columns_match_legacy_schema, lines: 341-377 }
+        - { name: test_oee_parquet_columns_match_legacy_schema, lines: 379-407 }
   functions:
     - { name: _make_base_job, lines: 26-31 }
     - { name: _make_oee_job, lines: 34-39 }

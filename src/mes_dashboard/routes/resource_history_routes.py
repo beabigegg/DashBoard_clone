@@ -462,7 +462,7 @@ def api_resource_history_export():
 
         from mes_dashboard.services.async_query_job_service import (
             enqueue_query_job,
-            complete_job,
+            complete_job,  # noqa: F401
         )
 
         unified_params = {

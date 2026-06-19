@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.22.0
+schema-version: 1.23.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1206,7 +1206,50 @@ Any future column rename, addition, or removal **must** bump `_SCHEMA_VERSION` (
 
 ---
 
+### §3.21 Downtime Analysis Enriched Spool Schema — UNCHANGED Assertion (P5 Migration)
+
+**Change: downtime-duckdb-join-migration (P5 BaseChunkedDuckDBJob migration)**
+
+The `query_downtime_dataset` enriched bridged-spool parquet schema is **explicitly unchanged** by this migration. The unified `DowntimeJob` path writes the identical column set as the legacy `_bridge_jobid` Path B `pd.merge` path via `query_downtime_dataset`. This is a non-goal verified by data-boundary parity tests (AC-1, AC-3).
+
+**Path scope:** This assertion covers ONLY the `query_downtime_dataset` enriched spool written by `query_downtime_dataset()` (in-Python bridge path). The `query_downtime_dataset_raw` two-spool path (`downtime_analysis_base_events` 7-col + `downtime_analysis_job_bridge` 16-col, browser-DuckDB path) is OUT OF SCOPE for this migration (design D6) and has a different column set; both spool schemas are documented in §3.13.
+
+`query_downtime_dataset` enriched spool columns (both legacy and unified paths must produce identically):
+
+| column | DuckDB type | nullable | description |
+|---|---|---|---|
+| event_id | VARCHAR | no | Stable composite key derived by cross-shift merge |
+| resource_id | VARCHAR | no | HISTORYID from base_events |
+| status | VARCHAR | no | OLDSTATUSNAME (UDT/SDT/EGT; DA-01) |
+| reason | VARCHAR | yes | OLDREASONNAME after strip(); null when blank/unset |
+| category | VARCHAR | no | Big-category per DA-04 taxonomy |
+| start_ts | VARCHAR | no | event_start ISO 8601 UTC (from cross-shift merge, DA-02) |
+| end_ts | VARCHAR | no | event_end ISO 8601 UTC (from cross-shift merge, DA-02) |
+| hours | DOUBLE | no | Merged event duration SUM(HOURS) after DA-02 |
+| fragment_count | INTEGER | no | Number of raw SHIFT fragments merged into this logical event by DA-02; 1 = single fragment (no cross-shift merge occurred) |
+| match_source | VARCHAR | no | Closed enum `'jobid' \| 'overlap' \| 'none'` (DA-03) |
+| match_ambiguous | BOOLEAN | no | true when runner-up Path-B overlap ≥ 80% of winner; false otherwise |
+| job_id | VARCHAR | yes | JOB.JOBID string; null when match_source='none' |
+| job_order_name | VARCHAR | yes | JOB.JOBORDERNAME; null when match_source='none' |
+| job_model | VARCHAR | yes | JOB.JOBMODELNAME; null when match_source='none' |
+| symptom | VARCHAR | yes | JOB.SYMPTOMCODENAME; null when match_source='none' |
+| cause | VARCHAR | yes | JOB.CAUSECODENAME; null when match_source='none' |
+| repair | VARCHAR | yes | JOB.REPAIRCODENAME; null when match_source='none' |
+| handler | VARCHAR | yes | JOB.COMPLETE_FULLNAME; null when match_source='none' |
+| wait_min | DOUBLE | yes | (FIRSTCLOCKONDATE − CREATEDATE) × 60; null when FIRSTCLOCKONDATE null or match_source='none' (DA-05) |
+| repair_min | DOUBLE | yes | (LASTCLOCKOFFDATE − FIRSTCLOCKONDATE) × 60; null when either null or match_source='none' (DA-05) |
+
+No `_SCHEMA_VERSION` bump required; no parquet cleanup on deploy/rollback. Switching `DOWNTIME_USE_UNIFIED_JOB` between `on` and `off` mid-flight is safe — a spool written by either path is readable by the other because the column set is identical.
+
+Any future column rename, addition, or removal in the `query_downtime_dataset` namespace **must** bump `DOWNTIME_BRIDGE_VERSION` (DA-06 cache invalidation) and document the change here.
+
+---
+
 ## CHANGELOG
+
+## [data 1.23.0] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration: §3.21 (Downtime Analysis Enriched Spool Schema — UNCHANGED Assertion for P5 migration). Documents the `query_downtime_dataset` enriched bridged-spool column set (20 columns: event_id, resource_id, status, reason, category, start_ts, end_ts, hours, fragment_count, match_source, match_ambiguous, job_id, job_order_name, job_model, symptom, cause, repair, handler, wait_min, repair_min). Asserts both legacy `_bridge_jobid` Path B and unified `DowntimeJob` paths produce identical column sets. Explicitly scopes assertion to `query_downtime_dataset` only — `query_downtime_dataset_raw` two-spool path (§3.13) has a different column set and is OUT OF SCOPE for this migration (design D6). No parquet cleanup required on deploy/rollback. Additive; no existing schemas changed.
 
 ## [data 1.22.0] — 2026-06-19
 ### Added
