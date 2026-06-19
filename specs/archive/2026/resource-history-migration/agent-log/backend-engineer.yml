@@ -1,0 +1,46 @@
+agent: backend-engineer
+session: 2026-06-19
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/resource_history_base_worker.py (created)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/resource_history_oee_worker.py (created)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/resource_history_routes.py (flag dispatch, 503, imports)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_history_service.py (export_csv_from_spools, flag const)"
+  - type: files-changed
+    pointer: "contracts/env/env-contract.md (1.0.16→1.0.17, RESOURCE_HISTORY_USE_UNIFIED_JOB)"
+  - type: files-changed
+    pointer: "contracts/business/business-rules.md (1.24.0→1.25.0, ASYNC-09)"
+  - type: files-changed
+    pointer: "contracts/data/data-shape-contract.md (1.20.0→1.21.0, §3.19 spool-schema-UNCHANGED)"
+  - type: files-changed
+    pointer: "contracts/ci/ci-gate-contract.md (1.3.27→1.3.28, P3 gate note)"
+  - type: files-changed
+    pointer: "contracts/CHANGELOG.md (ci 1.3.28, env 1.0.17, business 1.25.0, data 1.21.0)"
+  - type: tests-added
+    pointer: "tests/test_resource_history_unified_job.py (18 tests)"
+  - type: tests-added
+    pointer: "tests/test_resource_history_job_service.py (5 tests: TestUnifiedJobDispatch)"
+  - type: tests-added
+    pointer: "tests/test_resource_history_service.py (4 new: flag_off, 503, ast-fallback-absent, env-default)"
+  - type: tests-added
+    pointer: "tests/test_query_cost_policy.py (_APPROVED_CALLERS +2 workers)"
+  - type: tests-added
+    pointer: "tests/test_async_query_job_service.py (4 new: TestResourceHistoryBaseJobRegistry, OeeJobRegistry)"
+  - type: tests-added
+    pointer: "tests/integration/test_resource_history_rq_async.py (stub, pytestmark=integration_real)"
+  - type: test-output
+    pointer: "collect: pass; targeted: 140 pass; changed-area: 4740 pass, 132 skip; contract: pass"
+  - type: contracts-touched
+    pointer: "contracts/env/env-contract.md, contracts/business/business-rules.md, contracts/data/data-shape-contract.md, contracts/ci/ci-gate-contract.md, contracts/CHANGELOG.md"
+
+notes:
+  - "enqueue_query_job lazy import in route: dispatch test uses string probe rather than patch.object (same as eap_alarm_routes)"
+  - "both jobs: always_async=True (EapAlarm pattern); different from P2 production/reject which use always_async=False"
+  - "export_csv_from_spools: DuckDB-join replaces iterrows; reads resource_dataset + resource_oee spools; OEE formula = availability*yield/100 (AC-4 parity)"
+  - "resource_oee namespace absent from spool_routes._ALLOWED_NAMESPACES (internal only)"
+  - "no new systemd unit: reuse resource-history-query queue"

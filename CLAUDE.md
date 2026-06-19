@@ -133,6 +133,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Pre-warm cache namespace must exactly match the key pattern user queries read — see docs/architecture/cache-spool-patterns.md
 - Multi-worker gunicorn startup: use file-based exclusive lock (`O_CREAT|O_EXCL` sentinel) for Oracle load tasks — see docs/architecture/cache-spool-patterns.md
 - Parquet schema breaking changes: add `rm` to rollback runbook AND bump `_SCHEMA_VERSION` in same commit — see docs/architecture/cache-spool-patterns.md
+- Spool-schema "UNCHANGED" assertions: when legacy and unified paths produce different column sets, document each path's columns separately — a blanket "UNCHANGED" claim when columns differ is a false contract — see docs/architecture/cache-spool-patterns.md
 - query-tool has no persistent spool — skip parquet cleanup in all rollbacks — see docs/architecture/cache-spool-patterns.md
 - hold-history spool: use `DESCRIBE`-based column detection for live schema compat without forced purge — see docs/architecture/cache-spool-patterns.md
 - SQL-to-API rename layer at route boundary absorbs column renames; audit it before touching frontend — see docs/architecture/cache-spool-patterns.md
@@ -173,6 +174,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Cross-filter narrowing has its own test surface: assert "selecting A narrows B" — see docs/architecture/test-discipline.md
 - Module-level constants: `monkeypatch.setattr()` not `setenv` (frozen at import); module-level side-effects (e.g. `register_job_type()`): use `importlib.reload()` after clearing the dict to re-run registration — `setattr` alone does not re-execute them — see docs/architecture/test-discipline.md
 - Env-var contract tests must pin default values, not just assert var name presence — see docs/architecture/test-discipline.md
+- New feature-flag rows in `env-contract.md` must also be added to `contracts/env/env.schema.json` with `enum` + `default`; entries absent from the schema bypass machine enum validation (`cdd-kit validate --contracts` will not catch the typo) — see contracts/env/env.schema.json
 - Check `pytestmark` before adding mock tests to `tests/integration/` — see docs/architecture/test-discipline.md
 - Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md
 - Partial-trackout fixtures: include rows with different `TRACKINQTY` per session (real arithmetic) — see docs/architecture/test-discipline.md

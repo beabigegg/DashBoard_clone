@@ -131,3 +131,13 @@ Hash-mirroring (polling `get_batch_progress` from a background thread to extract
 Pattern: `src/mes_dashboard/services/hold_query_job_service.py` (hold-history Phase 3-B).  
 Contrast: downtime Phase 3-A uses `5→15→60→90→100` with a mid-call emit — also coarse bracket, not hash-mirrored.  
 Evidence: `specs/changes/hold-history-rq-async/archive.md` §Production Reality Findings #2.
+
+## Spool-Schema "UNCHANGED" Assertion — Per-Path Column Documentation
+
+**When a feature-flag migration introduces a new execution path that produces a different column set than the legacy path, document each path's actual columns separately in the `contracts/data/data-shape-contract.md` §3.x assertion. Writing a blanket "UNCHANGED" claim when the two paths diverge is a false contract.**
+
+Required format: list "legacy path columns" and "unified path columns" as separate bullet points, note which column is absent and why (e.g., GROUP BY scope change in `post_aggregate`), and confirm whether any consumer reads the dropped column (determines breaking vs. non-breaking).
+
+Pattern: `contracts/data/data-shape-contract.md §3.19` — `resource_oee` legacy includes `SHIFT_DATE`; unified `post_aggregate` drops it (GROUP BY EQUIPMENTID only, SHIFT_DATE absent from final parquet). Confirmed non-breaking because no consumer reads SHIFT_DATE from the OEE spool.
+
+Evidence: `resource-history-migration` CR-2 — blanket UNCHANGED claim was caught as internally contradictory by contract-reviewer; fix required documenting per-path column sets explicitly.

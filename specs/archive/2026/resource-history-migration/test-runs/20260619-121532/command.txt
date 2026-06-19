@@ -1,0 +1,1 @@
+pytest --collect-only -q tests/test_resource_history_unified_job.py tests/test_resource_history_job_service.py tests/test_resource_history_service.py tests/test_query_cost_policy.py tests/test_async_query_job_service.py 2>&1 | tail -5

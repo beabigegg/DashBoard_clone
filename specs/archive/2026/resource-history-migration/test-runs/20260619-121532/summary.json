@@ -1,0 +1,15 @@
+{
+  "change_id": "resource-history-migration",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest --collect-only -q tests/test_resource_history_unified_job.py tests/test_resource_history_job_service.py tests/test_resource_history_service.py tests/test_query_cost_policy.py tests/test_async_query_job_service.py 2>&1 | tail -5",
+  "duration_ms": 1467,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/resource-history-migration/test-runs/20260619-121532/summary.json",
+    "stdout": "specs/changes/resource-history-migration/test-runs/20260619-121532/stdout.log",
+    "stderr": "specs/changes/resource-history-migration/test-runs/20260619-121532/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -61,3 +61,4 @@
 | eap-alarm-analysis | 2026 | 2026-06-18 | specs/archive/2026/eap-alarm-analysis/ |
 | unified-query-core-infra | 2026 | 2026-06-18 | specs/archive/2026/unified-query-core-infra/ |
 | production-reject-history-migration | 2026 | 2026-06-19 | specs/archive/2026/production-reject-history-migration/ |
+| resource-history-migration | 2026 | 2026-06-19 | specs/archive/2026/resource-history-migration/ |

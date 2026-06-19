@@ -1,0 +1,17 @@
+agent: test-strategist
+session: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/resource-history-migration/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_resource_history_unified_job.py → workers/resource_history_base_worker.py + resource_history_oee_worker.py; tests/test_resource_history_job_service.py → flag dispatch; tests/integration/test_resource_history_rq_async.py → nightly parity" }
+  - { type: coverage-tiers, pointer: "unit, contract, data-boundary, resilience (all Tier 0); integration (Tier 1, integration_real)" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-9 all covered" }
+
+notes: >
+  Highest risk test: TestOeeChunkSeamParity — three fixtures for ±30d reject boundary.
+  New files: test_resource_history_unified_job.py (14 tests), test_resource_history_job_service.py (5 tests).
+  Extensions: test_resource_history_service.py (4 new), test_query_cost_policy.py (_APPROVED_CALLERS +2),
+  test_async_query_job_service.py (4 new), integration stub (2 tests).
+  ast.parse() probe confirms AC-7 sync-fallback absence.
+  importlib.reload() pattern required for AC-9 registry tests.

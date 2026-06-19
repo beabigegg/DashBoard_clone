@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 180
-visible-files: 921
+visible-files: 924
 omitted-dirs: 61
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -103,7 +103,7 @@ DashBoard_vite/
 |   |   |-- 2487e0dd67ee4005
 |   |   |-- 24a326889958cc67
 |   |   |-- 2513622121cc3cd3
-|   |   \-- ... (256 more entries truncated; cap=50)
+|   |   \-- ... (258 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -862,7 +862,9 @@ DashBoard_vite/
 |       |   |-- __init__.py
 |       |   |-- eap_alarm_worker.py
 |       |   |-- production_history_worker.py
-|       |   \-- reject_history_worker.py
+|       |   |-- reject_history_worker.py
+|       |   |-- resource_history_base_worker.py
+|       |   \-- resource_history_oee_worker.py
 |       |-- __init__.py
 |       |-- __main__.py
 |       |-- app.py
@@ -1107,15 +1109,16 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
-|   \-- ... (177 more entries truncated; cap=50)
+|   \-- ... (179 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   \-- test_ns/
 |   |-- query_spool/
 |   |   |-- downtime_analysis/
 |   |   |-- msd-events/
-|   |   |   |-- tmp3rtenje2.parquet
-|   |   |   \-- tmpk27ao_w0.parquet
+|   |   |   |-- tmpav120nj8.parquet
+|   |   |   |-- tmpml5g8867.parquet
+|   |   |   \-- tmpmnzdq93k.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
@@ -1164,7 +1167,7 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166368.json
 |   |   |-- probe_166780.json
-|   |   \-- ... (379 more entries truncated; cap=50)
+|   |   \-- ... (399 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   |-- mes_dashboard_restart.flag
