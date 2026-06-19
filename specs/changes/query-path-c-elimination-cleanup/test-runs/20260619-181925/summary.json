@@ -1,0 +1,15 @@
+{
+  "change_id": "query-path-c-elimination-cleanup",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest --collect-only -q tests/integration/test_query_tool_rq_async.py tests/integration/test_wip_rowcount_rq_routing.py tests/test_batch_query_engine.py tests/contract/test_env_async_threshold_removal.py tests/test_query_cost_policy.py tests/test_job_registry.py",
+  "duration_ms": 3367,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-181925/summary.json",
+    "stdout": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-181925/stdout.log",
+    "stderr": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-181925/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

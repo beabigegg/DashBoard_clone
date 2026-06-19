@@ -48,10 +48,9 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
         mock_enqueue.return_value = ("job-abc-001", None)
 
         # Patch module-level constants to ensure threshold is met
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                # 200 days span → well above 90
-                response = self._post_query("2024-01-01", "2024-07-20")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
+            # 200 days span → classify patched to return ASYNC
+            response = self._post_query("2024-01-01", "2024-07-20")
 
         self.assertEqual(response.status_code, 202)
         data = json.loads(response.data)
@@ -79,10 +78,9 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
             'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
         }
 
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                # 7 days → well below 90
-                response = self._post_query("2024-01-01", "2024-01-07")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="SYNC"):
+            # 7 days → classify patched to return SYNC
+            response = self._post_query("2024-01-01", "2024-01-07")
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -107,9 +105,8 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
         }
 
         with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', False):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                # 200 days span, but flag is off
-                response = self._post_query("2024-01-01", "2024-07-20")
+            # flag=False — never reaches _classify_query_cost (no threshold patch needed)
+            response = self._post_query("2024-01-01", "2024-07-20")
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -134,10 +131,9 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
             'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
         }
 
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                # 200 days, but Redis is down
-                response = self._post_query("2024-01-01", "2024-07-20")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
+            # 200 days, classify=ASYNC but Redis is down
+            response = self._post_query("2024-01-01", "2024-07-20")
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -158,9 +154,8 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
         import mes_dashboard.routes.resource_history_routes as _rmod
         mock_enqueue.return_value = ("job-owner-check-001", None)
 
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                self._post_query("2024-01-01", "2024-07-20")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
+            self._post_query("2024-01-01", "2024-07-20")
 
         # Assert per-kwarg: params dict must contain owner
         call_args = mock_enqueue.call_args
@@ -193,22 +188,17 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
             else:
                 importlib.reload(_rmod)
 
-    def test_resource_async_day_threshold_default_is_90(self):
-        """RESOURCE_ASYNC_DAY_THRESHOLD module constant must default to 90 (AC-5)."""
-        import importlib
+    def test_resource_async_day_threshold_removed(self):
+        """RESOURCE_ASYNC_DAY_THRESHOLD must NOT exist on the route module (query-path-c-elimination-cleanup, IP-7).
+
+        Replaced by classify_query_cost(domain="resource", ...) with unified CostPolicy (day_threshold=30).
+        """
         import mes_dashboard.routes.resource_history_routes as _rmod
-        _old = os.environ.pop("RESOURCE_ASYNC_DAY_THRESHOLD", None)
-        try:
-            importlib.reload(_rmod)
-            self.assertEqual(
-                _rmod.RESOURCE_ASYNC_DAY_THRESHOLD, 90,
-                f"RESOURCE_ASYNC_DAY_THRESHOLD must default 90, got {_rmod.RESOURCE_ASYNC_DAY_THRESHOLD!r}"
-            )
-        finally:
-            if _old is not None:
-                os.environ["RESOURCE_ASYNC_DAY_THRESHOLD"] = _old
-            else:
-                importlib.reload(_rmod)
+        self.assertFalse(
+            hasattr(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD'),
+            "RESOURCE_ASYNC_DAY_THRESHOLD must be absent — it was removed in IP-7 "
+            "and replaced by _classify_query_cost calls."
+        )
 
     # ── AC-6: enqueue failure → fall through to sync ────────────────────────
 
@@ -232,9 +222,8 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
             'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
         }
 
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                response = self._post_query("2024-01-01", "2024-07-20")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
+            response = self._post_query("2024-01-01", "2024-07-20")
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -263,9 +252,8 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
             'detail': {'data': [], 'total': 0, 'truncated': False, 'max_records': None},
         }
 
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                response = self._post_query("2024-01-01", "2024-07-20")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
+            response = self._post_query("2024-01-01", "2024-07-20")
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -297,10 +285,9 @@ class TestResourceHistoryAsyncRoute(unittest.TestCase):
         }
         mock_canonical.return_value = (_canonical_result, {"canonical_spool_latency_s": 0.3})
 
-        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True):
-            with patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
-                # 200 days span — would normally dispatch RQ, but canonical spool hits first
-                response = self._post_query("2024-01-01", "2024-07-20")
+        with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True),              patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
+            # 200 days span — would normally dispatch RQ, but canonical spool hits first
+            response = self._post_query("2024-01-01", "2024-07-20")
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)

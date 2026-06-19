@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
 from typing import Any
 
 from mes_dashboard.services.async_query_job_service import (
@@ -33,8 +32,6 @@ logger = logging.getLogger("mes_dashboard.resource_query_job_service")
 RESOURCE_ASYNC_ENABLED: bool = os.getenv(
     "RESOURCE_ASYNC_ENABLED", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
-
-RESOURCE_ASYNC_DAY_THRESHOLD: int = int(os.getenv("RESOURCE_ASYNC_DAY_THRESHOLD", "90"))
 
 RESOURCE_WORKER_QUEUE: str = os.getenv("RESOURCE_WORKER_QUEUE", "resource-history-query")
 
@@ -54,8 +51,8 @@ def should_use_async(params: dict) -> bool:
     """Return True when async dispatch is enabled and the date range meets the threshold.
 
     Called by the job registry's should_enqueue guard AND by the route's inline
-    dispatch check.  Module-level constants are read at call time so that
-    monkeypatch.setattr() overrides work in tests.
+    dispatch check.  Uses classify_query_cost (unified policy) instead of the
+    removed RESOURCE_ASYNC_DAY_THRESHOLD env var (query-path-c-elimination-cleanup, IP-7).
     """
     if not RESOURCE_ASYNC_ENABLED:
         return False
@@ -63,12 +60,11 @@ def should_use_async(params: dict) -> bool:
     end_date = params.get("end_date", "")
     if not start_date or not end_date:
         return False
-    try:
-        sd = datetime.strptime(start_date, "%Y-%m-%d")
-        ed = datetime.strptime(end_date, "%Y-%m-%d")
-        return (ed - sd).days >= RESOURCE_ASYNC_DAY_THRESHOLD
-    except (ValueError, TypeError):
-        return False
+    from mes_dashboard.core.query_cost_policy import classify_query_cost
+    return classify_query_cost(
+        domain="resource",
+        params={"date_from": start_date, "date_to": end_date},
+    ) == "ASYNC"
 
 
 # ---------------------------------------------------------------------------

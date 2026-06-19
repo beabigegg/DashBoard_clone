@@ -1,0 +1,15 @@
+{
+  "change_id": "query-path-c-elimination-cleanup",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest -q --maxfail=1 --tb=short -ra --ignore=tests/stress --ignore=tests/integration/test_oracle_error_path.py --ignore=tests/integration/test_oracle_error_codes.py",
+  "duration_ms": 256716,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-184111/summary.json",
+    "stdout": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-184111/stdout.log",
+    "stderr": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-184111/stderr.log"
+  },
+  "next_action": "all phases green"
+}

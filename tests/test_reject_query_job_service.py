@@ -25,10 +25,18 @@ import mes_dashboard.services.reject_query_job_service as rjs
 # ---------------------------------------------------------------------------
 
 class TestShouldUseAsync:
+    """Test should_use_async().
+
+    REJECT_ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7).
+    Routing now delegates to classify_query_cost(domain="reject", ...).
+    Tests patch classify_query_cost at the call site.
+    """
+    _CQC = "mes_dashboard.core.query_cost_policy.classify_query_cost"
+
     def test_true_for_date_range_over_threshold_when_async_available(self):
-        """Should return True for date_range with >10 day span when async is available."""
+        """Should return True for date_range when classify returns ASYNC and async is available."""
         with patch.object(rjs, "REJECT_ASYNC_ENABLED", True), \
-             patch.object(rjs, "REJECT_ASYNC_DAY_THRESHOLD", 10), \
+             patch(self._CQC, return_value="ASYNC"), \
              patch.object(rjs, "is_async_available", return_value=True):
             result = rjs.should_use_async("date_range", "2024-01-01", "2024-01-20")
         assert result is True
@@ -40,19 +48,22 @@ class TestShouldUseAsync:
             result = rjs.should_use_async("container", "2024-01-01", "2024-02-01")
         assert result is False
 
-    def test_false_when_range_is_exactly_at_threshold(self):
-        """Should return False when days == REJECT_ASYNC_DAY_THRESHOLD (not strictly greater)."""
+    def test_false_when_classify_returns_sync(self):
+        """Should return False when classify_query_cost returns SYNC (below threshold or SYNC policy).
+
+        Replaces the old test_false_when_range_is_exactly_at_threshold —
+        REJECT_ASYNC_DAY_THRESHOLD removed; routing now uses unified CostPolicy.day_threshold=30.
+        """
         with patch.object(rjs, "REJECT_ASYNC_ENABLED", True), \
-             patch.object(rjs, "REJECT_ASYNC_DAY_THRESHOLD", 10), \
+             patch(self._CQC, return_value="SYNC"), \
              patch.object(rjs, "is_async_available", return_value=True):
-            # 10 days exactly
             result = rjs.should_use_async("date_range", "2024-01-01", "2024-01-11")
         assert result is False
 
     def test_false_when_range_is_below_threshold(self):
         """Should return False when the date range is shorter than the threshold."""
         with patch.object(rjs, "REJECT_ASYNC_ENABLED", True), \
-             patch.object(rjs, "REJECT_ASYNC_DAY_THRESHOLD", 10), \
+             patch(self._CQC, return_value="SYNC"), \
              patch.object(rjs, "is_async_available", return_value=True):
             result = rjs.should_use_async("date_range", "2024-01-01", "2024-01-05")
         assert result is False
@@ -65,9 +76,9 @@ class TestShouldUseAsync:
         assert result is False
 
     def test_false_when_async_not_available(self):
-        """Should return False when is_async_available() returns False even if range is large."""
+        """Should return False when is_async_available() returns False even if classify=ASYNC."""
         with patch.object(rjs, "REJECT_ASYNC_ENABLED", True), \
-             patch.object(rjs, "REJECT_ASYNC_DAY_THRESHOLD", 10), \
+             patch(self._CQC, return_value="ASYNC"), \
              patch.object(rjs, "is_async_available", return_value=False):
             result = rjs.should_use_async("date_range", "2024-01-01", "2024-03-01")
         assert result is False
@@ -92,6 +103,13 @@ class TestShouldUseAsync:
              patch.object(rjs, "is_async_available", return_value=True):
             result = rjs.should_use_async("date_range", "not-a-date", "also-bad")
         assert result is False
+
+    def test_reject_async_day_threshold_removed_from_module(self):
+        """REJECT_ASYNC_DAY_THRESHOLD must NOT be a module-level attr (IP-7 removal)."""
+        assert not hasattr(rjs, "REJECT_ASYNC_DAY_THRESHOLD"), (
+            "REJECT_ASYNC_DAY_THRESHOLD was removed in query-path-c-elimination-cleanup IP-7 "
+            "but is still present on the rjs module."
+        )
 
 
 # ---------------------------------------------------------------------------

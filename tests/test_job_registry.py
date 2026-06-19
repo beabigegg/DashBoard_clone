@@ -222,9 +222,12 @@ class TestJobServiceRegistrations:
         importlib.reload(mts)
         importlib.reload(dtw)
 
+        import mes_dashboard.services.query_tool_service as qts  # query-path-c-elimination-cleanup (P5)
+        importlib.reload(qts)
+
         registered = jr.list_registered_job_types()
-        assert len(registered) == 10, (
-            f"Expected 10 registered job types, got {len(registered)}: {registered}"
+        assert len(registered) == 11, (
+            f"Expected 11 registered job types, got {len(registered)}: {registered}"
         )
 
         expected_types = {
@@ -238,6 +241,7 @@ class TestJobServiceRegistrations:
             "material-trace",
             "material-trace-unified",
             "downtime-unified",  # downtime-duckdb-join-migration (P5)
+            "query-tool",        # query-path-c-elimination-cleanup (P5)
         }
         assert set(registered) == expected_types, (
             f"Registered types mismatch.\n"

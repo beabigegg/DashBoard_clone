@@ -118,7 +118,7 @@
     "query_p99_ms": 0.0,
     "slow_query_count": 0,
     "slow_query_rate": 0.0,
-    "worker_pid": 333397
+    "worker_pid": 380770
   },
   "resilience": {
     "alerts": {
@@ -175,10 +175,10 @@
   },
   "status": "healthy",
   "system_memory": {
-    "available_mb": 3020.0,
+    "available_mb": 3586.0,
     "pressure": "normal",
-    "total_mb": 7115.0,
-    "used_pct": 57.6
+    "total_mb": 7879.0,
+    "used_pct": 54.5
   },
   "warnings": [
     "RQ Worker 離線，非同步查詢不可用"

@@ -4196,3 +4196,79 @@ def _build_lot_detail_response(row) -> Dict[str, Any]:
         'dataUpdateDate': format_date('SYS_DATE'),
         'fieldLabels': LOT_DETAIL_FIELD_LABELS
     }
+
+
+# ============================================================
+# Row Count Estimator (query-path-c-elimination-cleanup, IP-3)
+# ============================================================
+
+def count_wip_rows(
+    workcenter: str,
+    package: Optional[str] = None,
+    pj_type: Optional[str] = None,
+    firstname: Optional[str] = None,
+    waferdesc: Optional[str] = None,
+    status: Optional[str] = None,
+    hold_type: Optional[str] = None,
+    workorder: Optional[str] = None,
+    lotid: Optional[str] = None,
+    include_dummy: bool = False,
+    workflow: str = "",
+    bop: str = "",
+    pj_function: str = "",
+) -> int:
+    """Return a lightweight COUNT(*) estimate for the WIP detail query.
+
+    Runs a ``SELECT COUNT(*) FROM {WIP_VIEW} WHERE ...`` with the same
+    predicate as :func:`_get_wip_detail_from_oracle`.  Used by ``wip_routes``
+    to decide whether to dispatch to RQ (L3 ≥ 200,000 rows).
+
+    Fails open: any Oracle error returns 0 so the route stays SYNC.
+    Does NOT consult the Redis snapshot cache — the pre-check must reflect
+    the live Oracle count for the routing decision to be accurate.
+
+    Args:
+        All filter arguments mirror ``get_wip_detail`` exactly.
+
+    Returns:
+        Estimated row count as ``int``.  Returns ``0`` on any error.
+    """
+    try:
+        builder = _build_base_conditions_builder(include_dummy, workorder, lotid)
+        builder.add_param_condition("WORKCENTER_GROUP", workcenter)
+
+        _add_exact_filter_conditions(builder, "PACKAGE_LEF", package)
+        _add_exact_filter_conditions(builder, "PJ_TYPE", pj_type)
+        _add_exact_filter_conditions(builder, "FIRSTNAME", firstname)
+        _add_exact_filter_conditions(builder, "WAFERDESC", waferdesc)
+        _add_exact_filter_conditions(builder, "WORKFLOWNAME", workflow)
+        _add_exact_filter_conditions(builder, "BOP", bop)
+        _add_exact_filter_conditions(builder, "PJ_FUNCTION", pj_function)
+
+        if status:
+            status_upper = status.upper()
+            if status_upper == "RUN":
+                builder.add_condition("COALESCE(EQUIPMENTCOUNT, 0) > 0")
+            elif status_upper == "HOLD":
+                builder.add_condition(
+                    "COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) > 0"
+                )
+                if hold_type:
+                    _add_hold_type_conditions(builder, hold_type)
+            elif status_upper == "QUEUE":
+                builder.add_condition(
+                    "COALESCE(EQUIPMENTCOUNT, 0) = 0 AND COALESCE(CURRENTHOLDCOUNT, 0) = 0"
+                )
+
+        where_clause, params = builder.build_where_only()
+
+        count_sql = f"SELECT COUNT(*) AS ROW_COUNT FROM {WIP_VIEW} {where_clause}"
+        df = read_sql_df(count_sql, params)
+
+        if df is None or df.empty:
+            return 0
+        return int(df.iloc[0]["ROW_COUNT"] or 0)
+
+    except Exception as exc:
+        logger.warning("count_wip_rows: COUNT(*) failed (fail-open): %s", exc)
+        return 0

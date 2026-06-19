@@ -138,7 +138,7 @@
       }
     ],
     "overview": {
-      "active_sessions": 1,
+      "active_sessions": 0,
       "avg_duration_sec": 0,
       "total_sessions": 0,
       "unique_users": 0
@@ -310,7 +310,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T14:57:22.270923"
+    "timestamp": "2026-06-19T19:09:56.411569"
   },
   "success": true
 }

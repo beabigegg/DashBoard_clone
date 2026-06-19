@@ -1009,7 +1009,7 @@ class TestResourceHistoryAsyncContract(unittest.TestCase):
         mock_enqueue.return_value = ("contract-job-001", None)
 
         with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True), \
-             patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90):
+             patch.object(_rmod, '_classify_query_cost', return_value="ASYNC"):
             response = self.client.post(
                 '/api/resource/history/query',
                 json={"start_date": "2024-01-01", "end_date": "2024-07-20"},
@@ -1039,7 +1039,7 @@ class TestResourceHistoryAsyncContract(unittest.TestCase):
         import mes_dashboard.routes.resource_history_routes as _rmod
 
         with patch.object(_rmod, 'RESOURCE_ASYNC_ENABLED', True), \
-             patch.object(_rmod, 'RESOURCE_ASYNC_DAY_THRESHOLD', 90), \
+             patch.object(_rmod, '_classify_query_cost', return_value="SYNC"), \
              patch('mes_dashboard.services.resource_history_sql_runtime.try_compute_query_from_canonical_spool',
                    return_value=(None, None)), \
              patch('mes_dashboard.routes.resource_history_routes.execute_primary_query',

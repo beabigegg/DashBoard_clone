@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Global Redis-based concurrency limiter for heavy queries.
+"""Global Redis-based concurrency limiter for RQ heavy Oracle queries.
+
+``HEAVY_QUERY_MAX_CONCURRENT`` bounds the number of RQ heavy jobs concurrently
+hitting Oracle (cross-job semaphore), not synchronous gunicorn request workers.
+The slot is acquired **inside** the RQ worker around the Oracle fetch (per
+blueprint §4.2), not at route enqueue time.
 
 Uses a Redis sorted set where each member is an owner_id and the score is
 the epoch timestamp when the slot was acquired.  A Lua script performs
-atomic expire-cleanup + count-check + add in one round-trip.
+atomic expire-cleanup + count-check + add in one round-trip.  Fail-open when
+Redis is unavailable.  Lua/fail-open/TTL mechanics are unchanged
+(query-path-c-elimination-cleanup, IP-8, D3).
 
-Usage:
+Usage (inside an RQ worker, around the Oracle fetch):
     acquired = acquire_heavy_query_slot(owner_id)
     try:
-        ...execute query...
+        ...execute Oracle query...
     finally:
         if acquired:
             release_heavy_query_slot(owner_id)
@@ -76,15 +83,19 @@ def _slot_key() -> str:
 
 
 def acquire_heavy_query_slot(owner_id: str, ttl: int = 600) -> bool:
-    """Try to acquire a heavy query concurrency slot.
+    """Try to acquire a heavy Oracle concurrency slot for an RQ worker job.
+
+    Called inside the RQ worker around the Oracle fetch — NOT at route enqueue
+    time (D3 / blueprint §4.2).  This caps concurrent RQ jobs hitting Oracle
+    simultaneously; it does not throttle gunicorn request workers.
 
     Args:
-        owner_id: Unique identifier for this query (e.g., "{pid}:{uuid}").
+        owner_id: Unique identifier for this job (e.g., "{job_type}:{job_id}").
         ttl: Seconds until the slot is considered stale (fail-safe expiry).
 
     Returns:
-        True if slot acquired, False if at the concurrency limit.
-        Returns True on Redis failure (fail-open).
+        True if slot acquired (or Redis unavailable — fail-open).
+        False if at the ``HEAVY_QUERY_MAX_CONCURRENT`` concurrency limit.
     """
     conn = get_redis_client()
     if conn is None:

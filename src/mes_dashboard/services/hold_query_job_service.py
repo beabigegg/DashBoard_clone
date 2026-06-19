@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
 from typing import Any
 
 from mes_dashboard.services.async_query_job_service import (
@@ -33,8 +32,6 @@ logger = logging.getLogger("mes_dashboard.hold_query_job_service")
 HOLD_ASYNC_ENABLED: bool = os.getenv(
     "HOLD_ASYNC_ENABLED", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
-
-HOLD_ASYNC_DAY_THRESHOLD: int = int(os.getenv("HOLD_ASYNC_DAY_THRESHOLD", "90"))
 
 HOLD_WORKER_QUEUE: str = os.getenv("HOLD_WORKER_QUEUE", "hold-history-query")
 
@@ -54,8 +51,8 @@ def should_use_async(params: dict) -> bool:
     """Return True when async dispatch is enabled and the date range meets the threshold.
 
     Called by the job registry's should_enqueue guard AND by the route's inline
-    dispatch check.  module-level constants are read at call time so that
-    monkeypatch.setattr() overrides work in tests.
+    dispatch check.  Uses classify_query_cost (unified policy) instead of the
+    removed HOLD_ASYNC_DAY_THRESHOLD env var (query-path-c-elimination-cleanup, IP-7).
     """
     if not HOLD_ASYNC_ENABLED:
         return False
@@ -63,12 +60,11 @@ def should_use_async(params: dict) -> bool:
     end_date = params.get("end_date", "")
     if not start_date or not end_date:
         return False
-    try:
-        sd = datetime.strptime(start_date, "%Y-%m-%d")
-        ed = datetime.strptime(end_date, "%Y-%m-%d")
-        return (ed - sd).days >= HOLD_ASYNC_DAY_THRESHOLD
-    except (ValueError, TypeError):
-        return False
+    from mes_dashboard.core.query_cost_policy import classify_query_cost
+    return classify_query_cost(
+        domain="hold",
+        params={"date_from": start_date, "date_to": end_date},
+    ) == "ASYNC"
 
 
 # ---------------------------------------------------------------------------

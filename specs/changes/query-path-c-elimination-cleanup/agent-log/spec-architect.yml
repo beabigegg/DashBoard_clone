@@ -1,0 +1,20 @@
+agent: spec-architect
+change-id: query-path-c-elimination-cleanup
+summary: >
+  Authored design.md + current-behavior.md for P4+P5 Path-C elimination and env
+  cleanup. Confirmed merge_chunks has zero production callers; new query-tool RQ
+  job type required; wip needs a new COUNT estimator (none exists); semaphore
+  change is doc-only and pinned by ADR-0011.
+artifacts:
+  - { type: decision-summary, pointer: "D1=create query-tool job type; D2=new wip COUNT, fail-open at L3=200k; D3=semaphore doc-only; D4=no migration guide; D5=merge_chunks 0 prod callers" }
+  - { type: affected-areas, pointer: "query_tool, wip, global_concurrency, batch_query_engine, query_cost_policy, env contracts" }
+  - { type: adr-written, pointer: "docs/adr/0011-global-concurrency-semaphore-rq-oracle-bound.md" }
+  - { type: risks-noted, pointer: "0 high, 2 medium, 2 low" }
+  - { type: files-read, pointer: "core/query_cost_policy.py:1-163; core/global_concurrency.py:1-136; services/job_registry.py:1-82; async_query_job_service.py:124-406; batch_query_engine.py:14-39,631,764; query_tool_routes.py:47-92; wip_routes.py:243-316; wip_service.py:913,1119,1542" }
+findings:
+  - "merge_chunks: ZERO production callers — all on merge_chunks_to_spool; only docstring (lines 22/29) + tests reference it."
+  - "No existing query_tool/wip/generic-heavy job type in job_registry.py — new registration needed; bumps test_job_registry.py count."
+  - "classify_query_cost L3 already fails open to SYNC on COUNT(*) error — wip pre-check inherits this, no new failure mode."
+  - "hold/resource read ASYNC_DAY_THRESHOLD in BOTH route and service (two sites each); reject only in service with inverted comparison; downtime only in route."
+  - "wip_service has no COUNT function; WIP has no date range so only L3 applies for wip routing."
+  - "All 4 vars already deprecate-2-minors satisfied (DeprecationWarning live) — removal is final step, no migration guide."

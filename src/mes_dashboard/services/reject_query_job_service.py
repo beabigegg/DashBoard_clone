@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from datetime import date
 from typing import Any, Dict, Optional, Tuple
 try:
     from rq import Retry
@@ -35,7 +34,6 @@ logger = logging.getLogger("mes_dashboard.reject_query_job_service")
 REJECT_ASYNC_ENABLED = os.getenv("REJECT_ASYNC_ENABLED", "true").strip().lower() in {
     "1", "true", "yes", "on",
 }
-REJECT_ASYNC_DAY_THRESHOLD = int(os.getenv("REJECT_ASYNC_DAY_THRESHOLD", "10"))
 REJECT_WORKER_QUEUE = os.getenv("REJECT_WORKER_QUEUE", "reject-query")
 REJECT_JOB_TTL_SECONDS = int(os.getenv("REJECT_JOB_TTL_SECONDS", "3600"))
 REJECT_JOB_TIMEOUT_SECONDS = int(os.getenv("REJECT_JOB_TIMEOUT_SECONDS", "1800"))
@@ -60,8 +58,11 @@ def should_use_async(mode: str, start_date: Optional[str], end_date: Optional[st
     Conditions:
     - REJECT_ASYNC_ENABLED is True
     - mode is "date_range"
-    - date range > REJECT_ASYNC_DAY_THRESHOLD (default 10 days)
+    - date range meets classify_query_cost L2 threshold (unified CostPolicy)
     - is_async_available() returns True (workers are registered)
+
+    NOTE: REJECT_ASYNC_DAY_THRESHOLD env var removed (query-path-c-elimination-cleanup, IP-7).
+    Routing now uses classify_query_cost(domain="reject", ...) for unified policy.
     """
     if not REJECT_ASYNC_ENABLED:
         return False
@@ -69,13 +70,16 @@ def should_use_async(mode: str, start_date: Optional[str], end_date: Optional[st
         return False
     if not start_date or not end_date:
         return False
+    from mes_dashboard.core.query_cost_policy import classify_query_cost
     try:
-        start = date.fromisoformat(start_date)
-        end = date.fromisoformat(end_date)
-        days = (end - start).days
-        if days <= REJECT_ASYNC_DAY_THRESHOLD:
-            return False
+        cost = classify_query_cost(
+            domain="reject",
+            params={"date_from": start_date, "date_to": end_date},
+        )
     except (ValueError, TypeError):
+        # Fail-open: invalid date strings → stay SYNC (same as original strptime guard)
+        return False
+    if cost != "ASYNC":
         return False
     return is_async_available()
 

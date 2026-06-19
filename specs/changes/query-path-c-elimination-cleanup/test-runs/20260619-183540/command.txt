@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest -q --maxfail=1 --tb=short -ra --ignore=tests/stress --ignore=tests/integration/test_oracle_error_path.py --ignore=tests/integration/test_oracle_error_codes.py

@@ -711,7 +711,8 @@ class TestDowntimeAsyncQuery:
         import mes_dashboard.routes.downtime_analysis_routes as routes_mod
         monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
         monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
-        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+        # _ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7); patch classify instead
+        monkeypatch.setattr(routes_mod, '_classify_query_cost', lambda **kw: "ASYNC")
 
         with patch('mes_dashboard.routes.downtime_analysis_routes.is_async_available',
                    return_value=True), \
@@ -733,11 +734,12 @@ class TestDowntimeAsyncQuery:
         import mes_dashboard.routes.downtime_analysis_routes as routes_mod
         monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
         monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
-        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+        # _ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7); patch classify instead
+        monkeypatch.setattr(routes_mod, '_classify_query_cost', lambda **kw: "SYNC")
 
         with patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
                    return_value=_mock_raw_result()):
-            # 28 days — below threshold
+            # 28 days — classify patched to return SYNC
             resp = client.post('/api/downtime-analysis/query',
                                json={'start_date': '2026-04-01', 'end_date': '2026-04-29'})
 
@@ -751,11 +753,11 @@ class TestDowntimeAsyncQuery:
         import mes_dashboard.routes.downtime_analysis_routes as routes_mod
         monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
         monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', False)
-        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+        # _ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7)
 
         with patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset_raw',
                    return_value=_mock_raw_result()):
-            # 119 days — above threshold, but flag disabled
+            # flag disabled — never reaches classify_query_cost
             resp = client.post('/api/downtime-analysis/query',
                                json={'start_date': '2026-01-01', 'end_date': '2026-04-30'})
 
@@ -767,7 +769,8 @@ class TestDowntimeAsyncQuery:
         import mes_dashboard.routes.downtime_analysis_routes as routes_mod
         monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
         monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
-        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+        # _ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7); patch classify
+        monkeypatch.setattr(routes_mod, '_classify_query_cost', lambda **kw: "ASYNC")
 
         with patch('mes_dashboard.routes.downtime_analysis_routes.is_async_available',
                    return_value=False), \
@@ -784,7 +787,8 @@ class TestDowntimeAsyncQuery:
         import mes_dashboard.routes.downtime_analysis_routes as routes_mod
         monkeypatch.setattr(routes_mod, '_BROWSER_DUCKDB_ENABLED', True)
         monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
-        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
+        # _ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7); patch classify
+        monkeypatch.setattr(routes_mod, '_classify_query_cost', lambda **kw: "ASYNC")
 
         with patch('mes_dashboard.routes.downtime_analysis_routes.is_async_available',
                    return_value=True), \

@@ -1933,11 +1933,15 @@ class TestDowntimeAsyncEnvVars:
         monkeypatch.setattr(routes_mod, '_ASYNC_ENABLED', True)
         assert routes_mod._ASYNC_ENABLED is True
 
-    def test_default_day_threshold_30(self, monkeypatch):
-        """AC-4b: DOWNTIME_ASYNC_DAY_THRESHOLD defaults to 30."""
+    def test_default_day_threshold_removed(self, monkeypatch):
+        """AC-4b: DOWNTIME_ASYNC_DAY_THRESHOLD/_ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7).
+
+        Routing now uses _classify_query_cost(domain="downtime", ...) with unified CostPolicy.day_threshold=30.
+        """
         import mes_dashboard.routes.downtime_analysis_routes as routes_mod
-        monkeypatch.setattr(routes_mod, '_ASYNC_DAY_THRESHOLD', 30)
-        assert routes_mod._ASYNC_DAY_THRESHOLD == 30
+        assert not hasattr(routes_mod, '_ASYNC_DAY_THRESHOLD'), (
+            "_ASYNC_DAY_THRESHOLD was removed in IP-7 but is still present on the route module."
+        )
 
     def test_default_worker_queue(self):
         """AC-4c: DOWNTIME_WORKER_QUEUE default is 'downtime-query'."""

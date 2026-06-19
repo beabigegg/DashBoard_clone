@@ -9,61 +9,20 @@ Design decision D5: four layers in short-circuit order:
     else → SYNC
 
 Replaces the scattered ``*_ASYNC_DAY_THRESHOLD`` env vars with a single
-per-domain ``CostPolicy`` record.  The old env vars are **deprecated**
-(runtime ``DeprecationWarning`` emitted when present in os.environ); they
-are NOT removed until P5 per the deprecate-2-minors breaking-change policy.
+per-domain ``CostPolicy`` record.  The deprecated ``*_ASYNC_DAY_THRESHOLD``
+env vars have been removed as of P5 (query-path-c-elimination-cleanup, IP-7).
 
 No DB calls at module import.  ``row_count_fn`` is called only when L0–L2
 do not short-circuit (prevents unnecessary COUNT(*) queries).
 """
 from __future__ import annotations
 
-import os
-import warnings
 from dataclasses import dataclass
 from datetime import date
 from typing import Callable, Literal, Optional
 
-# ---------------------------------------------------------------------------
-# Deprecated env vars: list of (env_name, replacement_guidance).
-# Only vars that actually exist in the deployed codebase are listed (grepped
-# from src/ — RESOURCE_, HOLD_, REJECT_, DOWNTIME_).  Do NOT invent vars
-# to reach an arbitrary count (known risk from implementation-plan.md §Known
-# Risks).
-# ---------------------------------------------------------------------------
-_DEPRECATED_THRESHOLD_VARS: tuple[tuple[str, str], ...] = (
-    (
-        "DOWNTIME_ASYNC_DAY_THRESHOLD",
-        "Use CostPolicy.day_threshold via classify_query_cost() instead.",
-    ),
-    (
-        "HOLD_ASYNC_DAY_THRESHOLD",
-        "Use CostPolicy.day_threshold via classify_query_cost() instead.",
-    ),
-    (
-        "RESOURCE_ASYNC_DAY_THRESHOLD",
-        "Use CostPolicy.day_threshold via classify_query_cost() instead.",
-    ),
-    (
-        "REJECT_ASYNC_DAY_THRESHOLD",
-        "Use CostPolicy.day_threshold via classify_query_cost() instead.",
-    ),
-)
-
 # Domains that are always async regardless of date span or row count.
 _ALWAYS_ASYNC_DOMAINS: frozenset[str] = frozenset({"eap_alarm", "trace", "msd"})
-
-
-def _check_deprecated_threshold_env() -> None:
-    """Emit DeprecationWarning for any *_ASYNC_DAY_THRESHOLD env var present."""
-    for var_name, guidance in _DEPRECATED_THRESHOLD_VARS:
-        if var_name in os.environ:
-            warnings.warn(
-                f"{var_name} is deprecated and will be removed in a future minor "
-                f"release (deprecate-2-minors policy). {guidance}",
-                DeprecationWarning,
-                stacklevel=3,
-            )
 
 
 @dataclass(frozen=True)
@@ -107,8 +66,6 @@ def classify_query_cost(
     Returns:
         "SYNC" or "ASYNC".
     """
-    _check_deprecated_threshold_env()
-
     # Resolve effective policy
     if policy is None:
         policy = _default_policy_for(domain)

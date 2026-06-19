@@ -1,0 +1,41 @@
+agent: qa-reviewer
+model: claude-opus-4-8
+date: 2026-06-19
+change-id: query-path-c-elimination-cleanup
+
+artifacts:
+  - { type: gate-results, pointer: "new-contract-tests: pass(6), new-integration-tests: pass(4+3), job-registry: pass(11, query-tool present), deprecation-warning: pass(1), env-schema-clean: pass, service/route env-reads: clean, query_cost_policy-clean: pass, cdd-kit-gate: pass, response-shape: passed" }
+  - { type: ci-run-url, pointer: "n/a (local-only)" }
+  - { type: evidence-quality, pointer: "log (local pytest + cdd-kit gate output)" }
+  - { type: decision, pointer: "blocked" }
+  - { type: failure-routing, pointer: "missing AC-8 stress coverage + stress-soak-report.md -> stress-soak-engineer + test-strategist; missing regression-report.md -> backend-engineer + test-strategist; invalid tier-floor-override (contradicts design.md R2 + classification) -> change-classifier + spec-architect; non-integration_real test --ignore'd in full-phase evidence -> ci-cd-gatekeeper" }
+  - { type: blocking-issue, pointer: "AC-8 has zero test coverage: tests/stress/test_query_tool_stress.py lacks test_no_worker_starvation_under_concurrent_oversized_queries and test_rq_oracle_concurrency_bounded_by_semaphore (test-plan lines 79-81); only 3 unrelated pre-existing soak/browser tests collected" }
+  - { type: blocking-issue, pointer: "stress-soak-report.md REQUIRED by change-classification.md line 34 (create?=yes) and design.md R1 line 87 + R2 line 91-92 ('stress evidence') — file absent from change dir" }
+  - { type: blocking-issue, pointer: "regression-report.md REQUIRED by change-classification.md line 31 (create?=yes) for sync->async dispatch + semaphore repurpose — file absent" }
+  - { type: blocking-issue, pointer: "tier-floor-override in tasks.yml line 4 claims 'no new concurrency primitive' but this change repurposes global_concurrency semaphore semantics AND lands a real caller (query_tool_routes RQ dispatch); per CLAUDE.md override is invalidated when first real caller lands -> stress-soak-report.md becomes mandatory" }
+  - { type: residual-gap, pointer: "test-evidence.yml full-phase command --ignore's tests/integration/test_oracle_error_codes.py which is NOT integration_real (test_oracle_error_path.py IS integration_real, legit). Standalone run: 10/10 pass, so no masked failure — process drift only, not gate-blocking, but full-phase evidence should re-run without that ignore" }
+  - { type: verified-pass, pointer: "AC-1/AC-2 (test_query_tool_rq_async.py 4/4), AC-3 (test_wip_rowcount_rq_routing.py 3/3), AC-4 (merge_chunks deprecation 1/1), AC-5/AC-6/AC-7 (test_env_async_threshold_removal.py 6/6 + env.schema.json clean + no active env reads + query_cost_policy clean), registry count=11 with query-tool" }
+
+notes: |
+  Verdict: BLOCKED. Functional/contract/cleanup ACs (AC-1..AC-7) are fully
+  verified green with reproducible local evidence and cdd-kit gate passes.
+  However AC-8 (no worker starvation; RQ Oracle concurrency bounded by semaphore)
+  is the highest-risk criterion of this high-risk Tier-1 change and has:
+    (a) no test coverage (named stress tests do not exist in the stress file),
+    (b) no stress-soak-report.md (required by classification + design.md),
+    (c) no regression-report.md (required by classification).
+  The tasks.yml tier-floor-override that defers stress is not a valid waiver here:
+  it asserts "no new concurrency primitive / no new caller", but the change both
+  repurposes the global_concurrency semaphore semantics (design.md R2) and adds a
+  real RQ caller via query_tool_routes. Per project policy a required failing/
+  missing stress gate cannot be self-waived in tasks.yml. cdd-kit gate does not
+  enforce the classification's optional-artifact "create?=yes" rows, so a green
+  gate here does NOT discharge the stress/regression evidence requirement.
+
+  To clear: stress-soak-engineer adds the two AC-8 stress tests + produces
+  stress-soak-report.md with bounded-Oracle-concurrency + no-worker-starvation
+  evidence; backend-engineer/test-strategist produce regression-report.md for the
+  sync->async parity; spec-architect either re-affirms or rescinds the
+  tier-floor-override consistent with design.md R2. Separately, ci-cd-gatekeeper
+  should regenerate the full-phase evidence without --ignore of the
+  non-integration_real test_oracle_error_codes.py.

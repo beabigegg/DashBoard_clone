@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/integration/test_query_tool_rq_async.py tests/integration/test_wip_rowcount_rq_routing.py tests/test_batch_query_engine.py tests/contract/test_env_async_threshold_removal.py tests/test_query_cost_policy.py tests/test_job_registry.py -q --maxfail=1 --tb=short -ra

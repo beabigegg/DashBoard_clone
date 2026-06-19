@@ -453,6 +453,48 @@ class TestMergeChunks:
                 )
 
 
+    def test_merge_chunks_emits_deprecation_warning(self):
+        """AC-4 (query-path-c-elimination-cleanup): merge_chunks must emit DeprecationWarning.
+
+        The DeprecationWarning must be emitted on every call (no-new-callers sentinel).
+        The result must still be correct (backward compatible — D5).
+        """
+        import mes_dashboard.core.redis_df_store as rds
+
+        mock_client = MagicMock()
+        stored = {}
+        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
+        mock_client.get.side_effect = lambda k: stored.get(k)
+        mock_client.hgetall.return_value = {"total": "2", "completed": "2", "failed": "0"}
+        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client):
+            rds.redis_store_chunk("dep", "warn", 0, pd.DataFrame({"A": [1, 2]}))
+            rds.redis_store_chunk("dep", "warn", 1, pd.DataFrame({"A": [3]}))
+
+        import mes_dashboard.services.batch_query_engine as bqe
+        import warnings as _warnings
+
+        with patch.object(rds, "REDIS_ENABLED", True), \
+             patch.object(rds, "get_redis_client", return_value=mock_client), \
+             patch.object(bqe, "get_redis_client", return_value=mock_client):
+            with _warnings.catch_warnings(record=True) as caught:
+                _warnings.simplefilter("always")
+                merged = merge_chunks("dep", "warn")
+
+        dep_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert len(dep_warnings) >= 1, "merge_chunks must emit DeprecationWarning"
+        assert any(
+            "merge_chunks" in str(w.message).lower() or "merge_chunks_to_spool" in str(w.message)
+            for w in dep_warnings
+        ), f"DeprecationWarning must mention merge_chunks or merge_chunks_to_spool. Got: {[str(w.message) for w in dep_warnings]}"
+
+        # Backward compat: result must still be correct (D5 additive-only)
+        assert len(merged) == 3
+        assert list(merged["A"]) == [1, 2, 3]
+
+
 # ============================================================
 # 4.9 progress tracking
 # ============================================================

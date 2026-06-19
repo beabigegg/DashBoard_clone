@@ -1,0 +1,18 @@
+- type: tier-floor-override
+  change-id: query-path-c-elimination-cleanup
+  timestamp: '2026-06-19T10:47:07.580Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - breaking change
+    - concurrency
+    - migration
+    - query
+    - route
+    - worker
+  reason: >-
+    P5 cleanup: no new concurrency primitive; removes per-domain threshold constants; query-tool RQ
+    dispatch uses existing enqueue_query_job + JobTypeConfig (already Tier 1 approved in
+    material-trace-streaming-migration); semaphore doc-only; all stress tests deferred via P4/P5
+    precedent.

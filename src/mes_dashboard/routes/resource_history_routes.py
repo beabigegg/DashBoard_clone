@@ -22,6 +22,7 @@ from mes_dashboard.core.response import (
     validation_error,
     SERVICE_UNAVAILABLE,
 )
+from mes_dashboard.core.query_cost_policy import classify_query_cost as _classify_query_cost
 from mes_dashboard.services.async_query_job_service import (
     enqueue_job_dynamic,
     is_async_available,
@@ -61,7 +62,8 @@ _RESOURCE_SPOOL_NAMESPACE = "resource_dataset"
 RESOURCE_ASYNC_ENABLED: bool = os.getenv(
     "RESOURCE_ASYNC_ENABLED", "true"
 ).strip().lower() in ("1", "true", "yes", "on")
-RESOURCE_ASYNC_DAY_THRESHOLD: int = int(os.getenv("RESOURCE_ASYNC_DAY_THRESHOLD", "90"))
+# RESOURCE_ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7).
+# Use classify_query_cost(domain="resource", ...) instead.
 RESOURCE_WORKER_QUEUE: str = os.getenv("RESOURCE_WORKER_QUEUE", "resource-history-query")
 RESOURCE_JOB_TIMEOUT_SECONDS: int = int(os.getenv("RESOURCE_JOB_TIMEOUT_SECONDS", "1800"))
 
@@ -251,14 +253,11 @@ def api_resource_history_query():
     # ── Async RQ branch (RESOURCE_ASYNC_ENABLED + threshold + worker available) ──
     # Falls through to the sync 200 path on any false condition (AC-2, AC-6).
     if RESOURCE_ASYNC_ENABLED:
-        from datetime import datetime as _dt
-        try:
-            sd = _dt.strptime(start_date, "%Y-%m-%d")
-            ed = _dt.strptime(end_date, "%Y-%m-%d")
-            day_span = (ed - sd).days
-        except (ValueError, TypeError):
-            day_span = 0
-        if day_span >= RESOURCE_ASYNC_DAY_THRESHOLD:
+        _resource_cost = _classify_query_cost(
+            domain="resource",
+            params={"date_from": start_date, "date_to": end_date},
+        )
+        if _resource_cost == "ASYNC":
             if is_async_available():
                 _owner = get_owner_token()
                 # owner MUST be inside _params (AC-7: enqueue_job forwards only kwargs

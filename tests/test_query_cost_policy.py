@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ast
 import os
-import warnings
+# warnings import removed with TestDeprecationWarning (query-path-c-elimination-cleanup, IP-11)
 from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -259,41 +259,11 @@ class TestL3RowCount:
 # Deprecation warning
 # ---------------------------------------------------------------------------
 
-class TestDeprecationWarning:
-    @pytest.mark.parametrize("var_name", [
-        "DOWNTIME_ASYNC_DAY_THRESHOLD",
-        "HOLD_ASYNC_DAY_THRESHOLD",
-        "RESOURCE_ASYNC_DAY_THRESHOLD",
-        "REJECT_ASYNC_DAY_THRESHOLD",
-    ])
-    def test_deprecation_warning_for_async_threshold_env(self, monkeypatch, var_name):
-        """DeprecationWarning emitted when any *_ASYNC_DAY_THRESHOLD env var is present."""
-        monkeypatch.setenv(var_name, "30")
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            _call(domain="production")
-
-        dep_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert len(dep_warnings) >= 1
-        assert any(var_name in str(w.message) for w in dep_warnings)
-
-    def test_no_deprecation_warning_without_env_var(self, monkeypatch):
-        """No DeprecationWarning when threshold env vars are absent."""
-        for var in [
-            "DOWNTIME_ASYNC_DAY_THRESHOLD",
-            "HOLD_ASYNC_DAY_THRESHOLD",
-            "RESOURCE_ASYNC_DAY_THRESHOLD",
-            "REJECT_ASYNC_DAY_THRESHOLD",
-        ]:
-            monkeypatch.delenv(var, raising=False)
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            _call(domain="production")
-
-        dep_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert len(dep_warnings) == 0
+# TestDeprecationWarning removed (query-path-c-elimination-cleanup, IP-7/IP-11):
+# _check_deprecated_threshold_env() and _DEPRECATED_THRESHOLD_VARS have been deleted
+# from query_cost_policy.py. The 4 *_ASYNC_DAY_THRESHOLD vars are no longer read
+# anywhere in the codebase. Contract tests for their absence are in
+# tests/contract/test_env_async_threshold_removal.py.
 
 
 # ---------------------------------------------------------------------------
@@ -346,6 +316,18 @@ class TestNoPandasAndNoCallers:
             "oracle_arrow_reader": {
                 "material_trace_duckdb_runtime",
                 "downtime_worker",
+            },
+            # query-path-c-elimination-cleanup (IP-7, P5): all callers that replaced
+            # per-domain *_ASYNC_DAY_THRESHOLD with classify_query_cost() calls.
+            "query_cost_policy": {
+                "resource_query_job_service",
+                "reject_query_job_service",
+                "query_tool_routes",
+                "downtime_analysis_routes",
+                "hold_query_job_service",
+                "wip_routes",
+                "resource_history_routes",
+                "hold_history_routes",
             },
         }
 

@@ -40,6 +40,7 @@ import json
 import logging
 import os
 import tempfile
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Generator, List, Optional
@@ -637,9 +638,21 @@ def merge_chunks(
 ) -> pd.DataFrame:
     """Load all chunks from Redis and concatenate into one DataFrame.
 
+    .. deprecated::
+        ``merge_chunks`` is deprecated and will be removed in a future release.
+        Use :func:`merge_chunks_to_spool` instead.  **No new callers allowed.**
+        All production callers have already been migrated to ``merge_chunks_to_spool``
+        (query-path-c-elimination-cleanup, D5).
+
     If *total* is not given, reads it from the progress metadata.
     Missing chunks are skipped (``has_partial_failure`` semantics).
     """
+    warnings.warn(
+        "merge_chunks is deprecated and will be removed in a future release. "
+        "Use merge_chunks_to_spool() instead. No new callers allowed.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if total is None:
         progress = get_batch_progress(cache_prefix, query_hash)
         if progress:

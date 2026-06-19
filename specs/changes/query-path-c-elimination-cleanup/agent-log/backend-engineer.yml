@@ -1,0 +1,79 @@
+agent: backend-engineer
+model: claude-sonnet-4-6
+date: 2026-06-19
+
+artifacts:
+  - type: files-changed
+    pointer: |
+      src/mes_dashboard/services/query_tool_service.py (execute_query_tool_job + register_job_type)
+      src/mes_dashboard/services/wip_service.py (count_wip_rows)
+      src/mes_dashboard/routes/query_tool_routes.py (_QUERY_TOOL_USE_RQ flag + RQ dispatch branch)
+      src/mes_dashboard/routes/wip_routes.py (rowcount pre-check in api_detail)
+      src/mes_dashboard/services/batch_query_engine.py (merge_chunks deprecation warning)
+      src/mes_dashboard/core/query_cost_policy.py (remove _DEPRECATED_THRESHOLD_VARS + _check_deprecated_threshold_env)
+      src/mes_dashboard/core/global_concurrency.py (docstring re-statement for RQ Oracle concurrency)
+      src/mes_dashboard/routes/downtime_analysis_routes.py (IP-7: replace _ASYNC_DAY_THRESHOLD with _classify_query_cost)
+      src/mes_dashboard/routes/hold_history_routes.py (IP-7: replace HOLD_ASYNC_DAY_THRESHOLD)
+      src/mes_dashboard/routes/resource_history_routes.py (IP-7: replace RESOURCE_ASYNC_DAY_THRESHOLD)
+      src/mes_dashboard/services/hold_query_job_service.py (IP-7: remove HOLD_ASYNC_DAY_THRESHOLD)
+      src/mes_dashboard/services/resource_query_job_service.py (IP-7: remove RESOURCE_ASYNC_DAY_THRESHOLD)
+      src/mes_dashboard/services/reject_query_job_service.py (IP-7: remove REJECT_ASYNC_DAY_THRESHOLD; add ValueError guard)
+      contracts/env/env-contract.md (remove 4 threshold vars; add QUERY_TOOL_USE_RQ; bump 1.0.20→1.0.21)
+      contracts/env/env.schema.json (add QUERY_TOOL_USE_RQ with enum + default "off")
+      contracts/api/api-contract.md (add 202 to equipment-period; update Type B routing description)
+      contracts/api/openapi.json (regen after api-contract.md edit)
+      contracts/business/business-rules.md (add ASYNC-12/13/14; bump 1.27.0→1.28.0)
+      contracts/CHANGELOG.md (env 1.0.21, api 1.25.1, business 1.28.0 entries)
+      .env.example (remove 4 threshold vars; add QUERY_TOOL_USE_RQ=off)
+
+  - type: tests-added
+    pointer: |
+      tests/contract/test_env_async_threshold_removal.py (6 tests; AC-5, AC-6, AC-7)
+      tests/integration/test_query_tool_rq_async.py (4 tests; AC-1, AC-2; mock-based)
+      tests/integration/test_wip_rowcount_rq_routing.py (3 tests; AC-3; mock-based)
+      tests/test_batch_query_engine.py::TestMergeChunks::test_merge_chunks_emits_deprecation_warning (AC-4)
+      tests/test_job_registry.py::TestJobServiceRegistrations (count 10→11; "query-tool" added)
+      tests/test_query_cost_policy.py (TestDeprecationWarning removed; _APPROVED_CALLERS extended for query_cost_policy new callers)
+
+  - type: tests-added
+    pointer: |
+      (test fixes for removed threshold attrs)
+      tests/test_api_contract.py::TestResourceHistoryAsyncContract (patch RESOURCE_ASYNC_DAY_THRESHOLD→_classify_query_cost)
+      tests/test_downtime_analysis_routes.py::TestDowntimeAsyncQuery (5 tests patched _ASYNC_DAY_THRESHOLD→_classify_query_cost)
+      tests/test_resource_history_rq_async_route.py (8 tests patched RESOURCE_ASYNC_DAY_THRESHOLD→_classify_query_cost; 1 threshold-default test flipped to removed-assertion)
+      tests/test_reject_query_job_service.py::TestShouldUseAsync (patched REJECT_ASYNC_DAY_THRESHOLD→classify_query_cost; added removed-assertion test)
+      tests/test_resource_query_job_service.py (7 tests patched RESOURCE_ASYNC_DAY_THRESHOLD→_classify_query_cost; threshold-default→removed-assertion)
+      tests/test_hold_history_routes.py (2 tests: threshold-default→removed, config_keys asserts absent)
+      tests/test_downtime_analysis_service.py (test_default_day_threshold_30→removed assertion)
+      tests/test_env_contract.py (RESOURCE_ASYNC_DAY_THRESHOLD block replaced with absent assertion)
+
+  - type: test-output
+    pointer: |
+      collect: pass (115 collected)
+      targeted: pass (115 tests)
+      changed-area: pass
+      contract: pass (cdd-kit validate --contracts)
+      quality: pass (ruff check .)
+      full: pass (4127 passed, 572 skipped, 0 failed; 4:16 wall time)
+
+  - type: contracts-touched
+    pointer: |
+      contracts/env/env-contract.md:1.0.21 (remove 4 threshold vars; add QUERY_TOOL_USE_RQ)
+      contracts/env/env.schema.json (add QUERY_TOOL_USE_RQ property)
+      contracts/api/api-contract.md (equipment-period 202 status; Type B routing update)
+      contracts/api/openapi.json (regen'd via cdd-kit openapi export)
+      contracts/business/business-rules.md:1.28.0 (ASYNC-12/13/14 added)
+      contracts/CHANGELOG.md (3 new versioned entries)
+
+notes: |
+  - IP-1 through IP-12 complete.
+  - wip-detail worker is NOT registered (intentional fail-open per design D2 — future Px migration).
+  - reject_query_job_service.should_use_async now has ValueError guard (catches invalid ISO dates
+    from classify_query_cost._date_span_days before propagation).
+  - 4 *_ASYNC_DAY_THRESHOLD constants had different defaults (30/90/90/10); all unified to
+    CostPolicy.day_threshold=30. Existing tests in downtime/hold/resource/reject that patched
+    the old constants were updated to patch _classify_query_cost/classify_query_cost instead.
+  - merge_chunks emits DeprecationWarning at stacklevel=2; all existing callers in test suite
+    now emit it (verified by test_batch_query_engine.py warnings list).
+  - No new oracle_arrow_reader or base_chunked_duckdb_job callers introduced; _APPROVED_CALLERS
+    extension is only for query_cost_policy (8 new callers from IP-7 migration).

@@ -40,6 +40,18 @@ from mes_dashboard.core.exceptions import (
     DataContractError,
     InternalQueryError,
 )
+from mes_dashboard.core.feature_flags import resolve_bool_flag
+from mes_dashboard.core.query_cost_policy import classify_query_cost
+from mes_dashboard.services.async_query_job_service import (
+    enqueue_query_job,
+    is_async_available,
+)
+from mes_dashboard.core.permissions import get_owner_token
+
+# ── Feature flag: RQ async dispatch for query-tool (query-path-c-elimination-cleanup) ──
+# Default off; operators enable by setting QUERY_TOOL_USE_RQ=on.
+# Frozen at import time — tests must use monkeypatch.setattr(), not monkeypatch.setenv().
+_QUERY_TOOL_USE_RQ: bool = resolve_bool_flag("QUERY_TOOL_USE_RQ", default=False)
 
 logger = logging.getLogger('mes_dashboard.query_tool_routes')
 
@@ -628,7 +640,48 @@ def query_equipment_period():
     if query_type not in valid_types:
         return validation_error(f'不支援的查詢類型: {query_type}')
 
-    # Execute query based on type
+    # ── RQ async dispatch (QUERY_TOOL_USE_RQ=on, query-path-c-elimination-cleanup IP-4) ──
+    # When flag is on and classify_query_cost returns ASYNC, dispatch to RQ and
+    # return 202+job_id instead of blocking the gunicorn worker.
+    # Falls through to sync path when: flag=off (default), query is SYNC,
+    # or RQ is unavailable.
+    if _QUERY_TOOL_USE_RQ and is_async_available():
+        _cost = classify_query_cost(
+            domain="query_tool",
+            params={"date_from": start_date, "date_to": end_date},
+        )
+        if _cost == "ASYNC":
+            _owner = get_owner_token()
+            _params = dict(
+                owner=_owner,
+                query_type="equipment_period",
+                query_sub_type=query_type,
+                equipment_ids=equipment_ids,
+                equipment_names=equipment_names,
+                start_date=start_date,
+                end_date=end_date,
+                workcenter_groups=workcenter_groups,
+                page=page,
+                per_page=per_page,
+            )
+            job_id, err, status_hint = enqueue_query_job(
+                "query-tool",
+                owner=_owner,
+                params=_params,
+                sync_fallback_allowed=True,
+            )
+            if job_id is not None:
+                return success_response(
+                    {
+                        "async": True,
+                        "job_id": job_id,
+                        "status_url": f"/api/job/{job_id}?prefix=query-tool",
+                    },
+                    status_code=202,
+                )
+            # enqueue failed — fall through to sync path
+
+    # Execute query based on type (sync path — default or flag-off)
     try:
         if query_type == 'status_hours':
             if not equipment_ids:

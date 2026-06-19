@@ -273,20 +273,16 @@ class TestHoldHistoryAsyncQueryRoute(TestHoldHistoryRoutesBase):
             else:
                 importlib.reload(_rmod)  # restore original module state
 
-    def test_hold_async_day_threshold_default_is_90(self):
-        """HOLD_ASYNC_DAY_THRESHOLD route-module constant must default to 90."""
+    def test_hold_async_day_threshold_removed(self):
+        """HOLD_ASYNC_DAY_THRESHOLD must NOT be present on the route module (query-path-c-elimination-cleanup, IP-7).
+
+        Replaced by _classify_query_cost(domain="hold", ...) with unified CostPolicy.
+        """
         import mes_dashboard.routes.hold_history_routes as _rmod
-        import importlib
-        import os
-        _old = os.environ.pop("HOLD_ASYNC_DAY_THRESHOLD", None)
-        try:
-            importlib.reload(_rmod)
-            self.assertEqual(_rmod.HOLD_ASYNC_DAY_THRESHOLD, 90)
-        finally:
-            if _old is not None:
-                os.environ["HOLD_ASYNC_DAY_THRESHOLD"] = _old
-            else:
-                importlib.reload(_rmod)
+        self.assertFalse(
+            hasattr(_rmod, 'HOLD_ASYNC_DAY_THRESHOLD'),
+            "HOLD_ASYNC_DAY_THRESHOLD was removed in IP-7 but is still present on the module."
+        )
 
 
 class TestHoldHistoryViewRoute(TestHoldHistoryRoutesBase):
@@ -528,10 +524,17 @@ class TestHoldHistoryConfigRoute(TestHoldHistoryRoutesBase):
         self.assertIn('auto_refresh_seconds', data)
 
     def test_config_has_hold_async_keys(self):
-        """Route module must expose HOLD_ASYNC_ENABLED and HOLD_ASYNC_DAY_THRESHOLD
-        as module-level constants (AC-6 — config surface test)."""
+        """Route module must expose HOLD_ASYNC_ENABLED and other keys (AC-6).
+
+        HOLD_ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7);
+        routing now uses _classify_query_cost(domain="hold", ...) with unified CostPolicy.
+        """
         import mes_dashboard.routes.hold_history_routes as _rmod
         self.assertTrue(hasattr(_rmod, 'HOLD_ASYNC_ENABLED'))
-        self.assertTrue(hasattr(_rmod, 'HOLD_ASYNC_DAY_THRESHOLD'))
+        # HOLD_ASYNC_DAY_THRESHOLD removed — assert absent
+        self.assertFalse(
+            hasattr(_rmod, 'HOLD_ASYNC_DAY_THRESHOLD'),
+            "HOLD_ASYNC_DAY_THRESHOLD was removed in IP-7 but is still present."
+        )
         self.assertTrue(hasattr(_rmod, 'HOLD_WORKER_QUEUE'))
         self.assertTrue(hasattr(_rmod, 'HOLD_JOB_TIMEOUT_SECONDS'))

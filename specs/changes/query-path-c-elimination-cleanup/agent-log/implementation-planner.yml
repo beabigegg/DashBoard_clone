@@ -1,0 +1,13 @@
+agent: implementation-planner
+change-id: query-path-c-elimination-cleanup
+status: complete
+summary: >
+  Converted design.md D1-D5 + classification AC-1..AC-8 into a 12-item ordered
+  execution plan (IP-1..IP-12) with file-level pointers, same-PR test
+  constraints, contract updates, and a selector-fallback test table. Noted that
+  test-plan.md and ci-gates.md are still scaffold templates and must be filled
+  by test-strategist / ci-cd-gatekeeper before the gate.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/query-path-c-elimination-cleanup/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, contract-reviewer, test-strategist, stress-soak-engineer, e2e-resilience-engineer, ci-cd-gatekeeper" }
+  - { type: scope-summary, pointer: "in: query_tool RQ enqueue (flag), wip COUNT pre-check, merge_chunks deprecate, 4 env-var removal, semaphore docs, contracts+tests; out: domain migration, file deletion, global_concurrency runtime change, frontend/spool" }

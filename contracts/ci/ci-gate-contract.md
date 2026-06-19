@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.30
+schema-version: 1.3.31
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -581,7 +581,26 @@ gate tier, command, or status changed.
 
 **Schema-version bump to 1.3.29 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
 
+## query-path-c-elimination-cleanup Gate Compatibility Note
+
+**P4+P5 Path-C elimination — new `query-tool` RQ job type + env-var removal:**
+
+- **No new workflow files required.** All new tests (`tests/contract/test_env_query_tool_flag.py`, `tests/integration/test_query_tool_rq_async.py`, `tests/stress/test_query_tool_stress.py`) fall within existing gate discovery scopes.
+- **Tier 1 `unit-mock-integration` gate** auto-discovers: new env-pin contract tests (4 removed vars absent + `QUERY_TOOL_USE_RQ` present with default off), `tests/test_job_registry.py` count update (10→11, "query-tool" in expected_types set), `tests/test_batch_query_engine.py` DeprecationWarning assertion, `tests/test_query_cost_policy.py` `_DEPRECATED_THRESHOLD_VARS` removal, query_tool/wip dispatch unit tests (mock `is_async_available=True` + `enqueue_query_job` per CLAUDE.md async-gated route unit test pattern — CI has no Redis).
+- **Tier 1 `response-shape-validate` gate** (`cdd-kit validate --contracts`) validates the new 202+job_id async-dispatch shape for `query_tool_routes` under `QUERY_TOOL_USE_RQ=on`.
+- **Tier 3 `nightly-integration` gate** picks up `tests/integration/test_query_tool_rq_async.py` (`integration_real` marker) on the first nightly run after merge — verifies flag-on/off parity and worker-blocking-elimination (AC-1/AC-2/AC-8).
+- **Tier 4 `stress-load` gate** picks up `tests/stress/test_query_tool_stress.py` (`stress` marker) on the next weekly run — verifies RQ Oracle concurrency bounded by `HEAVY_QUERY_MAX_CONCURRENT` semaphore and no gunicorn worker starvation (AC-8). `stress-soak-report.md` required before promoting `QUERY_TOOL_USE_RQ` to `on` in production.
+- **CI env-var removal**: the 4 `*_ASYNC_DAY_THRESHOLD` vars are not set in any existing `env:` block in `backend-tests.yml` or `contract-driven-gates.yml`; no workflow YAML edit required for their removal.
+- **Feature flag `QUERY_TOOL_USE_RQ=off` (default)**: CI workflows do not need to set this explicitly. All gate runs exercise the flag-off (default / safe) path.
+- **No spool/parquet cleanup**: `query_tool_routes` has no persistent spool; do not add parquet cleanup to rollback steps for this change (see §material-part-consumption for contrast).
+- **Same-PR constraints enforced at Tier 1**: IP-2 (job registry count) + IP-7 (env removal) must co-ship with IP-11 (test updates) and IP-9/IP-10 (contract+example env updates) in the same PR or the `unit-mock-integration` and `response-shape-validate` gates will fail.
+
+**Schema-version bump to 1.3.31 (patch)**: additive gate-compatibility note for P4+P5 Path-C elimination. No gate tier, command, or status changed.
+
 ## CHANGELOG
+
+## [ci 1.3.31] — 2026-06-19
+- query-path-c-elimination-cleanup: Gate-compatibility note for P4+P5 Path-C elimination — new `query-tool` RQ job type (test_job_registry count 10→11), 4 `*_ASYNC_DAY_THRESHOLD` vars removed (no workflow YAML env-block edit required), `QUERY_TOOL_USE_RQ=off` default means zero behavioral change until explicitly set, `stress-soak-report.md` required before flag promotion. All new tests auto-discovered by existing gate commands. No new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.30] — 2026-06-19
 - downtime-duckdb-join-migration: Gate-compatibility note for P5 migration — `DowntimeJob(BaseChunkedDuckDBJob)` + `execute_downtime_unified_job`; reuses `downtime-query` queue and existing worker service; `chunk_strategy=RESOURCEID` with `requires_cross_chunk_reduction=True` (ADR-0003 compliance). Feature flag `DOWNTIME_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. `stress-soak-report.md` required before flag promotion. No new workflow file or gate tier. Additive; no existing gates changed.

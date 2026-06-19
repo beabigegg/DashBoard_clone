@@ -38,6 +38,7 @@ from mes_dashboard.services.hold_dataset_cache import (
 )
 from mes_dashboard.services.hold_today_snapshot_service import execute_today_snapshot
 from mes_dashboard.core.database import DatabaseCircuitOpenError, DatabasePoolExhaustedError
+from mes_dashboard.core.query_cost_policy import classify_query_cost as _classify_query_cost
 from mes_dashboard.services.async_query_job_service import (
     enqueue_job_dynamic,
     is_async_available,
@@ -63,7 +64,6 @@ _HOLD_SPOOL_NAMESPACE = "hold_dataset"
 HOLD_ASYNC_ENABLED: bool = os.getenv(
     "HOLD_ASYNC_ENABLED", "true"
 ).strip().lower() in ("1", "true", "yes", "on")
-HOLD_ASYNC_DAY_THRESHOLD: int = int(os.getenv("HOLD_ASYNC_DAY_THRESHOLD", "90"))
 HOLD_WORKER_QUEUE: str = os.getenv("HOLD_WORKER_QUEUE", "hold-history-query")
 HOLD_JOB_TIMEOUT_SECONDS: int = int(os.getenv("HOLD_JOB_TIMEOUT_SECONDS", "1800"))
 
@@ -229,14 +229,11 @@ def api_hold_history_query():
     # Falls through to the sync 200 path on any false condition (AC-2, AC-8).
     # Also falls through when spool already exists (no need to re-dispatch).
     if HOLD_ASYNC_ENABLED and not _spool_exists:
-        from datetime import datetime as _dt
-        try:
-            sd = _dt.strptime(start_date, "%Y-%m-%d")
-            ed = _dt.strptime(end_date, "%Y-%m-%d")
-            day_span = (ed - sd).days
-        except (ValueError, TypeError):
-            day_span = 0
-        if day_span >= HOLD_ASYNC_DAY_THRESHOLD:
+        _hold_cost = _classify_query_cost(
+            domain="hold",
+            params={"date_from": start_date, "date_to": end_date},
+        )
+        if _hold_cost == "ASYNC":
             if is_async_available():
                 _owner = get_owner_token()
                 _params = dict(

@@ -5,79 +5,79 @@
       "name": "點測"
     },
     {
-      "lot_count": 1761,
+      "lot_count": 1682,
       "name": "切割"
     },
     {
-      "lot_count": 857,
+      "lot_count": 905,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 80,
+      "lot_count": 89,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 357,
+      "lot_count": 325,
       "name": "焊接_WB"
     },
     {
-      "lot_count": 62,
+      "lot_count": 75,
       "name": "焊接_WB"
     },
     {
-      "lot_count": 99,
+      "lot_count": 101,
       "name": "焊接_DW"
     },
     {
-      "lot_count": 14,
+      "lot_count": 10,
       "name": "焊接_DW"
     },
     {
-      "lot_count": 450,
+      "lot_count": 490,
       "name": "成型"
     },
     {
-      "lot_count": 200,
+      "lot_count": 228,
       "name": "成型"
     },
     {
-      "lot_count": 440,
+      "lot_count": 405,
       "name": "去膠"
     },
     {
-      "lot_count": 488,
+      "lot_count": 466,
       "name": "水吹砂"
     },
     {
-      "lot_count": 383,
+      "lot_count": 452,
       "name": "電鍍"
     },
     {
-      "lot_count": 73,
+      "lot_count": 34,
       "name": "電鍍"
     },
     {
-      "lot_count": 207,
+      "lot_count": 167,
       "name": "電鍍"
     },
     {
-      "lot_count": 21,
+      "lot_count": 35,
       "name": "電鍍"
     },
     {
-      "lot_count": 262,
+      "lot_count": 285,
       "name": "移印"
     },
     {
-      "lot_count": 337,
+      "lot_count": 347,
       "name": "切彎腳"
     },
     {
-      "lot_count": 20,
+      "lot_count": 6,
       "name": "可靠性"
     },
     {
-      "lot_count": 3525,
+      "lot_count": 3512,
       "name": "TMTT"
     },
     {
@@ -85,21 +85,21 @@
       "name": "預備站"
     },
     {
-      "lot_count": 97,
+      "lot_count": 53,
       "name": "品檢"
     },
     {
-      "lot_count": 24,
+      "lot_count": 7,
       "name": "FQC"
     },
     {
-      "lot_count": 33,
+      "lot_count": 35,
       "name": "成品入庫"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T14:55:51.224985"
+    "timestamp": "2026-06-19T19:08:26.104590"
   },
   "success": true
 }

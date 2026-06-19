@@ -41,6 +41,7 @@ from mes_dashboard.services.async_query_job_service import (
     enqueue_job_dynamic,
     is_async_available,
 )
+from mes_dashboard.core.query_cost_policy import classify_query_cost as _classify_query_cost
 from mes_dashboard.core.permissions import get_owner_token
 
 downtime_analysis_bp = Blueprint(
@@ -70,7 +71,6 @@ _BROWSER_DUCKDB_ENABLED: bool = os.getenv(
 _ASYNC_ENABLED: bool = os.getenv(
     "DOWNTIME_ASYNC_ENABLED", "true"
 ).lower() in ("1", "true", "yes", "on")
-_ASYNC_DAY_THRESHOLD: int = int(os.getenv("DOWNTIME_ASYNC_DAY_THRESHOLD", "30"))
 _ASYNC_WORKER_QUEUE: str = os.getenv("DOWNTIME_WORKER_QUEUE", "downtime-query")
 _JOB_TIMEOUT: int = int(os.getenv("DOWNTIME_JOB_TIMEOUT_SECONDS", "1800"))
 
@@ -241,10 +241,11 @@ def api_downtime_query():
     # flag is enabled, AND the date span meets the threshold, AND a worker is live.
     # Falls through to the sync path on any false condition (ASYNC-02/ASYNC-DA-01).
     if _BROWSER_DUCKDB_ENABLED and _ASYNC_ENABLED:
-        sd = datetime.strptime(start_date, "%Y-%m-%d")
-        ed = datetime.strptime(end_date, "%Y-%m-%d")
-        day_span = (ed - sd).days
-        if day_span >= _ASYNC_DAY_THRESHOLD:
+        _downtime_cost = _classify_query_cost(
+            domain="downtime",
+            params={"date_from": start_date, "date_to": end_date},
+        )
+        if _downtime_cost == "ASYNC":
             if is_async_available():
                 query_params = dict(
                     start_date=start_date,

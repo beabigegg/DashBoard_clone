@@ -73,7 +73,7 @@
     "sqlite_files": [
       {
         "path": "logs/admin_logs.sqlite",
-        "size_bytes": 37769216
+        "size_bytes": 45453312
       },
       {
         "path": "logs/login_sessions.sqlite",
@@ -84,11 +84,11 @@
         "size_bytes": 176128
       }
     ],
-    "total_bytes": 37969920
+    "total_bytes": 45654016
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T14:57:22.252967"
+    "timestamp": "2026-06-19T19:09:56.392877"
   },
   "success": true
 }

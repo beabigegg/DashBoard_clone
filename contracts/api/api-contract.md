@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.25.0
-last-changed: 2026-06-18
+schema-version: 1.25.1
+last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -191,7 +191,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/query-tool/lot-history | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/query-tool/adjacent-lots | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/query-tool/lot-associations | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/query-tool/equipment-period | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/query-tool/equipment-period | required | JSON body  | GenericSuccessResponse | 202/400/500 | route tests |
 | GET | /api/query-tool/equipment-list | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/query-tool/workcenter-groups | required | — | GenericSuccessResponse | 500 | route tests |
 | POST | /api/query-tool/lot-equipment-lookup | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
@@ -268,7 +268,7 @@ breaking-change-policy: deprecate-2-minors
 
 **Type A — 同步 re-query on 410：** view miss → 410 `cache_expired` → client 同步重新觸發 `execute_primary_query()`。適用：`hold_history_routes.py`、`resource_history_routes.py`。
 
-**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ `DOWNTIME_ASYNC_DAY_THRESHOLD` when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ `HOLD_ASYNC_DAY_THRESHOLD` when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` when `RESOURCE_ASYNC_ENABLED=true`）、`eap_alarm_routes.py`（all date ranges; always async when worker available; no threshold — Type B only, no sync fallback path）。
+**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `RESOURCE_ASYNC_ENABLED=true`）、`eap_alarm_routes.py`（all date ranges; always async when worker available; no threshold — Type B only, no sync fallback path）、`query_tool_routes.py`（`POST /api/query-tool/equipment-period`; when `QUERY_TOOL_USE_RQ=on` + date range ≥ CostPolicy.day_threshold + worker available → 202+job_id; else sync 200; query-path-c-elimination-cleanup AC-1）。
 
 ## 8. API Inventory Governance
 
@@ -965,3 +965,11 @@ Tier-B — every `4xx`/`5xx` error envelope; see `contracts/api/error-format.md 
 | job_id | string | yes |  | RQ job identifier |
 | status_url | string | yes |  | polling URL |
 | query_id | string | no |  | spool key |
+
+### QueryToolJobAccepted
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| async | boolean | yes |  | 202 async branch indicator |
+| job_id | string | yes |  | RQ job identifier |
+| status_url | string | yes |  | polling URL |
+| status | string | no |  | job status hint |

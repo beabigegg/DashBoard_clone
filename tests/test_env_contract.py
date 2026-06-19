@@ -233,20 +233,13 @@ class TestDuckdbPrewarmTtlDefaults:
                 from mes_dashboard.services import resource_query_job_service as _svc
                 importlib.reload(_svc)
 
-        # Test RESOURCE_ASYNC_DAY_THRESHOLD default=90
-        _old_threshold = os.environ.pop("RESOURCE_ASYNC_DAY_THRESHOLD", None)
-        try:
-            from mes_dashboard.services import resource_query_job_service as _svc
-            importlib.reload(_svc)
-            assert _svc.RESOURCE_ASYNC_DAY_THRESHOLD == 90, (
-                f"RESOURCE_ASYNC_DAY_THRESHOLD must default 90, got {_svc.RESOURCE_ASYNC_DAY_THRESHOLD!r}"
-            )
-        finally:
-            if _old_threshold is not None:
-                os.environ["RESOURCE_ASYNC_DAY_THRESHOLD"] = _old_threshold
-            else:
-                from mes_dashboard.services import resource_query_job_service as _svc
-                importlib.reload(_svc)
+        # RESOURCE_ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7).
+        # Verify it is absent from the service module.
+        from mes_dashboard.services import resource_query_job_service as _svc
+        importlib.reload(_svc)
+        assert not hasattr(_svc, "RESOURCE_ASYNC_DAY_THRESHOLD"), (
+            "RESOURCE_ASYNC_DAY_THRESHOLD was removed in IP-7 but is still present on the module."
+        )
 
         # Test RESOURCE_WORKER_QUEUE default='resource-history-query'
         _old_queue = os.environ.pop("RESOURCE_WORKER_QUEUE", None)
@@ -283,10 +276,21 @@ class TestDuckdbPrewarmTtlDefaults:
         content = _CONTRACT_PATH.read_text(encoding="utf-8")
         for var in (
             "RESOURCE_ASYNC_ENABLED",
-            "RESOURCE_ASYNC_DAY_THRESHOLD",
+            # RESOURCE_ASYNC_DAY_THRESHOLD removed (query-path-c-elimination-cleanup, IP-7)
             "RESOURCE_WORKER_QUEUE",
             "RESOURCE_JOB_TIMEOUT_SECONDS",
         ):
+            if var.startswith("#"):
+                continue
             assert var in content, (
                 f"{var} must be documented in env-contract.md (AC-5)"
             )
+        # Assert RESOURCE_ASYNC_DAY_THRESHOLD is NOT in the env-contract.md property table.
+        # It may appear in comments/notes explaining its removal — check it's not in
+        # a table row (prefixed with `|`).
+        import re
+        table_rows = [line for line in content.splitlines() if "RESOURCE_ASYNC_DAY_THRESHOLD" in line and line.strip().startswith("|")]
+        assert not table_rows, (
+            "RESOURCE_ASYNC_DAY_THRESHOLD was removed in IP-7 but is still present in a "
+            "table row in env-contract.md. Remove the table row."
+        )

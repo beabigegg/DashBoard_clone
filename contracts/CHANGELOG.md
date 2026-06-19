@@ -8,6 +8,25 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [env 1.0.21] — 2026-06-19
+### Removed
+- query-path-c-elimination-cleanup (P5): `DOWNTIME_ASYNC_DAY_THRESHOLD` (P5 final removal; was Deprecated since unified-query-core-infra). Routing now uses `classify_query_cost(domain="downtime", ...)` with the unified `CostPolicy`.
+- query-path-c-elimination-cleanup (P5): `HOLD_ASYNC_DAY_THRESHOLD` (P5 final removal; was Deprecated since unified-query-core-infra). Routing now uses `classify_query_cost(domain="hold", ...)`.
+- query-path-c-elimination-cleanup (P5): `RESOURCE_ASYNC_DAY_THRESHOLD` (P5 final removal; was Deprecated since unified-query-core-infra). Routing now uses `classify_query_cost(domain="resource", ...)`.
+- query-path-c-elimination-cleanup (P5): `REJECT_ASYNC_DAY_THRESHOLD` (P5 final removal; was Deprecated since unified-query-core-infra). Routing now uses `classify_query_cost(domain="reject", ...)`.
+### Added
+- query-path-c-elimination-cleanup: `QUERY_TOOL_USE_RQ` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag enabling RQ async dispatch for `POST /api/query-tool/equipment-period` when `classify_query_cost(domain="query_tool")` returns ASYNC. When on + oversized query + worker available → 202+job_id; else sync 200. `always_async=False`; sync fallback always permitted. Additive.
+
+## [api 1.25.1] — 2026-06-19
+### Changed
+- query-path-c-elimination-cleanup: `POST /api/query-tool/equipment-period` status codes updated from `400/500` to `202/400/500` (202 is returned when `QUERY_TOOL_USE_RQ=on` and query cost is ASYNC). Type B async shape applied: `{async: true, job_id, status_url}`. Additive; flag-off path behavior unchanged.
+### Changed
+- query-path-c-elimination-cleanup: Type B routing description updated — replaced `*_ASYNC_DAY_THRESHOLD` references with `CostPolicy.day_threshold` unified policy language.
+
+## [business 1.28.0] — 2026-06-19
+### Added
+- query-path-c-elimination-cleanup: ASYNC-12 (query-tool RQ async dispatch), ASYNC-13 (WIP detail rowcount pre-check), ASYNC-14 (merge_chunks deprecation — no new callers). Additive; no existing rules changed.
+
 ## [env 1.0.20] — 2026-06-19
 ### Added
 - downtime-duckdb-join-migration (cdd-close): Cross-cutting "Worker Feature-Flag Env-Var Parity" normative rule. All `*_USE_UNIFIED_JOB` flags must be identical in gunicorn AND RQ worker service environments; module-level constants freeze at boot so drift causes silent split-brain routing. Lists all 6 current flags (EAP_ALARM, PRODUCTION_HISTORY, REJECT_HISTORY, RESOURCE_HISTORY, MATERIAL_TRACE, DOWNTIME) and extends to future P6+ flags. Additive; no existing defaults or enums changed.
@@ -31,6 +50,10 @@ a corresponding entry below.
 ## [data 1.22.0] — 2026-06-19
 ### Added
 - material-trace-streaming-migration: §3.20 spool-schema-UNCHANGED assertion for `material_trace` namespace. 13-column set identical between legacy `pd.concat` and unified `MaterialTraceJob` streaming paths (AC-4). No parquet cleanup on deploy/rollback. Additive; no existing schemas changed.
+
+## [ci 1.3.31] — 2026-06-19
+### Added
+- query-path-c-elimination-cleanup: Gate-compatibility note for P4+P5 Path-C elimination — new `query-tool` RQ job type (test_job_registry count 10→11), 4 `*_ASYNC_DAY_THRESHOLD` vars removed (no CI workflow env-block edit required), `QUERY_TOOL_USE_RQ=off` default means zero behavioral change until explicitly set, `stress-soak-report.md` required before promoting flag to `on` in production. All new tests auto-discovered by existing `unit-mock-integration` (Tier 1), `nightly-integration` (Tier 3), and `stress-load` (Tier 4) gate commands. No new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.30] — 2026-06-19
 ### Added

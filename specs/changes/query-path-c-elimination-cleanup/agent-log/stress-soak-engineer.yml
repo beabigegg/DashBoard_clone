@@ -1,0 +1,16 @@
+agent: stress-soak-engineer
+change-id: query-path-c-elimination-cleanup
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_query_tool_stress.py:TestAC8StructuralGuarantees" }
+  - { type: runner, pointer: "pytest --run-stress (mock-based; no real Oracle/Redis/RQ)" }
+  - { type: pass-criteria-cited, pointer: "starvation: all-202, wall<2s, individual<500ms; semaphore: peak_concurrent<=HEAVY_QUERY_MAX_CONCURRENT=3, all N=8 complete, zero slot leak" }
+  - { type: artifacts-location, pointer: "specs/changes/query-path-c-elimination-cleanup/stress-soak-report.md" }
+
+notes:
+  - "test_no_worker_starvation: N=10 concurrent, wall=17ms, max_individual=13ms, all 202 — PASS"
+  - "test_rq_oracle_concurrency_bounded_by_semaphore: N=8 workers, peak=3, MAX=3, completed=8/8, wall=154ms — PASS"
+  - "Gap: acquire_heavy_query_slot not yet wired in execute_query_tool_job; semaphore mechanism is proven correct but end-to-end worker integration requires production test before flag flip"
+  - "Pre-existing tests (test_mixed_query_tool_soak, test_large_multi_value_resolve, test_rapid_lot_reverse_switching) fail without live server — unrelated to this change"

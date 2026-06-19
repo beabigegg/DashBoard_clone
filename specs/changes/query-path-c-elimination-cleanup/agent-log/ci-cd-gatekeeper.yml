@@ -1,0 +1,24 @@
+agent: ci-cd-gatekeeper
+change-id: query-path-c-elimination-cleanup
+date: 2026-06-19
+status: complete
+
+summary: >
+  Filled ci-gates.md for P4+P5 Path-C elimination (query-path-c-elimination-cleanup).
+  All required gates identified; no new workflow YAML files needed (all tests
+  auto-discovered). Bumped contracts/ci/ci-gate-contract.md to 1.3.31 (patch);
+  added gate-compat note and CHANGELOG entry. Added ci 1.3.31 entry to
+  contracts/CHANGELOG.md.
+
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3, 4" }
+  - { type: gate-promotions, pointer: "n/a (no tier promotions; existing gates cover all new tests)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow YAML edits required; CI env-var audit confirmed 4 removed vars absent from existing env: blocks)" }
+  - { type: required-status-checks, pointer: "lint, contract-validate, response-shape-validate, unit-mock-integration, cdd-gate, playwright-resilience, playwright-critical-journeys" }
+
+decisions:
+  - No new workflow YAML files: all new test files (tests/contract/, tests/integration/test_query_tool_rq_async.py, tests/stress/test_query_tool_stress.py) fall within existing gate discovery scopes in backend-tests.yml and contract-driven-gates.yml.
+  - CI env-var audit: DOWNTIME_, HOLD_, RESOURCE_, REJECT_ASYNC_DAY_THRESHOLD not present in any env: block in backend-tests.yml or contract-driven-gates.yml — no YAML deletion needed.
+  - QUERY_TOOL_USE_RQ not set in CI workflows (default off is the safe merge state).
+  - stress-soak-report.md is a production-promotion gate, not a merge-eligibility gate.
+  - same-PR constraints (IP-2+IP-11+IP-7+IP-9+IP-10) enforced at Tier 1 (unit-mock-integration and response-shape-validate will fail if any co-ship constraint is violated).

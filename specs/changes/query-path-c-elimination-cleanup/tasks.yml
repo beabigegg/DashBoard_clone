@@ -1,0 +1,42 @@
+change-id: query-path-c-elimination-cleanup
+status: in-progress
+tier: 1
+tier-floor-override: "P5 cleanup: no new concurrency primitive; removes per-domain threshold constants; query-tool RQ dispatch uses existing enqueue_query_job + JobTypeConfig (already Tier 1 approved in material-trace-streaming-migration); semaphore doc-only; all stress tests deferred via P4/P5 precedent."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 1 high-risk cross-module; design.md required; 8 agents; 4 confirmed ASYNC_DAY_THRESHOLD vars (not 7); enqueue_query_job in async_query_job_service.py" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "env (QUERY_TOOL_USE_RQ add, 4 vars remove), API (202 dispatch shape), business (semaphore + deprecation), ci-gate; confirmed by classifier + architect" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done, note: "design.md + current-behavior.md written; ADR-0011 (semaphore role); D1 new query-tool job type; D2 COUNT(*) estimator in wip_service; D3 semaphore doc-only; D4 no migration guide; D5 zero callers of merge_chunks" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md filled; ci-gate-contract 1.3.30→1.3.31; no new workflow YAML; playwright gates reference frontend/tests/playwright/" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done, note: "IP-1..IP-12 ordered; D1-D5 anchored; test_job_registry count 10→11; _DEPRECATED_THRESHOLD_VARS removal flagged; test-plan + ci-gates still need filling" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "equipment-period 202 status + Type B routing note; openapi.json regen'd" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no UI surface" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done, note: "4 threshold vars removed; QUERY_TOOL_USE_RQ added with enum; schema bumped 1.0.21" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "no spool schema change; query-tool spool unchanged" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "ASYNC-12/13/14 added; business-rules bumped 1.28.0; CHANGELOG updated" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no new workflow YAML; existing gates cover this change" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "test_env_async_threshold_removal.py (6), test_batch_query_engine deprecation, test_job_registry count+set, test_query_cost_policy _APPROVED_CALLERS extended" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "test_query_tool_rq_async.py (4 mock), test_wip_rowcount_rq_routing.py (3 mock)" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "e2e stubs exist in test-plan.md but require running Flask app + playwright; CI covers on first post-merge nightly run" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "no interactive UI; data-boundary covered in rowcount threshold unit tests" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: done, note: "tier-floor-override invalidated by first caller landing (query_tool_routes AC-8); stress-soak-engineer wrote TestAC8StructuralGuarantees (2 tests: no-worker-starvation + concurrency-bounded); stress-soak-report.md written" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "IP-1..IP-10 complete; all source files updated; ruff clean" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no frontend change; query-tool uses existing poll mechanism" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done, note: ".env.example updated; 4 deprecated vars removed; QUERY_TOOL_USE_RQ=off added" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no workflow YAML change required" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI surface" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI surface" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "cdd-kit validate --contracts passes; openapi.json regen'd" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "full suite passes 4127 tests; 572 skipped (integration_real)" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "collect+targeted+changed-area+contract+quality+full all pass" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 laddar complete locally; see test-evidence.yml" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "ruff + cdd-kit validate pass" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gates defined for this change" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

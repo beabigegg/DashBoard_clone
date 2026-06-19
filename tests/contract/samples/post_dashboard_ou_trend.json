@@ -53,27 +53,27 @@
     {
       "date": "2026-06-17",
       "egt_hours": 73.6,
-      "ou_pct": 69.07,
-      "prd_hours": 25283.6,
+      "ou_pct": 69.08,
+      "prd_hours": 25306.0,
       "sby_hours": 9656.7,
       "sdt_hours": 912.6,
-      "total_hours": 46841.8,
+      "total_hours": 46864.2,
       "udt_hours": 681.5
     },
     {
       "date": "2026-06-18",
       "egt_hours": 72.0,
-      "ou_pct": 69.92,
-      "prd_hours": 25716.8,
+      "ou_pct": 69.94,
+      "prd_hours": 25740.8,
       "sby_hours": 9693.2,
       "sdt_hours": 716.9,
-      "total_hours": 46767.9,
+      "total_hours": 46791.9,
       "udt_hours": 582.5
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T14:57:21.512441"
+    "timestamp": "2026-06-19T19:09:55.598481"
   },
   "success": true
 }

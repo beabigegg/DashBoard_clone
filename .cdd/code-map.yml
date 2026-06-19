@@ -1,6 +1,6 @@
-# generated: 2026-06-19T09:18:57Z by cdd-kit 3.3.0
-# files: 922, src-lines: 271667, map-lines: 20294, compression: 13.4x
-# sources-digest: b25d37c89a9a14b30672bba2ae9de31ad316feba4b8f6b1d64456e9c3ea5efd9
+# generated: 2026-06-19T11:13:43Z by cdd-kit 3.3.0
+# files: 925, src-lines: 272701, map-lines: 20355, compression: 13.4x
+# sources-digest: 4471e681dbada93972862e824d61c39577cd972d92b4f10d3d30d29c986b0d65
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3949,21 +3949,21 @@ src/mes_dashboard/core/feature_flags.py:  # 49 lines
     - { name: parse_bool, lines: 14-28 }
     - { name: resolve_bool_flag, lines: 31-49 }
 
-src/mes_dashboard/core/global_concurrency.py:  # 136 lines
+src/mes_dashboard/core/global_concurrency.py:  # 147 lines
   imports:
-    - { module: __future__, items: [annotations], line: 17 }
-    - { module: logging, items: [], line: 19 }
-    - { module: os, items: [], line: 20 }
-    - { module: time, items: [], line: 21 }
-    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 23 }
+    - { module: __future__, items: [annotations], line: 24 }
+    - { module: logging, items: [], line: 26 }
+    - { module: os, items: [], line: 27 }
+    - { module: time, items: [], line: 28 }
+    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 30 }
   constants:
-    - { name: HEAVY_QUERY_MAX_CONCURRENT, line: 30 }
+    - { name: HEAVY_QUERY_MAX_CONCURRENT, line: 37 }
   functions:
-    - { name: _get_acquire_script, lines: 67-71 }
-    - { name: _slot_key, lines: 74-75 }
-    - { name: acquire_heavy_query_slot, lines: 78-111 }
-    - { name: release_heavy_query_slot, lines: 114-122 }
-    - { name: get_active_slot_count, lines: 125-136 }
+    - { name: _get_acquire_script, lines: 74-78 }
+    - { name: _slot_key, lines: 81-82 }
+    - { name: acquire_heavy_query_slot, lines: 85-122 }
+    - { name: release_heavy_query_slot, lines: 125-133 }
+    - { name: get_active_slot_count, lines: 136-147 }
 
 src/mes_dashboard/core/heavy_query_telemetry.py:  # 172 lines
   imports:
@@ -4267,22 +4267,19 @@ src/mes_dashboard/core/permissions.py:  # 90 lines
     - { name: login_required, lines: 71-78 }
     - { name: admin_required, lines: 81-90 }
 
-src/mes_dashboard/core/query_cost_policy.py:  # 163 lines
+src/mes_dashboard/core/query_cost_policy.py:  # 120 lines
   imports:
-    - { module: __future__, items: [annotations], line: 19 }
-    - { module: os, items: [], line: 21 }
-    - { module: warnings, items: [], line: 22 }
-    - { module: dataclasses, items: [dataclass], line: 23 }
-    - { module: datetime, items: [date], line: 24 }
-    - { module: typing, items: [Callable, Literal, Optional], line: 25 }
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: dataclasses, items: [dataclass], line: 20 }
+    - { module: datetime, items: [date], line: 21 }
+    - { module: typing, items: [Callable, Literal, Optional], line: 22 }
   classes:
     - name: CostPolicy
-      lines: 70-81
+      lines: 29-40
   functions:
-    - { name: _check_deprecated_threshold_env, lines: 57-66 }
-    - { name: classify_query_cost, lines: 84-142 }
-    - { name: _default_policy_for, lines: 149-153 }
-    - { name: _date_span_days, lines: 156-163 }
+    - { name: classify_query_cost, lines: 43-99 }
+    - { name: _default_policy_for, lines: 106-110 }
+    - { name: _date_span_days, lines: 113-120 }
 
 src/mes_dashboard/core/query_quality_contract.py:  # 337 lines
   imports:
@@ -4908,7 +4905,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 582 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 583 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: os, items: [], line: 19 }
@@ -4918,19 +4915,20 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 582 lines
     - { module: mes_dashboard.core.response, items: [cache_expired_error, internal_error, success_response, validation_error], line: 25 }
     - { module: mes_dashboard.services.downtime_analysis_service, items: [apply_view, export_equipment_detail_csv, export_event_detail_csv, get_filter_options, query_downtime_dataset, query_downtime_dataset_raw], line: 32 }
     - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 40 }
-    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 44 }
+    - { module: mes_dashboard.core.query_cost_policy, items: [_classify_query_cost], line: 44 }
+    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 45 }
     - { module: mes_dashboard.core.feature_flags, items: [_resolve_bool_flag], line: 83 }
   functions:
     - { name: _validate_dates, lines: 94-109 }
     - { name: _csv_param, lines: 112-117 }
     - { name: api_downtime_options, lines: 126-158 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 167-351 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 360-393 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 402-446 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 455-495 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 504-529 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 538-563 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 571-582 }
+    - { name: api_downtime_query, lines: 167-352 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 361-394 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 403-447 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 456-496 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 505-530 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 539-564 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 572-583 }
 
 src/mes_dashboard/routes/eap_alarm_routes.py:  # 392 lines
   imports:
@@ -4997,7 +4995,7 @@ src/mes_dashboard/routes/health_routes.py:  # 863 lines
     - { name: deep_health_check, lines: 631-837 }  # @health_bp.route('/health/deep', methods=['GET'])
     - { name: frontend_shell_health_check, lines: 841-863 }  # @health_bp.route('/health/frontend-shell', methods=['GET'])
 
-src/mes_dashboard/routes/hold_history_routes.py:  # 431 lines
+src/mes_dashboard/routes/hold_history_routes.py:  # 428 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -5012,11 +5010,11 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 431 lines
     - { module: mes_dashboard.services.hold_dataset_cache, items: [apply_view, execute_primary_query], line: 35 }
     - { module: mes_dashboard.services.hold_today_snapshot_service, items: [execute_today_snapshot], line: 39 }
     - { module: mes_dashboard.core.database, items: [DatabaseCircuitOpenError, DatabasePoolExhaustedError], line: 40 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 41 }
-    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 45 }
+    - { module: mes_dashboard.core.query_cost_policy, items: [_classify_query_cost], line: 41 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 42 }
+    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 46 }
   constants:
-    - { name: HOLD_ASYNC_ENABLED, line: 63 }
-    - { name: HOLD_ASYNC_DAY_THRESHOLD, line: 66 }
+    - { name: HOLD_ASYNC_ENABLED, line: 64 }
     - { name: HOLD_WORKER_QUEUE, line: 67 }
     - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 68 }
   functions:
@@ -5026,10 +5024,10 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 431 lines
     - { name: _normalize_hold_type, lines: 149-151 }
     - { name: _normalize_record_type, lines: 154-162 }
     - { name: hold_history_page, lines: 171-189 }  # @hold_history_bp.route('/hold-history')
-    - { name: api_hold_history_query, lines: 199-279 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
-    - { name: api_hold_history_view, lines: 289-337 }  # @hold_history_bp.route('/api/hold-history/view')
-    - { name: api_hold_history_config, lines: 346-351 }  # @hold_history_bp.route('/api/hold-history/config')
-    - { name: api_hold_history_today_snapshot, lines: 361-431 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+    - { name: api_hold_history_query, lines: 199-276 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
+    - { name: api_hold_history_view, lines: 286-334 }  # @hold_history_bp.route('/api/hold-history/view')
+    - { name: api_hold_history_config, lines: 343-348 }  # @hold_history_bp.route('/api/hold-history/config')
+    - { name: api_hold_history_today_snapshot, lines: 358-428 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
 src/mes_dashboard/routes/hold_overview_routes.py:  # 295 lines
   imports:
@@ -5207,7 +5205,7 @@ src/mes_dashboard/routes/qc_gate_routes.py:  # 20 lines
   functions:
     - { name: api_qc_gate_summary, lines: 15-20 }  # @qc_gate_bp.route('/summary')
 
-src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
+src/mes_dashboard/routes/query_tool_routes.py:  # 1043 lines
   imports:
     - { module: gc, items: [], line: 12 }
     - { module: hashlib, items: [], line: 13 }
@@ -5223,32 +5221,36 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
     - { module: mes_dashboard.core.heavy_query_telemetry, items: [record_memory_error], line: 25 }
     - { module: mes_dashboard.core.response, items: [success_response, validation_error, not_found_error, internal_error, query_timeout_error, service_unavailable_error, error_response, VALIDATION_ERROR], line: 26 }
     - { module: mes_dashboard.core.exceptions, items: [UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError], line: 36 }
-    - { module: mes_dashboard.services.query_tool_service, items: [resolve_lots, get_lot_history, get_lot_history_batch, get_adjacent_lots, get_lot_materials, get_lot_rejects, get_lot_holds, get_lot_splits, get_lot_jobs, get_lot_jobs_with_history, get_lot_associations_batch, get_equipment_status_hours, get_equipment_lots, get_equipment_materials, get_equipment_rejects, get_equipment_jobs, resolve_lot_equipment, generate_csv_stream, validate_date_range, validate_lot_input], line: 93 }
+    - { module: mes_dashboard.core.feature_flags, items: [resolve_bool_flag], line: 43 }
+    - { module: mes_dashboard.core.query_cost_policy, items: [classify_query_cost], line: 44 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_query_job, is_async_available], line: 45 }
+    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 49 }
+    - { module: mes_dashboard.services.query_tool_service, items: [resolve_lots, get_lot_history, get_lot_history_batch, get_adjacent_lots, get_lot_materials, get_lot_rejects, get_lot_holds, get_lot_splits, get_lot_jobs, get_lot_jobs_with_history, get_lot_associations_batch, get_equipment_status_hours, get_equipment_lots, get_equipment_materials, get_equipment_rejects, get_equipment_jobs, resolve_lot_equipment, generate_csv_stream, validate_date_range, validate_lot_input], line: 105 }
   functions:
-    - { name: map_service_errors, lines: 47-92 }
-    - { name: _resolve_export_cids, lines: 117-123 }
-    - { name: _memory_error_response, lines: 126-128 }
-    - { name: _query_tool_max_container_ids, lines: 186-191 }
-    - { name: _reject_if_batch_too_large, lines: 194-198 }
-    - { name: _sanitize_page, lines: 201-205 }
-    - { name: _sanitize_per_page, lines: 208-213 }
-    - { name: _format_lot_materials_export_rows, lines: 216-231 }
-    - { name: _format_lot_holds_export_rows, lines: 234-254 }
-    - { name: _format_equipment_lots_export_rows, lines: 257-276 }
-    - { name: _format_lot_history_export_rows, lines: 289-300 }
-    - { name: _format_lot_rejects_export_rows, lines: 303-316 }
-    - { name: _format_lot_jobs_export_rows, lines: 319-330 }
-    - { name: query_tool_page, lines: 338-343 }  # @query_tool_bp.route('/query-tool')
-    - { name: resolve_lot_input, lines: 353-407 }  # @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
-    - { name: query_lot_history, lines: 417-475 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
-    - { name: query_adjacent_lots, lines: 485-507 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
-    - { name: query_lot_associations, lines: 517-581 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
-    - { name: query_equipment_period, lines: 591-675 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
-    - { name: get_equipment_list, lines: 683-714 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
-    - { name: get_workcenter_groups_list, lines: 722-741 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
-    - { name: lookup_lot_equipment, lines: 751-786 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
-    - { name: get_equipment_recent_jobs_route, lines: 794-807 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
-    - { name: export_csv, lines: 817-990 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+    - { name: map_service_errors, lines: 59-104 }
+    - { name: _resolve_export_cids, lines: 129-135 }
+    - { name: _memory_error_response, lines: 138-140 }
+    - { name: _query_tool_max_container_ids, lines: 198-203 }
+    - { name: _reject_if_batch_too_large, lines: 206-210 }
+    - { name: _sanitize_page, lines: 213-217 }
+    - { name: _sanitize_per_page, lines: 220-225 }
+    - { name: _format_lot_materials_export_rows, lines: 228-243 }
+    - { name: _format_lot_holds_export_rows, lines: 246-266 }
+    - { name: _format_equipment_lots_export_rows, lines: 269-288 }
+    - { name: _format_lot_history_export_rows, lines: 301-312 }
+    - { name: _format_lot_rejects_export_rows, lines: 315-328 }
+    - { name: _format_lot_jobs_export_rows, lines: 331-342 }
+    - { name: query_tool_page, lines: 350-355 }  # @query_tool_bp.route('/query-tool')
+    - { name: resolve_lot_input, lines: 365-419 }  # @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
+    - { name: query_lot_history, lines: 429-487 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
+    - { name: query_adjacent_lots, lines: 497-519 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
+    - { name: query_lot_associations, lines: 529-593 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
+    - { name: query_equipment_period, lines: 603-728 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+    - { name: get_equipment_list, lines: 736-767 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
+    - { name: get_workcenter_groups_list, lines: 775-794 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
+    - { name: lookup_lot_equipment, lines: 804-839 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
+    - { name: get_equipment_recent_jobs_route, lines: 847-860 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
+    - { name: export_csv, lines: 870-1043 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
 src/mes_dashboard/routes/reject_history_routes.py:  # 1030 lines
   imports:
@@ -5294,7 +5296,7 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 1030 lines
     - { name: api_reject_history_view, lines: 858-948 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
     - { name: api_reject_history_export_cached, lines: 952-1030 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
-src/mes_dashboard/routes/resource_history_routes.py:  # 542 lines
+src/mes_dashboard/routes/resource_history_routes.py:  # 541 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: datetime, items: [datetime], line: 9 }
@@ -5303,29 +5305,29 @@ src/mes_dashboard/routes/resource_history_routes.py:  # 542 lines
     - { module: mes_dashboard.config.constants, items: [CACHE_TTL_FILTER_OPTIONS], line: 14 }
     - { module: mes_dashboard.core.permissions, items: [login_required, get_owner_token], line: 15 }
     - { module: mes_dashboard.core.response, items: [cache_expired_error, error_response, internal_error, not_found_error, success_response, validation_error, SERVICE_UNAVAILABLE], line: 16 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 25 }
-    - { module: mes_dashboard.services.batch_query_engine, items: [get_batch_progress], line: 29 }
-    - { module: mes_dashboard.services.resource_history_service, items: [get_filter_options, export_csv], line: 30 }
-    - { module: mes_dashboard.services.resource_dataset_cache, items: [execute_primary_query, apply_view], line: 34 }
-    - { module: mes_dashboard.services.resource_query_job_service, items: [], line: 38 }
+    - { module: mes_dashboard.core.query_cost_policy, items: [_classify_query_cost], line: 25 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 26 }
+    - { module: mes_dashboard.services.batch_query_engine, items: [get_batch_progress], line: 30 }
+    - { module: mes_dashboard.services.resource_history_service, items: [get_filter_options, export_csv], line: 31 }
+    - { module: mes_dashboard.services.resource_dataset_cache, items: [execute_primary_query, apply_view], line: 35 }
+    - { module: mes_dashboard.services.resource_query_job_service, items: [], line: 39 }
   constants:
-    - { name: RESOURCE_HISTORY_USE_UNIFIED_JOB, line: 45 }
-    - { name: RESOURCE_ASYNC_ENABLED, line: 61 }
-    - { name: RESOURCE_ASYNC_DAY_THRESHOLD, line: 64 }
-    - { name: RESOURCE_WORKER_QUEUE, line: 65 }
-    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 66 }
+    - { name: RESOURCE_HISTORY_USE_UNIFIED_JOB, line: 46 }
+    - { name: RESOURCE_ASYNC_ENABLED, line: 62 }
+    - { name: RESOURCE_WORKER_QUEUE, line: 67 }
+    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 68 }
   functions:
-    - { name: _inject_resource_spool_info, lines: 79-96 }
-    - { name: _inject_resource_metadata, lines: 99-120 }
-    - { name: api_resource_history_page, lines: 128-130 }  # @resource_history_bp.route('/page', methods=['GET'], endpoint='page_alias')
-    - { name: api_resource_history_options, lines: 138-154 }  # @resource_history_bp.route('/options', methods=['GET'])
-    - { name: _validate_dates, lines: 161-169 }
-    - { name: _parse_resource_filters, lines: 172-182 }
-    - { name: _bool_param, lines: 185-191 }
-    - { name: api_resource_history_query, lines: 195-302 }  # @resource_history_bp.route('/query', methods=['POST'])
-    - { name: api_resource_history_view, lines: 306-327 }  # @resource_history_bp.route('/view', methods=['GET'])
-    - { name: api_resource_history_query_progress, lines: 336-380 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
-    - { name: api_resource_history_export, lines: 388-542 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
+    - { name: _inject_resource_spool_info, lines: 81-98 }
+    - { name: _inject_resource_metadata, lines: 101-122 }
+    - { name: api_resource_history_page, lines: 130-132 }  # @resource_history_bp.route('/page', methods=['GET'], endpoint='page_alias')
+    - { name: api_resource_history_options, lines: 140-156 }  # @resource_history_bp.route('/options', methods=['GET'])
+    - { name: _validate_dates, lines: 163-171 }
+    - { name: _parse_resource_filters, lines: 174-184 }
+    - { name: _bool_param, lines: 187-193 }
+    - { name: api_resource_history_query, lines: 197-301 }  # @resource_history_bp.route('/query', methods=['POST'])
+    - { name: api_resource_history_view, lines: 305-326 }  # @resource_history_bp.route('/view', methods=['GET'])
+    - { name: api_resource_history_query_progress, lines: 335-379 }  # @resource_history_bp.route('/query/progress', methods=['GET'])
+    - { name: api_resource_history_export, lines: 387-541 }  # @resource_history_bp.route('/export', methods=['GET', 'POST'])
 
 src/mes_dashboard/routes/resource_routes.py:  # 475 lines
   imports:
@@ -5457,25 +5459,28 @@ src/mes_dashboard/routes/user_auth_routes.py:  # 231 lines
     - { name: me, lines: 199-212 }  # @user_auth_bp.route('/api/auth/me', methods=['GET'])
     - { name: heartbeat, lines: 217-231 }  # @user_auth_bp.route('/api/auth/heartbeat', methods=['PATCH'])
 
-src/mes_dashboard/routes/wip_routes.py:  # 495 lines
+src/mes_dashboard/routes/wip_routes.py:  # 567 lines
   imports:
     - { module: flask, items: [Blueprint, request], line: 8 }
     - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 10 }
     - { module: mes_dashboard.core.request_validation, items: [validate_workcenter_group_filter], line: 11 }
     - { module: mes_dashboard.core.response, items: [success_response, validation_error, not_found_error, internal_error], line: 12 }
     - { module: mes_dashboard.core.utils, items: [parse_bool_query], line: 18 }
-    - { module: mes_dashboard.services.wip_service, items: [get_wip_summary, get_wip_matrix, get_wip_hold_summary, get_wip_detail, get_workcenters, get_packages, get_wip_filter_options, search_workorders, search_lot_ids, search_packages, search_types, get_lot_detail], line: 30 }
+    - { module: mes_dashboard.services.wip_service, items: [get_wip_summary, get_wip_matrix, get_wip_hold_summary, get_wip_detail, count_wip_rows, get_workcenters, get_packages, get_wip_filter_options, search_workorders, search_lot_ids, search_packages, search_types, get_lot_detail], line: 30 }
+    - { module: mes_dashboard.core.query_cost_policy, items: [classify_query_cost], line: 45 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 46 }
+    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 50 }
   functions:
     - { name: _get_wip_args, lines: 21-29 }
-    - { name: api_overview_summary, lines: 70-118 }  # @wip_bp.route('/overview/summary', methods=['GET', 'POST'])
-    - { name: api_overview_matrix, lines: 123-183 }  # @wip_bp.route('/overview/matrix', methods=['GET', 'POST'])
-    - { name: api_overview_hold, lines: 187-234 }  # @wip_bp.route('/overview/hold', methods=['GET', 'POST'])
-    - { name: api_detail, lines: 243-330 }  # @wip_bp.route('/detail/<workcenter>', methods=['GET', 'POST'])
-    - { name: api_lot_detail, lines: 334-347 }  # @wip_bp.route('/lot/<lotid>')
-    - { name: api_meta_workcenters, lines: 355-369 }  # @wip_bp.route('/meta/workcenters')
-    - { name: api_meta_packages, lines: 373-387 }  # @wip_bp.route('/meta/packages')
-    - { name: api_meta_filter_options, lines: 391-427 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
-    - { name: api_meta_search, lines: 431-495 }  # @wip_bp.route('/meta/search')
+    - { name: api_overview_summary, lines: 77-125 }  # @wip_bp.route('/overview/summary', methods=['GET', 'POST'])
+    - { name: api_overview_matrix, lines: 130-190 }  # @wip_bp.route('/overview/matrix', methods=['GET', 'POST'])
+    - { name: api_overview_hold, lines: 194-241 }  # @wip_bp.route('/overview/hold', methods=['GET', 'POST'])
+    - { name: api_detail, lines: 250-402 }  # @wip_bp.route('/detail/<workcenter>', methods=['GET', 'POST'])
+    - { name: api_lot_detail, lines: 406-419 }  # @wip_bp.route('/lot/<lotid>')
+    - { name: api_meta_workcenters, lines: 427-441 }  # @wip_bp.route('/meta/workcenters')
+    - { name: api_meta_packages, lines: 445-459 }  # @wip_bp.route('/meta/packages')
+    - { name: api_meta_filter_options, lines: 463-499 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
+    - { name: api_meta_search, lines: 503-567 }  # @wip_bp.route('/meta/search')
 
 src/mes_dashboard/routes/yield_alert_routes.py:  # 657 lines
   imports:
@@ -5807,7 +5812,7 @@ src/mes_dashboard/services/auth_service.py:  # 212 lines
     - { name: authenticate, lines: 135-192 }
     - { name: is_admin, lines: 195-212 }
 
-src/mes_dashboard/services/batch_query_engine.py:  # 931 lines
+src/mes_dashboard/services/batch_query_engine.py:  # 944 lines
   imports:
     - { module: __future__, items: [annotations], line: 36 }
     - { module: hashlib, items: [], line: 38 }
@@ -5815,47 +5820,48 @@ src/mes_dashboard/services/batch_query_engine.py:  # 931 lines
     - { module: logging, items: [], line: 40 }
     - { module: os, items: [], line: 41 }
     - { module: tempfile, items: [], line: 42 }
-    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 43 }
-    - { module: datetime, items: [datetime, timedelta], line: 44 }
-    - { module: typing, items: [Any, Callable, Dict, Generator, List, Optional], line: 45 }
-    - { module: pandas, items: [], line: 47 }
-    - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta, serialize_partial_failure_meta], line: 49 }
-    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 53 }
-    - { module: mes_dashboard.core.redis_df_store, items: [redis_chunk_exists, redis_load_chunk, redis_store_chunk], line: 54 }
+    - { module: warnings, items: [], line: 43 }
+    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 44 }
+    - { module: datetime, items: [datetime, timedelta], line: 45 }
+    - { module: typing, items: [Any, Callable, Dict, Generator, List, Optional], line: 46 }
+    - { module: pandas, items: [], line: 48 }
+    - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta, serialize_partial_failure_meta], line: 50 }
+    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 54 }
+    - { module: mes_dashboard.core.redis_df_store, items: [redis_chunk_exists, redis_load_chunk, redis_store_chunk], line: 55 }
   constants:
-    - { name: BATCH_CHUNK_MAX_MEMORY_MB, line: 78 }
-    - { name: BATCH_QUERY_TIME_THRESHOLD_DAYS, line: 82 }
-    - { name: BATCH_QUERY_ID_THRESHOLD, line: 86 }
-    - { name: BATCH_QUERY_ROWS_PER_CHUNK, line: 90 }
+    - { name: BATCH_CHUNK_MAX_MEMORY_MB, line: 79 }
+    - { name: BATCH_QUERY_TIME_THRESHOLD_DAYS, line: 83 }
+    - { name: BATCH_QUERY_ID_THRESHOLD, line: 87 }
+    - { name: BATCH_QUERY_ROWS_PER_CHUNK, line: 91 }
   classes:
     - name: MergeChunksMaxRowsExceeded
-      lines: 600-610
+      lines: 601-611
       methods:
-        - { name: __init__, lines: 603-610 }
+        - { name: __init__, lines: 604-611 }
     - name: ChunkSchemaMismatch
-      lines: 613-628
+      lines: 614-629
       methods:
-        - { name: __init__, lines: 621-628 }
+        - { name: __init__, lines: 622-629 }
   functions:
-    - { name: decompose_by_time_range, lines: 104-144 }
-    - { name: decompose_by_ids, lines: 152-168 }
-    - { name: decompose_by_row_count, lines: 176-210 }
-    - { name: compute_query_hash, lines: 218-231 }
-    - { name: _canonicalize, lines: 234-247 }
-    - { name: _update_progress, lines: 255-292 }
-    - { name: get_batch_progress, lines: 295-308 }
-    - { name: execute_plan, lines: 320-420 }
-    - { name: _effective_parallelism, lines: 423-445 }
-    - { name: _execute_single_chunk, lines: 448-508 }
-    - { name: _execute_parallel, lines: 511-582 }
-    - { name: _is_retryable_error, lines: 585-592 }
-    - { name: merge_chunks, lines: 631-710 }
-    - { name: iterate_chunks, lines: 713-732 }
-    - { name: _promote_null_schema, lines: 740-761 }
-    - { name: merge_chunks_to_spool, lines: 764-901 }
-    - { name: should_decompose_by_time, lines: 909-916 }
-    - { name: should_decompose_by_ids, lines: 919-921 }
-    - { name: should_decompose_by_row_count, lines: 924-931 }
+    - { name: decompose_by_time_range, lines: 105-145 }
+    - { name: decompose_by_ids, lines: 153-169 }
+    - { name: decompose_by_row_count, lines: 177-211 }
+    - { name: compute_query_hash, lines: 219-232 }
+    - { name: _canonicalize, lines: 235-248 }
+    - { name: _update_progress, lines: 256-293 }
+    - { name: get_batch_progress, lines: 296-309 }
+    - { name: execute_plan, lines: 321-421 }
+    - { name: _effective_parallelism, lines: 424-446 }
+    - { name: _execute_single_chunk, lines: 449-509 }
+    - { name: _execute_parallel, lines: 512-583 }
+    - { name: _is_retryable_error, lines: 586-593 }
+    - { name: merge_chunks, lines: 632-723 }
+    - { name: iterate_chunks, lines: 726-745 }
+    - { name: _promote_null_schema, lines: 753-774 }
+    - { name: merge_chunks_to_spool, lines: 777-914 }
+    - { name: should_decompose_by_time, lines: 922-929 }
+    - { name: should_decompose_by_ids, lines: 932-934 }
+    - { name: should_decompose_by_row_count, lines: 937-944 }
 
 src/mes_dashboard/services/container_filter_cache.py:  # 490 lines
   imports:
@@ -6260,25 +6266,23 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 803 lines
     - { name: _build_duration_clause, lines: 671-682 }
     - { name: try_compute_view_from_spool, lines: 687-803 }
 
-src/mes_dashboard/services/hold_query_job_service.py:  # 190 lines
+src/mes_dashboard/services/hold_query_job_service.py:  # 186 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
     - { module: os, items: [], line: 17 }
-    - { module: datetime, items: [datetime], line: 18 }
-    - { module: typing, items: [Any], line: 19 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 21 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 181 }
+    - { module: typing, items: [Any], line: 18 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 20 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 177 }
   constants:
-    - { name: HOLD_ASYNC_ENABLED, line: 33 }
-    - { name: HOLD_ASYNC_DAY_THRESHOLD, line: 37 }
-    - { name: HOLD_WORKER_QUEUE, line: 39 }
-    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 41 }
-    - { name: HOLD_JOB_TTL_SECONDS, line: 43 }
+    - { name: HOLD_ASYNC_ENABLED, line: 32 }
+    - { name: HOLD_WORKER_QUEUE, line: 36 }
+    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 38 }
+    - { name: HOLD_JOB_TTL_SECONDS, line: 40 }
   functions:
-    - { name: should_use_async, lines: 53-71 }
-    - { name: enqueue_hold_history_query, lines: 78-91 }
-    - { name: execute_hold_history_query_job, lines: 98-175 }
+    - { name: should_use_async, lines: 50-67 }
+    - { name: enqueue_hold_history_query, lines: 74-87 }
+    - { name: execute_hold_history_query_job, lines: 94-171 }
 
 src/mes_dashboard/services/hold_today_snapshot_service.py:  # 508 lines
   imports:
@@ -6937,7 +6941,7 @@ src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
     - { name: _build_lot_payload, lines: 139-171 }
     - { name: get_qc_gate_summary, lines: 174-248 }
 
-src/mes_dashboard/services/query_tool_service.py:  # 2776 lines
+src/mes_dashboard/services/query_tool_service.py:  # 2906 lines
   imports:
     - { module: csv, items: [], line: 18 }
     - { module: hashlib, items: [], line: 19 }
@@ -6957,6 +6961,7 @@ src/mes_dashboard/services/query_tool_service.py:  # 2776 lines
     - { module: mes_dashboard.core.query_quality_contract, items: [unpack_event_fetch_result], line: 46 }
     - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 47 }
     - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 48 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 2897 }
   constants:
     - { name: BATCH_SIZE, line: 66 }
     - { name: MAX_DATE_RANGE_DAYS, line: 67 }
@@ -7034,6 +7039,7 @@ src/mes_dashboard/services/query_tool_service.py:  # 2776 lines
     - { name: export_to_csv, lines: 2657-2693 }
     - { name: generate_csv_stream, lines: 2696-2738 }
     - { name: get_equipment_recent_jobs, lines: 2745-2776 }
+    - { name: execute_query_tool_job, lines: 2783-2891 }
 
 src/mes_dashboard/services/query_tool_sql_runtime.py:  # 404 lines
   imports:
@@ -7357,27 +7363,25 @@ src/mes_dashboard/services/reject_pareto_materialized.py:  # 807 lines
     - { name: try_materialized_dimension_pareto, lines: 727-778 }
     - { name: _meta, lines: 785-807 }
 
-src/mes_dashboard/services/reject_query_job_service.py:  # 199 lines
+src/mes_dashboard/services/reject_query_job_service.py:  # 203 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: logging, items: [], line: 14 }
     - { module: os, items: [], line: 15 }
     - { module: uuid, items: [], line: 16 }
-    - { module: datetime, items: [date], line: 17 }
-    - { module: typing, items: [Any, Dict, Optional, Tuple], line: 18 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, is_async_available, update_job_progress], line: 23 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 193 }
+    - { module: typing, items: [Any, Dict, Optional, Tuple], line: 17 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, is_async_available, update_job_progress], line: 22 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 197 }
   constants:
-    - { name: REJECT_ASYNC_ENABLED, line: 35 }
-    - { name: REJECT_ASYNC_DAY_THRESHOLD, line: 38 }
-    - { name: REJECT_WORKER_QUEUE, line: 39 }
-    - { name: REJECT_JOB_TTL_SECONDS, line: 40 }
-    - { name: REJECT_JOB_TIMEOUT_SECONDS, line: 41 }
+    - { name: REJECT_ASYNC_ENABLED, line: 34 }
+    - { name: REJECT_WORKER_QUEUE, line: 37 }
+    - { name: REJECT_JOB_TTL_SECONDS, line: 38 }
+    - { name: REJECT_JOB_TIMEOUT_SECONDS, line: 39 }
   functions:
-    - { name: _build_retry, lines: 47-50 }
-    - { name: should_use_async, lines: 57-80 }
-    - { name: enqueue_reject_query, lines: 87-113 }
-    - { name: execute_reject_query_job, lines: 120-187 }
+    - { name: _build_retry, lines: 45-48 }
+    - { name: should_use_async, lines: 55-84 }
+    - { name: enqueue_reject_query, lines: 91-117 }
+    - { name: execute_reject_query_job, lines: 124-191 }
 
 src/mes_dashboard/services/resource_cache.py:  # 1261 lines
   imports:
@@ -7605,25 +7609,23 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 859 lines
     - { name: try_compute_view_from_spool, lines: 570-663 }
     - { name: try_compute_query_from_canonical_spool, lines: 668-859 }
 
-src/mes_dashboard/services/resource_query_job_service.py:  # 203 lines
+src/mes_dashboard/services/resource_query_job_service.py:  # 199 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
     - { module: os, items: [], line: 17 }
-    - { module: datetime, items: [datetime], line: 18 }
-    - { module: typing, items: [Any], line: 19 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 21 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 194 }
+    - { module: typing, items: [Any], line: 18 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 20 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 190 }
   constants:
-    - { name: RESOURCE_ASYNC_ENABLED, line: 33 }
-    - { name: RESOURCE_ASYNC_DAY_THRESHOLD, line: 37 }
-    - { name: RESOURCE_WORKER_QUEUE, line: 39 }
-    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 41 }
-    - { name: RESOURCE_JOB_TTL_SECONDS, line: 43 }
+    - { name: RESOURCE_ASYNC_ENABLED, line: 32 }
+    - { name: RESOURCE_WORKER_QUEUE, line: 36 }
+    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 38 }
+    - { name: RESOURCE_JOB_TTL_SECONDS, line: 40 }
   functions:
-    - { name: should_use_async, lines: 53-71 }
-    - { name: enqueue_resource_history_query, lines: 78-91 }
-    - { name: execute_resource_history_query_job, lines: 98-188 }
+    - { name: should_use_async, lines: 50-67 }
+    - { name: enqueue_resource_history_query, lines: 74-87 }
+    - { name: execute_resource_history_query_job, lines: 94-184 }
 
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:
@@ -7801,7 +7803,7 @@ src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
     - { name: _safe_int, lines: 412-419 }
     - { name: _compute_duration_buckets, lines: 422-434 }
 
-src/mes_dashboard/services/wip_service.py:  # 4198 lines
+src/mes_dashboard/services/wip_service.py:  # 4274 lines
   imports:
     - { module: logging, items: [], line: 10 }
     - { module: threading, items: [], line: 11 }
@@ -7889,6 +7891,7 @@ src/mes_dashboard/services/wip_service.py:  # 4198 lines
     - { name: get_lot_detail, lines: 3969-4003 }
     - { name: _get_lot_detail_from_oracle, lines: 4006-4086 }
     - { name: _build_lot_detail_response, lines: 4089-4198 }
+    - { name: count_wip_rows, lines: 4205-4274 }
 
 src/mes_dashboard/services/yield_alert_contracts.py:  # 84 lines
   imports:
@@ -8398,6 +8401,21 @@ tests/contract/test_doctor_clean.py:  # 78 lines
       lines: 16-78
       methods:
         - { name: test_doctor_response_shape_zero_warnings, lines: 27-78 }
+
+tests/contract/test_env_async_threshold_removal.py:  # 124 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: json, items: [], line: 11 }
+    - { module: pathlib, items: [Path], line: 12 }
+    - { module: pytest, items: [], line: 14 }
+  functions:
+    - { name: schema, lines: 25-26 }  # @pytest.fixture(scope='module')
+    - { name: test_downtime_async_day_threshold_absent_from_schema, lines: 34-39 }
+    - { name: test_hold_async_day_threshold_absent_from_schema, lines: 42-47 }
+    - { name: test_resource_async_day_threshold_absent_from_schema, lines: 50-55 }
+    - { name: test_reject_async_day_threshold_absent_from_schema, lines: 58-63 }
+    - { name: test_query_tool_use_rq_present_with_default_off, lines: 71-91 }
+    - { name: test_semaphore_semantics_note_in_env_contract, lines: 99-124 }
 
 tests/contract/test_env_downtime_unified_flag.py:  # 93 lines
   imports:
@@ -10137,6 +10155,26 @@ tests/integration/test_production_history_rq_async.py:  # 101 lines
       methods:
         - { name: test_flag_off_spool_matches_flag_on_spool, lines: 94-101 }
 
+tests/integration/test_query_tool_rq_async.py:  # 168 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 18 }
+    - { module: mes_dashboard.routes.query_tool_routes, items: [], line: 20 }
+  classes:
+    - name: TestFlagOnOversizedQuery
+      lines: 36-101
+      methods:
+        - { name: test_flag_on_oversized_query_returns_202_with_job_id, lines: 39-70 }
+        - { name: test_flag_on_oversized_enqueues_rq_job_not_inline, lines: 72-101 }
+    - name: TestFlagOffParity
+      lines: 109-168
+      methods:
+        - { name: test_flag_off_oversized_query_returns_inline_as_before, lines: 112-140 }
+        - { name: test_flag_off_small_query_identical_to_pre_change, lines: 142-168 }
+  functions:
+    - { name: qt_app, lines: 24-28 }  # @pytest.fixture
+
 tests/integration/test_race_conditions.py:  # 387 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
@@ -10368,6 +10406,28 @@ tests/integration/test_soak_workload.py:  # 960 lines
     - { name: _check_circuit_breaker_transitions, lines: 754-793 }
     - { name: _check_rq_queue_depth, lines: 799-859 }
     - { name: test_preload_workers_restart_loop_no_connection_leak, lines: 868-960 }  # @pytest.mark.soak
+
+tests/integration/test_wip_rowcount_rq_routing.py:  # 138 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 17 }
+    - { module: pytest, items: [], line: 19 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 20 }
+    - { module: mes_dashboard.routes.wip_routes, items: [], line: 22 }
+  classes:
+    - name: TestAboveL3Threshold
+      lines: 38-61
+      methods:
+        - { name: test_wip_above_l3_threshold_routes_to_rq, lines: 39-61 }
+    - name: TestBelowL3Threshold
+      lines: 69-99
+      methods:
+        - { name: test_wip_below_l3_threshold_stays_inline, lines: 70-99 }
+    - name: TestCountErrorFailOpen
+      lines: 107-138
+      methods:
+        - { name: test_wip_count_error_fails_open_stays_inline, lines: 108-138 }
+  functions:
+    - { name: wip_app, lines: 26-30 }  # @pytest.fixture
 
 tests/manual/test_job_owner_auth_live.py:  # 207 lines
   imports:
@@ -11320,7 +11380,7 @@ tests/stress/test_production_history_stress.py:  # 117 lines
         - { name: _run_page, lines: 78-93 }
         - { name: test_pagination_under_concurrent_load, lines: 95-117 }
 
-tests/stress/test_query_tool_stress.py:  # 438 lines
+tests/stress/test_query_tool_stress.py:  # 687 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: concurrent.futures, items: [], line: 12 }
@@ -11345,6 +11405,11 @@ tests/stress/test_query_tool_stress.py:  # 438 lines
       lines: 400-438
       methods:
         - { name: test_rapid_lot_reverse_switching_stays_responsive, lines: 403-438 }
+    - name: TestAC8StructuralGuarantees
+      lines: 447-687
+      methods:
+        - { name: test_no_worker_starvation_under_concurrent_oversized_queries, lines: 466-565 }
+        - { name: test_rq_oracle_concurrency_bounded_by_semaphore, lines: 571-687 }
   functions:
     - { name: _extract_container_id, lines: 26-36 }
     - { name: _probe_health_recoverability, lines: 39-67 }
@@ -12659,7 +12724,7 @@ tests/test_base_chunked_duckdb_job.py:  # 607 lines
     - { name: _patch_reader, lines: 116-123 }
     - { name: _make_batch, lines: 371-376 }
 
-tests/test_batch_query_engine.py:  # 1272 lines
+tests/test_batch_query_engine.py:  # 1314 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: pathlib, items: [Path], line: 5 }
@@ -12707,95 +12772,96 @@ tests/test_batch_query_engine.py:  # 1272 lines
       methods:
         - { name: test_max_rows_passed_to_query_fn, lines: 309-337 }
     - name: TestMergeChunks
-      lines: 345-453
+      lines: 345-495
       methods:
         - { name: test_merge_produces_correct_df, lines: 346-370 }
         - { name: test_merge_respects_max_total_rows, lines: 372-396 }
         - { name: test_merge_raises_when_overflow_mode_error, lines: 398-424 }
         - { name: test_merge_raises_when_cap_already_reached_and_next_chunk_exists, lines: 426-453 }
+        - { name: test_merge_chunks_emits_deprecation_warning, lines: 456-495 }
     - name: TestProgressTracking
-      lines: 461-502
+      lines: 503-544
       methods:
-        - { name: test_hset_updated_after_each_chunk, lines: 462-502 }
+        - { name: test_hset_updated_after_each_chunk, lines: 504-544 }
     - name: TestChunkFailureResilience
-      lines: 510-600
+      lines: 552-642
       methods:
-        - { name: test_one_chunk_fails_others_complete, lines: 511-556 }
-        - { name: test_chunk_store_failure_is_marked_partial, lines: 558-600 }
+        - { name: test_one_chunk_fails_others_complete, lines: 553-598 }
+        - { name: test_chunk_store_failure_is_marked_partial, lines: 600-642 }
     - name: TestQueryHash
-      lines: 608-621
+      lines: 650-663
       methods:
-        - { name: test_same_params_different_order, lines: 609-612 }
-        - { name: test_different_params_different_hash, lines: 614-617 }
-        - { name: test_hash_is_16_chars, lines: 619-621 }
+        - { name: test_same_params_different_order, lines: 651-654 }
+        - { name: test_different_params_different_hash, lines: 656-659 }
+        - { name: test_hash_is_16_chars, lines: 661-663 }
     - name: TestShouldDecompose
-      lines: 629-640
+      lines: 671-682
       methods:
-        - { name: test_long_range_true, lines: 630-631 }
-        - { name: test_short_range_false, lines: 633-634 }
-        - { name: test_large_ids_true, lines: 636-637 }
-        - { name: test_small_ids_false, lines: 639-640 }
+        - { name: test_long_range_true, lines: 672-673 }
+        - { name: test_short_range_false, lines: 675-676 }
+        - { name: test_large_ids_true, lines: 678-679 }
+        - { name: test_small_ids_false, lines: 681-682 }
     - name: TestRetryAndFailedRanges
-      lines: 643-779
+      lines: 685-821
       methods:
-        - { name: _mock_redis, lines: 644-655 }
-        - { name: test_transient_failure_retried_once, lines: 657-685 }
-        - { name: test_memory_guard_not_retried, lines: 687-710 }
-        - { name: test_failed_ranges_tracked, lines: 712-745 }
-        - { name: test_id_batch_chunk_no_failed_ranges, lines: 747-779 }
+        - { name: _mock_redis, lines: 686-697 }
+        - { name: test_transient_failure_retried_once, lines: 699-727 }
+        - { name: test_memory_guard_not_retried, lines: 729-752 }
+        - { name: test_failed_ranges_tracked, lines: 754-787 }
+        - { name: test_id_batch_chunk_no_failed_ranges, lines: 789-821 }
     - name: TestMergeChunksToSpool
-      lines: 786-1014
+      lines: 828-1056
       methods:
-        - { name: test_normal_flow_writes_parquet_and_returns_path, lines: 789-807 }
-        - { name: test_empty_result_returns_none_zero, lines: 809-821 }
-        - { name: test_overflow_error_raises_and_cleans_up, lines: 823-841 }
-        - { name: test_exception_deletes_partial_file, lines: 843-857 }
-        - { name: test_precreates_temp_file_before_parquet_writer, lines: 859-888 }
-        - { name: test_merge_chunks_to_spool_survives_cleanup_race, lines: 890-924 }
-        - { name: test_null_typed_column_in_first_chunk_succeeds, lines: 926-966 }
-        - { name: test_null_typed_column_all_chunks_null_still_works, lines: 968-984 }
-        - { name: test_promote_null_schema_helper, lines: 986-1002 }
-        - { name: test_promote_null_schema_noop_when_no_nulls, lines: 1004-1014 }
+        - { name: test_normal_flow_writes_parquet_and_returns_path, lines: 831-849 }
+        - { name: test_empty_result_returns_none_zero, lines: 851-863 }
+        - { name: test_overflow_error_raises_and_cleans_up, lines: 865-883 }
+        - { name: test_exception_deletes_partial_file, lines: 885-899 }
+        - { name: test_precreates_temp_file_before_parquet_writer, lines: 901-930 }
+        - { name: test_merge_chunks_to_spool_survives_cleanup_race, lines: 932-966 }
+        - { name: test_null_typed_column_in_first_chunk_succeeds, lines: 968-1008 }
+        - { name: test_null_typed_column_all_chunks_null_still_works, lines: 1010-1026 }
+        - { name: test_promote_null_schema_helper, lines: 1028-1044 }
+        - { name: test_promote_null_schema_noop_when_no_nulls, lines: 1046-1056 }
     - name: TestDecomposeByRowCount
-      lines: 1022-1110
+      lines: 1064-1152
       methods:
-        - { name: _import, lines: 1025-1027 }
-        - { name: test_total_rows_zero_returns_empty, lines: 1029-1031 }
-        - { name: test_total_less_than_chunk_returns_single_range, lines: 1033-1036 }
-        - { name: test_total_exact_multiple_yields_n_chunks, lines: 1038-1043 }
-        - { name: test_total_rows_one, lines: 1045-1048 }
-        - { name: test_non_divisor_last_chunk_smaller, lines: 1050-1056 }
-        - { name: test_ranges_are_1based_inclusive, lines: 1058-1063 }
-        - { name: test_negative_raises_value_error, lines: 1065-1068 }
-        - { name: test_chunk_size_zero_raises_value_error, lines: 1070-1073 }
-        - { name: test_no_gap_no_overlap_property, lines: 1076-1110 }
+        - { name: _import, lines: 1067-1069 }
+        - { name: test_total_rows_zero_returns_empty, lines: 1071-1073 }
+        - { name: test_total_less_than_chunk_returns_single_range, lines: 1075-1078 }
+        - { name: test_total_exact_multiple_yields_n_chunks, lines: 1080-1085 }
+        - { name: test_total_rows_one, lines: 1087-1090 }
+        - { name: test_non_divisor_last_chunk_smaller, lines: 1092-1098 }
+        - { name: test_ranges_are_1based_inclusive, lines: 1100-1105 }
+        - { name: test_negative_raises_value_error, lines: 1107-1110 }
+        - { name: test_chunk_size_zero_raises_value_error, lines: 1112-1115 }
+        - { name: test_no_gap_no_overlap_property, lines: 1118-1152 }
     - name: TestShouldDecomposeByRowCount
-      lines: 1118-1139
+      lines: 1160-1181
       methods:
-        - { name: _import, lines: 1121-1126 }
-        - { name: test_above_threshold_returns_true, lines: 1128-1130 }
-        - { name: test_below_threshold_returns_false, lines: 1132-1134 }
-        - { name: test_exact_threshold_returns_false, lines: 1136-1139 }
+        - { name: _import, lines: 1163-1168 }
+        - { name: test_above_threshold_returns_true, lines: 1170-1172 }
+        - { name: test_below_threshold_returns_false, lines: 1174-1176 }
+        - { name: test_exact_threshold_returns_false, lines: 1178-1181 }
     - name: TestEngineParallelCeiling
-      lines: 1147-1181
+      lines: 1189-1223
       methods:
-        - { name: _get_slow_pool_size, lines: 1150-1153 }
-        - { name: test_hold_engine_parallel_capped_at_db_slow_pool_size, lines: 1155-1163 }
-        - { name: test_job_engine_parallel_capped, lines: 1165-1169 }
-        - { name: test_msd_engine_parallel_capped, lines: 1171-1175 }
-        - { name: test_parallel_ceiling_within_limit_does_not_raise, lines: 1177-1181 }
+        - { name: _get_slow_pool_size, lines: 1192-1195 }
+        - { name: test_hold_engine_parallel_capped_at_db_slow_pool_size, lines: 1197-1205 }
+        - { name: test_job_engine_parallel_capped, lines: 1207-1211 }
+        - { name: test_msd_engine_parallel_capped, lines: 1213-1217 }
+        - { name: test_parallel_ceiling_within_limit_does_not_raise, lines: 1219-1223 }
     - name: TestFlagGating
-      lines: 1189-1243
+      lines: 1231-1285
       methods:
-        - { name: test_flag_false_key_exported, lines: 1192-1195 }
-        - { name: test_batch_query_rows_per_chunk_exported, lines: 1197-1201 }
-        - { name: test_flag_false_does_not_call_count_sql, lines: 1203-1226 }
-        - { name: test_flag_true_calls_count_then_paged_sql, lines: 1228-1243 }
+        - { name: test_flag_false_key_exported, lines: 1234-1237 }
+        - { name: test_batch_query_rows_per_chunk_exported, lines: 1239-1243 }
+        - { name: test_flag_false_does_not_call_count_sql, lines: 1245-1268 }
+        - { name: test_flag_true_calls_count_then_paged_sql, lines: 1270-1285 }
     - name: TestExcludedServicesUnmodified
-      lines: 1251-1272
+      lines: 1293-1314
       methods:
-        - { name: test_yield_alert_not_imported_by_batch_engine, lines: 1254-1266 }
-        - { name: test_material_trace_not_imported_by_batch_engine, lines: 1268-1272 }
+        - { name: test_yield_alert_not_imported_by_batch_engine, lines: 1296-1308 }
+        - { name: test_material_trace_not_imported_by_batch_engine, lines: 1310-1314 }
 
 tests/test_cache.py:  # 475 lines
   imports:
@@ -13479,7 +13545,7 @@ tests/test_downtime_analysis_duckdb_cache.py:  # 186 lines
         - { name: test_loaded_at_yesterday_triggers_fresh_load, lines: 168-178 }
         - { name: test_run_prewarm_job_exists_as_module_callable, lines: 180-186 }
 
-tests/test_downtime_analysis_routes.py:  # 833 lines
+tests/test_downtime_analysis_routes.py:  # 837 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: json, items: [], line: 12 }
@@ -13583,17 +13649,17 @@ tests/test_downtime_analysis_routes.py:  # 833 lines
         - { name: test_validate_dates_accepts_91_days_oracle_path, lines: 684-688 }
         - { name: test_duckdb_window_days_constant_absent, lines: 690-695 }
     - name: TestDowntimeAsyncQuery
-      lines: 703-801
+      lines: 703-805
       methods:
-        - { name: test_long_range_returns_202, lines: 709-729 }
-        - { name: test_short_range_returns_200, lines: 731-747 }
-        - { name: test_flag_disabled_returns_200, lines: 749-763 }
-        - { name: test_worker_unavailable_falls_back_to_200, lines: 765-780 }
-        - { name: test_status_url_contains_prefix_downtime, lines: 782-801 }
+        - { name: test_long_range_returns_202, lines: 709-730 }
+        - { name: test_short_range_returns_200, lines: 732-749 }
+        - { name: test_flag_disabled_returns_200, lines: 751-765 }
+        - { name: test_worker_unavailable_falls_back_to_200, lines: 767-783 }
+        - { name: test_status_url_contains_prefix_downtime, lines: 785-805 }
     - name: TestDowntimeJobDispatch
-      lines: 809-833
+      lines: 813-837
       methods:
-        - { name: test_job_type_registered, lines: 812-833 }
+        - { name: test_job_type_registered, lines: 816-837 }
   functions:
     - { name: app, lines: 22-26 }  # @pytest.fixture
     - { name: client, lines: 30-31 }  # @pytest.fixture
@@ -13601,7 +13667,7 @@ tests/test_downtime_analysis_routes.py:  # 833 lines
     - { name: _mock_view_result, lines: 47-56 }
     - { name: _mock_raw_result, lines: 469-481 }
 
-tests/test_downtime_analysis_service.py:  # 1952 lines
+tests/test_downtime_analysis_service.py:  # 1956 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: hashlib, items: [], line: 17 }
@@ -13773,12 +13839,12 @@ tests/test_downtime_analysis_service.py:  # 1952 lines
         - { name: test_pct_milestones_sequence, lines: 1842-1879 }
         - { name: test_atomicity_base_hit_bridge_miss_raises_500, lines: 1881-1914 }
     - name: TestDowntimeAsyncEnvVars
-      lines: 1922-1952
+      lines: 1922-1956
       methods:
         - { name: test_default_async_enabled_true, lines: 1929-1934 }
-        - { name: test_default_day_threshold_30, lines: 1936-1940 }
-        - { name: test_default_worker_queue, lines: 1942-1947 }
-        - { name: test_default_job_timeout, lines: 1949-1952 }
+        - { name: test_default_day_threshold_removed, lines: 1936-1944 }
+        - { name: test_default_worker_queue, lines: 1946-1951 }
+        - { name: test_default_job_timeout, lines: 1953-1956 }
   functions:
     - { name: _ts, lines: 41-43 }
     - { name: _shift_row, lines: 46-63 }
@@ -13969,7 +14035,7 @@ tests/test_eap_alarm_unified_job.py:  # 211 lines
       methods:
         - { name: test_progress_report_uses_eap_alarm_prefix, lines: 201-211 }
 
-tests/test_env_contract.py:  # 292 lines
+tests/test_env_contract.py:  # 296 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pathlib, items: [Path], line: 9 }
@@ -13998,15 +14064,15 @@ tests/test_env_contract.py:  # 292 lines
         - { name: test_resource_view_cache_ttl_default_equals_300, lines: 118-134 }
         - { name: test_resource_view_cache_ttl_documented_in_contract, lines: 136-141 }
     - name: TestDuckdbPrewarmTtlDefaults
-      lines: 148-292
+      lines: 148-296
       methods:
         - { name: test_resource_history_spool_ttl_default_is_72000, lines: 151-168 }
         - { name: test_downtime_analysis_cache_ttl_default_is_72000, lines: 170-186 }
         - { name: test_cache_ttl_dataset_unchanged_at_7200, lines: 188-193 }
         - { name: test_resource_history_spool_ttl_documented_in_contract, lines: 195-200 }
         - { name: test_downtime_analysis_cache_ttl_documented_in_contract, lines: 202-207 }
-        - { name: test_resource_async_env_vars_pinned_defaults, lines: 209-279 }
-        - { name: test_resource_async_vars_documented_in_env_contract, lines: 281-292 }
+        - { name: test_resource_async_env_vars_pinned_defaults, lines: 209-272 }
+        - { name: test_resource_async_vars_documented_in_env_contract, lines: 274-296 }
 
 tests/test_event_fetcher.py:  # 413 lines
   imports:
@@ -14419,7 +14485,7 @@ tests/test_hold_history_chunk_duplication.py:  # 196 lines
     - { name: _run_pipeline, lines: 132-161 }
     - { name: _on_hold_rows, lines: 164-165 }
 
-tests/test_hold_history_routes.py:  # 537 lines
+tests/test_hold_history_routes.py:  # 540 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: unittest, items: [], line: 5 }
@@ -14449,7 +14515,7 @@ tests/test_hold_history_routes.py:  # 537 lines
         - { name: test_query_rate_limited_returns_429, lines: 136-146 }
         - { name: test_query_bootstrap_render_failure_returns_500, lines: 149-160 }
     - name: TestHoldHistoryAsyncQueryRoute
-      lines: 163-289
+      lines: 163-285
       methods:
         - { name: test_query_long_range_returns_202, lines: 194-198 }
         - { name: test_query_202_response_has_job_id, lines: 202-210 }
@@ -14457,37 +14523,37 @@ tests/test_hold_history_routes.py:  # 537 lines
         - { name: test_query_async_flag_false_returns_200_sync, lines: 227-239 }
         - { name: test_query_redis_down_falls_back_to_sync, lines: 245-251 }
         - { name: test_hold_async_enabled_default_is_true, lines: 255-274 }
-        - { name: test_hold_async_day_threshold_default_is_90, lines: 276-289 }
+        - { name: test_hold_async_day_threshold_removed, lines: 276-285 }
     - name: TestHoldHistoryViewRoute
-      lines: 292-402
+      lines: 288-398
       methods:
-        - { name: test_view_missing_query_id_returns_400, lines: 295-301 }
-        - { name: test_view_invalid_record_type_returns_400, lines: 303-310 }
-        - { name: test_view_invalid_duration_range_returns_400, lines: 312-319 }
-        - { name: test_view_cache_expired_returns_410, lines: 322-330 }
-        - { name: test_view_success, lines: 333-358 }
-        - { name: test_view_caps_per_page, lines: 361-375 }
-        - { name: test_view_passes_duration_range, lines: 378-391 }
-        - { name: test_view_rate_limited_returns_429, lines: 395-402 }
+        - { name: test_view_missing_query_id_returns_400, lines: 291-297 }
+        - { name: test_view_invalid_record_type_returns_400, lines: 299-306 }
+        - { name: test_view_invalid_duration_range_returns_400, lines: 308-315 }
+        - { name: test_view_cache_expired_returns_410, lines: 318-326 }
+        - { name: test_view_success, lines: 329-354 }
+        - { name: test_view_caps_per_page, lines: 357-371 }
+        - { name: test_view_passes_duration_range, lines: 374-387 }
+        - { name: test_view_rate_limited_returns_429, lines: 391-398 }
     - name: TestHoldHistoryTodaySnapshotRoute
-      lines: 405-512
+      lines: 401-508
       methods:
-        - { name: test_today_snapshot_success_returns_200, lines: 425-431 }
-        - { name: test_today_snapshot_summary_keys_present, lines: 434-443 }
-        - { name: test_today_snapshot_invalid_record_type_returns_400, lines: 445-452 }
-        - { name: test_today_snapshot_invalid_duration_range_returns_400, lines: 454-461 }
-        - { name: test_today_snapshot_db_unavailable_returns_503, lines: 464-470 }
-        - { name: test_today_snapshot_pool_exhausted_returns_503, lines: 473-479 }
-        - { name: test_today_snapshot_runtime_error_returns_503, lines: 482-487 }
-        - { name: test_today_snapshot_valid_record_types, lines: 490-497 }
-        - { name: test_today_snapshot_default_hold_type_is_quality, lines: 500-504 }
-        - { name: test_today_snapshot_no_trend_key, lines: 507-512 }
+        - { name: test_today_snapshot_success_returns_200, lines: 421-427 }
+        - { name: test_today_snapshot_summary_keys_present, lines: 430-439 }
+        - { name: test_today_snapshot_invalid_record_type_returns_400, lines: 441-448 }
+        - { name: test_today_snapshot_invalid_duration_range_returns_400, lines: 450-457 }
+        - { name: test_today_snapshot_db_unavailable_returns_503, lines: 460-466 }
+        - { name: test_today_snapshot_pool_exhausted_returns_503, lines: 469-475 }
+        - { name: test_today_snapshot_runtime_error_returns_503, lines: 478-483 }
+        - { name: test_today_snapshot_valid_record_types, lines: 486-493 }
+        - { name: test_today_snapshot_default_hold_type_is_quality, lines: 496-500 }
+        - { name: test_today_snapshot_no_trend_key, lines: 503-508 }
     - name: TestHoldHistoryConfigRoute
-      lines: 515-537
+      lines: 511-540
       methods:
-        - { name: test_config_returns_200, lines: 518-522 }
-        - { name: test_config_has_feature_flag_keys, lines: 524-528 }
-        - { name: test_config_has_hold_async_keys, lines: 530-537 }
+        - { name: test_config_returns_200, lines: 514-518 }
+        - { name: test_config_has_feature_flag_keys, lines: 520-524 }
+        - { name: test_config_has_hold_async_keys, lines: 526-540 }
 
 tests/test_hold_history_service.py:  # 520 lines
   imports:
@@ -15040,7 +15106,7 @@ tests/test_job_query_service.py:  # 294 lines
         - { name: test_partial_failure_in_meta, lines: 275-285 }
         - { name: test_no_partial_failure_no_meta_key, lines: 287-294 }
 
-tests/test_job_registry.py:  # 288 lines
+tests/test_job_registry.py:  # 292 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: pytest, items: [], line: 9 }
@@ -15060,15 +15126,15 @@ tests/test_job_registry.py:  # 288 lines
         - { name: test_returns_error_tuple_for_unregistered_type, lines: 129-141 }
         - { name: test_respects_should_enqueue_false, lines: 143-172 }
     - name: TestJobServiceRegistrations
-      lines: 179-246
+      lines: 179-250
       methods:
-        - { name: test_each_service_registers_exactly_one_job_type, lines: 180-246 }
+        - { name: test_each_service_registers_exactly_one_job_type, lines: 180-250 }
     - name: TestAlwaysAsyncField
-      lines: 253-288
+      lines: 257-292
       methods:
-        - { name: test_job_type_config_always_async_defaults_false, lines: 254-262 }
-        - { name: test_job_type_config_always_async_true, lines: 264-273 }
-        - { name: test_eap_alarm_registered_with_always_async_true, lines: 275-288 }
+        - { name: test_job_type_config_always_async_defaults_false, lines: 258-266 }
+        - { name: test_job_type_config_always_async_true, lines: 268-277 }
+        - { name: test_eap_alarm_registered_with_always_async_true, lines: 279-292 }
   functions:
     - { name: reset_registry, lines: 18-22 }  # @pytest.fixture(autouse=True)
 
@@ -16811,12 +16877,11 @@ tests/test_qc_gate_service.py:  # 150 lines
     - { name: test_get_qc_gate_summary_returns_empty_when_no_match, lines: 115-135 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping', return_va...
     - { name: test_get_qc_gate_summary_returns_empty_when_cache_missing, lines: 141-150 }  # @patch('mes_dashboard.services.qc_gate_service.get_cache_updated_at', return_valu...
 
-tests/test_query_cost_policy.py:  # 370 lines
+tests/test_query_cost_policy.py:  # 352 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: ast, items: [], line: 9 }
     - { module: os, items: [], line: 10 }
-    - { module: warnings, items: [], line: 11 }
     - { module: datetime, items: [date], line: 12 }
     - { module: pathlib, items: [Path], line: 13 }
     - { module: unittest.mock, items: [MagicMock], line: 14 }
@@ -16852,16 +16917,11 @@ tests/test_query_cost_policy.py:  # 370 lines
         - { name: test_l3_row_count_fn_error_does_not_raise, lines: 214-226 }
         - { name: test_l2_short_circuits_l3, lines: 228-241 }
         - { name: test_all_under_threshold_returns_sync, lines: 243-255 }
-    - name: TestDeprecationWarning
-      lines: 262-296
-      methods:
-        - { name: test_deprecation_warning_for_async_threshold_env, lines: 269-279 }
-        - { name: test_no_deprecation_warning_without_env_var, lines: 281-296 }
     - name: TestNoPandasAndNoCallers
-      lines: 311-370
+      lines: 281-352
       methods:
-        - { name: test_no_pandas_import_in_new_modules, lines: 313-326 }
-        - { name: test_no_caller_outside_tests, lines: 328-370 }
+        - { name: test_no_pandas_import_in_new_modules, lines: 283-296 }
+        - { name: test_no_caller_outside_tests, lines: 298-352 }
   functions:
     - { name: _call, lines: 23-44 }
 
@@ -18027,7 +18087,7 @@ tests/test_reject_pareto_materialized.py:  # 670 lines
   functions:
     - { name: _build_sample_df, lines: 22-46 }
 
-tests/test_reject_query_job_service.py:  # 339 lines
+tests/test_reject_query_job_service.py:  # 357 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 16 }
@@ -18035,36 +18095,37 @@ tests/test_reject_query_job_service.py:  # 339 lines
     - { module: mes_dashboard.services.reject_query_job_service, items: [], line: 20 }
   classes:
     - name: TestShouldUseAsync
-      lines: 27-94
+      lines: 27-112
       methods:
-        - { name: test_true_for_date_range_over_threshold_when_async_available, lines: 28-34 }
-        - { name: test_false_for_container_mode, lines: 36-41 }
-        - { name: test_false_when_range_is_exactly_at_threshold, lines: 43-50 }
-        - { name: test_false_when_range_is_below_threshold, lines: 52-58 }
-        - { name: test_false_when_reject_async_enabled_is_false, lines: 60-65 }
-        - { name: test_false_when_async_not_available, lines: 67-73 }
-        - { name: test_false_when_start_date_is_missing, lines: 75-80 }
-        - { name: test_false_when_end_date_is_missing, lines: 82-87 }
-        - { name: test_false_when_dates_are_invalid_format, lines: 89-94 }
+        - { name: test_true_for_date_range_over_threshold_when_async_available, lines: 36-42 }
+        - { name: test_false_for_container_mode, lines: 44-49 }
+        - { name: test_false_when_classify_returns_sync, lines: 51-61 }
+        - { name: test_false_when_range_is_below_threshold, lines: 63-69 }
+        - { name: test_false_when_reject_async_enabled_is_false, lines: 71-76 }
+        - { name: test_false_when_async_not_available, lines: 78-84 }
+        - { name: test_false_when_start_date_is_missing, lines: 86-91 }
+        - { name: test_false_when_end_date_is_missing, lines: 93-98 }
+        - { name: test_false_when_dates_are_invalid_format, lines: 100-105 }
+        - { name: test_reject_async_day_threshold_removed_from_module, lines: 107-112 }
     - name: TestEnqueueRejectQuery
-      lines: 101-169
+      lines: 119-187
       methods:
-        - { name: test_delegates_to_enqueue_job_with_correct_arguments, lines: 102-120 }
-        - { name: test_returns_job_id_and_none_on_success, lines: 122-128 }
-        - { name: test_returns_none_and_error_on_failure, lines: 130-135 }
-        - { name: test_job_id_prefixed_with_reject, lines: 137-148 }
-        - { name: test_passes_ttl_and_timeout_from_config, lines: 150-158 }
-        - { name: test_passes_retry_configuration_to_enqueue_job, lines: 160-169 }
+        - { name: test_delegates_to_enqueue_job_with_correct_arguments, lines: 120-138 }
+        - { name: test_returns_job_id_and_none_on_success, lines: 140-146 }
+        - { name: test_returns_none_and_error_on_failure, lines: 148-153 }
+        - { name: test_job_id_prefixed_with_reject, lines: 155-166 }
+        - { name: test_passes_ttl_and_timeout_from_config, lines: 168-176 }
+        - { name: test_passes_retry_configuration_to_enqueue_job, lines: 178-187 }
     - name: TestExecuteRejectQueryJob
-      lines: 176-339
+      lines: 194-357
       methods:
-        - { name: _make_mock_cache_module, lines: 179-187 }
-        - { name: test_cache_hit_skips_oracle_and_calls_complete_job, lines: 189-212 }
-        - { name: test_successful_execution_calls_execute_primary_query_then_complete, lines: 214-237 }
-        - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 239-266 }
-        - { name: test_execute_primary_query_called_with_correct_params, lines: 268-292 }
-        - { name: test_failure_on_query_still_calls_complete_job, lines: 294-317 }
-        - { name: test_job_completes_regardless_of_mode_parameter, lines: 319-339 }
+        - { name: _make_mock_cache_module, lines: 197-205 }
+        - { name: test_cache_hit_skips_oracle_and_calls_complete_job, lines: 207-230 }
+        - { name: test_successful_execution_calls_execute_primary_query_then_complete, lines: 232-255 }
+        - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 257-284 }
+        - { name: test_execute_primary_query_called_with_correct_params, lines: 286-310 }
+        - { name: test_failure_on_query_still_calls_complete_job, lines: 312-335 }
+        - { name: test_job_completes_regardless_of_mode_parameter, lines: 337-357 }
 
 tests/test_resilience.py:  # 58 lines
   imports:
@@ -18392,7 +18453,7 @@ tests/test_resource_history_routes.py:  # 497 lines
   functions:
     - { name: _rh_client, lines: 401-407 }  # @pytest.fixture
 
-tests/test_resource_history_rq_async_route.py:  # 314 lines
+tests/test_resource_history_rq_async_route.py:  # 301 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: json, items: [], line: 11 }
@@ -18403,20 +18464,20 @@ tests/test_resource_history_rq_async_route.py:  # 314 lines
     - { module: mes_dashboard.core.database, items: [], line: 19 }
   classes:
     - name: TestResourceHistoryAsyncRoute
-      lines: 22-310
+      lines: 22-297
       methods:
         - { name: setUp, lines: 25-31 }
         - { name: _post_query, lines: 33-38 }
-        - { name: test_query_long_span_returns_202, lines: 45-63 }
-        - { name: test_query_short_span_returns_200_sync, lines: 73-91 }
-        - { name: test_query_async_flag_false_returns_200_sync, lines: 100-118 }
-        - { name: test_redis_unavailable_falls_back_to_sync, lines: 128-145 }
-        - { name: test_owner_in_params_dict, lines: 152-171 }
-        - { name: test_resource_async_enabled_default_is_true, lines: 175-194 }
-        - { name: test_resource_async_day_threshold_default_is_90, lines: 196-211 }
-        - { name: test_enqueue_failure_falls_through_to_sync, lines: 223-242 }
-        - { name: test_enqueue_exception_falls_through_to_sync, lines: 254-273 }
-        - { name: test_canonical_spool_hit_on_long_span_returns_200_no_rq, lines: 283-310 }
+        - { name: test_query_long_span_returns_202, lines: 45-62 }
+        - { name: test_query_short_span_returns_200_sync, lines: 72-89 }
+        - { name: test_query_async_flag_false_returns_200_sync, lines: 98-115 }
+        - { name: test_redis_unavailable_falls_back_to_sync, lines: 125-141 }
+        - { name: test_owner_in_params_dict, lines: 148-166 }
+        - { name: test_resource_async_enabled_default_is_true, lines: 170-189 }
+        - { name: test_resource_async_day_threshold_removed, lines: 191-201 }
+        - { name: test_enqueue_failure_falls_through_to_sync, lines: 213-231 }
+        - { name: test_enqueue_exception_falls_through_to_sync, lines: 243-261 }
+        - { name: test_canonical_spool_hit_on_long_span_returns_200_no_rq, lines: 271-297 }
 
 tests/test_resource_history_service.py:  # 603 lines
   imports:
@@ -18637,7 +18698,7 @@ tests/test_resource_history_unified_job.py:  # 407 lines
     - { name: _make_base_job, lines: 26-31 }
     - { name: _make_oee_job, lines: 34-39 }
 
-tests/test_resource_query_job_service.py:  # 299 lines
+tests/test_resource_query_job_service.py:  # 301 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: importlib, items: [], line: 11 }
@@ -18648,23 +18709,23 @@ tests/test_resource_query_job_service.py:  # 299 lines
     - { module: pytest, items: [], line: 17 }
   classes:
     - name: TestResourceQueryJobService
-      lines: 22-299
+      lines: 22-301
       methods:
-        - { name: test_should_use_async_above_threshold, lines: 27-36 }
-        - { name: test_should_use_async_at_exact_threshold, lines: 38-48 }
-        - { name: test_should_use_async_below_threshold_is_false, lines: 50-59 }
-        - { name: test_should_use_async_flag_false_returns_false, lines: 61-70 }
-        - { name: test_should_use_async_missing_dates_returns_false, lines: 72-80 }
-        - { name: test_should_use_async_invalid_date_format_returns_false, lines: 82-91 }
-        - { name: test_worker_fn_failure_reraises_and_sets_error, lines: 95-137 }
-        - { name: test_worker_fn_success_calls_complete_job_with_query_id, lines: 139-170 }
-        - { name: test_worker_fn_success_primes_canonical_spool, lines: 172-207 }
-        - { name: test_register_job_type_fires_at_import, lines: 211-220 }
-        - { name: test_register_job_type_reruns_after_reload, lines: 222-233 }
-        - { name: test_resource_async_enabled_defaults_to_true, lines: 237-251 }
-        - { name: test_resource_async_day_threshold_defaults_to_90, lines: 253-267 }
-        - { name: test_resource_worker_queue_defaults_to_resource_history_query, lines: 269-283 }
-        - { name: test_resource_job_timeout_defaults_to_1800, lines: 285-299 }
+        - { name: test_should_use_async_above_threshold, lines: 32-41 }
+        - { name: test_should_use_async_at_exact_threshold, lines: 43-52 }
+        - { name: test_should_use_async_below_threshold_is_false, lines: 54-63 }
+        - { name: test_should_use_async_flag_false_returns_false, lines: 65-73 }
+        - { name: test_should_use_async_missing_dates_returns_false, lines: 75-82 }
+        - { name: test_should_use_async_invalid_date_format_returns_false, lines: 84-98 }
+        - { name: test_worker_fn_failure_reraises_and_sets_error, lines: 102-144 }
+        - { name: test_worker_fn_success_calls_complete_job_with_query_id, lines: 146-177 }
+        - { name: test_worker_fn_success_primes_canonical_spool, lines: 179-214 }
+        - { name: test_register_job_type_fires_at_import, lines: 218-227 }
+        - { name: test_register_job_type_reruns_after_reload, lines: 229-240 }
+        - { name: test_resource_async_enabled_defaults_to_true, lines: 244-258 }
+        - { name: test_resource_async_day_threshold_removed_from_service, lines: 260-269 }
+        - { name: test_resource_worker_queue_defaults_to_resource_history_query, lines: 271-285 }
+        - { name: test_resource_job_timeout_defaults_to_1800, lines: 287-301 }
 
 tests/test_resource_routes.py:  # 219 lines
   imports:

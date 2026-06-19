@@ -1,0 +1,19 @@
+{
+  "change_id": "query-path-c-elimination-cleanup",
+  "phase": "full",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "conda run -n mes-dashboard python -m pytest -q --maxfail=1 --tb=short -ra --ignore=tests/stress --ignore=tests/integration/test_oracle_error_path.py --ignore=tests/integration/test_oracle_error_codes.py",
+  "duration_ms": 236291,
+  "first_failure": {
+    "kind": "unknown",
+    "nodeid": "tests/test_resource_query_job_service.py::TestResourceQueryJobService::test_should_use_async_above_threshold",
+    "message": "ERROR conda.cli.main_run:execute(127): `conda run python -m pytest -q --maxfail=1 --tb=short -ra --ignore=tests/stress --ignore=tests/integration/test_oracle_error_path.py --ignore=tests/integration/test_oracle_error_codes.py` failed. (See above for error)"
+  },
+  "artifacts": {
+    "summary": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-183540/summary.json",
+    "stdout": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-183540/stdout.log",
+    "stderr": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-183540/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

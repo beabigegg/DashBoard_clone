@@ -1,0 +1,15 @@
+{
+  "change_id": "query-path-c-elimination-cleanup",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts --env --ci",
+  "duration_ms": 1646,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-182159/summary.json",
+    "stdout": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-182159/stdout.log",
+    "stderr": "specs/changes/query-path-c-elimination-cleanup/test-runs/20260619-182159/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

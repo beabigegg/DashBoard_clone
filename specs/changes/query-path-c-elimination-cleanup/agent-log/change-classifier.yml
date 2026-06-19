@@ -1,0 +1,17 @@
+agent: change-classifier
+change-id: query-path-c-elimination-cleanup
+date: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: classification, pointer: "specs/changes/query-path-c-elimination-cleanup/change-classification.md" }
+  - { type: tier, pointer: "Tier 1 (high-risk, cross-module)" }
+  - { type: context-manifest, pointer: "specs/changes/query-path-c-elimination-cleanup/context-manifest.md" }
+
+findings:
+  - "CER-001 RESOLVED: no rq_utils.py; enqueue_query_job is in async_query_job_service.py"
+  - "CER-002 RESOLVED: confirmed 4 ASYNC_DAY_THRESHOLD vars (DOWNTIME_, HOLD_, RESOURCE_, REJECT_) — not 7 as estimated in change-request; all pre-marked deprecated by unified-query-core-infra"
+  - "query_tool_routes and wip_routes have NO existing ASYNC_DAY_THRESHOLD vars — they are pure sync-blocking Path C"
+  - "ASYNC_DAY_THRESHOLD callers: 3 route files (downtime, hold, resource) + 3 service files (hold, reject, resource)"
+  - "design.md required: concurrency, semaphore semantics, RQ job-type decision (reuse vs new), env-removal rollback"
+  - "current-behavior.md, regression-report.md, stress-soak-report.md all required (high-risk sync→async dispatch change)"

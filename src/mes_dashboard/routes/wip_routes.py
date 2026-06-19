@@ -32,6 +32,7 @@ from mes_dashboard.services.wip_service import (
     get_wip_matrix,
     get_wip_hold_summary,
     get_wip_detail,
+    count_wip_rows,
     get_workcenters,
     get_packages,
     get_wip_filter_options,
@@ -41,6 +42,12 @@ from mes_dashboard.services.wip_service import (
     search_types,
     get_lot_detail,
 )
+from mes_dashboard.core.query_cost_policy import classify_query_cost
+from mes_dashboard.services.async_query_job_service import (
+    enqueue_job_dynamic,
+    is_async_available,
+)
+from mes_dashboard.core.permissions import get_owner_token
 
 # Create Blueprint
 wip_bp = Blueprint('wip', __name__, url_prefix='/api/wip')
@@ -306,6 +313,71 @@ def api_detail(workcenter: str):
     # Validate hold_type parameter
     if hold_type and hold_type not in ('quality', 'non-quality'):
         return validation_error('Invalid hold_type. Use quality or non-quality')
+
+    # ── RQ rowcount pre-check (query-path-c-elimination-cleanup, IP-5) ──────
+    # Run a lightweight COUNT(*) and route to RQ when ≥ L3 (200,000 rows).
+    # Fail-open: COUNT error → stay sync (0 < 200,000 → SYNC).
+    # WIP has no date range so only L3 matters here.
+    if is_async_available():
+        _row_count = count_wip_rows(
+            workcenter=workcenter,
+            package=package,
+            pj_type=pj_type,
+            firstname=firstname,
+            waferdesc=waferdesc,
+            status=status,
+            hold_type=hold_type,
+            workorder=workorder,
+            lotid=lotid,
+            include_dummy=include_dummy,
+            workflow=workflow,
+            bop=bop,
+            pj_function=pj_function,
+        )
+        _cost = classify_query_cost(
+            domain="wip",
+            params={},  # WIP has no date range — only L3 check matters
+            row_count_fn=lambda: _row_count,
+        )
+        if _cost == "ASYNC":
+            _owner = get_owner_token()
+            _params = dict(
+                owner=_owner,
+                workcenter=workcenter,
+                package=package,
+                pj_type=pj_type,
+                firstname=firstname,
+                waferdesc=waferdesc,
+                status=status,
+                hold_type=hold_type,
+                workorder=workorder,
+                lotid=lotid,
+                include_dummy=include_dummy,
+                page=page,
+                page_size=page_size,
+                workflow=workflow,
+                bop=bop,
+                pj_function=pj_function,
+            )
+            job_id, err = enqueue_job_dynamic(
+                "wip-detail",
+                owner=_owner,
+                params=_params,
+            )
+            # Note: "wip-detail" job type is intentionally not registered in this
+            # change (no worker implementation yet) — enqueue_job_dynamic will return
+            # (None, "Unknown job type") which falls through to sync.
+            # This is safe: fail-open stays SYNC until a worker is registered.
+            if job_id is not None:
+                return success_response(
+                    {
+                        "async": True,
+                        "job_id": job_id,
+                        "status_url": f"/api/job/{job_id}?prefix=wip-detail",
+                    },
+                    status_code=202,
+                )
+            # enqueue failed — fall through to sync path
 
     result = get_wip_detail(
         workcenter=workcenter,
