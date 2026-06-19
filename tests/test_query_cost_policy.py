@@ -340,6 +340,10 @@ class TestNoPandasAndNoCallers:
                 "reject_history_worker",
                 "resource_history_base_worker",
                 "resource_history_oee_worker",
+                "material_trace_duckdb_runtime",
+            },
+            "oracle_arrow_reader": {
+                "material_trace_duckdb_runtime",
             },
         }
 

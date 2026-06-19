@@ -217,8 +217,8 @@ class TestJobServiceRegistrations:
         importlib.reload(mts)
 
         registered = jr.list_registered_job_types()
-        assert len(registered) == 8, (
-            f"Expected 8 registered job types, got {len(registered)}: {registered}"
+        assert len(registered) == 9, (
+            f"Expected 9 registered job types, got {len(registered)}: {registered}"
         )
 
         expected_types = {
@@ -230,6 +230,7 @@ class TestJobServiceRegistrations:
             "msd-lineage",
             "material-consumption",
             "material-trace",
+            "material-trace-unified",
         }
         assert set(registered) == expected_types, (
             f"Registered types mismatch.\n"
