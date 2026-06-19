@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.19
+schema-version: 1.0.20
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -94,6 +94,22 @@ breaking-change-policy: deprecate-2-minors
 - `DOWNTIME_USE_UNIFIED_JOB`: Feature flag enabling the unified `DowntimeJob` path (`BaseChunkedDuckDBJob` template method, P5 migration). When `on`/`true`/`1`, the downtime-analysis route enqueues via `enqueue_query_job("downtime-unified", ..., sync_fallback_allowed=False)` with `JobTypeConfig.always_async=True`; async unavailable → 503 SERVICE_UNAVAILABLE with Retry-After (no silent sync fallback). The `DowntimeJob` streams `base_events` + `job_data` as Arrow batches into a two-table job-temp DuckDB (`base_raw`/`job_raw`), runs the cross-shift 60s-gap merge and the RESOURCEID+time-overlap bridge JOIN (RANGE JOIN + window, NOT ASOF — ADR-0010) entirely in `post_aggregate`, then `COPY TO` the unchanged spool parquet. Chunked per-RESOURCEID group (`requires_cross_chunk_reduction=True`, `chunk_strategy=SINGLE` per group; ADR-0003 permanent exclusion). When `off` (default)/`false`/`0`, the legacy `_bridge_jobid` Path B `pd.merge` path via `execute_downtime_query_job` is used unchanged (AC-8 zero-regression). Spool namespace `query_downtime_dataset` and parquet schema are unchanged — frontend view endpoints and the async raw two-spool path need no change. Module-level constant frozen at import — restart required. `monkeypatch.setattr()` required in tests (not `setenv`). **Worker env-var parity**: the `mes-dashboard-downtime-worker.service` systemd unit MUST export `DOWNTIME_USE_UNIFIED_JOB` with the same value as gunicorn (env-var drift silently routes different code paths — gunicorn = unified DowntimeJob, worker = legacy pd.merge, or vice versa). Added by change `downtime-duckdb-join-migration`.
 
 **Worker env-var parity (P2 — production-reject-history-migration):** The `mes-dashboard-production-history-worker.service` systemd unit MUST export `PRODUCTION_HISTORY_USE_UNIFIED_JOB` with the same value as gunicorn. The `mes-dashboard-reject-worker.service` systemd unit MUST export `REJECT_HISTORY_USE_UNIFIED_JOB` with the same value as gunicorn. Both flags are module-level constants frozen at worker boot; env-var drift between gunicorn and a worker process silently routes different code paths per process (gunicorn = unified job, worker = legacy, or vice versa), breaking spool-parity guarantees. Validate via deploy-time env comparison before enabling either flag. Added by change `production-reject-history-migration`.
+
+## Worker Feature-Flag Env-Var Parity (Cross-Cutting Rule)
+
+Every `*_USE_UNIFIED_JOB` flag MUST be set to the **same value** in both the gunicorn process environment AND the corresponding RQ worker service environment (`*.service` unit `Environment=` or `EnvironmentFile=`). These flags are module-level constants frozen at process boot; a value difference between gunicorn and worker causes **silent split-brain routing** (gunicorn dispatches the unified DuckDB job, worker runs the legacy path, or vice versa) — breaking spool-parity without any error log.
+
+Validate during deployment by comparing env dumps of both units before enabling any flag. This rule applies to:
+
+- `EAP_ALARM_USE_UNIFIED_JOB` (eap-alarm worker)
+- `PRODUCTION_HISTORY_USE_UNIFIED_JOB` (production-history worker)
+- `REJECT_HISTORY_USE_UNIFIED_JOB` (reject worker)
+- `RESOURCE_HISTORY_USE_UNIFIED_JOB` (resource-history worker)
+- `MATERIAL_TRACE_USE_UNIFIED_JOB` (trace worker)
+- `DOWNTIME_USE_UNIFIED_JOB` (downtime worker)
+- Any future P6+ `*_USE_UNIFIED_JOB` flag
+
+Added by `downtime-duckdb-join-migration`. Prior per-worker parity notes in individual flag descriptions remain for readability; this section is the normative cross-cutting rule.
 
 ## Cache Tuning — Resource History
 

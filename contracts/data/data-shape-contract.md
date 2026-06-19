@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.23.0
+schema-version: 1.23.1
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -337,6 +337,14 @@ Large payloads that hit the memory/row limit include:
 ---
 
 ## 3. Required Columns（Common Row Types）
+
+### 3.0 Spool Schema Testability Rules
+
+**`_derive_*` column-preservation guard** (applies to all §3.x spool schemas backed by a `BaseChunkedDuckDBJob`): every `_derive_*` transform method MUST preserve all upstream spool columns that it does not explicitly compute. A hardcoded output column list that omits an upstream column silently drops it from the parquet spool and breaks AC-3 parity without any error.
+
+Enforcement: add a `test_derive_*_preserves_<column>` unit test asserting every upstream spool column appears in the output DataFrame. This test must be added in the same commit as the `_derive_*` method.
+
+Evidence: `downtime-duckdb-join-migration` — `_derive_job_columns` dropped `fragment_count` (§3.21); fixed by `tests/test_downtime_unified_job.py:test_derive_job_columns_preserves_fragment_count`. Added by `downtime-duckdb-join-migration`.
 
 ### 3.1 Lot Row（WIP / Hold）
 

@@ -42,5 +42,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 unit+contract+quality all passed locally; CI equivalents mapped in ci-gates.md" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: skipped, note: "no informational-only gates defined for this change; ci-gates.md lists all gates as required" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "archived to specs/archive/2026/downtime-duckdb-join-migration/" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "data §3.0 _derive_* guard (1.23.1), env §Worker Parity cross-cutting rule (1.0.20), CLAUDE.md Cache&spool one-liner" }

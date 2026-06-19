@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [env 1.0.20] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration (cdd-close): Cross-cutting "Worker Feature-Flag Env-Var Parity" normative rule. All `*_USE_UNIFIED_JOB` flags must be identical in gunicorn AND RQ worker service environments; module-level constants freeze at boot so drift causes silent split-brain routing. Lists all 6 current flags (EAP_ALARM, PRODUCTION_HISTORY, REJECT_HISTORY, RESOURCE_HISTORY, MATERIAL_TRACE, DOWNTIME) and extends to future P6+ flags. Additive; no existing defaults or enums changed.
+
+## [data 1.23.1] — 2026-06-19
+### Added
+- downtime-duckdb-join-migration (cdd-close): §3.0 Spool Schema Testability Rules — `_derive_*` column-preservation guard. Every `_derive_*` transform in a `BaseChunkedDuckDBJob` subclass must preserve all upstream spool columns not explicitly computed; enforce via `test_derive_*_preserves_<column>` guard test in same commit. Evidence: `_derive_job_columns` silently dropped `fragment_count` (§3.21) — caught and fixed before merge. Additive.
+
 ## [env 1.0.19] — 2026-06-19
 ### Added
 - downtime-duckdb-join-migration: `DOWNTIME_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `DowntimeJob` path (BaseChunkedDuckDBJob template method, P5 migration) vs legacy `_bridge_jobid` Path B `pd.merge`. `always_async=True`; `sync_fallback_allowed=False`; async unavailable → 503 + Retry-After (no sync fallback). Streams base_events + job_data Arrow batches into two-table job-temp DuckDB; cross-shift 60s-gap merge + RESOURCEID+time-overlap RANGE JOIN bridge in `post_aggregate` (ADR-0010); `COPY TO` unchanged spool parquet. Chunked per-RESOURCEID group (`requires_cross_chunk_reduction=True`, `chunk_strategy=SINGLE`; ADR-0003 preserved). Spool namespace `query_downtime_dataset` and parquet schema unchanged. Default `off` ensures zero regression on deploy (AC-8). Additive; no existing flags changed.

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 180
-visible-files: 924
+visible-files: 927
 omitted-dirs: 61
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -171,7 +171,8 @@ DashBoard_vite/
 |   |   |-- 0006-duckdb-prewarm-via-rq-queue.md
 |   |   |-- 0007-downtime-browser-duckdb-compute-relocation.md
 |   |   |-- 0008-eap-alarm-coarse-spool-detail-join.md
-|   |   \-- 0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md
+|   |   |-- 0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md
+|   |   \-- 0010-downtime-duckdb-time-overlap-join.md
 |   |-- architecture/
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
@@ -860,6 +861,7 @@ DashBoard_vite/
 |       |   \-- query_tool.html
 |       |-- workers/
 |       |   |-- __init__.py
+|       |   |-- downtime_worker.py
 |       |   |-- eap_alarm_worker.py
 |       |   |-- production_history_worker.py
 |       |   |-- reject_history_worker.py
@@ -929,6 +931,7 @@ DashBoard_vite/
 |   |   |-- response-samples.json
 |   |   |-- test_capture_samples.py
 |   |   |-- test_doctor_clean.py
+|   |   |-- test_env_downtime_unified_flag.py
 |   |   |-- test_env_duckdb_job_dir.py
 |   |   |-- test_env_material_trace_flag.py
 |   |   |-- test_gate_wiring.py
@@ -1111,7 +1114,7 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
-|   \-- ... (180 more entries truncated; cap=50)
+|   \-- ... (181 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   \-- test_ns/
@@ -1167,7 +1170,7 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166368.json
 |   |   |-- probe_166780.json
-|   |   \-- ... (407 more entries truncated; cap=50)
+|   |   \-- ... (427 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   |-- mes_dashboard_restart.flag
