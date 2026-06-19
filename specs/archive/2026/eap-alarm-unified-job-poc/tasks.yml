@@ -43,5 +43,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "test-evidence: collect/targeted/changed-area/contract all passed (89+118 tests); gate passed" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "test-evidence.yml: collect/targeted/changed-area/contract phases passed; code-map updated; ruff clean" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending, note: "integration (GunicornHarness), stress, soak are weekly/manual gates per ci-gates.md" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "L-1: BJ-01 to business-rules.md 1.26.1; L-2: P2+ parity template to test-discipline.md + CLAUDE.md; L-3: tier-floor-override invalidation amend in CLAUDE.md" }

@@ -98,6 +98,16 @@ Evidence: `unify-duckdb-prewarm-rq`.
 
 Evidence: `tests/test_production_history_sql_runtime.py::test_partial_merge_same_trackin_time_different_trackin_qty`
 
+## P2+ Domain Migration — Dual-Tier Parity Test Template
+
+Every domain migrated onto `BaseChunkedDuckDBJob` must reproduce two test tiers:
+
+1. **Unit tier (chunk-seam fixture)**: mock `OracleArrowReader.chunk_iter` with Arrow batches that straddle a chunk seam (e.g., a SET event in chunk-1, its CLEAR in chunk-2). Assert that `post_aggregate` produces exactly one paired row — not two orphaned half-rows. Proves cross-seam reduction correctness without Oracle.
+
+2. **Integration tier (parquet diff)**: run both the legacy `worker_fn` and the new `BaseChunkedDuckDBJob` subclass against the same seeded spool input. Diff the two output parquets: schema equality (column names + types), rowcount equality, and order-insensitive row-set equality on the business key (e.g., `(EQP_ID, ALARM_ID, ALARM_START)`). Count-only parity misses pairing regressions when the EAV pivot moves from pandas to DuckDB SQL.
+
+Evidence: `eap-alarm-unified-job-poc` design.md §D6; `tests/test_eap_alarm_unified_job.py` (5 test classes); change-classifier findings "AC-1/AC-8 establish the parity-testing template for all P2+ migrations".
+
 ## _APPROVED_CALLERS — New Controlled-Module Callers Must Be Explicitly Approved
 
 `tests/test_query_cost_policy.py::TestNoPandasAndNoCallers::test_no_caller_outside_tests` enforces a zero-caller policy for controlled internal modules (`oracle_arrow_reader`, `query_cost_policy`, `base_chunked_duckdb_job`). Any source file that **intentionally** imports from one of these must be added to the `_APPROVED_CALLERS` dict **in the same PR**:

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: c9aaa1885b1e72c8e783649e9f11304c16c196a320ed22103cf9ee0cba2e44ae
+inputs-digest: 2621f6d69043d36f5892712490a8197fde237f1048fecec1030ed2c1783ce899
 ---
 
 # Contracts Index
@@ -72,7 +72,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.26.0
+- schema-version: 1.26.1
 - last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.

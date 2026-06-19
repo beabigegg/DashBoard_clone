@@ -110,7 +110,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `context-manifest.md` Allowed Paths must use directory-level paths, not glob patterns — see docs/cdd-kit-patterns.md
 - `cdd-kit validate --contracts` requires `pip install jsonschema` before the step in CI (not bundled); also required locally when `response-samples.json` exists — see docs/cdd-kit-patterns.md
 - Response schema cells must be bare identifiers (`/^[A-Za-z][A-Za-z0-9_]*/`); Tier-A tables require `| field | type | required |` headers; `dataPath` only for inner-payload schemas; regen `contracts/openapi.json` after every endpoint-table or schema edit — see contracts/api/api-contract.md §Schema Authoring Rules
-- New concurrency-critical modules with zero callers: add `tier-floor-override` to `tasks.yml` frontmatter (≥20 chars, stating deferred-stress rationale) to satisfy the cdd-kit Tier-0 floor without declaring Tier 0 prematurely — see docs/cdd-kit-patterns.md
+- New concurrency-critical modules with zero callers: add `tier-floor-override` to `tasks.yml` frontmatter (≥20 chars, stating deferred-stress rationale); when the first real caller lands the override is invalidated — the owning change must be Tier 1 and stress-soak-report.md is required — see docs/cdd-kit-patterns.md
 - Pre-commit hook scans all staged `specs/changes/*/` dirs; stage only the completed change's directory, not all of `specs/changes/` — unfilled template placeholders in sibling dirs fail the hook — see docs/cdd-kit-patterns.md
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md` for full detail:
@@ -179,6 +179,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md
 - Partial-trackout fixtures: include rows with different `TRACKINQTY` per session (real arithmetic) — see docs/architecture/test-discipline.md
 - New modules using `oracle_arrow_reader` or `base_chunked_duckdb_job`: add stem to `_APPROVED_CALLERS` in `tests/test_query_cost_policy.py` in the same PR; also update `tests/test_job_registry.py` count for new `register_job_type()` calls — see docs/architecture/test-discipline.md
+- `BaseChunkedDuckDBJob` domain migrations: dual-tier parity test required (mock chunk-seam unit + real-path parquet diff on business key); see docs/architecture/test-discipline.md §P2+ Domain Migration
 
 **CI workflow & GunicornHarness** — see `docs/architecture/ci-workflow.md` for full detail:
 - New Playwright specs: add `npx playwright install --with-deps chromium` step in CI before running tests — see docs/architecture/ci-workflow.md

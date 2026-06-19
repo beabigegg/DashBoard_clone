@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.26.0
+schema-version: 1.26.1
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -304,6 +304,12 @@ breaking-change-policy: deprecate-2-minors
 | BQE-07 | `downtime_analysis_service` raw-spool output | (Updated by `downtime-browser-duckdb`.) Flag ON: `query_downtime_dataset_raw()` uses one whole-dataset BQE chunk to write two raw namespaces (`downtime_analysis_base_events`, `downtime_analysis_job_bridge`); server does NOT run reductions. Flag OFF (legacy): `query_downtime_dataset()` continues to use `BatchQueryEngine → execute_plan → merge_chunks_to_spool` into the enriched `downtime_analysis_events` namespace. ADR-0003 permanent exclusion from `USE_ROW_COUNT_CHUNKING` applies to both paths. | `tests/test_downtime_analysis_service.py::TestRawSpoolWriter`; integration tests |
 
 
+## BaseChunkedDuckDBJob Fan-out Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| BJ-01 | `requires_cross_chunk_reduction` governs write topology only | `requires_cross_chunk_reduction=False` selects the multi-parquet fan-out (no shared writer-lock DuckDB). It does NOT mean no cross-row reduction exists. Any domain whose reduction spans rows from different time/ID chunks MUST perform that reduction in `post_aggregate` (reads all chunk parquets together via DuckDB glob) and MUST NOT perform it per-chunk. Setting the flag to `True` unnecessarily forces single-chunk execution and defeats parallelism. See ADR-0009 for the eap-alarm SET/CLEAR pairing precedent. | `tests/test_eap_alarm_unified_job.py` (AC-2 cross-seam fixture); `tests/test_base_chunked_duckdb_job.py` |
+
 ## EAP ALARM Rules
 
 | rule id | name | current behavior | tests |
@@ -342,6 +348,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.26.1] — 2026-06-19
+### Added
+- eap-alarm-unified-job-poc: BJ-01 (`requires_cross_chunk_reduction` governs write topology only; post_aggregate is the safe deferral point for cross-row reductions that span chunk boundaries — see ADR-0009). New `## BaseChunkedDuckDBJob Fan-out Rules` section. Additive; no existing rules changed.
 
 ## [business 1.26.0] — 2026-06-19
 ### Added

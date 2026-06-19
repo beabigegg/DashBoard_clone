@@ -28,6 +28,10 @@ a corresponding entry below.
 ### Added
 - resource-history-migration: `RESOURCE_HISTORY_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `ResourceHistoryBaseJob` + `ResourceHistoryOeeJob` paths (BaseChunkedDuckDBJob template method, P3 migration) vs legacy `export_csv` Oracle read + pandas iterrows path. `always_async=True` for both; `sync_fallback_allowed=False`; degraded → 503. Default `off` ensures zero regression on deploy (AC-1). Additive; no existing flags changed.
 
+## [business 1.26.1] — 2026-06-19
+### Added
+- eap-alarm-unified-job-poc: BJ-01 — `requires_cross_chunk_reduction` governs write topology only; post_aggregate is the safe deferral point for cross-row reductions spanning chunk boundaries (SET/CLEAR pairing precedent). New `## BaseChunkedDuckDBJob Fan-out Rules` section. See ADR-0009. Additive; no existing rules changed.
+
 ## [business 1.26.0] — 2026-06-19
 ### Added
 - material-trace-streaming-migration: ASYNC-10 (unified-job dispatch for material-trace domain — `MATERIAL_TRACE_USE_UNIFIED_JOB=on` routes to `MaterialTraceJob` via `enqueue_query_job("material-trace-unified", always_async=True, sync_fallback_allowed=False)`; async unavailable → 503, no sync fallback; ID-list 1000/batch chunking; post_aggregate DISTINCT on exact 4-col key; WORKCENTER_GROUP enrichment inline; spool namespace+schema unchanged; flag-off uses legacy `_execute_batched_query_to_parquet` unchanged). ASYNC-11 (heavy-query semaphore role re-statement: no code change, semantics-only). Three new Decision Table rows (material-trace flag-on/async-available, flag-on/async-unavailable, flag-off). Additive; no existing rules changed.
