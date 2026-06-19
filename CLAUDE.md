@@ -158,6 +158,8 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - AI pipeline `raw_params` callables: require `dispatch: raw_params` flag in `ai_functions.yaml` — see docs/architecture/service-patterns.md
 - AI pipeline `advance_query_state`: pops entire `_SESSION_STORE`; extract/restore cross-turn state before/after — see docs/architecture/service-patterns.md
 - `_AI_SESSION` is a module-level `requests.Session`; patch at `ai_query_service._AI_SESSION`, not `requests.post` — see docs/architecture/service-patterns.md
+- Every `execute_*_job` worker must wire `acquire_heavy_query_slot` before its `*_USE_RQ` flag goes to production; current gap: query-tool/hold/resource/reject all unwired — see docs/architecture/service-patterns.md §RQ Worker Concurrency Gate
+- COUNT(*) fail-open pre-check: domains without date range use `count_*_rows()` → `classify_query_cost(domain=..., row_count=count)`; COUNT error must fail-open to sync, never 503 — see docs/architecture/service-patterns.md §Async Routing Pre-Check Pattern
 
 **MES domain semantics:**
 - `LOTWIPHISTORY.TRACKINQTY` is remaining-qty-per-partial (decrements across partials); use only `TRACKINTIMESTAMP` as session key — see contracts/business/business-rules.md §PH-06

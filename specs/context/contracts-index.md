@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: f47464d07e55d7d3a44517bc40104526e933e87261d67038d78f4d041263b59c
+inputs-digest: 1ddeda7e900d0b1f306fe6454ea99114059cb805e593bc821f5f738e75b50043
 ---
 
 # Contracts Index
@@ -35,8 +35,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.25.0
-- last-changed: 2026-06-18
+- schema-version: 1.25.1
+- last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
 
@@ -72,7 +72,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.27.0
+- schema-version: 1.28.0
 - last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
@@ -85,7 +85,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.30
+- schema-version: 1.3.31
 - last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.
@@ -148,7 +148,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Env Contract — MES Dashboard
 - owner: platform-team
 - surface: runtime-config
-- schema-version: 1.0.20
+- schema-version: 1.0.21
 - last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: Environment variable inventory, secret handling, and deployment sync policy.

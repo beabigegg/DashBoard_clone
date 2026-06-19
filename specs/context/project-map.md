@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 180
-visible-files: 927
+visible-files: 932
 omitted-dirs: 61
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -73,6 +73,7 @@ DashBoard_vite/
 |   |   |-- 09af02b32eace3be
 |   |   |-- 0a24b457adbbced2
 |   |   |-- 0ac8c61031ebb16b
+|   |   |-- 0af5fbfe62f0cb5e
 |   |   |-- 0bb0d7320a5cea09
 |   |   |-- 0c14e8a6e0dfaa9a
 |   |   |-- 0e749cfd569a40b7
@@ -84,6 +85,7 @@ DashBoard_vite/
 |   |   |-- 1131d28f548032e7
 |   |   |-- 11326b1300e7c559
 |   |   |-- 11d2c913de0cba90
+|   |   |-- 130930a01b21082f
 |   |   |-- 137aac6b65143dec
 |   |   |-- 15a2721810beed32
 |   |   |-- 16e5986e942e026b
@@ -101,9 +103,7 @@ DashBoard_vite/
 |   |   |-- 20a29d650996dc03
 |   |   |-- 2240f61bb7e8003e
 |   |   |-- 22775c7be38c0fc8
-|   |   |-- 2487e0dd67ee4005
-|   |   |-- 24a326889958cc67
-|   |   \-- ... (261 more entries truncated; cap=50)
+|   |   \-- ... (279 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -172,7 +172,8 @@ DashBoard_vite/
 |   |   |-- 0007-downtime-browser-duckdb-compute-relocation.md
 |   |   |-- 0008-eap-alarm-coarse-spool-detail-join.md
 |   |   |-- 0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md
-|   |   \-- 0010-downtime-duckdb-time-overlap-join.md
+|   |   |-- 0010-downtime-duckdb-time-overlap-join.md
+|   |   \-- 0011-global-concurrency-semaphore-rq-oracle-bound.md
 |   |-- architecture/
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
@@ -931,6 +932,7 @@ DashBoard_vite/
 |   |   |-- response-samples.json
 |   |   |-- test_capture_samples.py
 |   |   |-- test_doctor_clean.py
+|   |   |-- test_env_async_threshold_removal.py
 |   |   |-- test_env_downtime_unified_flag.py
 |   |   |-- test_env_duckdb_job_dir.py
 |   |   |-- test_env_material_trace_flag.py
@@ -997,6 +999,7 @@ DashBoard_vite/
 |   |   |-- test_oracle_error_path.py
 |   |   |-- test_preload_fork_safety.py
 |   |   |-- test_production_history_rq_async.py
+|   |   |-- test_query_tool_rq_async.py
 |   |   |-- test_race_conditions.py
 |   |   |-- test_real_multi_worker.py
 |   |   |-- test_real_oracle_fault_injection.py
@@ -1005,7 +1008,8 @@ DashBoard_vite/
 |   |   |-- test_reject_history_rq_async.py
 |   |   |-- test_resource_history_rq_async.py
 |   |   |-- test_rowcount_flag_parity.py
-|   |   \-- test_soak_workload.py
+|   |   |-- test_soak_workload.py
+|   |   \-- test_wip_rowcount_rq_routing.py
 |   |-- manual/
 |   |   \-- test_job_owner_auth_live.py
 |   |-- property/
@@ -1121,7 +1125,8 @@ DashBoard_vite/
 |   |-- query_spool/
 |   |   |-- downtime_analysis/
 |   |   |-- msd-events/
-|   |   |   \-- tmp01sqfwp7.parquet
+|   |   |   |-- tmp_9r30hlg.parquet
+|   |   |   \-- tmpd3yh1_ii.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
@@ -1170,7 +1175,7 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166368.json
 |   |   |-- probe_166780.json
-|   |   \-- ... (427 more entries truncated; cap=50)
+|   |   \-- ... (474 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   |-- mes_dashboard_restart.flag

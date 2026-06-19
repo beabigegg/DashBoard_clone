@@ -38,5 +38,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 laddar complete locally; see test-evidence.yml" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "ruff + cdd-kit validate pass" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gates defined for this change" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "archived to specs/archive/2026/query-path-c-elimination-cleanup/" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "2 learnings promoted to docs/architecture/service-patterns.md + CLAUDE.md: acquire_heavy_query_slot wiring requirement + COUNT(*) fail-open pre-check pattern" }

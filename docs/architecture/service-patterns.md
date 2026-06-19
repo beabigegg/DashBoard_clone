@@ -127,3 +127,42 @@ patch('mes_dashboard.services.ai_query_service._AI_SESSION')
 Patching `requests.post` at function level does not intercept calls routed through the pre-bound Session object. Apply the same boundary-patch discipline to any other service that holds a module-level Session.
 
 Evidence: `downtime-analysis-page` — `TestCallLlmText` required this correction in commit `ccb9347`.
+
+## RQ Worker Concurrency Gate — acquire_heavy_query_slot Wiring Requirement
+
+**Every `execute_*_job` worker function that runs Oracle-heavy queries MUST wire `acquire_heavy_query_slot` before the owning feature flag is promoted to production.**
+
+The `global_concurrency` semaphore (`MAX_CONCURRENT = 3`) bounds simultaneous Oracle connections from RQ workers to prevent DB exhaustion. Without wiring, flag-on workers bypass the gate entirely — the semaphore exists but is never acquired.
+
+Current gap (as of query-path-c-elimination-cleanup): `execute_query_tool_job`, `execute_hold_query_job`, `execute_resource_query_job`, and `execute_reject_query_job` are all unwired. Wiring pattern:
+
+```python
+with acquire_heavy_query_slot():
+    result = <oracle call>
+```
+
+Pre-production checklist before flipping any `*_USE_RQ=on`:
+1. Wire `acquire_heavy_query_slot` in the owning `execute_*_job`.
+2. Run real-Oracle load test to confirm `peak_concurrent ≤ MAX_CONCURRENT`.
+3. Update stress-soak-report.md with real evidence (mock structural proof alone is insufficient).
+
+Evidence: `query-path-c-elimination-cleanup` — stress-soak-engineer log; stress-soak-report.md §Production Readiness Gate; ADR-0011.
+
+## Async Routing Pre-Check Pattern — COUNT(*) Fail-Open for Domains Without Date Range
+
+**Domains that cannot estimate query cost from a date range use a `count_*_rows()` → `classify_query_cost(domain=..., row_count=count)` call as the L3 estimator.** The COUNT error path MUST fail-open to the sync response (never 503).
+
+Pattern (wip_routes / api_detail):
+```python
+try:
+    row_count = count_wip_rows(...)
+    cost = classify_query_cost(domain="wip", row_count=row_count)
+    if cost >= QueryCostTier.L3 and is_async_available():
+        return enqueue_query_job(...)  # 202
+except Exception:
+    pass  # fail-open → sync path below
+```
+
+The `count_*_rows()` function must reproduce the same filter predicate as the main query so the estimate is tight. For domains with a date range, `classify_query_cost(domain=..., date_span_days=...)` is preferred (no extra DB round-trip).
+
+Evidence: `query-path-c-elimination-cleanup` — spec-architect D2 decision; `wip_service.count_wip_rows`; `test_wip_rowcount_rq_routing.py::test_wip_count_error_fails_open_stays_inline`.
