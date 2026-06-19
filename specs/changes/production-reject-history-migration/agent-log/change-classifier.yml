@@ -1,0 +1,21 @@
+agent: change-classifier
+status: complete
+timestamp: "2026-06-19"
+
+summary: |
+  Classified P2 production-reject-history-migration as Tier 1, Risk high, Impact cross-module.
+  Two domains (production_history + reject_history) migrated to BaseChunkedDuckDBJob following
+  the P1/ADR-0009 pattern. No architecture review required (pattern established). 8 ACs derived.
+
+artifacts:
+  - { type: classification, pointer: specs/changes/production-reject-history-migration/change-classification.md }
+  - { type: context-manifest, pointer: specs/changes/production-reject-history-migration/context-manifest.md }
+
+key-findings:
+  - "Tier 1 confirmed: shared-core blast radius (base_chunked_duckdb_job, query_cost_policy, job_registry) classifies upward from potential Tier 2"
+  - "Architecture review NOT required: P1/ADR-0009 pattern applies directly; no new module boundary"
+  - "AC-2 (pandas→DuckDB numerical parity for groupby/pareto/trend) is highest-risk criterion — float aggregation ordering, null handling, groupby collation differ"
+  - "AC-5 investigation needed: confirm Production History already has merge_chunks_to_spool() path; if not, may require ADR and un-skip 1.3"
+  - "Worker deployment gap: only reject-worker.service exists; production-history may need new systemd unit"
+  - "query_cost_policy _APPROVED_CALLERS must be extended (AC-7) — same test that caught P1 caller gap"
+  - "Flag defaults off: pre-merge soak not required; stress tests optional but strongly recommended in nightly lane (OOM is the core bug)"

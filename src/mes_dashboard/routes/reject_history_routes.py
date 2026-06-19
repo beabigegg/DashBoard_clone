@@ -50,6 +50,13 @@ from mes_dashboard.services.reject_history_service import (
 
 reject_history_bp = Blueprint("reject_history", __name__)
 logger = logging.getLogger("mes_dashboard.reject_history_routes")
+
+# Feature flag: REJECT_HISTORY_USE_UNIFIED_JOB=on → unified RejectHistoryJob path.
+# Module-level constant frozen at import — restart required.
+# monkeypatch.setattr() in tests (not setenv — frozen at import).
+_REJECT_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
+    "REJECT_HISTORY_USE_UNIFIED_JOB", "off"
+).lower().strip() in ("on", "true", "1")
 _REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
     os.getenv("REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS", "14400")
 )
@@ -705,22 +712,59 @@ def api_reject_history_query():
             traceback.print_exc()
             return internal_error("主查詢執行失敗")
 
+    import uuid
+    from mes_dashboard.core.permissions import get_owner_token
+
+    job_params = {
+        "mode": mode,
+        "include_excluded_scrap": include_excluded_scrap,
+        "exclude_material_scrap": exclude_material_scrap,
+        "exclude_pb_diode": exclude_pb_diode,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    if mode == "container":
+        job_params["container_input_type"] = container_input_type
+        job_params["container_values"] = container_values
+
     try:
+        if _REJECT_HISTORY_USE_UNIFIED_JOB:
+            # Unified path: enqueue via BaseChunkedDuckDBJob (ASYNC-07)
+            # always_async=False → sync_fallback_allowed=True → no 503 on queue unavailable
+            from mes_dashboard.services.async_query_job_service import enqueue_query_job
+            import mes_dashboard.workers.reject_history_worker  # noqa: F401 — triggers registration
+
+            job_id = f"reject-{uuid.uuid4().hex[:12]}"
+            job_id_result, err, status_hint = enqueue_query_job(
+                "reject_unified",
+                owner=get_owner_token(),
+                params={"job_id": job_id, **job_params},
+                sync_fallback_allowed=True,
+                job_id=job_id,
+            )
+            if job_id_result is None:
+                logger.warning(
+                    "reject unified enqueue failed (hint=%s): %s", status_hint, err
+                )
+                return error_response(
+                    SERVICE_UNAVAILABLE,
+                    "背景查詢服務不可用，請稍後再試",
+                    status_code=status_hint or 503,
+                    meta={"retry_after_seconds": _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS},
+                    headers={"Retry-After": str(_REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS)},
+                )
+            return success_response(
+                {
+                    "async": True,
+                    "job_id": job_id_result,
+                    "status_url": f"/api/reject-history/job/{job_id_result}",
+                    "query_id": _pre_query_id,
+                },
+                status_code=202,
+            )
+
+        # Legacy path (REJECT_HISTORY_USE_UNIFIED_JOB=off, default)
         from mes_dashboard.services.reject_query_job_service import enqueue_reject_query
-
-        job_params = {
-            "include_excluded_scrap": include_excluded_scrap,
-            "exclude_material_scrap": exclude_material_scrap,
-            "exclude_pb_diode": exclude_pb_diode,
-            "start_date": start_date,
-            "end_date": end_date,
-        }
-
-        if mode == "container":
-            job_params["container_input_type"] = container_input_type
-            job_params["container_values"] = container_values
-
-        from mes_dashboard.core.permissions import get_owner_token
         job_id, err = enqueue_reject_query(mode, job_params, owner=get_owner_token())
         if job_id is None:
             logger.warning("reject async enqueue failed (%s)", err)
@@ -731,7 +775,6 @@ def api_reject_history_query():
                 meta={"retry_after_seconds": _REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS},
                 headers={"Retry-After": str(_REJECT_HISTORY_OVERLOAD_RETRY_AFTER_SECONDS)},
             )
-
         return success_response(
             {
                 "async": True,

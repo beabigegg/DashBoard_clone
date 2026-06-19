@@ -1,6 +1,6 @@
-# generated: 2026-06-19T00:24:15Z by cdd-kit 3.3.0
-# files: 906, src-lines: 263740, map-lines: 19652, compression: 13.4x
-# sources-digest: cc3f19e2e79f90656e380d0ce4274d2994514ea12d8a012fcd1fc6bb4cebec96
+# generated: 2026-06-19T02:06:30Z by cdd-kit 3.3.0
+# files: 912, src-lines: 265234, map-lines: 19838, compression: 13.4x
+# sources-digest: a7439f79ec4a919dbae31cf2eff199d36cdbd7215214c526d593046695a7da35
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -5168,7 +5168,7 @@ src/mes_dashboard/routes/mid_section_defect_routes.py:  # 287 lines
     - { name: api_loss_reasons, lines: 232-239 }  # @mid_section_defect_bp.route('/loss-reasons', methods=['GET'])
     - { name: api_export, lines: 244-287 }  # @mid_section_defect_bp.route('/export', methods=['GET'])
 
-src/mes_dashboard/routes/production_history_routes.py:  # 488 lines
+src/mes_dashboard/routes/production_history_routes.py:  # 537 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: json, items: [], line: 18 }
@@ -5182,17 +5182,17 @@ src/mes_dashboard/routes/production_history_routes.py:  # 488 lines
     - { module: mes_dashboard.services.production_history_service, items: [get_type_options, make_canonical_spool_id, query_production_history, validate_query_params], line: 39 }
     - { module: mes_dashboard.services.production_history_sql_runtime, items: [compute_detail_page, compute_filter_options, compute_matrix_view, stream_export], line: 45 }
   functions:
-    - { name: _require_dataset, lines: 65-72 }
-    - { name: _parse_filter_params, lines: 75-88 }
-    - { name: api_production_history_filter_options, lines: 94-141 }  # @production_history_bp.route('/api/production-history/filter-options', methods=['...
-    - { name: api_production_history_type_options, lines: 147-155 }  # @production_history_bp.route('/api/production-history/type-options', methods=['GE...
-    - { name: api_production_history_count, lines: 161-194 }  # @production_history_bp.route('/api/production-history/count', methods=['GET'])
-    - { name: api_production_history_query, lines: 200-298 }  # @production_history_bp.route('/api/production-history/query', methods=['POST'])
-    - { name: api_production_history_job_status, lines: 304-310 }  # @production_history_bp.route('/api/production-history/job/<job_id>', methods=['GE...
-    - { name: api_production_history_page, lines: 316-364 }  # @production_history_bp.route('/api/production-history/page', methods=['POST'])
-    - { name: api_production_history_matrix, lines: 370-400 }  # @production_history_bp.route('/api/production-history/matrix', methods=['POST'])
-    - { name: api_production_history_options, lines: 406-436 }  # @production_history_bp.route('/api/production-history/options', methods=['POST'])
-    - { name: api_production_history_export, lines: 442-488 }  # @production_history_bp.route('/api/production-history/export', methods=['GET', 'P...
+    - { name: _require_dataset, lines: 72-79 }
+    - { name: _parse_filter_params, lines: 82-95 }
+    - { name: api_production_history_filter_options, lines: 101-148 }  # @production_history_bp.route('/api/production-history/filter-options', methods=['...
+    - { name: api_production_history_type_options, lines: 154-162 }  # @production_history_bp.route('/api/production-history/type-options', methods=['GE...
+    - { name: api_production_history_count, lines: 168-201 }  # @production_history_bp.route('/api/production-history/count', methods=['GET'])
+    - { name: api_production_history_query, lines: 207-347 }  # @production_history_bp.route('/api/production-history/query', methods=['POST'])
+    - { name: api_production_history_job_status, lines: 353-359 }  # @production_history_bp.route('/api/production-history/job/<job_id>', methods=['GE...
+    - { name: api_production_history_page, lines: 365-413 }  # @production_history_bp.route('/api/production-history/page', methods=['POST'])
+    - { name: api_production_history_matrix, lines: 419-449 }  # @production_history_bp.route('/api/production-history/matrix', methods=['POST'])
+    - { name: api_production_history_options, lines: 455-485 }  # @production_history_bp.route('/api/production-history/options', methods=['POST'])
+    - { name: api_production_history_export, lines: 491-537 }  # @production_history_bp.route('/api/production-history/export', methods=['GET', 'P...
 
 src/mes_dashboard/routes/qc_gate_routes.py:  # 20 lines
   imports:
@@ -5246,7 +5246,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 990 lines
     - { name: get_equipment_recent_jobs_route, lines: 794-807 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 817-990 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 987 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 1030 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5264,31 +5264,31 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 987 lines
     - { module: mes_dashboard.services.reject_dataset_cache, items: [apply_view, compute_batch_pareto, compute_dimension_pareto, execute_primary_query, export_csv_from_cache, _has_cached_df, _make_query_id, _CACHE_SCHEMA_VERSION], line: 30 }
     - { module: mes_dashboard.services.reject_history_service, items: [_list_to_csv, export_csv, get_filter_options, view_analytics, view_count, view_list, view_summary, view_trend], line: 40 }
   functions:
-    - { name: _default_date_range, lines: 97-100 }
-    - { name: _validate_primary_query_date_range, lines: 103-116 }
-    - { name: _parse_date_range, lines: 119-130 }
-    - { name: _get_request_args, lines: 133-137 }
-    - { name: _parse_multi_param, lines: 140-170 }
-    - { name: _overload_error, lines: 173-181 }
-    - { name: _normalized_list_for_cache, lines: 184-191 }
-    - { name: _extract_meta, lines: 194-205 }
-    - { name: _parse_common_bools, lines: 223-245 }
-    - { name: _parse_pareto_selection, lines: 248-263 }
-    - { name: _parse_multi_pareto_selections, lines: 266-272 }
-    - { name: api_reject_history_options, lines: 276-343 }  # @reject_history_bp.route('/api/reject-history/options', methods=['GET'])
-    - { name: api_reject_history_summary, lines: 347-378 }  # @reject_history_bp.route('/api/reject-history/summary', methods=['GET'])
-    - { name: api_reject_history_trend, lines: 382-415 }  # @reject_history_bp.route('/api/reject-history/trend', methods=['GET'])
-    - { name: api_reject_history_reason_pareto, lines: 419-456 }  # @reject_history_bp.route('/api/reject-history/reason-pareto', methods=['GET'])
-    - { name: api_reject_history_batch_pareto, lines: 460-504 }  # @reject_history_bp.route('/api/reject-history/batch-pareto', methods=['GET', 'POS...
-    - { name: api_reject_history_list, lines: 509-547 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
-    - { name: api_reject_history_export, lines: 552-586 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
-    - { name: api_reject_history_analytics, lines: 590-624 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
-    - { name: api_reject_history_query, lines: 634-750 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
-    - { name: api_reject_history_count, lines: 754-780 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
-    - { name: api_reject_history_job_status, lines: 785-791 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
-    - { name: _inject_reject_spool_info, lines: 798-811 }
-    - { name: api_reject_history_view, lines: 815-905 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 909-987 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: _default_date_range, lines: 104-107 }
+    - { name: _validate_primary_query_date_range, lines: 110-123 }
+    - { name: _parse_date_range, lines: 126-137 }
+    - { name: _get_request_args, lines: 140-144 }
+    - { name: _parse_multi_param, lines: 147-177 }
+    - { name: _overload_error, lines: 180-188 }
+    - { name: _normalized_list_for_cache, lines: 191-198 }
+    - { name: _extract_meta, lines: 201-212 }
+    - { name: _parse_common_bools, lines: 230-252 }
+    - { name: _parse_pareto_selection, lines: 255-270 }
+    - { name: _parse_multi_pareto_selections, lines: 273-279 }
+    - { name: api_reject_history_options, lines: 283-350 }  # @reject_history_bp.route('/api/reject-history/options', methods=['GET'])
+    - { name: api_reject_history_summary, lines: 354-385 }  # @reject_history_bp.route('/api/reject-history/summary', methods=['GET'])
+    - { name: api_reject_history_trend, lines: 389-422 }  # @reject_history_bp.route('/api/reject-history/trend', methods=['GET'])
+    - { name: api_reject_history_reason_pareto, lines: 426-463 }  # @reject_history_bp.route('/api/reject-history/reason-pareto', methods=['GET'])
+    - { name: api_reject_history_batch_pareto, lines: 467-511 }  # @reject_history_bp.route('/api/reject-history/batch-pareto', methods=['GET', 'POS...
+    - { name: api_reject_history_list, lines: 516-554 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
+    - { name: api_reject_history_export, lines: 559-593 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
+    - { name: api_reject_history_analytics, lines: 597-631 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
+    - { name: api_reject_history_query, lines: 641-793 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
+    - { name: api_reject_history_count, lines: 797-823 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
+    - { name: api_reject_history_job_status, lines: 828-834 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
+    - { name: _inject_reject_spool_info, lines: 841-854 }
+    - { name: api_reject_history_view, lines: 858-948 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 952-1030 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
 src/mes_dashboard/routes/resource_history_routes.py:  # 450 lines
   imports:
@@ -8160,6 +8160,59 @@ src/mes_dashboard/workers/eap_alarm_worker.py:  # 528 lines
     - { name: run_eap_alarm_query_job, lines: 166-282 }
     - { name: execute_eap_alarm_unified_job, lines: 483-515 }
 
+src/mes_dashboard/workers/production_history_worker.py:  # 242 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 19 }
+    - { module: logging, items: [], line: 21 }
+    - { module: os, items: [], line: 22 }
+    - { module: datetime, items: [datetime, timedelta], line: 23 }
+    - { module: pathlib, items: [Path], line: 24 }
+    - { module: typing, items: [Any, Dict, List], line: 25 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 27 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 233 }
+  constants:
+    - { name: PRODUCTION_HISTORY_WORKER_QUEUE, line: 31 }
+    - { name: PRODUCTION_HISTORY_JOB_TIMEOUT_SECONDS, line: 34 }
+    - { name: PRODUCTION_HISTORY_JOB_TTL_SECONDS, line: 37 }
+  classes:
+    - name: ProductionHistoryJob
+      lines: 47-198
+      methods:
+        - { name: __init__, lines: 61-66 }
+        - { name: pre_query, lines: 68-107 }
+        - { name: build_chunk_sql, lines: 109-119 }
+        - { name: post_aggregate, lines: 121-193 }
+        - { name: progress_report, lines: 195-198 }
+  functions:
+    - { name: execute_production_history_unified_job, lines: 201-229 }
+
+src/mes_dashboard/workers/reject_history_worker.py:  # 319 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 21 }
+    - { module: logging, items: [], line: 23 }
+    - { module: os, items: [], line: 24 }
+    - { module: datetime, items: [datetime, timedelta], line: 25 }
+    - { module: pathlib, items: [Path], line: 26 }
+    - { module: typing, items: [Any, Dict, List], line: 27 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 29 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 310 }
+  constants:
+    - { name: REJECT_QUERY_WORKER_QUEUE, line: 34 }
+    - { name: REJECT_HISTORY_JOB_TIMEOUT_SECONDS, line: 36 }
+    - { name: REJECT_HISTORY_JOB_TTL_SECONDS, line: 39 }
+  classes:
+    - name: RejectHistoryJob
+      lines: 49-234
+      methods:
+        - { name: __init__, lines: 64-73 }
+        - { name: pre_query, lines: 75-144 }
+        - { name: build_chunk_sql, lines: 146-157 }
+        - { name: post_aggregate, lines: 159-229 }
+        - { name: progress_report, lines: 231-234 }
+  functions:
+    - { name: _write_empty_reject_spool, lines: 237-275 }
+    - { name: execute_reject_history_unified_job, lines: 278-306 }
+
 tests/__init__.py:  # 0 lines
 
 tests/conftest.py:  # 196 lines
@@ -9843,6 +9896,26 @@ tests/integration/test_preload_fork_safety.py:  # 535 lines
     - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 454-489 }  # @pytest.mark.integration_real
     - { name: test_worker_crash_respawn_fresh_connections, lines: 494-535 }  # @pytest.mark.integration_real
 
+tests/integration/test_production_history_rq_async.py:  # 101 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: os, items: [], line: 17 }
+    - { module: pathlib, items: [], line: 18 }
+    - { module: uuid, items: [], line: 19 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 20 }
+    - { module: pyarrow, items: [], line: 22 }
+    - { module: pyarrow.parquet, items: [], line: 23 }
+    - { module: pytest, items: [], line: 24 }
+  classes:
+    - name: TestProductionHistoryJobEnqueue
+      lines: 29-88
+      methods:
+        - { name: test_production_history_job_enqueues_and_spool_readable, lines: 32-88 }
+    - name: TestProductionHistorySpoolParity
+      lines: 91-101
+      methods:
+        - { name: test_flag_off_spool_matches_flag_on_spool, lines: 94-101 }
+
 tests/integration/test_race_conditions.py:  # 387 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
@@ -9958,6 +10031,26 @@ tests/integration/test_redis_timeout_fallback.py:  # 295 lines
         - { name: test_fresh_client_reconnects_after_simulated_error, lines: 276-295 }
   functions:
     - { name: _make_redis, lines: 31-38 }
+
+tests/integration/test_reject_history_rq_async.py:  # 116 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: os, items: [], line: 17 }
+    - { module: pathlib, items: [], line: 18 }
+    - { module: uuid, items: [], line: 19 }
+    - { module: unittest.mock, items: [patch], line: 20 }
+    - { module: pyarrow, items: [], line: 22 }
+    - { module: pyarrow.parquet, items: [], line: 23 }
+    - { module: pytest, items: [], line: 24 }
+  classes:
+    - name: TestRejectHistoryJobEnqueue
+      lines: 29-103
+      methods:
+        - { name: test_reject_history_job_enqueues_and_spool_readable, lines: 32-103 }
+    - name: TestRejectHistoryParetoShape
+      lines: 106-116
+      methods:
+        - { name: test_pareto_endpoint_shape_unchanged_under_unified_job, lines: 109-116 }
 
 tests/integration/test_resource_history_rq_async.py:  # 587 lines
   imports:
@@ -11806,7 +11899,7 @@ tests/test_anomaly_detection_sql_runtime.py:  # 91 lines
         - { name: test_hold_percentile_is_between_0_and_1, lines: 87-88 }
         - { name: test_deviation_threshold_is_positive, lines: 90-91 }
 
-tests/test_api_contract.py:  # 1059 lines
+tests/test_api_contract.py:  # 1062 lines
   imports:
     - { module: ast, items: [], line: 13 }
     - { module: unittest, items: [], line: 14 }
@@ -11868,81 +11961,81 @@ tests/test_api_contract.py:  # 1059 lines
         - { name: test_resource_history_progress_endpoint_in_inventory, lines: 448-464 }
         - { name: test_resource_history_progress_response_matches_data_shape_contract, lines: 466-484 }
     - name: TestProductionHistoryQueryModeContract
-      lines: 487-527
+      lines: 487-530
       methods:
         - { name: setUp, lines: 494-498 }
-        - { name: test_query_payload_dates_optional_with_identifier_tokens, lines: 501-516 }
-        - { name: test_query_payload_classification_mode_still_requires_dates, lines: 518-527 }
+        - { name: test_query_payload_dates_optional_with_identifier_tokens, lines: 502-519 }
+        - { name: test_query_payload_classification_mode_still_requires_dates, lines: 521-530 }
     - name: TestProductionHistoryPartialMergeContract
-      lines: 530-639
+      lines: 533-642
       methods:
-        - { name: _make_spool, lines: 537-543 }
-        - { name: _base_record, lines: 545-565 }
-        - { name: test_production_history_detail_pagination_total_rows_post_aggregation, lines: 567-591 }
-        - { name: _make_spool_path, lines: 593-602 }
-        - { name: test_detail_row_schema_has_partial_count_integer, lines: 604-639 }
+        - { name: _make_spool, lines: 540-546 }
+        - { name: _base_record, lines: 548-568 }
+        - { name: test_production_history_detail_pagination_total_rows_post_aggregation, lines: 570-594 }
+        - { name: _make_spool_path, lines: 596-605 }
+        - { name: test_detail_row_schema_has_partial_count_integer, lines: 607-642 }
     - name: TestDowntimeSummaryShape
-      lines: 647-693
+      lines: 650-696
       methods:
-        - { name: _build_summary, lines: 650-658 }
-        - { name: test_total_hours_present_and_float, lines: 660-663 }
-        - { name: test_udt_sdt_egt_hours_present, lines: 665-669 }
-        - { name: test_event_count_is_integer, lines: 671-674 }
-        - { name: test_avg_event_min_is_float, lines: 676-679 }
-        - { name: test_empty_df_returns_zeros, lines: 681-686 }
-        - { name: test_nst_excluded_from_totals, lines: 688-693 }
+        - { name: _build_summary, lines: 653-661 }
+        - { name: test_total_hours_present_and_float, lines: 663-666 }
+        - { name: test_udt_sdt_egt_hours_present, lines: 668-672 }
+        - { name: test_event_count_is_integer, lines: 674-677 }
+        - { name: test_avg_event_min_is_float, lines: 679-682 }
+        - { name: test_empty_df_returns_zeros, lines: 684-689 }
+        - { name: test_nst_excluded_from_totals, lines: 691-696 }
     - name: TestDailyTrendShape
-      lines: 696-723
+      lines: 699-726
       methods:
-        - { name: _build_trend, lines: 699-707 }
-        - { name: test_rows_have_required_fields, lines: 709-714 }
-        - { name: test_date_is_string, lines: 716-718 }
-        - { name: test_hours_are_floats, lines: 720-723 }
+        - { name: _build_trend, lines: 702-710 }
+        - { name: test_rows_have_required_fields, lines: 712-717 }
+        - { name: test_date_is_string, lines: 719-721 }
+        - { name: test_hours_are_floats, lines: 723-726 }
     - name: TestBigCategoryShape
-      lines: 726-756
+      lines: 729-759
       methods:
-        - { name: _build_big_cat, lines: 729-736 }
-        - { name: test_rows_have_required_fields, lines: 738-742 }
-        - { name: test_category_is_string, lines: 744-746 }
-        - { name: test_pct_sums_to_100, lines: 748-751 }
-        - { name: test_sorted_by_hours_desc, lines: 753-756 }
+        - { name: _build_big_cat, lines: 732-739 }
+        - { name: test_rows_have_required_fields, lines: 741-745 }
+        - { name: test_category_is_string, lines: 747-749 }
+        - { name: test_pct_sums_to_100, lines: 751-754 }
+        - { name: test_sorted_by_hours_desc, lines: 756-759 }
     - name: TestTopReasonsShape
-      lines: 759-798
+      lines: 762-801
       methods:
-        - { name: _build_top, lines: 762-770 }
-        - { name: test_rows_have_required_fields, lines: 772-776 }
-        - { name: test_sorted_by_hours_desc, lines: 778-781 }
-        - { name: test_top_n_respected, lines: 783-785 }
-        - { name: test_avg_min_is_float, lines: 787-790 }
-        - { name: test_null_reason_becomes_unfilled, lines: 792-798 }
+        - { name: _build_top, lines: 765-773 }
+        - { name: test_rows_have_required_fields, lines: 775-779 }
+        - { name: test_sorted_by_hours_desc, lines: 781-784 }
+        - { name: test_top_n_respected, lines: 786-788 }
+        - { name: test_avg_min_is_float, lines: 790-793 }
+        - { name: test_null_reason_becomes_unfilled, lines: 795-801 }
     - name: TestEquipmentDetailShape
-      lines: 801-831
+      lines: 804-834
       methods:
-        - { name: _build_eq_detail, lines: 804-813 }
-        - { name: test_rows_have_required_fields, lines: 815-821 }
-        - { name: test_sorted_by_total_hours_desc, lines: 823-826 }
-        - { name: test_resource_name_nullable, lines: 828-831 }
+        - { name: _build_eq_detail, lines: 807-816 }
+        - { name: test_rows_have_required_fields, lines: 818-824 }
+        - { name: test_sorted_by_total_hours_desc, lines: 826-829 }
+        - { name: test_resource_name_nullable, lines: 831-834 }
     - name: TestEventDetailShape
-      lines: 834-889
+      lines: 837-892
       methods:
-        - { name: _build_events_df, lines: 837-853 }
-        - { name: test_event_detail_page_has_pagination, lines: 855-863 }
-        - { name: test_event_detail_row_has_required_fields, lines: 865-872 }
-        - { name: test_match_source_closed_enum, lines: 874-880 }
-        - { name: test_job_is_null_when_no_match, lines: 882-889 }
+        - { name: _build_events_df, lines: 840-856 }
+        - { name: test_event_detail_page_has_pagination, lines: 858-866 }
+        - { name: test_event_detail_row_has_required_fields, lines: 868-875 }
+        - { name: test_match_source_closed_enum, lines: 877-883 }
+        - { name: test_job_is_null_when_no_match, lines: 885-892 }
     - name: TestJobEnrichmentShape
-      lines: 892-978
+      lines: 895-981
       methods:
-        - { name: _build_enriched_event, lines: 895-924 }
-        - { name: test_job_enrichment_fields_present, lines: 926-935 }
-        - { name: test_wait_min_nullable, lines: 937-971 }
-        - { name: test_match_ambiguous_is_boolean, lines: 973-978 }
+        - { name: _build_enriched_event, lines: 898-927 }
+        - { name: test_job_enrichment_fields_present, lines: 929-938 }
+        - { name: test_wait_min_nullable, lines: 940-974 }
+        - { name: test_match_ambiguous_is_boolean, lines: 976-981 }
     - name: TestResourceHistoryAsyncContract
-      lines: 981-1055
+      lines: 984-1058
       methods:
-        - { name: setUp, lines: 984-990 }
-        - { name: test_202_response_shape_has_job_id_and_status_url, lines: 995-1030 }
-        - { name: test_resource_history_query_short_span_returns_200_not_202, lines: 1032-1055 }
+        - { name: setUp, lines: 987-993 }
+        - { name: test_202_response_shape_has_job_id_and_status_url, lines: 998-1033 }
+        - { name: test_resource_history_query_short_span_returns_200_not_202, lines: 1035-1058 }
   functions:
     - { name: _count_jsonify_in_file, lines: 46-63 }
 
@@ -12053,7 +12146,7 @@ tests/test_async_job_timeout.py:  # 227 lines
     - { name: _meta_key_full, lines: 62-65 }
     - { name: _seed_job, lines: 68-83 }
 
-tests/test_async_query_job_service.py:  # 732 lines
+tests/test_async_query_job_service.py:  # 786 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: time, items: [], line: 14 }
@@ -12128,6 +12221,16 @@ tests/test_async_query_job_service.py:  # 732 lines
         - { name: test_always_async_available_proceeds, lines: 689-706 }
         - { name: test_sync_fallback_allowed_skips_503_even_when_unavailable, lines: 708-724 }
         - { name: test_unknown_job_type_returns_none_no_503, lines: 726-732 }
+    - name: TestProductionHistoryUnifiedJobRegistry
+      lines: 735-759
+      methods:
+        - { name: test_production_history_job_registered_always_async_false, lines: 738-749 }
+        - { name: test_production_history_job_queue_name, lines: 751-759 }
+    - name: TestRejectHistoryUnifiedJobRegistry
+      lines: 762-786
+      methods:
+        - { name: test_reject_history_job_registered_always_async_false, lines: 765-776 }
+        - { name: test_reject_history_job_queue_name, lines: 778-786 }
   functions:
     - { name: _reset_rq_cache, lines: 25-31 }
 
@@ -16000,7 +16103,7 @@ tests/test_production_history_async_routes.py:  # 215 lines
         - { name: test_spool_miss_returns_async_202, lines: 50-82 }
         - { name: test_spool_hit_returns_sync_200, lines: 88-107 }
         - { name: test_async_enqueue_failure_returns_503, lines: 113-135 }
-        - { name: test_rq_unavailable_falls_back_to_sync, lines: 141-162 }
+        - { name: test_rq_unavailable_returns_503, lines: 141-162 }
     - name: TestProductionHistoryJobStatusRoute
       lines: 165-215
       methods:
@@ -16038,68 +16141,74 @@ tests/test_production_history_job_service.py:  # 270 lines
         - { name: test_update_job_progress_called_with_pct_30_after_query, lines: 213-233 }
         - { name: test_update_job_progress_called_with_pct_100_before_complete, lines: 235-270 }
 
-tests/test_production_history_routes.py:  # 683 lines
+tests/test_production_history_routes.py:  # 737 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
-    - { module: unittest.mock, items: [patch], line: 16 }
-    - { module: pytest, items: [], line: 18 }
-    - { module: mes_dashboard.app, items: [create_app], line: 20 }
+    - { module: ast, items: [], line: 16 }
+    - { module: pathlib, items: [Path], line: 17 }
+    - { module: unittest.mock, items: [patch], line: 18 }
+    - { module: pytest, items: [], line: 20 }
+    - { module: mes_dashboard.app, items: [create_app], line: 22 }
   classes:
     - name: TestLotTraceGuards
-      lines: 319-419
+      lines: 334-434
       methods:
-        - { name: test_validate_lot_trace_same_cid_continues, lines: 320-344 }
-        - { name: test_validate_lot_trace_cross_lot_cycle_raises_valueerror, lines: 346-384 }
-        - { name: test_validate_query_params_missing_pj_types, lines: 386-390 }
-        - { name: test_validate_query_params_max_date_range, lines: 392-401 }
-        - { name: test_validate_query_params_bad_date_format, lines: 403-410 }
-        - { name: test_end_date_exclusive_semantics, lines: 412-419 }
+        - { name: test_validate_lot_trace_same_cid_continues, lines: 335-359 }
+        - { name: test_validate_lot_trace_cross_lot_cycle_raises_valueerror, lines: 361-399 }
+        - { name: test_validate_query_params_missing_pj_types, lines: 401-405 }
+        - { name: test_validate_query_params_max_date_range, lines: 407-416 }
+        - { name: test_validate_query_params_bad_date_format, lines: 418-425 }
+        - { name: test_end_date_exclusive_semantics, lines: 427-434 }
     - name: TestProductionHistory730dBoundary
-      lines: 422-513
+      lines: 437-528
       methods:
-        - { name: test_730d_boundary_is_valid, lines: 425-439 }
-        - { name: test_731d_returns_validation_error, lines: 441-455 }
-        - { name: test_missing_pj_types_returns_validation_error, lines: 457-470 }
-        - { name: test_empty_pj_types_returns_validation_error, lines: 472-485 }
-        - { name: _base_params, lines: 487-499 }
-        - { name: test_dataset_id_hash_stability, lines: 501-506 }
-        - { name: test_dataset_id_different_for_different_params, lines: 508-513 }
+        - { name: test_730d_boundary_is_valid, lines: 440-454 }
+        - { name: test_731d_returns_validation_error, lines: 456-470 }
+        - { name: test_missing_pj_types_returns_validation_error, lines: 472-485 }
+        - { name: test_empty_pj_types_returns_validation_error, lines: 487-500 }
+        - { name: _base_params, lines: 502-514 }
+        - { name: test_dataset_id_hash_stability, lines: 516-521 }
+        - { name: test_dataset_id_different_for_different_params, lines: 523-528 }
     - name: TestFilterOptionsEndpoint
-      lines: 521-626
+      lines: 536-641
       methods:
-        - { name: _stub_options, lines: 524-527 }
-        - { name: test_filter_options_endpoint_empty_selection, lines: 529-548 }
-        - { name: test_filter_options_endpoint_with_selected_package, lines: 550-575 }
-        - { name: test_filter_options_rejects_unknown_keys_is_fail_open, lines: 577-598 }
-        - { name: test_filter_options_invalid_json_returns_400, lines: 600-608 }
-        - { name: test_filter_options_response_shape_matches_data_2_7, lines: 610-626 }
+        - { name: _stub_options, lines: 539-542 }
+        - { name: test_filter_options_endpoint_empty_selection, lines: 544-563 }
+        - { name: test_filter_options_endpoint_with_selected_package, lines: 565-590 }
+        - { name: test_filter_options_rejects_unknown_keys_is_fail_open, lines: 592-613 }
+        - { name: test_filter_options_invalid_json_returns_400, lines: 615-623 }
+        - { name: test_filter_options_response_shape_matches_data_2_7, lines: 625-641 }
     - name: TestQueryModeSplitRoutes
-      lines: 631-683
+      lines: 646-701
       methods:
-        - { name: test_query_identifier_only_no_dates_returns_results, lines: 635-650 }
-        - { name: test_query_classification_only_no_dates_returns_validation_error, lines: 652-661 }
-        - { name: test_query_identifier_wide_window_bounded, lines: 663-683 }
+        - { name: test_query_identifier_only_no_dates_returns_results, lines: 651-668 }
+        - { name: test_query_classification_only_no_dates_returns_validation_error, lines: 670-679 }
+        - { name: test_query_identifier_wide_window_bounded, lines: 681-701 }
+    - name: TestRssFallbackAbsence
+      lines: 704-737
+      methods:
+        - { name: test_rss_pandas_fallback_branch_absent_in_ast, lines: 707-737 }
   functions:
-    - { name: app, lines: 24-27 }  # @pytest.fixture
-    - { name: client, lines: 31-32 }  # @pytest.fixture
-    - { name: test_query_success_envelope, lines: 38-55 }  # @patch('mes_dashboard.routes.production_history_routes.query_production_history')
-    - { name: test_page_success_envelope, lines: 60-74 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_matrix_success_envelope, lines: 79-90 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_query_missing_pj_types, lines: 95-103 }
-    - { name: test_query_missing_dates, lines: 106-114 }
-    - { name: test_query_empty_pj_types, lines: 117-124 }
-    - { name: test_query_date_range_exceeded, lines: 128-138 }  # @patch('mes_dashboard.routes.production_history_routes.query_production_history')
-    - { name: test_page_missing_dataset_id, lines: 143-147 }
-    - { name: test_page_dataset_expired, lines: 151-160 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_matrix_dataset_expired, lines: 164-173 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_export_dataset_expired, lines: 177-183 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_query_heavy_query_overloaded, lines: 189-199 }  # @patch('mes_dashboard.routes.production_history_routes.query_production_history')
-    - { name: test_query_memory_guard_rejected, lines: 203-213 }  # @patch('mes_dashboard.routes.production_history_routes.query_production_history')
-    - { name: test_page_memory_guard_rejected, lines: 218-228 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_matrix_memory_guard_rejected, lines: 233-243 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_page_accepts_matrix_filter_fields, lines: 250-271 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_matrix_accepts_same_filter_schema, lines: 276-293 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
-    - { name: test_export_accepts_filter_query_params, lines: 300-314 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: app, lines: 28-31 }  # @pytest.fixture
+    - { name: client, lines: 35-36 }  # @pytest.fixture
+    - { name: test_query_success_envelope, lines: 43-64 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_page_success_envelope, lines: 69-83 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_matrix_success_envelope, lines: 88-99 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_query_missing_pj_types, lines: 104-112 }
+    - { name: test_query_missing_dates, lines: 115-123 }
+    - { name: test_query_empty_pj_types, lines: 126-133 }
+    - { name: test_query_date_range_exceeded, lines: 137-147 }  # @patch('mes_dashboard.routes.production_history_routes.query_production_history')
+    - { name: test_page_missing_dataset_id, lines: 152-156 }
+    - { name: test_page_dataset_expired, lines: 160-169 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_matrix_dataset_expired, lines: 173-182 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_export_dataset_expired, lines: 186-192 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_query_heavy_query_overloaded, lines: 199-211 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_query_memory_guard_rejected, lines: 216-228 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_page_memory_guard_rejected, lines: 233-243 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_matrix_memory_guard_rejected, lines: 248-258 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_page_accepts_matrix_filter_fields, lines: 265-286 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_matrix_accepts_same_filter_schema, lines: 291-308 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
+    - { name: test_export_accepts_filter_query_params, lines: 315-329 }  # @patch('mes_dashboard.routes.production_history_routes.get_spool_file_path')
 
 tests/test_production_history_service.py:  # 579 lines
   imports:
@@ -16269,6 +16378,42 @@ tests/test_production_history_sql_runtime.py:  # 938 lines
     - { name: _ph_base_record, lines: 604-625 }
     - { name: _write_ph_spool, lines: 628-633 }
 
+tests/test_production_history_unified_job.py:  # 210 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 8 }
+    - { module: ast, items: [], line: 10 }
+    - { module: pathlib, items: [Path], line: 11 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 12 }
+    - { module: pyarrow, items: [], line: 14 }
+    - { module: pyarrow.parquet, items: [], line: 15 }
+    - { module: pytest, items: [], line: 16 }
+  classes:
+    - name: TestProductionHistoryJobFlagDispatch
+      lines: 21-35
+      methods:
+        - { name: test_flag_off_routes_to_legacy_service, lines: 24-29 }
+        - { name: test_flag_on_instantiates_production_history_job, lines: 31-35 }
+    - name: TestProductionHistoryJobConstruction
+      lines: 38-57
+      methods:
+        - { name: test_job_class_attributes, lines: 41-46 }
+        - { name: test_job_always_async_false, lines: 48-57 }
+    - name: TestProductionHistoryJobPreQuery
+      lines: 60-90
+      methods:
+        - { name: test_pre_query_populates_chunks, lines: 63-76 }
+        - { name: test_pre_query_single_day, lines: 78-90 }
+    - name: TestProductionHistoryJobSpoolParity
+      lines: 93-191
+      methods:
+        - { name: _make_sample_table, lines: 96-113 }
+        - { name: test_production_history_job_spool_parity_exact_rows, lines: 115-147 }
+        - { name: test_production_history_job_empty_chunk_window_handled, lines: 149-191 }
+    - name: TestProductionHistoryJobProgress
+      lines: 194-210
+      methods:
+        - { name: test_production_history_job_progress_milestones, lines: 197-210 }
+
 tests/test_qc_gate_routes.py:  # 62 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
@@ -16292,7 +16437,7 @@ tests/test_qc_gate_service.py:  # 150 lines
     - { name: test_get_qc_gate_summary_returns_empty_when_no_match, lines: 115-135 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping', return_va...
     - { name: test_get_qc_gate_summary_returns_empty_when_cache_missing, lines: 141-150 }  # @patch('mes_dashboard.services.qc_gate_service.get_cache_updated_at', return_valu...
 
-tests/test_query_cost_policy.py:  # 358 lines
+tests/test_query_cost_policy.py:  # 362 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: ast, items: [], line: 9 }
@@ -16339,10 +16484,10 @@ tests/test_query_cost_policy.py:  # 358 lines
         - { name: test_deprecation_warning_for_async_threshold_env, lines: 269-279 }
         - { name: test_no_deprecation_warning_without_env_var, lines: 281-296 }
     - name: TestNoPandasAndNoCallers
-      lines: 311-358
+      lines: 311-362
       methods:
         - { name: test_no_pandas_import_in_new_modules, lines: 313-326 }
-        - { name: test_no_caller_outside_tests, lines: 328-358 }
+        - { name: test_no_caller_outside_tests, lines: 328-362 }
   functions:
     - { name: _call, lines: 23-44 }
 
@@ -17401,6 +17546,47 @@ tests/test_reject_history_shell_coverage.py:  # 38 lines
     - { name: test_reject_history_route_contract_entry_exists, lines: 16-21 }
     - { name: test_reject_history_native_loader_entry_exists, lines: 24-28 }
     - { name: test_reject_history_page_status_entry_exists, lines: 31-38 }
+
+tests/test_reject_history_unified_job.py:  # 299 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 8 }
+    - { module: ast, items: [], line: 10 }
+    - { module: pathlib, items: [Path], line: 11 }
+    - { module: unittest.mock, items: [patch], line: 12 }
+    - { module: pyarrow, items: [], line: 14 }
+    - { module: pyarrow.parquet, items: [], line: 15 }
+    - { module: pytest, items: [], line: 16 }
+  classes:
+    - name: TestRejectHistoryJobFlagDispatch
+      lines: 21-34
+      methods:
+        - { name: test_flag_off_routes_to_legacy_service, lines: 24-28 }
+        - { name: test_flag_on_instantiates_reject_history_job, lines: 30-34 }
+    - name: TestRejectHistoryJobConstruction
+      lines: 37-55
+      methods:
+        - { name: test_job_class_attributes, lines: 40-45 }
+        - { name: test_job_always_async_false, lines: 47-55 }
+    - name: TestRejectHistoryJobPreQuery
+      lines: 58-75
+      methods:
+        - { name: test_pre_query_populates_chunks, lines: 61-75 }
+    - name: TestRejectHistoryJobPostAggregate
+      lines: 114-258
+      methods:
+        - { name: test_reject_history_job_groupby_parity_null_equipment, lines: 117-150 }
+        - { name: test_reject_history_job_pareto_parity_multi_defect, lines: 152-185 }
+        - { name: test_reject_history_job_trend_parity_tolerance, lines: 187-222 }
+        - { name: test_reject_history_job_empty_chunk_window_no_crash, lines: 224-258 }
+    - name: TestOomGuardAbsence
+      lines: 261-299
+      methods:
+        - { name: _parse_source, lines: 264-266 }
+        - { name: _find_oom_guard_raises, lines: 268-281 }
+        - { name: test_oom_guard_patterns_absent_in_reject_history_service, lines: 283-290 }
+        - { name: test_oom_guard_patterns_absent_in_reject_dataset_cache, lines: 292-299 }
+  functions:
+    - { name: _make_reject_raw_table, lines: 78-111 }
 
 tests/test_reject_pareto_materialized.py:  # 670 lines
   imports:

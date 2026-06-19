@@ -1,0 +1,19 @@
+change-id: production-reject-history-migration
+agent: implementation-planner
+timestamp: "2026-06-19T01:00:00Z"
+status: complete
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/production-reject-history-migration/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (all IP-1..IP-13)" }
+  - { type: scope-summary, pointer: "6 in-scope items; 6 out-of-scope items; 2 new worker classes, 2 flags, 4 contract edits, 1 new systemd unit" }
+next-action: backend-engineer implements IP-1 (RED trip-wires) → IP-13 (gate) in order
+notes: >
+  Verified 5 investigation questions against source. Key findings: (1) production_history has a
+  full pandas BQE chunked path (_run_oracle_to_spool) that P2 must REPLACE, not wrap. (2) 6 reject
+  OOM guards enumerated with line numbers (read_parquet x2, RejectPrimaryQueryOverloadError raise x2,
+  _enforce_interactive_memory_guard, + protected pandas groupby in reject_history_service). (3) RSS
+  sync-fallback = production_history_routes L270-298. (4) No production-history systemd unit exists —
+  IP-10 must add one (queue already wired). (5) SQL files enumerated. Flagged divergences: IP-7
+  _APPROVED_CALLERS lives in tests/test_query_cost_policy.py NOT source; RejectHistoryJob needs
+  requires_cross_chunk_reduction=True (cross-row agg) vs production False; both always_async=False;
+  reject_query_job_service.py registration site is outside manifest Allowed Paths (CER if edit needed).

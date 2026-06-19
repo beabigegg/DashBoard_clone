@@ -1,0 +1,16 @@
+{
+  "change_id": "production-reject-history-migration",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/ -q --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/production-reject-history-migration/test-runs/20260619-095537/junit.xml' --maxfail=1 --tb=short -ra",
+  "duration_ms": 251861,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-reject-history-migration/test-runs/20260619-095537/summary.json",
+    "stdout": "specs/changes/production-reject-history-migration/test-runs/20260619-095537/stdout.log",
+    "stderr": "specs/changes/production-reject-history-migration/test-runs/20260619-095537/stderr.log",
+    "junit": "specs/changes/production-reject-history-migration/test-runs/20260619-095537/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -1,0 +1,15 @@
+change-id: production-reject-history-migration
+agent: test-strategist
+timestamp: "2026-06-19T00:30:00Z"
+status: complete
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/production-reject-history-migration/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_production_history_unified_job.py → src/mes_dashboard/workers/production_history_worker.py; tests/test_reject_history_unified_job.py → src/mes_dashboard/workers/reject_history_worker.py; tests/integration/test_production_history_rq_async.py → src/mes_dashboard/workers/production_history_worker.py; tests/integration/test_reject_history_rq_async.py → src/mes_dashboard/workers/reject_history_worker.py" }
+  - { type: coverage-tiers, pointer: "unit, contract, data-boundary, integration, e2e, stress" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-8 all covered; AC-7 trip-wire test (test_no_caller_outside_tests) confirmed as pre-implementation red signal" }
+next-action: backend-engineer implements workers; test-strategist files must be created before implementation (TDD)
+notes: >
+  Key risk: _APPROVED_CALLERS test is the structural trip-wire that must fail red until both worker
+  modules exist and inherit BaseChunkedDuckDBJob. Parity tolerance for Reject History float fields
+  is abs <= 1e-6; integer aggregations must be bit-exact. Integration tests mock at Oracle/Redis
+  network boundary, not at internal service methods.

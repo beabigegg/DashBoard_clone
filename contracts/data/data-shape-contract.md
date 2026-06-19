@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.19.0
-last-changed: 2026-06-18
+schema-version: 1.20.0
+last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1165,7 +1165,24 @@ parquet spool, the existing breaking-change policy (`_SCHEMA_VERSION` bump +
 
 ---
 
+### §3.18 Production History and Reject Dataset Spool Schema — UNCHANGED Assertion (P2 Migration)
+
+**Change: production-reject-history-migration (P2 BaseChunkedDuckDBJob migration)**
+
+The `production_history` and `reject_dataset` spool parquet schemas are **explicitly unchanged** by this migration. The unified job workers (`ProductionHistoryJob`, `RejectHistoryJob`) write the identical column set as the legacy pandas BQE path. This is a non-goal and is verified by data-boundary parity tests (AC-1, AC-2).
+
+- `production_history` spool (§3.4): columns `CONTAINERNAME`, `PJ_TYPE`, `PJ_BOP`, `PJ_FUNCTION`, `MFGORDERNAME`, `FIRSTNAME`, `PRODUCTLINENAME`, `WORKCENTERNAME`, `SPECNAME`, `EQUIPMENTID`, `EQUIPMENTNAME`, `TRACKINTIMESTAMP`, `TRACKOUTTIMESTAMP`, `TRACKINQTY`, `TRACKOUTQTY` — unchanged. No `_SCHEMA_VERSION` bump required; no parquet cleanup on deploy/rollback.
+- `reject_dataset` spool: primary query columns (TXN_TIME, TXN_DAY, TXN_MONTH, WORKCENTER_GROUP, etc.) — unchanged. No parquet cleanup on deploy/rollback.
+
+Any future column rename, addition, or removal in either namespace **must** bump `_SCHEMA_VERSION` (or equivalent) and require parquet cleanup per the standard breaking-change policy.
+
+---
+
 ## CHANGELOG
+
+## [data 1.20.0] — 2026-06-19
+### Added
+- production-reject-history-migration: §3.18 (spool-schema-UNCHANGED assertion for `production_history` and `reject_dataset` namespaces). Explicit non-goal: P2 migration does not change spool parquet schemas. No parquet cleanup required on deploy/rollback. Standard breaking-change policy (schema-version bump + cleanup) applies to any future column change. Additive; no existing schemas changed.
 
 ## [data 1.18.0] — 2026-06-18
 ### Added

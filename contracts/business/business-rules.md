@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.23.0
+schema-version: 1.24.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -41,6 +41,8 @@ breaking-change-policy: deprecate-2-minors
 | ASYNC-04 | Job ownership | 若 job metadata 含 `owner`，caller 必須提供匹配的 `owner` 值；否則 403 `FORBIDDEN` | route tests |
 | ASYNC-05 | Progress milestone semantics | Services that call `update_job_progress(pct, stage)` MUST follow the canonical milestone map: `pct=0` (job start), `pct=30` (Oracle query issued, `stage="querying"`), `pct=100` (data written to spool, `stage="complete"`). Intermediate milestones are additive; omitting them for a service is permitted. Services that do not call `update_job_progress` omit `pct`/`stage` entirely from the job status payload. Consumer (`AsyncQueryProgress.vue`) MUST treat absent `pct` as indeterminate (show spinner, not 0%). | unit tests (backend pct-milestone, frontend composable) |
 | ASYNC-06 | Always-async 503 on forced sync | When `JobTypeConfig.always_async=True` AND `sync_fallback_allowed=False` AND async queue unavailable: the request MUST receive HTTP 503 `SERVICE_UNAVAILABLE` with a `Retry-After` header. It MUST NOT be silently downgraded to synchronous execution. Rationale: always-async domains (e.g. eap_alarm) have query durations that exceed safe synchronous timeout bounds; a partial synchronous result would be incorrect and misleading. Cross-reference: error-format.md §503 Async Unavailable. | `tests/test_async_query_job_service.py` (AC-4) |
+| ASYNC-07 | Unified-job dispatch (production_history + reject) | When `PRODUCTION_HISTORY_USE_UNIFIED_JOB=on` OR `REJECT_HISTORY_USE_UNIFIED_JOB=on`, the respective route MUST enqueue via `enqueue_query_job("<domain>_unified", ..., sync_fallback_allowed=True)` with `JobTypeConfig.always_async=False`. Queue unavailable: the route MAY fall back to legacy path or return 503 (sync_fallback_allowed=True means no forced 503). Queue available → HTTP 202. Flag `off` (default): the legacy enqueue path runs verbatim (AC-8 zero-regression). Both domain flags are independent per-domain rollback handles. Added by change `production-reject-history-migration`. | `tests/test_async_query_job_service.py::TestProductionHistoryUnifiedJobRegistry`, `tests/test_async_query_job_service.py::TestRejectHistoryUnifiedJobRegistry` |
+| ASYNC-08 | OOM guard shift (reject domain) | The unified job worker path (`reject_history_worker.py`) writes raw rows to the canonical spool via DuckDB COPY: no pandas heap allocation occurs, so no post-hoc memory check can trigger. Pre-emptive OOM protection: DuckDB on-disk spill (`DUCKDB_JOB_DIR`) handles memory pressure at the storage layer before any Python heap pressure. The legacy flag=off path retains its existing memory-pressure checks (`_enforce_interactive_memory_guard`, RSS-pressure guard) unchanged — no regression. The `TestOomGuardAbsence` test verifies that the new worker modules and the legacy source files contain no `if len(df)…: raise` or `memory_usage`-as-IF-condition raise patterns; the legacy path uses RSS-pressure and helper delegation (not these patterns), so the test confirms both paths are free of that specific guard class. Added by change `production-reject-history-migration`. | `tests/test_reject_history_unified_job.py::TestOomGuardAbsence` |
 
 ## Hold-History Rules
 
@@ -248,6 +250,12 @@ breaking-change-policy: deprecate-2-minors
 | EAP ALARM query: `EAP_ALARM_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (EapAlarmJob) | EA-ASYNC, ASYNC-06 | route tests |
 | EAP ALARM query: `EAP_ALARM_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 SERVICE_UNAVAILABLE + Retry-After | EA-ASYNC, ASYNC-06 | resilience tests |
 | EAP ALARM query: `EAP_ALARM_USE_UNIFIED_JOB=off` (default) | unchanged legacy path (run_eap_alarm_query_job) | EA-ASYNC, AC-8 | regression tests |
+| Production History query: `PRODUCTION_HISTORY_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (ProductionHistoryJob) | ASYNC-07 | route tests |
+| Production History query: `PRODUCTION_HISTORY_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 (sync_fallback_allowed=True; no forced 503 unless enqueue fails) | ASYNC-07 | resilience tests |
+| Production History query: `PRODUCTION_HISTORY_USE_UNIFIED_JOB=off` (default) | legacy path unchanged | ASYNC-07, AC-8 | regression tests |
+| Reject History query: `REJECT_HISTORY_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (RejectHistoryJob) | ASYNC-07 | route tests |
+| Reject History query: `REJECT_HISTORY_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 (sync_fallback_allowed=True) | ASYNC-07 | resilience tests |
+| Reject History query: `REJECT_HISTORY_USE_UNIFIED_JOB=off` (default) | legacy path unchanged | ASYNC-07, AC-8 | regression tests |
 
 ## Material Consumption Rules
 
@@ -328,6 +336,14 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.24.0] — 2026-06-19
+### Added
+- production-reject-history-migration: ASYNC-07 (unified-job dispatch rule — `<DOMAIN>_USE_UNIFIED_JOB=on` routes to `enqueue_query_job` with `always_async=False` and `sync_fallback_allowed=True`; flag-off uses legacy path verbatim; independent per-domain flags). ASYNC-08 (OOM guard shift — unified job path uses DuckDB COPY/on-disk spill; legacy flag=off path retains existing guards unchanged; ast-absence test confirms no `len(df)/memory_usage`-IF-raise patterns in new worker modules or legacy files). Six new Decision Table rows for production_history and reject unified/legacy/unavailable paths. EA-ASYNC rule supplemented with P2 context (production_history + reject). Additive; no existing rules changed.
+
+## [business 1.23.0] — 2026-06-18
+### Added
+- eap-alarm-unified-job-poc: ASYNC-06 (always-async 503 forced rule for `EapAlarmJob`: when `always_async=True` and `sync_fallback_allowed=False` and queue unavailable → HTTP 503, no silent sync downgrade). EA-ASYNC rule (EAP alarm unified-job routing decision table: flag-on/async-available, flag-on/async-unavailable, flag-off paths). Additive; no existing rules changed.
 
 ## [business 1.22.0] — 2026-06-18
 ### Added

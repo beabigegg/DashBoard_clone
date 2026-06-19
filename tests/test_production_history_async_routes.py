@@ -135,11 +135,11 @@ class TestProductionHistoryQueryRoute(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
 
     # ------------------------------------------------------------------
-    # 4. RQ unavailable → sync fallback
+    # 4. RQ unavailable → 503 (sync fallback removed by AC-5)
     # ------------------------------------------------------------------
 
-    def test_rq_unavailable_falls_back_to_sync(self):
-        """When RQ is unavailable, should fall back to sync execution."""
+    def test_rq_unavailable_returns_503(self):
+        """AC-5: sync fallback removed; RQ unavailable + legacy path → 503 degraded."""
         with patch(
             "mes_dashboard.routes.production_history_routes.make_canonical_spool_id",
             return_value="ph-test-003",
@@ -150,16 +150,16 @@ class TestProductionHistoryQueryRoute(unittest.TestCase):
             "mes_dashboard.services.async_query_job_service.is_async_available",
             return_value=False,
         ), patch(
-            "mes_dashboard.routes.production_history_routes.query_production_history",
-            return_value=dict(_SYNC_RESULT),
+            "mes_dashboard.routes.production_history_routes._PRODUCTION_HISTORY_USE_UNIFIED_JOB",
+            False,
         ):
             response = self.client.post(
                 "/api/production-history/query", json=_VALID_QUERY_BODY
             )
 
+        self.assertEqual(response.status_code, 503)
         payload = _parse(response)
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(payload["success"])
+        self.assertFalse(payload["success"])
 
 
 class TestProductionHistoryJobStatusRoute(unittest.TestCase):

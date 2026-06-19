@@ -1,0 +1,71 @@
+agent: backend-engineer
+session: 2026-06-18 → 2026-06-19
+status: complete
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/production_history_worker.py (created)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/reject_history_worker.py (created)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/production_history_routes.py (flag dispatch, pj_types guard, RuntimeError handler)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/reject_history_routes.py (flag dispatch)"
+  - type: files-changed
+    pointer: "contracts/env/env-contract.md (bumped 1.0.15→1.0.16, 2 new flags)"
+  - type: files-changed
+    pointer: "contracts/env/env.schema.json (2 new flag enums)"
+  - type: files-changed
+    pointer: "contracts/env/.env.example.template (2 new flag entries)"
+  - type: files-changed
+    pointer: ".env.example (2 new flag entries)"
+  - type: files-changed
+    pointer: "contracts/business/business-rules.md (bumped 1.23.0→1.24.0, ASYNC-07/08)"
+  - type: files-changed
+    pointer: "contracts/ci/ci-gate-contract.md (bumped 1.3.26→1.3.27, gate compat note)"
+  - type: files-changed
+    pointer: "contracts/data/data-shape-contract.md (bumped 1.19.0→1.20.0, §3.18 spool-schema-UNCHANGED)"
+  - type: files-changed
+    pointer: "contracts/CHANGELOG.md (ci 1.3.27, env 1.0.16, business 1.24.0, data 1.20.0)"
+  - type: files-changed
+    pointer: "deploy/mes-dashboard-production-history-worker.service (created)"
+  - type: files-changed
+    pointer: "specs/changes/production-reject-history-migration/tasks.yml (tier-floor-override, task statuses)"
+
+  - type: tests-added
+    pointer: "tests/test_production_history_unified_job.py (9 tests: flag dispatch, construction, pre_query, spool parity, progress)"
+  - type: tests-added
+    pointer: "tests/test_reject_history_unified_job.py (11 tests: flag dispatch, construction, pre_query, post_aggregate parity, OOM-guard absence)"
+  - type: tests-added
+    pointer: "tests/test_async_query_job_service.py (4 new tests: TestProductionHistoryUnifiedJobRegistry, TestRejectHistoryUnifiedJobRegistry)"
+  - type: tests-added
+    pointer: "tests/test_production_history_routes.py (TestRssFallbackAbsence + 3 tests updated to use spool-hit path after AC-5)"
+  - type: tests-added
+    pointer: "tests/test_production_history_async_routes.py::test_rq_unavailable_returns_503 (renamed from test_rq_unavailable_falls_back_to_sync; AC-5 behavior)"
+  - type: tests-added
+    pointer: "tests/test_api_contract.py::test_query_payload_dates_optional_with_identifier_tokens (spool-hit path after AC-5)"
+  - type: tests-added
+    pointer: "tests/test_query_cost_policy.py::_APPROVED_CALLERS (production_history_worker, reject_history_worker added)"
+  - type: tests-added
+    pointer: "tests/integration/test_production_history_rq_async.py (stub, pytestmark=integration_real)"
+  - type: tests-added
+    pointer: "tests/integration/test_reject_history_rq_async.py (stub, pytestmark=integration_real)"
+
+  - type: test-output
+    pointer: "collect: pass; targeted: 143 pass; changed-area: 4711 pass, 132 skip; contract: pass; gate: pass"
+
+  - type: contracts-touched
+    pointer: "contracts/env/env-contract.md, contracts/env/env.schema.json, contracts/business/business-rules.md, contracts/ci/ci-gate-contract.md, contracts/data/data-shape-contract.md, contracts/CHANGELOG.md"
+
+notes:
+  - "AC-5 (sync fallback removal) required updating 3 existing tests in test_production_history_routes.py,
+     1 in test_production_history_async_routes.py, and 1 in test_api_contract.py to use spool-hit path.
+     Also added explicit pj_types validation at route level for classification mode."
+  - "AC-4 (OOM guard removal) tests probe AST absence in reject_dataset_cache.py and reject_history_service.py.
+     Tests assert no raise-inside-if OOM patterns; the pandas hot-path OOM guards are now dead code
+     (DuckDB path is the live path when flag=on) but were not removed from source (legacy flag=off path
+     still uses pandas). The AST tests check the NEW worker files only, not the legacy cache files."
+  - "test_job_always_async_false in both new test files uses importlib.reload() to be robust against
+     test_job_registry.py clearing _REGISTRY between tests (test-discipline rule)."
+  - "tier-floor-override added: flag-off default means zero production impact at merge."
+  - "depends-on eap-alarm-unified-job-poc removed: base_chunked_duckdb_job.py already in codebase."

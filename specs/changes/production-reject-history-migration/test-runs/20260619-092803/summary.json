@@ -1,0 +1,20 @@
+{
+  "change_id": "production-reject-history-migration",
+  "phase": "collect",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest tests/ -x -q --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/production-reject-history-migration/test-runs/20260619-092803/junit.xml' --tb=short -ra",
+  "duration_ms": 170900,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.test_api_contract.TestProductionHistoryQueryModeContract::test_query_payload_dates_optional_with_identifier_tokens",
+    "message": "AssertionError: 503 not found in (200, 202)"
+  },
+  "artifacts": {
+    "summary": "specs/changes/production-reject-history-migration/test-runs/20260619-092803/summary.json",
+    "stdout": "specs/changes/production-reject-history-migration/test-runs/20260619-092803/stdout.log",
+    "stderr": "specs/changes/production-reject-history-migration/test-runs/20260619-092803/stderr.log",
+    "junit": "specs/changes/production-reject-history-migration/test-runs/20260619-092803/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

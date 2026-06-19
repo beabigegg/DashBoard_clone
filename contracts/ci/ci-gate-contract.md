@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.26
-last-changed: 2026-06-18
+schema-version: 1.3.27
+last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -474,7 +474,35 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 **Schema-version bump to 1.3.24 (patch)**: new required Tier 1 gate added; no existing
 gate tier, command, or status changed.
 
+## production-reject-history-migration Gate Compatibility Note
+
+**P2 migration — two new worker modules, two feature flags (default `off`):**
+
+- Two new job modules: `src/mes_dashboard/workers/production_history_worker.py` (job type `production_history_unified`) and `src/mes_dashboard/workers/reject_history_worker.py` (job type `reject_unified`). Both covered by existing `unit-mock-integration` gate (`pytest -m "not (e2e or integration_real or stress or load or soak or multi_worker)" --ignore=...`).
+- Two new test files: `tests/test_production_history_unified_job.py`, `tests/test_reject_history_unified_job.py` — auto-discovered by existing gate commands.
+- Two new integration test files: `tests/integration/test_production_history_rq_async.py`, `tests/integration/test_reject_history_rq_async.py` — skipped pre-merge (nightly gate).
+- Feature flags `PRODUCTION_HISTORY_USE_UNIFIED_JOB=off` and `REJECT_HISTORY_USE_UNIFIED_JOB=off` (default) ensure zero behavioral change under all gate runs until explicitly set.
+- New systemd unit `deploy/mes-dashboard-production-history-worker.service` (additive; existing units unchanged).
+- No new workflow file. No gate tier change. Additive; no existing gates changed.
+
+**Deploy checklist:**
+1. Start `mes-dashboard-production-history-worker.service` on all nodes after deploy.
+2. Verify `production-history-query` queue appears in Admin Dashboard → Worker Status (or `rq_monitor_service._QUEUE_NAMES`).
+3. Confirm both flags read as `off` in ALL processes (gunicorn + workers) before promoting either to `on`. Flags are module-level constants — env-var drift between processes silently routes different paths.
+4. Worker env-var parity: `mes-dashboard-production-history-worker.service` MUST export `PRODUCTION_HISTORY_USE_UNIFIED_JOB`; `mes-dashboard-reject-worker.service` MUST export `REJECT_HISTORY_USE_UNIFIED_JOB`.
+
+**Rollback checklist:**
+1. Set `PRODUCTION_HISTORY_USE_UNIFIED_JOB=off` and/or `REJECT_HISTORY_USE_UNIFIED_JOB=off`.
+2. **Restart** gunicorn and the respective worker(s) — env vars are module-level constants frozen at boot; `kill -HUP` is insufficient (reloads workers but not master environment).
+3. No spool cleanup required: spool schema is unchanged between unified-job and legacy paths.
+4. If rolling back the new `mes-dashboard-production-history-worker.service`: stop and disable it before restarting gunicorn.
+
+**Schema-version bump to 1.3.27 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
+
 ## CHANGELOG
+
+## [ci 1.3.27] — 2026-06-19
+- production-reject-history-migration: Gate-compatibility note for P2 migration (two new worker modules, feature flags default `off`, new systemd unit, two new integration test files skipped pre-merge). Additive; no existing gates changed.
 
 ## [ci 1.3.25] — 2026-06-18
 - eap-alarm-analysis: Added deploy/rollback checklist for EAP ALARM worker (`EAP_ALARM_*` env vars, `mes-dashboard-eap-alarm-worker.service`, parquet cleanup). Added `tests/playwright/eap-alarm.spec.js` to `playwright-critical-journeys` gate. Added compatibility note (no new gate tier; all tests within existing Tier 1/3 commands). Additive; no existing gates changed.

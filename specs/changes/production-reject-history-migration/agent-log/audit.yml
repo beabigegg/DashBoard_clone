@@ -1,0 +1,15 @@
+- type: tier-floor-override
+  change-id: production-reject-history-migration
+  timestamp: '2026-06-19T02:01:05.917Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - cache
+    - migration
+    - query
+    - worker
+  reason: >-
+    P2 migration flag-gated off by default; no production path executes new worker code until
+    PRODUCTION_HISTORY_USE_UNIFIED_JOB=on or REJECT_HISTORY_USE_UNIFIED_JOB=on is explicitly set.
+    Deferred stress testing to nightly gate (Tier 3) before promotion.

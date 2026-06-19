@@ -1,0 +1,41 @@
+[Unit]
+Description=MES Dashboard Production History Query Worker (RQ, Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/opt/mes-dashboard/.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+
+# Production history worker env-var parity (env-contract §Async Worker — Production History)
+Environment="PRODUCTION_HISTORY_WORKER_QUEUE=production-history-query"
+Environment="PRODUCTION_HISTORY_JOB_TIMEOUT_SECONDS=1800"
+Environment="PRODUCTION_HISTORY_JOB_TTL_SECONDS=3600"
+
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${PRODUCTION_HISTORY_WORKER_QUEUE:-production-history-query}" --url "${REDIS_URL:-redis://localhost:6379/0}"'
+
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-dashboard-production-history-worker
+
+# Memory protection: production history worker handles large Oracle JOIN + parquet writes.
+MemoryHigh=3G
+MemoryMax=4G
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/mes-dashboard/logs /opt/mes-dashboard/tmp
+
+[Install]
+WantedBy=multi-user.target

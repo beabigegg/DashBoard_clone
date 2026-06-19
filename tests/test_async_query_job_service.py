@@ -730,3 +730,57 @@ class TestEnqueueQueryJob:
         assert job_id is None
         assert hint is None  # not 503 — just unknown type
         assert "_nonexistent_type" in err
+
+
+class TestProductionHistoryUnifiedJobRegistry:
+    """AC-6: ProductionHistoryJob registered with always_async=False."""
+
+    def test_production_history_job_registered_always_async_false(self):
+        """production_history_unified must be registered with always_async=False."""
+        import importlib
+        import mes_dashboard.workers.production_history_worker as _ph_worker
+        # Reload to re-fire module-level register_job_type (test-discipline rule)
+        importlib.reload(_ph_worker)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("production_history_unified")
+        assert config is not None, "production_history_unified not registered in job_registry"
+        assert config.always_async is False, (
+            f"production_history_unified must have always_async=False; got {config.always_async}"
+        )
+
+    def test_production_history_job_queue_name(self):
+        """production_history_unified must use production-history-query queue."""
+        import importlib
+        import mes_dashboard.workers.production_history_worker as _ph_worker
+        importlib.reload(_ph_worker)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("production_history_unified")
+        assert config is not None
+        assert config.queue_name == "production-history-query"
+
+
+class TestRejectHistoryUnifiedJobRegistry:
+    """AC-6: RejectHistoryJob registered with always_async=False."""
+
+    def test_reject_history_job_registered_always_async_false(self):
+        """reject_unified must be registered with always_async=False."""
+        import importlib
+        import mes_dashboard.workers.reject_history_worker as _rh_worker
+        # Reload to re-fire module-level register_job_type (test-discipline rule)
+        importlib.reload(_rh_worker)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("reject_unified")
+        assert config is not None, "reject_unified not registered in job_registry"
+        assert config.always_async is False, (
+            f"reject_unified must have always_async=False; got {config.always_async}"
+        )
+
+    def test_reject_history_job_queue_name(self):
+        """reject_unified must use reject-query queue (same as legacy)."""
+        import importlib
+        import mes_dashboard.workers.reject_history_worker as _rh_worker
+        importlib.reload(_rh_worker)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("reject_unified")
+        assert config is not None
+        assert config.queue_name == "reject-query"

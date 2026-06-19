@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.27] — 2026-06-19
+### Added
+- production-reject-history-migration: Gate-compatibility note for P2 migration — two new worker modules (`production_history_worker`, `reject_history_worker`) covered by existing `unit-mock-integration` and `cdd-kit-gate` commands; no new workflow file or gate tier needed. Feature flags `PRODUCTION_HISTORY_USE_UNIFIED_JOB=off` and `REJECT_HISTORY_USE_UNIFIED_JOB=off` (default) mean zero behavioral change until explicitly set. Additive; no existing gates changed.
+
+## [env 1.0.16] — 2026-06-19
+### Added
+- production-reject-history-migration: `PRODUCTION_HISTORY_USE_UNIFIED_JOB` and `REJECT_HISTORY_USE_UNIFIED_JOB` (both optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flags selecting unified `ProductionHistoryJob` / `RejectHistoryJob` paths (BaseChunkedDuckDBJob template method, P2 migration) vs legacy pandas BQE / `enqueue_reject_query` paths. Default `off` ensures zero regression on deploy (AC-8). `always_async=False` for both; `sync_fallback_allowed=True`. Additive; no existing flags changed.
+
+## [business 1.24.0] — 2026-06-19
+### Added
+- production-reject-history-migration: ASYNC-07 (unified-job dispatch rule — `<DOMAIN>_USE_UNIFIED_JOB=on` routes to `enqueue_query_job` with `always_async=False` and `sync_fallback_allowed=True`; flag-off uses legacy path verbatim). ASYNC-08 (OOM guard shift — post-hoc pandas `len(df)` / `memory_usage` guards replaced by pre-emptive DuckDB on-disk spill; proven by ast-absence test AC-4). Two new Decision Table rows for production_history and reject domain unified paths. Additive; no existing rules changed.
+
+## [data 1.20.0] — 2026-06-19
+### Added
+- production-reject-history-migration: §3.18 spool-schema-UNCHANGED assertion — `production_history` and `reject_dataset` spool parquet schemas are explicitly unchanged by this migration. Additive; no existing spool schemas changed.
+
 ## [ci 1.3.26] — 2026-06-19
 ### Added
 - eap-alarm-unified-job-poc: Gate-compatibility note for P1 migration — all new test files (test_base_chunked_duckdb_job extensions, test_eap_alarm_service extensions, test_async_query_job_service extensions, tests/integration/ eap_alarm cases, tests/stress/ eap_alarm cases, tests/contract/test_env_eap_alarm_flag.py) covered by existing gate commands; no new workflow file or gate tier needed. Feature flag default `off` means zero behavioral change until explicitly enabled. Additive; no existing gates changed.

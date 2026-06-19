@@ -1,0 +1,1 @@
+pytest tests/ -q --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/production-reject-history-migration/test-runs/20260619-095537/junit.xml' --maxfail=1 --tb=short -ra

@@ -334,7 +334,11 @@ class TestNoPandasAndNoCallers:
         """
         # P1+ approved callers per module stem.  Extend as each Px migration lands.
         _APPROVED_CALLERS: dict = {
-            "base_chunked_duckdb_job": {"eap_alarm_worker"},
+            "base_chunked_duckdb_job": {
+                "eap_alarm_worker",
+                "production_history_worker",
+                "reject_history_worker",
+            },
         }
 
         src_dir = _REPO_ROOT / "src/mes_dashboard"

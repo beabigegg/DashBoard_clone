@@ -13,11 +13,15 @@ Coverage:
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from mes_dashboard.app import create_app
+
+_REPO_ROOT = Path(__file__).parent.parent
 
 
 @pytest.fixture
@@ -34,8 +38,13 @@ def client(app):
 
 # ── 0. Contract: success envelope ────────────────────────────────────────────
 
+@patch("mes_dashboard.routes.production_history_routes.get_spool_file_path")
 @patch("mes_dashboard.routes.production_history_routes.query_production_history")
-def test_query_success_envelope(mock_query, client):
+def test_query_success_envelope(mock_query, mock_spool_path, client):
+    # Simulate spool-hit: get_spool_file_path returns a non-None path so that
+    # the spool-hit branch (not the async/sync-fallback branch) serves the response.
+    # The sync fallback branch was removed (AC-5); this test must use the spool-hit path.
+    mock_spool_path.return_value = "/tmp/fake-spool.parquet"
     mock_query.return_value = {
         "dataset_id": "ph-abc123",
         "detail": {"rows": [], "pagination": {"page": 1, "per_page": 25, "total_rows": 0, "total_pages": 0}},
@@ -185,8 +194,11 @@ def test_export_dataset_expired(mock_spool, client):
 
 # ── 3. Overload: 503 + Retry-After ────────────────────────────────────────────
 
+@patch("mes_dashboard.routes.production_history_routes.get_spool_file_path")
 @patch("mes_dashboard.routes.production_history_routes.query_production_history")
-def test_query_heavy_query_overloaded(mock_query, client):
+def test_query_heavy_query_overloaded(mock_query, mock_spool_path, client):
+    # Use spool-hit path to trigger query_production_history (sync fallback removed, AC-5)
+    mock_spool_path.return_value = "/tmp/fake-spool.parquet"
     mock_query.side_effect = RuntimeError("heavy_query_overloaded")
     resp = client.post(
         "/api/production-history/query",
@@ -199,8 +211,11 @@ def test_query_heavy_query_overloaded(mock_query, client):
     assert data["meta"]["error_code"] == "heavy_query_overloaded"
 
 
+@patch("mes_dashboard.routes.production_history_routes.get_spool_file_path")
 @patch("mes_dashboard.routes.production_history_routes.query_production_history")
-def test_query_memory_guard_rejected(mock_query, client):
+def test_query_memory_guard_rejected(mock_query, mock_spool_path, client):
+    # Use spool-hit path to trigger query_production_history (sync fallback removed, AC-5)
+    mock_spool_path.return_value = "/tmp/fake-spool.parquet"
     mock_query.side_effect = MemoryError("rss limit exceeded")
     resp = client.post(
         "/api/production-history/query",
@@ -631,9 +646,12 @@ class TestFilterOptionsEndpoint:
 class TestQueryModeSplitRoutes:
     """Route-level coverage for identifier-mode optional dates (AC-4 / AC-5 / AC-7)."""
 
+    @patch("mes_dashboard.routes.production_history_routes.get_spool_file_path")
     @patch("mes_dashboard.routes.production_history_routes.query_production_history")
-    def test_query_identifier_only_no_dates_returns_results(self, mock_query, client):
-        """AC-4 — identifier token, no dates → 200 success envelope."""
+    def test_query_identifier_only_no_dates_returns_results(self, mock_query, mock_spool_path, client):
+        """AC-4 — identifier token, no dates → 200 success envelope (via spool-hit path)."""
+        # Use spool-hit to exercise query_production_history (sync fallback removed, AC-5)
+        mock_spool_path.return_value = "/tmp/fake-spool-id.parquet"
         mock_query.return_value = {
             "dataset_id": "ph-id1",
             "detail": {"rows": [], "pagination": {"page": 1, "per_page": 25, "total_rows": 0, "total_pages": 0}},
@@ -681,3 +699,39 @@ class TestQueryModeSplitRoutes:
         floor = (date.today() - timedelta(days=MAX_DATE_RANGE_DAYS)).strftime("%Y-%m-%d")
         first_start = min(c["chunk_start"] for c in chunks)
         assert first_start >= floor, "chunk_start must be ≥ today − 730d (no unbounded scan)"
+
+
+class TestRssFallbackAbsence:
+    """AC-5: The large-range synchronous Oracle pandas BQE SELECT is removed from production_history_routes."""
+
+    def test_rss_pandas_fallback_branch_absent_in_ast(self):
+        """Assert that production_history_routes.py has no module-level `import pandas` (AC-5).
+
+        The large-range synchronous fallback that did `query_production_history(body)` inside
+        a sync fallback branch (calling the full pandas BQE path) has been replaced by a 503
+        response. The route file must NOT import pandas at module level (it was only needed
+        by the removed fallback branch).
+        """
+        src_path = _REPO_ROOT / "src/mes_dashboard/routes/production_history_routes.py"
+        src = src_path.read_text(encoding="utf-8")
+        tree = ast.parse(src, filename=str(src_path))
+
+        # Assert no module-level `import pandas` or `from pandas import ...`
+        pandas_imports = []
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name == "pandas" or alias.name.startswith("pandas."):
+                            pandas_imports.append(node)
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module and (
+                        node.module == "pandas" or node.module.startswith("pandas.")
+                    ):
+                        pandas_imports.append(node)
+
+        assert pandas_imports == [], (
+            f"AC-5 violation: production_history_routes.py has {len(pandas_imports)} "
+            f"pandas import(s) — the sync RSS fallback branch with pandas BQE must be removed. "
+            f"Lines: {[n.lineno for n in pandas_imports]}"
+        )

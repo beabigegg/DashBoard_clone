@@ -1,0 +1,42 @@
+change-id: production-reject-history-migration
+status: in-progress
+tier: 1
+tier-floor-override: "P2 migration flag-gated off by default; no production path executes new worker code until PRODUCTION_HISTORY_USE_UNIFIED_JOB=on or REJECT_HISTORY_USE_UNIFIED_JOB=on is explicitly set. Deferred stress testing to nightly gate (Tier 3) before promotion."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []  # eap-alarm-unified-job-poc code merged; base_chunked_duckdb_job.py in codebase
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 1, Risk high, Impact cross-module; 8 ACs; Required agents: implementation-planner, backend-engineer, test-strategist, contract-reviewer, ci-cd-gatekeeper, qa-reviewer" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "env (2 flags), business (ASYNC-07/08), ci-gate compat note, data-shape (unchanged assertion); API/CSS/UI all N/A" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "Architecture established by P1/ADR-0009; no new ADR needed; design.md not required" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written; no new workflow files; flag-off default = zero behavioral change at merge; Tier 3/4 before flag-on promotion" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done, note: "implementation-plan.md written; IP-1..IP-13 ordered; 5 investigation questions answered with line numbers; divergences from P1 flagged" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "no new endpoints; spool schema unchanged; existing endpoint shape unmodified" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no frontend change" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no frontend change; spool schema and view endpoints unchanged" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI surface" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI surface" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer: changes-required resolved; fixed ASYNC-08 wording, added worker env-var parity note, added deploy/rollback checklist, fixed last-changed dates, backfilled 1.23.0 CHANGELOG; cdd-kit validate --contracts passed" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-reviewer: approved-with-risk; verdict=merge-with-flag-off; AC-1/3/5/6/7/8 satisfied; AC-2 parity nightly only; AC-4 ast test vacuous but behavior correct; gunicorn HUP insufficient (fixed in ci-gates.md)" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

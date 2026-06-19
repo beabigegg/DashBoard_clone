@@ -59,6 +59,13 @@ _ENABLED = os.getenv("PROD_HISTORY_ENABLED", "true").strip().lower() in {
     "1", "true", "yes", "on",
 }
 
+# Feature flag: PRODUCTION_HISTORY_USE_UNIFIED_JOB=on → unified ProductionHistoryJob path.
+# Module-level constant frozen at import — restart required.
+# monkeypatch.setattr() in tests (not setenv — frozen at import).
+_PRODUCTION_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
+    "PRODUCTION_HISTORY_USE_UNIFIED_JOB", "off"
+).lower().strip() in ("on", "true", "1")
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -212,9 +219,18 @@ def api_production_history_query():
         return error_response(VALIDATION_ERROR, payload_error.message, status_code=payload_error.status_code)
 
     try:
-        validate_query_params(body)
+        _vparams = validate_query_params(body)
     except ValueError as exc:
         return error_response(VALIDATION_ERROR, str(exc), status_code=400)
+
+    # Classification mode requires pj_types (AC-5: no longer deferred to sync fallback)
+    _is_identifier_mode = bool(
+        _vparams.get("mfg_orders_tokens")
+        or _vparams.get("wafer_lots_tokens")
+        or _vparams.get("lot_ids_tokens")
+    )
+    if not _is_identifier_mode and not _vparams.get("pj_types"):
+        return error_response(VALIDATION_ERROR, "分類模式必要參數: pj_types", status_code=400)
 
     # Check if spool already exists for these params — serve immediately if so
     dataset_id = make_canonical_spool_id(body)
@@ -234,11 +250,61 @@ def api_production_history_query():
             )
         except ValueError as exc:
             return error_response(VALIDATION_ERROR, str(exc), status_code=400)
+        except RuntimeError as exc:
+            if "heavy_query_overloaded" in str(exc):
+                return error_response(
+                    SERVICE_UNAVAILABLE,
+                    "伺服器繁忙，請稍後再試",
+                    status_code=503,
+                    meta={"retry_after_seconds": 30, "error_code": "heavy_query_overloaded"},
+                    headers={"Retry-After": "30"},
+                )
+            logger.exception("production_history primary query failed (spool hit path)")
+            return internal_error("生產歷程查詢失敗")
         except Exception:
             logger.exception("production_history primary query failed (spool hit path)")
             return internal_error("生產歷程查詢失敗")
 
-    # Spool miss — try async path
+    # Spool miss — enqueue job (unified or legacy path)
+    import uuid
+    from mes_dashboard.core.permissions import get_owner_token
+
+    if _PRODUCTION_HISTORY_USE_UNIFIED_JOB:
+        # Unified path: enqueue via BaseChunkedDuckDBJob (ASYNC-07)
+        # always_async=False → sync_fallback_allowed=True → no 503 on queue unavailable
+        from mes_dashboard.services.async_query_job_service import enqueue_query_job
+        import mes_dashboard.workers.production_history_worker  # noqa: F401 — triggers registration
+
+        job_id = f"prod-hist-{uuid.uuid4().hex[:12]}"
+        job_id_result, err, status_hint = enqueue_query_job(
+            "production_history_unified",
+            owner=get_owner_token(),
+            params={"job_id": job_id, **body},
+            sync_fallback_allowed=True,
+            job_id=job_id,
+        )
+        if job_id_result is None:
+            logger.warning(
+                "production_history unified enqueue failed (hint=%s): %s", status_hint, err
+            )
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用，請稍後再試",
+                status_code=status_hint or 503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+        return success_response(
+            {
+                "async": True,
+                "job_id": job_id_result,
+                "status_url": f"/api/production-history/job/{job_id_result}",
+                "dataset_id": dataset_id or "",
+            },
+            status_code=202,
+        )
+
+    # Legacy path (PRODUCTION_HISTORY_USE_UNIFIED_JOB=off, default)
     from mes_dashboard.services.async_query_job_service import is_async_available
     from mes_dashboard.services.production_history_job_service import (
         PRODUCTION_HISTORY_ASYNC_ENABLED,
@@ -246,7 +312,6 @@ def api_production_history_query():
     )
 
     if PRODUCTION_HISTORY_ASYNC_ENABLED and is_async_available():
-        from mes_dashboard.core.permissions import get_owner_token
         job_id, err = enqueue_production_history_query(body, owner=get_owner_token())
         if job_id is None:
             logger.warning("production_history async enqueue failed (%s)", err)
@@ -267,35 +332,19 @@ def api_production_history_query():
             status_code=202,
         )
 
-    # Sync fallback (RQ unavailable or async disabled)
-    try:
-        result = query_production_history(body)
-        return success_response(result, meta=result.pop("meta", None))
-    except MemoryError:
-        record_memory_error("production_history.query", reason="rss_guard")
-        return error_response(
-            SERVICE_UNAVAILABLE,
-            "伺服器記憶體不足，請稍後再試",
-            status_code=503,
-            meta={"retry_after_seconds": 60, "error_code": "memory_guard_rejected"},
-            headers={"Retry-After": "60"},
-        )
-    except RuntimeError as exc:
-        if "heavy_query_overloaded" in str(exc):
-            return error_response(
-                SERVICE_UNAVAILABLE,
-                "查詢伺服器負載過高，請稍後再試",
-                status_code=503,
-                meta={"retry_after_seconds": 30, "error_code": "heavy_query_overloaded"},
-                headers={"Retry-After": "30"},
-            )
-        logger.exception("production_history primary query failed")
-        return internal_error("生產歷程查詢失敗")
-    except ValueError as exc:
-        return error_response(VALIDATION_ERROR, str(exc), status_code=400)
-    except Exception:
-        logger.exception("production_history primary query failed")
-        return internal_error("生產歷程查詢失敗")
+    # Degraded path: RQ unavailable or async disabled — return 503.
+    # The large-range synchronous Oracle pandas BQE SELECT has been removed (AC-5).
+    # Spool-hit serving (above, dataset_id already exists) is still available.
+    logger.warning(
+        "production_history: async unavailable and unified job disabled — returning 503"
+    )
+    return error_response(
+        SERVICE_UNAVAILABLE,
+        "背景查詢服務不可用，請稍後再試",
+        status_code=503,
+        meta={"retry_after_seconds": 30},
+        headers={"Retry-After": "30"},
+    )
 
 
 # ── GET /api/production-history/job/<job_id> ─────────────────────────────────

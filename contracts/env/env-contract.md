@@ -3,7 +3,7 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.15
+schema-version: 1.0.16
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -79,8 +79,14 @@ breaking-change-policy: deprecate-2-minors
 | REGISTER_INTERNAL_METRICS | feature | dev | no | no | False | False | platform-team | True or False — production MUST NOT set True | yes | internal metrics blueprint 掛載 |
 | INTERNAL_METRICS_ENABLED | feature | dev | no | no | 0 | 0 | platform-team | 0 or 1 — production MUST NOT set 1 | no | handler guard |
 | EAP_ALARM_USE_UNIFIED_JOB | feature | all | no | no | off | off | application-team | off/on or false/true or 0/1; selects unified EapAlarmJob path (on) vs legacy run_eap_alarm_query_job (off). Restart required. | yes | uses default off |
+| PRODUCTION_HISTORY_USE_UNIFIED_JOB | feature | all | no | no | off | off | application-team | off/on or false/true or 0/1; selects unified ProductionHistoryJob path (on) vs legacy pandas BQE path (off). Restart required. | yes | uses default off |
+| REJECT_HISTORY_USE_UNIFIED_JOB | feature | all | no | no | off | off | application-team | off/on or false/true or 0/1; selects unified RejectHistoryJob path (on) vs legacy execute_primary_query path (off). Restart required. | yes | uses default off |
 
 - `EAP_ALARM_USE_UNIFIED_JOB`: Feature flag enabling the unified `EapAlarmJob` path (`BaseChunkedDuckDBJob` template method). When `on`/`true`/`1`, the eap_alarm route enqueues via `enqueue_query_job` + `EapAlarmJob`; the always-async 503 decision tree applies (`sync_fallback_allowed=False`). When `off` (default)/`false`/`0`, the legacy `run_eap_alarm_query_job` path is used unchanged (AC-8 zero-regression guarantee). Module-level constant frozen at import — restart required. `monkeypatch.setattr()` required in tests (not `setenv`). Must be `off` in production until AC-1 parity tests pass. Added by change `eap-alarm-unified-job-poc`.
+- `PRODUCTION_HISTORY_USE_UNIFIED_JOB`: Feature flag enabling the unified `ProductionHistoryJob` path (`BaseChunkedDuckDBJob` template method, P2 migration). When `on`/`true`/`1`, production_history route enqueues via `enqueue_query_job("production_history_unified", ..., sync_fallback_allowed=True)`; `always_async=False` so sync fallback is permitted. When `off` (default)/`false`/`0`, the legacy `query_production_history` pandas BQE path is used unchanged (AC-8 zero-regression). Module-level constant `_PRODUCTION_HISTORY_USE_UNIFIED_JOB` frozen at import — restart required. `monkeypatch.setattr()` required in tests. Added by change `production-reject-history-migration`.
+- `REJECT_HISTORY_USE_UNIFIED_JOB`: Feature flag enabling the unified `RejectHistoryJob` path (`BaseChunkedDuckDBJob` template method, P2 migration). When `on`/`true`/`1`, reject_history route enqueues via `enqueue_query_job("reject_unified", ..., sync_fallback_allowed=True)`; `always_async=False` so sync fallback is permitted; `requires_cross_chunk_reduction=True` so DuckDB `post_aggregate` runs GROUP BY/pareto/trend. When `off` (default)/`false`/`0`, the legacy `enqueue_reject_query` path is used unchanged (AC-8 zero-regression). Module-level constant `_REJECT_HISTORY_USE_UNIFIED_JOB` frozen at import — restart required. `monkeypatch.setattr()` required in tests. Added by change `production-reject-history-migration`.
+
+**Worker env-var parity (P2 — production-reject-history-migration):** The `mes-dashboard-production-history-worker.service` systemd unit MUST export `PRODUCTION_HISTORY_USE_UNIFIED_JOB` with the same value as gunicorn. The `mes-dashboard-reject-worker.service` systemd unit MUST export `REJECT_HISTORY_USE_UNIFIED_JOB` with the same value as gunicorn. Both flags are module-level constants frozen at worker boot; env-var drift between gunicorn and a worker process silently routes different code paths per process (gunicorn = unified job, worker = legacy, or vice versa), breaking spool-parity guarantees. Validate via deploy-time env comparison before enabling either flag. Added by change `production-reject-history-migration`.
 
 ## Cache Tuning — Resource History
 
@@ -255,4 +261,10 @@ Variables such as `VITE_`, `NEXT_PUBLIC_`, and `PUBLIC_` are browser-exposed. Ne
 - `FLASK_DEBUG=1` 在 production 是嚴重安全問題：啟動時 `_validate_production_security_settings()` 會拒絕。
 - `SECRET_KEY` 過短（< 32 bytes）：`_resolve_secret_key()` 會記錄 warning。
 - `DB_HOST` / `DB_SERVICE` 空值：app factory 啟動時即失敗，不會延遲到首次查詢。
+
+## CHANGELOG
+
+## [env 1.0.16] — 2026-06-19
+### Added
+- production-reject-history-migration: Added `PRODUCTION_HISTORY_USE_UNIFIED_JOB` (default `off`) and `REJECT_HISTORY_USE_UNIFIED_JOB` (default `off`) feature flags for P2 BaseChunkedDuckDBJob migration. Both flags are module-level constants frozen at import (restart required); `always_async=False` for both job types; `sync_fallback_allowed=True`. Additive; no existing flags changed.
 
