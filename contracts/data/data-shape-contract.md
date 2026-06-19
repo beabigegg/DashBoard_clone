@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.20.0
+schema-version: 1.21.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1178,7 +1178,24 @@ Any future column rename, addition, or removal in either namespace **must** bump
 
 ---
 
+### §3.19 Resource History Base and OEE Dataset Spool Schema — UNCHANGED Assertion (P3 Migration)
+
+**Change: resource-history-migration (P3 BaseChunkedDuckDBJob migration)**
+
+The `resource_dataset` and `resource_oee` spool parquet schemas are **explicitly unchanged** by this migration. The unified job workers (`ResourceHistoryBaseJob`, `ResourceHistoryOeeJob`) write the identical column sets as the legacy `_query_and_store_canonical_dataset` / `execute_primary_query` pandas ThreadPool path. This is a non-goal verified by data-boundary parity tests (AC-6).
+
+- `resource_dataset` spool: columns `HISTORYID`, `DATA_DATE`, `PRD_HOURS`, `SBY_HOURS`, `UDT_HOURS`, `SDT_HOURS`, `EGT_HOURS`, `NST_HOURS`, `TOTAL_HOURS` — unchanged. No `_SCHEMA_VERSION` bump required; no parquet cleanup on deploy/rollback.
+- `resource_oee` spool: **legacy** columns `EQUIPMENTID`, `SHIFT_DATE`, `TRACKOUT_QTY`, `NG_QTY`; **unified path** columns `EQUIPMENTID`, `TRACKOUT_QTY`, `NG_QTY` (SHIFT_DATE absent — `post_aggregate` groups by EQUIPMENTID only; no consumer reads SHIFT_DATE from this spool, so removing it is non-breaking). AC-6 `_OEE_LEGACY_COLS = {EQUIPMENTID, TRACKOUT_QTY, NG_QTY}` reflects the unified output. No parquet cleanup on deploy/rollback.
+
+Any future column rename, addition, or removal in either namespace **must** bump `_SCHEMA_VERSION` (or equivalent) and require parquet cleanup per the standard breaking-change policy.
+
+---
+
 ## CHANGELOG
+
+## [data 1.21.0] — 2026-06-19
+### Added
+- resource-history-migration: §3.19 (spool-schema-UNCHANGED assertion for `resource_dataset` and `resource_oee` namespaces). Explicit non-goal: P3 migration does not change spool parquet schemas. No parquet cleanup required on deploy/rollback. Standard breaking-change policy (schema-version bump + cleanup) applies to any future column change. Additive; no existing schemas changed.
 
 ## [data 1.20.0] — 2026-06-19
 ### Added

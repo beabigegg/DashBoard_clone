@@ -784,3 +784,57 @@ class TestRejectHistoryUnifiedJobRegistry:
         config = get_job_type_config("reject_unified")
         assert config is not None
         assert config.queue_name == "reject-query"
+
+
+class TestResourceHistoryBaseJobRegistry:
+    """AC-9: ResourceHistoryBaseJob registered with always_async=True."""
+
+    def test_base_job_registered_always_async_true(self):
+        """resource-history-base must be registered with always_async=True."""
+        import importlib
+        import mes_dashboard.workers.resource_history_base_worker as _bw
+        # Reload to re-fire module-level register_job_type (test-discipline rule)
+        importlib.reload(_bw)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("resource-history-base")
+        assert config is not None, "resource-history-base not registered in job_registry"
+        assert config.always_async is True, (
+            f"resource-history-base must have always_async=True; got {config.always_async}"
+        )
+
+    def test_base_job_queue_name(self):
+        """resource-history-base must use resource-history-query queue."""
+        import importlib
+        import mes_dashboard.workers.resource_history_base_worker as _bw
+        importlib.reload(_bw)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("resource-history-base")
+        assert config is not None
+        assert config.queue_name == "resource-history-query"
+
+
+class TestResourceHistoryOeeJobRegistry:
+    """AC-9: ResourceHistoryOeeJob registered with always_async=True."""
+
+    def test_oee_job_registered_always_async_true(self):
+        """resource-history-oee must be registered with always_async=True."""
+        import importlib
+        import mes_dashboard.workers.resource_history_oee_worker as _ow
+        # Reload to re-fire module-level register_job_type (test-discipline rule)
+        importlib.reload(_ow)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("resource-history-oee")
+        assert config is not None, "resource-history-oee not registered in job_registry"
+        assert config.always_async is True, (
+            f"resource-history-oee must have always_async=True; got {config.always_async}"
+        )
+
+    def test_oee_job_queue_name(self):
+        """resource-history-oee must use resource-history-query queue."""
+        import importlib
+        import mes_dashboard.workers.resource_history_oee_worker as _ow
+        importlib.reload(_ow)
+        from mes_dashboard.services.job_registry import get_job_type_config
+        config = get_job_type_config("resource-history-oee")
+        assert config is not None
+        assert config.queue_name == "resource-history-query"

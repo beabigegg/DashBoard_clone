@@ -49,6 +49,14 @@
       "workcenter": "PKG_SAW"
     },
     {
+      "avail_hours": 0.0,
+      "date": "2026-06-18",
+      "group": "元件切割",
+      "prd_hours": 0.0,
+      "prd_pct": 0,
+      "workcenter": "PKG_SAW"
+    },
+    {
       "avail_hours": 2283.5,
       "date": "2026-06-12",
       "group": "測試",
@@ -97,11 +105,11 @@
       "workcenter": "TMTT"
     },
     {
-      "avail_hours": 2115.0,
+      "avail_hours": 2416.5,
       "date": "2026-06-18",
       "group": "測試",
-      "prd_hours": 1798.4,
-      "prd_pct": 85.03,
+      "prd_hours": 2000.4,
+      "prd_pct": 82.78,
       "workcenter": "TMTT"
     },
     {
@@ -153,11 +161,11 @@
       "workcenter": "切割"
     },
     {
-      "avail_hours": 1401.5,
+      "avail_hours": 1490.6,
       "date": "2026-06-18",
       "group": "切割",
-      "prd_hours": 1201.2,
-      "prd_pct": 85.71,
+      "prd_hours": 1279.5,
+      "prd_pct": 85.84,
       "workcenter": "切割"
     },
     {
@@ -209,11 +217,11 @@
       "workcenter": "切彎腳"
     },
     {
-      "avail_hours": 404.2,
+      "avail_hours": 472.9,
       "date": "2026-06-18",
       "group": "切彎腳",
-      "prd_hours": 323.0,
-      "prd_pct": 79.93,
+      "prd_hours": 341.5,
+      "prd_pct": 72.22,
       "workcenter": "切彎腳"
     },
     {
@@ -265,11 +273,11 @@
       "workcenter": "去膠"
     },
     {
-      "avail_hours": 632.2,
+      "avail_hours": 668.5,
       "date": "2026-06-18",
       "group": "去膠",
-      "prd_hours": 567.9,
-      "prd_pct": 89.83,
+      "prd_hours": 601.1,
+      "prd_pct": 89.92,
       "workcenter": "去膠"
     },
     {
@@ -321,11 +329,11 @@
       "workcenter": "成型"
     },
     {
-      "avail_hours": 214.9,
+      "avail_hours": 3504.0,
       "date": "2026-06-18",
       "group": "成型",
-      "prd_hours": 90.5,
-      "prd_pct": 42.12,
+      "prd_hours": 140.0,
+      "prd_pct": 4.0,
       "workcenter": "成型"
     },
     {
@@ -377,11 +385,11 @@
       "workcenter": "成型_料"
     },
     {
-      "avail_hours": 837.2,
+      "avail_hours": 873.9,
       "date": "2026-06-18",
       "group": "成型",
-      "prd_hours": 633.6,
-      "prd_pct": 75.68,
+      "prd_hours": 666.4,
+      "prd_pct": 76.26,
       "workcenter": "成型_料"
     },
     {
@@ -433,11 +441,11 @@
       "workcenter": "掛鍍"
     },
     {
-      "avail_hours": 34.0,
+      "avail_hours": 39.6,
       "date": "2026-06-18",
       "group": "電鍍",
-      "prd_hours": 29.7,
-      "prd_pct": 87.53,
+      "prd_hours": 35.4,
+      "prd_pct": 89.31,
       "workcenter": "掛鍍"
     },
     {
@@ -489,11 +497,11 @@
       "workcenter": "條鍍"
     },
     {
-      "avail_hours": 57.5,
+      "avail_hours": 58.4,
       "date": "2026-06-18",
       "group": "電鍍",
       "prd_hours": 46.7,
-      "prd_pct": 81.13,
+      "prd_pct": 79.98,
       "workcenter": "條鍍"
     },
     {
@@ -545,11 +553,11 @@
       "workcenter": "水吹砂"
     },
     {
-      "avail_hours": 317.4,
+      "avail_hours": 363.1,
       "date": "2026-06-18",
       "group": "水吹砂",
-      "prd_hours": 281.1,
-      "prd_pct": 88.54,
+      "prd_hours": 319.0,
+      "prd_pct": 87.84,
       "workcenter": "水吹砂"
     },
     {
@@ -601,11 +609,11 @@
       "workcenter": "滾鍍"
     },
     {
-      "avail_hours": 19.5,
+      "avail_hours": 20.8,
       "date": "2026-06-18",
       "group": "電鍍",
-      "prd_hours": 15.7,
-      "prd_pct": 80.51,
+      "prd_hours": 17.0,
+      "prd_pct": 81.7,
       "workcenter": "滾鍍"
     },
     {
@@ -657,11 +665,11 @@
       "workcenter": "焊_DB_料"
     },
     {
-      "avail_hours": 288.8,
+      "avail_hours": 336.0,
       "date": "2026-06-18",
       "group": "焊接_DB",
-      "prd_hours": 166.6,
-      "prd_pct": 57.7,
+      "prd_hours": 180.6,
+      "prd_pct": 53.76,
       "workcenter": "焊_DB_料"
     },
     {
@@ -713,11 +721,11 @@
       "workcenter": "焊_WB_料"
     },
     {
-      "avail_hours": 311.5,
+      "avail_hours": 383.4,
       "date": "2026-06-18",
       "group": "焊接_WB",
-      "prd_hours": 184.1,
-      "prd_pct": 59.09,
+      "prd_hours": 191.7,
+      "prd_pct": 49.99,
       "workcenter": "焊_WB_料"
     },
     {
@@ -769,11 +777,11 @@
       "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 2545.1,
+      "avail_hours": 3093.9,
       "date": "2026-06-18",
       "group": "焊接_DB",
-      "prd_hours": 2288.2,
-      "prd_pct": 89.9,
+      "prd_hours": 2698.0,
+      "prd_pct": 87.2,
       "workcenter": "焊接_DB"
     },
     {
@@ -825,11 +833,11 @@
       "workcenter": "焊接_DW"
     },
     {
-      "avail_hours": 3112.9,
+      "avail_hours": 3968.0,
       "date": "2026-06-18",
       "group": "焊接_DW",
-      "prd_hours": 2042.7,
-      "prd_pct": 65.62,
+      "prd_hours": 2311.6,
+      "prd_pct": 58.26,
       "workcenter": "焊接_DW"
     },
     {
@@ -881,11 +889,11 @@
       "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 3459.1,
+      "avail_hours": 4236.9,
       "date": "2026-06-18",
       "group": "焊接_WB",
-      "prd_hours": 2730.6,
-      "prd_pct": 78.94,
+      "prd_hours": 3194.5,
+      "prd_pct": 75.4,
       "workcenter": "焊接_WB"
     },
     {
@@ -937,11 +945,11 @@
       "workcenter": "移印"
     },
     {
-      "avail_hours": 528.2,
+      "avail_hours": 554.2,
       "date": "2026-06-18",
       "group": "移印",
-      "prd_hours": 444.8,
-      "prd_pct": 84.22,
+      "prd_hours": 470.3,
+      "prd_pct": 84.87,
       "workcenter": "移印"
     },
     {
@@ -993,11 +1001,11 @@
       "workcenter": "電鍍"
     },
     {
-      "avail_hours": 35.4,
+      "avail_hours": 36.4,
       "date": "2026-06-18",
       "group": "電鍍",
-      "prd_hours": 30.9,
-      "prd_pct": 87.13,
+      "prd_hours": 31.8,
+      "prd_pct": 87.46,
       "workcenter": "電鍍"
     },
     {
@@ -1049,17 +1057,17 @@
       "workcenter": "點測"
     },
     {
-      "avail_hours": 245.5,
+      "avail_hours": 397.0,
       "date": "2026-06-18",
       "group": null,
-      "prd_hours": 241.6,
-      "prd_pct": 98.42,
+      "prd_hours": 393.1,
+      "prd_pct": 99.01,
       "workcenter": "點測"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T08:12:20.371435"
+    "timestamp": "2026-06-19T12:17:24.534714"
   },
   "success": true
 }

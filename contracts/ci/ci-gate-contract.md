@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.27
+schema-version: 1.3.28
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -499,7 +499,34 @@ gate tier, command, or status changed.
 
 **Schema-version bump to 1.3.27 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
 
+## resource-history-migration Gate Compatibility Note
+
+**P3 migration — two new worker modules, one feature flag (default `off`):**
+
+- Two new job modules: `src/mes_dashboard/workers/resource_history_base_worker.py` (job type `resource-history-base`, `always_async=True`, `requires_cross_chunk_reduction=False`) and `src/mes_dashboard/workers/resource_history_oee_worker.py` (job type `resource-history-oee`, `always_async=True`, `requires_cross_chunk_reduction=True`). Both covered by existing `unit-mock-integration` gate.
+- New test files: `tests/test_resource_history_unified_job.py`, `tests/test_resource_history_job_service.py` — auto-discovered by existing gate commands.
+- Integration stub: `tests/integration/test_resource_history_rq_async.py` — skipped pre-merge (nightly gate, `integration_real` marker).
+- Feature flag `RESOURCE_HISTORY_USE_UNIFIED_JOB=off` (default) ensures zero behavioral change under all gate runs until explicitly set.
+- Reuses existing `resource-history-query` RQ queue and `mes-dashboard-resource-history-worker.service` — no new systemd unit, no new workflow file, no gate tier change. Additive; no existing gates changed.
+
+**Deploy checklist:**
+1. No new worker service required — reuses existing `mes-dashboard-resource-history-worker.service`.
+2. Verify `resource-history-query` queue and worker remain healthy after deploy.
+3. Confirm `RESOURCE_HISTORY_USE_UNIFIED_JOB` reads as `off` in ALL processes (gunicorn + worker) before promoting to `on`. Flag is a module-level constant frozen at boot.
+4. Worker env-var parity: `mes-dashboard-resource-history-worker.service` MUST export `RESOURCE_HISTORY_USE_UNIFIED_JOB` with the same value as gunicorn.
+5. Run `tests/test_resource_history_unified_job.py` and `tests/test_query_cost_policy.py` green before promoting flag.
+
+**Rollback checklist:**
+1. Set `RESOURCE_HISTORY_USE_UNIFIED_JOB=off`.
+2. **Restart** gunicorn and the resource-history worker — env vars are module-level constants frozen at boot.
+3. No spool cleanup required: spool schema is unchanged between unified-job and legacy paths.
+
+**Schema-version bump to 1.3.28 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
+
 ## CHANGELOG
+
+## [ci 1.3.28] — 2026-06-19
+- resource-history-migration: Gate-compatibility note for P3 migration — two new worker modules (`resource_history_base_worker`, `resource_history_oee_worker`) reuse existing `resource-history-query` queue and worker service; no new workflow file or gate tier needed. Feature flag `RESOURCE_HISTORY_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. Additive; no existing gates changed.
 
 ## [ci 1.3.27] — 2026-06-19
 - production-reject-history-migration: Gate-compatibility note for P2 migration (two new worker modules, feature flags default `off`, new systemd unit, two new integration test files skipped pre-merge). Additive; no existing gates changed.

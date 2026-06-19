@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 179
-visible-files: 913
+visible-dirs: 180
+visible-files: 921
 omitted-dirs: 61
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -68,6 +68,7 @@ DashBoard_vite/
 |   |   |-- 05c158cd4e4da3b0
 |   |   |-- 06e37be44b7c2558
 |   |   |-- 080fe7d7b77357e4
+|   |   |-- 0860b7ce1f462945
 |   |   |-- 08fea481e286d665
 |   |   |-- 09af02b32eace3be
 |   |   |-- 0a24b457adbbced2
@@ -90,6 +91,7 @@ DashBoard_vite/
 |   |   |-- 1ae1a5c44c5de27d
 |   |   |-- 1b488e9c0e7c5031
 |   |   |-- 1bfae4d4f286c3d1
+|   |   |-- 1c079de4646a8d8b
 |   |   |-- 1cc56ed5fc92eb40
 |   |   |-- 1fa576bc7d285941
 |   |   |-- 1fcb892092629696
@@ -99,11 +101,9 @@ DashBoard_vite/
 |   |   |-- 2240f61bb7e8003e
 |   |   |-- 22775c7be38c0fc8
 |   |   |-- 2487e0dd67ee4005
+|   |   |-- 24a326889958cc67
 |   |   |-- 2513622121cc3cd3
-|   |   |-- 252e65ed0ede4ad2
-|   |   |-- 253e6c94fab987bc
-|   |   |-- 25971344fbd495b6
-|   |   \-- ... (247 more entries truncated; cap=50)
+|   |   \-- ... (256 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -156,6 +156,7 @@ DashBoard_vite/
 |   |-- mes-dashboard-hold-history-worker.service
 |   |-- mes-dashboard-material-consumption-worker.service
 |   |-- mes-dashboard-msd-worker.service
+|   |-- mes-dashboard-production-history-worker.service
 |   |-- mes-dashboard-reject-worker.service
 |   |-- mes-dashboard-trace-worker.service
 |   |-- mes-dashboard-watchdog.service
@@ -169,7 +170,8 @@ DashBoard_vite/
 |   |   |-- 0005-resource-history-canonical-spool-key.md
 |   |   |-- 0006-duckdb-prewarm-via-rq-queue.md
 |   |   |-- 0007-downtime-browser-duckdb-compute-relocation.md
-|   |   \-- 0008-eap-alarm-coarse-spool-detail-join.md
+|   |   |-- 0008-eap-alarm-coarse-spool-detail-join.md
+|   |   \-- 0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md
 |   |-- architecture/
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
@@ -858,7 +860,9 @@ DashBoard_vite/
 |       |   \-- query_tool.html
 |       |-- workers/
 |       |   |-- __init__.py
-|       |   \-- eap_alarm_worker.py
+|       |   |-- eap_alarm_worker.py
+|       |   |-- production_history_worker.py
+|       |   \-- reject_history_worker.py
 |       |-- __init__.py
 |       |-- __main__.py
 |       |-- app.py
@@ -985,11 +989,13 @@ DashBoard_vite/
 |   |   |-- test_oracle_error_codes.py
 |   |   |-- test_oracle_error_path.py
 |   |   |-- test_preload_fork_safety.py
+|   |   |-- test_production_history_rq_async.py
 |   |   |-- test_race_conditions.py
 |   |   |-- test_real_multi_worker.py
 |   |   |-- test_real_oracle_fault_injection.py
 |   |   |-- test_redis_chaos.py
 |   |   |-- test_redis_timeout_fallback.py
+|   |   |-- test_reject_history_rq_async.py
 |   |   |-- test_resource_history_rq_async.py
 |   |   |-- test_rowcount_flag_parity.py
 |   |   \-- test_soak_workload.py
@@ -1101,13 +1107,15 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
-|   \-- ... (174 more entries truncated; cap=50)
+|   \-- ... (177 more entries truncated; cap=50)
 |-- tmp/
+|   |-- duckdb_jobs/
+|   |   \-- test_ns/
 |   |-- query_spool/
 |   |   |-- downtime_analysis/
 |   |   |-- msd-events/
-|   |   |   \-- tmp1ys3n6w4.parquet
-|   |   |-- production_history/
+|   |   |   |-- tmp3rtenje2.parquet
+|   |   |   \-- tmpk27ao_w0.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
@@ -1155,7 +1163,8 @@ DashBoard_vite/
 |   |   |-- probe_165113.json
 |   |   |-- probe_165674.json
 |   |   |-- probe_166368.json
-|   |   \-- ... (323 more entries truncated; cap=50)
+|   |   |-- probe_166780.json
+|   |   \-- ... (379 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   |-- mes_dashboard_restart.flag

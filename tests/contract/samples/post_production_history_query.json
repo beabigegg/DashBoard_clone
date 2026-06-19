@@ -1,11 +1,12 @@
 {
   "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "查詢無結果，請確認篩選條件後重試"
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "背景查詢服務不可用，請稍後再試"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T08:11:43.451005"
+    "retry_after_seconds": 30,
+    "timestamp": "2026-06-19T12:16:47.581004"
   },
   "success": false
 }

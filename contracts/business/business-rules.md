@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.24.0
+schema-version: 1.25.0
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -43,6 +43,7 @@ breaking-change-policy: deprecate-2-minors
 | ASYNC-06 | Always-async 503 on forced sync | When `JobTypeConfig.always_async=True` AND `sync_fallback_allowed=False` AND async queue unavailable: the request MUST receive HTTP 503 `SERVICE_UNAVAILABLE` with a `Retry-After` header. It MUST NOT be silently downgraded to synchronous execution. Rationale: always-async domains (e.g. eap_alarm) have query durations that exceed safe synchronous timeout bounds; a partial synchronous result would be incorrect and misleading. Cross-reference: error-format.md §503 Async Unavailable. | `tests/test_async_query_job_service.py` (AC-4) |
 | ASYNC-07 | Unified-job dispatch (production_history + reject) | When `PRODUCTION_HISTORY_USE_UNIFIED_JOB=on` OR `REJECT_HISTORY_USE_UNIFIED_JOB=on`, the respective route MUST enqueue via `enqueue_query_job("<domain>_unified", ..., sync_fallback_allowed=True)` with `JobTypeConfig.always_async=False`. Queue unavailable: the route MAY fall back to legacy path or return 503 (sync_fallback_allowed=True means no forced 503). Queue available → HTTP 202. Flag `off` (default): the legacy enqueue path runs verbatim (AC-8 zero-regression). Both domain flags are independent per-domain rollback handles. Added by change `production-reject-history-migration`. | `tests/test_async_query_job_service.py::TestProductionHistoryUnifiedJobRegistry`, `tests/test_async_query_job_service.py::TestRejectHistoryUnifiedJobRegistry` |
 | ASYNC-08 | OOM guard shift (reject domain) | The unified job worker path (`reject_history_worker.py`) writes raw rows to the canonical spool via DuckDB COPY: no pandas heap allocation occurs, so no post-hoc memory check can trigger. Pre-emptive OOM protection: DuckDB on-disk spill (`DUCKDB_JOB_DIR`) handles memory pressure at the storage layer before any Python heap pressure. The legacy flag=off path retains its existing memory-pressure checks (`_enforce_interactive_memory_guard`, RSS-pressure guard) unchanged — no regression. The `TestOomGuardAbsence` test verifies that the new worker modules and the legacy source files contain no `if len(df)…: raise` or `memory_usage`-as-IF-condition raise patterns; the legacy path uses RSS-pressure and helper delegation (not these patterns), so the test confirms both paths are free of that specific guard class. Added by change `production-reject-history-migration`. | `tests/test_reject_history_unified_job.py::TestOomGuardAbsence` |
+| ASYNC-09 | Dual-job unified execution (resource-history domain) | When `RESOURCE_HISTORY_USE_UNIFIED_JOB=on`, the export route MUST enqueue TWO separate RQ jobs: (1) `ResourceHistoryBaseJob` (`resource-history-base`, `requires_cross_chunk_reduction=False`) writing to `resource_dataset` spool, and (2) `ResourceHistoryOeeJob` (`resource-history-oee`, `requires_cross_chunk_reduction=True`) writing to `resource_oee` spool. Both jobs use `always_async=True` and `sync_fallback_allowed=False`. When the async queue is unavailable the route returns HTTP 503 with Retry-After (no silent sync downgrade). The OEE job computes ratio-of-SUMs (`yield = ΣTRACKOUT/(ΣTRACKOUT+ΣNG)`) across all chunks via job-temp DuckDB `post_aggregate`; per-chunk pre-aggregation is not used (ADR-0003 cross-chunk reduction). Each OEE chunk's `:reject_start`/`:reject_end` binds are widened ±30 days around the chunk's production dates to prevent boundary-NG loss. Flag `off` (default): the legacy `export_csv` Oracle read + pandas iterrows path is used unchanged (AC-1 zero-regression). Spool parquet schemas for `resource_dataset` and `resource_oee` are identical to the legacy path (§3.19 data-shape-UNCHANGED). Added by change `resource-history-migration`. | `tests/test_resource_history_unified_job.py`, `tests/test_resource_history_job_service.py` |
 
 ## Hold-History Rules
 
@@ -336,6 +337,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.25.0] — 2026-06-19
+### Added
+- resource-history-migration: ASYNC-09 (dual-job unified execution rule for resource-history domain — `RESOURCE_HISTORY_USE_UNIFIED_JOB=on` routes to two RQ jobs: `resource-history-base` (`always_async=True`, `requires_cross_chunk_reduction=False`) and `resource-history-oee` (`always_async=True`, `requires_cross_chunk_reduction=True`); queue unavailable → 503 with Retry-After; OEE ratio-of-SUMs via job-temp DuckDB `post_aggregate`; ±30d reject window per chunk; spool schemas per §3.19; flag-off uses legacy `export_csv` unchanged). Additive; no existing rules changed.
 
 ## [business 1.24.0] — 2026-06-19
 ### Added

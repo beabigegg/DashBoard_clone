@@ -187,5 +187,6 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Playwright specs for reject-history / reject-material: `DetailTable` only renders after `queryId` is set — always click the submit button in `beforeEach` before asserting table content — see docs/architecture/ci-workflow.md
 - Playwright resilience specs: use `page.goto(...).catch(()=>{})` + early-return guard, NOT `page.request.post()` (`loginViaApi`), which is not interceptable by `page.route()` and throws ECONNREFUSED in CI — see docs/architecture/ci-workflow.md
 - Playwright `pageRendered` guard: check app-specific content (theme class or feature keyword), NOT `bodyText.length > 100` — Chrome's ECONNREFUSED error page body exceeds 100 chars — see docs/architecture/ci-workflow.md
+- Async-gated route unit tests: mock `is_async_available()=True` + enqueue fn instead of spool-hit mocks; CI has no Redis, so routes without this mock fall to 503 — see docs/architecture/ci-workflow.md
 
 <!-- cdd-kit:learnings:end -->

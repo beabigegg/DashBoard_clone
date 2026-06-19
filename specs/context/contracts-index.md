@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 627da88855fe36684834184d9e48e08540ccda35c25b1fd3b1d968e1cc3e1329
+inputs-digest: 42feac389737099af9517c6d574dcc5eb6ea57bdd7d5028b4a271d0fbfc556e3
 ---
 
 # Contracts Index
@@ -60,8 +60,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Error Format
 - owner: application-team
 - surface: api
-- schema-version: 1.1.0
-- last-changed: 2026-05-05
+- schema-version: 1.2.0
+- last-changed: 2026-06-19
 - summary: Standard error payload shape, safety rules, and reusable error code table.
 
 
@@ -72,8 +72,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.22.0
-- last-changed: 2026-06-18
+- schema-version: 1.24.0
+- last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
 
@@ -85,8 +85,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.25
-- last-changed: 2026-06-18
+- schema-version: 1.3.27
+- last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.
 
@@ -135,8 +135,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.19.0
-- last-changed: 2026-06-18
+- schema-version: 1.20.0
+- last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
 
@@ -148,8 +148,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Env Contract — MES Dashboard
 - owner: platform-team
 - surface: runtime-config
-- schema-version: 1.0.14
-- last-changed: 2026-06-18
+- schema-version: 1.0.16
+- last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: Environment variable inventory, secret handling, and deployment sync policy.
 

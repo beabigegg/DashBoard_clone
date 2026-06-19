@@ -70,3 +70,37 @@ Evidence: `resource-history-rq-async` — CI run failed (all 3 tests ECONNREFUSE
 Pattern: `frontend/tests/playwright/resource-history-async.spec.ts` — AC-9 `pageRendered` check uses `bodyText.includes('設備') || bodyText.includes('KPI') || locator('.theme-resource-history, #resource-history-app').count() > 0`.
 
 Evidence: `resource-history-rq-async` — fix commit `f8b15d6`.
+
+## Async-Gated Route Unit Tests — Mock `is_async_available()`, Not Spool-Hit
+
+**The `backend-tests` CI job has no Redis service.** `is_async_available()` returns `False` when Redis is unreachable, causing routes for async-only domains (production-history, reject-history) to fall through to a 503 degraded response. Tests that expected 200/202 fail with 503.
+
+**Wrong approach — spool-hit mock:**
+```python
+# Fragile in CI: spool directory is empty; mock path resolution may mismatch
+patch("...get_spool_file_path", return_value="/tmp/fake.parquet")
+patch("...query_production_history", return_value={...})
+```
+
+**Correct approach — async-path mock:**
+```python
+@patch(
+    "mes_dashboard.services.production_history_job_service.enqueue_production_history_query",
+    return_value=("job-id-test-123", None),
+)
+@patch(
+    "mes_dashboard.services.async_query_job_service.is_async_available",
+    return_value=True,
+)
+def test_something(self, mock_async, mock_enqueue):
+    response = self.client.post("/api/production-history/query", json={...})
+    self.assertIn(response.status_code, (200, 202))
+```
+
+This ensures the route walks the legacy async path (202) and never reaches the degraded 503 branch, regardless of Redis availability.
+
+The same applies to any route that has `if is_async_available():` as its only non-spool dispatch branch.
+
+Pattern: `tests/test_api_contract.py::TestProductionHistoryQueryModeContract::test_query_payload_dates_optional_with_identifier_tokens`
+
+Evidence: `production-reject-history-migration` — CI failures on `a96acd5` fixed in same commit.

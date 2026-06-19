@@ -338,6 +338,8 @@ class TestNoPandasAndNoCallers:
                 "eap_alarm_worker",
                 "production_history_worker",
                 "reject_history_worker",
+                "resource_history_base_worker",
+                "resource_history_oee_worker",
             },
         }
 

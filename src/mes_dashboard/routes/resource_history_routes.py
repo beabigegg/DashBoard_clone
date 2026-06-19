@@ -15,10 +15,12 @@ from mes_dashboard.config.constants import CACHE_TTL_FILTER_OPTIONS
 from mes_dashboard.core.permissions import login_required, get_owner_token
 from mes_dashboard.core.response import (
     cache_expired_error,
+    error_response,
     internal_error,
     not_found_error,
     success_response,
     validation_error,
+    SERVICE_UNAVAILABLE,
 )
 from mes_dashboard.services.async_query_job_service import (
     enqueue_job_dynamic,
@@ -34,6 +36,15 @@ from mes_dashboard.services.resource_dataset_cache import (
     apply_view,
 )
 import mes_dashboard.services.resource_query_job_service  # noqa: F401 — forces register_job_type() side-effect
+
+# ── Unified-job feature flag (P3 migration, resource-history-migration) ──────
+# Frozen at import time — tests must use monkeypatch.setattr(), never setenv().
+# Default off: legacy export_csv path is unchanged when flag is off (AC-1).
+# When on: both ResourceHistoryBaseJob and ResourceHistoryOeeJob are enqueued;
+# sync fallback is removed from this path (AC-7); degraded → 503.
+RESOURCE_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
+    "RESOURCE_HISTORY_USE_UNIFIED_JOB", "off"
+).strip().lower() in ("1", "true", "yes", "on")
 
 # ── Local-compute feature flags (Task 1.3) ────────────────────────────────────
 
@@ -429,7 +440,88 @@ def api_resource_history_export():
     # Generate filename
     filename = f"resource_history_{start_date}_to_{end_date}.csv"
 
-    # Stream CSV response
+    # ── Unified-job path (RESOURCE_HISTORY_USE_UNIFIED_JOB=on) ─────────────
+    # When flag is on, enqueue both base + OEE unified jobs; sync fallback is
+    # removed (AC-7): degraded (no worker) → 503.  The CSV is streamed from
+    # the two spool files via DuckDB join (export_csv_from_spools).
+    # Flag=off → unchanged legacy export_csv stream (AC-1).
+    if RESOURCE_HISTORY_USE_UNIFIED_JOB:
+        # 503 if worker is unavailable (AC-7; always_async=True has no sync fallback)
+        if not is_async_available():
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+
+        # Trigger worker registration (lazy import pattern like eap_alarm_routes)
+        import mes_dashboard.workers.resource_history_base_worker  # noqa: F401
+        import mes_dashboard.workers.resource_history_oee_worker   # noqa: F401
+
+        from mes_dashboard.services.async_query_job_service import (
+            enqueue_query_job,
+            complete_job,
+        )
+
+        unified_params = {
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+
+        import uuid as _uuid
+        base_job_id = f"rh-base-{_uuid.uuid4().hex[:12]}"
+        oee_job_id = f"rh-oee-{_uuid.uuid4().hex[:12]}"
+
+        _owner = get_owner_token()
+
+        base_result, base_err, base_hint = enqueue_query_job(
+            "resource-history-base",
+            owner=_owner,
+            params={**unified_params, "job_id": base_job_id},
+            sync_fallback_allowed=False,
+            job_id=base_job_id,
+        )
+        if base_result is None:
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用 (base)，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+
+        oee_result, oee_err, oee_hint = enqueue_query_job(
+            "resource-history-oee",
+            owner=_owner,
+            params={**unified_params, "job_id": oee_job_id},
+            sync_fallback_allowed=False,
+            job_id=oee_job_id,
+        )
+        if oee_result is None:
+            return error_response(
+                SERVICE_UNAVAILABLE,
+                "背景查詢服務不可用 (oee)，請稍後再試",
+                status_code=503,
+                meta={"retry_after_seconds": 30},
+                headers={"Retry-After": "30"},
+            )
+
+        # Both jobs enqueued; return 202 with job IDs for polling
+        return success_response(
+            {
+                "async": True,
+                "base_job_id": base_result,
+                "oee_job_id": oee_result,
+                "status_url_base": f"/api/job/{base_result}?prefix=resource-history-base",
+                "status_url_oee": f"/api/job/{oee_result}?prefix=resource-history-oee",
+            },
+            status_code=202,
+        )
+
+    # ── Legacy path (flag=off, AC-1) ──────────────────────────────────────────
+    # Stream CSV response using the existing export_csv service (unchanged).
     return Response(
         export_csv(
             start_date=start_date,

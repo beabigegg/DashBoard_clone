@@ -1,0 +1,15 @@
+{
+  "change_id": "resource-history-migration",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest -m 'not (e2e or integration_real or stress or load or soak or multi_worker)' --ignore=tests/integration --ignore=tests/stress --ignore=tests/e2e --ignore=tests/manual -x -q 2>&1 | tail -5",
+  "duration_ms": 251020,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/resource-history-migration/test-runs/20260619-121551/summary.json",
+    "stdout": "specs/changes/resource-history-migration/test-runs/20260619-121551/stdout.log",
+    "stderr": "specs/changes/resource-history-migration/test-runs/20260619-121551/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

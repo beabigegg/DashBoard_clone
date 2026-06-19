@@ -1,0 +1,14 @@
+- type: tier-floor-override
+  change-id: resource-history-migration
+  timestamp: '2026-06-19T04:25:38.621Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - cache
+    - migration
+    - query
+  reason: >-
+    P2 migration flag-gated off by default; no production path executes new worker code until
+    RESOURCE_HISTORY_USE_UNIFIED_JOB=on is explicitly set. Deferred stress/soak testing to
+    nightly/weekly gates (Tier 3/4) before flag promotion.

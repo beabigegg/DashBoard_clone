@@ -1,0 +1,1 @@
+pytest tests/test_resource_history_service.py tests/test_resource_history_unified_job.py tests/test_resource_history_job_service.py tests/test_query_cost_policy.py tests/test_async_query_job_service.py -x --tb=short -q --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/resource-history-migration/test-runs/20260619-123255/junit.xml' -ra

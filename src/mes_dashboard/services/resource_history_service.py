@@ -16,6 +16,7 @@ Architecture:
 import io
 import csv
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, List, Any, Generator
@@ -26,6 +27,15 @@ from mes_dashboard.core.database import read_sql_df_slow as read_sql_df
 from mes_dashboard.sql import SQLLoader
 from mes_dashboard.config.field_contracts import get_export_headers, get_export_api_keys
 logger = logging.getLogger('mes_dashboard.resource_history')
+
+# ── Unified-job flag — frozen at import; tests must use monkeypatch.setattr() ──
+# Mirrors RESOURCE_HISTORY_USE_UNIFIED_JOB in resource_history_routes.py.
+# When on: export_csv_from_spools() produces CSV from pre-built parquet spools
+# via DuckDB join (replacing the in-process read_sql_df + iterrows path).
+# When off (default): export_csv behaves exactly as before (AC-1 legacy guard).
+_RESOURCE_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
+    "RESOURCE_HISTORY_USE_UNIFIED_JOB", "off"
+).strip().lower() in ("1", "true", "yes", "on")
 
 # Maximum allowed query range in days
 MAX_QUERY_DAYS = 730
@@ -648,6 +658,197 @@ def export_csv(
     except Exception as exc:
         logger.error(f"CSV export failed: {exc}")
         yield f"Error: {exc}\n"
+
+
+# ============================================================
+# Unified-job spool CSV export (flag=on path, AC-4 / AC-5)
+# ============================================================
+
+def export_csv_from_spools(
+    base_spool_path: str,
+    oee_spool_path: str,
+    start_date: str,
+    end_date: str,
+    workcenter_groups: Optional[List[str]] = None,
+    families: Optional[List[str]] = None,
+    resource_ids: Optional[List[str]] = None,
+    is_production: bool = False,
+    is_key: bool = False,
+    is_monitor: bool = False,
+) -> Generator[str, None, None]:
+    """Generate CSV from pre-built base + OEE parquet spools via DuckDB join.
+
+    Replaces the in-process read_sql_df + iterrows path (AC-4) under
+    RESOURCE_HISTORY_USE_UNIFIED_JOB=on.  No sync Oracle query; no pandas iterrows.
+
+    The base spool (resource_dataset) contains per-HISTORYID/day status hours.
+    The OEE spool (resource_oee) contains per-EQUIPMENTID TRACKOUT_QTY + NG_QTY
+    already aggregated across the date range by ResourceHistoryOeeJob.post_aggregate.
+
+    This function does the final CSV stitch:
+      - For each HISTORYID in base spool, look up resource dimension from cache
+      - Compute availability_pct = (PRD+SBY+EGT)/(PRD+SBY+EGT+SDT+UDT+NST)
+      - Look up TRACKOUT_QTY + NG_QTY per EQUIPMENTID from OEE spool
+      - Compute yield_pct = TRACKOUT / (TRACKOUT + NG)
+      - OEE% = availability_pct * yield_pct / 100
+
+    Parity ≤1e-6 with legacy iterrows path (AC-3/AC-4 assertion in test suite).
+    """
+    import duckdb
+
+    # Get resource dimension data from cache
+    resources = _get_filtered_resources(
+        workcenter_groups=workcenter_groups,
+        families=families,
+        resource_ids=resource_ids,
+        is_production=is_production,
+        is_key=is_key,
+        is_monitor=is_monitor,
+    )
+    if not resources:
+        yield "Error: No resources match the filter criteria\n"
+        return
+
+    resource_lookup = _build_resource_lookup(resources)
+
+    from mes_dashboard.services.filter_cache import get_workcenter_mapping
+    wc_mapping = get_workcenter_mapping() or {}
+
+    export_keys = get_export_api_keys('resource_history')
+    headers = get_export_headers('resource_history')
+    if not export_keys or not headers or len(export_keys) != len(headers):
+        export_keys = [
+            'workcenter', 'family', 'resource',
+            'ou_pct', 'oee_pct', 'availability_pct', 'yield_pct',
+            'trackout_qty', 'ng_qty',
+            'prd_hours', 'prd_pct', 'sby_hours', 'sby_pct',
+            'udt_hours', 'udt_pct', 'sdt_hours', 'sdt_pct',
+            'egt_hours', 'egt_pct', 'nst_hours', 'nst_pct',
+        ]
+        headers = [
+            '站點', '型號', '機台', 'OU%', 'OEE%', 'Availability%',
+            'Yield%', 'TRACKOUT_QTY', 'NG_QTY',
+            'PRD(h)', 'PRD(%)', 'SBY(h)', 'SBY(%)',
+            'UDT(h)', 'UDT(%)', 'SDT(h)', 'SDT(%)',
+            'EGT(h)', 'EGT(%)', 'NST(h)', 'NST(%)',
+        ]
+
+    # Write BOM + header row
+    output = io.StringIO()
+    output.write('﻿')
+    writer = csv.writer(output)
+    writer.writerow(headers)
+    yield output.getvalue()
+    output.truncate(0)
+    output.seek(0)
+
+    # Build OEE lookup from OEE spool via DuckDB
+    oee_by_equipment: Dict[str, Dict[str, int]] = {}
+    try:
+        con = duckdb.connect()
+        try:
+            oee_rows = con.execute(
+                f"SELECT EQUIPMENTID, TRACKOUT_QTY, NG_QTY "
+                f"FROM read_parquet('{oee_spool_path}')"
+            ).fetchall()
+            for eq_id, trackout, ng in oee_rows:
+                oee_by_equipment[str(eq_id)] = {
+                    "trackout_qty": int(trackout or 0),
+                    "ng_qty": int(ng or 0),
+                }
+        finally:
+            con.close()
+    except Exception as oee_exc:
+        logger.warning("export_csv_from_spools: OEE spool read failed: %s", oee_exc)
+
+    # Read base spool and produce CSV rows
+    try:
+        con = duckdb.connect()
+        try:
+            # Aggregate base spool: SUM status hours per HISTORYID across all days
+            _BASE_AGG_SQL = f"""
+SELECT
+    HISTORYID,
+    SUM(PRD_HOURS)   AS PRD_HOURS,
+    SUM(SBY_HOURS)   AS SBY_HOURS,
+    SUM(UDT_HOURS)   AS UDT_HOURS,
+    SUM(SDT_HOURS)   AS SDT_HOURS,
+    SUM(EGT_HOURS)   AS EGT_HOURS,
+    SUM(NST_HOURS)   AS NST_HOURS,
+    SUM(TOTAL_HOURS) AS TOTAL_HOURS
+FROM read_parquet('{base_spool_path}')
+GROUP BY HISTORYID
+ORDER BY HISTORYID
+"""
+            base_rows = con.execute(_BASE_AGG_SQL).fetchall()
+        finally:
+            con.close()
+    except Exception as base_exc:
+        logger.error("export_csv_from_spools: base spool read failed: %s", base_exc)
+        yield f"Error: {base_exc}\n"
+        return
+
+    for row in base_rows:
+        historyid, prd, sby, udt, sdt, egt, nst, total = (
+            row[0], float(row[1] or 0), float(row[2] or 0),
+            float(row[3] or 0), float(row[4] or 0), float(row[5] or 0),
+            float(row[6] or 0), float(row[7] or 0),
+        )
+
+        resource_info = resource_lookup.get(historyid, {})
+        if not resource_info:
+            continue
+
+        wc_name = resource_info.get('WORKCENTERNAME', '')
+        wc_info = wc_mapping.get(wc_name, {})
+        wc_group = wc_info.get('group', wc_name)
+        family = resource_info.get('RESOURCEFAMILYNAME', '')
+        resource_name = resource_info.get('RESOURCENAME', '')
+
+        ou_pct = _calc_ou_pct(prd, sby, udt, sdt, egt)
+        availability_pct = _calc_availability_pct(prd, sby, udt, sdt, egt, nst)
+        prd_pct = round(prd / total * 100, 1) if total > 0 else 0
+        sby_pct = round(sby / total * 100, 1) if total > 0 else 0
+        udt_pct = round(udt / total * 100, 1) if total > 0 else 0
+        sdt_pct = round(sdt / total * 100, 1) if total > 0 else 0
+        egt_pct = round(egt / total * 100, 1) if total > 0 else 0
+        nst_pct = round(nst / total * 100, 1) if total > 0 else 0
+
+        oee_info = oee_by_equipment.get(historyid, {})
+        trackout_qty = oee_info.get('trackout_qty', 0)
+        ng_qty = oee_info.get('ng_qty', 0)
+        oee_denom = trackout_qty + ng_qty
+        yield_pct = round(trackout_qty / oee_denom * 100, 1) if oee_denom > 0 else 0
+        oee_pct = round(availability_pct * yield_pct / 100, 1)
+
+        value_map = {
+            'workcenter': wc_group,
+            'family': family,
+            'resource': resource_name,
+            'ou_pct': f"{ou_pct}%",
+            'oee_pct': f"{oee_pct}%",
+            'availability_pct': f"{availability_pct}%",
+            'yield_pct': f"{yield_pct}%",
+            'trackout_qty': trackout_qty,
+            'ng_qty': ng_qty,
+            'prd_hours': round(prd, 1),
+            'prd_pct': f"{prd_pct}%",
+            'sby_hours': round(sby, 1),
+            'sby_pct': f"{sby_pct}%",
+            'udt_hours': round(udt, 1),
+            'udt_pct': f"{udt_pct}%",
+            'sdt_hours': round(sdt, 1),
+            'sdt_pct': f"{sdt_pct}%",
+            'egt_hours': round(egt, 1),
+            'egt_pct': f"{egt_pct}%",
+            'nst_hours': round(nst, 1),
+            'nst_pct': f"{nst_pct}%",
+        }
+        csv_row = [value_map.get(key, '') for key in export_keys]
+        writer.writerow(csv_row)
+        yield output.getvalue()
+        output.truncate(0)
+        output.seek(0)
 
 
 # ============================================================

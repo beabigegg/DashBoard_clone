@@ -1,0 +1,15 @@
+agent: spec-architect
+session: 2026-06-19
+status: complete
+
+artifacts:
+  - { type: design, pointer: specs/changes/resource-history-migration/design.md }
+
+key-decisions:
+  - "Topology: TWO separate jobs — ResourceHistoryBaseJob (requires_cross_chunk_reduction=False) + ResourceHistoryOeeJob (requires_cross_chunk_reduction=True)"
+  - "Base job: GROUP BY HISTORYID/day from RESOURCESTATUS_SHIFT; whole-day TIME chunks never split groups → multi-parquet append, no job-temp DuckDB"
+  - "OEE job: ratio-of-SUMs per EQUIPMENTID across all dates + ±30d reject window crossing chunk seams → INSERT INTO raw, post_aggregate GROUP BY in DuckDB"
+  - "Two jobs → spool-schema-UNCHANGED (AC-6) by construction: each job owns one namespace, one legacy column set"
+  - "ChunkStrategy.TIME confirmed; RESOURCEID/EQUIPMENTID is NOT the chunk key"
+  - "base+OEE ThreadPoolExecutor(2) superseded by two RQ jobs + intra-chunk fan-out (AC-5 elevated)"
+  - "Highest risk: OEE chunk build_chunk_sql must extend reject sub-window ±30d or boundary NG is lost (AC-3)"

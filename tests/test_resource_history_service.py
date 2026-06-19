@@ -496,3 +496,108 @@ class TestTtlBifurcation(unittest.TestCase):
             _CACHE_TTL,
             f"end_date {boundary_date!r} (today - 2) should NOT be historical (boundary is exclusive)",
         )
+
+
+# ============================================================
+# Extended tests for resource-history-migration (IP-7)
+# ============================================================
+
+class TestFlagOffRegression(unittest.TestCase):
+    """Test export_csv with flag=off (AC-1 regression guard)."""
+
+    def test_flag_off_behavior_unchanged(self):
+        """When _RESOURCE_HISTORY_USE_UNIFIED_JOB=off, export_csv behaves as legacy."""
+        import mes_dashboard.services.resource_history_service as svc
+
+        # Ensure flag is off
+        original_flag = svc._RESOURCE_HISTORY_USE_UNIFIED_JOB
+        svc._RESOURCE_HISTORY_USE_UNIFIED_JOB = False
+
+        try:
+            with patch.object(svc, '_get_filtered_resources', return_value=[]):
+                rows = list(svc.export_csv(
+                    start_date="2024-01-01",
+                    end_date="2024-01-03",
+                ))
+            # With empty resources, expect error row
+            self.assertTrue(any("Error" in r or "No resources" in r for r in rows))
+        finally:
+            svc._RESOURCE_HISTORY_USE_UNIFIED_JOB = original_flag
+
+
+class TestDegradedPath:
+    """Test that flag=on + no worker → 503 (AC-7)."""
+
+    def test_flag_on_no_worker_returns_503(self, client, monkeypatch):
+        """When RESOURCE_HISTORY_USE_UNIFIED_JOB=on and async unavailable → 503."""
+        import mes_dashboard.routes.resource_history_routes as rhr
+        from unittest.mock import patch as _patch
+
+        monkeypatch.setattr(rhr, "RESOURCE_HISTORY_USE_UNIFIED_JOB", True)
+
+        with _patch("mes_dashboard.routes.resource_history_routes.is_async_available",
+                    return_value=False):
+            resp = client.get(
+                "/api/resource/history/export"
+                "?start_date=2024-01-01&end_date=2024-01-31"
+            )
+
+        assert resp.status_code == 503
+
+
+class TestSyncFallbackAbsent(unittest.TestCase):
+    """AC-7: ast.parse probe that sync fallback (read_sql_df in export context) is absent
+    from unified path (i.e., the new worker modules do NOT call read_sql_df directly)."""
+
+    def test_sync_fallback_not_present_in_unified_path(self):
+        """Base and OEE worker modules must not contain direct read_sql_df calls."""
+        import ast
+        from pathlib import Path
+
+        workers_dir = Path(__file__).resolve().parent.parent / "src" / "mes_dashboard" / "workers"
+        for stem in ("resource_history_base_worker", "resource_history_oee_worker"):
+            worker_path = workers_dir / f"{stem}.py"
+            self.assertTrue(worker_path.exists(), f"{worker_path} must exist")
+            source = worker_path.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+
+            # Check no call to read_sql_df or read_sql_df_slow in worker module top-level
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        self.assertNotIn(
+                            node.func.id,
+                            ("read_sql_df", "read_sql_df_slow"),
+                            f"{stem}.py calls {node.func.id} (sync-fallback absent required)",
+                        )
+
+
+class TestEnvDefaultPin(unittest.TestCase):
+    """AC-8: env default pin — RESOURCE_HISTORY_USE_UNIFIED_JOB default must be off."""
+
+    def test_use_unified_job_default_is_off(self):
+        """Module-level _RESOURCE_HISTORY_USE_UNIFIED_JOB defaults to False (off)."""
+        import importlib
+        import os
+        import sys
+
+        # Remove any existing env override
+        original_env = os.environ.pop("RESOURCE_HISTORY_USE_UNIFIED_JOB", None)
+        try:
+            # Force reimport without env var
+            mod_name = "mes_dashboard.services.resource_history_service"
+            if mod_name in sys.modules:
+                del sys.modules[mod_name]
+            import mes_dashboard.services.resource_history_service as svc
+            # Re-add to sys.modules (importlib.reload is cleaner but may side-effect)
+            self.assertFalse(
+                svc._RESOURCE_HISTORY_USE_UNIFIED_JOB,
+                "RESOURCE_HISTORY_USE_UNIFIED_JOB default must be off (False)",
+            )
+        finally:
+            if original_env is not None:
+                os.environ["RESOURCE_HISTORY_USE_UNIFIED_JOB"] = original_env
+            # Restore module
+            mod_name = "mes_dashboard.services.resource_history_service"
+            if mod_name in sys.modules:
+                del sys.modules[mod_name]

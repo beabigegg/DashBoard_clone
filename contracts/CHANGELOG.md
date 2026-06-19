@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.28] — 2026-06-19
+### Added
+- resource-history-migration: Gate-compatibility note for P3 migration — two new worker modules (`resource_history_base_worker`, `resource_history_oee_worker`) reuse existing `resource-history-query` queue and worker service; no new workflow file or gate tier. Feature flag `RESOURCE_HISTORY_USE_UNIFIED_JOB=off` (default) means zero behavioral change until explicitly set. Additive; no existing gates changed.
+
+## [env 1.0.17] — 2026-06-19
+### Added
+- resource-history-migration: `RESOURCE_HISTORY_USE_UNIFIED_JOB` (optional, string enum off/on/false/true/0/1, default `off`, all environments, restart required) — feature flag selecting unified `ResourceHistoryBaseJob` + `ResourceHistoryOeeJob` paths (BaseChunkedDuckDBJob template method, P3 migration) vs legacy `export_csv` Oracle read + pandas iterrows path. `always_async=True` for both; `sync_fallback_allowed=False`; degraded → 503. Default `off` ensures zero regression on deploy (AC-1). Additive; no existing flags changed.
+
+## [business 1.25.0] — 2026-06-19
+### Added
+- resource-history-migration: ASYNC-09 (dual-job unified execution rule — `RESOURCE_HISTORY_USE_UNIFIED_JOB=on` routes to two RQ jobs: `resource-history-base` + `resource-history-oee`, both `always_async=True`/`sync_fallback_allowed=False`; queue unavailable → 503; OEE cross-chunk reduction via job-temp DuckDB; ±30d reject window per chunk; spool schemas unchanged). Additive; no existing rules changed.
+
+## [data 1.21.0] — 2026-06-19
+### Added
+- resource-history-migration: §3.19 spool-schema-UNCHANGED assertion — `resource_dataset` and `resource_oee` spool parquet schemas are explicitly unchanged by this P3 migration. No parquet cleanup required on deploy/rollback. Additive; no existing spool schemas changed.
+
 ## [ci 1.3.27] — 2026-06-19
 ### Added
 - production-reject-history-migration: Gate-compatibility note for P2 migration — two new worker modules (`production_history_worker`, `reject_history_worker`) covered by existing `unit-mock-integration` and `cdd-kit-gate` commands; no new workflow file or gate tier needed. Feature flags `PRODUCTION_HISTORY_USE_UNIFIED_JOB=off` and `REJECT_HISTORY_USE_UNIFIED_JOB=off` (default) mean zero behavioral change until explicitly set. Additive; no existing gates changed.
