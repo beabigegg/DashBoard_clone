@@ -86,6 +86,7 @@ DashBoard_vite/
 |   |   |-- 11d2c913de0cba90
 |   |   |-- 137aac6b65143dec
 |   |   |-- 15a2721810beed32
+|   |   |-- 16e5986e942e026b
 |   |   |-- 17a6952f61650689
 |   |   |-- 1968d36e3319a49f
 |   |   |-- 1ae1a5c44c5de27d
@@ -102,8 +103,7 @@ DashBoard_vite/
 |   |   |-- 22775c7be38c0fc8
 |   |   |-- 2487e0dd67ee4005
 |   |   |-- 24a326889958cc67
-|   |   |-- 2513622121cc3cd3
-|   |   \-- ... (258 more entries truncated; cap=50)
+|   |   \-- ... (261 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -930,6 +930,7 @@ DashBoard_vite/
 |   |   |-- test_capture_samples.py
 |   |   |-- test_doctor_clean.py
 |   |   |-- test_env_duckdb_job_dir.py
+|   |   |-- test_env_material_trace_flag.py
 |   |   |-- test_gate_wiring.py
 |   |   |-- test_manifest_completeness.py
 |   |   |-- test_openapi_schema_resolution.py
@@ -986,6 +987,7 @@ DashBoard_vite/
 |   |   |-- test_eap_alarm_rq_async.py
 |   |   |-- test_fixtures_smoke.py
 |   |   |-- test_hold_history_rq_async.py
+|   |   |-- test_material_trace_rq_async.py
 |   |   |-- test_multi_worker_concurrency.py
 |   |   |-- test_oracle_arrow_pool_lifecycle.py
 |   |   |-- test_oracle_error_codes.py
@@ -1109,16 +1111,14 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
-|   \-- ... (179 more entries truncated; cap=50)
+|   \-- ... (180 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   \-- test_ns/
 |   |-- query_spool/
 |   |   |-- downtime_analysis/
 |   |   |-- msd-events/
-|   |   |   |-- tmpav120nj8.parquet
-|   |   |   |-- tmpml5g8867.parquet
-|   |   |   \-- tmpmnzdq93k.parquet
+|   |   |   \-- tmp01sqfwp7.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
@@ -1167,7 +1167,7 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166368.json
 |   |   |-- probe_166780.json
-|   |   \-- ... (399 more entries truncated; cap=50)
+|   |   \-- ... (407 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   |-- mes_dashboard_restart.flag

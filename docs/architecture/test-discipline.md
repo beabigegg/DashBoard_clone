@@ -97,3 +97,18 @@ Evidence: `unify-duckdb-prewarm-rq`.
 **Always include at least one fixture where partials of the same `TRACKINTIMESTAMP` have *different* `TRACKINQTY` values** (use real arithmetic: `TRACKINQTY[N+1] = TRACKINQTY[N] − TRACKOUTQTY[N]`). A fixture with uniform `TRACKINQTY` across partials cannot distinguish a 4-key from a 5-key aggregation design — both pass.
 
 Evidence: `tests/test_production_history_sql_runtime.py::test_partial_merge_same_trackin_time_different_trackin_qty`
+
+## _APPROVED_CALLERS — New Controlled-Module Callers Must Be Explicitly Approved
+
+`tests/test_query_cost_policy.py::TestNoPandasAndNoCallers::test_no_caller_outside_tests` enforces a zero-caller policy for controlled internal modules (`oracle_arrow_reader`, `query_cost_policy`, `base_chunked_duckdb_job`). Any source file that **intentionally** imports from one of these must be added to the `_APPROVED_CALLERS` dict **in the same PR**:
+
+```python
+_APPROVED_CALLERS: dict = {
+    "oracle_arrow_reader": {"material_trace_duckdb_runtime"},
+    "base_chunked_duckdb_job": {"eap_alarm_worker", ..., "material_trace_duckdb_runtime"},
+}
+```
+
+Missing entry → CI failure: `"Found caller of oracle_arrow_reader in src/…/your_module.py — If this is intentional, add 'your_module' to _APPROVED_CALLERS['oracle_arrow_reader']."` Also update `tests/test_job_registry.py` count when adding a new job type via `register_job_type()`.
+
+Evidence: `material-trace-streaming-migration` (tests/test_query_cost_policy.py:L336, tests/test_job_registry.py:L220).

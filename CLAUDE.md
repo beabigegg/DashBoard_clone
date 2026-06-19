@@ -178,6 +178,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Check `pytestmark` before adding mock tests to `tests/integration/` — see docs/architecture/test-discipline.md
 - Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md
 - Partial-trackout fixtures: include rows with different `TRACKINQTY` per session (real arithmetic) — see docs/architecture/test-discipline.md
+- New modules using `oracle_arrow_reader` or `base_chunked_duckdb_job`: add stem to `_APPROVED_CALLERS` in `tests/test_query_cost_policy.py` in the same PR; also update `tests/test_job_registry.py` count for new `register_job_type()` calls — see docs/architecture/test-discipline.md
 
 **CI workflow & GunicornHarness** — see `docs/architecture/ci-workflow.md` for full detail:
 - New Playwright specs: add `npx playwright install --with-deps chromium` step in CI before running tests — see docs/architecture/ci-workflow.md
