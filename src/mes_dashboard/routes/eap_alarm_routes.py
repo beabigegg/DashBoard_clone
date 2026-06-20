@@ -41,7 +41,7 @@ _EAP_ALARM_RETRY_AFTER_SECONDS = int(
 )
 _JOB_PREFIX = "eap-alarm"
 _EAP_ALARM_USE_UNIFIED_JOB: bool = os.getenv(
-    "EAP_ALARM_USE_UNIFIED_JOB", "off"
+    "EAP_ALARM_USE_UNIFIED_JOB", "on"
 ).lower().strip() in ("on", "true", "1")
 
 

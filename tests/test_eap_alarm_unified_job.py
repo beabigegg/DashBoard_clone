@@ -171,14 +171,14 @@ class TestEapAlarmJobPostAggregate:
 
 
 class TestEapAlarmRouteFlag:
-    """AC-6 (flag-OFF zero regression) / AC-7 (env var gating) tests."""
+    """AC-7 (env var gating) / default-on tests."""
 
-    def test_flag_off_by_default(self, monkeypatch):
+    def test_flag_on_by_default(self, monkeypatch):
         monkeypatch.delenv("EAP_ALARM_USE_UNIFIED_JOB", raising=False)
         import importlib
         import mes_dashboard.routes.eap_alarm_routes as rt
         importlib.reload(rt)
-        assert rt._EAP_ALARM_USE_UNIFIED_JOB is False
+        assert rt._EAP_ALARM_USE_UNIFIED_JOB is True
 
     def test_flag_on_via_env(self, monkeypatch):
         monkeypatch.setenv("EAP_ALARM_USE_UNIFIED_JOB", "on")
