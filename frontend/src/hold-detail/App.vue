@@ -488,7 +488,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dashboard hold-detail-page theme-hold-detail">
+  <div class="dashboard hold-detail-page theme-hold-detail" data-testid="hold-detail-app">
     <div class="hold-detail-nav">
       <div class="hold-detail-nav-left">
         <a

@@ -107,7 +107,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="job-query-page dashboard theme-job-query">
+  <div class="job-query-page dashboard theme-job-query" data-testid="job-query-app">
     <div class="u-panel-stack">
       <SectionCard>
         <template #header>
@@ -139,10 +139,10 @@ onMounted(async () => {
           </label>
 
           <template #actions>
-            <button type="button" class="job-query-btn job-query-btn-primary" :disabled="loadingJobs" @click="wrappedQueryJobs">
+            <button type="button" class="job-query-btn job-query-btn-primary" data-testid="query-btn" :disabled="loadingJobs" @click="wrappedQueryJobs">
               {{ loadingJobs ? '查詢中...' : '查詢' }}
             </button>
-            <button type="button" class="job-query-btn job-query-btn-success" :disabled="exporting" @click="exportCsv">
+            <button type="button" class="job-query-btn job-query-btn-success" data-testid="export-btn" :disabled="exporting" @click="exportCsv">
               {{ exporting ? '匯出中...' : '匯出 CSV' }}
             </button>
           </template>

@@ -135,7 +135,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="theme-admin-pages">
+  <div class="theme-admin-pages" data-testid="admin-pages-app">
     <PageHeader title="頁面管理" :refreshing="refreshing" @refresh="refreshAll">
       <template #subtitle>
         管理頁面狀態、抽屜分類與排序（Released：所有人可見 / Dev：僅管理員可見）

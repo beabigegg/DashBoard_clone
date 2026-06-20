@@ -84,6 +84,7 @@ function handleDelete(id: string): void {
       v-model="newName"
       class="input"
       type="text"
+      data-testid="create-drawer-name"
       placeholder="新抽屜名稱（例如：自訂分類）"
       @keydown.enter.prevent="handleCreate"
     />
@@ -98,7 +99,7 @@ function handleDelete(id: string): void {
       <input v-model="newAdminOnly" type="checkbox" />
       僅管理員可見
     </label>
-    <button class="action-btn primary" type="button" @click="handleCreate">新增抽屜</button>
+    <button class="action-btn primary" type="button" data-testid="create-drawer-btn" @click="handleCreate">新增抽屜</button>
   </div>
   <div class="table-container">
     <table>
