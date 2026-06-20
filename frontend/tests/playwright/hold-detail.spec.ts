@@ -201,6 +201,6 @@ test('test_api_error_shows_error_banner', async ({ page }) => {
 
   await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForSelector('[data-testid="hold-detail-app"]', { timeout: 20_000 });
-  const banner = page.locator('.error-banner').first();
+  const banner = page.locator('.error-banner-wrap').first();
   await expect(banner).toBeVisible({ timeout: 15_000 });
 });

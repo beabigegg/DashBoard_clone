@@ -114,7 +114,8 @@ async function gotoWipDetailPage(page: Page): Promise<void> {
 test('test_page_loads_with_title', async ({ page }) => {
   await setupMocks(page);
   await gotoWipDetailPage(page);
-  const title = await page.locator('h1').first().textContent();
+  // .detail-page-title is the wip-detail app's own h1 (avoid portal-shell nav h1)
+  const title = await page.locator('.detail-page-title').textContent();
   expect(title).toContain('ETCH-01');
 });
 
@@ -138,30 +139,27 @@ test('test_summary_card_values', async ({ page }) => {
 test('test_filter_panel_visible', async ({ page }) => {
   await setupMocks(page);
   await gotoWipDetailPage(page);
-  // FilterPanel renders MultiSelect inputs for each filter category
-  const filterPanel = page.locator('.filter-panel, .filters-panel, .wip-filter-panel').first();
-  const hasPanel = await filterPanel.isVisible().catch(() => false);
-  // Fallback: check for the filter toggle button which FilterPanel always renders
-  const toggleBtn = page.locator('.filters-toggle, button:has-text("篩選")').first();
-  const hasToggle = await toggleBtn.isVisible().catch(() => false);
-  expect(hasPanel || hasToggle || true).toBe(true); // panel exists somewhere
-  // More reliable: filter clear button or at least one MultiSelect trigger
-  const anyMultiSelect = page.locator('.multi-select-trigger, [placeholder*="WORKORDER"]').first();
-  await expect(anyMultiSelect).toBeVisible({ timeout: 10_000 });
+  // FilterPanel starts collapsed; .filters-toggle is always visible
+  const toggleBtn = page.locator('.filters-toggle');
+  await expect(toggleBtn).toBeVisible({ timeout: 10_000 });
+  // Expand the filter panel so MultiSelect triggers become visible
+  await toggleBtn.click();
+  await expect(page.locator('.filters-body')).toBeVisible({ timeout: 5_000 });
 });
 
 test('test_lot_table_renders_rows', async ({ page }) => {
   await setupMocks(page);
   await gotoWipDetailPage(page);
-  await page.waitForSelector('.lot-table', { timeout: 15_000 });
-  const rows = page.locator('.lot-table tbody tr');
+  // LotTable renders as .table-section > table (no .lot-table class)
+  await page.waitForSelector('.table-section table', { timeout: 15_000 });
+  const rows = page.locator('.table-section table tbody tr');
   await expect(rows).toHaveCount(2);
 });
 
 test('test_lot_id_link_opens_detail_panel', async ({ page }) => {
   await setupMocks(page);
   await gotoWipDetailPage(page);
-  await page.waitForSelector('.lot-table', { timeout: 15_000 });
+  await page.waitForSelector('.table-section table', { timeout: 15_000 });
   // Click the first lot-id link
   const lotLink = page.locator('.lot-id-link').first();
   await lotLink.click();
@@ -204,7 +202,7 @@ test('test_api_error_shows_banner', async ({ page }) => {
 
   await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForSelector('[data-testid="wip-detail-app"]', { timeout: 20_000 });
-  await page.waitForSelector('.error-banner, [data-testid="error-banner"]', { timeout: 15_000 });
-  const banner = page.locator('.error-banner, [data-testid="error-banner"]').first();
+  await page.waitForSelector('.error-banner-wrap', { timeout: 15_000 });
+  const banner = page.locator('.error-banner-wrap').first();
   await expect(banner).toBeVisible();
 });

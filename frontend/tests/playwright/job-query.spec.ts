@@ -256,6 +256,6 @@ test('test_api_error_shows_banner', async ({ page }) => {
   await selectFirstEquipment(page);
   await page.locator('[data-testid="query-btn"]').click();
   await page.waitForTimeout(2_000);
-  const banner = page.locator('.error-banner').first();
+  const banner = page.locator('.error-banner-wrap').first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 });

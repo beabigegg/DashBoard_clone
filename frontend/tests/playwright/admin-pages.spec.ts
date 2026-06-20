@@ -17,7 +17,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:8080';
-const PAGE_URL = `${BASE_URL}/admin/pages`;
+// Navigate to portal-shell home; the shell auto-navigates to the first drawer page
+// (/admin/pages) when at route '/'. Navigating directly to /portal-shell/admin/pages
+// triggers a NavigationDuplicated error (same path re-replace) that resets routing.
+const PAGE_URL = `${BASE_URL}/portal-shell`;
 
 const MOCK_DRAWERS = {
   success: true,
@@ -59,6 +62,35 @@ async function setupMocks(page: Page): Promise<void> {
     }),
   );
 
+  // Portal-shell requires navigation config on boot.
+  // Include /admin/pages in drawers so the router adds it as a dynamic route,
+  // which triggers the shell-fallback → replace() re-navigation into NativeRouteView.
+  await page.route('**/api/portal/navigation**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        drawers: [
+          {
+            id: 'admin',
+            name: '管理',
+            order: 99,
+            admin_only: true,
+            pages: [
+              { route: '/admin/pages', name: '頁面管理', status: 'released', order: 1 },
+            ],
+          },
+        ],
+        is_admin: true,
+        admin_user: { username: 'admin', displayName: 'Admin User' },
+        admin_links: { logout: '/api/auth/logout', dashboard: '/admin/dashboard' },
+        diagnostics: { filtered_drawers: 0, filtered_pages: 0, invalid_drawers: 0, invalid_pages: 0, contract_mismatch_routes: [] },
+        portal_spa_enabled: false,
+        features: { ai_query_enabled: false },
+      }),
+    }),
+  );
+
   await page.route('**/admin/api/drawers**', (route) => {
     if (route.request().method() === 'POST') {
       route.fulfill({
@@ -85,9 +117,11 @@ async function setupMocks(page: Page): Promise<void> {
 }
 
 async function gotoAdminPagesPage(page: Page): Promise<void> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
-  await page.waitForSelector('[data-testid="admin-pages-app"]', { timeout: 20_000 });
-  // Wait for initial loading to finish
+  // Navigate to portal-shell home; the shell auto-navigates to the first drawer
+  // page (/admin/pages) when the nav config is returned. Navigating directly to
+  // /portal-shell/admin/pages causes NavigationDuplicated (same-path re-replace).
+  await page.goto(PAGE_URL).catch(() => {});
+  await page.waitForSelector('[data-testid="admin-pages-app"]', { timeout: 30_000 });
   await page.waitForSelector('.empty-state:has-text("載入中...")', { state: 'detached', timeout: 15_000 }).catch(() => {});
 }
 
@@ -107,11 +141,11 @@ test('test_page_loads_with_panels', async ({ page }) => {
 test('test_drawer_table_renders_rows', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  // Drawer management table should show 2 drawers
+  // Drawer management table shows drawer IDs in the ID column (name is in an <input>)
   await page.waitForSelector('[data-testid="create-drawer-name"]', { timeout: 10_000 });
   const tableText = await page.locator('.panel').first().textContent();
-  expect(tableText).toContain('即時報表');
-  expect(tableText).toContain('歷史查詢');
+  expect(tableText).toContain('live');
+  expect(tableText).toContain('history');
 });
 
 test('test_pages_table_renders_rows', async ({ page }) => {
@@ -162,7 +196,8 @@ test('test_page_status_badge_renders', async ({ page }) => {
 test('test_page_header_with_title', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  const headerText = await page.locator('h1, .page-header__title, [class*="page-header"]').first().textContent();
+  // Scope to admin-pages app to avoid grabbing portal-shell nav h1 ("MES 報表入口")
+  const headerText = await page.locator('[data-testid="admin-pages-app"] h1').first().textContent();
   expect(headerText).toContain('頁面管理');
 });
 
@@ -170,7 +205,16 @@ test('test_api_error_shows_error_panel', async ({ page }) => {
   await page.route('**/*', (route) => route.continue());
   await page.route('**/api/auth/me**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: { name: 'Admin', role: 'admin' } }) }),
+      body: JSON.stringify({ success: true, data: { name: 'Admin', role: 'admin', is_admin: true } }) }),
+  );
+  await page.route('**/api/portal/navigation**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        drawers: [{ id: 'admin', name: '管理', order: 99, admin_only: true,
+          pages: [{ route: '/admin/pages', name: '頁面管理', status: 'released', order: 1 }] }],
+        is_admin: true, admin_links: {}, portal_spa_enabled: false, features: {},
+        diagnostics: { filtered_drawers: 0, filtered_pages: 0, invalid_drawers: 0, invalid_pages: 0, contract_mismatch_routes: [] },
+      }) }),
   );
   await page.route('**/admin/api/drawers**', (route) =>
     route.fulfill({ status: 500, contentType: 'application/json',
@@ -181,8 +225,8 @@ test('test_api_error_shows_error_panel', async ({ page }) => {
       body: JSON.stringify({ success: false, error: 'Server error' }) }),
   );
 
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
-  await page.waitForSelector('[data-testid="admin-pages-app"]', { timeout: 20_000 });
-  const errorPanel = page.locator('.error-panel');
-  await expect(errorPanel).toBeVisible({ timeout: 15_000 });
+  await page.goto(`${BASE_URL}/portal-shell`).catch(() => {});
+  await page.waitForSelector('[data-testid="admin-pages-app"]', { timeout: 30_000 });
+  const errorPanel = page.locator('.error-panel, .error-banner-wrap');
+  await expect(errorPanel.first()).toBeVisible({ timeout: 15_000 });
 });
