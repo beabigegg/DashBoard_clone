@@ -52,6 +52,7 @@ _QUEUE_DEFS: List[tuple] = [
     ("PRODUCTION_HISTORY_WORKER_QUEUE",   "production-history-query"),
     ("MSD_WORKER_QUEUE",                  "msd-analysis"),
     ("YIELD_ALERT_WORKER_QUEUE",          "yield-alert-query"),
+    ("WIP_WORKER_QUEUE",                  "wip-detail-query"),
     ("MATERIAL_CONSUMPTION_WORKER_QUEUE", "material-consumption"),
     ("DOWNTIME_WORKER_QUEUE",             "downtime-query"),
     ("WARMUP_QUEUE_NAME",                 "warmup"),   # lowest priority

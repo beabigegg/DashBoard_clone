@@ -153,13 +153,13 @@ class TestGetRqQueueDetails:
         # trace-events, reject-query, msd-analysis, production-history-query,
         # yield-alert-query, material-consumption, downtime-query, hold-history-query,
         # resource-history-query, eap-alarm-query
-        assert len(result["queues"]) == 10
+        assert len(result["queues"]) == 11
         assert result["queues"][0]["name"] == "trace-events"
         assert result["queues"][0]["depth"] == 3
         assert result["queues"][1]["name"] == "reject-query"
         assert result["queues"][1]["depth"] == 1
-        assert result["total_queued"] == 12  # 3 + 1×9
-        assert result["total_started"] == 10  # 1 per queue × 10 queues
+        assert result["total_queued"] == 13  # 3 + 1×10 (trace has 3 depth; 10 others have 1 each)
+        assert result["total_started"] == 11  # 1 per queue × 11 queues
         assert result["total_failed"] == 0
 
     def test_hold_history_queue_in_queue_names(self):
@@ -176,7 +176,7 @@ class TestGetRqQueueDetails:
              patch("rq.Queue", side_effect=Exception("Redis error")):
             result = svc.get_rq_queue_details()
         # Should still return entries with zero values (now 10 queues including eap-alarm-query)
-        assert len(result["queues"]) == 10
+        assert len(result["queues"]) == 11
         assert result["total_queued"] == 0
 
 
