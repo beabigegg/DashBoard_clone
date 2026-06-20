@@ -1,27 +1,31 @@
 {
   "data": [
     {
-      "lot_count": 82,
+      "lot_count": 19,
       "name": "點測"
     },
     {
-      "lot_count": 1682,
+      "lot_count": 63,
+      "name": "已CP入庫"
+    },
+    {
+      "lot_count": 1529,
       "name": "切割"
     },
     {
-      "lot_count": 905,
+      "lot_count": 854,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 89,
+      "lot_count": 95,
       "name": "焊接_DB"
     },
     {
-      "lot_count": 325,
+      "lot_count": 334,
       "name": "焊接_WB"
     },
     {
-      "lot_count": 75,
+      "lot_count": 82,
       "name": "焊接_WB"
     },
     {
@@ -29,47 +33,47 @@
       "name": "焊接_DW"
     },
     {
-      "lot_count": 10,
+      "lot_count": 11,
       "name": "焊接_DW"
     },
     {
-      "lot_count": 490,
+      "lot_count": 514,
       "name": "成型"
     },
     {
-      "lot_count": 228,
+      "lot_count": 172,
       "name": "成型"
     },
     {
-      "lot_count": 405,
+      "lot_count": 375,
       "name": "去膠"
     },
     {
-      "lot_count": 466,
+      "lot_count": 527,
       "name": "水吹砂"
     },
     {
-      "lot_count": 452,
+      "lot_count": 367,
       "name": "電鍍"
     },
     {
-      "lot_count": 34,
+      "lot_count": 30,
       "name": "電鍍"
     },
     {
-      "lot_count": 167,
+      "lot_count": 238,
       "name": "電鍍"
     },
     {
-      "lot_count": 35,
+      "lot_count": 20,
       "name": "電鍍"
     },
     {
-      "lot_count": 285,
+      "lot_count": 214,
       "name": "移印"
     },
     {
-      "lot_count": 347,
+      "lot_count": 350,
       "name": "切彎腳"
     },
     {
@@ -77,7 +81,7 @@
       "name": "可靠性"
     },
     {
-      "lot_count": 3512,
+      "lot_count": 3605,
       "name": "TMTT"
     },
     {
@@ -85,21 +89,21 @@
       "name": "預備站"
     },
     {
-      "lot_count": 53,
+      "lot_count": 118,
       "name": "品檢"
     },
     {
-      "lot_count": 7,
+      "lot_count": 12,
       "name": "FQC"
     },
     {
-      "lot_count": 35,
+      "lot_count": 36,
       "name": "成品入庫"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T19:08:26.104590"
+    "timestamp": "2026-06-20T11:57:37.154170"
   },
   "success": true
 }

@@ -19,14 +19,14 @@ Usage::
         decompose_by_row_count,
         should_decompose_by_row_count,
         execute_plan,
-        merge_chunks,
+        merge_chunks_to_spool,
         compute_query_hash,
     )
 
     chunks = decompose_by_time_range("2025-01-01", "2025-12-31")
     qh = compute_query_hash({"mode": "date_range", ...})
     execute_plan(chunks, my_query_fn, query_hash=qh, cache_prefix="reject")
-    df = merge_chunks("reject", qh)
+    # Use merge_chunks_to_spool() for all result materialisation (merge_chunks removed).
 
     # Row-count chunking (USE_ROW_COUNT_CHUNKING=true path):
     rc_chunks = decompose_by_row_count(total_rows=150000)
@@ -40,7 +40,6 @@ import json
 import logging
 import os
 import tempfile
-import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Generator, List, Optional
@@ -629,98 +628,9 @@ class ChunkSchemaMismatch(RuntimeError):
         self.got = list(got)
 
 
-def merge_chunks(
-    cache_prefix: str,
-    query_hash: str,
-    total: Optional[int] = None,
-    max_total_rows: Optional[int] = None,
-    overflow_mode: str = "truncate",
-) -> pd.DataFrame:
-    """Load all chunks from Redis and concatenate into one DataFrame.
-
-    .. deprecated::
-        ``merge_chunks`` is deprecated and will be removed in a future release.
-        Use :func:`merge_chunks_to_spool` instead.  **No new callers allowed.**
-        All production callers have already been migrated to ``merge_chunks_to_spool``
-        (query-path-c-elimination-cleanup, D5).
-
-    If *total* is not given, reads it from the progress metadata.
-    Missing chunks are skipped (``has_partial_failure`` semantics).
-    """
-    warnings.warn(
-        "merge_chunks is deprecated and will be removed in a future release. "
-        "Use merge_chunks_to_spool() instead. No new callers allowed.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    if total is None:
-        progress = get_batch_progress(cache_prefix, query_hash)
-        if progress:
-            total = int(progress.get("total", 0))
-        else:
-            total = 0
-
-    dfs: List[pd.DataFrame] = []
-    total_rows = 0
-    if overflow_mode not in {"truncate", "error"}:
-        raise ValueError("overflow_mode must be either 'truncate' or 'error'")
-
-    for idx in range(total):
-        df = redis_load_chunk(cache_prefix, query_hash, idx)
-        if df is not None and not df.empty:
-            if max_total_rows is not None and total_rows >= max_total_rows:
-                if overflow_mode == "error":
-                    observed_rows = total_rows + len(df)
-                    logger.warning(
-                        "merge_chunks overflow in strict mode after cap reached: max_total_rows=%d, observed_rows=%d, chunk=%d",
-                        max_total_rows,
-                        observed_rows,
-                        idx,
-                    )
-                    raise MergeChunksMaxRowsExceeded(
-                        max_total_rows=max_total_rows,
-                        observed_rows=observed_rows,
-                        chunk_index=idx,
-                    )
-                logger.warning(
-                    "merge_chunks reached max_total_rows=%d (prefix=%s, query_hash=%s)",
-                    max_total_rows,
-                    cache_prefix,
-                    query_hash,
-                )
-                break
-            if max_total_rows is not None:
-                remaining = max_total_rows - total_rows
-                if remaining <= 0:
-                    break
-                if len(df) > remaining:
-                    if overflow_mode == "error":
-                        observed_rows = total_rows + len(df)
-                        logger.warning(
-                            "merge_chunks overflow in strict mode: max_total_rows=%d, observed_rows=%d, chunk=%d",
-                            max_total_rows,
-                            observed_rows,
-                            idx,
-                        )
-                        raise MergeChunksMaxRowsExceeded(
-                            max_total_rows=max_total_rows,
-                            observed_rows=observed_rows,
-                            chunk_index=idx,
-                        )
-                    df = df.head(remaining).copy()
-                    logger.warning(
-                        "merge_chunks truncated chunk %d to %d rows (max_total_rows=%d)",
-                        idx,
-                        remaining,
-                        max_total_rows,
-                    )
-            dfs.append(df)
-            total_rows += len(df)
-
-    if not dfs:
-        return pd.DataFrame()
-
-    return pd.concat(dfs, ignore_index=True)
+# merge_chunks() removed by wip-rq-worker-chunks-cleanup (AC-6, IP-2).
+# It was deprecated in query-path-c-elimination-cleanup with zero production callers.
+# Use merge_chunks_to_spool() for all new code.
 
 
 def iterate_chunks(

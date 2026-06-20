@@ -1,0 +1,15 @@
+{
+  "change_id": "wip-rq-worker-chunks-cleanup",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "ruff check src/ tests/",
+  "duration_ms": 15,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115517/summary.json",
+    "stdout": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115517/stdout.log",
+    "stderr": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115517/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

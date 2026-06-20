@@ -313,3 +313,129 @@ class TestConcurrencyCap:
         assert len(enters) == len(exits), (
             f"Slot leak from faulted worker: {len(enters)} enters vs {len(exits)} exits"
         )
+
+
+# ===========================================================================
+# AC-8: WIP detail slot respects concurrency cap
+# wip-rq-worker-chunks-cleanup
+# ===========================================================================
+
+class TestWipDetailConcurrencyCap:
+    """Integration: N=8 concurrent WIP detail worker calls verify slot wiring.
+
+    Mirrors TestConcurrencyCap for hold-history (same pattern, different service).
+    Thread-safety: ALL patches applied via monkeypatch (before thread launch).
+    """
+
+    _N = 8
+
+    def _setup_svc(self, monkeypatch, wip_svc, preload):
+        """Apply all monkeypatches to wip_query_job_service before threads run."""
+        monkeypatch.setattr(wip_svc, "update_job_progress", lambda *a, **kw: None)
+        monkeypatch.setattr(wip_svc, "complete_job", lambda *a, **kw: None)
+        monkeypatch.setattr(preload, "ensure_rq_logging", lambda: None)
+
+    def test_wip_detail_slot_respects_concurrency_cap(self, monkeypatch):
+        """AC-8: Under N=8 concurrent WIP workers, slot CM is entered exactly N times.
+
+        Uses recording CM (not real Redis semaphore). Verifies slot wiring is in place.
+        """
+        import mes_dashboard.services.wip_query_job_service as svc
+        import mes_dashboard.rq_worker_preload as preload
+
+        self._setup_svc(monkeypatch, svc, preload)
+
+        # Mock the Oracle query helper
+        monkeypatch.setattr(
+            svc, "execute_wip_detail_oracle_query",
+            lambda **kw: {"query_id": f"qid-{kw.get('workcenter', 'wc')}", "spool_path": None, "row_count": 0},
+        )
+
+        events: List[Tuple[float, str, str]] = []
+        lock = threading.Lock()
+
+        @contextmanager
+        def _recording_slot(owner: str):
+            with lock:
+                events.append((time.monotonic(), "enter", owner))
+            try:
+                yield True
+                time.sleep(0.01)
+            finally:
+                with lock:
+                    events.append((time.monotonic(), "exit", owner))
+
+        monkeypatch.setattr(svc, "heavy_query_slot", _recording_slot)
+
+        results: List[str] = []
+        errors: List[Tuple[str, str]] = []
+        result_lock = threading.Lock()
+
+        def _run_job(job_id: str):
+            try:
+                svc.execute_wip_detail_job(
+                    job_id=job_id,
+                    owner="integration-test",
+                    workcenter="焊接_DB",
+                )
+                with result_lock:
+                    results.append(job_id)
+            except Exception as exc:
+                with result_lock:
+                    errors.append((job_id, str(exc)))
+
+        threads = [
+            threading.Thread(target=_run_job, args=(f"wip-integ-{i:03d}",))
+            for i in range(self._N)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30.0)
+
+        assert len(errors) == 0, f"Worker errors: {errors}"
+        assert len(results) == self._N, f"Not all workers finished: {len(results)}/{self._N}"
+
+        enter_count = sum(1 for e in events if e[1] == "enter")
+        assert enter_count == self._N, (
+            f"Expected {self._N} slot enters (wiring check); got {enter_count}"
+        )
+
+    def test_wip_detail_slot_released_on_exception(self, monkeypatch):
+        """AC-8: Slot is released even when Oracle query raises (no leak)."""
+        import mes_dashboard.services.wip_query_job_service as svc
+        import mes_dashboard.rq_worker_preload as preload
+
+        self._setup_svc(monkeypatch, svc, preload)
+        def _oracle_fault(**kw):
+            raise RuntimeError("oracle fault")
+
+        monkeypatch.setattr(svc, "execute_wip_detail_oracle_query", _oracle_fault)
+
+        events: List[Tuple[float, str, str]] = []
+        lock = threading.Lock()
+
+        @contextmanager
+        def _recording_slot(owner: str):
+            with lock:
+                events.append((time.monotonic(), "enter", owner))
+            try:
+                yield True
+            finally:
+                with lock:
+                    events.append((time.monotonic(), "exit", owner))
+
+        monkeypatch.setattr(svc, "heavy_query_slot", _recording_slot)
+
+        with pytest.raises(RuntimeError):
+            svc.execute_wip_detail_job(
+                job_id="wip-fault-000",
+                owner="fault-test",
+                workcenter="焊接_DB",
+            )
+
+        enters = [e for e in events if e[1] == "enter"]
+        exits = [e for e in events if e[1] == "exit"]
+        assert len(enters) == len(exits), (
+            f"Slot leak from faulted WIP worker: {len(enters)} enters vs {len(exits)} exits"
+        )

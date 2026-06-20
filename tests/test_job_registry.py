@@ -180,8 +180,8 @@ class TestJobServiceRegistrations:
     def test_each_service_registers_exactly_one_job_type(self):
         """AC-4: importing all job services registers exactly N distinct job types.
 
-        Updated for downtime-duckdb-join-migration (P5): downtime_worker registers
-        'downtime-unified' bringing the total to 10.
+        Updated for wip-rq-worker-chunks-cleanup: wip_query_job_service registers
+        'wip-detail' bringing the total to 12.
         """
         import mes_dashboard.services.job_registry as jr
 
@@ -225,9 +225,12 @@ class TestJobServiceRegistrations:
         import mes_dashboard.services.query_tool_service as qts  # query-path-c-elimination-cleanup (P5)
         importlib.reload(qts)
 
+        import mes_dashboard.services.wip_query_job_service as wip_svc  # wip-rq-worker-chunks-cleanup
+        importlib.reload(wip_svc)
+
         registered = jr.list_registered_job_types()
-        assert len(registered) == 11, (
-            f"Expected 11 registered job types, got {len(registered)}: {registered}"
+        assert len(registered) == 12, (
+            f"Expected 12 registered job types, got {len(registered)}: {registered}"
         )
 
         expected_types = {
@@ -242,6 +245,7 @@ class TestJobServiceRegistrations:
             "material-trace-unified",
             "downtime-unified",  # downtime-duckdb-join-migration (P5)
             "query-tool",        # query-path-c-elimination-cleanup (P5)
+            "wip-detail",        # wip-rq-worker-chunks-cleanup
         }
         assert set(registered) == expected_types, (
             f"Registered types mismatch.\n"

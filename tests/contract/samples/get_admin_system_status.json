@@ -6,8 +6,8 @@
         "enabled": true,
         "loaded": false,
         "lookup": {
-          "age_seconds": 6.097,
-          "built_at": "2026-06-19T19:09:49.849767",
+          "age_seconds": 5.858,
+          "built_at": "2026-06-20T11:59:01.311134",
           "count": 0,
           "ready": false
         },
@@ -46,7 +46,7 @@
       "enabled": true,
       "failure_count": 2,
       "failure_rate": 0.2,
-      "last_failure_time": "2026-06-19T19:09:54.874925",
+      "last_failure_time": "2026-06-20T11:59:06.332997",
       "open_until": null,
       "state": "CLOSED",
       "success_count": 8,
@@ -169,11 +169,11 @@
       }
     },
     "single_port_bind": "0.0.0.0:8080",
-    "worker_pid": 380770
+    "worker_pid": 457163
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T19:09:55.946404"
+    "timestamp": "2026-06-20T11:59:07.168792"
   },
   "success": true
 }

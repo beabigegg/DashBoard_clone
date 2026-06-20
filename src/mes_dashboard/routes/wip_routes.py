@@ -364,10 +364,9 @@ def api_detail(workcenter: str):
                 owner=_owner,
                 params=_params,
             )
-            # Note: "wip-detail" job type is intentionally not registered in this
-            # change (no worker implementation yet) — enqueue_job_dynamic will return
-            # (None, "Unknown job type") which falls through to sync.
-            # This is safe: fail-open stays SYNC until a worker is registered.
+            # "wip-detail" job type registered by wip_query_job_service.py (wip-rq-worker-chunks-cleanup).
+            # Worker ships inert until app.py import activated (see ci-gates.md §Promotion Policy).
+            # Fail-open: enqueue failure falls through to sync path below.
             if job_id is not None:
                 return success_response(
                     {

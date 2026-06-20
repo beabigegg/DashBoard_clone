@@ -1,0 +1,85 @@
+agent: e2e-resilience-engineer
+change-id: wip-rq-worker-chunks-cleanup
+date: 2026-06-20
+status: done
+
+summary: >
+  All E2E/resilience test cases for AC-2 (202→poll happy path) and AC-5
+  (Redis-down fail-open) were found already written by the backend-engineer
+  in tests/integration/test_wip_rowcount_rq_routing.py. Six tests collected;
+  5 passed + 1 xfail(strict=True) for AC-7 open risk (schema parity — correct
+  and intentional per test-plan.md Notes). No new test files were needed.
+  tests/integration/test_redis_timeout_fallback.py covers filter-cache / L1
+  cache Redis timeout fallback (integration_real marker, requires live Redis);
+  it does not and need not cover the WIP async-route fail-open path — that
+  proof is the is_async_available()=False mock, not a raw Redis-socket timeout.
+
+findings:
+  - test: TestAboveL3Threshold::test_wip_above_l3_threshold_routes_to_rq
+    ac: AC-2
+    result: PASSED
+    notes: >
+      Mocks count_wip_rows=250k, is_async_available=True, enqueue_job_dynamic
+      returns ("wip-detail-xyz", None). Asserts resp.status_code==202,
+      data["data"]["async"]==True, and "job_id" in data["data"]. Complete
+      and sufficient for inert-worker CI (no live worker needed).
+
+  - test: TestWipJobCompletesAndSpoolReadable::test_wip_above_l3_job_completes_and_spool_readable
+    ac: AC-2
+    result: PASSED
+    notes: >
+      Extends the 202 assertion: verifies job_id value matches enqueue return
+      ("wip-detail-abc123") and that status_url contains "wip-detail" for
+      polling. Satisfies the "202→poll reference retrievable" contract without
+      a live worker (worker ships inert per design D6 / implementation-plan).
+
+  - test: TestBelowL3Threshold::test_wip_below_l3_threshold_stays_inline
+    ac: AC-3
+    result: PASSED
+    notes: Sync path returns 200; enqueue_job_dynamic not called.
+
+  - test: TestCountErrorFailOpen::test_wip_count_error_fails_open_stays_inline
+    ac: AC-5 (COUNT error branch)
+    result: PASSED
+    notes: count_wip_rows returns 0 (fail-open on Oracle error per IP-3); route stays sync 200.
+
+  - test: TestRedisDownFailOpen::test_wip_redis_down_fails_open_to_sync
+    ac: AC-5 (Redis/worker down branch)
+    result: PASSED
+    notes: >
+      is_async_available()=False with count_wip_rows=300k (above L3). Route
+      returns 200; enqueue not called. This is the canonical AC-5 Redis-down
+      proof: when is_async_available() returns False the route must never 503.
+
+  - test: TestAsyncRowSchemaMatchesSyncPath::test_async_row_schema_matches_sync_path
+    ac: AC-7
+    result: XFAIL (strict=True)
+    notes: >
+      Intentional sentinel per test-plan.md AC-7 open risk. Oracle column names
+      (LOTID, WIP_STATUS, etc.) != camelCase sync lot keys (lotId, wipStatus).
+      Assembly layer not yet implemented; xfail marks the gap for the next PR.
+
+  - area: test_redis_timeout_fallback.py WIP coverage
+    finding: not-applicable
+    notes: >
+      test_redis_timeout_fallback.py covers filter_cache / container_filter_cache
+      Redis timeout fallback (integration_real, requires --run-integration-real).
+      WIP async-route fail-open is gated by is_async_available(), not raw Redis
+      socket operations, so a new integration_real WIP entry here would duplicate
+      the mock-based TestRedisDownFailOpen test without adding correctness proof.
+      No change needed.
+
+run-command: conda run -n mes-dashboard pytest tests/integration/test_wip_rowcount_rq_routing.py -x -v
+run-result: "5 passed, 1 xfailed in 0.51s"
+
+artifacts:
+  - type: test-files
+    pointer: "tests/integration/test_wip_rowcount_rq_routing.py (all 6 tests: lines 38-252)"
+  - type: scenarios-covered
+    pointer: >
+      happy-path 202 (AC-2), spool-url reference check (AC-2), below-L3 sync (AC-3),
+      COUNT-error fail-open (AC-5), Redis-down fail-open (AC-5), AC-7 xfail schema gap
+  - type: mutation-checks
+    pointer: "none"
+  - type: trace-artifacts
+    pointer: "n/a (mock-based integration tests; no Playwright trace needed — worker ships inert)"

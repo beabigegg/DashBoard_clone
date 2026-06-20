@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
 visible-dirs: 180
-visible-files: 932
+visible-files: 934
 omitted-dirs: 61
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -91,6 +91,7 @@ DashBoard_vite/
 |   |   |-- 16e5986e942e026b
 |   |   |-- 17a6952f61650689
 |   |   |-- 1968d36e3319a49f
+|   |   |-- 1a701b0588e51868
 |   |   |-- 1ae1a5c44c5de27d
 |   |   |-- 1b488e9c0e7c5031
 |   |   |-- 1bfae4d4f286c3d1
@@ -102,8 +103,7 @@ DashBoard_vite/
 |   |   |-- 209aa30bab8411f2
 |   |   |-- 20a29d650996dc03
 |   |   |-- 2240f61bb7e8003e
-|   |   |-- 22775c7be38c0fc8
-|   |   \-- ... (279 more entries truncated; cap=50)
+|   |   \-- ... (284 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -1008,6 +1008,7 @@ DashBoard_vite/
 |   |   |-- test_reject_history_rq_async.py
 |   |   |-- test_resource_history_rq_async.py
 |   |   |-- test_rowcount_flag_parity.py
+|   |   |-- test_rq_semaphore_wiring.py
 |   |   |-- test_soak_workload.py
 |   |   \-- test_wip_rowcount_rq_routing.py
 |   |-- manual/
@@ -1058,6 +1059,7 @@ DashBoard_vite/
 |   |   |-- test_query_tool_stress.py
 |   |   |-- test_reject_history_stress.py
 |   |   |-- test_resource_history_stress.py
+|   |   |-- test_rq_semaphore_stress.py
 |   |   \-- test_yield_alert_stress.py
 |   |-- templates/
 |   |   |-- data-boundary/
@@ -1118,15 +1120,15 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
-|   \-- ... (181 more entries truncated; cap=50)
+|   \-- ... (182 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   \-- test_ns/
 |   |-- query_spool/
 |   |   |-- downtime_analysis/
 |   |   |-- msd-events/
-|   |   |   |-- tmp_9r30hlg.parquet
-|   |   |   \-- tmpd3yh1_ii.parquet
+|   |   |   |-- tmphwszefvc.parquet
+|   |   |   \-- tmpn8lp21eh.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
@@ -1175,7 +1177,7 @@ DashBoard_vite/
 |   |   |-- probe_165674.json
 |   |   |-- probe_166368.json
 |   |   |-- probe_166780.json
-|   |   \-- ... (474 more entries truncated; cap=50)
+|   |   \-- ... (513 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
 |   |-- mes_dashboard_restart.flag

@@ -1,0 +1,16 @@
+{
+  "change_id": "wip-rq-worker-chunks-cleanup",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/test_wip_query_job_service.py tests/test_job_registry.py tests/test_query_cost_policy.py tests/test_batch_query_engine.py tests/test_spool_routes.py tests/integration/test_wip_rowcount_rq_routing.py -x -v --ignore=tests/integration/test_rq_semaphore_wiring.py --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115342/junit.xml' -q --tb=short -ra",
+  "duration_ms": 3154,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115342/summary.json",
+    "stdout": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115342/stdout.log",
+    "stderr": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115342/stderr.log",
+    "junit": "specs/changes/wip-rq-worker-chunks-cleanup/test-runs/20260620-115342/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

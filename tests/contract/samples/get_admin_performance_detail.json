@@ -43,7 +43,7 @@
     },
     "direct_connections": {
       "total_since_start": 6,
-      "worker_pid": 380770
+      "worker_pid": 457163
     },
     "duckdb": {
       "memory_limit_state": "512MB",
@@ -214,7 +214,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-19T19:09:56.229192"
+    "timestamp": "2026-06-20T11:59:07.404082"
   },
   "success": true
 }

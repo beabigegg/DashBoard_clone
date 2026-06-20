@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.32
-last-changed: 2026-06-19
+schema-version: 1.3.33
+last-changed: 2026-06-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -597,6 +597,32 @@ gate tier, command, or status changed.
 
 **Schema-version bump to 1.3.31 (patch)**: additive gate-compatibility note for P4+P5 Path-C elimination. No gate tier, command, or status changed.
 
+## wip-rq-worker-chunks-cleanup Gate Compatibility Note
+
+**Tier-1 unit assertions** (covered by existing `unit-mock-integration` gate):
+- AC-1: `enqueue_job_dynamic("wip-detail")` returns a valid job id; `"wip-detail"` registered in `job_registry`. Use `importlib.reload()` after clearing registry dict to re-run `register_job_type()` side-effects.
+- AC-4: No Oracle connection acquired at request time; `acquire_heavy_query_slot` acquired only inside the worker (mock `is_async_available=True` + enqueue — CI has no Redis).
+- AC-5: Redis-down / worker-down fail-open to sync, never 503; COUNT pre-check error fails open.
+- AC-6: `merge_chunks` absence verified via `ast.parse()` walk; `grep merge_chunks` clean under `src/` and `tests/`.
+- AC-8: Slot acquire/release wires once around Oracle phase; guarded on success and exception.
+- `tests/test_job_registry.py` registered-job-type count bumped by 1.
+- `wip_dataset` in `spool_routes._ALLOWED_NAMESPACES`; parametrized spool-route test co-ships in same PR.
+- Env-var defaults pinned with `monkeypatch.setattr` (module-level constants — `WIP_WORKER_QUEUE`, timeout/ttl).
+
+**Tier-3 integration coverage** (covered by existing `nightly-integration` gate):
+- `tests/integration/test_wip_worker_integration.py` (`integration_real` marker): above-L3 enqueues to RQ, job completes, result retrievable via `wip_dataset` spool; no Oracle connection at request time (AC-4); parity test — worker spool row schema byte-identical to sync paged-dict lot rows (AC-7).
+- `tests/integration/test_rq_semaphore_wiring.py` already covers multi-worker semaphore correctness; WIP worker stems added to concurrent burst.
+
+**Tier-4 stress/soak** (covered by existing `stress-load` and `soak` gates):
+- `tests/stress/test_wip_worker_stress.py` (`stress` marker): burst concurrent `"wip-detail"` jobs confirms `peak_concurrent ≤ HEAVY_QUERY_MAX_CONCURRENT`, zero slot leak, no deadlock (AC-8).
+- **`stress-soak-report.md` is required** before activating the worker in production. Evidence must show: `peak_concurrent ≤ HEAVY_QUERY_MAX_CONCURRENT`; zero slot leak post-termination; DBA Oracle session headroom (WIP is single connection per slot — NOT the 2-conn resource-worker case).
+
+**Activation model (no routing flag — D1):** the worker ships inert; registering `"wip-detail"` in `app.py` is itself the activation. Fail-open to sync path is automatic when the import is absent (`is_async_available()` + registry miss).
+
+**No new gate tier, command, or workflow file**: all new tests fall within existing `unit-mock-integration` (Tier 1), `nightly-integration` (Tier 3), `stress-load` (Tier 4), and `soak` (Tier 4) gate commands.
+
+**Schema-version bump to 1.3.33 (patch)**: additive gate-compatibility note for WIP RQ worker + `merge_chunks` dead-code removal. No gate tier, command, or status changed.
+
 ## rq-semaphore-wiring Gate Compatibility Note
 
 **Tier-1 unit assertions** (covered by existing `unit-mock-integration` gate):
@@ -618,6 +644,9 @@ gate tier, command, or status changed.
 **Schema-version bump to 1.3.32 (patch)**: additive gate-compatibility note for cross-worker semaphore wiring. No gate tier, command, or status changed.
 
 ## CHANGELOG
+
+## [ci 1.3.33] — 2026-06-20
+- wip-rq-worker-chunks-cleanup: Gate-compatibility note for new `"wip-detail"` RQ worker + `merge_chunks` dead-code removal. Tier-1 unit assertions (job-registry count bump, `wip_dataset` spool-namespace param, slot acquire/release wiring, merge_chunks AST-absence, env-var defaults). Tier-3 integration (`test_wip_worker_integration.py`, `integration_real` marker). Tier-4 stress (`test_wip_worker_stress.py`). `stress-soak-report.md` required before production activation (single Oracle connection per slot — not the 2-conn resource-worker case). No routing flag introduced (D1); activation = `app.py` import line + deployed worker unit. No new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.32] — 2026-06-20
 - rq-semaphore-wiring: Gate-compatibility note for cross-worker semaphore wiring — Tier-1 per-worker acquire/release unit assertions, Tier-3 N=8 concurrent-worker integration test (peak ≤ 3, no deadlock, no leak), Tier-4 stress coverage. `stress-soak-report.md` required before any flag promotion. No new workflow file or gate tier. Additive; no existing gates changed.

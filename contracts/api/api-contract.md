@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.25.1
-last-changed: 2026-06-19
+schema-version: 1.26.0
+last-changed: 2026-06-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -76,15 +76,15 @@ breaking-change-policy: deprecate-2-minors
 | GET | /health/deep | none | — | HealthPayload | — | smoke tests |
 | GET | /api/job/{job_id} | required | ?prefix= | JobStatusResponse | 400/404 | route tests |
 | POST | /api/job/{job_id}/abandon | required | JSON body | AckResponse | 403/404/409 | route tests |
-| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm} | application/octet-stream (parquet) | 400/410 | route tests |
+| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm, wip_dataset} | application/octet-stream (parquet) | 400/410 | route tests |
 | GET | /api/wip/overview/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/summary | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/wip/overview/matrix | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/wip/overview/hold | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/hold | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
-| GET | /api/wip/detail/{workcenter} | required | query params | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/wip/detail/{workcenter} | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/wip/detail/{workcenter} | required | query params | GenericSuccessResponse | 202/400/500 | route tests |
+| POST | /api/wip/detail/{workcenter} | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
 | GET | /api/wip/lot/{lotid} | required | — | GenericSuccessResponse | 404/500 | route tests |
 | GET | /api/wip/meta/workcenters | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/wip/meta/packages | required | — | GenericSuccessResponse | 500 | route tests |
@@ -452,6 +452,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **WIP detail async 202 routing (2026-06-20, wip-rq-worker-chunks-cleanup)**: `GET/POST /api/wip/detail/<workcenter>` now returns HTTP 202 + `{async: true, job_id, status_url}` when row count ≥ L3 (200,000) and RQ worker available. Sync 200 path is unchanged when row count < L3 or worker unavailable (fail-open). New spool namespace `wip_dataset` added to `/api/spool` whitelist. New schema `WipDetailJobAccepted`. Type B async; `prefix=wip-detail` for job status polling. Additive; no existing fields removed or renamed. Worker ships inert until `stress-soak-report.md` sign-off (see ci-gates.md §Promotion Policy).
 ## [api 1.25.0] — 2026-06-18
 ### Added
 - eap-alarm-analysis: 7 new endpoints under `/api/eap-alarm/*` (POST /spool 202 async, GET /spool/status, GET /filter-options, GET /summary, GET /pareto, GET /trend, GET /detail). Spool namespace `eap_alarm` added to `/api/spool` whitelist. Type B async; fine-filter views DuckDB-only (no Oracle re-query post-spool). New schema `EapAlarmSpoolJobAccepted`. Additive; no existing endpoints changed.
@@ -973,3 +974,10 @@ Tier-B — every `4xx`/`5xx` error envelope; see `contracts/api/error-format.md 
 | job_id | string | yes |  | RQ job identifier |
 | status_url | string | yes |  | polling URL |
 | status | string | no |  | job status hint |
+
+### WipDetailJobAccepted
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| async | boolean | yes |  | 202 async branch indicator |
+| job_id | string | yes |  | RQ job identifier |
+| status_url | string | yes |  | polling URL; prefix=wip-detail |

@@ -97,6 +97,7 @@ def test_valid_spool_streams_parquet(client, tmp_path):
     "hold_dataset",
     "downtime_analysis_base_events",
     "downtime_analysis_job_bridge",
+    "wip_dataset",  # wip-rq-worker-chunks-cleanup
 ])
 def test_allowed_namespaces_pass_namespace_validation(client, ns):
     with patch(
@@ -135,4 +136,18 @@ def test_eap_alarm_in_allowed_namespaces():
     assert "eap_alarm" in spool_routes._ALLOWED_NAMESPACES, (
         "'eap_alarm' must be in spool_routes._ALLOWED_NAMESPACES "
         "(eap-alarm-analysis adds this namespace; removal causes HTTP 400)"
+    )
+
+
+def test_wip_dataset_in_allowed_namespaces():
+    """wip_dataset namespace must be in spool_routes._ALLOWED_NAMESPACES (AC-7).
+
+    Added by change wip-rq-worker-chunks-cleanup. Required for
+    GET /api/spool/wip_dataset/<query_id>.parquet to serve async WIP detail results.
+    Removal causes HTTP 400 for all async WIP detail parquet downloads.
+    """
+    from mes_dashboard.routes import spool_routes
+    assert "wip_dataset" in spool_routes._ALLOWED_NAMESPACES, (
+        "'wip_dataset' must be in spool_routes._ALLOWED_NAMESPACES "
+        "(wip-rq-worker-chunks-cleanup adds this namespace; removal causes HTTP 400)"
     )

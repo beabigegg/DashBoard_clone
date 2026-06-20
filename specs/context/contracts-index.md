@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 1ddeda7e900d0b1f306fe6454ea99114059cb805e593bc821f5f738e75b50043
+inputs-digest: 69a4bb8d89053d805663b6e24341bbeac2ba95d1ac24cc69ff6cbaeead3a407f
 ---
 
 # Contracts Index
@@ -72,8 +72,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.28.0
-- last-changed: 2026-06-19
+- schema-version: 1.29.0
+- last-changed: 2026-06-20
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
 
@@ -85,7 +85,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.31
+- schema-version: 1.3.32
 - last-changed: 2026-06-19
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.

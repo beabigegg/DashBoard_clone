@@ -8,13 +8,14 @@ from unittest.mock import patch, MagicMock
 
 import pandas as pd
 
+import ast
+
 from mes_dashboard.services.batch_query_engine import (
     MergeChunksMaxRowsExceeded,
     compute_query_hash,
     decompose_by_ids,
     decompose_by_time_range,
     execute_plan,
-    merge_chunks,
     should_decompose_by_time,
     should_decompose_by_ids,
 )
@@ -338,161 +339,63 @@ class TestMaxRowsPerChunk:
 
 
 # ============================================================
-# 4.8 merge_chunks
+# 4.8 merge_chunks — AC-6 absence proof (wip-rq-worker-chunks-cleanup)
 # ============================================================
 
+class TestMergeChunksAbsentFromSource:
+    """AC-6: merge_chunks (non-spool) must be absent from batch_query_engine.py.
 
-class TestMergeChunks:
-    def test_merge_produces_correct_df(self):
-        import mes_dashboard.core.redis_df_store as rds
+    Uses ast.parse() + ast.walk to prove absence at the AST level.
+    merge_chunks_to_spool is a distinct function and must NOT be deleted.
+    """
 
-        mock_client = MagicMock()
-        stored = {}
-        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
-        mock_client.get.side_effect = lambda k: stored.get(k)
-        mock_client.hgetall.return_value = {"total": "3", "completed": "3", "failed": "0"}
-        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+    _SOURCE_PATH = Path(__file__).parent.parent / "src/mes_dashboard/services/batch_query_engine.py"
 
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client):
-            rds.redis_store_chunk("t", "h", 0, pd.DataFrame({"A": [1, 2]}))
-            rds.redis_store_chunk("t", "h", 1, pd.DataFrame({"A": [3, 4]}))
-            rds.redis_store_chunk("t", "h", 2, pd.DataFrame({"A": [5]}))
+    def test_merge_chunks_def_absent_from_batch_query_engine(self):
+        """AC-6: merge_chunks function definition must not exist in batch_query_engine.py.
 
-        import mes_dashboard.services.batch_query_engine as bqe
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client), \
-             patch.object(bqe, "get_redis_client", return_value=mock_client):
-            merged = merge_chunks("t", "h")
-
-        assert len(merged) == 5
-        assert list(merged["A"]) == [1, 2, 3, 4, 5]
-
-    def test_merge_respects_max_total_rows(self):
-        import mes_dashboard.core.redis_df_store as rds
-
-        mock_client = MagicMock()
-        stored = {}
-        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
-        mock_client.get.side_effect = lambda k: stored.get(k)
-        mock_client.hgetall.return_value = {"total": "3", "completed": "3", "failed": "0"}
-        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client):
-            rds.redis_store_chunk("t", "cap", 0, pd.DataFrame({"A": [1, 2]}))
-            rds.redis_store_chunk("t", "cap", 1, pd.DataFrame({"A": [3, 4]}))
-            rds.redis_store_chunk("t", "cap", 2, pd.DataFrame({"A": [5, 6]}))
-
-        import mes_dashboard.services.batch_query_engine as bqe
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client), \
-             patch.object(bqe, "get_redis_client", return_value=mock_client):
-            merged = merge_chunks("t", "cap", max_total_rows=4)
-
-        assert len(merged) == 4
-        assert list(merged["A"]) == [1, 2, 3, 4]
-
-    def test_merge_raises_when_overflow_mode_error(self):
-        import mes_dashboard.core.redis_df_store as rds
-
-        mock_client = MagicMock()
-        stored = {}
-        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
-        mock_client.get.side_effect = lambda k: stored.get(k)
-        mock_client.hgetall.return_value = {"total": "2", "completed": "2", "failed": "0"}
-        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client):
-            rds.redis_store_chunk("t", "strict", 0, pd.DataFrame({"A": [1, 2]}))
-            rds.redis_store_chunk("t", "strict", 1, pd.DataFrame({"A": [3, 4]}))
-
-        import mes_dashboard.services.batch_query_engine as bqe
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client), \
-             patch.object(bqe, "get_redis_client", return_value=mock_client):
-            with pytest.raises(MergeChunksMaxRowsExceeded):
-                merge_chunks(
-                    "t",
-                    "strict",
-                    max_total_rows=3,
-                    overflow_mode="error",
-                )
-
-    def test_merge_raises_when_cap_already_reached_and_next_chunk_exists(self):
-        import mes_dashboard.core.redis_df_store as rds
-
-        mock_client = MagicMock()
-        stored = {}
-        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
-        mock_client.get.side_effect = lambda k: stored.get(k)
-        mock_client.hgetall.return_value = {"total": "3", "completed": "3", "failed": "0"}
-        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client):
-            rds.redis_store_chunk("t", "strict_cap", 0, pd.DataFrame({"A": [1, 2]}))
-            rds.redis_store_chunk("t", "strict_cap", 1, pd.DataFrame({"A": [3]}))
-            rds.redis_store_chunk("t", "strict_cap", 2, pd.DataFrame({"A": [4]}))
-
-        import mes_dashboard.services.batch_query_engine as bqe
-
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client), \
-             patch.object(bqe, "get_redis_client", return_value=mock_client):
-            with pytest.raises(MergeChunksMaxRowsExceeded):
-                merge_chunks(
-                    "t",
-                    "strict_cap",
-                    max_total_rows=3,
-                    overflow_mode="error",
-                )
-
-
-    def test_merge_chunks_emits_deprecation_warning(self):
-        """AC-4 (query-path-c-elimination-cleanup): merge_chunks must emit DeprecationWarning.
-
-        The DeprecationWarning must be emitted on every call (no-new-callers sentinel).
-        The result must still be correct (backward compatible — D5).
+        ast.walk over FunctionDef nodes — if a node named 'merge_chunks' (not
+        'merge_chunks_to_spool') is found, the dead-code removal is incomplete.
         """
-        import mes_dashboard.core.redis_df_store as rds
+        source = self._SOURCE_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(self._SOURCE_PATH))
 
-        mock_client = MagicMock()
-        stored = {}
-        mock_client.setex.side_effect = lambda k, t, v: stored.update({k: v})
-        mock_client.get.side_effect = lambda k: stored.get(k)
-        mock_client.hgetall.return_value = {"total": "2", "completed": "2", "failed": "0"}
-        mock_client.exists.side_effect = lambda k: 1 if k in stored else 0
+        merge_chunks_defs = [
+            node.name for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "merge_chunks"
+        ]
+        assert not merge_chunks_defs, (
+            "merge_chunks() FunctionDef still present in batch_query_engine.py. "
+            "Dead-code removal (AC-6, IP-2) is incomplete."
+        )
 
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client):
-            rds.redis_store_chunk("dep", "warn", 0, pd.DataFrame({"A": [1, 2]}))
-            rds.redis_store_chunk("dep", "warn", 1, pd.DataFrame({"A": [3]}))
+    def test_merge_chunks_to_spool_still_present(self):
+        """AC-6 guard: merge_chunks_to_spool must NOT be deleted (it is still active)."""
+        source = self._SOURCE_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(self._SOURCE_PATH))
 
-        import mes_dashboard.services.batch_query_engine as bqe
-        import warnings as _warnings
+        spool_defs = [
+            node.name for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "merge_chunks_to_spool"
+        ]
+        assert spool_defs, (
+            "merge_chunks_to_spool must NOT be deleted — it is still active and used by "
+            "multiple services. Only the deprecated bare merge_chunks is removed."
+        )
 
-        with patch.object(rds, "REDIS_ENABLED", True), \
-             patch.object(rds, "get_redis_client", return_value=mock_client), \
-             patch.object(bqe, "get_redis_client", return_value=mock_client):
-            with _warnings.catch_warnings(record=True) as caught:
-                _warnings.simplefilter("always")
-                merged = merge_chunks("dep", "warn")
+    def test_merge_chunks_max_rows_exceeded_still_present(self):
+        """AC-6 guard: MergeChunksMaxRowsExceeded exception class must still exist."""
+        source = self._SOURCE_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(self._SOURCE_PATH))
 
-        dep_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert len(dep_warnings) >= 1, "merge_chunks must emit DeprecationWarning"
-        assert any(
-            "merge_chunks" in str(w.message).lower() or "merge_chunks_to_spool" in str(w.message)
-            for w in dep_warnings
-        ), f"DeprecationWarning must mention merge_chunks or merge_chunks_to_spool. Got: {[str(w.message) for w in dep_warnings]}"
-
-        # Backward compat: result must still be correct (D5 additive-only)
-        assert len(merged) == 3
-        assert list(merged["A"]) == [1, 2, 3]
+        class_names = [
+            node.name for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef) and node.name == "MergeChunksMaxRowsExceeded"
+        ]
+        assert class_names, (
+            "MergeChunksMaxRowsExceeded must remain in batch_query_engine.py "
+            "(used by merge_chunks_to_spool)."
+        )
 
 
 # ============================================================

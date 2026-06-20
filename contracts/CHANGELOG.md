@@ -8,9 +8,23 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.26.0] — 2026-06-20
+### Added
+- wip-rq-worker-chunks-cleanup: WIP detail async 202 routing now active when row count ≥ L3 (200,000) and RQ worker available. `GET/POST /api/wip/detail/<workcenter>` error codes updated from 400/500 to 202/400/500. New spool namespace `wip_dataset` added to `/api/spool` whitelist. New schema `WipDetailJobAccepted` (async: bool, job_id: str, status_url: str). `wip_routes.py` added to Section 7 Type B async list. Section 10 compat note added. Additive; no existing fields removed or renamed. Worker ships inert until stress-soak-report.md sign-off.
+### Removed
+- wip-rq-worker-chunks-cleanup: `merge_chunks()` dead-code removed from batch_query_engine.py (AC-6). Zero production callers confirmed by grep. `merge_chunks_to_spool`, `MergeChunksMaxRowsExceeded`, `ChunkSchemaMismatch` unchanged.
+
+## [env 1.0.22] — 2026-06-20
+### Added
+- wip-rq-worker-chunks-cleanup: `WIP_WORKER_QUEUE` (optional, default `"wip-detail-query"`, restart required) — RQ queue name for WIP detail worker. `WIP_JOB_TIMEOUT_SECONDS` (optional, default 1800, restart required) — max job duration. `WIP_SPOOL_TTL` (optional, default 72000, restart required) — spool Redis TTL. No routing flag introduced (D1 design decision: `is_async_available()` + `classify_query_cost(domain="wip")` gate is sufficient). Additive; no existing vars changed.
+
 ## [business 1.29.0] — 2026-06-20
 ### Added
 - rq-semaphore-wiring: ASYNC-15 (Oracle-phase RQ concurrency cap — `HEAVY_QUERY_MAX_CONCURRENT` (default 3) bounds simultaneous Oracle-phase executions across all four `execute_*_job` workers; slot acquired once per job around Oracle fetch only, released on success and exception; reject wired at cache layer; Redis-down fail-open). Two Decision Table rows. Additive; no existing rules changed.
+
+## [ci 1.3.33] — 2026-06-20
+### Added
+- wip-rq-worker-chunks-cleanup: Gate-compatibility note for WIP detail RQ worker — Tier-1 unit tests (wip_query_job_service wiring, merge_chunks absence), Tier-3 integration test (test_wip_worker_integration.py), Tier-4 stress coverage (test_wip_worker_stress.py). `stress-soak-report.md` required before worker activation (inert at merge). No new workflow file or gate tier. Worker ships inert; activation follows ci-gates.md §Promotion Policy.
 
 ## [ci 1.3.32] — 2026-06-20
 ### Added

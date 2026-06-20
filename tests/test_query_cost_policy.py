@@ -319,6 +319,7 @@ class TestNoPandasAndNoCallers:
             },
             # query-path-c-elimination-cleanup (IP-7, P5): all callers that replaced
             # per-domain *_ASYNC_DAY_THRESHOLD with classify_query_cost() calls.
+            # wip-rq-worker-chunks-cleanup: wip_query_job_service added as approved caller.
             "query_cost_policy": {
                 "resource_query_job_service",
                 "reject_query_job_service",
@@ -328,6 +329,7 @@ class TestNoPandasAndNoCallers:
                 "wip_routes",
                 "resource_history_routes",
                 "hold_history_routes",
+                "wip_query_job_service",
             },
         }
 

@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.21
-last-changed: 2026-06-19
+schema-version: 1.0.22
+last-changed: 2026-06-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -227,6 +227,23 @@ Added by `downtime-duckdb-join-migration`. Prior per-worker parity notes in indi
 - `EAP_ALARM_SPOOL_DIR`: Directory for EAP ALARM parquet spool files. Relative paths resolve against CWD. Default `tmp/query_spool/eap_alarm`. Added by change `eap-alarm-analysis`.
 
 **Worker env-var parity:** The `mes-dashboard-eap-alarm-worker.service` systemd unit MUST export the same `EAP_ALARM_*` env set as gunicorn.
+
+
+## Async Worker — WIP Detail Query
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| WIP_WORKER_QUEUE | async | all | no | no | wip-detail-query | wip-detail-query | application-team | non-empty string; RQ queue name for the WIP detail worker process | yes | uses default "wip-detail-query" |
+| WIP_JOB_TIMEOUT_SECONDS | async | all | no | no | 1800 | 1800 | application-team | positive integer (seconds); RQ job timeout for the WIP detail worker; must exceed the longest expected Oracle query duration | yes | uses default 1800 |
+| WIP_SPOOL_TTL | cache | all | no | no | 72000 | 72000 | application-team | positive integer (seconds); Redis spool metadata TTL for WIP detail queries; minimum 3600 | yes | uses default 72000 |
+
+- `WIP_WORKER_QUEUE`: RQ queue name that `enqueue_job_dynamic()` routes WIP detail jobs to. Must match the `--queues` argument of the running WIP detail worker process. Default `"wip-detail-query"`. Added by change `wip-rq-worker-chunks-cleanup`.
+- `WIP_JOB_TIMEOUT_SECONDS`: Maximum seconds a single RQ WIP detail job may run before the worker kills it. Default 1800 s. Added by change `wip-rq-worker-chunks-cleanup`.
+- `WIP_SPOOL_TTL`: Redis spool metadata TTL for WIP detail queries. Default 72000 s (20 h). Controls how long the `wip_dataset` parquet result is accessible after the job completes. Added by change `wip-rq-worker-chunks-cleanup`.
+
+**No routing flag:** WIP detail async routing is gated solely by `is_async_available()` + `classify_query_cost(domain="wip", ...)` in `wip_routes.py`. No `WIP_DETAIL_USE_RQ` flag exists — registering the worker IS the activation. Only the above operational tuning vars are added (D1 design decision).
+
+**Worker env-var parity:** The `mes-dashboard-wip-worker.service` systemd unit MUST export the same `WIP_*` env set as gunicorn (at minimum: `WIP_WORKER_QUEUE`, `WIP_JOB_TIMEOUT_SECONDS`, `WIP_SPOOL_TTL`). Env-var drift silently changes query routing. Added by change `wip-rq-worker-chunks-cleanup`.
 
 ## Unified Query Infrastructure — DuckDB Job Temp Directory
 

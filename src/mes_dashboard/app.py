@@ -894,6 +894,10 @@ def create_app(config_name: str | None = None) -> Flask:
     import mes_dashboard.services.hold_query_job_service  # noqa: F401
     import mes_dashboard.services.resource_query_job_service  # noqa: F401
     import mes_dashboard.workers.eap_alarm_worker  # noqa: F401
+    # DEFERRED ACTIVATION (wip-rq-worker-chunks-cleanup): wip_query_job_service ships
+    # inert — do NOT uncomment until stress-soak-report.md is signed off.
+    # See ci-gates.md §Promotion Policy step 2 for the full activation sequence.
+    # import mes_dashboard.services.wip_query_job_service  # noqa: F401  # pragma: no cover
 
     # Register API routes
     register_routes(app)

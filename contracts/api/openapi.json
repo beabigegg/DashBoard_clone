@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.25.1"
+    "version": "1.26.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -469,6 +469,9 @@
               }
             }
           },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
           "400": {
             "description": "Error response (see contract error format)"
           },
@@ -491,7 +494,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cdd-errors": "400/500"
+        "x-cdd-errors": "202/400/500"
       },
       "post": {
         "summary": "POST /api/wip/detail/{workcenter}",
@@ -505,6 +508,9 @@
                 }
               }
             }
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
           },
           "400": {
             "description": "Error response (see contract error format)"
@@ -533,7 +539,7 @@
           "content": {},
           "x-cdd-unresolved": true
         },
-        "x-cdd-errors": "400/500"
+        "x-cdd-errors": "202/400/500"
       }
     },
     "/api/wip/lot/{lotid}": {
@@ -6767,6 +6773,28 @@
           "status": {
             "type": "string",
             "description": "job status hint"
+          }
+        },
+        "required": [
+          "async",
+          "job_id",
+          "status_url"
+        ]
+      },
+      "WipDetailJobAccepted": {
+        "type": "object",
+        "properties": {
+          "async": {
+            "type": "boolean",
+            "description": "202 async branch indicator"
+          },
+          "job_id": {
+            "type": "string",
+            "description": "RQ job identifier"
+          },
+          "status_url": {
+            "type": "string",
+            "description": "polling URL; prefix=wip-detail"
           }
         },
         "required": [
