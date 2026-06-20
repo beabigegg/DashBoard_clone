@@ -60,6 +60,7 @@ function updateFilters(patch) {
         <button
           type="button"
           :class="['mode-tab', { active: queryMode === 'date_range' }]"
+          data-testid="mode-date-range"
           @click="$emit('update:queryMode', 'date_range')"
         >
           日期區間
@@ -67,6 +68,7 @@ function updateFilters(patch) {
         <button
           type="button"
           :class="['mode-tab', { active: queryMode === 'container' }]"
+          data-testid="mode-container"
           @click="$emit('update:queryMode', 'container')"
         >
           LOT / 工單 / WAFER
@@ -82,6 +84,7 @@ function updateFilters(patch) {
             :options="stationOptions"
             :disabled="loading"
             placeholder="選擇偵測站"
+            data-testid="station-select"
             @update:model-value="updateFilters({ station: $event })"
           />
         </div>
@@ -96,9 +99,9 @@ function updateFilters(patch) {
             :disabled="loading"
             @change="$emit('update:containerInputType', $event.target.value)"
           >
-            <option value="lot">LOT</option>
-            <option value="work_order">工單</option>
-            <option value="wafer_lot">WAFER LOT</option>
+            <option value="lot" data-testid="container-type-lot">LOT</option>
+            <option value="work_order" data-testid="container-type-workorder">工單</option>
+            <option value="wafer_lot" data-testid="container-type-wafer">WAFER LOT</option>
             <option value="serial_number">成品流水號</option>
             <option value="gd_work_order">GD 工單</option>
             <option value="gd_lot_id">GD LOT ID</option>
@@ -139,6 +142,7 @@ function updateFilters(patch) {
               type="date"
               :value="filters.startDate"
               :disabled="loading"
+              data-testid="start-date"
               @input="updateFilters({ startDate: $event.target.value })"
             />
           </div>
@@ -150,6 +154,7 @@ function updateFilters(patch) {
               type="date"
               :value="filters.endDate"
               :disabled="loading"
+              data-testid="end-date"
               @input="updateFilters({ endDate: $event.target.value })"
             />
           </div>
@@ -163,6 +168,7 @@ function updateFilters(patch) {
             :options="availableLossReasons"
             :disabled="loading"
             placeholder="全部原因"
+            data-testid="loss-reason-select"
             @update:model-value="updateFilters({ lossReasons: $event })"
           />
         </div>
@@ -171,6 +177,7 @@ function updateFilters(patch) {
           type="button"
           class="ui-btn ui-btn--primary"
           :disabled="loading"
+          data-testid="query-submit-btn"
           @click="$emit('query')"
         >
           查詢
@@ -185,6 +192,7 @@ function updateFilters(patch) {
           :value="containerInput"
           :disabled="loading"
           placeholder="每行一個，支援 * 或 % wildcard&#10;GA26020001-A00-001&#10;GA260200%&#10;..."
+          data-testid="container-input"
           @input="$emit('update:containerInput', $event.target.value)"
         ></textarea>
       </div>

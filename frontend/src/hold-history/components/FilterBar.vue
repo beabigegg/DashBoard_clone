@@ -123,6 +123,7 @@ function setMode(newMode: string): void {
           v-model="localStartDate"
           class="date-input"
           type="date"
+          data-testid="start-date"
           :disabled="disabled"
         />
       </div>
@@ -134,6 +135,7 @@ function setMode(newMode: string): void {
           v-model="localEndDate"
           class="date-input"
           type="date"
+          data-testid="end-date"
           :disabled="disabled"
         />
       </div>
@@ -152,6 +154,7 @@ function setMode(newMode: string): void {
         id="hold-history-hold-type"
         v-model="holdTypeModel"
         class="hold-type-select"
+        data-testid="hold-type-select"
         :disabled="disabled"
       >
         <option value="quality">品質異常</option>
@@ -164,6 +167,7 @@ function setMode(newMode: string): void {
       <button
         type="button"
         class="ui-btn ui-btn--primary"
+        data-testid="query-submit-btn"
         :disabled="disabled"
         @click="handleApply"
       >

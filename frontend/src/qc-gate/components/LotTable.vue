@@ -80,7 +80,7 @@ function bucketClass(value: unknown): string {
 
 <template>
   <div class="lot-table-wrap">
-    <div v-if="activeFilter" class="filter-chip" @click="emit('clear-filter')">
+    <div v-if="activeFilter" class="filter-chip" data-testid="clear-filter-chip" @click="emit('clear-filter')">
       已套用圖表篩選，點擊清除
     </div>
 

@@ -1489,9 +1489,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="dashboard reject-history-page theme-reject-history">
+  <div class="dashboard reject-history-page theme-reject-history" data-testid="reject-history-app">
 
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+    <ErrorBanner :message="errorMessage" :dismissible="false" data-testid="error-banner" />
     <div v-if="partialFailureWarning" class="warning-banner">
       {{ partialFailureWarning }}
     </div>
@@ -1526,11 +1526,11 @@ onUnmounted(() => {
         <template v-if="jobProgress.pct > 0">（{{ jobProgress.pct }}%）</template>
         <template v-if="jobProgress.elapsedSeconds > 0"> · 已等待 {{ jobProgress.elapsedSeconds }} 秒</template>
       </span>
-      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" @click="cancelAsyncJob">取消查詢</button>
+      <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" data-testid="cancel-job-btn" @click="cancelAsyncJob">取消查詢</button>
     </div>
 
     <template v-if="queryId">
-      <SummaryCards :cards="kpiCards" />
+      <SummaryCards :cards="kpiCards" data-testid="results-summary" />
 
       <div class="section-gap"></div>
       <TrendChart

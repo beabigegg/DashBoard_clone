@@ -72,6 +72,7 @@ const unresolvedWarning = ref<string>('');
 // ---- Async job state (task 8.3) ----
 const currentQueryHash = ref<string | null>(null);
 const pollingJobId = ref<string | null>(null);
+const hasQueried = ref<boolean>(false); // true once the first query attempt completes
 const _POLL_INTERVAL_MS = 2000;
 const _POLL_MAX_ATTEMPTS = 150; // ~5 minutes
 let _pollingAttempts = 0;
@@ -151,6 +152,7 @@ function clearResults() {
   unresolvedWarning.value = '';
   currentQueryHash.value = null;
   pollingJobId.value = null;
+  hasQueried.value = false;
   _stopPolling();
 }
 
@@ -299,6 +301,7 @@ async function executePrimaryQuery(page: number = 1, opts: { paginationOnly?: bo
       unresolvedWarning.value = `以下 LOT ID 無法解析：${payload.meta.unresolved.join('、')}`;
     }
     warningMessage.value = buildQualityWarning(payload.quality_meta, payload.meta);
+    hasQueried.value = true;
   } catch (err) {
     errorMessage.value = (err instanceof Error ? err.message : null) || '查詢失敗，請稍後再試';
     if (!paginationOnly && !_fromPoll) {
@@ -406,10 +409,10 @@ function onDocumentClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="dashboard theme-material-trace" @click="onDocumentClick">
+  <div class="dashboard theme-material-trace" data-testid="material-trace-app" @click="onDocumentClick">
     <!-- Error / Warning Banners -->
-    <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
-    <div v-if="unresolvedWarning" class="warning-banner">{{ unresolvedWarning }}</div>
+    <ErrorBanner data-testid="error-banner" :message="errorMessage" @dismiss="errorMessage = ''" />
+    <div v-if="unresolvedWarning" data-testid="unresolved-warning" class="warning-banner">{{ unresolvedWarning }}</div>
     <div v-if="warningMessage" class="warning-banner">{{ warningMessage }}</div>
 
     <!-- Query Card -->
@@ -421,6 +424,7 @@ function onDocumentClick(e: MouseEvent) {
         <!-- Mode tabs -->
         <div class="mode-tab-row mode-tab-row--spaced">
           <button
+            data-testid="mode-forward"
             class="mode-tab"
             :class="{ active: queryMode === 'forward' }"
             @click="switchQueryMode('forward')"
@@ -428,6 +432,7 @@ function onDocumentClick(e: MouseEvent) {
             正向查詢：LOT/工單 → 原物料
           </button>
           <button
+            data-testid="mode-reverse"
             class="mode-tab"
             :class="{ active: queryMode === 'reverse' }"
             @click="switchQueryMode('reverse')"
@@ -442,12 +447,13 @@ function onDocumentClick(e: MouseEvent) {
             <label class="filter-label">輸入類型</label>
             <div class="input-type-row">
               <select
+                data-testid="input-type-select"
                 class="filter-input input-type-select"
                 :value="forwardInputType"
                 @change="switchForwardInputType(($event.target as HTMLSelectElement).value as 'lot' | 'workorder')"
               >
-                <option value="lot">LOT ID</option>
-                <option value="workorder">工單</option>
+                <option data-testid="input-type-lot" value="lot">LOT ID</option>
+                <option data-testid="input-type-workorder" value="workorder">工單</option>
               </select>
             </div>
           </div>
@@ -455,7 +461,7 @@ function onDocumentClick(e: MouseEvent) {
           <!-- Workcenter group filter -->
           <div class="filter-group">
             <label class="filter-label">站群組篩選</label>
-            <div class="wc-select" @click.stop>
+            <div data-testid="workcenter-select" class="wc-select" @click.stop>
               <button
                 class="wc-select-trigger"
                 @click="workcenterDropdownOpen = !workcenterDropdownOpen"
@@ -507,6 +513,7 @@ function onDocumentClick(e: MouseEvent) {
               }}
             </label>
             <textarea
+              data-testid="trace-input"
               v-model="inputText"
               class="filter-input filter-textarea"
               rows="5"
@@ -518,7 +525,7 @@ function onDocumentClick(e: MouseEvent) {
                   : 'WIRE-LOT-20250101-A\nSLD-LOT-2025*\n...'
               "
             ></textarea>
-            <div class="input-count" :class="{ 'over-limit': isOverLimit }">
+            <div data-testid="input-limit" class="input-count" :class="{ 'over-limit': isOverLimit }">
               已輸入 {{ inputCount }} 筆
               <template v-if="isOverLimit">
                 （超過上限 {{ currentInputLimit }} 筆）
@@ -530,6 +537,7 @@ function onDocumentClick(e: MouseEvent) {
           <div class="filter-toolbar">
             <div class="filter-actions">
               <button
+                data-testid="submit-btn"
                 class="ui-btn ui-btn--primary"
                 :class="{ 'is-loading': loading }"
                 :disabled="!canQuery || loading"
@@ -539,7 +547,7 @@ function onDocumentClick(e: MouseEvent) {
                 {{ loading ? '查詢中...' : '查詢' }}
               </button>
               <button class="ui-btn ui-btn--secondary" @click="clearAll">清除</button>
-              <button class="ui-btn ui-btn--secondary" :disabled="!canExport" @click="exportCsv">
+              <button data-testid="export-btn" class="ui-btn ui-btn--secondary" :disabled="!canExport" @click="exportCsv">
                 匯出 CSV
               </button>
             </div>
@@ -559,15 +567,24 @@ function onDocumentClick(e: MouseEvent) {
         </span>
       </div>
       <div class="card-body ui-card-body result-card-body">
-        <DataTable
-          :data="rows"
-          :loading="loading || paginationLoading"
-          :pagination="pagination.total_pages > 1 ? { page: pagination.page, totalPages: pagination.total_pages, infoText: `第 ${pagination.page} / ${pagination.total_pages} 頁，共 ${pagination.total.toLocaleString()} 筆` } : null"
-          @page-change="goToPage"
-        >
-          <DataTableColumn v-for="col in TABLE_COLUMNS" :key="col.key" :column-key="col.key" :label="col.label" :sortable="true" />
-        </DataTable>
+        <!-- Loading state sentinel (visible while request is in flight or polling) -->
+        <div v-if="loading && !hasResults" data-testid="loading-state" class="loading-state-sentinel" aria-busy="true"></div>
+        <div data-testid="result-table">
+          <DataTable
+            :data="rows"
+            :loading="loading || paginationLoading"
+            :pagination="pagination.total_pages > 1 ? { page: pagination.page, totalPages: pagination.total_pages, infoText: `第 ${pagination.page} / ${pagination.total_pages} 頁，共 ${pagination.total.toLocaleString()} 筆` } : null"
+            @page-change="goToPage"
+          >
+            <DataTableColumn v-for="col in TABLE_COLUMNS" :key="col.key" :column-key="col.key" :label="col.label" :sortable="true" />
+          </DataTable>
+        </div>
       </div>
+    </div>
+
+    <!-- Empty state: shown after a completed query that returned zero rows -->
+    <div v-if="hasQueried && !loading && !paginationLoading && !hasResults && !errorMessage && pollingJobId === null" data-testid="empty-state" class="empty-state-card">
+      <p>查無結果</p>
     </div>
   </div>
 </template>

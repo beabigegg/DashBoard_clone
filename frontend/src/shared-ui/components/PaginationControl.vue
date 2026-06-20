@@ -108,6 +108,7 @@ const pageNumbers = computed((): (number | string)[] => {
       <select
         :value="pageSize || pageSizeOptions[0]"
         aria-label="每頁顯示筆數"
+        data-testid="page-size"
         @change="onPageSizeChange"
       >
         <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
@@ -123,6 +124,7 @@ const pageNumbers = computed((): (number | string)[] => {
         type="button"
         class="pagination-page-btn"
         :class="{ active: p === page }"
+        data-testid="page-num"
         :disabled="p === '...'"
         :aria-label="p !== '...' ? `第 ${p} 頁` : undefined"
         :aria-current="p === page ? 'page' : undefined"
@@ -151,6 +153,7 @@ const pageNumbers = computed((): (number | string)[] => {
         :max="safeTotalPages"
         :value="page"
         aria-label="跳至頁碼"
+        data-testid="page-jump"
         class="pagination-jump-input"
         @change="onPageInput"
       />

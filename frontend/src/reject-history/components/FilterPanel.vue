@@ -90,6 +90,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
       <div class="filter-group-full mode-tab-row">
         <button
           type="button"
+          data-testid="query-mode-date"
           :class="['mode-tab', { active: queryMode === 'date_range' }]"
           @click="$emit('update:queryMode', 'date_range')"
         >
@@ -97,6 +98,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
         </button>
         <button
           type="button"
+          data-testid="query-mode-container"
           :class="['mode-tab', { active: queryMode === 'container' }]"
           @click="$emit('update:queryMode', 'container')"
         >
@@ -113,6 +115,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
             v-model="filters.startDate"
             type="date"
             class="filter-input"
+            data-testid="start-date"
           />
         </div>
         <div class="filter-group">
@@ -122,6 +125,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
             v-model="filters.endDate"
             type="date"
             class="filter-input"
+            data-testid="end-date"
           />
         </div>
         <div class="filter-group-full date-limit-hint">
@@ -137,11 +141,12 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
             <select
               id="container-type"
               class="filter-input container-type-select"
+              data-testid="container-type-select"
               :value="containerInputType"
               @change="$emit('update:containerInputType', ($event.target as HTMLSelectElement).value)"
             >
-              <option value="lot">LOT</option>
-              <option value="work_order">工單</option>
+              <option value="lot" data-testid="container-type-lot">LOT</option>
+              <option value="work_order" data-testid="container-type-workorder">工單</option>
               <option value="wafer_lot">WAFER LOT</option>
             </select>
             <label class="filter-label" for="container-input"
@@ -151,6 +156,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           <textarea
             id="container-input"
             class="filter-input filter-textarea"
+            data-testid="container-input"
             rows="3"
             :value="containerInput"
             @input="$emit('update:containerInput', ($event.target as HTMLTextAreaElement).value)"
@@ -162,21 +168,22 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
       <div class="filter-toolbar">
         <div class="checkbox-row">
           <label class="checkbox-pill">
-            <input v-model="filters.includeExcludedScrap" type="checkbox" />
+            <input v-model="filters.includeExcludedScrap" type="checkbox" data-testid="include-excluded-scrap" />
             納入不計良率報廢
           </label>
           <label class="checkbox-pill">
-            <input v-model="filters.excludeMaterialScrap" type="checkbox" />
+            <input v-model="filters.excludeMaterialScrap" type="checkbox" data-testid="exclude-material-scrap" />
             排除原物料報廢
           </label>
           <label class="checkbox-pill">
-            <input v-model="filters.excludePbDiode" type="checkbox" />
+            <input v-model="filters.excludePbDiode" type="checkbox" data-testid="exclude-pb-diode" />
             排除 PB_* 系列
           </label>
         </div>
         <div class="filter-actions">
           <button
             class="ui-btn ui-btn--primary"
+            data-testid="query-submit-btn"
             :disabled="loading.querying"
             @click="$emit('apply')"
           >
@@ -187,6 +194,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           </button>
           <button
             class="ui-btn ui-btn--ghost"
+            data-testid="clear-btn"
             :disabled="loading.querying"
             @click="$emit('clear')"
           >
@@ -236,7 +244,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
         </div>
       </div>
       <div class="supplementary-row">
-        <div class="filter-group">
+        <div class="filter-group" data-testid="workcenter-select">
           <label class="filter-label">WORKCENTER GROUP</label>
           <MultiSelect
             :model-value="supplementaryFilters?.workcenterGroups"
@@ -247,7 +255,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           />
         </div>
 
-        <div class="filter-group">
+        <div class="filter-group" data-testid="package-select">
           <label class="filter-label">Package</label>
           <MultiSelect
             :model-value="supplementaryFilters?.packages"
@@ -258,7 +266,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           />
         </div>
 
-        <div class="filter-group">
+        <div class="filter-group" data-testid="reason-select">
           <label class="filter-label">報廢原因</label>
           <MultiSelect
             :model-value="supplementaryFilters?.reasons"
@@ -269,7 +277,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           />
         </div>
 
-        <div class="filter-group">
+        <div class="filter-group" data-testid="type-select">
           <label class="filter-label">TYPE</label>
           <MultiSelect
             :model-value="supplementaryFilters?.types"

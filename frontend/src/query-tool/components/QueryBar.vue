@@ -77,6 +77,7 @@ function handleResolve() {
             type="button"
             class="ui-btn ui-btn--primary"
             :disabled="resolving"
+            data-testid="submit-btn"
             @click="handleResolve"
           >
             {{ resolving ? '解析中...' : '解析' }}
@@ -88,6 +89,7 @@ function handleResolve() {
         <textarea
           :value="inputText"
           class="query-tool-textarea"
+          data-testid="lot-input"
           :placeholder="`請輸入 ${inputTypeLabel}（換行或逗號分隔），最多 ${inputLimit} 筆`"
           :disabled="resolving"
           @input="emit('update:inputText', ($event.target as HTMLTextAreaElement).value)"

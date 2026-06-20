@@ -760,7 +760,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="dashboard theme-yield-alert-center">
+  <div class="dashboard theme-yield-alert-center" data-testid="yield-alert-app">
     <section class="filter-panel primary-query-panel">
       <header class="panel-header">
         <h2>第一階段：日期主查詢</h2>
@@ -769,17 +769,17 @@ onUnmounted(() => {
       <div class="filter-row two">
         <label>
           開始日期
-          <input v-model="filters.start_date" class="text-input" type="date" />
+          <input v-model="filters.start_date" class="text-input" type="date" data-testid="start-date" />
         </label>
         <label>
           結束日期
-          <input v-model="filters.end_date" class="text-input" type="date" />
+          <input v-model="filters.end_date" class="text-input" type="date" data-testid="end-date" />
         </label>
       </div>
       <div class="filter-row one">
         <div class="ctrl-item">
           <span class="ctrl-label">製程類型</span>
-          <div class="process-type-toggle" role="radiogroup" aria-label="製程類型選擇">
+          <div class="process-type-toggle" role="radiogroup" aria-label="製程類型選擇" data-testid="process-type-select">
             <label
               v-for="opt in PROCESS_TYPE_OPTIONS"
               :key="opt.value"
@@ -800,10 +800,10 @@ onUnmounted(() => {
       </div>
       <div class="filter-row one">
         <div class="filter-actions">
-          <button class="ui-btn ui-btn--primary" :disabled="!canSubmit" @click="runQuery(1)">
+          <button class="ui-btn ui-btn--primary" :disabled="!canSubmit" @click="runQuery(1)" data-testid="query-submit-btn">
             {{ loading ? '查詢中...' : isDateStageDirty ? '執行日期查詢' : '重新查詢日期範圍' }}
           </button>
-          <button class="ui-btn ui-btn--ghost" :disabled="loading" @click="resetFilters">清除條件</button>
+          <button class="ui-btn ui-btn--ghost" :disabled="loading" @click="resetFilters" data-testid="clear-btn">清除條件</button>
         </div>
       </div>
     </section>
@@ -868,15 +868,15 @@ onUnmounted(() => {
         <div class="control-bar">
           <label class="ctrl-item">
             風險門檻良率(%)
-            <input v-model="filters.risk_threshold" class="text-input ctrl-input" type="number" step="0.1" min="0" max="100" />
+            <input v-model="filters.risk_threshold" class="text-input ctrl-input" type="number" step="0.1" min="0" max="100" data-testid="risk-threshold-input" />
           </label>
           <label class="ctrl-item">
             最小報廢量
-            <input v-model="filters.min_scrap_qty" class="text-input ctrl-input" type="number" step="0.1" min="0" />
+            <input v-model="filters.min_scrap_qty" class="text-input ctrl-input" type="number" step="0.1" min="0" data-testid="min-scrap-qty-input" />
           </label>
           <div class="ctrl-item">
             <span class="ctrl-label">時間聚合</span>
-            <div class="granularity-toggle">
+            <div class="granularity-toggle" data-testid="granularity-select">
               <button
                 v-for="opt in GRANULARITY_OPTIONS"
                 :key="opt.value"
@@ -899,11 +899,11 @@ onUnmounted(() => {
     </section>
 
     <section class="status-stack">
-      <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" />
+      <ErrorBanner :message="errorMessage" @dismiss="errorMessage = ''" data-testid="error-banner" />
       <div v-if="warningMessage" class="status warn">{{ warningMessage }}</div>
     </section>
 
-    <section class="summary-section">
+    <section class="summary-section" data-testid="summary-cards">
       <SummaryCardGroup :columns="3">
         <SummaryCard
           v-for="card in summaryCards"
@@ -917,7 +917,7 @@ onUnmounted(() => {
     </section>
 
     <div v-if="hasQueried" class="chart-grid">
-      <section class="trend-panel">
+      <section class="trend-panel" data-testid="trend-chart">
         <LoadingSpinner v-if="trendLoading" size="sm" />
         <YieldTrendChart
           :trend="trend"
@@ -940,7 +940,7 @@ onUnmounted(() => {
         />
       </section>
 
-      <section class="heatmap-panel chart-grid-full">
+      <section class="heatmap-panel chart-grid-full" data-testid="heatmap-chart">
         <YieldHeatmap :heatmap="heatmapData" :granularity="granularity" />
       </section>
     </div>
@@ -950,7 +950,7 @@ onUnmounted(() => {
         <h2>告警候選清單</h2>
         <span>{{ pagination.total }} 筆</span>
       </header>
-      <div class="table-wrap ui-table-wrap" :class="{ 'is-loading': paginationLoading }" v-if="hasData">
+      <div class="table-wrap ui-table-wrap" :class="{ 'is-loading': paginationLoading }" v-if="hasData" data-testid="alerts-table">
         <table class="alert-table">
           <thead>
             <tr>
@@ -990,12 +990,13 @@ onUnmounted(() => {
                   <button
                     class="ui-btn ui-btn--ghost ui-btn--sm"
                     @click="toggleReasonDetail(row)"
+                    data-testid="row-expand-btn"
                   >
                     {{ reasonDetailLoading && expandedRowKey === alertRowKey(row) ? '載入中...' : expandedRowKey === alertRowKey(row) ? '收合' : '查看原因' }}
                   </button>
                 </td>
               </tr>
-              <tr v-if="expandedRowKey === alertRowKey(row)" class="reason-detail-row">
+              <tr v-if="expandedRowKey === alertRowKey(row)" class="reason-detail-row" data-testid="row-detail">
                 <td colspan="12">
                   <EmptyState v-if="reasonDetailLoading" type="loading" />
                   <EmptyState v-else-if="reasonDetailRows.length === 0" type="filter-empty" />
@@ -1041,7 +1042,7 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-      <EmptyState v-else :type="alertLoading || paginationLoading ? 'loading' : hasQueried ? 'filter-empty' : 'no-data'" />
+      <EmptyState v-else :type="alertLoading || paginationLoading ? 'loading' : hasQueried ? 'filter-empty' : 'no-data'" data-testid="empty-state" />
 
       <footer class="pagination">
         <button class="ui-btn ui-btn--ghost" :disabled="loading || paginationLoading || pagination.page <= 1" @click="goToPage(pagination.page - 1)">上一頁</button>
@@ -1056,6 +1057,7 @@ onUnmounted(() => {
       :elapsed-seconds="0"
       :status="jobProgress.status"
       @cancel="cancelAsyncJob"
+      data-testid="loading-state"
     />
     <LoadingOverlay v-if="loading && !jobProgress.active" tier="page" />
   </div>

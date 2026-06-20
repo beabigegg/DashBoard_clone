@@ -109,7 +109,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
   <!-- Column registrations (invisible) -->
   <slot />
 
-  <div class="data-table-root">
+  <div class="data-table-root" data-testid="datatable">
     <div
       class="data-table-scroll"
       :class="{ 'is-loading': loading }"
@@ -126,6 +126,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
             <th
               v-for="col in columns"
               :key="col.key"
+              :data-testid="'sort-header-' + col.key"
               class="data-table-th"
               :class="[
                 `data-table-th--${col.align || 'left'}`,
@@ -159,7 +160,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
 
         <tbody v-if="!isEmpty">
           <template v-for="(row, index) in displayData" :key="index">
-            <tr class="data-table-row" :class="{ 'data-table-row--even': index % 2 === 1 }">
+            <tr class="data-table-row" :class="{ 'data-table-row--even': index % 2 === 1 }" data-testid="datatable-row">
               <!-- Expand toggle cell -->
               <td v-if="$slots.expand" class="data-table-td data-table-td--expand">
                 <button
@@ -213,7 +214,7 @@ const isEmpty = computed(() => !props.loading && displayData.value.length === 0)
         </tbody>
 
         <tbody v-else>
-          <tr>
+          <tr data-testid="datatable-empty">
             <td
               :colspan="($slots.expand ? 1 : 0) + columns.length"
               class="data-table-empty-cell"

@@ -98,6 +98,7 @@ const canSubmit = computed(() =>
           v-model="filters.date_from"
           type="date"
           class="filter-input"
+          data-testid="start-date"
           required
         />
       </div>
@@ -108,6 +109,7 @@ const canSubmit = computed(() =>
           v-model="filters.date_to"
           type="date"
           class="filter-input"
+          data-testid="end-date"
           required
         />
       </div>
@@ -134,6 +136,7 @@ const canSubmit = computed(() =>
           :disabled="loading.querying"
           placeholder="全部篩選後機台"
           searchable
+          data-testid="machine-select"
           @update:model-value="updateMachines"
         />
       </div>
@@ -144,6 +147,7 @@ const canSubmit = computed(() =>
           <button
             type="button"
             class="ui-btn ui-btn--primary"
+            data-testid="coarse-submit-btn"
             :disabled="!canSubmit"
             @click="handleSubmit"
           >

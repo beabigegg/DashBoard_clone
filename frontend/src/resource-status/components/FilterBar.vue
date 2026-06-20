@@ -60,6 +60,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
         <div class="filter-block">
           <label>工站群組</label>
           <MultiSelect
+            data-testid="groups-select"
             :model-value="selectedGroups"
             :options="workcenterGroups"
             :disabled="loading"
@@ -71,6 +72,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
         <div class="filter-block">
           <label>型號</label>
           <MultiSelect
+            data-testid="families-select"
             :model-value="selectedFamilies"
             :options="familyOptions"
             :disabled="loading"
@@ -82,6 +84,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
         <div class="filter-block">
           <label>機台</label>
           <MultiSelect
+            data-testid="machines-select"
             :model-value="selectedMachines"
             :options="machineOptions"
             :disabled="loading"
@@ -94,6 +97,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
         <div class="filter-block">
           <label>封裝群組</label>
           <MultiSelect
+            data-testid="package-groups-select"
             :model-value="selectedPackageGroups"
             :options="packageGroups"
             :disabled="loading"
@@ -106,6 +110,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
       <div class="filter-row filter-row--chips">
         <label class="filter-chip" :class="{ active: flags.isProduction }">
           <input
+            data-testid="filter-is-production"
             type="checkbox"
             :checked="flags.isProduction"
             :disabled="loading"
@@ -116,6 +121,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
 
         <label class="filter-chip" :class="{ active: flags.isKey }">
           <input
+            data-testid="filter-is-key"
             type="checkbox"
             :checked="flags.isKey"
             :disabled="loading"
@@ -126,6 +132,7 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
 
         <label class="filter-chip" :class="{ active: flags.isMonitor }">
           <input
+            data-testid="filter-is-monitor"
             type="checkbox"
             :checked="flags.isMonitor"
             :disabled="loading"

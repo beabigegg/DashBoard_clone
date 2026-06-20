@@ -789,7 +789,7 @@ void initPage();
 </script>
 
 <template>
-  <div class="dashboard theme-mid-section-defect">
+  <div class="dashboard theme-mid-section-defect" data-testid="mid-defect-app">
     <PageHeader
       title="製程不良追溯分析"
       :show-refresh="false"
@@ -818,7 +818,7 @@ void initPage();
       :stage_errors="trace.stage_errors"
     />
 
-    <ErrorBanner :message="queryError" :dismissible="false" />
+    <ErrorBanner :message="queryError" :dismissible="false" data-testid="error-banner" />
 
     <template v-if="hasQueried">
       <div v-if="analysisData.genealogy_status === 'error'" class="warning-banner">
@@ -853,13 +853,14 @@ void initPage();
             :loading="false"
             :direction="committedFilters.direction"
             :station-label="committedStation"
+            data-testid="kpi-cards"
           />
 
           <div class="charts-section">
             <template v-if="!isForward">
               <div class="charts-row">
                 <div class="chart-with-panel">
-                  <ParetoChart title="依上游機台歸因" :data="filteredByMachineData" enable-click @bar-click="handleMachineBarClick">
+                  <ParetoChart title="依上游機台歸因" :data="filteredByMachineData" enable-click data-testid="pareto-chart" @bar-click="handleMachineBarClick">
                     <template #header-extra>
                       <div class="chart-inline-filters">
                         <MultiSelect
@@ -881,6 +882,7 @@ void initPage();
                   </ParetoChart>
                   <SuspectContextPanel
                     :machine="suspectPanelMachine"
+                    data-testid="suspect-context"
                     @close="suspectPanelMachine = null"
                   />
                 </div>
@@ -918,7 +920,7 @@ void initPage();
               </div>
             </template>
             <div v-if="committedFilters.queryMode !== 'container'" class="charts-row charts-row-full">
-              <TrendChart :data="analysisData.daily_trend" />
+              <TrendChart :data="analysisData.daily_trend" data-testid="trend-chart" />
             </div>
           </div>
         </div>
@@ -930,12 +932,13 @@ void initPage();
         :pagination="detailPagination"
         :direction="committedFilters.direction"
         :suspect-machines="suspectMachineNames"
+        data-testid="detail-table"
         @export-csv="exportCsv"
         @prev-page="prevPage"
         @next-page="nextPage"
       />
     </template>
 
-    <EmptyState v-else-if="!loading.querying" type="no-data" />
+    <EmptyState v-else-if="!loading.querying" type="no-data" data-testid="empty-state" />
   </div>
 </template>

@@ -93,7 +93,7 @@ onMounted(() => {
 <template>
   <div class="cache-tab">
     <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+    <ErrorBanner :message="errorMessage" :dismissible="false" data-testid="error-banner" />
 
     <SectionCard v-if="perfDetail?.redis">
       <template #header><h2 class="panel-title">Redis 快取</h2></template>

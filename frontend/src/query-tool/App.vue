@@ -517,7 +517,7 @@ watch(
 </script>
 
 <template>
-  <div class="dashboard query-tool-page theme-query-tool">
+  <div class="dashboard query-tool-page theme-query-tool" data-testid="query-tool-app">
     <section class="card ui-card">
       <div class="card-header ui-card-header">
         <nav class="query-tool-tab-bar" aria-label="query-tool tabs">
@@ -529,6 +529,7 @@ watch(
             :class="{ active: tab.key === activeTab }"
             :aria-selected="tab.key === activeTab"
             :aria-current="tab.key === activeTab ? 'page' : undefined"
+            :data-testid="`tab-${tab.key}`"
             @click="activateTab(tab.key)"
           >
             {{ tab.label }}

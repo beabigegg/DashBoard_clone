@@ -22,6 +22,7 @@ withDefaults(defineProps<Props>(), {
       'data-update-badge--success': refreshSuccess && !refreshing,
       'data-update-badge--error': refreshError && !refreshing,
     }"
+    data-testid="cache-timestamp"
     aria-live="polite"
     :aria-label="`資料更新時間：${updateTime}`"
   >

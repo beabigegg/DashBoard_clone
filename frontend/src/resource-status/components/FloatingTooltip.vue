@@ -221,7 +221,7 @@ onBeforeUnmount(() => {
         <div class="tooltip-backdrop" @click="$emit('close')" />
 
         <!-- Right-side detail panel -->
-        <aside ref="panelRef" class="floating-tooltip" role="dialog" :aria-label="tooltipTitle" @click.stop>
+        <aside ref="panelRef" class="floating-tooltip" data-testid="equipment-tooltip" role="dialog" :aria-label="tooltipTitle" @click.stop>
           <div class="floating-tooltip-header">
             <h3 class="floating-tooltip-title">{{ tooltipTitle }}</h3>
             <button

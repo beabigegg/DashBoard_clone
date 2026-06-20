@@ -180,7 +180,7 @@ onMounted(() => {
 <template>
   <div class="worker-tab">
     <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+    <ErrorBanner :message="errorMessage" :dismissible="false" data-testid="error-banner" />
 
     <SectionCard v-if="perfDetail?.worker_memory_guard?.enabled">
       <template #header><h2 class="panel-title">記憶體守衛</h2></template>

@@ -1195,12 +1195,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="dashboard hold-history-page theme-hold-history">
-    <ErrorBanner :message="errorMessage || todayError || currentError" :dismissible="false" />
+  <div class="dashboard hold-history-page theme-hold-history" data-testid="hold-history-app">
+    <ErrorBanner :message="errorMessage || todayError || currentError" :dismissible="false" data-testid="error-banner" />
 
     <!-- Async query progress bar (shown when POST /api/hold-history/query returns 202) -->
     <!-- AC-5: only shown for long-range queries; short-range path is unchanged -->
     <AsyncQueryProgress
+      data-testid="loading-state"
       :active="asyncJobProgress.active"
       :progress="asyncJobProgress.progress"
       :pct="asyncJobProgress.pct"
@@ -1222,7 +1223,7 @@ onMounted(async () => {
       @mode-change="handleModeChange"
     />
 
-    <div class="hold-history-summary-row">
+    <div class="hold-history-summary-row" data-testid="results-summary">
       <SummaryCards :summary="summary" :mode="mode" />
     </div>
 
@@ -1258,10 +1259,12 @@ onMounted(async () => {
 
     <EmptyState
       v-if="todayEmptyState"
+      data-testid="empty-state"
       message="今日無符合條件的 lot"
     />
     <EmptyState
       v-else-if="currentEmptyState"
+      data-testid="empty-state"
       message="現況無符合條件的 lot"
     />
 

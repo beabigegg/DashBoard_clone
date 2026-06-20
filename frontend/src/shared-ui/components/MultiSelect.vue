@@ -165,6 +165,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
       type="button"
       class="multi-select-trigger"
       :disabled="disabled || loading"
+      data-testid="multiselect-trigger"
       @click="toggleDropdown"
     >
       <span class="multi-select-text">{{ selectedText }}</span>
@@ -186,6 +187,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
         ref="dropdownRef"
         class="multi-select-dropdown"
         :style="dropdownStyle"
+        data-testid="multiselect-dropdown"
         @keydown.esc.stop="closeDropdown"
       >
         <input
@@ -195,6 +197,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
           type="text"
           class="multi-select-search"
           placeholder="搜尋..."
+          data-testid="multiselect-search"
           @click.stop
         />
 
@@ -204,6 +207,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
             :key="option.value"
             type="button"
             class="multi-select-option"
+            data-testid="multiselect-option"
             @click="toggleOption(option.value)"
           >
             <input type="checkbox" :checked="isSelected(option.value)" tabindex="-1" />
@@ -216,8 +220,8 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
 
         <div class="multi-select-actions">
           <button type="button" class="ui-btn ui-btn--sm" @click="selectAll">全選</button>
-          <button type="button" class="ui-btn ui-btn--sm" @click="clearAll">清除</button>
-          <button type="button" class="ui-btn ui-btn--sm" @click="closeDropdown">關閉</button>
+          <button type="button" class="ui-btn ui-btn--sm" data-testid="multiselect-clear" @click="clearAll">清除</button>
+          <button type="button" class="ui-btn ui-btn--sm" data-testid="multiselect-close" @click="closeDropdown">關閉</button>
         </div>
       </div>
     </Teleport>

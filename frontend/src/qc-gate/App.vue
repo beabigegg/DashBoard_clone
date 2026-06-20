@@ -91,8 +91,8 @@ function clearFilter(): void {
 </script>
 
 <template>
-  <div class="qc-gate-page theme-qc-gate">
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+  <div class="qc-gate-page theme-qc-gate" data-testid="qc-gate-app">
+    <ErrorBanner :message="errorMessage" :dismissible="false" data-testid="error-banner" />
 
 
     <main class="qc-gate-content">
@@ -106,9 +106,10 @@ function clearFilter(): void {
           <QcGateChart
             :stations="stations"
             :active-filter="activeFilter"
+            data-testid="qc-gate-chart"
             @select-segment="handleChartSelect"
           />
-          <div v-if="!hasStations" class="empty-state">目前無 QC-GATE LOT</div>
+          <div v-if="!hasStations" class="empty-state" data-testid="empty-state">目前無 QC-GATE LOT</div>
         </template>
       </SectionCard>
 
@@ -119,6 +120,7 @@ function clearFilter(): void {
             v-if="activeFilter"
             type="button"
             class="filter-indicator"
+            data-testid="clear-filter-btn"
             @click="clearFilter"
           >
             篩選中：{{ activeFilterLabel }}（點擊清除）
@@ -128,11 +130,12 @@ function clearFilter(): void {
         <LotTable
           :lots="filteredLots"
           :active-filter="activeFilter"
+          data-testid="lot-table"
           @clear-filter="clearFilter"
         />
       </SectionCard>
     </main>
 
-    <LoadingOverlay v-if="loading" tier="page" />
+    <LoadingOverlay v-if="loading" tier="page" data-testid="loading-state" />
   </div>
 </template>

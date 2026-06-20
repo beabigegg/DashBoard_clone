@@ -43,6 +43,7 @@ const drilldown = reactive({
 const sections = ref([
   {
     key: 'yield',
+    slug: 'yield-anomalies',
     label: '良率異常',
     route: '/yield-alert-center',
     apiPath: '/api/analytics/yield-anomalies',
@@ -64,6 +65,7 @@ const sections = ref([
   },
   {
     key: 'reject',
+    slug: 'reject-spikes',
     label: '報廢突增',
     route: '/reject-history',
     apiPath: '/api/analytics/reject-spikes',
@@ -83,6 +85,7 @@ const sections = ref([
   },
   {
     key: 'hold',
+    slug: 'hold-outliers',
     label: 'Hold 離群',
     route: '/hold-history',
     apiPath: '/api/analytics/hold-outliers',
@@ -103,6 +106,7 @@ const sections = ref([
   },
   {
     key: 'equipment',
+    slug: 'equipment-deviation',
     label: '稼動偏離',
     route: '/resource-history',
     apiPath: '/api/analytics/equipment-deviation',
@@ -403,14 +407,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="anomaly-overview-page theme-anomaly-overview">
+  <div class="anomaly-overview-page theme-anomaly-overview" data-testid="anomaly-overview-app">
     <header class="ao-header">
       <h1>異常總覽</h1>
       <p>統整 4 種異常偵測器的結果，點擊列展開 14 天趨勢明細</p>
     </header>
 
     <!-- 摘要卡片 -->
-    <section class="ao-summary-cards">
+    <section class="ao-summary-cards" data-testid="summary-cards">
       <div v-if="summaryLoading" class="ao-loading-row">
         <LoadingSpinner size="sm" /> 載入摘要中...
       </div>
@@ -419,6 +423,7 @@ onMounted(async () => {
         <SummaryCard
           v-for="section in sections"
           :key="section.key"
+          :data-testid="`summary-card-${section.key}`"
           :label="section.label"
           :value="summaryData.breakdown[section.key]?.count ?? '—'"
           :accent="(summaryData.breakdown[section.key]?.severity ?? 'ok') === 'critical' ? 'danger' : (summaryData.breakdown[section.key]?.severity ?? 'ok') === 'warning' ? 'warning' : 'success'"
@@ -434,8 +439,9 @@ onMounted(async () => {
       :id="`section-${section.key}`"
       :key="section.key"
       class="ao-section"
+      :data-testid="`section-${section.slug}`"
     >
-      <div class="ao-section-header" @click="toggleSection(section)">
+      <div class="ao-section-header" :data-testid="`toggle-${section.slug}`" @click="toggleSection(section)">
         <div class="ao-section-header-left">
           <span class="ao-section-label">{{ section.label }}</span>
           <span class="ao-section-badge" :class="section.count > 5 ? 'badge-critical' : section.count > 0 ? 'badge-warning' : 'badge-ok'">
@@ -460,13 +466,13 @@ onMounted(async () => {
         </div>
 
         <!-- 資料表格 -->
-        <div v-if="section.loading" class="ao-loading-row">
+        <div v-if="section.loading" class="ao-loading-row" :data-testid="`loading-${section.slug}`">
           <LoadingSpinner size="sm" /> 載入中...
         </div>
-        <ErrorBanner v-else-if="section.error" :message="section.error" :dismissible="false" />
-        <div v-else-if="section.items.length === 0" class="ao-empty-row">無異常記錄</div>
+        <ErrorBanner v-else-if="section.error" :message="section.error" :dismissible="false" :data-testid="`error-${section.slug}`" />
+        <div v-else-if="section.items.length === 0" class="ao-empty-row" data-testid="empty-state">無異常記錄</div>
         <div v-else class="ao-table-wrap">
-          <table class="ao-table">
+          <table class="ao-table" :data-testid="`table-${section.slug}`">
             <thead>
               <tr>
                 <th v-for="col in section.columns" :key="col.key">{{ col.label }}</th>
@@ -486,7 +492,7 @@ onMounted(async () => {
                   >{{ item[col.key] ?? '—' }}</td>
                 </tr>
                 <!-- Drilldown panel (not for hold) -->
-                <tr v-if="section.key !== 'hold' && drilldown.sectionKey === section.key && drilldown.itemIndex === idx" class="ao-drilldown-row">
+                <tr v-if="section.key !== 'hold' && drilldown.sectionKey === section.key && drilldown.itemIndex === idx" class="ao-drilldown-row" data-testid="drilldown-row">
                   <td :colspan="section.columns.length">
                     <div class="ao-drilldown-panel">
                       <div class="ao-drilldown-header">

@@ -713,7 +713,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="resource-page theme-resource" @keydown.esc="handleGlobalEsc">
+  <div class="resource-page theme-resource" data-testid="resource-status-app" @keydown.esc="handleGlobalEsc">
     <div class="dashboard">
 
       <FilterBar
@@ -734,9 +734,9 @@ onMounted(() => {
         @change-package-groups="updatePackageGroups"
       />
 
-      <ErrorBanner :message="summaryError" @dismiss="summaryError = ''" />
+      <ErrorBanner data-testid="error-banner" :message="summaryError" @dismiss="summaryError = ''" />
 
-      <SummaryCardGroup columns="auto">
+      <SummaryCardGroup columns="auto" data-testid="summary-cards">
         <SummaryCard
           label="OU%"
           :value="summary.ouPct"
@@ -776,15 +776,17 @@ onMounted(() => {
         </SummaryCard>
       </SummaryCardGroup>
 
-      <ErrorBanner :message="equipmentError" @dismiss="equipmentError = ''" />
+      <ErrorBanner data-testid="error-banner" :message="equipmentError" @dismiss="equipmentError = ''" />
 
       <WorkcenterOuRings
+        data-testid="ou-rings"
         :equipment="getInputForChart('ring').value"
         :selection="ringSelection"
         @chart-select="handleRingSelect"
       />
 
       <OuHeatmap
+        data-testid="ou-heatmap"
         :equipment="getInputForChart('heatmap').value"
         :selected-cell="heatmapSelectedCell"
         @cell-select="handleHeatmapSelect"
@@ -809,10 +811,11 @@ onMounted(() => {
       />
 
       <div v-if="hasActiveSelections" class="cross-filter-clear-btn-wrap">
-        <button type="button" class="cross-filter-clear-btn" @click="clearAllEquipmentFilters" @keydown.esc.stop="handleEscClear($event)">清除全部篩選</button>
+        <button type="button" class="cross-filter-clear-btn" data-testid="clear-filters-btn" @click="clearAllEquipmentFilters" @keydown.esc.stop="handleEscClear($event)">清除全部篩選</button>
       </div>
       <EquipmentGrid
         v-if="hasActiveSelections"
+        data-testid="equipment-grid"
         :equipment="filteredEquipment"
         :active-filter-text="activeFilterText"
         @clear-filter="clearAllEquipmentFilters"
@@ -821,9 +824,10 @@ onMounted(() => {
       />
     </div>
 
-    <LoadingOverlay v-if="loading.initial || loading.refreshing" tier="page" />
+    <LoadingOverlay v-if="loading.initial || loading.refreshing" data-testid="loading-state" tier="page" />
 
     <FloatingTooltip
+      data-testid="equipment-tooltip"
       :visible="tooltipState.visible"
       :type="tooltipState.type"
       :payload="tooltipState.payload"

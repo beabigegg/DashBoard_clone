@@ -270,11 +270,12 @@ async function handleParetoClick(alarmText: string): Promise<void> {
 </script>
 
 <template>
-  <div class="theme-eap-alarm">
+  <div class="theme-eap-alarm" data-testid="eap-alarm-app">
     <!-- Page-level loading overlay — hide when async job is active (css-contract 4.6) -->
     <LoadingOverlay
       v-if="queryLoading && !jobProgress.active"
       tier="page"
+      data-testid="loading-state"
     />
 
     <!-- Async job progress bar (always-async EAP ALARM) -->
@@ -300,6 +301,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
         <ErrorBanner
           v-if="errorMessage || viewError"
           :message="errorMessage || viewError"
+          data-testid="error-banner"
         />
 
         <!-- Coarse filter bar -->
@@ -317,6 +319,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
           <FineFilterBar
             :fine-filter="fineFilter"
             :filter-options="filterOptions"
+            data-testid="fine-filter-panel"
             @change="handleFineFilterChange"
           />
 
@@ -324,6 +327,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
           <SummaryCards
             :summary="summary"
             :loading="viewLoading.summary"
+            data-testid="summary-cards"
           />
 
           <!-- Charts row -->
@@ -332,6 +336,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
               :items="pareto.items"
               :total="pareto.total"
               :loading="viewLoading.pareto"
+              data-testid="pareto-chart"
               @bar-click="handleParetoClick"
             />
             <TrendChart
@@ -348,6 +353,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
             :rows="detail.rows"
             :meta="detail.meta"
             :loading="viewLoading.detail"
+            data-testid="detail-table"
             @go-to-page="handleDetailPageChange"
           />
 
@@ -356,6 +362,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
             v-if="hasNoResults"
             type="no-results"
             message="目前篩選條件無 ALARM 資料，請調整細部篩選或擴大日期範圍"
+            data-testid="empty-state"
           />
         </template>
 
@@ -364,6 +371,7 @@ async function handleParetoClick(alarmText: string): Promise<void> {
           v-else-if="!queryLoading && !jobProgress.active && !spoolReady"
           type="default"
           message="請選擇查詢條件後按「查詢」以開始分析"
+          data-testid="empty-state"
         />
       </div>
     </div>

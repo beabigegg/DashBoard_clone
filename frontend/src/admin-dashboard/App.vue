@@ -109,7 +109,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="theme-admin-dashboard dashboard-root">
+  <div class="theme-admin-dashboard dashboard-root" data-testid="admin-dashboard-app">
     <PageHeader
       title="Admin Dashboard"
       :refreshing="refreshing"
@@ -120,6 +120,7 @@ onBeforeUnmount(() => {
           <input
             type="checkbox"
             :checked="autoRefreshEnabled"
+            data-testid="auto-refresh-toggle"
             @change="autoRefreshEnabled = !autoRefreshEnabled; toggleAutoRefresh()"
           />
           自動更新 (30s)
@@ -134,6 +135,7 @@ onBeforeUnmount(() => {
         type="button"
         class="dashboard-tab"
         :class="{ 'is-active': tab.key === activeTabKey }"
+        :data-testid="`tab-${tab.key}`"
         @click="setActiveTab(tab.key)"
       >
         {{ tab.label }}
@@ -142,7 +144,11 @@ onBeforeUnmount(() => {
 
     <main class="dashboard-main">
       <KeepAlive>
-        <component :is="currentTabComponent" ref="tabRef" />
+        <component
+          :is="currentTabComponent"
+          ref="tabRef"
+          :data-testid="`panel-${activeTabKey}`"
+        />
       </KeepAlive>
     </main>
   </div>

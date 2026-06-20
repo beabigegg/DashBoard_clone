@@ -115,13 +115,13 @@ function getSuspectHits(row) {
 </script>
 
 <template>
-  <section class="section-card">
+  <section class="section-card" data-testid="detail-table">
     <div class="section-inner">
       <div class="detail-header">
         <h3 class="section-title">LOT 明細</h3>
         <div class="detail-actions">
           <span class="detail-count">{{ tableInfo }}</span>
-          <button type="button" class="ui-btn ui-btn--secondary" :disabled="loading" @click="$emit('export-csv')">
+          <button type="button" class="ui-btn ui-btn--secondary" :disabled="loading" data-testid="export-btn" @click="$emit('export-csv')">
             匯出 CSV
           </button>
         </div>

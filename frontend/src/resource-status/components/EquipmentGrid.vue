@@ -73,12 +73,13 @@ defineEmits<{
         <EquipmentCard
           v-for="eq in equipment"
           :key="eq.RESOURCEID || eq.RESOURCENAME"
+          data-testid="equipment-card"
           :equipment="eq"
           @show-lot="$emit('show-lot', $event)"
           @show-job="$emit('show-job', $event)"
         />
       </div>
-      <div v-else class="empty-state">無符合條件的設備</div>
+      <div v-else class="empty-state" data-testid="empty-state">無符合條件的設備</div>
     </div>
   </section>
 </template>

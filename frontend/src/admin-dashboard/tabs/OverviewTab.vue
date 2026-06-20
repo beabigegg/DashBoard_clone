@@ -169,11 +169,11 @@ onMounted(() => {
 <template>
   <div class="overview-tab">
     <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
-    <section v-if="isInitialLoading" class="panel">
+    <section v-if="isInitialLoading" class="panel" data-testid="loading-state">
       <BlockLoadingState text="載入總覽資料中..." />
     </section>
 
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+    <ErrorBanner :message="errorMessage" :dismissible="false" data-testid="error-banner" />
 
     <SectionCard>
       <template #header><h2 class="panel-title">系統警示</h2></template>

@@ -115,6 +115,7 @@ const showTimelineModal = ref(false);
             <input
               type="date"
               class="query-tool-date-input"
+              data-testid="start-date"
               :value="startDate"
               @input="emit('update:start-date', ($event.target as HTMLInputElement).value)"
             />
@@ -125,6 +126,7 @@ const showTimelineModal = ref(false);
             <input
               type="date"
               class="query-tool-date-input"
+              data-testid="end-date"
               :value="endDate"
               @input="emit('update:end-date', ($event.target as HTMLInputElement).value)"
             />
@@ -142,6 +144,7 @@ const showTimelineModal = ref(false);
             <button
               type="button"
               class="ui-btn ui-btn--primary"
+              data-testid="submit-btn"
               :disabled="loading[activeSubTab] || loading.timeline"
               @click="emit('query-active-sub-tab')"
             >
@@ -211,6 +214,7 @@ const showTimelineModal = ref(false);
               type="button"
               class="ui-btn ui-btn--ghost"
               :disabled="loading.lots || lotsPagination.page <= 1"
+              data-testid="page-prev"
               @click="emit('change-lots-page', lotsPagination.page - 1)"
             >
               上一頁
@@ -219,6 +223,7 @@ const showTimelineModal = ref(false);
               type="button"
               class="ui-btn ui-btn--ghost"
               :disabled="loading.lots || lotsPagination.page >= lotsPagination.total_pages"
+              data-testid="page-next"
               @click="emit('change-lots-page', lotsPagination.page + 1)"
             >
               下一頁

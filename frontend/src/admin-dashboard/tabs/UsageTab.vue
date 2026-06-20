@@ -95,9 +95,9 @@ onMounted(() => {
       </div>
     </section>
 
-    <ErrorBanner :message="error" :dismissible="false" />
+    <ErrorBanner :message="error" :dismissible="false" data-testid="error-banner" />
 
-    <section v-if="loading && !kpiData" class="panel">
+    <section v-if="loading && !kpiData" class="panel" data-testid="loading-state">
       <BlockLoadingState />
     </section>
 

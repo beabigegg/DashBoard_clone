@@ -151,7 +151,7 @@ function formatBytes(bytes) {
 <template>
   <div class="performance-tab">
     <div class="admin-tab__last-updated" role="status" aria-live="polite">{{ lastUpdatedLabel }}</div>
-    <ErrorBanner :message="errorMessage" :dismissible="false" />
+    <ErrorBanner :message="errorMessage" :dismissible="false" data-testid="error-banner" />
 
     <SectionCard>
       <template #header><h2 class="panel-title">查詢效能</h2></template>
