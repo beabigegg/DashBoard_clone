@@ -58,6 +58,26 @@ The same rule applies to any module-level `requests.Session`, integer constants,
 
 Evidence: `tests/integration/test_rowcount_flag_parity.py` — all flag-toggle tests use `setattr`.
 
+## Threaded Tests — Apply All Monkeypatches Before Thread Launch
+
+**In tests that spawn worker threads, all `monkeypatch.setattr()` calls must complete before any threads are launched.** Using `patch()` or `patch.object()` inside thread bodies causes a concurrent restore race: whichever thread exits last restores the original attribute, overwriting patches still needed by concurrently running threads — and because Python's `unittest.mock` does global attribute teardown, it can leave stale mocks visible to test modules that run afterward.
+
+```python
+# CORRECT — all patches before thread launch
+monkeypatch.setattr("mes_dashboard.services.hold_query_job_service._HOLD_USE_RQ", True)
+monkeypatch.setattr("mes_dashboard.core.global_concurrency.HEAVY_QUERY_MAX_CONCURRENT", 3)
+threads = [threading.Thread(target=worker) for _ in range(N)]
+for t in threads: t.start()
+for t in threads: t.join()
+
+# WRONG — patch() inside thread body; __exit__ on thread teardown restores attribute mid-run
+def worker():
+    with patch("mes_dashboard.services.hold_query_job_service._HOLD_USE_RQ", True):
+        ...  # races with other threads' teardown
+```
+
+Evidence: `rq-semaphore-wiring` — `tests/integration/test_rq_semaphore_wiring.py` replaced `patch()`-in-threads with `monkeypatch`-before-threads after `tests/test_hold_dataset_cache.py::test_long_range_triggers_engine` failed with `RuntimeError: oracle fault` in test run `test-runs/20260620-100337` due to the concurrent attribute restore race.
+
 ## Env-Var Contract Tests Must Pin Default Values
 
 **A test that only checks `"VAR_NAME" in contract_text` passes even when the documented default is wrong.** For every env var with a code default, add a companion test that imports the module-level constant and asserts it equals the value stated in `env-contract.md`.

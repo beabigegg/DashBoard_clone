@@ -38,5 +38,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 full suite (4899/0) passes locally per cdd-kit-patterns.md §Section-6" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "targeted + changed-area phases passed; test-evidence.yml generated" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly CI gates; pre-production gate (real-Redis cap + DBA headroom) is manual before flag-on, documented in stress-soak-report.md" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done, note: "archived to specs/archive/2026/rq-semaphore-wiring/" }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "tier-floor-override flag-gated case → cdd-kit-patterns.md + CLAUDE.md; threaded test monkeypatch ordering → test-discipline.md + CLAUDE.md; validate --contracts clean; context-scan refreshed" }

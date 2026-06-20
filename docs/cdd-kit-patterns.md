@@ -86,6 +86,14 @@ tier-floor-override: "Modules ship with zero callers; concurrency stress deferre
 
 Evidence: `unified-query-core-infra` — gate blocked on `writer_lock`/`ThreadPoolExecutor`/Oracle pool surface with Tier 1 classification; resolved by `tier-floor-override` in `tasks.yml:4`; audit.yml recorded `declared-tier:1 / floor-tier:0 / bypassed-by:tier-floor-override`.
 
+A second valid case is **flag-gated concurrency wiring** — where callers exist in code but the concurrency path is inert because all governing feature flags (`*_USE_RQ`, `*_USE_UNIFIED_JOB`) default to off. The same `tier-floor-override` resolves the gate violation. The critical lifecycle difference: this override does NOT expire when a caller lands — it stands for the duration of the flag-off period. Expiration is triggered when any flag is promoted to on in production, at which point the *flag-promotion change* must be Tier 1 and include a `stress-soak-report.md` with real-Redis peak-cap evidence and DBA connection headroom confirmation. The production gate is documented in that change's `stress-soak-report.md`, not in the wiring change itself.
+
+```yaml
+tier-floor-override: "All wiring is flag-off by default and inert until each *_USE_RQ/*_USE_UNIFIED_JOB flag is explicitly promoted to on; stress-soak-report.md written with mock wiring evidence; real-Redis peak-cap and DBA headroom confirmation required before any flag flip — pre-production gate documented."
+```
+
+Evidence: `rq-semaphore-wiring` — `tier-floor-override` in `tasks.yml:4`; audit.yml reason "All wiring is flag-off by default and inert…"; `contracts/business/business-rules.md` ASYNC-15 gates flag-on promotion behind real-Redis evidence.
+
 ## Git Staging Scope for `specs/changes/`
 
 **The pre-commit hook runs `cdd-kit gate --strict` on every `specs/changes/<id>/` directory that appears in the git staged diff.** If you stage `specs/changes/` broadly (e.g., `git add specs/changes/`), the hook also validates sibling scaffold directories that contain unfilled template placeholders, causing it to fail on a change unrelated to your current work.

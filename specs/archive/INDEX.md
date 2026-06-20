@@ -66,3 +66,4 @@
 | eap-alarm-unified-job-poc | 2026 | 2026-06-19 | specs/archive/2026/eap-alarm-unified-job-poc/ |
 | downtime-duckdb-join-migration | 2026 | 2026-06-19 | specs/archive/2026/downtime-duckdb-join-migration/ |
 | query-path-c-elimination-cleanup | 2026 | 2026-06-19 | specs/archive/2026/query-path-c-elimination-cleanup/ |
+| rq-semaphore-wiring | 2026 | 2026-06-20 | specs/archive/2026/rq-semaphore-wiring/ |
