@@ -64,21 +64,21 @@ def test_reject_async_day_threshold_absent_from_schema(schema):
 
 
 # ---------------------------------------------------------------------------
-# AC-7: QUERY_TOOL_USE_RQ must be present with default="off"
+# AC-7: QUERY_TOOL_USE_RQ must be present with default="on"
 # ---------------------------------------------------------------------------
 
 
-def test_query_tool_use_rq_present_with_default_off(schema):
-    """QUERY_TOOL_USE_RQ must be in env.schema.json with default 'off' (AC-7)."""
+def test_query_tool_use_rq_present_with_default_on(schema):
+    """QUERY_TOOL_USE_RQ must be in env.schema.json with default 'on' (AC-7, promoted 2026-06-20)."""
     props = schema.get("properties", {})
     assert "QUERY_TOOL_USE_RQ" in props, (
         "QUERY_TOOL_USE_RQ not found in env.schema.json. "
         "Add it per query-path-c-elimination-cleanup IP-9."
     )
     entry = props["QUERY_TOOL_USE_RQ"]
-    assert entry.get("default") == "off", (
-        f"QUERY_TOOL_USE_RQ default must be 'off', got {entry.get('default')!r}. "
-        "Feature flag must default to off (AC-2 no-regression guarantee)."
+    assert entry.get("default") == "on", (
+        f"QUERY_TOOL_USE_RQ default must be 'on', got {entry.get('default')!r}. "
+        "Default promoted to on 2026-06-20 after pool manager wiring complete."
     )
     assert "enum" in entry, (
         "QUERY_TOOL_USE_RQ must have 'enum' field for typo-guard validation."

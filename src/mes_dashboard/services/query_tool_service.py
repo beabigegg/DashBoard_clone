@@ -86,7 +86,7 @@ QUERY_TOOL_SPOOL_TTL_SECONDS = int(os.getenv('QUERY_TOOL_SPOOL_TTL_SECONDS', '30
 # When False, execute_query_tool_job does NOT acquire heavy_query_slot — the
 # slot is acquired only when the RQ dispatch path is enabled (flag-off parity,
 # rq-semaphore-wiring AC-5).  No new env var: reuses existing QUERY_TOOL_USE_RQ.
-_QUERY_TOOL_CONCURRENCY_WIRED: bool = _env_bool("QUERY_TOOL_USE_RQ", default=False)
+_QUERY_TOOL_CONCURRENCY_WIRED: bool = _env_bool("QUERY_TOOL_USE_RQ", default=True)
 
 QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP = _env_bool(
     "QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP",

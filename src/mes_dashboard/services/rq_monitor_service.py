@@ -32,6 +32,7 @@ _QUEUE_NAMES: List[str] = [
     os.getenv("HOLD_WORKER_QUEUE", "hold-history-query"),
     os.getenv("RESOURCE_WORKER_QUEUE", "resource-history-query"),
     os.getenv("EAP_ALARM_WORKER_QUEUE", "eap-alarm-query"),
+    os.getenv("QUERY_TOOL_WORKER_QUEUE", "query-tool"),
 ]
 
 

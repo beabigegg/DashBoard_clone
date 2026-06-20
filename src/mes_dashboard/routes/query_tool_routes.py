@@ -49,9 +49,9 @@ from mes_dashboard.services.async_query_job_service import (
 from mes_dashboard.core.permissions import get_owner_token
 
 # ── Feature flag: RQ async dispatch for query-tool (query-path-c-elimination-cleanup) ──
-# Default off; operators enable by setting QUERY_TOOL_USE_RQ=on.
+# Default on; set QUERY_TOOL_USE_RQ=off to revert to sync-only path.
 # Frozen at import time — tests must use monkeypatch.setattr(), not monkeypatch.setenv().
-_QUERY_TOOL_USE_RQ: bool = resolve_bool_flag("QUERY_TOOL_USE_RQ", default=False)
+_QUERY_TOOL_USE_RQ: bool = resolve_bool_flag("QUERY_TOOL_USE_RQ", default=True)
 
 logger = logging.getLogger('mes_dashboard.query_tool_routes')
 

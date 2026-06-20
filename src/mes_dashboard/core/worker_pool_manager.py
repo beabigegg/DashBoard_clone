@@ -56,6 +56,7 @@ _QUEUE_DEFS: List[tuple] = [
     ("MATERIAL_CONSUMPTION_WORKER_QUEUE", "material-consumption"),
     ("DOWNTIME_WORKER_QUEUE",             "downtime-query"),
     ("EAP_ALARM_WORKER_QUEUE",            "eap-alarm-query"),
+    ("QUERY_TOOL_WORKER_QUEUE",           "query-tool"),
     ("WARMUP_QUEUE_NAME",                 "warmup"),   # lowest priority
 ]
 

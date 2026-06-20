@@ -895,6 +895,7 @@ def create_app(config_name: str | None = None) -> Flask:
     import mes_dashboard.services.resource_query_job_service  # noqa: F401
     import mes_dashboard.workers.eap_alarm_worker  # noqa: F401
     import mes_dashboard.services.wip_query_job_service  # noqa: F401
+    import mes_dashboard.services.query_tool_service  # noqa: F401
 
     # Register API routes
     register_routes(app)
