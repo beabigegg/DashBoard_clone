@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.28.0
-last-changed: 2026-06-19
+schema-version: 1.29.0
+last-changed: 2026-06-20
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -49,6 +49,7 @@ breaking-change-policy: deprecate-2-minors
 | ASYNC-12 | Query-tool RQ async dispatch (AC-1, D1) | When `QUERY_TOOL_USE_RQ=on`, `classify_query_cost(domain="query_tool", ...)` returns ASYNC, and `is_async_available()=True`, the `POST /api/query-tool/equipment-period` route MUST enqueue via `enqueue_query_job("query-tool", ..., sync_fallback_allowed=True)` and return HTTP 202 `{async: true, job_id, status_url}`. When flag=off (default), date span < threshold, or queue unavailable, the route falls through to the existing inline sync path (200). Fail-open: enqueue failure → sync fallback (no 503). The `query-tool` job type uses `always_async=False` so sync fallback is always permitted. Added by change `query-path-c-elimination-cleanup`. | `tests/integration/test_query_tool_rq_async.py` |
 | ASYNC-13 | WIP detail rowcount pre-check (AC-3, D2) | `GET /api/wip/detail/<workcenter>` route performs a lightweight `SELECT COUNT(*)` via `count_wip_rows(...)` with the same filtered predicate as the detail query BEFORE calling `get_wip_detail`. When count >= L3 (200,000 rows) and async is available, the route attempts RQ dispatch. COUNT failure returns 0 (fail-open → SYNC). WIP has no date range so L2 never fires — only L3 matters. Added by change `query-path-c-elimination-cleanup`. | `tests/integration/test_wip_rowcount_rq_routing.py` |
 | ASYNC-14 | merge_chunks deprecation — no new callers (AC-4, D5) | `batch_query_engine.merge_chunks` is deprecated as of `query-path-c-elimination-cleanup` (P5). It emits `DeprecationWarning` on every call. No new callers are permitted — all production callers already use `merge_chunks_to_spool`. The function is NOT removed (backward compat) and its signature is unchanged. Any new code that calls `merge_chunks` must instead use `merge_chunks_to_spool`. | `tests/test_batch_query_engine.py::TestMergeChunks::test_merge_chunks_emits_deprecation_warning` |
+| ASYNC-15 | Oracle-phase RQ concurrency cap | At most `HEAVY_QUERY_MAX_CONCURRENT` (env default 3) RQ worker functions may hold an Oracle-phase slot simultaneously across all four `execute_*_job` workers (`execute_query_tool_job`, `execute_hold_history_query_job`, `execute_resource_history_query_job`, `execute_reject_query_job`). Slot is acquired exactly once per job around the Oracle fetch only (not job-global). Exception or timeout during Oracle phase releases the slot; no slot leak. Redis unavailable: fail-open (unlimited). `execute_reject_query_job` slot is held internally by `reject_dataset_cache`; a job-level outer acquire would double-count — reject is wired at the cache layer only. Added by change `rq-semaphore-wiring`. | `tests/integration/test_rq_semaphore_wiring.py`; `tests/stress/test_rq_semaphore_stress.py` |
 
 ## Hold-History Rules
 
@@ -268,6 +269,8 @@ breaking-change-policy: deprecate-2-minors
 | Downtime query: `DOWNTIME_USE_UNIFIED_JOB=on` + async available | HTTP 202 async job (DowntimeJob, always_async=True) | DDA-01, ASYNC-06 | route tests |
 | Downtime query: `DOWNTIME_USE_UNIFIED_JOB=on` + async unavailable | HTTP 503 SERVICE_UNAVAILABLE + Retry-After; no sync fallback | DDA-01, ASYNC-06 | resilience tests |
 | Downtime query: `DOWNTIME_USE_UNIFIED_JOB=off` (default) | legacy path unchanged (_bridge_jobid Path B pd.merge) | DDA-01, AC-8 | regression tests |
+| N concurrent heavy RQ workers (N > HEAVY_QUERY_MAX_CONCURRENT) | Peak simultaneous Oracle-phase executions ≤ HEAVY_QUERY_MAX_CONCURRENT (default 3); all N complete; no deadlock | ASYNC-15 | stress gate (`tests/stress/test_rq_semaphore_stress.py`) |
+| Oracle phase raises exception during slot hold | Slot released in finally block; subsequent job can acquire; no leak | ASYNC-15 | resilience tests (`tests/integration/test_rq_semaphore_wiring.py`) |
 
 ## Material Consumption Rules
 
@@ -355,6 +358,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.29.0] — 2026-06-20
+### Added
+- rq-semaphore-wiring: ASYNC-15 (Oracle-phase RQ concurrency cap — `HEAVY_QUERY_MAX_CONCURRENT` (default 3) bounds simultaneous Oracle-phase executions across all four `execute_*_job` workers; slot acquired once per job around Oracle fetch, released on success and exception; `execute_reject_query_job` wired at cache layer only; Redis-down fail-open). Two Decision Table rows (N>cap burst + exception-during-slot). Additive; no existing rules changed.
 
 ## [business 1.27.0] — 2026-06-19
 ### Added

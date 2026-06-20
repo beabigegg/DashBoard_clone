@@ -1,0 +1,1 @@
+pytest -m 'not (e2e or integration_real or stress or load or soak)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/rq-semaphore-wiring/test-runs/20260620-100337/junit.xml' -q --tb=short -ra

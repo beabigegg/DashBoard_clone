@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from contextlib import contextmanager
 
 from mes_dashboard.core.redis_client import get_key, get_redis_client
 
@@ -131,6 +132,38 @@ def release_heavy_query_slot(owner_id: str) -> None:
         conn.zrem(_slot_key(), owner_id)
     except Exception as exc:
         logger.warning("global_concurrency: release_heavy_query_slot error: %s", exc)
+
+
+@contextmanager
+def heavy_query_slot(owner: str, ttl: int = 600):
+    """Exception-safe context manager around one heavy Oracle concurrency slot.
+
+    Wraps ``acquire_heavy_query_slot`` / ``release_heavy_query_slot`` so callers
+    can use a ``with`` statement instead of a bare try/finally.  Release is
+    guarded by the ``acquired`` bool so a fail-open (acquired=False, cap reached)
+    path never calls release for a slot it never counted.
+
+    Usage (inside an RQ worker, around the Oracle fetch only):
+
+        with heavy_query_slot(f"{job_type}:{job_id}"):
+            result = execute_primary_query(...)
+
+    The yielded value is the ``acquired`` bool — useful for logging but can be
+    ignored (the Oracle call proceeds either way per fail-open semantics).
+
+    Args:
+        owner: Unique identifier for this job (e.g., "hold-history:job-uuid").
+        ttl:   Seconds until the slot is considered stale (passed to acquire).
+
+    Yields:
+        bool — True if the slot was acquired; False if at capacity (fail-open).
+    """
+    acquired = acquire_heavy_query_slot(owner, ttl=ttl)
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            release_heavy_query_slot(owner)
 
 
 def get_active_slot_count() -> int:

@@ -1,0 +1,13 @@
+agent: implementation-planner
+change-id: rq-semaphore-wiring
+status: complete
+summary: >
+  Wrote implementation-plan.md. Three workers (query-tool, hold, resource) get
+  Oracle-phase acquire via a new heavy_query_slot(owner) @contextmanager in
+  global_concurrency.py. Reject gets NO job-level acquire (already wired in cache).
+  TDD order: tests (IP-6) -> CM helper (IP-1) -> worker wiring (IP-2..IP-4).
+  No env, no API/response, no contract authoring in scope.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/rq-semaphore-wiring/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, test-strategist, stress-soak-engineer" }
+  - { type: scope-summary, pointer: "6 in scope, 8 out of scope; 9 IP steps" }

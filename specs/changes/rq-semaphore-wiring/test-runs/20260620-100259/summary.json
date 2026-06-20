@@ -1,0 +1,16 @@
+{
+  "change_id": "rq-semaphore-wiring",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest --collect-only -q --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/rq-semaphore-wiring/test-runs/20260620-100259/junit.xml' --maxfail=1 --tb=short -ra",
+  "duration_ms": 5538,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100259/summary.json",
+    "stdout": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100259/stdout.log",
+    "stderr": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100259/stderr.log",
+    "junit": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100259/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

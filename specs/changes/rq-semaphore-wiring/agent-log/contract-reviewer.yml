@@ -1,0 +1,19 @@
+agent: contract-reviewer
+change-id: rq-semaphore-wiring
+status: changes-applied
+
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/env/env-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/business/business-rules.md" }
+  - { type: contracts-reviewed, pointer: "contracts/ci/ci-gate-contract.md" }
+  - { type: version-bumps, pointer: "business-rules.md 1.28.0→1.29.0; ci-gate-contract.md 1.3.31→1.3.32; env-contract.md unchanged" }
+  - { type: breaking-changes, pointer: "none" }
+
+notes: |
+  env-contract: APPROVE — no new env var; HEAVY_QUERY_MAX_CONCURRENT undocumented gap is
+  follow-up debt (not a blocker; var pre-dates this change).
+  business-rules: ASYNC-15 added (Oracle-phase cap + 2 Decision Table rows).
+  ci-gate: rq-semaphore-wiring compatibility note added (stress-soak-report.md required
+  before flag promotion).
+  Key finding: HEAVY_QUERY_MAX_CONCURRENT tunable env var absent from env-contract.md —
+  recommended follow-up change to add it with enum default "3".

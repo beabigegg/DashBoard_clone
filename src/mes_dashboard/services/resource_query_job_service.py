@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import nullcontext as _nullcontext
 from typing import Any
 
+from mes_dashboard.core.global_concurrency import heavy_query_slot
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     enqueue_job_dynamic,
@@ -132,20 +134,28 @@ def execute_resource_history_query_job(*, job_id: str, owner: str, **query_param
         # Wrap execute_primary_query unmodified (IP constraint: do NOT add
         # progress_callback or alter signature/body).
         # owner is NOT forwarded — execute_primary_query takes no owner param.
+        # rq-semaphore-wiring IP-4: acquire heavy_query_slot around Oracle phase only
+        # (between pct=15 and pct=70 milestones, per D1 / ADR 0011).
+        # Guard by RESOURCE_ASYNC_ENABLED so flag-off path is byte-for-byte identical (AC-5).
+        # base+OEE fans out over ThreadPoolExecutor(max_workers=2) → 2 Oracle conns under 1 slot;
+        # this is deliberate — the semaphore bounds jobs not raw connections (design D3, ADR 0011).
+        # ensure_canonical_spool (below) is left OUTSIDE the slot — single-acquire (AC-6, D3).
         start_date = query_params["start_date"]
         end_date = query_params["end_date"]
-        result = execute_primary_query(
-            start_date=start_date,
-            end_date=end_date,
-            granularity=query_params.get("granularity", "day"),
-            workcenter_groups=query_params.get("workcenter_groups"),
-            families=query_params.get("families"),
-            resource_ids=query_params.get("resource_ids"),
-            is_production=query_params.get("is_production", False),
-            is_key=query_params.get("is_key", False),
-            is_monitor=query_params.get("is_monitor", False),
-            package_groups=query_params.get("package_groups"),
-        )
+        _slot_owner = f"resource-history:{job_id}"
+        with (heavy_query_slot(_slot_owner) if RESOURCE_ASYNC_ENABLED else _nullcontext()):
+            result = execute_primary_query(
+                start_date=start_date,
+                end_date=end_date,
+                granularity=query_params.get("granularity", "day"),
+                workcenter_groups=query_params.get("workcenter_groups"),
+                families=query_params.get("families"),
+                resource_ids=query_params.get("resource_ids"),
+                is_production=query_params.get("is_production", False),
+                is_key=query_params.get("is_key", False),
+                is_monitor=query_params.get("is_monitor", False),
+                package_groups=query_params.get("package_groups"),
+            )
 
         update_job_progress(
             _JOB_PREFIX, job_id,

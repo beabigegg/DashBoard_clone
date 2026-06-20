@@ -1,0 +1,15 @@
+{
+  "change_id": "rq-semaphore-wiring",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "ruff check .",
+  "duration_ms": 23,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/rq-semaphore-wiring/test-runs/20260620-104045/summary.json",
+    "stdout": "specs/changes/rq-semaphore-wiring/test-runs/20260620-104045/stdout.log",
+    "stderr": "specs/changes/rq-semaphore-wiring/test-runs/20260620-104045/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

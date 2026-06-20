@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.29.0] — 2026-06-20
+### Added
+- rq-semaphore-wiring: ASYNC-15 (Oracle-phase RQ concurrency cap — `HEAVY_QUERY_MAX_CONCURRENT` (default 3) bounds simultaneous Oracle-phase executions across all four `execute_*_job` workers; slot acquired once per job around Oracle fetch only, released on success and exception; reject wired at cache layer; Redis-down fail-open). Two Decision Table rows. Additive; no existing rules changed.
+
+## [ci 1.3.32] — 2026-06-20
+### Added
+- rq-semaphore-wiring: Gate-compatibility note for cross-worker semaphore wiring — Tier-1 per-worker unit assertions, Tier-3 N=8 concurrent-worker integration test, Tier-4 stress coverage. `stress-soak-report.md` required before any flag promotion. No new workflow file or gate tier.
+
 ## [env 1.0.21] — 2026-06-19
 ### Removed
 - query-path-c-elimination-cleanup (P5): `DOWNTIME_ASYNC_DAY_THRESHOLD` (P5 final removal; was Deprecated since unified-query-core-infra). Routing now uses `classify_query_cost(domain="downtime", ...)` with the unified `CostPolicy`.

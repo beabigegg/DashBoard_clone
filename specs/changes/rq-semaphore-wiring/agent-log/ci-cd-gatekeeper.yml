@@ -1,0 +1,5 @@
+artifacts:
+  - { type: tiers-modified, pointer: "1, 3, 4" }
+  - { type: gate-promotions, pointer: "none — all new tests fall within existing gate commands; no tier changes" }
+  - { type: workflow-files-changed, pointer: "n/a (no new workflow YAML; existing auto-discovery covers all three new test files)" }
+  - { type: required-status-checks, pointer: "unit-mock-integration, response-shape-validate, lint, contract-validate" }

@@ -1,0 +1,8 @@
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/rq-semaphore-wiring/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_rq_semaphore_wiring.py → src/mes_dashboard/services/{query_tool,hold_query_job,resource_query_job}_service.py + src/mes_dashboard/core/global_concurrency.py" }
+  - { type: tdd-pairs, pointer: "tests/test_global_concurrency.py (TestHeavyQuerySlotCM) → src/mes_dashboard/core/global_concurrency.py::heavy_query_slot" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_rq_semaphore_wiring.py → multi-worker peak-cap integration" }
+  - { type: tdd-pairs, pointer: "tests/stress/test_rq_semaphore_stress.py → burst N=20 stress validation" }
+  - { type: coverage-tiers, pointer: "unit (Tier 1), integration (Tier 1), contract (Tier 1), stress (Tier 4)" }
+  - { type: mapping-completeness, pointer: "all 7 AC covered: AC-1..AC-4 integration+unit, AC-5 flag-off unit x3, AC-6 per-worker unit x3 + AST + CM helper, AC-7 contract" }

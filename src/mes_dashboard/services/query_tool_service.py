@@ -27,7 +27,10 @@ from typing import Any, Dict, List, Optional, Generator, Iterable, Tuple
 
 import pandas as pd
 
+from contextlib import nullcontext as _nullcontext
+
 from mes_dashboard.core.database import read_sql_df
+from mes_dashboard.core.global_concurrency import heavy_query_slot
 from mes_dashboard.sql import QueryBuilder, SQLLoader
 from mes_dashboard.services.container_resolution_policy import (
     assess_resolution_result,
@@ -78,6 +81,13 @@ QUERY_TOOL_RSS_REJECT_MB = float(os.getenv('QUERY_TOOL_RSS_REJECT_MB', '1100'))
 QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE', '200'))
 QUERY_TOOL_DETAIL_MAX_PER_PAGE = int(os.getenv('QUERY_TOOL_DETAIL_MAX_PER_PAGE', '500'))
 QUERY_TOOL_SPOOL_TTL_SECONDS = int(os.getenv('QUERY_TOOL_SPOOL_TTL_SECONDS', '300'))
+
+# Concurrency wiring gate: mirrors QUERY_TOOL_USE_RQ (route-level flag).
+# When False, execute_query_tool_job does NOT acquire heavy_query_slot — the
+# slot is acquired only when the RQ dispatch path is enabled (flag-off parity,
+# rq-semaphore-wiring AC-5).  No new env var: reuses existing QUERY_TOOL_USE_RQ.
+_QUERY_TOOL_CONCURRENCY_WIRED: bool = _env_bool("QUERY_TOOL_USE_RQ", default=False)
+
 QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP = _env_bool(
     "QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP",
     False,
@@ -2812,56 +2822,62 @@ def execute_query_tool_job(*, job_id: str, owner: str, **query_params) -> None:
         )
 
         query_type = query_params.get("query_type")
-        if query_type == "lot_history_batch":
-            container_ids = query_params.get("container_ids", [])
-            workcenter_groups = query_params.get("workcenter_groups")
-            page = query_params.get("page", 1)
-            per_page = query_params.get("per_page", 200)
-            result = get_lot_history_batch(
-                container_ids,
-                workcenter_groups=workcenter_groups,
-                page=page,
-                per_page=per_page,
-            )
-        elif query_type == "lot_associations_batch":
-            container_ids = query_params.get("container_ids", [])
-            assoc_type = query_params.get("assoc_type", "materials")
-            page = query_params.get("page", 1)
-            per_page = query_params.get("per_page", 200)
-            result = get_lot_associations_batch(
-                container_ids,
-                assoc_type,
-                page=page,
-                per_page=per_page,
-            )
-        elif query_type == "equipment_period":
-            equipment_ids = query_params.get("equipment_ids", [])
-            equipment_names = query_params.get("equipment_names", [])
-            start_date = query_params.get("start_date")
-            end_date = query_params.get("end_date")
-            query_sub_type = query_params.get("query_sub_type", "status_hours")
-            page = query_params.get("page", 1)
-            per_page = query_params.get("per_page", 200)
-            workcenter_groups = query_params.get("workcenter_groups") or []
-            if query_sub_type == "status_hours":
-                result = get_equipment_status_hours(equipment_ids, start_date, end_date)
-            elif query_sub_type == "lots":
-                result = get_equipment_lots(equipment_ids, start_date, end_date, page=page, per_page=per_page)
-            elif query_sub_type == "materials":
-                result = get_equipment_materials(equipment_names, start_date, end_date)
-            elif query_sub_type == "rejects":
-                result = get_equipment_rejects(
-                    equipment_ids=equipment_ids,
-                    start_date=start_date,
-                    end_date=end_date,
-                    workcenter_groups=workcenter_groups or None,
+        # rq-semaphore-wiring IP-2: acquire heavy_query_slot around Oracle phase only
+        # (between pct=15 and pct=90 milestones, per D1 / ADR 0011).
+        # Guard by _QUERY_TOOL_CONCURRENCY_WIRED so flag-off path is byte-for-byte
+        # identical (AC-5).  base+OEE fan-out not applicable here (single phase, AC-6).
+        _slot_owner = f"query-tool:{job_id}"
+        with (heavy_query_slot(_slot_owner) if _QUERY_TOOL_CONCURRENCY_WIRED else _nullcontext()):
+            if query_type == "lot_history_batch":
+                container_ids = query_params.get("container_ids", [])
+                workcenter_groups = query_params.get("workcenter_groups")
+                page = query_params.get("page", 1)
+                per_page = query_params.get("per_page", 200)
+                result = get_lot_history_batch(
+                    container_ids,
+                    workcenter_groups=workcenter_groups,
+                    page=page,
+                    per_page=per_page,
                 )
-            elif query_sub_type == "jobs":
-                result = get_equipment_jobs(equipment_ids, start_date, end_date)
+            elif query_type == "lot_associations_batch":
+                container_ids = query_params.get("container_ids", [])
+                assoc_type = query_params.get("assoc_type", "materials")
+                page = query_params.get("page", 1)
+                per_page = query_params.get("per_page", 200)
+                result = get_lot_associations_batch(
+                    container_ids,
+                    assoc_type,
+                    page=page,
+                    per_page=per_page,
+                )
+            elif query_type == "equipment_period":
+                equipment_ids = query_params.get("equipment_ids", [])
+                equipment_names = query_params.get("equipment_names", [])
+                start_date = query_params.get("start_date")
+                end_date = query_params.get("end_date")
+                query_sub_type = query_params.get("query_sub_type", "status_hours")
+                page = query_params.get("page", 1)
+                per_page = query_params.get("per_page", 200)
+                workcenter_groups = query_params.get("workcenter_groups") or []
+                if query_sub_type == "status_hours":
+                    result = get_equipment_status_hours(equipment_ids, start_date, end_date)
+                elif query_sub_type == "lots":
+                    result = get_equipment_lots(equipment_ids, start_date, end_date, page=page, per_page=per_page)
+                elif query_sub_type == "materials":
+                    result = get_equipment_materials(equipment_names, start_date, end_date)
+                elif query_sub_type == "rejects":
+                    result = get_equipment_rejects(
+                        equipment_ids=equipment_ids,
+                        start_date=start_date,
+                        end_date=end_date,
+                        workcenter_groups=workcenter_groups or None,
+                    )
+                elif query_sub_type == "jobs":
+                    result = get_equipment_jobs(equipment_ids, start_date, end_date)
+                else:
+                    raise ValueError(f"Unknown query_sub_type: {query_sub_type!r}")
             else:
-                raise ValueError(f"Unknown query_sub_type: {query_sub_type!r}")
-        else:
-            raise ValueError(f"Unknown query_type: {query_type!r}")
+                raise ValueError(f"Unknown query_type: {query_type!r}")
 
         update_job_progress(
             _JOB_PREFIX, job_id,

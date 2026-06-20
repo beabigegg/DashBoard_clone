@@ -1,0 +1,44 @@
+agent: backend-engineer
+change-id: rq-semaphore-wiring
+date: 2026-06-20
+status: complete
+
+summary: >
+  Implemented IP-1 through IP-5 in TDD order. Added heavy_query_slot() contextmanager
+  to global_concurrency.py, wired it into three RQ workers (query-tool, hold, resource)
+  around the Oracle-phase only, wrote all required unit/integration/stress tests, and
+  corrected service-patterns.md. Full suite passes (4899/4899, 0 failures).
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/core/global_concurrency.py:137-168 (heavy_query_slot CM added)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/query_tool_service.py:31,83-90,2819-2875 (import + flag + Oracle wrap)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/hold_query_job_service.py:21-22,138-143 (import + Oracle wrap)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/resource_query_job_service.py:21-22,143-157 (import + Oracle wrap)"
+  - type: files-changed
+    pointer: "docs/architecture/service-patterns.md:131-165 (RQ Worker Concurrency Gate doc corrected)"
+  - type: tests-added
+    pointer: "tests/test_global_concurrency.py::TestHeavyQuerySlotCM (5 tests: yields bool, guards release, exception-safe)"
+  - type: tests-added
+    pointer: "tests/test_rq_semaphore_wiring.py (12 tests: AC-4/AC-5/AC-6 coverage, flag-off, AST reject proof)"
+  - type: tests-added
+    pointer: "tests/integration/test_rq_semaphore_wiring.py::TestConcurrencyCap (4 tests: AC-1/2/3/4)"
+  - type: tests-added
+    pointer: "tests/stress/test_rq_semaphore_stress.py::TestSemaphoreStress (2 tests: N=20 burst, mixed fault)"
+  - type: test-output
+    pointer: "all 6 phases passed: collect, targeted, changed-area, contract, quality, full (4899 passed, 0 failed)"
+  - type: contracts-touched
+    pointer: "none (no API, env, or schema contract changes; docs/architecture/service-patterns.md is doc-only)"
+
+known-risks:
+  - "Resource worker holds 2 Oracle connections under 1 slot (base+OEE ThreadPool); DBA headroom must be validated as HEAVY_QUERY_MAX_CONCURRENT x 2 + overhead before RESOURCE_ASYNC_ENABLED flag goes to production."
+  - "Reject slot owner is sync:<pid>:<lock_owner> (pre-async naming relic); harmless for counting but misleading in logs; noted for future cleanup."
+  - "Stress test (tests/stress/test_rq_semaphore_stress.py) requires @pytest.mark.stress flag; not pre-merge gate."
+
+implementation-notes:
+  - "IP-2 (query-tool): used conditional expression `heavy_query_slot(owner) if _QUERY_TOOL_CONCURRENCY_WIRED else nullcontext()` to avoid code duplication while preserving flag-off parity."
+  - "Integration tests: replaced patch()-in-threads pattern with monkeypatch-before-threads to prevent concurrent patch() calls from racing on module attribute restore (which would leave stale mocks and pollute test_hold_dataset_cache.py)."
+  - "IP-4 (resource): ensure_canonical_spool intentionally left OUTSIDE the slot (single-acquire per D3); note that it may touch Oracle in fallback path but is best-effort/non-fatal."

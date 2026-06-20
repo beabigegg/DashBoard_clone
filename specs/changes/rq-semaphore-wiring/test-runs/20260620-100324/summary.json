@@ -1,0 +1,15 @@
+{
+  "change_id": "rq-semaphore-wiring",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts",
+  "duration_ms": 1574,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100324/summary.json",
+    "stdout": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100324/stdout.log",
+    "stderr": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100324/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

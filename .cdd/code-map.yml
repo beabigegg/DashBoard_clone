@@ -1,6 +1,6 @@
-# generated: 2026-06-19T11:13:43Z by cdd-kit 3.3.0
-# files: 925, src-lines: 272701, map-lines: 20355, compression: 13.4x
-# sources-digest: 4471e681dbada93972862e824d61c39577cd972d92b4f10d3d30d29c986b0d65
+# generated: 2026-06-20T02:56:07Z by cdd-kit 3.3.0
+# files: 928, src-lines: 273823, map-lines: 20449, compression: 13.4x
+# sources-digest: 55c3750acc813c8d52b762c38cf6faca062ca2d2912da10a8795e212aed0b0b2
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -3949,21 +3949,23 @@ src/mes_dashboard/core/feature_flags.py:  # 49 lines
     - { name: parse_bool, lines: 14-28 }
     - { name: resolve_bool_flag, lines: 31-49 }
 
-src/mes_dashboard/core/global_concurrency.py:  # 147 lines
+src/mes_dashboard/core/global_concurrency.py:  # 180 lines
   imports:
     - { module: __future__, items: [annotations], line: 24 }
     - { module: logging, items: [], line: 26 }
     - { module: os, items: [], line: 27 }
     - { module: time, items: [], line: 28 }
-    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 30 }
+    - { module: contextlib, items: [contextmanager], line: 29 }
+    - { module: mes_dashboard.core.redis_client, items: [get_key, get_redis_client], line: 31 }
   constants:
-    - { name: HEAVY_QUERY_MAX_CONCURRENT, line: 37 }
+    - { name: HEAVY_QUERY_MAX_CONCURRENT, line: 38 }
   functions:
-    - { name: _get_acquire_script, lines: 74-78 }
-    - { name: _slot_key, lines: 81-82 }
-    - { name: acquire_heavy_query_slot, lines: 85-122 }
-    - { name: release_heavy_query_slot, lines: 125-133 }
-    - { name: get_active_slot_count, lines: 136-147 }
+    - { name: _get_acquire_script, lines: 75-79 }
+    - { name: _slot_key, lines: 82-83 }
+    - { name: acquire_heavy_query_slot, lines: 86-123 }
+    - { name: release_heavy_query_slot, lines: 126-134 }
+    - { name: heavy_query_slot, lines: 138-166 }  # @contextmanager
+    - { name: get_active_slot_count, lines: 169-180 }
 
 src/mes_dashboard/core/heavy_query_telemetry.py:  # 172 lines
   imports:
@@ -6266,23 +6268,25 @@ src/mes_dashboard/services/hold_history_sql_runtime.py:  # 803 lines
     - { name: _build_duration_clause, lines: 671-682 }
     - { name: try_compute_view_from_spool, lines: 687-803 }
 
-src/mes_dashboard/services/hold_query_job_service.py:  # 186 lines
+src/mes_dashboard/services/hold_query_job_service.py:  # 194 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
     - { module: os, items: [], line: 17 }
-    - { module: typing, items: [Any], line: 18 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 20 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 177 }
+    - { module: contextlib, items: [_nullcontext], line: 18 }
+    - { module: typing, items: [Any], line: 19 }
+    - { module: mes_dashboard.core.global_concurrency, items: [heavy_query_slot], line: 21 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 22 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 185 }
   constants:
-    - { name: HOLD_ASYNC_ENABLED, line: 32 }
-    - { name: HOLD_WORKER_QUEUE, line: 36 }
-    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 38 }
-    - { name: HOLD_JOB_TTL_SECONDS, line: 40 }
+    - { name: HOLD_ASYNC_ENABLED, line: 34 }
+    - { name: HOLD_WORKER_QUEUE, line: 38 }
+    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 40 }
+    - { name: HOLD_JOB_TTL_SECONDS, line: 42 }
   functions:
-    - { name: should_use_async, lines: 50-67 }
-    - { name: enqueue_hold_history_query, lines: 74-87 }
-    - { name: execute_hold_history_query_job, lines: 94-171 }
+    - { name: should_use_async, lines: 52-69 }
+    - { name: enqueue_hold_history_query, lines: 76-89 }
+    - { name: execute_hold_history_query_job, lines: 96-179 }
 
 src/mes_dashboard/services/hold_today_snapshot_service.py:  # 508 lines
   imports:
@@ -6941,7 +6945,7 @@ src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
     - { name: _build_lot_payload, lines: 139-171 }
     - { name: get_qc_gate_summary, lines: 174-248 }
 
-src/mes_dashboard/services/query_tool_service.py:  # 2906 lines
+src/mes_dashboard/services/query_tool_service.py:  # 2922 lines
   imports:
     - { module: csv, items: [], line: 18 }
     - { module: hashlib, items: [], line: 19 }
@@ -6953,93 +6957,95 @@ src/mes_dashboard/services/query_tool_service.py:  # 2906 lines
     - { module: decimal, items: [Decimal], line: 25 }
     - { module: typing, items: [Any, Dict, List, Optional, Generator, Iterable, Tuple], line: 26 }
     - { module: pandas, items: [], line: 28 }
-    - { module: mes_dashboard.core.database, items: [read_sql_df], line: 30 }
-    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 31 }
-    - { module: mes_dashboard.services.container_resolution_policy, items: [assess_resolution_result, normalize_input_values, validate_resolution_request, validate_resolution_result], line: 32 }
-    - { module: mes_dashboard.core.interactive_memory_guard, items: [process_rss_mb], line: 38 }
-    - { module: mes_dashboard.core.exceptions, items: [UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError], line: 39 }
-    - { module: mes_dashboard.core.query_quality_contract, items: [unpack_event_fetch_result], line: 46 }
-    - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 47 }
-    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 48 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 2897 }
+    - { module: contextlib, items: [_nullcontext], line: 30 }
+    - { module: mes_dashboard.core.database, items: [read_sql_df], line: 32 }
+    - { module: mes_dashboard.core.global_concurrency, items: [heavy_query_slot], line: 33 }
+    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 34 }
+    - { module: mes_dashboard.services.container_resolution_policy, items: [assess_resolution_result, normalize_input_values, validate_resolution_request, validate_resolution_result], line: 35 }
+    - { module: mes_dashboard.core.interactive_memory_guard, items: [process_rss_mb], line: 41 }
+    - { module: mes_dashboard.core.exceptions, items: [UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError], line: 42 }
+    - { module: mes_dashboard.core.query_quality_contract, items: [unpack_event_fetch_result], line: 49 }
+    - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 50 }
+    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 51 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 2913 }
   constants:
-    - { name: BATCH_SIZE, line: 66 }
-    - { name: MAX_DATE_RANGE_DAYS, line: 67 }
-    - { name: DEFAULT_TIME_WINDOW_HOURS, line: 68 }
-    - { name: ADJACENT_LOTS_COUNT, line: 69 }
-    - { name: QUERY_TOOL_RSS_REJECT_MB, line: 77 }
-    - { name: QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, line: 78 }
-    - { name: QUERY_TOOL_DETAIL_MAX_PER_PAGE, line: 79 }
-    - { name: QUERY_TOOL_SPOOL_TTL_SECONDS, line: 80 }
-    - { name: QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP, line: 81 }
-    - { name: QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP, line: 85 }
-    - { name: QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE, line: 89 }
-    - { name: QUERY_TOOL_SPOOL_NS_HISTORY_BATCH, line: 93 }
-    - { name: QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX, line: 94 }
-    - { name: MAX_LOT_EQUIPMENT_INPUT, line: 1953 }
-    - { name: MAX_PARENT_TRACE_DEPTH, line: 1954 }
+    - { name: BATCH_SIZE, line: 69 }
+    - { name: MAX_DATE_RANGE_DAYS, line: 70 }
+    - { name: DEFAULT_TIME_WINDOW_HOURS, line: 71 }
+    - { name: ADJACENT_LOTS_COUNT, line: 72 }
+    - { name: QUERY_TOOL_RSS_REJECT_MB, line: 80 }
+    - { name: QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, line: 81 }
+    - { name: QUERY_TOOL_DETAIL_MAX_PER_PAGE, line: 82 }
+    - { name: QUERY_TOOL_SPOOL_TTL_SECONDS, line: 83 }
+    - { name: QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP, line: 91 }
+    - { name: QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP, line: 95 }
+    - { name: QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE, line: 99 }
+    - { name: QUERY_TOOL_SPOOL_NS_HISTORY_BATCH, line: 103 }
+    - { name: QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX, line: 104 }
+    - { name: MAX_LOT_EQUIPMENT_INPUT, line: 1963 }
+    - { name: MAX_PARENT_TRACE_DEPTH, line: 1964 }
   functions:
-    - { name: _env_bool, lines: 72-74 }
-    - { name: _fetch_domain_records, lines: 97-99 }
-    - { name: _sanitize_page, lines: 102-106 }
-    - { name: _sanitize_per_page, lines: 109-118 }
-    - { name: _paginate_rows, lines: 121-142 }
-    - { name: _check_rss_guard, lines: 145-162 }
-    - { name: _max_batch_container_ids, lines: 165-169 }
-    - { name: _build_query_tool_batch_query_id, lines: 172-183 }
-    - { name: _query_tool_batch_namespace, lines: 186-190 }
-    - { name: _query_tool_reject_policy, lines: 193-198 }
-    - { name: _store_query_tool_batch_spool, lines: 201-229 }
-    - { name: _try_query_tool_spool_page, lines: 232-260 }
-    - { name: validate_date_range, lines: 267-291 }
-    - { name: validate_lot_input, lines: 294-304 }
-    - { name: validate_equipment_input, lines: 307-319 }
-    - { name: _df_to_records, lines: 322-351 }
-    - { name: _normalize_search_tokens, lines: 354-364 }
-    - { name: _normalize_wildcard_token, lines: 367-372 }
-    - { name: _is_pattern_token, lines: 375-377 }
-    - { name: _to_like_regex, lines: 380-403 }
-    - { name: _add_exact_or_pattern_condition, lines: 406-439 }
-    - { name: _match_rows_by_tokens, lines: 442-502 }
-    - { name: resolve_lots, lines: 509-577 }
-    - { name: _resolve_by_lot_id, lines: 580-622 }
-    - { name: _resolve_by_wafer_lot, lines: 625-663 }
-    - { name: _is_gd_like, lines: 666-668 }
-    - { name: _literal_prefix_before_wildcard, lines: 671-676 }
-    - { name: _resolve_by_gd_lot_id, lines: 679-719 }
-    - { name: _resolve_by_serial_number, lines: 722-845 }
-    - { name: _resolve_by_work_order, lines: 848-897 }
-    - { name: _resolve_by_gd_work_order, lines: 900-942 }
-    - { name: _get_workcenters_for_groups, lines: 949-959 }
-    - { name: _enrich_workcenter_group, lines: 962-996 }
-    - { name: _apply_query_tool_reject_policy, lines: 999-1047 }
-    - { name: get_lot_history, lines: 1050-1126 }
-    - { name: get_adjacent_lots, lines: 1129-1188 }
-    - { name: get_lot_history_batch, lines: 1195-1315 }
-    - { name: get_lot_associations_batch, lines: 1318-1423 }
-    - { name: get_lot_materials, lines: 1430-1469 }
-    - { name: get_lot_rejects, lines: 1472-1512 }
-    - { name: get_lot_holds, lines: 1515-1553 }
-    - { name: get_lot_split_merge_history, lines: 1556-1661 }
-    - { name: _get_mfg_order_for_lot, lines: 1664-1689 }
-    - { name: get_lot_splits, lines: 1692-1826 }
-    - { name: get_lot_jobs, lines: 1829-1884 }
-    - { name: get_lot_jobs_with_history, lines: 1887-1946 }
-    - { name: _resolve_container_ids_by_names, lines: 1957-1979 }
-    - { name: _build_two_filters, lines: 1982-1996 }
-    - { name: _check_names_with_equipment, lines: 1999-2026 }
-    - { name: _lookup_equipment_by_names, lines: 2029-2056 }
-    - { name: _trace_parents_for_equipment, lines: 2059-2151 }
-    - { name: resolve_lot_equipment, lines: 2154-2296 }
-    - { name: get_equipment_status_hours, lines: 2303-2396 }
-    - { name: get_equipment_lots, lines: 2399-2467 }
-    - { name: get_equipment_materials, lines: 2470-2522 }
-    - { name: get_equipment_rejects, lines: 2525-2596 }
-    - { name: get_equipment_jobs, lines: 2599-2650 }
-    - { name: export_to_csv, lines: 2657-2693 }
-    - { name: generate_csv_stream, lines: 2696-2738 }
-    - { name: get_equipment_recent_jobs, lines: 2745-2776 }
-    - { name: execute_query_tool_job, lines: 2783-2891 }
+    - { name: _env_bool, lines: 75-77 }
+    - { name: _fetch_domain_records, lines: 107-109 }
+    - { name: _sanitize_page, lines: 112-116 }
+    - { name: _sanitize_per_page, lines: 119-128 }
+    - { name: _paginate_rows, lines: 131-152 }
+    - { name: _check_rss_guard, lines: 155-172 }
+    - { name: _max_batch_container_ids, lines: 175-179 }
+    - { name: _build_query_tool_batch_query_id, lines: 182-193 }
+    - { name: _query_tool_batch_namespace, lines: 196-200 }
+    - { name: _query_tool_reject_policy, lines: 203-208 }
+    - { name: _store_query_tool_batch_spool, lines: 211-239 }
+    - { name: _try_query_tool_spool_page, lines: 242-270 }
+    - { name: validate_date_range, lines: 277-301 }
+    - { name: validate_lot_input, lines: 304-314 }
+    - { name: validate_equipment_input, lines: 317-329 }
+    - { name: _df_to_records, lines: 332-361 }
+    - { name: _normalize_search_tokens, lines: 364-374 }
+    - { name: _normalize_wildcard_token, lines: 377-382 }
+    - { name: _is_pattern_token, lines: 385-387 }
+    - { name: _to_like_regex, lines: 390-413 }
+    - { name: _add_exact_or_pattern_condition, lines: 416-449 }
+    - { name: _match_rows_by_tokens, lines: 452-512 }
+    - { name: resolve_lots, lines: 519-587 }
+    - { name: _resolve_by_lot_id, lines: 590-632 }
+    - { name: _resolve_by_wafer_lot, lines: 635-673 }
+    - { name: _is_gd_like, lines: 676-678 }
+    - { name: _literal_prefix_before_wildcard, lines: 681-686 }
+    - { name: _resolve_by_gd_lot_id, lines: 689-729 }
+    - { name: _resolve_by_serial_number, lines: 732-855 }
+    - { name: _resolve_by_work_order, lines: 858-907 }
+    - { name: _resolve_by_gd_work_order, lines: 910-952 }
+    - { name: _get_workcenters_for_groups, lines: 959-969 }
+    - { name: _enrich_workcenter_group, lines: 972-1006 }
+    - { name: _apply_query_tool_reject_policy, lines: 1009-1057 }
+    - { name: get_lot_history, lines: 1060-1136 }
+    - { name: get_adjacent_lots, lines: 1139-1198 }
+    - { name: get_lot_history_batch, lines: 1205-1325 }
+    - { name: get_lot_associations_batch, lines: 1328-1433 }
+    - { name: get_lot_materials, lines: 1440-1479 }
+    - { name: get_lot_rejects, lines: 1482-1522 }
+    - { name: get_lot_holds, lines: 1525-1563 }
+    - { name: get_lot_split_merge_history, lines: 1566-1671 }
+    - { name: _get_mfg_order_for_lot, lines: 1674-1699 }
+    - { name: get_lot_splits, lines: 1702-1836 }
+    - { name: get_lot_jobs, lines: 1839-1894 }
+    - { name: get_lot_jobs_with_history, lines: 1897-1956 }
+    - { name: _resolve_container_ids_by_names, lines: 1967-1989 }
+    - { name: _build_two_filters, lines: 1992-2006 }
+    - { name: _check_names_with_equipment, lines: 2009-2036 }
+    - { name: _lookup_equipment_by_names, lines: 2039-2066 }
+    - { name: _trace_parents_for_equipment, lines: 2069-2161 }
+    - { name: resolve_lot_equipment, lines: 2164-2306 }
+    - { name: get_equipment_status_hours, lines: 2313-2406 }
+    - { name: get_equipment_lots, lines: 2409-2477 }
+    - { name: get_equipment_materials, lines: 2480-2532 }
+    - { name: get_equipment_rejects, lines: 2535-2606 }
+    - { name: get_equipment_jobs, lines: 2609-2660 }
+    - { name: export_to_csv, lines: 2667-2703 }
+    - { name: generate_csv_stream, lines: 2706-2748 }
+    - { name: get_equipment_recent_jobs, lines: 2755-2786 }
+    - { name: execute_query_tool_job, lines: 2793-2907 }
 
 src/mes_dashboard/services/query_tool_sql_runtime.py:  # 404 lines
   imports:
@@ -7609,23 +7615,25 @@ src/mes_dashboard/services/resource_history_sql_runtime.py:  # 859 lines
     - { name: try_compute_view_from_spool, lines: 570-663 }
     - { name: try_compute_query_from_canonical_spool, lines: 668-859 }
 
-src/mes_dashboard/services/resource_query_job_service.py:  # 199 lines
+src/mes_dashboard/services/resource_query_job_service.py:  # 209 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: logging, items: [], line: 16 }
     - { module: os, items: [], line: 17 }
-    - { module: typing, items: [Any], line: 18 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 20 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 190 }
+    - { module: contextlib, items: [_nullcontext], line: 18 }
+    - { module: typing, items: [Any], line: 19 }
+    - { module: mes_dashboard.core.global_concurrency, items: [heavy_query_slot], line: 21 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 22 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 200 }
   constants:
-    - { name: RESOURCE_ASYNC_ENABLED, line: 32 }
-    - { name: RESOURCE_WORKER_QUEUE, line: 36 }
-    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 38 }
-    - { name: RESOURCE_JOB_TTL_SECONDS, line: 40 }
+    - { name: RESOURCE_ASYNC_ENABLED, line: 34 }
+    - { name: RESOURCE_WORKER_QUEUE, line: 38 }
+    - { name: RESOURCE_JOB_TIMEOUT_SECONDS, line: 40 }
+    - { name: RESOURCE_JOB_TTL_SECONDS, line: 42 }
   functions:
-    - { name: should_use_async, lines: 50-67 }
-    - { name: enqueue_resource_history_query, lines: 74-87 }
-    - { name: execute_resource_history_query_job, lines: 94-184 }
+    - { name: should_use_async, lines: 52-69 }
+    - { name: enqueue_resource_history_query, lines: 76-89 }
+    - { name: execute_resource_history_query_job, lines: 96-194 }
 
 src/mes_dashboard/services/resource_service.py:  # 679 lines
   imports:
@@ -10373,6 +10381,26 @@ tests/integration/test_rowcount_flag_parity.py:  # 776 lines
     - { name: _extract_chunks_from_execute_plan_call, lines: 39-47 }
     - { name: _chunk_key_sets, lines: 50-52 }
 
+tests/integration/test_rq_semaphore_wiring.py:  # 315 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 24 }
+    - { module: threading, items: [], line: 26 }
+    - { module: time, items: [], line: 27 }
+    - { module: contextlib, items: [contextmanager], line: 28 }
+    - { module: typing, items: [List, Tuple], line: 29 }
+    - { module: pytest, items: [], line: 31 }
+  classes:
+    - name: TestConcurrencyCap
+      lines: 50-315
+      methods:
+        - { name: _setup_svc, lines: 59-69 }
+        - { name: test_peak_oracle_concurrent_bounded, lines: 71-136 }
+        - { name: test_all_jobs_complete_no_deadlock, lines: 138-184 }
+        - { name: test_semaphore_fully_released_after_run, lines: 186-244 }
+        - { name: test_slot_released_after_oracle_exception_in_worker, lines: 246-315 }
+  functions:
+    - { name: _compute_peak_concurrent, lines: 36-47 }
+
 tests/integration/test_soak_workload.py:  # 960 lines
   imports:
     - { module: __future__, items: [annotations], line: 75 }
@@ -11458,6 +11486,25 @@ tests/stress/test_resource_history_stress.py:  # 384 lines
         - { name: test_concurrent_async_jobs_complete_without_db_pool_exhaustion, lines: 149-216 }
         - { name: test_async_job_progress_milestones_under_load, lines: 222-304 }
         - { name: test_job_timeout_enforced_under_slow_oracle, lines: 310-384 }
+
+tests/stress/test_rq_semaphore_stress.py:  # 218 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 16 }
+    - { module: threading, items: [], line: 18 }
+    - { module: time, items: [], line: 19 }
+    - { module: contextlib, items: [contextmanager], line: 20 }
+    - { module: typing, items: [List, Tuple], line: 21 }
+    - { module: unittest.mock, items: [patch], line: 22 }
+    - { module: pytest, items: [], line: 24 }
+  classes:
+    - name: TestSemaphoreStress
+      lines: 62-218
+      methods:
+        - { name: test_burst_peak_bounded_no_leak, lines: 67-143 }
+        - { name: test_burst_no_deadlock_with_mixed_success_failure, lines: 145-218 }
+  functions:
+    - { name: _recording_cm_factory, lines: 29-44 }
+    - { name: _compute_peak_concurrent, lines: 47-58 }
 
 tests/stress/test_yield_alert_stress.py:  # 390 lines
   imports:
@@ -14349,7 +14396,7 @@ tests/test_frontend_resource_history_parity.py:  # 297 lines
     - { name: frontend_kpi, lines: 164-186 }
     - { name: frontend_trend, lines: 189-218 }
 
-tests/test_global_concurrency.py:  # 234 lines
+tests/test_global_concurrency.py:  # 307 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 13 }
@@ -14384,6 +14431,14 @@ tests/test_global_concurrency.py:  # 234 lines
         - { name: setup_method, lines: 191-192 }
         - { name: test_cutoff_is_less_than_current_time, lines: 194-215 }
         - { name: test_max_concurrent_passed_to_script, lines: 217-234 }
+    - name: TestHeavyQuerySlotCM
+      lines: 241-307
+      methods:
+        - { name: test_cm_yields_true_when_slot_acquired, lines: 249-256 }
+        - { name: test_cm_yields_false_when_slot_not_acquired, lines: 258-268 }
+        - { name: test_cm_releases_slot_on_success, lines: 270-279 }
+        - { name: test_cm_releases_slot_on_exception, lines: 281-292 }
+        - { name: test_cm_does_not_double_release_on_fail_open, lines: 294-307 }
   functions:
     - { name: _reset_acquire_script, lines: 23-25 }
 
@@ -18834,6 +18889,45 @@ tests/test_rq_monitor_service.py:  # 234 lines
       methods:
         - { name: test_aggregates_all_sections, lines: 208-222 }
         - { name: test_graceful_on_partial_failure, lines: 224-234 }
+
+tests/test_rq_semaphore_wiring.py:  # 449 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 22 }
+    - { module: ast, items: [], line: 24 }
+    - { module: textwrap, items: [], line: 25 }
+    - { module: contextlib, items: [contextmanager], line: 26 }
+    - { module: pathlib, items: [Path], line: 27 }
+    - { module: unittest.mock, items: [MagicMock, call, patch], line: 28 }
+    - { module: pytest, items: [], line: 30 }
+  classes:
+    - name: TestHeavyQuerySlotCM
+      lines: 37-80
+      methods:
+        - { name: test_slot_released_on_oracle_exception, lines: 46-57 }
+        - { name: test_next_job_acquires_after_exception, lines: 59-80 }
+    - name: TestPerWorkerWiring
+      lines: 87-195
+      methods:
+        - { name: _get_acquire_call_count, lines: 90-92 }
+        - { name: test_query_tool_slot_acquired_once, lines: 96-129 }
+        - { name: test_hold_slot_acquired_once, lines: 133-162 }
+        - { name: test_resource_slot_acquired_once, lines: 166-195 }
+    - name: TestFlagOffParity
+      lines: 202-297
+      methods:
+        - { name: test_query_tool_flag_off_no_slot_acquire, lines: 205-235 }
+        - { name: test_hold_flag_off_no_slot_acquire, lines: 237-266 }
+        - { name: test_resource_flag_off_no_slot_acquire, lines: 268-297 }
+    - name: TestSlotReleasedOnException
+      lines: 304-402
+      methods:
+        - { name: test_query_tool_slot_released_on_oracle_exception, lines: 307-338 }
+        - { name: test_hold_slot_released_on_oracle_exception, lines: 340-370 }
+        - { name: test_resource_slot_released_on_oracle_exception, lines: 372-402 }
+    - name: TestRejectWorkerAbsence
+      lines: 409-449
+      methods:
+        - { name: test_reject_job_has_no_job_level_acquire, lines: 417-449 }
 
 tests/test_rq_warmup_resilience.py:  # 170 lines
   imports:

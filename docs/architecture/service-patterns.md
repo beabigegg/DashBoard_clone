@@ -128,25 +128,47 @@ Patching `requests.post` at function level does not intercept calls routed throu
 
 Evidence: `downtime-analysis-page` — `TestCallLlmText` required this correction in commit `ccb9347`.
 
-## RQ Worker Concurrency Gate — acquire_heavy_query_slot Wiring Requirement
+## RQ Worker Concurrency Gate — heavy_query_slot Wiring Requirement
 
-**Every `execute_*_job` worker function that runs Oracle-heavy queries MUST wire `acquire_heavy_query_slot` before the owning feature flag is promoted to production.**
+**Every `execute_*_job` worker function that runs Oracle-heavy queries MUST wire `heavy_query_slot` before the owning feature flag is promoted to production.**
 
 The `global_concurrency` semaphore (`MAX_CONCURRENT = 3`) bounds simultaneous Oracle connections from RQ workers to prevent DB exhaustion. Without wiring, flag-on workers bypass the gate entirely — the semaphore exists but is never acquired.
 
-Current gap (as of query-path-c-elimination-cleanup): `execute_query_tool_job`, `execute_hold_query_job`, `execute_resource_query_job`, and `execute_reject_query_job` are all unwired. Wiring pattern:
+Wiring status (as of rq-semaphore-wiring):
+- `execute_query_tool_job` — **wired** (guarded by `_QUERY_TOOL_CONCURRENCY_WIRED`)
+- `execute_hold_history_query_job` — **wired** (guarded by `HOLD_ASYNC_ENABLED`)
+- `execute_resource_history_query_job` — **wired** (guarded by `RESOURCE_ASYNC_ENABLED`)
+- `execute_reject_query_job` — **wired at cache layer** (`reject_dataset_cache.execute_primary_query` acquires internally; no job-level acquire to avoid double-counting)
+
+Use the `heavy_query_slot(owner)` contextmanager from `global_concurrency` — it wraps
+`acquire_heavy_query_slot` / `release_heavy_query_slot` with an exception-safe
+try/finally and guards release with `if acquired` (fail-open never double-releases):
 
 ```python
-with acquire_heavy_query_slot():
-    result = <oracle call>
+from mes_dashboard.core.global_concurrency import heavy_query_slot
+
+_slot_owner = f"{job_type}:{job_id}"
+with heavy_query_slot(_slot_owner):
+    result = execute_primary_query(...)
+# ensure_canonical_spool and complete_job stay OUTSIDE the slot (single-acquire, D3)
+```
+
+Guard the `with heavy_query_slot(...)` call with the module-level feature flag so the
+flag-off path is byte-for-byte identical (AC-5 / rq-semaphore-wiring):
+
+```python
+with (heavy_query_slot(_slot_owner) if FEATURE_ASYNC_ENABLED else nullcontext()):
+    result = execute_primary_query(...)
 ```
 
 Pre-production checklist before flipping any `*_USE_RQ=on`:
-1. Wire `acquire_heavy_query_slot` in the owning `execute_*_job`.
+1. Wire `heavy_query_slot` in the owning `execute_*_job` (guarded by the feature flag).
 2. Run real-Oracle load test to confirm `peak_concurrent ≤ MAX_CONCURRENT`.
 3. Update stress-soak-report.md with real evidence (mock structural proof alone is insufficient).
+4. For resource worker: validate DBA headroom as `HEAVY_QUERY_MAX_CONCURRENT × 2 + overhead`
+   (resource fans base+OEE over `ThreadPoolExecutor(max_workers=2)` — 2 Oracle conns per slot).
 
-Evidence: `query-path-c-elimination-cleanup` — stress-soak-engineer log; stress-soak-report.md §Production Readiness Gate; ADR-0011.
+Evidence: `rq-semaphore-wiring` — backend-engineer log; stress-soak-report.md §Production Readiness Gate; ADR-0011.
 
 ## Async Routing Pre-Check Pattern — COUNT(*) Fail-Open for Domains Without Date Range
 

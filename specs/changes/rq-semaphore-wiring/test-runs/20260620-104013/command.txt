@@ -1,0 +1,1 @@
+pytest --collect-only -q --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/rq-semaphore-wiring/test-runs/20260620-104013/junit.xml' --maxfail=1 --tb=short -ra

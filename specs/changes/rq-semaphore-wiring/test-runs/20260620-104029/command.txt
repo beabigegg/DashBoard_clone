@@ -1,0 +1,1 @@
+pytest tests/test_rq_semaphore_wiring.py tests/integration/test_rq_semaphore_wiring.py tests/test_global_concurrency.py tests/integration/test_query_tool_rq_async.py -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/rq-semaphore-wiring/test-runs/20260620-104029/junit.xml' -q --tb=short -ra

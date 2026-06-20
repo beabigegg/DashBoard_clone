@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import nullcontext as _nullcontext
 from typing import Any
 
+from mes_dashboard.core.global_concurrency import heavy_query_slot
 from mes_dashboard.services.async_query_job_service import (
     complete_job,
     enqueue_job_dynamic,
@@ -128,12 +130,18 @@ def execute_hold_history_query_job(*, job_id: str, owner: str, **query_params: A
 
         # Wrap execute_primary_query unmodified (IP constraint: do NOT add
         # progress_callback or alter signature/body).
-        result = execute_primary_query(
-            start_date=query_params["start_date"],
-            end_date=query_params["end_date"],
-            hold_type=query_params.get("hold_type", "quality"),
-            record_type=query_params.get("record_type", "new"),
-        )
+        # rq-semaphore-wiring IP-3: acquire heavy_query_slot around Oracle phase only
+        # (between pct=15 and pct=90, per D1 / ADR 0011).
+        # Guard by HOLD_ASYNC_ENABLED so flag-off path is byte-for-byte identical (AC-5).
+        # ensure_canonical_spool (below) is left OUTSIDE the slot — single-acquire (AC-6, D3).
+        _slot_owner = f"hold-history:{job_id}"
+        with (heavy_query_slot(_slot_owner) if HOLD_ASYNC_ENABLED else _nullcontext()):
+            result = execute_primary_query(
+                start_date=query_params["start_date"],
+                end_date=query_params["end_date"],
+                hold_type=query_params.get("hold_type", "quality"),
+                record_type=query_params.get("record_type", "new"),
+            )
 
         update_job_progress(
             _JOB_PREFIX, job_id,

@@ -1,0 +1,17 @@
+change-id: rq-semaphore-wiring
+agent: stress-soak-engineer
+timestamp: "2026-06-20T10:48:30Z"
+status: complete
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_rq_semaphore_stress.py" }
+  - { type: runner-config-path, pointer: "tests/integration/test_rq_semaphore_wiring.py" }
+  - { type: runner, pointer: "pytest (threading harness; mock-based; no external service)" }
+  - { type: pass-criteria-cited, pointer: "AC-1 wiring: CM entered exactly N times per run; AC-2: all N complete within 30s/60s timeout; AC-3: enters==exits post-run (zero leak); AC-4: faulted workers exit CM (enters==exits with injected exceptions)" }
+  - { type: artifacts-location, pointer: "specs/changes/rq-semaphore-wiring/stress-soak-report.md" }
+next-action: none
+notes: >
+  All 6 tests pass (2 stress, 4 integration). peak_concurrent=20 in recording CM is expected
+  and correct — the recording CM does not enforce the Redis Lua-CAS cap (Redis absent in CI).
+  Real Redis cap enforcement (AC-1 ≤ 3) is a pre-production gate item documented in the
+  stress-soak-report.md §Known Gaps. Resource worker DBA headroom (3×2 Oracle connections)
+  also flagged as pre-production gate before RESOURCE_ASYNC_ENABLED flag-on.

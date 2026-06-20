@@ -1,0 +1,20 @@
+{
+  "change_id": "rq-semaphore-wiring",
+  "phase": "full",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest -m 'not (e2e or integration_real or stress or load or soak)' -x --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/rq-semaphore-wiring/test-runs/20260620-100337/junit.xml' -q --tb=short -ra",
+  "duration_ms": 193241,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.test_hold_dataset_cache.TestHoldEngineDecomposition::test_long_range_triggers_engine",
+    "message": "RuntimeError: oracle fault"
+  },
+  "artifacts": {
+    "summary": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100337/summary.json",
+    "stdout": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100337/stdout.log",
+    "stderr": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100337/stderr.log",
+    "junit": "specs/changes/rq-semaphore-wiring/test-runs/20260620-100337/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

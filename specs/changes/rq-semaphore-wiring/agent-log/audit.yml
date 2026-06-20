@@ -1,0 +1,15 @@
+- type: tier-floor-override
+  change-id: rq-semaphore-wiring
+  timestamp: '2026-06-20T02:54:36.905Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - deadlock
+    - query
+  reason: >-
+    All wiring is flag-off by default and inert until each *_USE_RQ/*_USE_UNIFIED_JOB flag is
+    explicitly promoted to on; stress-soak-report.md written with mock wiring evidence; ASYNC-15
+    gates flag-on production promotion; real-Redis peak-cap and DBA headroom confirmation required
+    before any flag flip — pre-production gate documented. Established Tier-1 convention for all RQ
+    worker flag-gated changes.

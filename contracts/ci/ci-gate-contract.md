@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.31
+schema-version: 1.3.32
 last-changed: 2026-06-19
 breaking-change-policy: deprecate-2-minors
 ---
@@ -597,7 +597,30 @@ gate tier, command, or status changed.
 
 **Schema-version bump to 1.3.31 (patch)**: additive gate-compatibility note for P4+P5 Path-C elimination. No gate tier, command, or status changed.
 
+## rq-semaphore-wiring Gate Compatibility Note
+
+**Tier-1 unit assertions** (covered by existing `unit-mock-integration` gate):
+- Per-worker acquire/release wiring: `execute_query_tool_job`, `execute_hold_history_query_job`, `execute_resource_history_query_job` each acquire exactly once around the Oracle phase and release on success and on exception (AC-4, AC-6).
+- Flag-off path parity: with `*_USE_RQ=off` or `*_USE_UNIFIED_JOB=off`, acquire/release is never reached — behavior byte-for-byte identical to pre-change (AC-5).
+- `@contextmanager` helper in `global_concurrency.py` (new): acquire returns bool; CM yields it; `release` is guarded by `acquired` so fail-open never double-releases.
+- `execute_reject_query_job` has no job-level acquire — verified by absence of `acquire_heavy_query_slot` call in its body (AC-6, D3/reject exception).
+
+**Tier-3 integration coverage** (covered by existing `nightly-integration` gate):
+- `tests/integration/test_rq_semaphore_wiring.py`: N=8 concurrent workers across all four job types → peak simultaneous Oracle-phase executions ≤ `HEAVY_QUERY_MAX_CONCURRENT` (3) (AC-1); all N reach terminal state, no deadlock (AC-2); post-completion semaphore reports full availability, zero slot leak (AC-3).
+- Exception-path integration: slot released on Oracle exception; subsequent job can acquire (AC-4).
+
+**Tier-4 stress/soak gate** (covered by existing `stress-load` and `soak` gates):
+- `tests/stress/test_rq_semaphore_stress.py` (`stress` marker): high-concurrency burst across all four worker types confirms cap sustained without leak or deadlock.
+- **`stress-soak-report.md` is required** before any `*_USE_RQ` or `*_USE_UNIFIED_JOB` flag is promoted to `on` in production. Evidence must show `peak_concurrent ≤ 3` sampled via `get_active_slot_count()`, no slot leak, no deadlock, across all four worker types simultaneously (ASYNC-15).
+
+**No new gate tier, command, or workflow file**: all new tests fall within existing `unit-mock-integration` (Tier 1), `nightly-integration` (Tier 3), `stress-load` (Tier 4), and `soak` (Tier 4) gate commands.
+
+**Schema-version bump to 1.3.32 (patch)**: additive gate-compatibility note for cross-worker semaphore wiring. No gate tier, command, or status changed.
+
 ## CHANGELOG
+
+## [ci 1.3.32] — 2026-06-20
+- rq-semaphore-wiring: Gate-compatibility note for cross-worker semaphore wiring — Tier-1 per-worker acquire/release unit assertions, Tier-3 N=8 concurrent-worker integration test (peak ≤ 3, no deadlock, no leak), Tier-4 stress coverage. `stress-soak-report.md` required before any flag promotion. No new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.31] — 2026-06-19
 - query-path-c-elimination-cleanup: Gate-compatibility note for P4+P5 Path-C elimination — new `query-tool` RQ job type (test_job_registry count 10→11), 4 `*_ASYNC_DAY_THRESHOLD` vars removed (no workflow YAML env-block edit required), `QUERY_TOOL_USE_RQ=off` default means zero behavioral change until explicitly set, `stress-soak-report.md` required before flag promotion. All new tests auto-discovered by existing gate commands. No new workflow file or gate tier. Additive; no existing gates changed.

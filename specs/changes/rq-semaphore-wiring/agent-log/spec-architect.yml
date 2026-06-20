@@ -1,0 +1,7 @@
+artifacts:
+  - { type: decision-summary, pointer: "wrap Oracle-phase only in acquire/release per worker; reject already wired at cache layer (do not double-acquire)" }
+  - { type: affected-areas, pointer: "query_tool/hold/resource RQ workers; global_concurrency (optional CM helper)" }
+  - { type: adr-written, pointer: "none (conforms to existing docs/adr/0011)" }
+  - { type: risks-noted, pointer: "0 high, 3 medium (stale service-patterns doc, reject owner naming, resource 2-conn/slot DBA headroom)" }
+  - { type: finding, pointer: "acquire_heavy_query_slot returns bool not context manager; service-patterns.md 'with acquire_heavy_query_slot():' is non-working" }
+  - { type: finding, pointer: "execute_reject_query_job already covered: reject_dataset_cache.execute_primary_query acquires/releases at lines 976/1231" }

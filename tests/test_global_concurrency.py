@@ -232,3 +232,76 @@ class TestLuaScriptExpiredEntriesCleanup:
             gc_mod.acquire_heavy_query_slot("owner-max")
 
         assert captured_args["max_concurrent"] == 7
+
+
+# ---------------------------------------------------------------------------
+# heavy_query_slot contextmanager helper (IP-1)
+# ---------------------------------------------------------------------------
+
+class TestHeavyQuerySlotCM:
+    """Tests for the heavy_query_slot() @contextmanager added in rq-semaphore-wiring IP-1.
+
+    AC-6: CM yields bool (the acquired value); release is guarded by `acquired`
+    so a fail-open path (acquired=False) never calls release_heavy_query_slot.
+    AC-4: release fires in finally even when the body raises.
+    """
+
+    def test_cm_yields_true_when_slot_acquired(self):
+        """heavy_query_slot yields True when acquire_heavy_query_slot returns True."""
+        from mes_dashboard.core.global_concurrency import heavy_query_slot
+
+        with patch.object(gc_mod, "acquire_heavy_query_slot", return_value=True), \
+             patch.object(gc_mod, "release_heavy_query_slot"):
+            with heavy_query_slot("cm-owner-true") as acquired:
+                assert acquired is True, f"Expected True, got {acquired!r}"
+
+    def test_cm_yields_false_when_slot_not_acquired(self):
+        """heavy_query_slot yields False when acquire_heavy_query_slot returns False (fail-open
+        scenario where cap is reached — not the Redis-down path which returns True)."""
+        from mes_dashboard.core.global_concurrency import heavy_query_slot
+
+        with patch.object(gc_mod, "acquire_heavy_query_slot", return_value=False), \
+             patch.object(gc_mod, "release_heavy_query_slot") as mock_rel:
+            with heavy_query_slot("cm-owner-false") as acquired:
+                assert acquired is False, f"Expected False, got {acquired!r}"
+            # release must NOT be called when acquired is False
+            mock_rel.assert_not_called()
+
+    def test_cm_releases_slot_on_success(self):
+        """heavy_query_slot calls release_heavy_query_slot in finally on success."""
+        from mes_dashboard.core.global_concurrency import heavy_query_slot
+
+        with patch.object(gc_mod, "acquire_heavy_query_slot", return_value=True), \
+             patch.object(gc_mod, "release_heavy_query_slot") as mock_rel:
+            with heavy_query_slot("cm-release-ok"):
+                pass  # no exception
+
+        mock_rel.assert_called_once_with("cm-release-ok")
+
+    def test_cm_releases_slot_on_exception(self):
+        """heavy_query_slot calls release_heavy_query_slot in finally even when body raises."""
+        from mes_dashboard.core.global_concurrency import heavy_query_slot
+        import pytest
+
+        with patch.object(gc_mod, "acquire_heavy_query_slot", return_value=True), \
+             patch.object(gc_mod, "release_heavy_query_slot") as mock_rel:
+            with pytest.raises(ValueError, match="body error"):
+                with heavy_query_slot("cm-release-exc"):
+                    raise ValueError("body error")
+
+        mock_rel.assert_called_once_with("cm-release-exc")
+
+    def test_cm_does_not_double_release_on_fail_open(self):
+        """heavy_query_slot must NOT call release when acquired=False (fail-open).
+
+        This guards the case where Redis is at capacity (acquired=False) or
+        fail-opens True but the Lua returned 0.  The guard is `if acquired: release`.
+        """
+        from mes_dashboard.core.global_concurrency import heavy_query_slot
+
+        with patch.object(gc_mod, "acquire_heavy_query_slot", return_value=False), \
+             patch.object(gc_mod, "release_heavy_query_slot") as mock_rel:
+            with heavy_query_slot("cm-no-release"):
+                pass
+
+        mock_rel.assert_not_called()

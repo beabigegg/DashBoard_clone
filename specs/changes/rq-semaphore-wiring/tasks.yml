@@ -1,0 +1,42 @@
+change-id: rq-semaphore-wiring
+status: in-progress
+tier: 1
+tier-floor-override: "All wiring is flag-off by default and inert until each *_USE_RQ/*_USE_UNIFIED_JOB flag is explicitly promoted to on; stress-soak-report.md written with mock wiring evidence; ASYNC-15 gates flag-on production promotion; real-Redis peak-cap and DBA headroom confirmation required before any flag flip — pre-production gate documented. Established Tier-1 convention for all RQ worker flag-gated changes."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done, note: "Tier 1 high-risk cross-module; design.md + stress-soak-report.md required; 8 agents; 7 ACs; CER-001/002 resolved" }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "env no change; business ASYNC-15 added 1.28.0→1.29.0; ci-gate note added 1.3.31→1.3.32" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done, note: "design.md written; D1-D5 answered; key finding: acquire_heavy_query_slot returns bool not CM → need CM helper; reject already wired transitively → only 3 workers need wiring" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written; no new workflow YAML; stress-soak-report.md pre-production gate; resource 2-conn-per-slot DBA headroom noted" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done, note: "IP-1..IP-8; TDD order: IP-6 tests → IP-1 CM helper → IP-2..IP-4 worker wiring → IP-5 doc → IP-7 integration → IP-8 ladder" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "no endpoint change" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no UI" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done, note: "no change; HEAVY_QUERY_MAX_CONCURRENT gap is follow-up debt" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "job result schema unchanged" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "ASYNC-15 + 2 Decision Table rows + 1.28.0→1.29.0" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done, note: "gate-compatibility note + 1.3.31→1.3.32" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "tests/test_rq_semaphore_wiring.py (per-worker wiring + flag-off parity + exception release + reject AST absence) + TestHeavyQuerySlotCM in test_global_concurrency.py" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "tests/integration/test_rq_semaphore_wiring.py: N=8 concurrent workers peak≤3 + no deadlock + no leak + fault-inject" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "no user-facing flow change" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "no interactive UI" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: done, note: "N=20 burst: all pass (wiring coverage); peak_concurrent=3 real-Redis enforcement is pre-production gate; stress-soak-report.md written" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "IP-1..IP-8 complete; heavy_query_slot CM helper + 3-worker wiring + service-patterns.md doc correction; ruff clean; 4899 passed 0 failed" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: skipped, note: "no UI change" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no new env var" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "no new workflow YAML needed; existing CI matrix covers all required phases (ci-cd-gatekeeper confirmed)" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer ran; ASYNC-15 added business-rules 1.28→1.29; ci-gate note 1.3.31→1.3.32; validate --contracts passed" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa-reviewer APPROVED; tier-floor-override added; cdd-kit gate passed; all AC evidence green; pre-production gates documented in stress-soak-report.md" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate rq-semaphore-wiring passed; all validators green; tier-floor-override recorded in agent-log/audit.yml" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 full suite (4899/0) passes locally per cdd-kit-patterns.md §Section-6" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "targeted + changed-area phases passed; test-evidence.yml generated" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly CI gates; pre-production gate (real-Redis cap + DBA headroom) is manual before flag-on, documented in stress-soak-report.md" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
