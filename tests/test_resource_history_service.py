@@ -573,10 +573,10 @@ class TestSyncFallbackAbsent(unittest.TestCase):
 
 
 class TestEnvDefaultPin(unittest.TestCase):
-    """AC-8: env default pin — RESOURCE_HISTORY_USE_UNIFIED_JOB default must be off."""
+    """AC-8: env default pin — RESOURCE_HISTORY_USE_UNIFIED_JOB default must be on."""
 
-    def test_use_unified_job_default_is_off(self):
-        """Module-level _RESOURCE_HISTORY_USE_UNIFIED_JOB defaults to False (off)."""
+    def test_use_unified_job_default_is_on(self):
+        """Module-level _RESOURCE_HISTORY_USE_UNIFIED_JOB defaults to True (on)."""
         import importlib
         import os
         import sys
@@ -590,9 +590,9 @@ class TestEnvDefaultPin(unittest.TestCase):
                 del sys.modules[mod_name]
             import mes_dashboard.services.resource_history_service as svc
             # Re-add to sys.modules (importlib.reload is cleaner but may side-effect)
-            self.assertFalse(
+            self.assertTrue(
                 svc._RESOURCE_HISTORY_USE_UNIFIED_JOB,
-                "RESOURCE_HISTORY_USE_UNIFIED_JOB default must be off (False)",
+                "RESOURCE_HISTORY_USE_UNIFIED_JOB default must be on (True)",
             )
         finally:
             if original_env is not None:

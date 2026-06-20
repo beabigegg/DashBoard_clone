@@ -82,7 +82,7 @@ _JOB_TIMEOUT: int = int(os.getenv("DOWNTIME_JOB_TIMEOUT_SECONDS", "1800"))
 # Legacy _bridge_jobid Path B is NOT deleted while this flag exists (AC-8).
 from mes_dashboard.core.feature_flags import resolve_bool_flag as _resolve_bool_flag  # noqa: E402
 _DOWNTIME_USE_UNIFIED_JOB: bool = _resolve_bool_flag(
-    "DOWNTIME_USE_UNIFIED_JOB", default=False
+    "DOWNTIME_USE_UNIFIED_JOB", default=True
 )
 
 

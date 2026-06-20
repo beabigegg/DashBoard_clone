@@ -50,7 +50,7 @@ _MAX_PER_PAGE = 200
 # Feature flag: unified MaterialTraceJob pipeline (material-trace-streaming-migration)
 # Module-level constant frozen at import; monkeypatch.setattr() required in tests (not setenv).
 MATERIAL_TRACE_USE_UNIFIED_JOB: bool = os.getenv(
-    "MATERIAL_TRACE_USE_UNIFIED_JOB", "off"
+    "MATERIAL_TRACE_USE_UNIFIED_JOB", "on"
 ).lower().strip() in ("on", "true", "1")
 
 # ============================================================

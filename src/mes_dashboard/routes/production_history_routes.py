@@ -63,7 +63,7 @@ _ENABLED = os.getenv("PROD_HISTORY_ENABLED", "true").strip().lower() in {
 # Module-level constant frozen at import — restart required.
 # monkeypatch.setattr() in tests (not setenv — frozen at import).
 _PRODUCTION_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
-    "PRODUCTION_HISTORY_USE_UNIFIED_JOB", "off"
+    "PRODUCTION_HISTORY_USE_UNIFIED_JOB", "on"
 ).lower().strip() in ("on", "true", "1")
 
 

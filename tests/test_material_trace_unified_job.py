@@ -424,22 +424,22 @@ class TestIdListDecomposition:
 
 
 # ---------------------------------------------------------------------------
-# Flag default-off assertion
+# Flag default-on assertion
 # ---------------------------------------------------------------------------
 
-class TestFlagDefaultOff:
-    """Module-level MATERIAL_TRACE_USE_UNIFIED_JOB constant must default to falsy."""
+class TestFlagDefaultOn:
+    """Module-level MATERIAL_TRACE_USE_UNIFIED_JOB constant must default to truthy."""
 
-    def test_flag_constant_defaults_off(self, monkeypatch):
-        """MATERIAL_TRACE_USE_UNIFIED_JOB is False when env var is absent (monkeypatch.delenv)."""
+    def test_flag_constant_defaults_on(self, monkeypatch):
+        """MATERIAL_TRACE_USE_UNIFIED_JOB is True when env var is absent (monkeypatch.delenv)."""
         monkeypatch.delenv("MATERIAL_TRACE_USE_UNIFIED_JOB", raising=False)
 
         import mes_dashboard.routes.material_trace_routes as routes_mod
         importlib.reload(routes_mod)  # re-evaluate module with env var unset
 
         flag_value = routes_mod.MATERIAL_TRACE_USE_UNIFIED_JOB
-        assert not flag_value, (
-            f"MATERIAL_TRACE_USE_UNIFIED_JOB must be falsy when env var is absent, "
+        assert flag_value, (
+            f"MATERIAL_TRACE_USE_UNIFIED_JOB must be truthy when env var is absent, "
             f"got {flag_value!r}"
         )
 

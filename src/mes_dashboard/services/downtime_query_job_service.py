@@ -44,7 +44,7 @@ DOWNTIME_JOB_TIMEOUT_SECONDS = int(
 # Tests must use monkeypatch.setattr(downtime_query_job_service, '_DOWNTIME_USE_UNIFIED_JOB', ...)
 # rather than monkeypatch.setenv (env vars are read at import; setenv after-the-fact has no effect).
 _DOWNTIME_USE_UNIFIED_JOB: bool = resolve_bool_flag(
-    "DOWNTIME_USE_UNIFIED_JOB", default=False
+    "DOWNTIME_USE_UNIFIED_JOB", default=True
 )
 
 # Prefix used for Redis meta keys: downtime:job:{job_id}:meta

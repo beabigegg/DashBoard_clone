@@ -55,7 +55,7 @@ logger = logging.getLogger("mes_dashboard.reject_history_routes")
 # Module-level constant frozen at import — restart required.
 # monkeypatch.setattr() in tests (not setenv — frozen at import).
 _REJECT_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
-    "REJECT_HISTORY_USE_UNIFIED_JOB", "off"
+    "REJECT_HISTORY_USE_UNIFIED_JOB", "on"
 ).lower().strip() in ("on", "true", "1")
 _REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS = int(
     os.getenv("REJECT_HISTORY_OPTIONS_CACHE_TTL_SECONDS", "14400")

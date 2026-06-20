@@ -44,7 +44,7 @@ import mes_dashboard.services.resource_query_job_service  # noqa: F401 — force
 # When on: both ResourceHistoryBaseJob and ResourceHistoryOeeJob are enqueued;
 # sync fallback is removed from this path (AC-7); degraded → 503.
 RESOURCE_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
-    "RESOURCE_HISTORY_USE_UNIFIED_JOB", "off"
+    "RESOURCE_HISTORY_USE_UNIFIED_JOB", "on"
 ).strip().lower() in ("1", "true", "yes", "on")
 
 # ── Local-compute feature flags (Task 1.3) ────────────────────────────────────

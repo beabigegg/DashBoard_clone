@@ -34,7 +34,7 @@ logger = logging.getLogger('mes_dashboard.resource_history')
 # via DuckDB join (replacing the in-process read_sql_df + iterrows path).
 # When off (default): export_csv behaves exactly as before (AC-1 legacy guard).
 _RESOURCE_HISTORY_USE_UNIFIED_JOB: bool = os.getenv(
-    "RESOURCE_HISTORY_USE_UNIFIED_JOB", "off"
+    "RESOURCE_HISTORY_USE_UNIFIED_JOB", "on"
 ).strip().lower() in ("1", "true", "yes", "on")
 
 # Maximum allowed query range in days
