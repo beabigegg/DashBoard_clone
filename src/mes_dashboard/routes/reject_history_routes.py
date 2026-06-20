@@ -828,7 +828,11 @@ def api_reject_history_count():
 def api_reject_history_job_status(job_id: str):
     """Get async query job status."""
     from mes_dashboard.services.async_query_job_service import get_job_status
-    status = get_job_status("reject", job_id)
+    # Try unified prefix first (REJECT_HISTORY_USE_UNIFIED_JOB=on path)
+    status = get_job_status("reject_unified", job_id)
+    if status is None:
+        # Fall back to legacy prefix for jobs enqueued before flag promotion
+        status = get_job_status("reject", job_id)
     if status is None:
         return not_found_error("Job not found")
     return success_response(status)

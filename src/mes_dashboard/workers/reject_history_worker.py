@@ -40,7 +40,7 @@ REJECT_HISTORY_JOB_TTL_SECONDS: int = max(
     3600, int(os.getenv("REJECT_ENGINE_SPOOL_TTL_SECONDS", "21600"))
 )
 
-_JOB_PREFIX = "reject"
+_JOB_PREFIX = "reject_unified"  # matches enqueue_job_dynamic prefix (job_type=reject_unified)
 
 # Grain size for time-chunking (days per Oracle query)
 _ENGINE_GRAIN_DAYS: int = max(1, int(os.getenv("REJECT_ENGINE_GRAIN_DAYS", "10")))

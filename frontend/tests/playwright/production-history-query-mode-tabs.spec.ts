@@ -110,21 +110,30 @@ test.describe('Production History — query-mode tabs', () => {
     await expect(page.locator('[data-testid="ph-mode-panel-classification"]')).toBeVisible();
   });
 
-  test('Tab A blocks query with empty TYPE showing validation message (AC-2)', async ({ page }) => {
+  test('Tab A allows query without TYPE — dates alone are sufficient (AC-2 updated)', async ({ page }) => {
+    // 2026-06-16: Type filter was made optional (fix/production-history: make Type filter optional).
+    // Query proceeds with default dates even without TYPE selected.
     const { queryRequests } = await installMocks(page);
     await loginViaApi(page);
     await navigateViaSidebar(page, 'production-history', {
       waitForSelector: '[data-testid="ph-query-btn"]',
     });
 
-    // Tab A is active; dates are pre-filled with the default window, but no
-    // TYPE is selected → query must be blocked.
+    // Tab A is active; dates pre-filled by default window, TYPE is empty.
+    // Query should now proceed (no validation error for missing TYPE).
     await page.locator('[data-testid="ph-query-btn"]').click();
 
+    // No form error should appear for missing TYPE (TYPE is now optional).
     const formError = page.locator('[data-testid="ph-form-error"]');
-    await expect(formError).toBeVisible();
-    await expect(formError).toContainText('Type');
-    expect(queryRequests.length).toBe(0);
+    // Form error may appear for OTHER reasons (e.g. missing dates), but NOT for TYPE.
+    // Since dates are pre-filled, we expect the query to be dispatched.
+    const isFormErrorVisible = await formError.isVisible().catch(() => false);
+    if (isFormErrorVisible) {
+      const errorText = await formError.textContent().catch(() => '');
+      expect(errorText, 'Form error should not mention Type since TYPE is now optional').not.toContain('Type');
+    }
+    // At least one query request should be dispatched (TYPE no longer blocks).
+    expect(queryRequests.length, 'Query should be dispatched when dates are filled even without TYPE').toBeGreaterThanOrEqual(1);
   });
 
   test('Tab B has no date row; paste LOT ID and query succeeds without TYPE/dates (AC-3)', async ({

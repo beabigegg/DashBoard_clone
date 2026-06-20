@@ -191,9 +191,8 @@ test('test_detail_worker_absent_shows_pending_state', async ({ page }) => {
   await page.click('[data-testid="query-submit-button"]');
   await page.waitForSelector('.trend-chart-container', { timeout: 10000 });
 
-  // Click Detail tab and submit
+  // Click Detail tab — detail auto-loads on query submit (db870aa0)
   await page.click('[data-testid="tab-detail"]');
-  await page.click('[data-testid="detail-submit-button"]');
   await page.waitForTimeout(1000);
 
   // UI should show a pending/loading state

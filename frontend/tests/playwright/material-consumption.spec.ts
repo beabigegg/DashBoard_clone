@@ -263,9 +263,8 @@ test('test_detail_async_polling_resolves_to_table', async ({ page }) => {
   await page.click('[data-testid="query-submit-button"]');
   await page.waitForSelector('.trend-chart-container', { timeout: 10000 });
 
-  // Click Detail tab
+  // Click Detail tab — detail auto-loads on query submit (db870aa0), no button click needed
   await page.click('[data-testid="tab-detail"]');
-  await page.click('[data-testid="detail-submit-button"]');
 
   // Wait for table to appear after polling resolves (2 polls × 2 s + page fetch)
   await page.waitForSelector('.data-table-container', { timeout: 30000 });
@@ -284,19 +283,8 @@ test('test_csv_export_download_starts', async ({ page }) => {
     });
   });
 
-  await page.goto(PAGE_URL);
-
-  // Run query first to enable export
-  await selectParts(page, ['PartA']);
-  await page.fill('[data-testid="start-date"]', '2026-01-01');
-  await page.fill('[data-testid="end-date"]', '2026-01-31');
-  await page.click('[data-testid="query-submit-button"]');
-  await page.waitForSelector('.trend-chart-container', { timeout: 10000 });
-
-  // Navigate to detail tab and load data
-  await page.click('[data-testid="tab-detail"]');
-
-  // Stub detail with inline response
+  // Register detail mock BEFORE goto — detail auto-loads immediately after summary
+  // (db870aa0: submitDetail fires after submitQuery completes, no button needed)
   await page.route('**/api/material-consumption/detail', (route) => {
     route.fulfill({
       status: 200,
@@ -312,8 +300,19 @@ test('test_csv_export_download_starts', async ({ page }) => {
       }),
     });
   });
-  await page.click('[data-testid="detail-submit-button"]');
-  await page.waitForSelector('.data-table-container', { timeout: 10000 });
+
+  await page.goto(PAGE_URL);
+
+  // Run query first to enable export
+  await selectParts(page, ['PartA']);
+  await page.fill('[data-testid="start-date"]', '2026-01-01');
+  await page.fill('[data-testid="end-date"]', '2026-01-31');
+  await page.click('[data-testid="query-submit-button"]');
+  await page.waitForSelector('.trend-chart-container', { timeout: 10000 });
+
+  // Navigate to detail tab — detail already auto-loading in background
+  await page.click('[data-testid="tab-detail"]');
+  await page.waitForSelector('.data-table-container', { timeout: 15000 });
 
   // Click CSV export
   const downloadPromise = page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
