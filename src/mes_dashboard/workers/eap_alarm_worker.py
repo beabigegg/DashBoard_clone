@@ -252,6 +252,11 @@ def run_eap_alarm_query_job(
             con.register("events_raw", events_df)
             con.register("detail_pivot", detail_pivot_df)
 
+            # Re-create directory immediately before write: the spool cleanup daemon
+            # calls rmdir() on empty directories every ~5 min, so the directory
+            # created at job-start can disappear during the long Oracle query phase.
+            os.makedirs(os.path.dirname(spool_path), exist_ok=True)
+
             if events_df.empty:
                 row_count = 0
                 con.execute(f"COPY (SELECT * FROM ({_PAIR_SQL.format(machines_hash=machines_hash)}) t WHERE FALSE) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
