@@ -55,6 +55,8 @@ GEMINI.md
 htmlcov/
 .tox/
 artifacts/
+test-results/
+playwright-report/
 
 # Hypothesis: track failure shrinks, ignore the rest
 # Failure examples are committed to share across CI and local runs

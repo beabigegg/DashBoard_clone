@@ -1,6 +1,6 @@
-# generated: 2026-06-20T04:20:18Z by cdd-kit 3.3.0
-# files: 931, src-lines: 274834, map-lines: 20538, compression: 13.4x
-# sources-digest: d234fb219960b5c899944177609020d5a095451d5e8d269c54b2a1e50ddc7439
+# generated: 2026-06-20T11:56:14Z by cdd-kit 3.3.0
+# files: 942, src-lines: 281936, map-lines: 20750, compression: 13.6x
+# sources-digest: d6ad1faf8aea34d2a303f0b4c16b91a42a6dfc7ad1192a9555421d2a7c4313e0
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -42,7 +42,7 @@ frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   functions:
     - { name: async resolve, lines: 16-50 }
 
-frontend/src/admin-dashboard/App.vue:  # 149 lines
+frontend/src/admin-dashboard/App.vue:  # 155 lines
   imports:
     - { module: vue, items: [computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch], line: 2 }
     - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 12 }
@@ -367,7 +367,7 @@ frontend/src/admin-shared/utils/formatDuration.ts:  # 6 lines
   functions:
     - { name: formatDuration, lines: 1-6 }
 
-frontend/src/anomaly-overview/App.vue:  # 521 lines
+frontend/src/anomaly-overview/App.vue:  # 527 lines
   imports:
     - { module: vue, items: [onMounted, ref, reactive, computed], line: 2 }
     - { module: vue-router, items: [useRouter], line: 3 }
@@ -386,19 +386,19 @@ frontend/src/anomaly-overview/App.vue:  # 521 lines
     - { module: echarts/charts, items: [LineChart, BarChart], line: 16 }
     - { module: echarts/components, items: [GridComponent, TooltipComponent, MarkLineComponent], line: 17 }
   functions:
-    - { name: formatDate, lines: 129-135 }
-    - { name: daysAgo, lines: 137-141 }
-    - { name: severityClass, lines: 143-147 }
-    - { name: scrollToSection, lines: 149-152 }
-    - { name: toggleSection, lines: 154-156 }
-    - { name: buildDrilldownUrl, lines: 160-174 }
-    - { name: buildNavigateQuery, lines: 176-208 }
-    - { name: drilldownLabel, lines: 210-223 }
-    - { name: async toggleDrilldown, lines: 294-336 }
-    - { name: navigateWithParams, lines: 338-342 }
-    - { name: async loadSummary, lines: 346-366 }
-    - { name: async loadSectionDetail, lines: 368-389 }
-    - { name: applyDefaultExpand, lines: 391-395 }
+    - { name: formatDate, lines: 133-139 }
+    - { name: daysAgo, lines: 141-145 }
+    - { name: severityClass, lines: 147-151 }
+    - { name: scrollToSection, lines: 153-156 }
+    - { name: toggleSection, lines: 158-160 }
+    - { name: buildDrilldownUrl, lines: 164-178 }
+    - { name: buildNavigateQuery, lines: 180-212 }
+    - { name: drilldownLabel, lines: 214-227 }
+    - { name: async toggleDrilldown, lines: 298-340 }
+    - { name: navigateWithParams, lines: 342-346 }
+    - { name: async loadSummary, lines: 350-370 }
+    - { name: async loadSectionDetail, lines: 372-393 }
+    - { name: applyDefaultExpand, lines: 395-399 }
 
 frontend/src/anomaly-overview/main.js:  # 6 lines
   imports:
@@ -933,11 +933,11 @@ frontend/src/downtime-analysis/types.ts:  # 141 lines
   types:
     - { name: MatchSource, lines: 76-76 }
 
-frontend/src/eap-alarm/App.vue:  # 371 lines
+frontend/src/eap-alarm/App.vue:  # 379 lines
 
 frontend/src/eap-alarm/DetailTable.vue:  # 142 lines
 
-frontend/src/eap-alarm/FilterBar.vue:  # 168 lines
+frontend/src/eap-alarm/FilterBar.vue:  # 172 lines
 
 frontend/src/eap-alarm/FineFilterBar.vue:  # 73 lines
 
@@ -985,7 +985,7 @@ frontend/src/hold-detail/main.ts:  # 8 lines
     - { module: './style.css', items: [], line: 4 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
 
-frontend/src/hold-history/App.vue:  # 1287 lines
+frontend/src/hold-history/App.vue:  # 1290 lines
 
 frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
 
@@ -993,7 +993,7 @@ frontend/src/hold-history/components/DetailTable.vue:  # 321 lines
 
 frontend/src/hold-history/components/DurationChart.vue:  # 130 lines
 
-frontend/src/hold-history/components/FilterBar.vue:  # 179 lines
+frontend/src/hold-history/components/FilterBar.vue:  # 183 lines
 
 frontend/src/hold-history/components/FilterIndicator.vue:  # 34 lines
 
@@ -1209,7 +1209,7 @@ frontend/src/material-consumption/main.ts:  # 5 lines
     - { module: './App.vue', items: ['default:App'], line: 2 }
     - { module: './style.css', items: [], line: 3 }
 
-frontend/src/material-trace/App.vue:  # 573 lines
+frontend/src/material-trace/App.vue:  # 590 lines
 
 frontend/src/material-trace/main.ts:  # 7 lines
   imports:
@@ -1218,7 +1218,7 @@ frontend/src/material-trace/main.ts:  # 7 lines
     - { module: '../wip-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/mid-section-defect/App.vue:  # 941 lines
+frontend/src/mid-section-defect/App.vue:  # 944 lines
 
 frontend/src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
   imports:
@@ -1244,7 +1244,7 @@ frontend/src/mid-section-defect/components/DetailTable.vue:  # 177 lines
     - { name: formatCell, lines: 88-93 }
     - { name: getSuspectHits, lines: 95-114 }
 
-frontend/src/mid-section-defect/components/FilterBar.vue:  # 208 lines
+frontend/src/mid-section-defect/components/FilterBar.vue:  # 216 lines
   imports:
     - { module: '../../shared-ui/components/MultiSelect.vue', items: ['default:MultiSelect'], line: 2 }
   functions:
@@ -1545,7 +1545,7 @@ frontend/src/production-history/main.ts:  # 7 lines
     - { module: '../resource-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/qc-gate/App.vue:  # 138 lines
+frontend/src/qc-gate/App.vue:  # 141 lines
 
 frontend/src/qc-gate/components/LotTable.vue:  # 119 lines
 
@@ -1581,7 +1581,7 @@ frontend/src/qc-gate/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/query-tool/App.vue:  # 699 lines
+frontend/src/query-tool/App.vue:  # 700 lines
 
 frontend/src/query-tool/components/EquipmentJobsPanel.vue:  # 77 lines
 
@@ -1589,7 +1589,7 @@ frontend/src/query-tool/components/EquipmentLotsTable.vue:  # 81 lines
 
 frontend/src/query-tool/components/EquipmentRejectsTable.vue:  # 260 lines
 
-frontend/src/query-tool/components/EquipmentView.vue:  # 298 lines
+frontend/src/query-tool/components/EquipmentView.vue:  # 303 lines
 
 frontend/src/query-tool/components/ExportButton.vue:  # 30 lines
 
@@ -1611,7 +1611,7 @@ frontend/src/query-tool/components/LotTimeline.vue:  # 399 lines
 
 frontend/src/query-tool/components/LotTraceView.vue:  # 419 lines
 
-frontend/src/query-tool/components/QueryBar.vue:  # 112 lines
+frontend/src/query-tool/components/QueryBar.vue:  # 114 lines
 
 frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 424 lines
 
@@ -1776,7 +1776,7 @@ frontend/src/reject-history/App.vue:  # 1570 lines
 
 frontend/src/reject-history/components/DetailTable.vue:  # 182 lines
 
-frontend/src/reject-history/components/FilterPanel.vue:  # 309 lines
+frontend/src/reject-history/components/FilterPanel.vue:  # 317 lines
 
 frontend/src/reject-history/components/ParetoGrid.vue:  # 51 lines
 
@@ -1920,13 +1920,13 @@ frontend/src/resource-shared/constants.ts:  # 79 lines
 
 frontend/src/resource-shared/index.ts:  # 13 lines
 
-frontend/src/resource-status/App.vue:  # 834 lines
+frontend/src/resource-status/App.vue:  # 838 lines
 
 frontend/src/resource-status/components/EquipmentCard.vue:  # 136 lines
 
-frontend/src/resource-status/components/EquipmentGrid.vue:  # 84 lines
+frontend/src/resource-status/components/EquipmentGrid.vue:  # 85 lines
 
-frontend/src/resource-status/components/FilterBar.vue:  # 139 lines
+frontend/src/resource-status/components/FilterBar.vue:  # 146 lines
 
 frontend/src/resource-status/components/FloatingTooltip.vue:  # 407 lines
 
@@ -2137,11 +2137,11 @@ frontend/src/shared-ui/components/BlockLoadingState.vue:  # 36 lines
 
 frontend/src/shared-ui/components/Chip.vue:  # 162 lines
 
-frontend/src/shared-ui/components/DataTable.vue:  # 384 lines
+frontend/src/shared-ui/components/DataTable.vue:  # 385 lines
 
 frontend/src/shared-ui/components/DataTableColumn.vue:  # 46 lines
 
-frontend/src/shared-ui/components/DataUpdateBadge.vue:  # 138 lines
+frontend/src/shared-ui/components/DataUpdateBadge.vue:  # 139 lines
 
 frontend/src/shared-ui/components/EmptyState.vue:  # 54 lines
 
@@ -2153,11 +2153,11 @@ frontend/src/shared-ui/components/LoadingOverlay.vue:  # 39 lines
 
 frontend/src/shared-ui/components/LoadingSpinner.vue:  # 51 lines
 
-frontend/src/shared-ui/components/MultiSelect.vue:  # 359 lines
+frontend/src/shared-ui/components/MultiSelect.vue:  # 363 lines
 
 frontend/src/shared-ui/components/PageHeader.vue:  # 88 lines
 
-frontend/src/shared-ui/components/PaginationControl.vue:  # 229 lines
+frontend/src/shared-ui/components/PaginationControl.vue:  # 232 lines
 
 frontend/src/shared-ui/components/SectionCard.vue:  # 121 lines
 
@@ -2273,7 +2273,7 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 1062 lines
+frontend/src/yield-alert-center/App.vue:  # 1064 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
@@ -2738,6 +2738,43 @@ frontend/tests/playwright/_auth.js:  # 207 lines
     - { name: async waitForIdleUi, lines: 132-146 }
     - { name: async navigateViaSidebar, lines: 161-207 }
 
+frontend/tests/playwright/admin-dashboard.spec.ts:  # 382 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 20 }
+  constants:
+    - { name: BASE_URL, line: 26 }
+    - { name: PAGE_URL, line: 27 }
+    - { name: MOCK_HEALTH, line: 33 }
+    - { name: MOCK_PERF_HISTORY, line: 48 }
+    - { name: MOCK_METRICS, line: 52 }
+    - { name: MOCK_PERF_DETAIL, line: 66 }
+    - { name: MOCK_STORAGE, line: 80 }
+    - { name: MOCK_USAGE_KPI, line: 86 }
+    - { name: MOCK_LOGS, line: 92 }
+    - { name: MOCK_PORTAL_NAV_ADMIN, line: 98 }
+  functions:
+    - { name: async installBaseRoutes, lines: 117-204 }
+    - { name: async gotoAdminDashboard, lines: 210-218 }
+
+frontend/tests/playwright/anomaly-overview.spec.ts:  # 819 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 28 }
+  constants:
+    - { name: PAGE_URL, line: 34 }
+    - { name: THEME_ROOT, line: 37 }
+    - { name: MOCK_SUMMARY, line: 43 }
+    - { name: MOCK_YIELD_ANOMALIES, line: 56 }
+    - { name: MOCK_REJECT_SPIKES, line: 69 }
+    - { name: MOCK_HOLD_OUTLIERS, line: 80 }
+    - { name: MOCK_EQUIPMENT_DEVIATION, line: 91 }
+    - { name: MOCK_YIELD_DRILLDOWN, line: 103 }
+    - { name: EMPTY_SECTION_RESPONSE, line: 120 }
+    - { name: ERROR_ENVELOPE, line: 126 }
+  functions:
+    - { name: async stubAuthRoutes, lines: 140-163 }
+    - { name: async stubAllDataRoutes, lines: 169-185 }
+    - { name: async gotoPage, lines: 191-212 }
+
 frontend/tests/playwright/data-boundary/empty-result.spec.js:  # 174 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 14 }
@@ -2818,6 +2855,30 @@ frontend/tests/playwright/downtime-analysis.spec.ts:  # 937 lines
     - { name: async waitForErrorBanner, lines: 231-248 }
     - { name: async waitForEmptyState, lines: 250-267 }
 
+frontend/tests/playwright/eap-alarm-filters.spec.ts:  # 667 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 19 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 20 }
+  constants:
+    - { name: MOCK_QUERY_ID, line: 24 }
+    - { name: MOCK_SPOOL_202, line: 26 }
+    - { name: MOCK_SPOOL_STATUS_FINISHED, line: 37 }
+    - { name: MOCK_RESOURCE_OPTIONS, line: 49 }
+    - { name: MOCK_FILTER_OPTIONS, line: 61 }
+    - { name: MOCK_SUMMARY, line: 70 }
+    - { name: MOCK_SUMMARY_EMPTY, line: 81 }
+    - { name: MOCK_PARETO, line: 92 }
+    - { name: MOCK_TREND, line: 104 }
+    - { name: MOCK_DETAIL, line: 116 }
+    - { name: MOCK_DETAIL_PAGINATED, line: 150 }
+  functions:
+    - { name: async setupEapMocks, lines: 184-304 }
+    - { name: async navigateToEapAlarm, lines: 307-320 }
+    - { name: async submitCoarseFilter, lines: 326-347 }
+    - { name: async waitForFineFilter, lines: 352-356 }
+  interfaces:
+    - { name: MockOptions, lines: 172-178 }  # local
+
 frontend/tests/playwright/eap-alarm.spec.js:  # 388 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 12 }
@@ -2834,6 +2895,22 @@ frontend/tests/playwright/eap-alarm.spec.js:  # 388 lines
   functions:
     - { name: async setupEapAlarmMocks, lines: 128-196 }
     - { name: async submitAndWaitForResults, lines: 202-237 }
+
+frontend/tests/playwright/hold-history-filter.spec.ts:  # 542 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 19 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 20 }
+  constants:
+    - { name: BASE_URL, line: 22 }
+  functions:
+    - { name: mockConfigResponse, lines: 28-34 }
+    - { name: mockViewResult, lines: 36-48 }
+    - { name: mockSyncQueryResult, lines: 50-65 }
+    - { name: mock202AsyncResponse, lines: 67-77 }
+    - { name: mockJobRunning, lines: 79-84 }
+    - { name: mockJobFinished, lines: 86-104 }
+    - { name: async setupBaseRoutes, lines: 110-154 }
+    - { name: async navigateToHoldHistory, lines: 156-163 }
 
 frontend/tests/playwright/hold-history-flat-table.spec.js:  # 313 lines
   imports:
@@ -2854,7 +2931,7 @@ frontend/tests/playwright/hold-overview.spec.js:  # 167 lines
     - { module: '@playwright/test', items: [test, expect], line: 7 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 8 }
 
-frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 130 lines
+frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 142 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 13 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, BASE_URL], line: 14 }
@@ -2872,7 +2949,7 @@ frontend/tests/playwright/material-consumption-data-boundary.spec.ts:  # 187 lin
     - { name: async setupBasicMocks, lines: 52-78 }
     - { name: async selectParts, lines: 80-89 }
 
-frontend/tests/playwright/material-consumption-resilience.spec.ts:  # 204 lines
+frontend/tests/playwright/material-consumption-resilience.spec.ts:  # 203 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 12 }
   constants:
@@ -2886,7 +2963,7 @@ frontend/tests/playwright/material-consumption-resilience.spec.ts:  # 204 lines
     - { name: async selectParts, lines: 19-28 }
     - { name: async setupAuthMocks, lines: 48-60 }
 
-frontend/tests/playwright/material-consumption.spec.ts:  # 367 lines
+frontend/tests/playwright/material-consumption.spec.ts:  # 366 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 15 }
   constants:
@@ -2899,6 +2976,50 @@ frontend/tests/playwright/material-consumption.spec.ts:  # 367 lines
   functions:
     - { name: async setupMockRoutes, lines: 102-136 }
     - { name: async selectParts, lines: 143-155 }
+
+frontend/tests/playwright/material-trace.spec.ts:  # 742 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 27 }
+  constants:
+    - { name: BASE_URL, line: 33 }
+    - { name: PAGE_URL, line: 34 }
+    - { name: MOCK_META, line: 36 }
+    - { name: JOB_ID, line: 38 }
+    - { name: MOCK_FILTER_OPTIONS, line: 44 }
+    - { name: MOCK_QUERY_ROWS, line: 53 }
+    - { name: MOCK_QUERY_RESULT_SYNC, line: 101 }
+    - { name: MOCK_QUERY_RESULT_EMPTY, line: 113 }
+    - { name: MOCK_QUERY_RESULT_UNRESOLVED, line: 125 }
+    - { name: MOCK_QUERY_RESULT_ASYNC, line: 138 }
+    - { name: MOCK_JOB_COMPLETED, line: 149 }
+    - { name: MOCK_JOB_PENDING, line: 156 }
+    - { name: MOCK_JOB_FAILED, line: 163 }
+    - { name: MOCK_ERROR_500, line: 169 }
+  functions:
+    - { name: async setupAuthRoutes, lines: 185-200 }
+    - { name: async setupFilterOptions, lines: 206-214 }
+    - { name: async gotoPage, lines: 221-223 }
+    - { name: async pageRendered, lines: 230-234 }
+    - { name: async fillAndSubmit, lines: 240-250 }
+
+frontend/tests/playwright/mid-section-defect.spec.ts:  # 543 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 19 }
+  constants:
+    - { name: BASE_URL, line: 25 }
+    - { name: PAGE_URL, line: 26 }
+    - { name: MOCK_STATION_OPTIONS, line: 32 }
+    - { name: MOCK_LOSS_REASONS, line: 41 }
+    - { name: MOCK_ANALYSIS_RESPONSE, line: 47 }
+    - { name: MOCK_DETAIL_RESPONSE, line: 89 }
+    - { name: MOCK_EMPTY_DETAIL_RESPONSE, line: 101 }
+    - { name: MOCK_PORTAL_NAV, line: 110 }
+    - { name: MOCK_SEED_RESULT, line: 134 }
+    - { name: MOCK_LINEAGE_RESULT, line: 140 }
+    - { name: MOCK_EVENTS_RESULT, line: 146 }
+  functions:
+    - { name: async installBaseRoutes, lines: 161-237 }
+    - { name: async gotoPage, lines: 244-254 }
 
 frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
   imports:
@@ -2935,7 +3056,7 @@ frontend/tests/playwright/production-history-pruning-feedback.spec.ts:  # 103 li
     - { name: async installPruningMock, lines: 13-46 }
     - { name: async pickByTestidLabel, lines: 48-58 }
 
-frontend/tests/playwright/production-history-query-mode-tabs.spec.ts:  # 180 lines
+frontend/tests/playwright/production-history-query-mode-tabs.spec.ts:  # 189 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page, Request], line: 15 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 16 }
@@ -2954,6 +3075,39 @@ frontend/tests/playwright/production-history-wildcard-paste.spec.ts:  # 203 line
     - { name: async installMocks, lines: 34-97 }
     - { name: async switchToIdentifierTab, lines: 103-108 }
 
+frontend/tests/playwright/qc-gate.spec.ts:  # 687 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 23 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 24 }
+  constants:
+    - { name: MOCK_STATION_A, line: 30 }
+    - { name: MOCK_STATION_B, line: 75 }
+    - { name: MOCK_CACHE_TIME, line: 108 }
+    - { name: MOCK_SUMMARY_RESPONSE, line: 111 }
+    - { name: MOCK_SUMMARY_EMPTY, line: 121 }
+    - { name: MOCK_500_RESPONSE, line: 131 }
+  functions:
+    - { name: async setupPortalShellRoutes, lines: 148-179 }
+    - { name: async mockQcGateSummary, lines: 185-197 }
+    - { name: async navigateToQcGate, lines: 203-222 }
+    - { name: async requireQcGatePage, lines: 228-235 }
+
+frontend/tests/playwright/query-tool-filters.spec.ts:  # 534 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 23 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 24 }
+  constants:
+    - { name: MOCK_EQUIPMENT_LIST, line: 28 }
+    - { name: MOCK_WORKCENTER_GROUPS, line: 39 }
+    - { name: MOCK_EQUIPMENT_PERIOD_LOTS, line: 45 }
+    - { name: MOCK_EQUIPMENT_PERIOD_PAGINATED, line: 71 }
+    - { name: MOCK_RESOLVE_LOTS, line: 87 }
+  functions:
+    - { name: async setupBaseMocks, lines: 104-130 }
+    - { name: async navigateToQueryTool, lines: 132-145 }
+    - { name: async switchToEquipmentTab, lines: 147-152 }
+    - { name: async selectFirstEquipment, lines: 154-167 }
+
 frontend/tests/playwright/query-tool-url-state.spec.js:  # 92 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 1 }
@@ -2967,6 +3121,21 @@ frontend/tests/playwright/query-tool.spec.js:  # 78 lines
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
   constants:
     - { name: DUMMY_LOT_ID, line: 11 }
+
+frontend/tests/playwright/reject-history-filter.spec.ts:  # 525 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 24 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 25 }
+  constants:
+    - { name: BASE_URL, line: 27 }
+    - { name: MOCK_QUERY_ID, line: 33 }
+  functions:
+    - { name: makeSyncResult, lines: 35-62 }
+    - { name: makeViewResult, lines: 64-85 }
+    - { name: makeBatchParetoResult, lines: 87-99 }
+    - { name: async setupBaseRoutes, lines: 105-167 }
+    - { name: async navigateToRejectHistory, lines: 169-173 }
+    - { name: async submitQueryAndWait, lines: 175-184 }
 
 frontend/tests/playwright/reject-history.spec.js:  # 274 lines
   imports:
@@ -3064,10 +3233,47 @@ frontend/tests/playwright/resource-history-async.spec.ts:  # 452 lines
   functions:
     - { name: async registerCatchAllRoutes, lines: 186-241 }
 
+frontend/tests/playwright/resource-status.spec.ts:  # 542 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 25 }
+  constants:
+    - { name: PAGE_URL, line: 31 }
+    - { name: MOCK_OPTIONS, line: 37 }
+    - { name: MOCK_SUMMARY, line: 51 }
+    - { name: MOCK_STATUS_RESPONSE, line: 124 }
+    - { name: ERROR_500, line: 130 }
+  functions:
+    - { name: makeMockEquipment, lines: 62-122 }
+    - { name: async setupShellRoutes, lines: 144-199 }
+    - { name: async setupResourceRoutes, lines: 202-234 }
+    - { name: async gotoResourcePage, lines: 240-261 }
+
 frontend/tests/playwright/wip-matrix-drilldown.spec.js:  # 111 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 10 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+
+frontend/tests/playwright/yield-alert-center.spec.ts:  # 766 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 26 }
+  constants:
+    - { name: BASE_URL, line: 32 }
+    - { name: PAGE_URL, line: 33 }
+    - { name: JOB_ID, line: 35 }
+    - { name: QUERY_ID, line: 36 }
+    - { name: STATUS_URL, line: 37 }
+    - { name: MOCK_META, line: 39 }
+    - { name: MOCK_FILTER_OPTIONS, line: 45 }
+    - { name: MOCK_200_SYNC, line: 54 }
+    - { name: MOCK_202, line: 112 }
+    - { name: MOCK_JOB_STARTED, line: 124 }
+    - { name: MOCK_JOB_FINISHED, line: 139 }
+    - { name: MOCK_VIEW, line: 154 }
+    - { name: MOCK_200_EMPTY, line: 164 }
+    - { name: MOCK_REASON_DETAIL, line: 180 }
+  functions:
+    - { name: async registerCatchAllRoutes, lines: 208-286 }
+    - { name: async gotoPage, lines: 293-304 }
 
 frontend/tests/query-tool/App.url-state.test.js:  # 430 lines
   imports:
@@ -3405,7 +3611,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1662 lines
+src/mes_dashboard/app.py:  # 1660 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3465,8 +3671,8 @@ src/mes_dashboard/app.py:  # 1662 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-746 }
-    - { name: create_app, lines: 755-1536 }
-    - { name: _register_error_handlers, lines: 1539-1662 }
+    - { name: create_app, lines: 755-1534 }
+    - { name: _register_error_handlers, lines: 1537-1660 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -4724,7 +4930,7 @@ src/mes_dashboard/core/worker_memory_guard.py:  # 512 lines
     - { name: stop_worker_memory_guard, lines: 494-499 }
     - { name: get_memory_guard_telemetry, lines: 502-512 }
 
-src/mes_dashboard/core/worker_pool_manager.py:  # 292 lines
+src/mes_dashboard/core/worker_pool_manager.py:  # 295 lines
   imports:
     - { module: __future__, items: [annotations], line: 22 }
     - { module: logging, items: [], line: 24 }
@@ -4736,17 +4942,17 @@ src/mes_dashboard/core/worker_pool_manager.py:  # 292 lines
     - { module: time, items: [], line: 30 }
     - { module: typing, items: [Dict, List], line: 31 }
   functions:
-    - { name: _per_queue_int, lines: 71-78 }
-    - { name: _build_queue_configs, lines: 81-90 }
-    - { name: _make_redis, lines: 97-104 }
-    - { name: _queue_depth, lines: 107-112 }
-    - { name: _reap, lines: 122-134 }
-    - { name: _local_count, lines: 137-139 }
-    - { name: _total_count, lines: 142-143 }
-    - { name: _resolve_rq_cmd, lines: 153-157 }
-    - { name: _spawn, lines: 160-175 }
-    - { name: _on_signal, lines: 185-195 }
-    - { name: run, lines: 202-288 }
+    - { name: _per_queue_int, lines: 74-81 }
+    - { name: _build_queue_configs, lines: 84-93 }
+    - { name: _make_redis, lines: 100-107 }
+    - { name: _queue_depth, lines: 110-115 }
+    - { name: _reap, lines: 125-137 }
+    - { name: _local_count, lines: 140-142 }
+    - { name: _total_count, lines: 145-146 }
+    - { name: _resolve_rq_cmd, lines: 156-160 }
+    - { name: _spawn, lines: 163-178 }
+    - { name: _on_signal, lines: 188-198 }
+    - { name: run, lines: 205-291 }
 
 src/mes_dashboard/core/worker_recovery_policy.py:  # 220 lines
   imports:
@@ -4932,7 +5138,7 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 583 lines
     - { name: api_export_event_detail, lines: 539-564 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
     - { name: _get_resource_lookup_safe, lines: 572-583 }
 
-src/mes_dashboard/routes/eap_alarm_routes.py:  # 392 lines
+src/mes_dashboard/routes/eap_alarm_routes.py:  # 399 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
     - { module: logging, items: [], line: 20 }
@@ -4944,16 +5150,16 @@ src/mes_dashboard/routes/eap_alarm_routes.py:  # 392 lines
   functions:
     - { name: _parse_list_param, lines: 50-62 }
     - { name: _parse_fine_filters, lines: 65-82 }
-    - { name: _get_spool_path, lines: 85-92 }
-    - { name: _require_query_id, lines: 95-100 }
-    - { name: _require_spool, lines: 103-108 }
-    - { name: api_eap_alarm_spool, lines: 114-232 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
-    - { name: api_eap_alarm_spool_status, lines: 238-260 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
-    - { name: api_eap_alarm_filter_options, lines: 266-284 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
-    - { name: api_eap_alarm_summary, lines: 290-308 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
-    - { name: api_eap_alarm_pareto, lines: 314-332 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
-    - { name: api_eap_alarm_trend, lines: 338-359 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
-    - { name: api_eap_alarm_detail, lines: 365-392 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
+    - { name: _get_spool_path, lines: 85-99 }
+    - { name: _require_query_id, lines: 102-107 }
+    - { name: _require_spool, lines: 110-115 }
+    - { name: api_eap_alarm_spool, lines: 121-239 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
+    - { name: api_eap_alarm_spool_status, lines: 245-267 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
+    - { name: api_eap_alarm_filter_options, lines: 273-291 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
+    - { name: api_eap_alarm_summary, lines: 297-315 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
+    - { name: api_eap_alarm_pareto, lines: 321-339 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
+    - { name: api_eap_alarm_trend, lines: 345-366 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
+    - { name: api_eap_alarm_detail, lines: 372-399 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5254,7 +5460,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 1043 lines
     - { name: get_equipment_recent_jobs_route, lines: 847-860 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 870-1043 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 1030 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 1034 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5293,10 +5499,10 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 1030 lines
     - { name: api_reject_history_analytics, lines: 597-631 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
     - { name: api_reject_history_query, lines: 641-793 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
     - { name: api_reject_history_count, lines: 797-823 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
-    - { name: api_reject_history_job_status, lines: 828-834 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
-    - { name: _inject_reject_spool_info, lines: 841-854 }
-    - { name: api_reject_history_view, lines: 858-948 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 952-1030 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: api_reject_history_job_status, lines: 828-838 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
+    - { name: _inject_reject_spool_info, lines: 845-858 }
+    - { name: api_reject_history_view, lines: 862-952 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 956-1034 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
 src/mes_dashboard/routes/resource_history_routes.py:  # 541 lines
   imports:
@@ -7659,7 +7865,7 @@ src/mes_dashboard/services/resource_service.py:  # 679 lines
     - { name: get_resource_status_summary, lines: 507-604 }
     - { name: get_workcenter_status_matrix, lines: 607-679 }
 
-src/mes_dashboard/services/rq_monitor_service.py:  # 251 lines
+src/mes_dashboard/services/rq_monitor_service.py:  # 253 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -7668,11 +7874,11 @@ src/mes_dashboard/services/rq_monitor_service.py:  # 251 lines
     - { module: typing, items: [Any, Dict, List], line: 14 }
     - { module: mes_dashboard.core.redis_client, items: [get_redis_client], line: 16 }
   functions:
-    - { name: _check_rq_installed, lines: 37-42 }
-    - { name: get_rq_worker_details, lines: 49-128 }
-    - { name: get_rq_queue_details, lines: 135-189 }
-    - { name: get_heavy_query_slot_status, lines: 196-209 }
-    - { name: get_rq_monitor_summary, lines: 216-251 }
+    - { name: _check_rq_installed, lines: 39-44 }
+    - { name: get_rq_worker_details, lines: 51-130 }
+    - { name: get_rq_queue_details, lines: 137-191 }
+    - { name: get_heavy_query_slot_status, lines: 198-211 }
+    - { name: get_rq_monitor_summary, lines: 218-253 }
 
 src/mes_dashboard/services/scrap_reason_exclusion_cache.py:  # 236 lines
   imports:
@@ -7809,24 +8015,25 @@ src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
     - { name: _safe_int, lines: 412-419 }
     - { name: _compute_duration_buckets, lines: 422-434 }
 
-src/mes_dashboard/services/wip_query_job_service.py:  # 328 lines
+src/mes_dashboard/services/wip_query_job_service.py:  # 410 lines
   imports:
-    - { module: __future__, items: [annotations], line: 27 }
-    - { module: logging, items: [], line: 29 }
-    - { module: os, items: [], line: 30 }
-    - { module: pathlib, items: [Path], line: 31 }
-    - { module: typing, items: [Any], line: 32 }
-    - { module: mes_dashboard.core.global_concurrency, items: [heavy_query_slot], line: 34 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 35 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 319 }
+    - { module: __future__, items: [annotations], line: 28 }
+    - { module: logging, items: [], line: 30 }
+    - { module: os, items: [], line: 31 }
+    - { module: pathlib, items: [Path], line: 32 }
+    - { module: typing, items: [Any], line: 33 }
+    - { module: mes_dashboard.core.global_concurrency, items: [heavy_query_slot], line: 35 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job_dynamic, update_job_progress], line: 36 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 401 }
   constants:
-    - { name: WIP_WORKER_QUEUE, line: 47 }
-    - { name: WIP_JOB_TIMEOUT_SECONDS, line: 49 }
-    - { name: WIP_SPOOL_TTL, line: 51 }
+    - { name: WIP_WORKER_QUEUE, line: 48 }
+    - { name: WIP_JOB_TIMEOUT_SECONDS, line: 50 }
+    - { name: WIP_SPOOL_TTL, line: 52 }
   functions:
-    - { name: execute_wip_detail_oracle_query, lines: 64-218 }
-    - { name: enqueue_wip_detail_query, lines: 225-238 }
-    - { name: execute_wip_detail_job, lines: 245-306 }
+    - { name: _compute_wip_status, lines: 122-128 }
+    - { name: execute_wip_detail_oracle_query, lines: 135-300 }
+    - { name: enqueue_wip_detail_query, lines: 307-320 }
+    - { name: execute_wip_detail_job, lines: 327-388 }
 
 src/mes_dashboard/services/wip_service.py:  # 4274 lines
   imports:
@@ -8211,7 +8418,7 @@ src/mes_dashboard/workers/downtime_worker.py:  # 747 lines
     - { name: _build_in_filter, lines: 140-164 }
     - { name: execute_downtime_unified_job, lines: 700-732 }
 
-src/mes_dashboard/workers/eap_alarm_worker.py:  # 528 lines
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 533 lines
   imports:
     - { module: __future__, items: [annotations], line: 23 }
     - { module: hashlib, items: [], line: 25 }
@@ -8221,24 +8428,24 @@ src/mes_dashboard/workers/eap_alarm_worker.py:  # 528 lines
     - { module: pathlib, items: [Path], line: 29 }
     - { module: typing, items: [Any, Dict, List], line: 30 }
     - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 32 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 519 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 524 }
   constants:
     - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 36 }
     - { name: EAP_ALARM_WORKER_QUEUE, line: 39 }
     - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 40 }
   classes:
     - name: EapAlarmJob
-      lines: 285-480
+      lines: 290-485
       methods:
-        - { name: __init__, lines: 298-308 }
-        - { name: pre_query, lines: 310-356 }
-        - { name: build_chunk_sql, lines: 358-369 }
-        - { name: post_aggregate, lines: 371-475 }
-        - { name: progress_report, lines: 477-480 }
+        - { name: __init__, lines: 303-313 }
+        - { name: pre_query, lines: 315-361 }
+        - { name: build_chunk_sql, lines: 363-374 }
+        - { name: post_aggregate, lines: 376-480 }
+        - { name: progress_report, lines: 482-485 }
   functions:
     - { name: _build_equipment_filter, lines: 148-163 }
-    - { name: run_eap_alarm_query_job, lines: 166-282 }
-    - { name: execute_eap_alarm_unified_job, lines: 483-515 }
+    - { name: run_eap_alarm_query_job, lines: 166-287 }
+    - { name: execute_eap_alarm_unified_job, lines: 488-520 }
 
 src/mes_dashboard/workers/production_history_worker.py:  # 242 lines
   imports:
@@ -8439,7 +8646,7 @@ tests/contract/test_env_async_threshold_removal.py:  # 124 lines
     - { name: test_hold_async_day_threshold_absent_from_schema, lines: 42-47 }
     - { name: test_resource_async_day_threshold_absent_from_schema, lines: 50-55 }
     - { name: test_reject_async_day_threshold_absent_from_schema, lines: 58-63 }
-    - { name: test_query_tool_use_rq_present_with_default_off, lines: 71-91 }
+    - { name: test_query_tool_use_rq_present_with_default_on, lines: 71-91 }
     - { name: test_semaphore_semantics_note_in_env_contract, lines: 99-124 }
 
 tests/contract/test_env_downtime_unified_flag.py:  # 93 lines
@@ -10424,7 +10631,7 @@ tests/integration/test_rq_semaphore_wiring.py:  # 441 lines
   functions:
     - { name: _compute_peak_concurrent, lines: 36-47 }
 
-tests/integration/test_soak_workload.py:  # 960 lines
+tests/integration/test_soak_workload.py:  # 963 lines
   imports:
     - { module: __future__, items: [annotations], line: 75 }
     - { module: json, items: [], line: 77 }
@@ -10440,25 +10647,25 @@ tests/integration/test_soak_workload.py:  # 960 lines
     - { module: '._metrics_probe', items: [MetricsProbe, ProbeError, _detect_gate_hint], line: 89 }
   functions:
     - { name: _default_warmup_s, lines: 108-110 }
-    - { name: soak_config, lines: 128-164 }  # @pytest.fixture
-    - { name: _soak_env, lines: 168-178 }  # @pytest.fixture
-    - { name: _traffic_thread, lines: 186-229 }
-    - { name: _sampler_thread, lines: 237-263 }
-    - { name: test_soak_workload_six_property_regression, lines: 271-416 }
-    - { name: _valid_samples, lines: 428-430 }
-    - { name: _post_warmup, lines: 433-447 }
-    - { name: _require_min_samples, lines: 450-457 }
-    - { name: _linear_slope, lines: 460-472 }
-    - { name: _quantile, lines: 475-486 }
-    - { name: _check_pool_slope, lines: 492-571 }
-    - { name: _check_duckdb_bounded, lines: 577-618 }
-    - { name: _check_redis_converges, lines: 624-679 }
-    - { name: _check_rss_growth, lines: 685-748 }
-    - { name: _check_circuit_breaker_transitions, lines: 754-793 }
-    - { name: _check_rq_queue_depth, lines: 799-859 }
-    - { name: test_preload_workers_restart_loop_no_connection_leak, lines: 868-960 }  # @pytest.mark.soak
+    - { name: soak_config, lines: 131-167 }  # @pytest.fixture
+    - { name: _soak_env, lines: 171-181 }  # @pytest.fixture
+    - { name: _traffic_thread, lines: 189-232 }
+    - { name: _sampler_thread, lines: 240-266 }
+    - { name: test_soak_workload_six_property_regression, lines: 274-419 }
+    - { name: _valid_samples, lines: 431-433 }
+    - { name: _post_warmup, lines: 436-450 }
+    - { name: _require_min_samples, lines: 453-460 }
+    - { name: _linear_slope, lines: 463-475 }
+    - { name: _quantile, lines: 478-489 }
+    - { name: _check_pool_slope, lines: 495-574 }
+    - { name: _check_duckdb_bounded, lines: 580-621 }
+    - { name: _check_redis_converges, lines: 627-682 }
+    - { name: _check_rss_growth, lines: 688-751 }
+    - { name: _check_circuit_breaker_transitions, lines: 757-796 }
+    - { name: _check_rq_queue_depth, lines: 802-862 }
+    - { name: test_preload_workers_restart_loop_no_connection_leak, lines: 871-963 }  # @pytest.mark.soak
 
-tests/integration/test_wip_rowcount_rq_routing.py:  # 253 lines
+tests/integration/test_wip_rowcount_rq_routing.py:  # 264 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: pytest, items: [], line: 19 }
@@ -10486,9 +10693,9 @@ tests/integration/test_wip_rowcount_rq_routing.py:  # 253 lines
       methods:
         - { name: test_wip_redis_down_fails_open_to_sync, lines: 184-213 }
     - name: TestAsyncRowSchemaMatchesSyncPath
-      lines: 223-253
+      lines: 223-264
       methods:
-        - { name: test_async_row_schema_matches_sync_path, lines: 236-253 }
+        - { name: test_async_row_schema_matches_sync_path, lines: 224-264 }
   functions:
     - { name: wip_app, lines: 26-30 }  # @pytest.fixture
 
@@ -11541,23 +11748,28 @@ tests/stress/test_rq_semaphore_stress.py:  # 218 lines
     - { name: _recording_cm_factory, lines: 29-44 }
     - { name: _compute_peak_concurrent, lines: 47-58 }
 
-tests/stress/test_wip_worker_stress.py:  # 285 lines
+tests/stress/test_wip_worker_stress.py:  # 403 lines
   imports:
     - { module: __future__, items: [annotations], line: 34 }
-    - { module: threading, items: [], line: 36 }
-    - { module: time, items: [], line: 37 }
-    - { module: contextlib, items: [contextmanager], line: 38 }
-    - { module: typing, items: [List, Tuple], line: 39 }
-    - { module: pytest, items: [], line: 41 }
+    - { module: os, items: [], line: 36 }
+    - { module: threading, items: [], line: 37 }
+    - { module: time, items: [], line: 38 }
+    - { module: contextlib, items: [contextmanager], line: 39 }
+    - { module: typing, items: [List, Tuple], line: 40 }
+    - { module: pytest, items: [], line: 42 }
   classes:
     - name: TestWipWorkerStress
-      lines: 78-285
+      lines: 79-286
       methods:
-        - { name: test_burst_peak_bounded_no_leak, lines: 92-185 }
-        - { name: test_burst_no_deadlock_with_mixed_success_failure, lines: 187-285 }
+        - { name: test_burst_peak_bounded_no_leak, lines: 93-186 }
+        - { name: test_burst_no_deadlock_with_mixed_success_failure, lines: 188-286 }
+    - name: TestWipWorkerRealRedisCap
+      lines: 298-403
+      methods:
+        - { name: test_real_redis_peak_bounded, lines: 314-403 }
   functions:
-    - { name: _recording_cm_factory, lines: 46-60 }
-    - { name: _compute_peak_concurrent, lines: 63-74 }
+    - { name: _recording_cm_factory, lines: 47-61 }
+    - { name: _compute_peak_concurrent, lines: 64-75 }
 
 tests/stress/test_yield_alert_stress.py:  # 390 lines
   imports:
@@ -14126,7 +14338,7 @@ tests/test_eap_alarm_unified_job.py:  # 211 lines
     - name: TestEapAlarmRouteFlag
       lines: 173-195
       methods:
-        - { name: test_flag_off_by_default, lines: 176-181 }
+        - { name: test_flag_on_by_default, lines: 176-181 }
         - { name: test_flag_on_via_env, lines: 183-188 }
         - { name: test_flag_true_string, lines: 190-195 }
     - name: TestEapAlarmJobProgressReport
@@ -15813,10 +16025,10 @@ tests/test_material_trace_unified_job.py:  # 466 lines
         - { name: test_batch_size_boundary_exactly_1000, lines: 400-405 }
         - { name: test_batch_size_1001_splits_into_two, lines: 407-415 }
         - { name: test_material_lot_mode_also_decomposes_at_1000, lines: 417-423 }
-    - name: TestFlagDefaultOff
+    - name: TestFlagDefaultOn
       lines: 430-466
       methods:
-        - { name: test_flag_constant_defaults_off, lines: 433-444 }
+        - { name: test_flag_constant_defaults_on, lines: 433-444 }
         - { name: test_flag_off_string_resolves_false, lines: 446-455 }
         - { name: test_flag_on_string_resolves_true, lines: 457-466 }
   functions:
@@ -18678,7 +18890,7 @@ tests/test_resource_history_service.py:  # 603 lines
     - name: TestEnvDefaultPin
       lines: 575-603
       methods:
-        - { name: test_use_unified_job_default_is_off, lines: 578-603 }
+        - { name: test_use_unified_job_default_is_on, lines: 578-603 }
 
 tests/test_resource_history_sql_parity.py:  # 204 lines
   imports:
