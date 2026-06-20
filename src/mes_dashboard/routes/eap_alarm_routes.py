@@ -86,7 +86,14 @@ def _get_spool_path(query_id: str) -> Optional[str]:
     """Resolve spool parquet path by query_id; returns None on miss/expiry."""
     try:
         from mes_dashboard.core.query_spool_store import get_spool_file_path
-        return get_spool_file_path("eap_alarm", query_id)
+        path = get_spool_file_path("eap_alarm", query_id)
+        if path is not None and not os.path.exists(path):
+            logger.warning(
+                "eap_alarm_routes: parquet missing from disk (stale metadata) "
+                "query_id=%s path=%s", query_id, path
+            )
+            return None
+        return path
     except Exception as exc:
         logger.warning("eap_alarm_routes: spool path lookup failed query_id=%s: %s", query_id, exc)
         return None
