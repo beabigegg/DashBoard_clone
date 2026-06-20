@@ -142,3 +142,24 @@ _APPROVED_CALLERS: dict = {
 Missing entry → CI failure: `"Found caller of oracle_arrow_reader in src/…/your_module.py — If this is intentional, add 'your_module' to _APPROVED_CALLERS['oracle_arrow_reader']."` Also update `tests/test_job_registry.py` count when adding a new job type via `register_job_type()`.
 
 Evidence: `material-trace-streaming-migration` (tests/test_query_cost_policy.py:L336, tests/test_job_registry.py:L220).
+
+## Cross-Change Spec Gaps — xfail(strict=True) as Tripwire
+
+When an async worker path and a sync path produce structurally different outputs (column name casing, field naming, envelope shape) and the gap is acknowledged but deferred to a future change, mark the schema-parity test with `pytest.mark.xfail(strict=True, reason="...")` — **not** `xfail` without `strict`, and not `skip`.
+
+**Why `strict=True`?** Plain `xfail` silently passes (xfail-consumed) if the test unexpectedly starts passing — meaning an accidental half-fix of the gap would go undetected. `strict=True` converts the expected-failure into a tripwire: if the test passes before the `xfail` is explicitly removed, CI fails with `XPASS`. This ensures the gap cannot be accidentally closed without a deliberate decision to remove the marker.
+
+**How to resolve:** When the assembly layer is implemented, remove the `xfail` decorator; the test becomes a required green assertion.
+
+```python
+@pytest.mark.xfail(
+    strict=True,
+    reason="AC-7: async spool emits raw Oracle column names (LOTID, WIP_STATUS); "
+           "sync path returns camelCase (lotId, wipStatus). "
+           "Resolve before worker activation."
+)
+def test_async_row_schema_matches_sync_path():
+    ...
+```
+
+Evidence: `wip-rq-worker-chunks-cleanup` `tests/integration/test_wip_rowcount_rq_routing.py::TestAsyncRowSchemaMatchesSyncPath`; qa-reviewer.yml ac-summary.

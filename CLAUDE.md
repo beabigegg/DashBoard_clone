@@ -180,6 +180,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - New feature-flag rows in `env-contract.md` must also be added to `contracts/env/env.schema.json` with `enum` + `default`; entries absent from the schema bypass machine enum validation (`cdd-kit validate --contracts` will not catch the typo) — see contracts/env/env.schema.json
 - Check `pytestmark` before adding mock tests to `tests/integration/` — see docs/architecture/test-discipline.md
 - Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md
+- Cross-change spec gaps (e.g. async vs sync column-name parity): mark with `xfail(strict=True)` not `xfail` or `skip` — `strict=True` converts the test into a tripwire that auto-fails CI if the gap is accidentally closed without removing the marker — see docs/architecture/test-discipline.md
 - Partial-trackout fixtures: include rows with different `TRACKINQTY` per session (real arithmetic) — see docs/architecture/test-discipline.md
 - New modules using `oracle_arrow_reader` or `base_chunked_duckdb_job`: add stem to `_APPROVED_CALLERS` in `tests/test_query_cost_policy.py` in the same PR; also update `tests/test_job_registry.py` count for new `register_job_type()` calls — see docs/architecture/test-discipline.md
 - `BaseChunkedDuckDBJob` domain migrations: dual-tier parity test required (mock chunk-seam unit + real-path parquet diff on business key); see docs/architecture/test-discipline.md §P2+ Domain Migration

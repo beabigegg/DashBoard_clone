@@ -1,0 +1,32 @@
+agent: implementation-planner
+change-id: wip-rq-worker-chunks-cleanup
+timestamp: 2026-06-20
+status: complete
+
+summary: >
+  Execution packet written. Part B (wip-detail RQ worker via wip_dataset spool,
+  slot inside worker only) + Part C (delete merge_chunks dead code). Worker ships
+  inert; activation gated on stress-soak-report.md. 12 ordered steps IP-1..IP-12,
+  tests-first. AC-7 summary/lots spool parity flagged as pre-impl open risk
+  (xfail strict until backend-engineer reconciles recompute-vs-metadata).
+
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/wip-rq-worker-chunks-cleanup/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (primary), e2e-resilience-engineer (IP-10 fail-open), stress-soak-engineer (IP-11)" }
+  - { type: scope-summary, pointer: "8 in scope, 4 out of scope; 5 contracts edited; 1 new service + 1 new deploy unit + 1 new test file" }
+
+notes: |
+  Validated against source via Grep (read-hook strict-prefers cdd-kit index query):
+    - wip_query_job_service.py does NOT exist yet (new file confirmed).
+    - hold_query_job_service.py L96-194 is the canonical Type-B template
+      (slot 15->90, complete_job outside slot, module-bottom register_job_type).
+    - JobTypeConfig fields: job_type, queue_name, worker_fn, ..., always_async=False.
+    - batch_query_engine: merge_chunks def L632, docstring refs L22/L29, deprecation
+      L642-652; KEEP merge_chunks_to_spool(L777), MergeChunksMaxRowsExceeded(L601),
+      ChunkSchemaMismatch(L614).
+    - wip_routes.api_detail L321-379: routing + 202 + enqueue stub already present;
+      only misleading comment L367-370 to remove. count_wip_rows/is_async_available/
+      classify_query_cost all wired.
+  Flagged for backend-engineer / test-strategist:
+    - Test filename ambiguity (test_wip_query_job_service.py vs test_wip_worker_semaphore.py).
+    - AC-7 spool summary+lots parity must be resolved before AC-7 test goes green.
