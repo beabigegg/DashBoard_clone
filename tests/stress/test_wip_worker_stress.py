@@ -33,6 +33,7 @@ Implementation note — thread-safe mock wiring:
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from contextlib import contextmanager
@@ -282,4 +283,121 @@ class TestWipWorkerStress:
         print(
             f"\n[wip-stress-mixed] N={self._N} completed={len(completed)} "
             f"faulted={len(faults)} enters={len(enters)} exits={len(exits)}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Gate 1: Real-Redis peak-cap validation (stress-soak-report.md §Gate 1)
+# Requires real Redis running (REDIS_URL). Skips if Redis unavailable.
+# Proves HEAVY_QUERY_MAX_CONCURRENT is enforced by the Redis sorted-set Lua
+# script, not just by mock wiring. Thread-safety: all patches before thread launch.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.stress
+class TestWipWorkerRealRedisCap:
+    """G1 pre-production gate: real-Redis cap enforcement.
+
+    N=10 concurrent threads each acquire a heavy_query_slot with real Redis.
+    A background poller samples ZCARD(key) every 5ms.  Peak ZCARD must be
+    ≤ HEAVY_QUERY_MAX_CONCURRENT (3).  All threads must enter and exit (no leak).
+
+    Run:
+        conda run -n mes-dashboard pytest tests/stress/test_wip_worker_stress.py \\
+            -k TestWipWorkerRealRedisCap --run-stress -v -s
+    """
+
+    _N = 10
+    _HOLD_SECONDS = 0.15   # how long each thread holds the slot (simulate Oracle I/O)
+    _POLL_INTERVAL = 0.005  # poller interval (5 ms)
+
+    def test_real_redis_peak_bounded(self, monkeypatch):
+        """Peak concurrent Oracle-phase slots must be ≤ HEAVY_QUERY_MAX_CONCURRENT under real Redis."""
+        import redis as redis_lib
+        import mes_dashboard.core.global_concurrency as concurrency_mod
+
+        from mes_dashboard.core.global_concurrency import (
+            HEAVY_QUERY_MAX_CONCURRENT,
+            acquire_heavy_query_slot,
+            release_heavy_query_slot,
+            _slot_key,
+        )
+
+        # Connect directly to Redis (bypasses REDIS_ENABLED flag which is False in test env)
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        try:
+            conn = redis_lib.from_url(redis_url, socket_connect_timeout=2)
+            conn.ping()
+        except Exception as exc:
+            pytest.skip(f"Redis unavailable — skip real-Redis gate: {exc}")
+
+        # Patch get_redis_client in global_concurrency to return our real connection.
+        # Must happen BEFORE threads are launched (thread-safety rule).
+        monkeypatch.setattr(concurrency_mod, "get_redis_client", lambda: conn)
+
+        slot_key = _slot_key()
+
+        # Clean up any leftover slots from prior runs
+        conn.delete(slot_key)
+
+        results = {"enters": 0, "exits": 0, "peak_zcard": 0}
+        results_lock = threading.Lock()
+        poll_stop = threading.Event()
+
+        def _poller():
+            """Sample ZCARD every 5ms; record the peak."""
+            while not poll_stop.is_set():
+                try:
+                    zcard = conn.zcard(slot_key)
+                    with results_lock:
+                        if zcard > results["peak_zcard"]:
+                            results["peak_zcard"] = zcard
+                except Exception:
+                    pass
+                time.sleep(self._POLL_INTERVAL)
+
+        def _worker(worker_id: str):
+            acquired = acquire_heavy_query_slot(worker_id, ttl=60)
+            try:
+                if acquired:
+                    with results_lock:
+                        results["enters"] += 1
+                time.sleep(self._HOLD_SECONDS)
+            finally:
+                if acquired:
+                    release_heavy_query_slot(worker_id)
+                    with results_lock:
+                        results["exits"] += 1
+
+        poller = threading.Thread(target=_poller, daemon=True)
+        poller.start()
+
+        threads = [
+            threading.Thread(target=_worker, args=(f"wip-gate1-{i:03d}",))
+            for i in range(self._N)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30.0)
+
+        poll_stop.set()
+        poller.join(timeout=1.0)
+
+        # Cleanup
+        conn.delete(slot_key)
+
+        print(
+            f"\n[wip-gate1-real-redis] N={self._N} "
+            f"peak_zcard={results['peak_zcard']} "
+            f"HEAVY_QUERY_MAX_CONCURRENT={HEAVY_QUERY_MAX_CONCURRENT} "
+            f"enters={results['enters']} exits={results['exits']}"
+        )
+
+        assert results["enters"] == results["exits"], (
+            f"Slot leak: {results['enters']} enters vs {results['exits']} exits"
+        )
+        assert results["peak_zcard"] <= HEAVY_QUERY_MAX_CONCURRENT, (
+            f"Real-Redis peak {results['peak_zcard']} exceeded cap "
+            f"HEAVY_QUERY_MAX_CONCURRENT={HEAVY_QUERY_MAX_CONCURRENT}"
         )

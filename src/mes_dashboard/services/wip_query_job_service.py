@@ -19,9 +19,10 @@ Design decisions (wip-rq-worker-chunks-cleanup):
   D6: register_job_type at module bottom; app.py import is deferred (inert until
       activation per ci-gates.md Promotion Policy).
 
-AC-7 open risk: spool carries the raw lot-row parquet. Summary fields (totalLots, etc.)
-  must be recomputed from parquet rows at async-result assembly time. This is flagged
-  with xfail(strict=True) in the integration test until the assembly path is confirmed.
+AC-7 (resolved): Column assembly layer (_ORACLE_TO_CAMEL + wipStatus) applied before
+  writing to parquet so async spool columns match the sync API camelCase shape.
+  Summary fields (totalLots, etc.) must still be recomputed from parquet rows at
+  async-result serve time.
 """
 
 from __future__ import annotations
@@ -55,6 +56,76 @@ _JOB_PREFIX = "wip-detail"
 
 # Spool namespace for parquet result files
 _SPOOL_NAMESPACE = "wip_dataset"
+
+# ---------------------------------------------------------------------------
+# Oracle column → camelCase key mapping (AC-7 assembly layer)
+# Mirrors the key names used by the sync get_wip_detail/_assemble_lot_dict path.
+# Applied to lots_df before writing to parquet so async spool columns match sync API.
+# ---------------------------------------------------------------------------
+_ORACLE_TO_CAMEL: dict = {
+    "LOTID": "lotId",
+    "WORKORDER": "workorder",
+    "QTY": "qty",
+    "QTY2": "qty2",
+    "STATUS": "status",
+    "HOLDREASONNAME": "holdReason",
+    "CURRENTHOLDCOUNT": "holdCount",
+    "OWNER": "owner",
+    "STARTDATE": "startDate",
+    "UTS": "uts",
+    "PRODUCT": "product",
+    "PRODUCTLINENAME": "productLine",
+    "PACKAGE_LEF": "packageLef",
+    "PJ_FUNCTION": "pjFunction",
+    "PJ_TYPE": "pjType",
+    "BOP": "bop",
+    "FIRSTNAME": "waferLotId",
+    "WAFERNAME": "waferPn",
+    "WAFERLOT": "waferLotPrefix",
+    "SPECNAME": "spec",
+    "SPECSEQUENCE": "specSequence",
+    "WORKCENTERNAME": "workcenter",
+    "WORKCENTERSEQUENCE": "workcenterSequence",
+    "WORKCENTER_GROUP": "workcenterGroup",
+    "WORKCENTER_SHORT": "workcenterShort",
+    "AGEBYDAYS": "ageByDays",
+    "EQUIPMENTS": "equipment",
+    "EQUIPMENTCOUNT": "equipmentCount",
+    "WORKFLOWNAME": "workflow",
+    "DATECODE": "dateCode",
+    "LEADFRAMENAME": "leadframeName",
+    "LEADFRAMEOPTION": "leadframeOption",
+    "LEADFRAMEDESC": "leadframeDesc",
+    "COMNAME": "compoundName",
+    "WAFERDESC": "waferDesc",
+    "LOCATIONNAME": "location",
+    "EVENTNAME": "ncrId",
+    "OCCURRENCEDATE": "ncrDate",
+    "RELEASETIME": "releaseTime",
+    "RELEASEEMP": "releaseEmp",
+    "RELEASEREASON": "releaseComment",
+    "COMMENT_HOLD": "holdComment",
+    "CONTAINERCOMMENTS": "comment",
+    "COMMENT_DATE": "commentDate",
+    "COMMENT_EMP": "commentEmp",
+    "COMMENT_FUTURE": "futureHoldComment",
+    "HOLDEMP": "holdEmp",
+    "DEPTNAME": "holdDept",
+    "PJ_PRODUCEREGION": "produceRegion",
+    "PRIORITYCODENAME": "priority",
+    "TMTT_R": "tmttRemaining",
+    "WAFER_FACTOR": "dieConsumption",
+    "SYS_DATE": "dataUpdateDate",
+}
+
+
+def _compute_wip_status(equipment_count: int, hold_count: int) -> str:
+    """Derive wipStatus from raw Oracle EQUIPMENTCOUNT / CURRENTHOLDCOUNT."""
+    if equipment_count > 0:
+        return "RUN"
+    if hold_count > 0:
+        return "HOLD"
+    return "QUEUE"
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +243,17 @@ def execute_wip_detail_oracle_query(**query_params: Any) -> dict:
 
     if row_count == 0:
         return {"query_id": query_id, "spool_path": None, "row_count": 0}
+
+    # AC-7 assembly layer: compute wipStatus + rename Oracle columns → camelCase
+    # before writing to parquet so async spool schema matches the sync API shape.
+    lots_df["wipStatus"] = lots_df.apply(
+        lambda r: _compute_wip_status(
+            int(r.get("EQUIPMENTCOUNT") or 0),
+            int(r.get("CURRENTHOLDCOUNT") or 0),
+        ),
+        axis=1,
+    )
+    lots_df = lots_df.rename(columns=_ORACLE_TO_CAMEL)
 
     # Write parquet spool to a temp file then register
     spool_dir = QUERY_SPOOL_DIR

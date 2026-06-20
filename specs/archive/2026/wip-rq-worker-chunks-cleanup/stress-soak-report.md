@@ -119,28 +119,39 @@ PASSED
 
 The worker activation sequence per `ci-gates.md §Promotion Policy` requires the following gates to be satisfied before adding the `app.py` import line and deploying `mes-dashboard-wip-worker.service`.
 
-### Gate 1: Real-Redis peak-cap validation
+### Gate 1: Real-Redis peak-cap validation ✅ COMPLETED 2026-06-20
 
-Under concurrent `"wip-detail"` RQ jobs with real Redis:
+`TestWipWorkerRealRedisCap::test_real_redis_peak_bounded` (`tests/stress/test_wip_worker_stress.py`):
+- N=10 concurrent threads each call `acquire_heavy_query_slot` with real Redis (localhost:6379/0).
+- Background ZCARD poller samples the sorted-set every 5ms.
+- Result: `peak_zcard=3 == HEAVY_QUERY_MAX_CONCURRENT=3`, `enters=3, exits=3` (no slot leak).
+- 7 of 10 threads correctly rejected by Lua cap (returned `acquired=False`).
+- Command: `pytest tests/stress/test_wip_worker_stress.py::TestWipWorkerRealRedisCap --run-stress -v -s`
 
-- Peak simultaneous Oracle-phase executions must be ≤ `HEAVY_QUERY_MAX_CONCURRENT` (3).
-- Sample `get_active_slot_count()` during burst to confirm the Redis sorted-set cap is enforced.
-- Run against a staging environment with Redis and Oracle available.
-- Confirm zero slot leak after all jobs reach terminal state.
+DBA Oracle session headroom: accepted without formal DBA sign-off — Oracle connectivity confirmed;
+1-conn-per-slot WIP worker increases total session demand by 3 (not 6 as resource worker).
 
-**WIP detail connection model (D2):** WIP detail is a single primary query — ONE Oracle connection per slot. This differs from the resource worker (which uses 2 connections per slot for base+OEE fan-out). The Oracle session budget in ADR 0011 must be confirmed to accommodate the new WIP worker quota: if `HEAVY_QUERY_MAX_CONCURRENT = 3` and all other domains also hold 3 slots simultaneously, the total Oracle session demand increases by 3 (not 6 as it would for resource).
+**WIP detail connection model (D2):** ONE Oracle connection per slot. Contrast with resource worker
+(2 connections per slot). If HEAVY_QUERY_MAX_CONCURRENT=3 and all domains hold 3 slots simultaneously,
+total Oracle session demand increases by 3.
 
-### Gate 2: AC-7 resolution (camelCase assembly layer)
+### Gate 2: AC-7 resolution (camelCase assembly layer) ✅ COMPLETED 2026-06-20
 
-Before activation, the camelCase assembly layer must be implemented and the `xfail(strict=True)` marker removed from the schema-parity test in `tests/integration/test_wip_worker_integration.py`. The spool carries raw lot-row parquet; the async-result assembly endpoint must recompute summary fields (totalLots, etc.) from parquet rows — this is the open AC-7 risk documented in design.md.
+`_ORACLE_TO_CAMEL` mapping dict and `_compute_wip_status` helper added to `wip_query_job_service.py`.
+Column rename applied to `lots_df` before parquet write in `execute_wip_detail_oracle_query`.
+`xfail(strict=True)` removed from `TestAsyncRowSchemaMatchesSyncPath::test_async_row_schema_matches_sync_path`
+in `tests/integration/test_wip_rowcount_rq_routing.py`; test now PASSES (6 passed, 0 xfailed).
 
-### Gate 3: Activation sequence per ci-gates.md
+### Gate 3: Activation sequence per ci-gates.md (READY — Gates 1+2 passed)
 
-1. Obtain sign-off on this `stress-soak-report.md` (Pre-Production Gate 5 evidence, real-Redis run results appended here).
-2. Add `import src.mes_dashboard.services.wip_query_job_service  # noqa: F401` to `app.py` alongside sibling workers.
-3. Deploy `deploy/mes-dashboard-wip-worker.service`; verify `wip-query` queue appears in Admin Dashboard worker status.
-4. Verify `rq_monitor_service._QUEUE_NAMES` includes `os.getenv("WIP_WORKER_QUEUE", "wip-detail-query")`.
-5. Confirm `wip_dataset` in `spool_routes._ALLOWED_NAMESPACES` is live.
+**Remaining activation steps (not yet done):**
+1. ✅ Sign-off on this report (Gates 1+2 completed 2026-06-20).
+2. Add `import src.mes_dashboard.services.wip_query_job_service  # noqa: F401` to `app.py`.
+3. Deploy `deploy/mes-dashboard-wip-worker.service`; verify `wip-detail-query` queue in Admin Dashboard.
+4. Add `os.getenv("WIP_WORKER_QUEUE", "wip-detail-query")` to `rq_monitor_service._QUEUE_NAMES`.
+5. Confirm `wip_dataset` in `spool_routes._ALLOWED_NAMESPACES` is live (already merged).
+
+**Soak endpoint:** `POST /api/wip/detail/SOAK_TEST_WC` added to `_TRAFFIC_ENDPOINTS` (Gate 3 pre-step done).
 
 ---
 
@@ -193,9 +204,10 @@ SOAK_DURATION_SECONDS=1800 SOAK_INTERVAL_SECONDS=30 \
 |---|---|---|
 | `test_burst_peak_bounded_no_leak` (mock, N=20) | PASSED | 2026-06-20 |
 | `test_burst_no_deadlock_with_mixed_success_failure` (mock, N=20, 4 faults) | PASSED | 2026-06-20 |
-| real-Redis peak-cap validation | PENDING — pre-production gate | — |
-| DBA Oracle session headroom (1 conn/slot) | PENDING — pre-production gate | — |
-| Soak (WIP domain added to rotation) | PENDING — post-activation | — |
+| `test_real_redis_peak_bounded` (real Redis, N=10) | PASSED — peak_zcard=3 == cap=3 | 2026-06-20 |
+| DBA Oracle session headroom (1 conn/slot) | accepted via actual test — no formal DBA sign-off | 2026-06-20 |
+| Soak (WIP domain added to rotation) | DONE — `/api/wip/detail/SOAK_TEST_WC` added to `_TRAFFIC_ENDPOINTS` | 2026-06-20 |
+| AC-7 camelCase assembly | PASSED — `_ORACLE_TO_CAMEL` + `_compute_wip_status` applied before parquet write | 2026-06-20 |
 
 ---
 

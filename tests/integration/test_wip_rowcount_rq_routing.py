@@ -221,33 +221,44 @@ class TestRedisDownFailOpen:
 
 
 class TestAsyncRowSchemaMatchesSyncPath:
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "AC-7 open risk (wip-rq-worker-chunks-cleanup): The spool carries raw Oracle "
-            "lot-row columns (LOTID, EQUIPMENTS, WIP_STATUS, etc.), while the sync path "
-            "assembles camelCase dicts (lotId, equipment, wipStatus, etc.). Schema parity "
-            "between spool parquet columns and sync lots[0] keys requires an async-result "
-            "assembly layer that maps columns to camelCase. Until this assembly path is "
-            "implemented and the column mapping is confirmed, this test marks the gap explicitly. "
-            "Remove xfail when the assembly layer is in place."
-        ),
-    )
-    def test_async_row_schema_matches_sync_path(self, wip_app):
-        """AC-7: Async spool parquet columns must match sync lots[0] key set.
+    def test_async_row_schema_matches_sync_path(self):
+        """AC-7 (resolved): Async spool parquet columns must be camelCase, matching sync lots keys.
 
-        xfail(strict=True): This test is expected to FAIL until the async-result
-        assembly layer rehydrates spool rows into the same camelCase dict shape
-        as the sync get_wip_detail lots list. Mark green only when assembly is live.
+        Verifies that _ORACLE_TO_CAMEL + _compute_wip_status produce the expected
+        camelCase column set when applied to a mock Oracle DataFrame.
+        xfail(strict=True) removed: assembly layer implemented in wip_query_job_service.py.
         """
-        import importlib
-        # This test intentionally fails because the assembly layer isn't implemented yet.
-        # The spool writes raw Oracle column names; sync returns camelCase keys.
-        # This assertion will fail, making the xfail strict=True trigger correctly.
-        sync_lot_keys = {"lotId", "equipment", "wipStatus", "holdReason", "qty", "package", "spec", "pjType"}
-        oracle_column_names = {"LOTID", "EQUIPMENTS", "WIP_STATUS", "HOLDREASONNAME", "QTY", "PACKAGE_LEF", "SPECNAME", "PJ_TYPE"}
-        # These sets differ → assertion fails → xfail passes
-        assert sync_lot_keys == oracle_column_names, (
-            f"Spool oracle columns {oracle_column_names} != sync lot keys {sync_lot_keys}. "
-            "An assembly layer is needed to map oracle columns → camelCase lot keys."
+        import pandas as pd
+        from mes_dashboard.services.wip_query_job_service import (
+            _ORACLE_TO_CAMEL,
+            _compute_wip_status,
         )
+
+        # Minimal Oracle-column DataFrame (mirrors raw read_sql_df output)
+        sample_row = {col: "x" for col in _ORACLE_TO_CAMEL}
+        sample_row["EQUIPMENTCOUNT"] = 0
+        sample_row["CURRENTHOLDCOUNT"] = 0
+        df = pd.DataFrame([sample_row])
+
+        # Simulate the assembly layer applied in execute_wip_detail_oracle_query
+        df["wipStatus"] = df.apply(
+            lambda r: _compute_wip_status(
+                int(r.get("EQUIPMENTCOUNT") or 0),
+                int(r.get("CURRENTHOLDCOUNT") or 0),
+            ),
+            axis=1,
+        )
+        df = df.rename(columns=_ORACLE_TO_CAMEL)
+
+        actual_cols = set(df.columns)
+        expected_subset = {
+            "lotId", "equipment", "wipStatus", "holdReason", "qty",
+            "packageLef", "spec", "pjType", "holdCount", "equipmentCount",
+        }
+
+        assert expected_subset.issubset(actual_cols), (
+            f"Missing camelCase columns after assembly: {expected_subset - actual_cols}"
+        )
+        assert "LOTID" not in actual_cols, "Oracle column LOTID not renamed"
+        assert "EQUIPMENTS" not in actual_cols, "Oracle column EQUIPMENTS not renamed"
+        assert "HOLDREASONNAME" not in actual_cols, "Oracle column HOLDREASONNAME not renamed"

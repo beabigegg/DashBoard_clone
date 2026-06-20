@@ -121,6 +121,9 @@ _TRAFFIC_ENDPOINTS: Tuple[Tuple[str, str, Dict[str, Any]], ...] = (
     ("POST", "/query", {"json": {}}),  # resource_history_bp prefix "/query"
     # today-snapshot simulates auto-refresh pattern (60s interval in real usage)
     ("POST", "/api/hold-history/today-snapshot", {"json": {"hold_type": "quality", "record_type": "on_hold"}}),
+    # WIP detail async path — added post-activation per stress-soak-report.md Gate 3 (wip-rq-worker-chunks-cleanup)
+    # Returns 202 (async) or 200/sync depending on row count and worker availability; 5xx OK for soak.
+    ("POST", "/api/wip/detail/SOAK_TEST_WC", {"json": {}}),
 )
 
 
