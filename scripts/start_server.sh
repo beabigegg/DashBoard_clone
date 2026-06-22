@@ -68,6 +68,9 @@ RQ_WARMUP_WORKER_QUEUE="${WARMUP_WORKER_QUEUE:-warmup}"
 RQ_QUERY_TOOL_WORKER_ENABLED="${RQ_QUERY_TOOL_WORKER_ENABLED:-true}"
 RQ_QUERY_TOOL_WORKER_QUEUE="${QUERY_TOOL_WORKER_QUEUE:-query-tool}"
 
+# Vite dev server configuration
+VITE_DEV_PORT="${VITE_DEV_PORT:-5173}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -1984,6 +1987,67 @@ rq_query_tool_worker_status() {
     fi
 }
 
+do_dev() {
+    load_env
+    resolve_runtime_paths
+
+    check_conda || return 1
+    check_env_file
+
+    if ! command -v npm &>/dev/null; then
+        log_error "npm not found; cannot start Vite dev server"
+        return 1
+    fi
+
+    conda activate "$CONDA_ENV"
+    export PYTHONPATH="${ROOT}/src:${PYTHONPATH:-}"
+    cd "$ROOT"
+
+    start_redis
+
+    ensure_dirs
+
+    local flask_dev_log="${LOG_DIR}/flask_dev.log"
+    local vite_dev_log="${LOG_DIR}/vite_dev.log"
+
+    log_info "Starting Flask dev server (port ${PORT})..."
+    FLASK_ENV=development FLASK_DEBUG=1 FRONTEND_BUILD_MODE=never \
+        flask run --host=0.0.0.0 --port="${PORT}" \
+        >> "${flask_dev_log}" 2>&1 &
+    local flask_pid=$!
+
+    _dev_cleanup() {
+        log_info "Stopping dev mode..."
+        kill "${flask_pid}" 2>/dev/null || true
+        wait "${flask_pid}" 2>/dev/null || true
+        log_success "Dev mode stopped"
+    }
+    trap '_dev_cleanup' INT TERM EXIT
+
+    sleep 1
+    if ! kill -0 "${flask_pid}" 2>/dev/null; then
+        log_error "Flask dev server failed to start; check ${flask_dev_log}"
+        return 1
+    fi
+    log_success "Flask dev server started (PID: ${flask_pid})"
+    log_info "Backend URL: http://localhost:${PORT}"
+    log_info "Flask log:   ${flask_dev_log}"
+    echo ""
+    log_info "Starting Vite dev server (port ${VITE_DEV_PORT})..."
+    log_info "  → Flask proxy target: http://localhost:${PORT}"
+    log_info "  → HMR assets served at: http://localhost:${VITE_DEV_PORT}/static/dist/"
+    log_info "Vite log:    ${vite_dev_log}  (live output below)"
+    log_info "Press Ctrl+C to stop both services"
+    echo ""
+
+    # 把 Flask port 傳給 vite.config.ts 的 proxy 設定
+    export VITE_FLASK_PORT="${PORT}"
+    export VITE_DEV_PORT
+
+    # Vite 在前景執行，HMR 輸出直接顯示
+    npm --prefix "${ROOT}/frontend" run dev 2>&1 | tee -a "${vite_dev_log}"
+}
+
 do_start() {
     local foreground=false
 
@@ -2288,6 +2352,7 @@ show_help() {
     echo "Usage: $0 <command> [options]"
     echo ""
     echo "Commands:"
+    echo "  dev            Start Flask dev server + Vite HMR (for frontend development)"
     echo "  start [-f]     Start the server (-f for foreground mode)"
     echo "  stop           Stop the server gracefully"
     echo "  restart        Restart the server"
@@ -2297,6 +2362,7 @@ show_help() {
     echo "  help           Show this help message"
     echo ""
     echo "Examples:"
+    echo "  $0 dev             # Dev mode: Flask auto-reload + Vite HMR"
     echo "  $0 start           # Start in background (with Redis)"
     echo "  $0 start -f        # Start in foreground"
     echo "  $0 logs follow     # Follow logs in real-time"
@@ -2309,6 +2375,7 @@ show_help() {
     echo "  REDIS_ENABLED      Enable Redis cache (default: true)"
     echo "  REDIS_URL          Redis connection URL"
     echo "  WATCHDOG_ENABLED   Enable worker watchdog (default: true)"
+    echo "  VITE_DEV_PORT      Vite dev server port (default: 5173)"
     echo ""
 }
 
@@ -2320,6 +2387,9 @@ main() {
     shift || true
 
     case "$command" in
+        dev)
+            do_dev
+            ;;
         start)
             do_start "$@"
             ;;

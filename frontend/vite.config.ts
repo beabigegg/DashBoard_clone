@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import vue from '@vitejs/plugin-vue';
 
+const FLASK_PORT = process.env['VITE_FLASK_PORT'] ?? '8080';
+const DEV_PORT   = parseInt(process.env['VITE_DEV_PORT'] ?? '5173');
+
 export default defineConfig(({ mode }) => ({
   base: '/static/dist/',
   plugins: [vue()],
@@ -9,6 +12,29 @@ export default defineConfig(({ mode }) => ({
   esbuild: {
     // production build 時移除所有 console.* 呼叫，避免洩漏除錯資訊
     drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
+  server: {
+    port: DEV_PORT,
+    proxy: {
+      // 攔截一切請求；bypass 讓 Vite 自己處理 HMR 資產
+      '^/': {
+        target: `http://localhost:${FLASK_PORT}`,
+        changeOrigin: true,
+        ws: false,
+        bypass(req) {
+          const url = req.url ?? '';
+          // Vite HMR 資產與模組不代理，其餘全轉 Flask
+          if (
+            url.startsWith('/static/dist/') ||
+            url.startsWith('/@vite') ||
+            url.startsWith('/@fs') ||
+            url.startsWith('/node_modules')
+          ) {
+            return url;
+          }
+        },
+      },
+    },
   },
   build: {
     outDir: '../src/mes_dashboard/static/dist',
