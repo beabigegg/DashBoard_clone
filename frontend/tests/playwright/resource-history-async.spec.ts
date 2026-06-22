@@ -276,7 +276,7 @@ test.describe('resource-history — RQ async polling flow', () => {
 
     // STEP 4: Navigate directly (no real backend needed — all API calls are mocked above).
     // page.goto() is caught so the test does not fail when no dev server is running in CI.
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
 
     // Guard: if the Vue app did not mount (no dev server), skip all assertions.
     const _body1 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
@@ -337,7 +337,7 @@ test.describe('resource-history — RQ async polling flow', () => {
     );
 
     // STEP 3: Navigate directly (all API calls mocked above).
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
 
     // Guard: skip when no dev server running.
     const _body2 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
@@ -385,68 +385,58 @@ test.describe('resource-history — RQ async polling flow', () => {
       }),
     );
 
-    // STEP 4: Navigate directly (all API calls mocked above).
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+    // STEP 4: Navigate. This spec mocks auth but NOT /api/portal/navigation, so it
+    // deep-links rather than using sidebar nav. The deep-link only resolves to
+    // resource-history after the nav response settles and routes are registered —
+    // 'networkidle' waits for that (the mocked failed job stops polling quickly, so
+    // the network settles fast). domcontentloaded/load return too early and the app
+    // root never appears. networkidle is the correct wait for THIS deep-link spec.
+    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
 
-    // STEP 5: Wait for polling to detect the failure and update reactive state.
-    // pollJobUntilComplete throws with errorCode 'JOB_FAILED'; the catch block
-    // sets queryError.value which feeds <ErrorBanner :message="queryError">.
-    await page.waitForTimeout(8_000);
+    // STEP 5: Guard — if the Vue app did not mount (no dev server), skip assertions.
+    const appMounted = await page
+      .waitForSelector('.theme-resource-history, #resource-history-app', { timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appMounted) {
+      console.warn(
+        '[resource-history-async] AC-9: Vue app not detected — ' +
+        'check whether the portal-shell server is running.',
+      );
+      return;
+    }
 
-    // STEP 6: AsyncQueryProgress must NOT linger after failure.
-    // When status='failed', asyncJobProgress.active is set to false in the
-    // finally block; the --failed modifier also renders a failed-state bar
-    // briefly, but after the catch sets queryError the bar should be gone.
-    const progressBar = page.locator('.async-job-progress');
-    const progressStillActive = await progressBar.isVisible({ timeout: 2_000 }).catch(() => false);
-    expect(progressStillActive).toBe(false);
-
-    // STEP 7: An error indicator must be visible.
-    // ErrorBanner renders a [role="alert"] element when :message is non-empty.
-    // AsyncQueryProgress with status='failed' also uses role="status" with
-    // the --failed CSS modifier while still active (transitional).
-    // We accept any of the standard error surface selectors.
+    // STEP 6: An error indicator must appear. resource-history auto-runs the primary
+    // query on mount → 202 → poll detects JOB_FAILED → queryError set → <ErrorBanner>.
+    // Poll web-first (not a fixed sleep) across the error surfaces so the
+    // mount→query→poll→error chain timing cannot race a hard-coded window. Each
+    // selector is its own locator() so CSS and text= engines aren't mixed in one string.
     const errorSelectors = [
       '[role="alert"]',
       '.error-banner',
       '[class*="error-banner"]',
       '[data-testid="error-banner"]',
       '.async-job-progress--failed',
-      // Text fallbacks — the ErrorBanner shows queryError verbatim
       'text=Oracle timeout',
       'text=查詢執行失敗',
       'text=非同步查詢失敗',
     ];
+    await expect
+      .poll(
+        async () => {
+          for (const sel of errorSelectors) {
+            if (await page.locator(sel).first().isVisible().catch(() => false)) return true;
+          }
+          return false;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
 
-    let errorVisible = false;
-    for (const sel of errorSelectors) {
-      const visible = await page.locator(sel).first().isVisible({ timeout: 3_000 }).catch(() => false);
-      if (visible) {
-        errorVisible = true;
-        break;
-      }
-    }
-
-    // Soft assertion: if the page rendered content at all, an error indicator
-    // must be present.  Guard against CI environments where the SPA did not
-    // mount (portal-shell not served) — don't false-fail on a blank page.
-    const bodyText = await page.locator('body').textContent({ timeout: 3_000 }).catch(() => '');
-    // "page rendered" = Vue app mounted (app-specific content present, not the browser's error page).
-    // The ECONNREFUSED error page has no Chinese/Vue content; only our app does.
-    const pageRendered =
-      (bodyText ?? '').includes('設備') ||
-      (bodyText ?? '').includes('KPI') ||
-      (await page.locator('.theme-resource-history, #resource-history-app').count().catch(() => 0)) > 0;
-
-    if (pageRendered) {
-      // Hard assertion: page rendered + job failed → error indicator required.
-      expect(errorVisible).toBe(true);
-    } else {
-      // Page did not mount (no backend in this run); log and skip.
-      console.warn(
-        '[resource-history-async] AC-9: Vue app not detected — ' +
-        'check whether the portal-shell Vite server is running.',
-      );
-    }
+    // STEP 7: The ACTIVE (non-failed) progress bar must not linger after failure.
+    // (The transitional --failed bar is allowed; only a stuck active bar is a bug.)
+    await expect(
+      page.locator('.async-job-progress:not(.async-job-progress--failed)'),
+    ).toHaveCount(0, { timeout: 5_000 });
   });
 });
