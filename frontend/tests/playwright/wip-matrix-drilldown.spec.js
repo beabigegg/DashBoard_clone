@@ -27,7 +27,8 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { USE_MOCKS, navigateDual, navigateMocked } from './_api-mode.js';
+import { USE_MOCKS, navigateDual, navigateMocked, BASE_URL } from './_api-mode.js';
+import { loginViaApi } from './_auth.js';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -125,10 +126,44 @@ async function registerWipMocks(page, matrixPayload = MOCK_MATRIX) {
  *   - Real mode: real login + real backend
  */
 async function gotoWipOverview(page, matrixPayload = MOCK_MATRIX) {
-  await navigateDual(page, 'wip-overview', {
-    waitForSelector: '.matrix-container',
-    extraMocks: () => registerWipMocks(page, matrixPayload),
-  });
+  if (USE_MOCKS) {
+    await navigateMocked(page, 'wip-overview', {
+      waitForSelector: '.matrix-container',
+      extraMocks: () => registerWipMocks(page, matrixPayload),
+    });
+    return;
+  }
+
+  // Real mode: wip-overview IS the page under test, so it must receive REAL WIP
+  // data.  navigateViaSidebar() suppresses **/api/wip/** with an empty stub to
+  // clear the loading overlay when navigating AWAY from wip-overview — but that
+  // same stub would starve the matrix here.  Navigate manually without it.
+  await loginViaApi(page);
+  await page.goto(`${BASE_URL}/portal-shell/`).catch(() => {});
+
+  const toggle = page.locator('button.sidebar-toggle');
+  await toggle.waitFor({ timeout: 10_000 }).catch(() => {});
+  if ((await toggle.getAttribute('aria-expanded').catch(() => null)) !== 'true') {
+    await toggle.click().catch(() => {});
+  }
+  await page.waitForSelector('a[href*="wip-overview"]', { timeout: 10_000 });
+  await page.click('a[href*="wip-overview"]');
+  if ((await toggle.getAttribute('aria-expanded').catch(() => null)) === 'true') {
+    await toggle.click().catch(() => {});
+  }
+  await page
+    .locator('.sidebar-overlay')
+    .waitFor({ state: 'detached', timeout: 3_000 })
+    .catch(() => {});
+
+  // Real Oracle WIP query is slower than the mock; wait generously for the
+  // matrix container and its first data cell to populate.
+  await page.waitForSelector('.matrix-container', { timeout: 30_000 }).catch(() => {});
+  await page
+    .locator('table.matrix-table tbody td.clickable')
+    .first()
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
