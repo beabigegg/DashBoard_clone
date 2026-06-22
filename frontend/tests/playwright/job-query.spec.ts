@@ -121,7 +121,7 @@ async function setupMocks(page: Page): Promise<void> {
 }
 
 async function gotoJobQueryPage(page: Page): Promise<void> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForSelector('[data-testid="job-query-app"]', { timeout: 20_000 });
 }
 

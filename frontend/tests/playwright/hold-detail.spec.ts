@@ -100,7 +100,7 @@ async function setupMocks(page: Page): Promise<void> {
 }
 
 async function gotoHoldDetailPage(page: Page): Promise<void> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForSelector('[data-testid="hold-detail-app"]', { timeout: 20_000 });
 }
 
@@ -199,7 +199,7 @@ test('test_api_error_shows_error_banner', async ({ page }) => {
       body: JSON.stringify({ success: false, error: { message: 'Server Error' } }) }),
   );
 
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForSelector('[data-testid="hold-detail-app"]', { timeout: 20_000 });
   const banner = page.locator('.error-banner-wrap').first();
   await expect(banner).toBeVisible({ timeout: 15_000 });

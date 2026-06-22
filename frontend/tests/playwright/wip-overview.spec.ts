@@ -103,7 +103,7 @@ async function setupMocks(page: Page): Promise<void> {
 }
 
 async function gotoWipOverview(page: Page): Promise<void> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   // Wait for wip-overview app root to be rendered by NativeRouteView
   await page.waitForSelector('.wip-overview-page', { timeout: 20_000 });
   // Wait for loading overlay to disappear (API data loaded)
@@ -178,7 +178,7 @@ test('test_api_error_shows_error_banner', async ({ page }) => {
       body: JSON.stringify({ success: false, error: 'Server error' }) }),
   );
 
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await page.waitForSelector('.wip-overview-page', { timeout: 20_000 });
   await expect(page.locator('.error-banner-wrap')).toBeVisible({ timeout: 20_000 });
 });

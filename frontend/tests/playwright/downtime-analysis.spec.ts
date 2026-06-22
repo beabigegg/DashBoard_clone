@@ -287,7 +287,7 @@ test.describe('downtime-analysis — happy path (browser-DuckDB shape)', () => {
       }
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
 
     // Page heading must be present (CSS theme root or heading text)
     const heading = page.locator(`text=${DOWNTIME_PAGE_HEADING}`).first();
@@ -314,7 +314,7 @@ test.describe('downtime-analysis — happy path (browser-DuckDB shape)', () => {
   // theme root element
   // -------------------------------------------------------------------------
   test('root element has theme-downtime-analysis class (CSS scoping)', async ({ page }) => {
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     const themeRoot = page.locator('.theme-downtime-analysis');
     // Accept: portal-shell may wrap it; at minimum no crash during navigation.
     await expect(themeRoot).toBeVisible({ timeout: 15_000 }).catch(() => {});
@@ -324,7 +324,7 @@ test.describe('downtime-analysis — happy path (browser-DuckDB shape)', () => {
   // filter bar
   // -------------------------------------------------------------------------
   test('filter bar date inputs accept user input', async ({ page }) => {
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     const startInput = page.locator('#downtime-start-date');
     if (await startInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await startInput.fill('2026-05-01');
@@ -340,7 +340,7 @@ test.describe('downtime-analysis — happy path (browser-DuckDB shape)', () => {
     // Capture download event
     const downloadPromise = page.waitForEvent('download', { timeout: 20_000 }).catch(() => null);
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(2_000); // let composable initialise
 
     // Try clicking CSV/export button via multiple possible selectors
@@ -393,7 +393,7 @@ test.describe('AC-5: filter change issues zero API round-trips after initial loa
     });
     await setupDuckDBRoutes(page); // spool mocks
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(3_000); // let composable activate
 
     const countAfterLoad = queryCallCount;
@@ -455,7 +455,7 @@ test.describe('AC-6: >90-day date range accepted (no 400 rejection)', () => {
       }
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(1_000);
 
     // Set a 180-day range (well beyond the old 90-day Oracle guard that was removed)
@@ -522,7 +522,7 @@ test.describe('AC-7 resilience: WASM init failure shows visible error banner', (
     // is at the WASM layer, not the network layer.
     await setupDuckDBRoutes(page);
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(5_000); // allow composable to attempt init and fail
 
     // The test outcome depends on whether the composable has WASM init interception:
@@ -598,7 +598,7 @@ test.describe('AC-7 resilience: parquet fetch 404 shows error banner', () => {
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(8_000); // allow composable to attempt fetch and detect 404
 
     // AC-7 D3: a parquet 404 must surface a visible error banner — never a silent empty table.
@@ -647,7 +647,7 @@ test.describe('AC-7 resilience: parquet fetch 404 shows error banner', () => {
       route.abort('failed');
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(8_000);
 
     // Loading spinner must not be stuck after abort
@@ -692,7 +692,7 @@ test.describe('data-boundary: empty result set shows empty-state, not error', ()
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(5_000);
 
     // If zero rows are returned, an empty-state indicator must appear —
@@ -728,7 +728,7 @@ test.describe('data-boundary: empty result set shows empty-state, not error', ()
     });
     await setupDuckDBRoutes(page);
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(2_000);
 
     // Set a 91-day range in the filter inputs
@@ -779,12 +779,12 @@ test.describe('browser back/forward preserves date range in URL state', () => {
     await setupBaseRoutes(page);
     await setupDuckDBRoutes(page);
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(2_000);
 
     // Navigate to another page (simulate back/forward)
-    await page.goto('/portal-shell.html', { waitUntil: 'networkidle', timeout: 15_000 }).catch(() => {});
-    await page.goBack({ waitUntil: 'networkidle', timeout: 15_000 }).catch(() => {});
+    await page.goto('/portal-shell.html', { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
+    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(2_000);
 
     // Page must re-render without a JS crash
@@ -812,7 +812,7 @@ test.describe('resilience: server errors from /query endpoint', () => {
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(5_000);
 
     // Loading overlay must not be stuck
@@ -852,7 +852,7 @@ test.describe('resilience: server errors from /query endpoint', () => {
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(5_000);
 
     const crashed = await page.evaluate(() => !!(window as any).__vue_app_crashed).catch(() => false);
@@ -865,7 +865,7 @@ test.describe('resilience: server errors from /query endpoint', () => {
       route.abort('failed');
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(8_000);
 
     const loadingStuck = await page.locator('.loading-overlay').isVisible({ timeout: 1_000 }).catch(() => false);
@@ -890,7 +890,7 @@ test.describe('regression: flag-OFF (legacy) response shape does not crash page'
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(3_000);
 
     const crashed = await page.evaluate(() => !!(window as any).__vue_app_crashed).catch(() => false);
@@ -927,7 +927,7 @@ test.describe('taxonomy: server labels used in BigCategory rendering', () => {
     });
     await setupDuckDBRoutes(page);
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     await page.waitForTimeout(3_000);
 
     // The page must not crash when taxonomy labels differ from old frontend constants

@@ -205,7 +205,7 @@ test.describe('downtime-analysis page', () => {
   });
 
   test('overview_chart_renders_and_kpi_cards_visible', async ({ page }) => {
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     // KPI cards should be visible (total_hours = 42.5)
     await expect(page.locator('.theme-downtime-analysis')).toBeVisible({ timeout: 15000 }).catch(() => {
@@ -221,7 +221,7 @@ test.describe('downtime-analysis page', () => {
   });
 
   test('event_detail_match_source_none_shows_em_dash_in_job_columns', async ({ page }) => {
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     // Navigate to the events tab
     const eventsTab = page.locator('button[role="tab"]:has-text("事件明細")');
@@ -258,7 +258,7 @@ test.describe('downtime-analysis page', () => {
   test('no_tab_switcher_present_in_redesigned_layout', async ({ page }) => {
     // AC-3: The three-tab switcher (圖表總覽 / 設備明細 / 事件明細) must NOT exist.
     // The redesigned page is single-page layout with charts on top and three-tier table below.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     // Tab buttons with these labels should NOT be present
     const chartTab = page.locator('button[role="tab"]:has-text("圖表總覽")');
@@ -271,7 +271,7 @@ test.describe('downtime-analysis page', () => {
   });
 
   test('filter_bar_date_inputs_accept_user_input', async ({ page }) => {
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     const startInput = page.locator('#downtime-start-date');
     if (await startInput.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -283,7 +283,7 @@ test.describe('downtime-analysis page', () => {
 
   test('root_element_has_theme_downtime_analysis_class', async ({ page }) => {
     // AC-6: Root element must have .theme-downtime-analysis for CSS scoping
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     const themeRoot = page.locator('.theme-downtime-analysis');
     await expect(themeRoot).toBeVisible({ timeout: 15000 }).catch(() => {
@@ -294,7 +294,7 @@ test.describe('downtime-analysis page', () => {
   test('BigCategoryChart_click_filters_three_tier_table', async ({ page }) => {
     // AC-1: Clicking a BigCategoryChart sector sets big_category filter and
     // triggers a new equipment-detail request with big_category param.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     // Wait for page to load
     await page.waitForTimeout(2000);
@@ -320,7 +320,7 @@ test.describe('downtime-analysis page', () => {
   test('BigCategoryChart_same_slice_click_clears_filter', async ({ page }) => {
     // AC-1 second part: same-slice click clears filter chip.
     // We verify the chip clear button works when chip is rendered.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(1000);
 
     // If a filter chip exists (from any prior interaction), click the clear button
@@ -339,7 +339,7 @@ test.describe('downtime-analysis page', () => {
   test('DailyTrendChart_legend_click_filters_by_status_type', async ({ page }) => {
     // AC-2: DailyTrendChart legend click sets status_types filter.
     // This test verifies the chart section exists and the legend interaction mechanism.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Verify the daily trend chart renders
@@ -352,7 +352,7 @@ test.describe('downtime-analysis page', () => {
   test('DailyTrendChart_multiple_legend_clicks_union_filter', async ({ page }) => {
     // AC-2: Multiple legend deselections should produce a union-filter (remaining active series).
     // Verify chart area is rendered — ECharts legend is inside canvas, not DOM-clickable easily.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // The chart grid should contain both charts
@@ -362,7 +362,7 @@ test.describe('downtime-analysis page', () => {
 
   test('tier3_lazy_load_fires_event_detail_request_on_machine_expand', async ({ page }) => {
     // AC-4: Tier 3 events are lazily loaded only when a Tier 2 machine row is expanded.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // Track event-detail requests
@@ -482,7 +482,7 @@ test.describe('downtime-analysis page', () => {
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from([0x50, 0x41, 0x52, 0x31, 0x50, 0x41, 0x52, 0x31]) });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
 
     // The AsyncQueryProgress component should appear while polling
     const progressBar = page.locator('.async-job-progress');
@@ -516,7 +516,7 @@ test.describe('downtime-analysis page', () => {
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(3000); // allow page to settle
 
     // For short-range 200 response, the AsyncQueryProgress bar must NOT be rendered
@@ -574,7 +574,7 @@ test.describe('downtime-analysis page', () => {
       });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(5000); // allow polling to detect failure
 
     // After failure, AsyncQueryProgress bar must NOT remain as a spinner

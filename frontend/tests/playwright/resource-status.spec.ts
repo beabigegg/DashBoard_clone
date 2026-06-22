@@ -238,7 +238,7 @@ async function setupResourceRoutes(page: Page, overrides: {
  * Uses .catch(()=>{}) on goto per ci-workflow.md resilience spec pattern.
  */
 async function gotoResourcePage(page: Page): Promise<void> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
 
   // The portal-shell uses dynamic route registration: routes are added via
   // router.addRoute() after /api/portal/navigation resolves. On initial page

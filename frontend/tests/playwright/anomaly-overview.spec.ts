@@ -189,7 +189,7 @@ async function stubAllDataRoutes(page: Page): Promise<void> {
  * Uses .catch(()=>{}) on goto per CLAUDE.md ci-workflow.md (ECONNREFUSED guard).
  */
 async function gotoPage(page: Page, timeoutMs = 20_000): Promise<boolean> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
 
   // Wait for Vue to mount the theme root — this is the reliable "page rendered" signal.
   // Per CLAUDE.md: check app-specific content (theme class), NOT body text length.
@@ -734,10 +734,10 @@ test.describe('anomaly-overview — browser back/forward navigation', () => {
     if (!mounted) { test.skip(); return; }
 
     // Navigate away to shell home (hash change)
-    await page.goto('/portal-shell.html', { waitUntil: 'networkidle', timeout: 15_000 }).catch(() => {});
+    await page.goto('/portal-shell.html', { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
 
     // Go back to anomaly-overview
-    await page.goBack({ waitUntil: 'networkidle', timeout: 15_000 }).catch(() => {});
+    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(2_000);
 
     // Page must not crash after back navigation

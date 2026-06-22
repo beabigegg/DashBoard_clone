@@ -26,7 +26,7 @@ const SHELL_URL = `${BASE_URL}/portal-shell`;
 async function gotoLoginPageDirectly(page: Page): Promise<void> {
   // /login path is always accessible (bypasses auth guard)
   await page.route('**/*', (route) => route.continue());
-  await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await expect(page.locator('#username')).toBeVisible({ timeout: 15_000 });
 }
 
@@ -83,7 +83,7 @@ test('test_bad_credentials_shows_error', async ({ page }) => {
     }),
   );
 
-  await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await expect(page.locator('#username')).toBeVisible({ timeout: 15_000 });
 
   await page.locator('#username').fill('wrong_user');
@@ -135,7 +135,7 @@ test('test_successful_login_redirects_away_from_login', async ({ page }) => {
     }),
   );
 
-  await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
   await expect(page.locator('#username')).toBeVisible({ timeout: 15_000 });
 
   await page.locator('#username').fill('testuser');

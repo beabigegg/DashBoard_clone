@@ -276,7 +276,7 @@ test.describe('resource-history — RQ async polling flow', () => {
 
     // STEP 4: Navigate directly (no real backend needed — all API calls are mocked above).
     // page.goto() is caught so the test does not fail when no dev server is running in CI.
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
 
     // Guard: if the Vue app did not mount (no dev server), skip all assertions.
     const _body1 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
@@ -337,7 +337,7 @@ test.describe('resource-history — RQ async polling flow', () => {
     );
 
     // STEP 3: Navigate directly (all API calls mocked above).
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
 
     // Guard: skip when no dev server running.
     const _body2 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
@@ -386,7 +386,7 @@ test.describe('resource-history — RQ async polling flow', () => {
     );
 
     // STEP 4: Navigate directly (all API calls mocked above).
-    await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
 
     // STEP 5: Wait for polling to detect the failure and update reactive state.
     // pollJobUntilComplete throws with errorCode 'JOB_FAILED'; the catch block

@@ -103,7 +103,7 @@ async function setupMocks(page: Page): Promise<void> {
 }
 
 async function gotoWipDetailPage(page: Page): Promise<void> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForSelector('[data-testid="wip-detail-app"]', { timeout: 20_000 });
 }
 
@@ -200,7 +200,7 @@ test('test_api_error_shows_banner', async ({ page }) => {
       body: JSON.stringify({ success: false, error: { message: 'Internal Server Error' } }) }),
   );
 
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForSelector('[data-testid="wip-detail-app"]', { timeout: 20_000 });
   await page.waitForSelector('.error-banner-wrap', { timeout: 15_000 });
   const banner = page.locator('.error-banner-wrap').first();
