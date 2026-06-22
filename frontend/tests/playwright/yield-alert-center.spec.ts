@@ -24,6 +24,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { navigateViaSidebar } from './_auth.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -291,10 +292,15 @@ async function registerCatchAllRoutes(page: import('@playwright/test').Page) {
  * Returns whether the Vue app mounted (page-rendered guard).
  */
 async function gotoPage(page: import('@playwright/test').Page): Promise<boolean> {
-  await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
-  // pageRendered: look for the theme class or a Chinese keyword from our app.
-  // Chrome's ECONNREFUSED error page body exceeds 100 chars but contains no
-  // theme class or Chinese text, so this guard is reliable.
+  // portal-shell registers routes dynamically AFTER /api/portal/navigation
+  // resolves, so a direct deep-link goto to PAGE_URL lands on ShellHomeView and
+  // the yield-alert app never mounts.  Navigate via the sidebar (open toggle →
+  // click nav link → wait overlay detach) — the proven portal-shell pattern.
+  await navigateViaSidebar(page, 'yield-alert-center', {
+    waitForSelector: '[data-testid="yield-alert-app"]',
+  }).catch(() => {});
+
+  // pageRendered guard: confirm the app actually mounted (theme keyword or root).
   const bodyText = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
   const appMounted =
     (bodyText ?? '').includes('日期') ||
@@ -527,6 +533,17 @@ test.describe('yield-alert-center', () => {
       }),
     );
 
+    // The app fetches /view (pagination) after the primary query.  The default
+    // catch-all returns non-empty MOCK_VIEW, which would render the table even
+    // on an empty result.  Override /view to empty so the empty-state shows.
+    await page.route('**/api/yield-alert/view**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MOCK_200_EMPTY),
+      }),
+    );
+
     const mounted = await gotoPage(page);
     if (!mounted) {
       console.warn('[yield-alert-center] test_empty_state_no_alerts: no dev server — skip');
@@ -656,10 +673,16 @@ test.describe('yield-alert-center', () => {
       return;
     }
 
-    // Select GC% radio button
+    // Select GC% radio button.  The <input> is visually hidden (class="sr-only")
+    // and its <label> intercepts pointer events, so clicking the input directly
+    // times out.  Click the wrapping label instead (real user interaction).
     const gcRadio = page.locator('[data-testid="process-type-select"] input[value="GC%"]');
-    await expect(gcRadio).toBeVisible({ timeout: 10_000 });
-    await gcRadio.check();
+    const gcLabel = page
+      .locator('[data-testid="process-type-select"] label.process-type-option')
+      .filter({ has: page.locator('input[value="GC%"]') });
+    await expect(gcLabel).toBeVisible({ timeout: 10_000 });
+    await gcLabel.click();
+    await expect(gcRadio).toBeChecked();
 
     // Fill dates and submit
     await page.locator('[data-testid="start-date"]').fill('2026-06-01');

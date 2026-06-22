@@ -246,15 +246,30 @@ async function gotoResourcePage(page: Page): Promise<void> {
   // route is not yet registered. Once the nav loads and routes are registered,
   // we must click the nav link to trigger a new navigation that matches the
   // now-registered /resource route.
-  const navLink = page.locator('a[href="/portal-shell/resource"]').first();
-  const navLinkVisible = await navLink.isVisible().catch(() => false);
-  if (navLinkVisible) {
-    await navLink.click();
-  } else {
-    // Navigation is still loading; wait for it then click.
-    await navLink.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
-    await navLink.click().catch(() => {});
+  //
+  // The sidebar is collapsed by default: the nav link exists in the DOM but is
+  // positioned outside the viewport (transform: translateX). We must open the
+  // sidebar via its toggle before the link is clickable, then close it so the
+  // overlay does not intercept later filter-panel interactions.
+  const toggle = page.locator('button.sidebar-toggle');
+  await toggle.waitFor({ timeout: 10_000 }).catch(() => {});
+  if ((await toggle.getAttribute('aria-expanded').catch(() => null)) !== 'true') {
+    await toggle.click().catch(() => {});
   }
+
+  const navLink = page.locator('a[href="/portal-shell/resource"]').first();
+  await navLink.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+  await navLink.click().catch(() => {});
+
+  // Close the sidebar if it is still expanded so the overlay does not block
+  // subsequent clicks on the filter panel.
+  if ((await toggle.getAttribute('aria-expanded').catch(() => null)) === 'true') {
+    await toggle.click().catch(() => {});
+  }
+  await page
+    .locator('.sidebar-overlay')
+    .waitFor({ state: 'detached', timeout: 3_000 })
+    .catch(() => {});
 
   // Guard: wait for the resource-status SPA root to mount.
   await page.waitForSelector('[data-testid="resource-status-app"]', { timeout: 20_000 }).catch(() => {});

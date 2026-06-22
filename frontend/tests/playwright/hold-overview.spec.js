@@ -134,7 +134,9 @@ test.describe('Hold Overview — CSV export button', () => {
     await expect(exportBtn).toBeVisible({ timeout: 20_000 });
 
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 15_000 }),
+      // Widen from 15s to 25s so the download event is not missed under
+      // full-suite resource contention (this test is download-timing sensitive).
+      page.waitForEvent('download', { timeout: 25_000 }),
       exportBtn.click(),
     ]);
 

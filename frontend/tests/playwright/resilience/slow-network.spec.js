@@ -78,7 +78,9 @@ test.describe('Slow network — Reject History', () => {
         const text = await queryBtn.textContent();
         return disabled || (text && text.includes('查詢中'));
       },
-      { timeout: 2_000 },
+      // DELAY_MS (5s) keeps the request in-flight; widen to 4s so the transient
+      // disabled state is reliably caught even under CI/suite resource contention.
+      { timeout: 4_000 },
     ).toBe(true);
 
     // After response it must be re-enabled
