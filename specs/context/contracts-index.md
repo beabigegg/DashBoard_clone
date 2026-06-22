@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 3584a9dfe516391abbc299816ecd4680f5085b773c05eb0f79ab350207b5f72f
+inputs-digest: 08ead52199e8e4838aa74b3e33a32a82b93432f7dac7937970658a16a3feb7e9
 ---
 
 # Contracts Index

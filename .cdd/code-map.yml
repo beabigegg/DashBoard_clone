@@ -1,6 +1,6 @@
-# generated: 2026-06-20T11:56:14Z by cdd-kit 3.3.0
-# files: 942, src-lines: 281936, map-lines: 20750, compression: 13.6x
-# sources-digest: d6ad1faf8aea34d2a303f0b4c16b91a42a6dfc7ad1192a9555421d2a7c4313e0
+# generated: 2026-06-22T23:34:05Z by cdd-kit 3.4.0
+# files: 950, src-lines: 285537, map-lines: 20888, compression: 13.7x
+# sources-digest: f99eff577c066648fe8a5fe8d741dc7c76930b6853fdf88fa3d5ccb5ce43387a
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -285,7 +285,7 @@ frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
 
 frontend/src/admin-pages/App.vue:  # 182 lines
 
-frontend/src/admin-pages/components/DrawerManagementPanel.vue:  # 149 lines
+frontend/src/admin-pages/components/DrawerManagementPanel.vue:  # 150 lines
 
 frontend/src/admin-pages/components/PagesManagementPanel.vue:  # 94 lines
 
@@ -2726,6 +2726,22 @@ frontend/tests/pending-jobs-registry.test.js:  # 177 lines
   functions:
     - { name: makeLocalStorageStub, lines: 20-29 }
 
+frontend/tests/playwright/_api-mode.ts:  # 225 lines
+  imports:
+    - { module: '@playwright/test', items: [Page], line: 22 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, BASE_URL], line: 23 }
+  constants:
+    - { name: USE_MOCKS, line: 32 }
+  functions:
+    - { name: async conditionalRoute, lines: 43-51 }
+    - { name: buildNavWith, lines: 57-82 }
+    - { name: async setupMockedShell, lines: 85-136 }
+    - { name: async clickSidebarLink, lines: 139-163 }
+    - { name: async navigateMocked, lines: 181-199 }
+    - { name: async navigateDual, lines: 211-225 }
+  interfaces:
+    - { name: NavigateOpts, lines: 169-174 }
+
 frontend/tests/playwright/_auth.js:  # 207 lines
   constants:
     - { name: BASE_URL, line: 12 }
@@ -2755,6 +2771,31 @@ frontend/tests/playwright/admin-dashboard.spec.ts:  # 382 lines
   functions:
     - { name: async installBaseRoutes, lines: 117-204 }
     - { name: async gotoAdminDashboard, lines: 210-218 }
+
+frontend/tests/playwright/admin-pages.spec.ts:  # 232 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 17 }
+  constants:
+    - { name: BASE_URL, line: 19 }
+    - { name: PAGE_URL, line: 23 }
+    - { name: MOCK_DRAWERS, line: 25 }
+    - { name: MOCK_PAGES, line: 35 }
+    - { name: MOCK_CREATE_DRAWER_RESP, line: 46 }
+  functions:
+    - { name: async setupMocks, lines: 51-117 }
+    - { name: async gotoAdminPagesPage, lines: 119-126 }
+
+frontend/tests/playwright/ai-query-panel.spec.ts:  # 410 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 22 }
+  constants:
+    - { name: BASE_URL, line: 24 }
+    - { name: SHELL_URL, line: 25 }
+  functions:
+    - { name: buildNavMock, lines: 31-56 }
+    - { name: async setupPortalMocks, lines: 58-77 }
+    - { name: async gotoShell, lines: 79-83 }
+    - { name: async openAiPanel, lines: 85-88 }
 
 frontend/tests/playwright/anomaly-overview.spec.ts:  # 819 lines
   imports:
@@ -2896,6 +2937,19 @@ frontend/tests/playwright/eap-alarm.spec.js:  # 388 lines
     - { name: async setupEapAlarmMocks, lines: 128-196 }
     - { name: async submitAndWaitForResults, lines: 202-237 }
 
+frontend/tests/playwright/hold-detail.spec.ts:  # 206 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 18 }
+  constants:
+    - { name: BASE_URL, line: 20 }
+    - { name: PAGE_URL, line: 21 }
+    - { name: MOCK_SUMMARY, line: 23 }
+    - { name: MOCK_DISTRIBUTION, line: 35 }
+    - { name: MOCK_LOTS, line: 55 }
+  functions:
+    - { name: async setupMocks, lines: 66-100 }
+    - { name: async gotoHoldDetailPage, lines: 102-105 }
+
 frontend/tests/playwright/hold-history-filter.spec.ts:  # 542 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 19 }
@@ -2926,15 +2980,39 @@ frontend/tests/playwright/hold-history-flat-table.spec.js:  # 313 lines
   functions:
     - { name: async setupBaseRoutes, lines: 91-123 }
 
-frontend/tests/playwright/hold-overview.spec.js:  # 167 lines
+frontend/tests/playwright/hold-overview.spec.js:  # 169 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 7 }
     - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 8 }
 
-frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 142 lines
+frontend/tests/playwright/job-abandon-on-unload.spec.js:  # 498 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 13 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, BASE_URL], line: 14 }
+    - { module: '@playwright/test', items: [test, expect], line: 19 }
+    - { module: './_api-mode.js', items: [USE_MOCKS, navigateMocked, BASE_URL], line: 20 }
+    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 21 }
+  constants:
+    - { name: FAKE_JOB_ID, line: 27 }
+    - { name: FAKE_JOB_ID_B, line: 28 }
+    - { name: FAKE_PREFIX, line: 29 }
+    - { name: STORAGE_KEY, line: 30 }
+  functions:
+    - { name: async injectJobs, lines: 41-49 }
+    - { name: async readJobs, lines: 56-64 }
+    - { name: makeRejectHistoryMocks, lines: 79-123 }
+
+frontend/tests/playwright/job-query.spec.ts:  # 261 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 17 }
+  constants:
+    - { name: BASE_URL, line: 19 }
+    - { name: PAGE_URL, line: 20 }
+    - { name: MOCK_RESOURCES, line: 22 }
+    - { name: MOCK_JOBS, line: 33 }
+    - { name: MOCK_TXN, line: 61 }
+  functions:
+    - { name: async setupMocks, lines: 79-121 }
+    - { name: async gotoJobQueryPage, lines: 123-126 }
+    - { name: async selectFirstEquipment, lines: 128-139 }
 
 frontend/tests/playwright/material-consumption-data-boundary.spec.ts:  # 187 lines
   imports:
@@ -3021,6 +3099,16 @@ frontend/tests/playwright/mid-section-defect.spec.ts:  # 543 lines
     - { name: async installBaseRoutes, lines: 161-237 }
     - { name: async gotoPage, lines: 244-254 }
 
+frontend/tests/playwright/portal-shell-login.spec.ts:  # 148 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 16 }
+  constants:
+    - { name: BASE_URL, line: 18 }
+    - { name: LOGIN_URL, line: 19 }
+    - { name: SHELL_URL, line: 20 }
+  functions:
+    - { name: async gotoLoginPageDirectly, lines: 26-31 }
+
 frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 14 }
@@ -3033,28 +3121,34 @@ frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
     - { name: async selectOption, lines: 113-127 }
     - { name: async readOptions, lines: 130-140 }
 
-frontend/tests/playwright/production-history-filter-options-error.spec.ts:  # 59 lines
+frontend/tests/playwright/production-history-filter-options-error.spec.ts:  # 247 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 12 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar, mockApiError], line: 13 }
+    - { module: '@playwright/test', items: [test, expect, Page], line: 17 }
+    - { module: './_api-mode.js', items: [navigateMocked], line: 18 }
+    - { module: './_auth.js', items: [mockApiError], line: 19 }
+  functions:
+    - { name: async gotoWithFilterOptionsError, lines: 25-37 }
 
-frontend/tests/playwright/production-history-multi-line-input.spec.ts:  # 155 lines
+frontend/tests/playwright/production-history-multi-line-input.spec.ts:  # 345 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 23 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 24 }
+    - { module: '@playwright/test', items: [test, expect, Page, Request], line: 30 }
+    - { module: './_api-mode.js', items: [USE_MOCKS, navigateDual], line: 31 }
   constants:
-    - { name: FILTER_OPTIONS_PAYLOAD, line: 26 }
+    - { name: FILTER_OPTIONS_PAYLOAD, line: 37 }
   functions:
-    - { name: async installMocks, lines: 42-84 }
-    - { name: async switchToIdentifierTab, lines: 89-94 }
+    - { name: buildFeatureMocks, lines: 64-110 }
+    - { name: async navigateToIdentifierTab, lines: 124-141 }
 
-frontend/tests/playwright/production-history-pruning-feedback.spec.ts:  # 103 lines
+frontend/tests/playwright/production-history-pruning-feedback.spec.ts:  # 355 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect, Page], line: 10 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+    - { module: '@playwright/test', items: [test, expect, Page], line: 16 }
+    - { module: './_api-mode.js', items: [navigateMocked], line: 17 }
   functions:
-    - { name: async installPruningMock, lines: 13-46 }
-    - { name: async pickByTestidLabel, lines: 48-58 }
+    - { name: async installPruningMock, lines: 31-64 }
+    - { name: async installMultiFieldPruningMock, lines: 70-95 }
+    - { name: async installConsecutivePruningMock, lines: 106-137 }
+    - { name: async pickByTestidLabel, lines: 143-153 }
+    - { name: async waitForPackageFilterResponse, lines: 160-169 }
 
 frontend/tests/playwright/production-history-query-mode-tabs.spec.ts:  # 189 lines
   imports:
@@ -3075,7 +3169,7 @@ frontend/tests/playwright/production-history-wildcard-paste.spec.ts:  # 203 line
     - { name: async installMocks, lines: 34-97 }
     - { name: async switchToIdentifierTab, lines: 103-108 }
 
-frontend/tests/playwright/qc-gate.spec.ts:  # 687 lines
+frontend/tests/playwright/qc-gate.spec.ts:  # 698 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 23 }
     - { module: './_auth.js', items: [navigateViaSidebar], line: 24 }
@@ -3108,19 +3202,27 @@ frontend/tests/playwright/query-tool-filters.spec.ts:  # 534 lines
     - { name: async switchToEquipmentTab, lines: 147-152 }
     - { name: async selectFirstEquipment, lines: 154-167 }
 
-frontend/tests/playwright/query-tool-url-state.spec.js:  # 92 lines
+frontend/tests/playwright/query-tool-url-state.spec.js:  # 266 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 1 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 3 }
-  functions:
-    - { name: async openQueryToolUrlWithRetry, lines: 5-26 }
-
-frontend/tests/playwright/query-tool.spec.js:  # 78 lines
-  imports:
-    - { module: '@playwright/test', items: [test, expect], line: 8 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 9 }
+    - { module: '@playwright/test', items: [test, expect], line: 12 }
+    - { module: './_api-mode.js', items: [navigateDual, USE_MOCKS, BASE_URL], line: 13 }
   constants:
-    - { name: DUMMY_LOT_ID, line: 11 }
+    - { name: MOCK_WORKCENTER_GROUPS, line: 19 }
+    - { name: MOCK_EQUIPMENT_LIST, line: 29 }
+  functions:
+    - { name: async openQueryToolUrlWithRetry, lines: 48-72 }
+    - { name: buildFeatureMocks, lines: 79-96 }
+
+frontend/tests/playwright/query-tool.spec.js:  # 298 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 17 }
+    - { module: './_api-mode.js', items: [USE_MOCKS, conditionalRoute, navigateDual], line: 18 }
+  constants:
+    - { name: MOCK_WORKCENTER_GROUPS, line: 24 }
+    - { name: MOCK_EQUIPMENT_LIST, line: 34 }
+    - { name: MOCK_EQUIPMENT_PERIOD, line: 44 }
+    - { name: MOCK_RESOLVE, line: 59 }
+    - { name: DUMMY_LOT_ID, line: 66 }
 
 frontend/tests/playwright/reject-history-filter.spec.ts:  # 525 lines
   imports:
@@ -3201,7 +3303,7 @@ frontend/tests/playwright/resilience/resource-history-progress-503.spec.js:  # 1
   functions:
     - { name: async setupResourceHistoryWithBatchQuery, lines: 21-65 }
 
-frontend/tests/playwright/resilience/slow-network.spec.js:  # 141 lines
+frontend/tests/playwright/resilience/slow-network.spec.js:  # 143 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 11 }
     - { module: '../_auth.js', items: [loginViaApi, navigateViaSidebar, waitForIdleUi], line: 12 }
@@ -3210,7 +3312,7 @@ frontend/tests/playwright/resilience/slow-network.spec.js:  # 141 lines
   functions:
     - { name: async setupRejectHistoryWithSlowQuery, lines: 16-43 }
 
-frontend/tests/playwright/resource-history-async.spec.ts:  # 452 lines
+frontend/tests/playwright/resource-history-async.spec.ts:  # 442 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 23 }
   constants:
@@ -3233,7 +3335,7 @@ frontend/tests/playwright/resource-history-async.spec.ts:  # 452 lines
   functions:
     - { name: async registerCatchAllRoutes, lines: 186-241 }
 
-frontend/tests/playwright/resource-status.spec.ts:  # 542 lines
+frontend/tests/playwright/resource-status.spec.ts:  # 557 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 25 }
   constants:
@@ -3246,34 +3348,70 @@ frontend/tests/playwright/resource-status.spec.ts:  # 542 lines
     - { name: makeMockEquipment, lines: 62-122 }
     - { name: async setupShellRoutes, lines: 144-199 }
     - { name: async setupResourceRoutes, lines: 202-234 }
-    - { name: async gotoResourcePage, lines: 240-261 }
+    - { name: async gotoResourcePage, lines: 240-276 }
 
-frontend/tests/playwright/wip-matrix-drilldown.spec.js:  # 111 lines
+frontend/tests/playwright/wip-detail.spec.ts:  # 208 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 10 }
-    - { module: './_auth.js', items: [loginViaApi, navigateViaSidebar], line: 11 }
+    - { module: '@playwright/test', items: [test, expect, Page], line: 17 }
+  constants:
+    - { name: BASE_URL, line: 19 }
+    - { name: PAGE_URL, line: 20 }
+    - { name: MOCK_FILTER_OPTIONS, line: 22 }
+    - { name: MOCK_DETAIL, line: 37 }
+    - { name: MOCK_LOT_DETAIL, line: 57 }
+  functions:
+    - { name: async setupMocks, lines: 68-103 }
+    - { name: async gotoWipDetailPage, lines: 105-108 }
 
-frontend/tests/playwright/yield-alert-center.spec.ts:  # 766 lines
+frontend/tests/playwright/wip-matrix-drilldown.spec.js:  # 414 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 29 }
+    - { module: './_api-mode.js', items: [USE_MOCKS, navigateDual, navigateMocked, BASE_URL], line: 30 }
+    - { module: './_auth.js', items: [loginViaApi], line: 31 }
+  constants:
+    - { name: MOCK_SUMMARY, line: 37 }
+    - { name: MOCK_MATRIX, line: 52 }
+    - { name: MOCK_FILTER_OPTIONS, line: 67 }
+    - { name: MOCK_EMPTY_MATRIX, line: 77 }
+  functions:
+    - { name: async registerWipMocks, lines: 99-121 }
+    - { name: async gotoWipOverview, lines: 128-167 }
+
+frontend/tests/playwright/wip-overview.spec.ts:  # 184 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 16 }
+  constants:
+    - { name: BASE_URL, line: 18 }
+    - { name: PAGE_URL, line: 19 }
+    - { name: MOCK_SUMMARY, line: 21 }
+    - { name: MOCK_MATRIX, line: 36 }
+    - { name: MOCK_FILTER_OPTIONS, line: 51 }
+  functions:
+    - { name: async setupMocks, lines: 66-103 }
+    - { name: async gotoWipOverview, lines: 105-111 }
+
+frontend/tests/playwright/yield-alert-center.spec.ts:  # 789 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 26 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 27 }
   constants:
-    - { name: BASE_URL, line: 32 }
-    - { name: PAGE_URL, line: 33 }
-    - { name: JOB_ID, line: 35 }
-    - { name: QUERY_ID, line: 36 }
-    - { name: STATUS_URL, line: 37 }
-    - { name: MOCK_META, line: 39 }
-    - { name: MOCK_FILTER_OPTIONS, line: 45 }
-    - { name: MOCK_200_SYNC, line: 54 }
-    - { name: MOCK_202, line: 112 }
-    - { name: MOCK_JOB_STARTED, line: 124 }
-    - { name: MOCK_JOB_FINISHED, line: 139 }
-    - { name: MOCK_VIEW, line: 154 }
-    - { name: MOCK_200_EMPTY, line: 164 }
-    - { name: MOCK_REASON_DETAIL, line: 180 }
+    - { name: BASE_URL, line: 33 }
+    - { name: PAGE_URL, line: 34 }
+    - { name: JOB_ID, line: 36 }
+    - { name: QUERY_ID, line: 37 }
+    - { name: STATUS_URL, line: 38 }
+    - { name: MOCK_META, line: 40 }
+    - { name: MOCK_FILTER_OPTIONS, line: 46 }
+    - { name: MOCK_200_SYNC, line: 55 }
+    - { name: MOCK_202, line: 113 }
+    - { name: MOCK_JOB_STARTED, line: 125 }
+    - { name: MOCK_JOB_FINISHED, line: 140 }
+    - { name: MOCK_VIEW, line: 155 }
+    - { name: MOCK_200_EMPTY, line: 165 }
+    - { name: MOCK_REASON_DETAIL, line: 181 }
   functions:
-    - { name: async registerCatchAllRoutes, lines: 208-286 }
-    - { name: async gotoPage, lines: 293-304 }
+    - { name: async registerCatchAllRoutes, lines: 209-287 }
+    - { name: async gotoPage, lines: 294-310 }
 
 frontend/tests/query-tool/App.url-state.test.js:  # 430 lines
   imports:

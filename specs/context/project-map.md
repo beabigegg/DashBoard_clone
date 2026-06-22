@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 180
-visible-files: 936
+visible-dirs: 189
+visible-files: 1013
 omitted-dirs: 61
-truncated-dirs: 5
+truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -103,7 +103,7 @@ DashBoard_vite/
 |   |   |-- 209aa30bab8411f2
 |   |   |-- 20a29d650996dc03
 |   |   |-- 2240f61bb7e8003e
-|   |   \-- ... (289 more entries truncated; cap=50)
+|   |   \-- ... (299 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -496,6 +496,11 @@ DashBoard_vite/
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
 |   |-- test-results/
+|   |   |-- hold-detail-test-pagination-buttons-visible-chromium/
+|   |   |   |-- error-context.md
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
 |   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
@@ -557,28 +562,47 @@ DashBoard_vite/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- resilience/
 |   |   |   |   \-- ... (max depth)
+|   |   |   |-- _api-mode.ts
 |   |   |   |-- _auth.js
+|   |   |   |-- admin-dashboard.spec.ts
+|   |   |   |-- admin-pages.spec.ts
+|   |   |   |-- ai-query-panel.spec.ts
+|   |   |   |-- anomaly-overview.spec.ts
 |   |   |   |-- downtime-analysis.spec.js
 |   |   |   |-- downtime-analysis.spec.ts
+|   |   |   |-- eap-alarm-filters.spec.ts
 |   |   |   |-- eap-alarm.spec.js
+|   |   |   |-- hold-detail.spec.ts
+|   |   |   |-- hold-history-filter.spec.ts
 |   |   |   |-- hold-history-flat-table.spec.js
 |   |   |   |-- hold-overview.spec.js
 |   |   |   |-- job-abandon-on-unload.spec.js
+|   |   |   |-- job-query.spec.ts
 |   |   |   |-- material-consumption-data-boundary.spec.ts
 |   |   |   |-- material-consumption-resilience.spec.ts
 |   |   |   |-- material-consumption.spec.ts
+|   |   |   |-- material-trace.spec.ts
+|   |   |   |-- mid-section-defect.spec.ts
+|   |   |   |-- portal-shell-login.spec.ts
 |   |   |   |-- production-history-cross-filter.spec.ts
 |   |   |   |-- production-history-filter-options-error.spec.ts
 |   |   |   |-- production-history-multi-line-input.spec.ts
 |   |   |   |-- production-history-pruning-feedback.spec.ts
 |   |   |   |-- production-history-query-mode-tabs.spec.ts
 |   |   |   |-- production-history-wildcard-paste.spec.ts
+|   |   |   |-- qc-gate.spec.ts
+|   |   |   |-- query-tool-filters.spec.ts
 |   |   |   |-- query-tool-url-state.spec.js
 |   |   |   |-- query-tool.spec.js
+|   |   |   |-- reject-history-filter.spec.ts
 |   |   |   |-- reject-history.spec.js
 |   |   |   |-- reject-material-flat-table.spec.js
 |   |   |   |-- resource-history-async.spec.ts
-|   |   |   \-- wip-matrix-drilldown.spec.js
+|   |   |   |-- resource-status.spec.ts
+|   |   |   |-- wip-detail.spec.ts
+|   |   |   |-- wip-matrix-drilldown.spec.js
+|   |   |   |-- wip-overview.spec.ts
+|   |   |   \-- yield-alert-center.spec.ts
 |   |   |-- query-tool/
 |   |   |   |-- App.url-state.test.js
 |   |   |   |-- EquipmentRejectsTable.test.js
@@ -616,8 +640,61 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
+|   |   |-- access_20260622_181910.log
+|   |   |-- access_20260622_184141.log
+|   |   |-- access_20260622_184539.log
+|   |   |-- access_20260622_184849.log
+|   |   |-- access_20260622_193813.log
+|   |   |-- access_20260622_200629.log
+|   |   |-- access_20260622_203820.log
+|   |   |-- access_20260622_204808.log
+|   |   |-- access_20260622_205546.log
+|   |   |-- access_20260622_211005.log
+|   |   |-- error_20260622_184141.log
+|   |   |-- error_20260622_184539.log
+|   |   |-- error_20260622_184849.log
+|   |   |-- error_20260622_193813.log
+|   |   |-- error_20260622_200629.log
+|   |   |-- error_20260622_203820.log
+|   |   |-- error_20260622_204808.log
+|   |   |-- error_20260622_204923.log
+|   |   |-- error_20260622_205546.log
+|   |   |-- error_20260622_211005.log
+|   |   |-- rq_downtime_worker_20260622_184141.log
+|   |   |-- rq_downtime_worker_20260622_184539.log
+|   |   |-- rq_downtime_worker_20260622_184849.log
+|   |   |-- rq_downtime_worker_20260622_193813.log
+|   |   |-- rq_downtime_worker_20260622_200629.log
+|   |   |-- rq_downtime_worker_20260622_203820.log
+|   |   |-- rq_downtime_worker_20260622_204808.log
+|   |   |-- rq_downtime_worker_20260622_204923.log
+|   |   |-- rq_downtime_worker_20260622_205546.log
+|   |   |-- rq_downtime_worker_20260622_211005.log
+|   |   |-- rq_eap_alarm_worker_20260622_184141.log
+|   |   |-- rq_eap_alarm_worker_20260622_184539.log
+|   |   |-- rq_eap_alarm_worker_20260622_184849.log
+|   |   |-- rq_eap_alarm_worker_20260622_193813.log
+|   |   |-- rq_eap_alarm_worker_20260622_200629.log
+|   |   |-- rq_eap_alarm_worker_20260622_203820.log
+|   |   |-- rq_eap_alarm_worker_20260622_204808.log
+|   |   |-- rq_eap_alarm_worker_20260622_204923.log
+|   |   |-- rq_eap_alarm_worker_20260622_205546.log
+|   |   |-- rq_eap_alarm_worker_20260622_211005.log
+|   |   |-- rq_hold_hist_worker_20260622_184141.log
+|   |   |-- rq_hold_hist_worker_20260622_184539.log
+|   |   |-- rq_hold_hist_worker_20260622_184849.log
+|   |   |-- rq_hold_hist_worker_20260622_193813.log
+|   |   |-- rq_hold_hist_worker_20260622_200629.log
+|   |   |-- rq_hold_hist_worker_20260622_203820.log
+|   |   |-- rq_hold_hist_worker_20260622_204808.log
+|   |   |-- rq_hold_hist_worker_20260622_204923.log
+|   |   |-- rq_hold_hist_worker_20260622_205546.log
+|   |   |-- rq_hold_hist_worker_20260622_211005.log
+|   |   \-- ... (80 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
 |   |-- metrics_history.sqlite
@@ -627,6 +704,7 @@ DashBoard_vite/
 |   |-- rq_hold_history_worker.log
 |   |-- rq_msd_worker.log
 |   |-- rq_prod_hist_worker.log
+|   |-- rq_query_tool_worker.log
 |   |-- rq_reject_worker.log
 |   |-- rq_resource_worker.log
 |   |-- rq_warmup_worker.log
@@ -1125,12 +1203,29 @@ DashBoard_vite/
 |   \-- ... (183 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
+|   |   |-- eap_alarm/
 |   |   \-- test_ns/
 |   |-- query_spool/
-|   |   |-- downtime_analysis/
-|   |   |-- msd-events/
-|   |   |   |-- tmp0m0u_2ua.parquet
-|   |   |   \-- tmpy80d5t9v.parquet
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- anomaly_reject_dataset/
+|   |   |   \-- 858f092b53042f96.parquet
+|   |   |-- anomaly_resource_dataset/
+|   |   |   \-- daa76e309ed12ee6.parquet
+|   |   |-- anomaly_yield_dataset/
+|   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- 1f99be41ba1cf6b8.parquet
+|   |   |-- reject_dataset/
+|   |   |   \-- 22870446b15e1cbb.parquet
+|   |   |-- resource_dataset/
+|   |   |   |-- 227afb3ff4443cd4.parquet
+|   |   |   \-- 2bc2c08cd983fcd5.parquet
+|   |   |-- resource_oee/
+|   |   |   |-- 233797155faef9c4.parquet
+|   |   |   \-- b6013f93cc201dc6.parquet
+|   |   |-- yield_alert_dataset/
+|   |   |   \-- b67e8f6a2499507c.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_10707.json
@@ -1172,17 +1267,9 @@ DashBoard_vite/
 |   |   |-- probe_162216.json
 |   |   |-- probe_163309.json
 |   |   |-- probe_163320.json
-|   |   |-- probe_163610.json
-|   |   |-- probe_164709.json
-|   |   |-- probe_164716.json
-|   |   |-- probe_165113.json
-|   |   |-- probe_165674.json
-|   |   |-- probe_166368.json
-|   |   |-- probe_166780.json
-|   |   \-- ... (525 more entries truncated; cap=50)
+|   |   \-- ... (568 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
-|   |-- mes_dashboard_restart.flag
 |   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py
