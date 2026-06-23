@@ -2011,7 +2011,7 @@ do_dev() {
     local vite_dev_log="${LOG_DIR}/vite_dev.log"
 
     log_info "Starting Flask dev server (port ${PORT})..."
-    FLASK_ENV=development FLASK_DEBUG=1 FRONTEND_BUILD_MODE=never \
+    FLASK_APP=mes_dashboard FLASK_ENV=development FLASK_DEBUG=1 FRONTEND_BUILD_MODE=never \
         flask run --host=0.0.0.0 --port="${PORT}" \
         >> "${flask_dev_log}" 2>&1 &
     local flask_pid=$!
@@ -2024,12 +2024,24 @@ do_dev() {
     }
     trap '_dev_cleanup' INT TERM EXIT
 
-    sleep 1
-    if ! kill -0 "${flask_pid}" 2>/dev/null; then
-        log_error "Flask dev server failed to start; check ${flask_dev_log}"
+    log_info "Waiting for Flask to be ready on port ${PORT}..."
+    local waited=0
+    while [ "$waited" -lt 60 ]; do
+        if ! kill -0 "${flask_pid}" 2>/dev/null; then
+            log_error "Flask dev server died; check ${flask_dev_log}"
+            return 1
+        fi
+        if lsof -i ":${PORT}" -sTCP:LISTEN &>/dev/null; then
+            break
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    if ! lsof -i ":${PORT}" -sTCP:LISTEN &>/dev/null; then
+        log_error "Flask did not listen on port ${PORT} after ${waited}s; check ${flask_dev_log}"
         return 1
     fi
-    log_success "Flask dev server started (PID: ${flask_pid})"
+    log_success "Flask dev server ready (PID: ${flask_pid}, ${waited}s)"
     log_info "Backend URL: http://localhost:${PORT}"
     log_info "Flask log:   ${flask_dev_log}"
     echo ""
