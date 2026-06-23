@@ -114,12 +114,33 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* ── KPI top row: 2 summary cards + 2 status-mix donuts ──────────────── */
+
+.theme-wip-overview .wip-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 1100px) {
+  .theme-wip-overview .wip-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .theme-wip-overview .wip-kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .theme-wip-overview .wip-status-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: theme('spacing.token.p28');
-  margin-bottom: theme('spacing.token.p16');
+  gap: 10px;
+  margin-top: 6px;
+  margin-bottom: 12px;
 }
 
 .theme-wip-overview .wip-status-card {
@@ -134,7 +155,10 @@
 
 .theme-wip-overview .wip-status-card:hover {
   transform: var(--hover-lift);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 0 0 1px var(--card-glow-ring, rgba(0,0,0,0.1)),
+    0 0 20px var(--card-glow-halo, rgba(0,0,0,0.1)),
+    0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
 .theme-wip-overview .wip-status-card .status-header {
@@ -147,43 +171,80 @@
 }
 
 .theme-wip-overview .wip-status-card .status-header .dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: currentColor;
+  animation: dot-breathe 2.4s ease-in-out infinite;
 }
+
+@keyframes dot-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--dot-glow-color); opacity: 1; }
+  50%       { box-shadow: 0 0 0 5px transparent; opacity: 0.75; }
+}
+
+.theme-wip-overview .wip-status-card.run .dot            { --dot-glow-color: rgba(34, 197, 94, 0.7); }
+.theme-wip-overview .wip-status-card.queue .dot          { --dot-glow-color: rgba(245, 158, 11, 0.7); }
+.theme-wip-overview .wip-status-card.quality-hold .dot   { --dot-glow-color: rgba(239, 68, 68, 0.7); }
+.theme-wip-overview .wip-status-card.non-quality-hold .dot { --dot-glow-color: rgba(249, 115, 22, 0.7); }
 
 .theme-wip-overview .wip-status-card .status-values {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
 }
 
-.theme-wip-overview .wip-status-card .status-values span {
-  font-size: 24px;
+.theme-wip-overview .wip-status-card .status-val-grp {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.theme-wip-overview .wip-status-card .status-val-num {
+  font-size: 22px;
   font-weight: 700;
+  line-height: 1.15;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.theme-wip-overview .wip-status-card .status-val-unit {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.55;
   color: var(--text);
 }
 
 .theme-wip-overview .wip-status-card.run {
   background: theme('colors.token.hf0fdf4');
   border-color: theme('colors.token.h22c55e');
+  --card-glow-ring: rgba(34, 197, 94, 0.3);
+  --card-glow-halo: rgba(34, 197, 94, 0.2);
 }
 
 .theme-wip-overview .wip-status-card.queue {
   background: theme('colors.token.hfffbeb');
   border-color: theme('colors.token.hf59e0b');
+  --card-glow-ring: rgba(245, 158, 11, 0.3);
+  --card-glow-halo: rgba(245, 158, 11, 0.2);
 }
 
 .theme-wip-overview .wip-status-card.quality-hold {
   background: theme('colors.token.hfef2f2');
   border-color: theme('colors.token.hef4444');
+  --card-glow-ring: rgba(239, 68, 68, 0.3);
+  --card-glow-halo: rgba(239, 68, 68, 0.2);
 }
 
 .theme-wip-overview .wip-status-card.non-quality-hold {
   background: theme('colors.token.hfff7ed');
   border-color: theme('colors.token.hf97316');
+  --card-glow-ring: rgba(249, 115, 22, 0.3);
+  --card-glow-halo: rgba(249, 115, 22, 0.2);
 }
 
 .theme-wip-overview .wip-status-card.run .status-header {
@@ -263,8 +324,7 @@
 
 .theme-wip-overview .card-body.matrix-container {
   padding: 0;
-  max-height: 500px;
-  overflow: auto;
+  overflow-x: auto;
 }
 
 .theme-wip-overview .matrix-table {
@@ -409,6 +469,42 @@
 
 .theme-wip-overview .wip-chart-body {
   padding: theme('spacing.token.p10');
+  position: relative;
+  overflow: hidden;
+}
+
+/* Light-sweep shimmer: slides left→right once on card hover */
+.theme-wip-overview .wip-chart-body::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.13) 50%,
+    transparent 100%
+  );
+  transform: translateX(-160%) skewX(-10deg);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.theme-wip-overview .wip-chart-card:hover .wip-chart-body::after {
+  animation: wip-bar-shimmer 0.85s ease-out forwards;
+}
+
+@keyframes wip-bar-shimmer {
+  from { transform: translateX(-160%) skewX(-10deg); }
+  to   { transform: translateX(290%) skewX(-10deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wip-overview .wip-chart-card:hover .wip-chart-body::after {
+    animation: none;
+  }
 }
 
 .theme-wip-overview .wip-charts-row {
@@ -425,13 +521,61 @@
   overflow: hidden;
 }
 
+.theme-wip-overview .wip-chart-vchart-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
 .theme-wip-overview .wip-echarts {
   width: 100%;
   min-height: 200px;
 }
 
+/* ── Bar-level shimmer: looping light strip while hovering a bar ───────── */
+
+.theme-wip-overview .wip-bar-shimmer {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 3px;
+}
+
+.theme-wip-overview .wip-bar-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 55%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  animation: wip-bar-shimmer-loop 1.1s ease-in-out infinite;
+}
+
+@keyframes wip-bar-shimmer-loop {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wip-overview .wip-bar-shimmer::after {
+    animation: none;
+  }
+}
+
 @media (max-width: 900px) {
   .theme-wip-overview .wip-charts-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wip-overview .wip-status-card .status-header .dot {
+    animation: none;
   }
 }

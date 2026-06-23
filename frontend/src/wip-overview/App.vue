@@ -14,10 +14,10 @@ import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
-import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import FilterPanel from './components/FilterPanel.vue';
 import MatrixTable from './components/MatrixTable.vue';
 import StatusCards from './components/StatusCards.vue';
+import StatusMixDonut from './components/StatusMixDonut.vue';
 import WipDistributionCharts from './components/WipDistributionCharts.vue';
 
 // ── Local type aliases ──────────────────────────────────────────────────────
@@ -527,20 +527,31 @@ onBeforeUnmount(() => {
       @draft-change="onFilterDraftChange"
     />
 
-    <SummaryCardGroup :columns="2">
+    <div class="wip-kpi-row">
       <SummaryCard
         label="Total Lots"
         :value="summary?.totalLots"
+        :sub-value="summary?.totalLots"
         format="number"
         accent="brand"
       />
       <SummaryCard
-        label="Total QTY"
+        label="Total QTY · PCS"
         :value="summary?.totalQtyPcs"
+        :sub-value="summary?.totalQtyPcs"
+        sub-unit=" pcs"
         format="number"
         accent="info"
       />
-    </SummaryCardGroup>
+      <StatusMixDonut
+        :data="summary?.byWipStatus || {}"
+        mode="lots"
+      />
+      <StatusMixDonut
+        :data="summary?.byWipStatus || {}"
+        mode="pcs"
+      />
+    </div>
 
     <StatusCards
       :summary="summary?.byWipStatus || {}"

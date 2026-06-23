@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useTransition, TransitionPresets } from '@vueuse/core'
 
 interface Props {
   label: string;
@@ -12,6 +13,8 @@ interface Props {
   warningThreshold?: number;
   dangerThreshold?: number;
   thresholdValue?: number;
+  subValue?: number | null;
+  subUnit?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -21,6 +24,8 @@ const props = withDefaults(defineProps<Props>(), {
   tooltip: null,
   clickable: false,
   active: false,
+  subValue: null,
+  subUnit: '',
 });
 
 const emit = defineEmits<{
@@ -36,29 +41,57 @@ const accentColor = computed(() => {
   return props.accent ?? 'brand'
 })
 
+// ── Count-up animation for main value ────────────────────────────────────
+
+const mainSource = ref(0)
+watch(
+  () => {
+    const v = props.value
+    if (v === null || v === undefined) return 0
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  },
+  (val) => { mainSource.value = val },
+  { immediate: true },
+)
+const animatedMain = useTransition(mainSource, {
+  duration: 900,
+  transition: TransitionPresets.easeOutExpo,
+})
+
 const formattedValue = computed(() => {
   const v = props.value
   if (v === null || v === undefined) return '—'
+  if (!props.format) return String(v)
+
+  const n = animatedMain.value
   if (props.format === 'number') {
-    const n = Number(v)
     if (n >= 1e6) return `${(n / 1e6).toFixed(1)}KK`
     if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
-    return n.toLocaleString('zh-TW')
+    return Math.round(n).toLocaleString('zh-TW')
   }
-  if (props.format === 'percent') {
-    return `${Number(v).toFixed(1)}%`
-  }
-  if (props.format === 'duration') {
-    return `${Number(v).toFixed(1)}`
-  }
+  if (props.format === 'percent') return `${n.toFixed(1)}%`
+  if (props.format === 'duration') return `${n.toFixed(1)}`
   return String(v)
 })
 
-// Value update animation
-const valuePulse = ref(false)
-watch(() => props.value, () => {
-  valuePulse.value = true
-  setTimeout(() => { valuePulse.value = false }, 500)
+// ── Count-up animation for sub raw value ────────────────────────────────
+
+const subSource = ref(0)
+watch(
+  () => (props.subValue !== null && props.subValue !== undefined ? Number(props.subValue) || 0 : 0),
+  (val) => { subSource.value = val },
+  { immediate: true },
+)
+const animatedSub = useTransition(subSource, {
+  duration: 900,
+  transition: TransitionPresets.easeOutExpo,
+})
+
+const formattedSubValue = computed(() => {
+  if (props.subValue === null || props.subValue === undefined) return null
+  const n = Math.round(animatedSub.value)
+  return n.toLocaleString('zh-TW') + (props.subUnit || '')
 })
 
 function handleClick() {
@@ -86,11 +119,11 @@ function handleClick() {
       <div class="summary-card__label" :title="label">
         {{ label }}
       </div>
-      <div
-        class="summary-card__value"
-        :class="{ 'summary-card__value--pulse': valuePulse }"
-      >
+      <div class="summary-card__value">
         {{ formattedValue }}
+      </div>
+      <div v-if="formattedSubValue !== null" class="summary-card__sub-num">
+        {{ formattedSubValue }}
       </div>
       <div v-if="$slots.sub" class="summary-card__sub">
         <slot name="sub" />
@@ -148,12 +181,49 @@ function handleClick() {
   font-variant-numeric: tabular-nums;
 }
 
+.summary-card__sub-num {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: theme('colors.text.muted');
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
 .summary-card__sub {
   margin-top: 6px;
   font-size: 12px;
   color: theme('colors.text.muted');
 }
 
+/* Radial ambient glow behind content (revealed on hover) */
+.summary-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 30% 60%,
+    var(--summary-glow-bg, rgba(0, 128, 200, 0.05)) 0%,
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+/* Universal hover — all cards lift + glow */
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px var(--summary-glow-ring, rgba(0, 128, 200, 0.2)),
+    0 0 20px var(--summary-glow-halo, rgba(0, 128, 200, 0.2)),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.summary-card:hover::after {
+  opacity: 1;
+}
 
 /* Clickable state */
 .summary-card--clickable {
@@ -162,7 +232,6 @@ function handleClick() {
 
 .summary-card--clickable:hover {
   transform: translateY(-3px);
-  box-shadow: theme('boxShadow.md');
 }
 
 /* Active state */
@@ -172,21 +241,8 @@ function handleClick() {
   transform: scale(1.02);
 }
 
-/* Pulse animation */
-@keyframes value-pulse {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.06); }
-  100% { transform: scale(1); }
-}
-
-.summary-card__value--pulse {
-  animation: value-pulse 500ms var(--motion-ease);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .summary-card__value--pulse {
-    animation: none;
-  }
+  .summary-card:hover,
   .summary-card--clickable:hover {
     transform: none;
   }
@@ -195,17 +251,21 @@ function handleClick() {
   }
 }
 
-/* Accent tokens — all colors resolved via theme() to avoid hardcoded HEX */
-.summary-card[data-accent="brand"]   { --accent-bar: theme('colors.brand.500');    --accent-text: theme('colors.brand.500'); }
-.summary-card[data-accent="success"] { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d'); }
-.summary-card[data-accent="warning"] { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309'); }
-.summary-card[data-accent="danger"]  { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c'); }
-.summary-card[data-accent="info"]    { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
-.summary-card[data-accent="neutral"] { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary'); }
-.summary-card[data-accent="prd"]     { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d'); }
-.summary-card[data-accent="sby"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
-.summary-card[data-accent="udt"]     { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c'); }
-.summary-card[data-accent="sdt"]     { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309'); }
-.summary-card[data-accent="egt"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8'); }
-.summary-card[data-accent="nst"]     { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary'); }
+/* Accent tokens */
+.summary-card[data-accent="brand"]   { --accent-bar: theme('colors.brand.500');    --accent-text: theme('colors.brand.500');          --summary-glow-bg: rgba(0, 128, 200, 0.05);   --summary-glow-ring: rgba(0, 128, 200, 0.2);   --summary-glow-halo: rgba(0, 128, 200, 0.2); }
+.summary-card[data-accent="success"] { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d');     --summary-glow-bg: rgba(34, 197, 94, 0.05);   --summary-glow-ring: rgba(34, 197, 94, 0.2);   --summary-glow-halo: rgba(34, 197, 94, 0.2); }
+.summary-card[data-accent="warning"] { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309');     --summary-glow-bg: rgba(245, 158, 11, 0.05);  --summary-glow-ring: rgba(245, 158, 11, 0.2);  --summary-glow-halo: rgba(245, 158, 11, 0.2); }
+.summary-card[data-accent="danger"]  { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c');     --summary-glow-bg: rgba(239, 68, 68, 0.05);   --summary-glow-ring: rgba(239, 68, 68, 0.2);   --summary-glow-halo: rgba(239, 68, 68, 0.2); }
+.summary-card[data-accent="info"]    { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8');     --summary-glow-bg: rgba(59, 130, 246, 0.05);  --summary-glow-ring: rgba(59, 130, 246, 0.2);  --summary-glow-halo: rgba(59, 130, 246, 0.2); }
+.summary-card[data-accent="neutral"] { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary');    --summary-glow-bg: rgba(107, 114, 128, 0.05); --summary-glow-ring: rgba(107, 114, 128, 0.2); --summary-glow-halo: rgba(107, 114, 128, 0.2); }
+.summary-card[data-accent="prd"]     { --accent-bar: theme('colors.state.success'); --accent-text: theme('colors.token.h15803d');     --summary-glow-bg: rgba(34, 197, 94, 0.05);   --summary-glow-ring: rgba(34, 197, 94, 0.2);   --summary-glow-halo: rgba(34, 197, 94, 0.2); }
+.summary-card[data-accent="sby"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8');     --summary-glow-bg: rgba(59, 130, 246, 0.05);  --summary-glow-ring: rgba(59, 130, 246, 0.2);  --summary-glow-halo: rgba(59, 130, 246, 0.2); }
+.summary-card[data-accent="udt"]     { --accent-bar: theme('colors.state.danger');  --accent-text: theme('colors.token.hb91c1c');     --summary-glow-bg: rgba(239, 68, 68, 0.05);   --summary-glow-ring: rgba(239, 68, 68, 0.2);   --summary-glow-halo: rgba(239, 68, 68, 0.2); }
+.summary-card[data-accent="sdt"]     { --accent-bar: theme('colors.state.warning'); --accent-text: theme('colors.token.hb45309');     --summary-glow-bg: rgba(245, 158, 11, 0.05);  --summary-glow-ring: rgba(245, 158, 11, 0.2);  --summary-glow-halo: rgba(245, 158, 11, 0.2); }
+.summary-card[data-accent="egt"]     { --accent-bar: theme('colors.state.info');    --accent-text: theme('colors.token.h1d4ed8');     --summary-glow-bg: rgba(59, 130, 246, 0.05);  --summary-glow-ring: rgba(59, 130, 246, 0.2);  --summary-glow-halo: rgba(59, 130, 246, 0.2); }
+.summary-card[data-accent="nst"]     { --accent-bar: theme('colors.state.neutral'); --accent-text: theme('colors.text.secondary');    --summary-glow-bg: rgba(107, 114, 128, 0.05); --summary-glow-ring: rgba(107, 114, 128, 0.2); --summary-glow-halo: rgba(107, 114, 128, 0.2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .summary-card::after { transition: none; }
+}
 </style>

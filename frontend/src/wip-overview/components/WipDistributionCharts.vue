@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -33,8 +33,6 @@ const emit = defineEmits<{
 }>();
 
 // ── Package chart ────────────────────────────────────────────────────────
-// Context: if a station is selected, show that station's package breakdown
-//          otherwise show global package totals
 const pkgChartData = computed(() => {
   const matrixData = props.data?.matrix || {};
   const station = props.selectedStation;
@@ -59,7 +57,6 @@ const pkgChartHeight = computed(() => Math.max(220, pkgChartData.value.length * 
 
 const pkgChartOption = computed(() => {
   const anySelected = !!props.selectedPackage;
-  // Reverse so largest value is at top of horizontal bar
   const reversed = [...pkgChartData.value].reverse();
   const names = reversed.map(([k]) => k);
   const values = reversed.map(([k, v]) => ({
@@ -106,8 +103,6 @@ const pkgChartOption = computed(() => {
 });
 
 // ── Station chart ────────────────────────────────────────────────────────
-// Context: if a package is selected, show each station's qty for that package
-//          otherwise show global workcenter totals
 const stationChartData = computed(() => {
   const workcenters = props.data?.workcenters || [];
   const matrixData = props.data?.matrix || {};
@@ -125,7 +120,6 @@ const stationChartHeight = computed(() => Math.max(220, stationChartData.value.l
 
 const stationChartOption = computed(() => {
   const anySelected = !!props.selectedStation;
-  // Reverse so first process step appears at top
   const reversed = [...stationChartData.value].reverse();
   const names = reversed.map(([k]) => k);
   const values = reversed.map(([k, v]) => ({
@@ -185,13 +179,64 @@ const hasData = computed(() =>
   pkgChartData.value.length > 0 || stationChartData.value.some(([, v]) => v > 0),
 );
 
-// Subtitle for context-awareness
 const pkgChartTitle = computed(() =>
   props.selectedStation ? `Package WIP — ${props.selectedStation}` : 'WIP by Package (QTY)',
 );
 
 const stationChartTitle = computed(() =>
   props.selectedPackage ? `各站 WIP — ${props.selectedPackage}` : '各站 WIP 數量',
+);
+
+// ── Bar-level shimmer overlay ────────────────────────────────────────────
+// On bar mouseover: compute bar bounds via convertToPixel and show an
+// absolutely-positioned div with a looping CSS shimmer animation.
+
+const pkgChartRef = ref<InstanceType<typeof VChart> | null>(null);
+const stationChartRef = ref<InstanceType<typeof VChart> | null>(null);
+
+const pkgShimmer = ref({ visible: false, style: {} as Record<string, string> });
+const stationShimmer = ref({ visible: false, style: {} as Record<string, string> });
+
+function attachShimmerListeners(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  instance: any,
+  shimmer: { value: { visible: boolean; style: Record<string, string> } },
+) {
+  instance.on('mouseover', (params: { componentType: string; name: string; value: number }) => {
+    if (params.componentType !== 'series') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x0 = (instance as any).convertToPixel({ xAxisIndex: 0 }, 0) as number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x1 = (instance as any).convertToPixel({ xAxisIndex: 0 }, params.value) as number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const yCenter = (instance as any).convertToPixel({ yAxisIndex: 0 }, params.name) as number;
+    const barH = 16;
+    shimmer.value = {
+      visible: true,
+      style: {
+        top: `${yCenter - barH / 2}px`,
+        left: `${Math.min(x0, x1)}px`,
+        width: `${Math.abs(x1 - x0)}px`,
+        height: `${barH}px`,
+      },
+    };
+  });
+
+  instance.on('mouseout', () => {
+    shimmer.value.visible = false;
+  });
+}
+
+watch(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  () => (pkgChartRef.value as any)?.chart,
+  (instance) => { if (instance) attachShimmerListeners(instance, pkgShimmer); },
+);
+
+watch(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  () => (stationChartRef.value as any)?.chart,
+  (instance) => { if (instance) attachShimmerListeners(instance, stationShimmer); },
 );
 </script>
 
@@ -209,13 +254,17 @@ const stationChartTitle = computed(() =>
         >✕ 清除</button>
       </div>
       <div class="card-body ui-card-body wip-chart-body">
-        <v-chart
-          class="wip-echarts"
-          :option="pkgChartOption"
-          :style="{ height: `${pkgChartHeight}px` }"
-          autoresize
-          @click="onPkgClick"
-        />
+        <div class="wip-chart-vchart-wrap">
+          <v-chart
+            ref="pkgChartRef"
+            class="wip-echarts"
+            :option="pkgChartOption"
+            :style="{ height: `${pkgChartHeight}px` }"
+            autoresize
+            @click="onPkgClick"
+          />
+          <div v-if="pkgShimmer.visible" class="wip-bar-shimmer" :style="pkgShimmer.style" />
+        </div>
       </div>
     </section>
 
@@ -231,13 +280,17 @@ const stationChartTitle = computed(() =>
         >✕ 清除</button>
       </div>
       <div class="card-body ui-card-body wip-chart-body">
-        <v-chart
-          class="wip-echarts"
-          :option="stationChartOption"
-          :style="{ height: `${stationChartHeight}px` }"
-          autoresize
-          @click="onStationClick"
-        />
+        <div class="wip-chart-vchart-wrap">
+          <v-chart
+            ref="stationChartRef"
+            class="wip-echarts"
+            :option="stationChartOption"
+            :style="{ height: `${stationChartHeight}px` }"
+            autoresize
+            @click="onStationClick"
+          />
+          <div v-if="stationShimmer.visible" class="wip-bar-shimmer" :style="stationShimmer.style" />
+        </div>
       </div>
     </section>
   </div>

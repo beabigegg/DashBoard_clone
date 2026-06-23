@@ -51,8 +51,14 @@ function formatNumber(value: unknown): string {
         {{ card.label }}
       </div>
       <div class="status-values">
-        <span>{{ formatNumber(resolveData(card.key).lots) }}</span>
-        <span>{{ formatNumber(resolveData(card.key).qtyPcs) }}</span>
+        <div class="status-val-grp">
+          <span class="status-val-num">{{ formatNumber(resolveData(card.key).lots) }}</span>
+          <span class="status-val-unit">lots</span>
+        </div>
+        <div class="status-val-grp">
+          <span class="status-val-num">{{ formatNumber(resolveData(card.key).qtyPcs) }}</span>
+          <span class="status-val-unit">pcs</span>
+        </div>
       </div>
     </article>
   </section>
