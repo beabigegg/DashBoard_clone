@@ -3,6 +3,7 @@ import type { FilterState } from '../types';
 
 const DEFAULT_STATE: FilterState = {
   workcenter_groups: [],
+  locations: [],
   families: [],
   resource_ids: [],
   package_groups: [],
@@ -80,6 +81,7 @@ export function useFilterState() {
       end_date: state.end_date,
     };
     if (state.workcenter_groups.length > 0) body.workcenter_groups = state.workcenter_groups;
+    if (state.locations.length > 0) body.locations = state.locations;
     if (state.families.length > 0) body.families = state.families;
     if (state.resource_ids.length > 0) body.resource_ids = state.resource_ids;
     if (state.package_groups.length > 0) body.package_groups = state.package_groups;

@@ -151,6 +151,7 @@ export function useDowntimeData() {
 
   const filterOptions = reactive<FilterOptions>({
     workcenter_groups: [],
+    locations: [],
     families: [],
     resources: [],
     package_groups: [],
@@ -160,18 +161,30 @@ export function useDowntimeData() {
 
   /**
    * Load filter options from GET /api/downtime-analysis/options.
+   * Pass filterState to narrow options via cross-filter (backend does the narrowing).
    */
-  async function loadOptions(): Promise<void> {
+  async function loadOptions(filterState?: Record<string, unknown>): Promise<void> {
     loading.options = true;
     error.value = '';
     try {
+      const params: Record<string, string> = {};
+      if (filterState) {
+        const csv = (arr: unknown) => Array.isArray(arr) && arr.length > 0 ? (arr as string[]).join(',') : '';
+        const wc = csv(filterState.workcenter_groups); if (wc) params.workcenter_groups = wc;
+        const loc = csv(filterState.locations);         if (loc) params.locations = loc;
+        const fam = csv(filterState.families);          if (fam) params.families = fam;
+        const pkg = csv(filterState.package_groups);    if (pkg) params.package_groups = pkg;
+        const res = csv(filterState.resource_ids);      if (res) params.resource_ids = res;
+      }
       const response = await apiGet('/api/downtime-analysis/options', {
+        params,
         timeout: API_TIMEOUT,
         silent: true,
       });
       const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (data) {
         filterOptions.workcenter_groups = Array.isArray(data.workcenter_groups) ? (data.workcenter_groups as string[]) : [];
+        filterOptions.locations = Array.isArray(data.locations) ? (data.locations as string[]) : [];
         filterOptions.families = Array.isArray(data.families) ? (data.families as string[]) : [];
         filterOptions.resources = Array.isArray(data.resources) ? (data.resources as string[]) : [];
         filterOptions.package_groups = Array.isArray(data.package_groups) ? (data.package_groups as string[]) : [];

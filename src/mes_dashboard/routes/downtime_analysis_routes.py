@@ -140,6 +140,7 @@ def api_downtime_options():
     families = _csv_param(request.args.get('families', ''))
     resource_ids = _csv_param(request.args.get('resource_ids', ''))
     package_groups = _csv_param(request.args.get('package_groups', ''))
+    locations = _csv_param(request.args.get('locations', ''))
     is_production = request.args.get('is_production', '').lower() in ('1', 'true')
     is_key = request.args.get('is_key', '').lower() in ('1', 'true')
     is_monitor = request.args.get('is_monitor', '').lower() in ('1', 'true')
@@ -149,6 +150,7 @@ def api_downtime_options():
         families=families,
         resource_ids=resource_ids,
         package_groups=package_groups,
+        locations=locations,
         is_production=is_production,
         is_key=is_key,
         is_monitor=is_monitor,
@@ -193,6 +195,7 @@ def api_downtime_query():
     families = body.get('families') or None
     resource_ids = body.get('resource_ids') or None
     package_groups = body.get('package_groups') or None
+    locations = body.get('locations') or None
     big_categories = body.get('big_categories') or None
     status_types = body.get('status_types') or None
     is_production = bool(body.get('is_production', False))
@@ -225,6 +228,7 @@ def api_downtime_query():
             'families': sorted(families or []),
             'resource_ids': sorted(resource_ids or []),
             'package_groups': sorted(package_groups or []),
+            'locations': sorted(locations or []),
         }
         _spool_qid = make_raw_spool_query_id(_spool_key_params)
         if has_downtime_base_events(_spool_qid) and has_downtime_job_bridge(_spool_qid):
@@ -254,6 +258,7 @@ def api_downtime_query():
                     families=families,
                     resource_ids=resource_ids,
                     package_groups=package_groups,
+                    locations=locations,
                     big_categories=big_categories,
                     status_types=status_types,
                     is_production=is_production,
@@ -288,6 +293,7 @@ def api_downtime_query():
                 families=families,
                 resource_ids=resource_ids,
                 package_groups=package_groups,
+                locations=locations,
                 big_categories=big_categories,
                 status_types=status_types,
                 is_production=is_production,
@@ -310,6 +316,7 @@ def api_downtime_query():
                 families=families,
                 resource_ids=resource_ids,
                 package_groups=package_groups,
+                locations=locations,
                 big_categories=big_categories,
                 status_types=status_types,
                 is_production=is_production,
@@ -341,6 +348,7 @@ def api_downtime_query():
                 families=families,
                 resource_ids=resource_ids,
                 package_groups=package_groups,
+                locations=locations,
                 big_categories=big_categories,
                 status_types=status_types,
                 is_production=is_production,

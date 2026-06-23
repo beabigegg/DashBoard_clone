@@ -15,6 +15,8 @@ interface MachineOption {
 const props = withDefaults(defineProps<{
   workcenterGroups?: string[];
   selectedGroups?: string[];
+  locationOptions?: string[];
+  selectedLocations?: string[];
   flags?: FilterFlags;
   familyOptions?: string[];
   machineOptions?: (string | number | Record<string, unknown>)[];
@@ -26,6 +28,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   workcenterGroups: () => [],
   selectedGroups: () => [],
+  locationOptions: () => [],
+  selectedLocations: () => [],
   flags: () => ({ isProduction: false, isKey: false, isMonitor: false }),
   familyOptions: () => [],
   machineOptions: () => [],
@@ -38,6 +42,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'change-groups': [groups: string[]];
+  'change-locations': [locations: string[]];
   'change-flags': [flags: FilterFlags];
   'change-families': [families: string[]];
   'change-machines': [machines: string[]];
@@ -66,6 +71,18 @@ function updateFlag(key: keyof FilterFlags, event: Event): void {
             :disabled="loading"
             placeholder="全部群組"
             @update:model-value="$emit('change-groups', $event)"
+          />
+        </div>
+
+        <div class="filter-block">
+          <label>設備區域</label>
+          <MultiSelect
+            data-testid="locations-select"
+            :model-value="selectedLocations"
+            :options="locationOptions"
+            :disabled="loading"
+            placeholder="全部區域"
+            @update:model-value="$emit('change-locations', $event)"
           />
         </div>
 

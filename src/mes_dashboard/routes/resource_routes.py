@@ -121,6 +121,7 @@ from mes_dashboard.services.filter_cache import get_workcenter_groups
 from mes_dashboard.services.resource_cache import (
     get_resource_families,
     get_resource_cascade_metadata,
+    get_locations,
     get_package_groups,
 )
 from mes_dashboard.config.constants import STATUS_CATEGORIES
@@ -323,6 +324,8 @@ def api_resource_status():
     resource_ids = resource_ids_param.split(',') if resource_ids_param else None
     package_groups_param = request.args.get('package_groups')
     package_groups = package_groups_param.split(',') if package_groups_param else None
+    locations_param = request.args.get('locations')
+    locations = locations_param.split(',') if locations_param else None
 
     try:
         data = get_merged_resource_status(
@@ -334,6 +337,7 @@ def api_resource_status():
             families=families,
             resource_ids=resource_ids,
             package_groups=package_groups,
+            locations=locations,
         )
         # Clean NaN/NaT values for valid JSON
         cleaned_data = _clean_nan_values(data)
@@ -366,6 +370,7 @@ def api_resource_status_options():
 
         data = {
             'workcenter_groups': [g['name'] for g in wc_groups],
+            'locations': get_locations(),
             'status_categories': STATUS_CATEGORIES,
             'families': get_resource_families(),
             'resources': get_resource_cascade_metadata(),

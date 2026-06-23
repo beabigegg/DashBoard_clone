@@ -101,6 +101,7 @@ async function handleExportEquipment(): Promise<void> {
 /** draftFilters is a local reactive copy; filterState is the committed state managed by useFilterState */
 const draftFilters = reactive<FilterState>({
   workcenter_groups: [],
+  locations: [],
   families: [],
   resource_ids: [],
   package_groups: [],
@@ -116,6 +117,7 @@ const draftFilters = reactive<FilterState>({
 
 function syncDraftFromState(): void {
   draftFilters.workcenter_groups = [...filterState.workcenter_groups];
+  draftFilters.locations = [...filterState.locations];
   draftFilters.families = [...filterState.families];
   draftFilters.resource_ids = [...filterState.resource_ids];
   draftFilters.package_groups = [...filterState.package_groups];
@@ -275,17 +277,29 @@ function handleUpdateState(patch: Partial<FilterState>): void {
     (draftFilters as Record<string, unknown>)[key] = patch[key];
   }
   updateAll({ ...draftFilters });
+
+}
+
+function handleDimensionClosed(dimension: string): void {
+  // Cross-filter: reload options when a dropdown closes.
+  // Exclude the dimension that just closed from its own filter param so
+  // the backend doesn't narrow that dimension's options by its own selection.
+  const optionsFilter = { ...(draftFilters as Record<string, unknown>) };
+  optionsFilter[dimension] = [];
+  void loadOptions(optionsFilter as Record<string, unknown>);
 }
 
 async function handleFilterChange(next: FilterState): Promise<void> {
   updateAll(next);
   syncDraftFromState();
+  void loadOptions({ ...next });
   await runPrimaryQuery();
 }
 
 async function handleClear(): Promise<void> {
   updateAll({
     workcenter_groups: [],
+    locations: [],
     families: [],
     resource_ids: [],
     package_groups: [],
@@ -434,6 +448,7 @@ onMounted(() => {
         :options="filterOptions"
         :loading="loading.querying || loading.options"
         @filter-change="handleFilterChange"
+        @dimension-closed="handleDimensionClosed"
         @update-state="handleUpdateState"
         @clear="handleClear"
       />

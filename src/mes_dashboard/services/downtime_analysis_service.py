@@ -788,6 +788,7 @@ def query_downtime_dataset_raw(
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
     package_groups: Optional[List[str]] = None,
+    locations: Optional[List[str]] = None,
     big_categories: Optional[List[str]] = None,
     status_types: Optional[List[str]] = None,
     is_production: bool = False,
@@ -824,6 +825,7 @@ def query_downtime_dataset_raw(
         'families': sorted(families or []),
         'resource_ids': sorted(resource_ids or []),
         'package_groups': sorted(package_groups or []),
+        'locations': sorted(locations or []),
     }
     query_id = make_raw_spool_query_id(query_id_input)
 
@@ -882,6 +884,7 @@ def query_downtime_dataset_raw(
             base_df = _apply_resource_filters(
                 base_df, workcenter_groups, families, resource_ids, package_groups,
                 is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+                locations=locations,
             )
     else:
         # ── Oracle BQE fallback (ADR-0003: one whole-dataset chunk, no chunking) ──
@@ -946,6 +949,7 @@ def query_downtime_dataset_raw(
             base_df = _apply_resource_filters(
                 base_df, workcenter_groups, families, resource_ids, package_groups,
                 is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+                locations=locations,
             )
 
         # Job bridge Oracle query
@@ -996,6 +1000,7 @@ def get_filter_options(
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
     package_groups: Optional[List[str]] = None,
+    locations: Optional[List[str]] = None,
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
@@ -1046,6 +1051,10 @@ def get_filter_options(
                     filtered_pg.append(r)
             filtered = filtered_pg
 
+        if locations:
+            loc_set = set(locations)
+            filtered = [r for r in filtered if r.get('LOCATIONNAME') in loc_set]
+
         # Equipment type flags
         if is_production:
             filtered = [r for r in filtered if r.get('PJ_ISPRODUCTION') == 1]
@@ -1065,12 +1074,19 @@ def get_filter_options(
             if get_package_group_name(r.get('PACKAGEGROUPID'))
         })
 
+        # Locations from filtered resources (guard against NaN from Oracle NULL via pandas)
+        loc_list = sorted({
+            v for r in filtered
+            if isinstance(v := r.get('LOCATIONNAME'), str) and v
+        })
+
         # Big categories and reasons from taxonomy
         big_cats = ['維修', '保養', '改機換料', '治工具更換與模具清潔', '教讀程式', '檢查', '待料待指示', '工程', '其他/未分類']
         reasons = sorted(_BIG_CATEGORY_MAP.keys())
 
         return {
             'workcenter_groups': wc_groups,
+            'locations': loc_list,
             'families': fam_list,
             'resources': res_list,
             'package_groups': pg_list,
@@ -1094,6 +1110,7 @@ def query_downtime_dataset(
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
     package_groups: Optional[List[str]] = None,
+    locations: Optional[List[str]] = None,
     big_categories: Optional[List[str]] = None,
     status_types: Optional[List[str]] = None,
     is_production: bool = False,
@@ -1131,6 +1148,7 @@ def query_downtime_dataset(
         'families': sorted(families or []),
         'resource_ids': sorted(resource_ids or []),
         'package_groups': sorted(package_groups or []),
+        'locations': sorted(locations or []),
         'big_categories': sorted(big_categories or []),
         'status_types': sorted(status_types or []),
     }
@@ -1171,6 +1189,7 @@ def query_downtime_dataset(
             base_df = _apply_resource_filters(
                 base_df, workcenter_groups, families, resource_ids, package_groups,
                 is_production=is_production, is_key=is_key, is_monitor=is_monitor,
+                locations=locations,
             )
         merged_df = _merge_cross_shift_events(base_df) if not base_df.empty else pd.DataFrame()
     else:
@@ -1302,6 +1321,7 @@ def _apply_resource_filters(
     is_production: bool = False,
     is_key: bool = False,
     is_monitor: bool = False,
+    locations: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """Filter events DataFrame by resource dimension filters.
 
@@ -1335,7 +1355,7 @@ def _apply_resource_filters(
 
         allowed_hist_ids: Optional[set] = None
 
-        if workcenter_groups or families or package_groups or is_production or is_key or is_monitor:
+        if workcenter_groups or families or package_groups or is_production or is_key or is_monitor or locations:
             allowed_wcs = None
             if workcenter_groups:
                 allowed_wcs = {
@@ -1359,6 +1379,9 @@ def _apply_resource_filters(
                 filtered = [r for r in filtered if r.get('PJ_ISKEY') == 1]
             if is_monitor:
                 filtered = [r for r in filtered if r.get('PJ_ISMONITOR') == 1]
+            if locations:
+                loc_set = set(locations)
+                filtered = [r for r in filtered if r.get('LOCATIONNAME') in loc_set]
             allowed_hist_ids = {str(r.get('RESOURCEID', '')).strip() for r in filtered if r.get('RESOURCEID')}
 
         if resource_ids:

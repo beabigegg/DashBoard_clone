@@ -56,6 +56,7 @@ def _get_filtered_resources(
     is_key: bool = False,
     is_monitor: bool = False,
     package_groups: Optional[List[str]] = None,
+    locations: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get filtered resources from resource_cache.
 
@@ -124,6 +125,10 @@ def _get_filtered_resources(
             pgname = get_package_group_name(r.get('PACKAGEGROUPID'))
             if pgname not in package_group_set:
                 continue
+
+        # Location filter
+        if locations and r.get('LOCATIONNAME') not in locations:
+            continue
 
         filtered.append(r)
 
@@ -213,6 +218,7 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
     from mes_dashboard.services.resource_cache import (
         get_resource_families,
         get_resource_cascade_metadata,
+        get_locations,
         get_package_groups,
     )
 
@@ -226,6 +232,7 @@ def get_filter_options() -> Optional[Dict[str, Any]]:
 
         return {
             'workcenter_groups': groups,
+            'locations': get_locations(),
             'families': families,
             'resources': get_resource_cascade_metadata(),
             'package_groups': get_package_groups(),

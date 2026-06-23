@@ -6,6 +6,13 @@ import { unwrapApiData as unwrapApiResult } from '../core/unwrap-api-result';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh';
 import { bindUpdateBadge } from '../shared-composables/usePageUpdateBadge';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
+import {
+  deriveWorkcenterGroupOptions,
+  deriveLocationOptions,
+  deriveResourceFamilyOptions,
+  deriveResourceMachineOptions,
+  derivePackageGroupOptions,
+} from '../core/resource-history-filters';
 import { MATRIX_STATUS_COLUMNS, OU_BADGE_THRESHOLDS, STATUS_DISPLAY_MAP, normalizeStatus } from '../resource-shared/constants';
 import { useCrossFilter } from './composables/useCrossFilter';
 import type { CrossFilterSource } from './composables/useCrossFilter';
@@ -51,6 +58,8 @@ interface ResourceOption {
   name: string;
   family: string;
   workcenterGroup: string;
+  location: string;
+  packageGroup: string;
   isProduction: boolean;
   isKey: boolean;
   isMonitor: boolean;
@@ -105,9 +114,28 @@ ensureMesApiAvailable();
 const API_TIMEOUT = 60000;
 
 const allEquipment = ref<EquipmentItem[]>([]);
-const workcenterGroups = ref<string[]>([]);
-const packageGroups = ref<string[]>([]);
 const allResources = ref<ResourceOption[]>([]);
+
+// Adapter: convert resource-status filterState to ResourceFilterInput shape
+function rsFilterInput() {
+  return {
+    workcenterGroups: filterState.groups,
+    locations: filterState.locations,
+    families: filterState.families,
+    machines: filterState.machines,
+    packageGroups: filterState.packageGroups,
+    isProduction: filterState.isProduction,
+    isKey: filterState.isKey,
+    isMonitor: filterState.isMonitor,
+  };
+}
+
+// Cross-filter: each option list excludes its own dimension
+const workcenterGroupOptions = computed(() => deriveWorkcenterGroupOptions(allResources.value, rsFilterInput()));
+const locationOptions = computed(() => deriveLocationOptions(allResources.value, rsFilterInput()));
+const familyOptionsComputed = computed(() => deriveResourceFamilyOptions(allResources.value, rsFilterInput()));
+const machineOptionsComputed = computed(() => deriveResourceMachineOptions(allResources.value, rsFilterInput()));
+const packageGroupOptions = computed(() => derivePackageGroupOptions(allResources.value, rsFilterInput()));
 const summary = ref<SummaryData>({
   totalCount: 0,
   byStatus: {
@@ -127,6 +155,7 @@ const summary = ref<SummaryData>({
 
 interface FilterState {
   groups: string[];
+  locations: string[];
   isProduction: boolean;
   isKey: boolean;
   isMonitor: boolean;
@@ -141,6 +170,7 @@ const {
 } = useFilterOrchestrator({
   fields: {
     groups:        { trigger: 'immediate', initial: [] },
+    locations:     { trigger: 'immediate', initial: [] },
     isProduction:  { trigger: 'immediate', initial: false },
     isKey:         { trigger: 'immediate', initial: false },
     isMonitor:     { trigger: 'immediate', initial: false },
@@ -150,6 +180,7 @@ const {
   },
   dependencies: [
     { when: 'groups',       then: ['families', 'machines'], action: 'clear' },
+    { when: 'locations',    then: ['families', 'machines'], action: 'clear' },
     { when: 'isProduction', then: ['families', 'machines'], action: 'clear' },
     { when: 'isKey',        then: ['families', 'machines'], action: 'clear' },
     { when: 'isMonitor',    then: ['families', 'machines'], action: 'clear' },
@@ -266,6 +297,9 @@ function buildFilterParams(): Record<string, string | number> {
   if (filterState.groups.length > 0) {
     params.workcenter_groups = filterState.groups.join(',');
   }
+  if (filterState.locations.length > 0) {
+    params.locations = filterState.locations.join(',');
+  }
   if (filterState.isProduction) {
     params.is_production = 1;
   }
@@ -288,36 +322,9 @@ function buildFilterParams(): Record<string, string | number> {
   return params;
 }
 
-// --- Cascade: derive available family/machine options from upstream filters ---
-const filteredByUpstream = computed(() => {
-  const groupSet = filterState.groups.length > 0 ? new Set(filterState.groups) : null;
-  return allResources.value.filter((r) => {
-    if (groupSet && !groupSet.has(r.workcenterGroup)) return false;
-    if (filterState.isProduction && !r.isProduction) return false;
-    if (filterState.isKey && !r.isKey) return false;
-    if (filterState.isMonitor && !r.isMonitor) return false;
-    return true;
-  });
-});
-
-const familyOptions = computed<string[]>(() => {
-  const set = new Set<string>();
-  filteredByUpstream.value.forEach((r) => {
-    if (r.family) set.add(r.family);
-  });
-  return [...set].sort();
-});
-
-const machineOptions = computed<(string | number | Record<string, unknown>)[]>(() => {
-  let list = filteredByUpstream.value;
-  if (filterState.families.length > 0) {
-    const fset = new Set<string>(filterState.families);
-    list = list.filter((r) => fset.has(r.family));
-  }
-  return list
-    .map((r): Record<string, unknown> => ({ label: r.name, value: r.id }))
-    .sort((a, b) => String(a['label']).localeCompare(String(b['label'])));
-});
+// Cross-filter: forward the computed refs so the rest of the code stays unchanged
+const familyOptions = familyOptionsComputed;
+const machineOptions = machineOptionsComputed;
 
 function resetHierarchyState() {
   Object.keys(hierarchyState).forEach((key) => {
@@ -333,10 +340,8 @@ async function loadOptions() {
       timeout: API_TIMEOUT,
       silent: true,
     });
-    const data = unwrapApiResult(result, '載入篩選選項失敗') as { workcenter_groups?: unknown; resources?: unknown; package_groups?: unknown } | null | undefined;
-    workcenterGroups.value = Array.isArray(data?.workcenter_groups) ? (data.workcenter_groups as string[]) : [];
+    const data = unwrapApiResult(result, '載入篩選選項失敗') as { resources?: unknown } | null | undefined;
     allResources.value = Array.isArray(data?.resources) ? (data.resources as ResourceOption[]) : [];
-    packageGroups.value = Array.isArray(data?.package_groups) ? (data.package_groups as string[]) : [];
   } finally {
     loading.options = false;
   }
@@ -679,6 +684,10 @@ function updateFlags(nextFlags: { isProduction?: boolean; isKey?: boolean; isMon
   }
 }
 
+function updateLocations(locations: string[]): void {
+  updateField('locations', locations || []);
+}
+
 function updateFamilies(families: string[]): void {
   updateField('families', families || []);
 }
@@ -717,17 +726,20 @@ onMounted(() => {
     <div class="dashboard">
 
       <FilterBar
-        :workcenter-groups="workcenterGroups"
+        :workcenter-groups="workcenterGroupOptions"
         :selected-groups="filterState.groups"
+        :location-options="locationOptions"
+        :selected-locations="filterState.locations"
         :flags="filterState"
         :family-options="familyOptions"
-        :machine-options="machineOptions"
+        :machine-options="(machineOptions as unknown as (string | number | Record<string, unknown>)[])"
         :selected-families="filterState.families"
         :selected-machines="filterState.machines"
-        :package-groups="packageGroups"
+        :package-groups="packageGroupOptions"
         :selected-package-groups="filterState.packageGroups"
         :loading="loading.options || loading.refreshing"
         @change-groups="updateGroups"
+        @change-locations="updateLocations"
         @change-flags="updateFlags"
         @change-families="updateFamilies"
         @change-machines="updateMachines"

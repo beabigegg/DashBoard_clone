@@ -31,7 +31,9 @@ function normalizeArray(values: unknown): string[] {
 
 export interface ResourceItem {
   workcenterGroup?: unknown;
+  location?: unknown;
   family?: unknown;
+  packageGroup?: unknown;
   isProduction?: unknown;
   isKey?: unknown;
   isMonitor?: unknown;
@@ -40,25 +42,49 @@ export interface ResourceItem {
   [key: string]: unknown;
 }
 
-function applyUpstreamResourceFilters(
+// ── Internal cross-filter helper ──────────────────────────────────────────────
+// For each dimension's option list, apply ALL other filters but exclude the
+// dimension's own key so the list stays open to the user's next selection.
+function applyFiltersExcluding(
   resources: ResourceItem[],
-  filters: ResourceFilterSnapshot
+  filters: ResourceFilterSnapshot,
+  exclude: Set<string>
 ): ResourceItem[] {
   let list = Array.isArray(resources) ? resources : [];
-  const groups = new Set(normalizeArray(filters.workcenterGroups));
 
-  if (groups.size > 0) {
-    list = list.filter((resource) => groups.has(normalizeText(resource.workcenterGroup)));
+  if (!exclude.has('workcenterGroups')) {
+    const groups = new Set(normalizeArray(filters.workcenterGroups));
+    if (groups.size > 0) {
+      list = list.filter((r) => groups.has(normalizeText(r.workcenterGroup)));
+    }
   }
-  if (filters.isProduction) {
-    list = list.filter((resource) => Boolean(resource.isProduction));
+  if (!exclude.has('locations')) {
+    const locs = new Set(normalizeArray(filters.locations));
+    if (locs.size > 0) {
+      list = list.filter((r) => locs.has(normalizeText(r.location)));
+    }
   }
-  if (filters.isKey) {
-    list = list.filter((resource) => Boolean(resource.isKey));
+  if (!exclude.has('families')) {
+    const fams = new Set(normalizeArray(filters.families));
+    if (fams.size > 0) {
+      list = list.filter((r) => fams.has(normalizeText(r.family)));
+    }
   }
-  if (filters.isMonitor) {
-    list = list.filter((resource) => Boolean(resource.isMonitor));
+  if (!exclude.has('machines')) {
+    const machs = new Set(normalizeArray(filters.machines));
+    if (machs.size > 0) {
+      list = list.filter((r) => machs.has(normalizeText(r.id)));
+    }
   }
+  if (!exclude.has('packageGroups')) {
+    const pkgs = new Set(normalizeArray(filters.packageGroups));
+    if (pkgs.size > 0) {
+      list = list.filter((r) => pkgs.has(normalizeText(r.packageGroup)));
+    }
+  }
+  if (filters.isProduction) list = list.filter((r) => Boolean(r.isProduction));
+  if (filters.isKey) list = list.filter((r) => Boolean(r.isKey));
+  if (filters.isMonitor) list = list.filter((r) => Boolean(r.isMonitor));
 
   return list;
 }
@@ -68,12 +94,13 @@ export interface ResourceFilterInput {
   endDate?: unknown;
   granularity?: unknown;
   workcenterGroups?: unknown;
+  locations?: unknown;
   families?: unknown;
   machines?: unknown;
+  packageGroups?: unknown;
   isProduction?: unknown;
   isKey?: unknown;
   isMonitor?: unknown;
-  packageGroups?: unknown;
   [key: string]: unknown;
 }
 
@@ -82,12 +109,13 @@ export interface ResourceFilterSnapshot {
   endDate: string;
   granularity: string;
   workcenterGroups: string[];
+  locations: string[];
   families: string[];
   machines: string[];
+  packageGroups: string[];
   isProduction: boolean;
   isKey: boolean;
   isMonitor: boolean;
-  packageGroups: string[];
 }
 
 export function toResourceFilterSnapshot(input: ResourceFilterInput = {}): ResourceFilterSnapshot {
@@ -96,13 +124,44 @@ export function toResourceFilterSnapshot(input: ResourceFilterInput = {}): Resou
     endDate: normalizeText(input.endDate),
     granularity: normalizeText(input.granularity) || 'day',
     workcenterGroups: normalizeArray(input.workcenterGroups),
+    locations: normalizeArray(input.locations),
     families: normalizeArray(input.families),
     machines: normalizeArray(input.machines),
+    packageGroups: normalizeArray(input.packageGroups),
     isProduction: normalizeBoolean(input.isProduction, false),
     isKey: normalizeBoolean(input.isKey, false),
     isMonitor: normalizeBoolean(input.isMonitor, false),
-    packageGroups: normalizeArray(input.packageGroups),
   };
+}
+
+// ── Cross-filter option derivers (each excludes its own dimension) ────────────
+
+export function deriveWorkcenterGroupOptions(
+  resources: ResourceItem[] = [],
+  filters: ResourceFilterInput = {}
+): string[] {
+  const next = toResourceFilterSnapshot(filters);
+  const filtered = applyFiltersExcluding(resources, next, new Set(['workcenterGroups']));
+  const values = new Set<string>();
+  for (const r of filtered) {
+    const v = normalizeText(r.workcenterGroup);
+    if (v) values.add(v);
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
+export function deriveLocationOptions(
+  resources: ResourceItem[] = [],
+  filters: ResourceFilterInput = {}
+): string[] {
+  const next = toResourceFilterSnapshot(filters);
+  const filtered = applyFiltersExcluding(resources, next, new Set(['locations']));
+  const values = new Set<string>();
+  for (const r of filtered) {
+    const v = normalizeText(r.location);
+    if (v) values.add(v);
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
 }
 
 export function deriveResourceFamilyOptions(
@@ -110,15 +169,13 @@ export function deriveResourceFamilyOptions(
   filters: ResourceFilterInput = {}
 ): string[] {
   const next = toResourceFilterSnapshot(filters);
-  const filtered = applyUpstreamResourceFilters(resources, next);
-  const families = new Set<string>();
-  for (const resource of filtered) {
-    const value = normalizeText(resource.family);
-    if (value) {
-      families.add(value);
-    }
+  const filtered = applyFiltersExcluding(resources, next, new Set(['families']));
+  const values = new Set<string>();
+  for (const r of filtered) {
+    const v = normalizeText(r.family);
+    if (v) values.add(v);
   }
-  return [...families].sort((left, right) => left.localeCompare(right));
+  return [...values].sort((a, b) => a.localeCompare(b));
 }
 
 export interface MachineOption {
@@ -131,20 +188,31 @@ export function deriveResourceMachineOptions(
   filters: ResourceFilterInput = {}
 ): MachineOption[] {
   const next = toResourceFilterSnapshot(filters);
-  let filtered = applyUpstreamResourceFilters(resources, next);
-  const families = new Set(next.families);
-  if (families.size > 0) {
-    filtered = filtered.filter((resource) => families.has(normalizeText(resource.family)));
-  }
-
+  const filtered = applyFiltersExcluding(resources, next, new Set(['machines']));
   return filtered
-    .map((resource) => ({
-      label: normalizeText(resource.name),
-      value: normalizeText(resource.id),
+    .map((r) => ({
+      label: normalizeText(r.name),
+      value: normalizeText(r.id),
     }))
-    .filter((option) => option.label && option.value)
-    .sort((left, right) => left.label.localeCompare(right.label));
+    .filter((o) => o.label && o.value)
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
+
+export function derivePackageGroupOptions(
+  resources: ResourceItem[] = [],
+  filters: ResourceFilterInput = {}
+): string[] {
+  const next = toResourceFilterSnapshot(filters);
+  const filtered = applyFiltersExcluding(resources, next, new Set(['packageGroups']));
+  const values = new Set<string>();
+  for (const r of filtered) {
+    const v = normalizeText(r.packageGroup);
+    if (v) values.add(v);
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
+// ── Prune selections that are no longer valid after upstream change ───────────
 
 export interface PruneResourceFilterOptions {
   familyOptions?: unknown[];
@@ -211,6 +279,7 @@ export interface ResourceHistoryQueryParams {
   end_date: string;
   granularity: string;
   workcenter_groups: string[];
+  locations?: string[];
   families: string[];
   resource_ids: string[];
   is_production?: string;
@@ -231,6 +300,9 @@ export function buildResourceHistoryQueryParams(
     families: next.families,
     resource_ids: next.machines,
   };
+  if (next.locations.length > 0) {
+    params.locations = next.locations;
+  }
   if (next.isProduction) {
     params.is_production = '1';
   }

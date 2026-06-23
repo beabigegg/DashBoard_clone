@@ -1253,6 +1253,8 @@ def get_resource_cascade_metadata() -> list[dict]:
             'family': r.get('RESOURCEFAMILYNAME', ''),
             'workcenter': r.get('WORKCENTERNAME', ''),
             'workcenterGroup': (wc_mapping.get(r.get('WORKCENTERNAME')) or {}).get('group', ''),
+            'location': r.get('LOCATIONNAME', ''),
+            'packageGroup': get_package_group_name(r.get('PACKAGEGROUPID')) or '',
             'isProduction': bool(r.get('PJ_ISPRODUCTION')),
             'isKey': bool(r.get('PJ_ISKEY')),
             'isMonitor': bool(r.get('PJ_ISMONITOR')),

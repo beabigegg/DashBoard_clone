@@ -7,8 +7,11 @@ import { buildResourceKpiFromHours } from '../core/compute';
 import { checkLocalComputeEligibility } from '../core/duckdb-activation-policy';
 import {
   buildResourceHistoryQueryParams,
+  deriveWorkcenterGroupOptions,
+  deriveLocationOptions,
   deriveResourceFamilyOptions,
   deriveResourceMachineOptions,
+  derivePackageGroupOptions,
   pruneResourceFilterSelections,
   toResourceFilterSnapshot,
 } from '../core/resource-history-filters';
@@ -40,6 +43,7 @@ function createDefaultFilters() {
   return toResourceFilterSnapshot({
     granularity: 'day',
     workcenterGroups: [],
+    locations: [],
     families: [],
     machines: [],
     isProduction: false,
@@ -59,6 +63,7 @@ const {
     endDate:         { trigger: 'immediate', initial: '' },
     granularity:     { trigger: 'immediate', initial: 'day' },
     workcenterGroups:{ trigger: 'immediate', initial: [] },
+    locations:       { trigger: 'immediate', initial: [] },
     families:        { trigger: 'immediate', initial: [] },
     machines:        { trigger: 'immediate', initial: [] },
     isProduction:    { trigger: 'immediate', initial: false },
@@ -71,11 +76,13 @@ const {
 
 const options = reactive<{
   workcenterGroups: (string | number | Record<string, unknown>)[];
+  locations: (string | number | Record<string, unknown>)[];
   families: (string | number | Record<string, unknown>)[];
   resources: ResourceItem[];
   packageGroups: (string | number | Record<string, unknown>)[];
 }>({
   workcenterGroups: [],
+  locations: [],
   families: [],
   resources: [],
   packageGroups: [],
@@ -281,6 +288,7 @@ function assignFilterState(target: Record<string, unknown>, source: Record<strin
   target.endDate = snapshot.endDate;
   target.granularity = snapshot.granularity;
   target.workcenterGroups = [...snapshot.workcenterGroups];
+  target.locations = [...snapshot.locations];
   target.families = [...snapshot.families];
   target.machines = [...snapshot.machines];
   target.isProduction = snapshot.isProduction;
@@ -316,6 +324,7 @@ function buildQueryStringFromFilters(filters: Record<string, unknown>): string {
   params.append('end_date', queryParams.end_date);
   params.append('granularity', queryParams.granularity);
   appendArrayParams(params, 'workcenter_groups', queryParams.workcenter_groups || []);
+  appendArrayParams(params, 'locations', queryParams.locations || []);
   appendArrayParams(params, 'families', queryParams.families || []);
   appendArrayParams(params, 'resource_ids', queryParams.resource_ids || []);
   appendArrayParams(params, 'package_groups', queryParams.package_groups || []);
@@ -356,6 +365,7 @@ function restoreCommittedFiltersFromUrl() {
     endDate: String(params.get('end_date') || '').trim(),
     granularity: String(params.get('granularity') || '').trim(),
     workcenterGroups: readArrayParam(params, 'workcenter_groups'),
+    locations: readArrayParam(params, 'locations'),
     families: readArrayParam(params, 'families'),
     machines: readArrayParam(params, 'resource_ids'),
     isProduction: readBooleanParam(params, 'is_production'),
@@ -375,6 +385,9 @@ function restoreCommittedFiltersFromUrl() {
   }
   if (next.workcenterGroups.length > 0) {
     committedFilters.workcenterGroups = next.workcenterGroups;
+  }
+  if (next.locations.length > 0) {
+    committedFilters.locations = next.locations;
   }
   if (next.families.length > 0) {
     committedFilters.families = next.families;
@@ -428,6 +441,7 @@ async function loadOptions() {
     const data = (payload?.data || {}) as Record<string, unknown>;
 
     options.workcenterGroups = Array.isArray(data.workcenter_groups) ? (data.workcenter_groups as (string | number | Record<string, unknown>)[]) : [];
+    options.locations = Array.isArray(data.locations) ? (data.locations as (string | number | Record<string, unknown>)[]) : [];
     options.families = Array.isArray(data.families) ? (data.families as (string | number | Record<string, unknown>)[]) : [];
     options.resources = Array.isArray(data.resources) ? (data.resources as ResourceItem[]) : [];
     options.packageGroups = Array.isArray(data.package_groups) ? (data.package_groups as (string | number | Record<string, unknown>)[]) : [];
@@ -444,11 +458,16 @@ const machineOptions = computed(() => {
   return deriveResourceMachineOptions(options.resources, draftFilters);
 });
 
+const workcenterGroupOptions = computed(() => deriveWorkcenterGroupOptions(options.resources, draftFilters));
+const locationOptions = computed(() => deriveLocationOptions(options.resources, draftFilters));
+const packageGroupOptions = computed(() => derivePackageGroupOptions(options.resources, draftFilters));
+
 const filterBarOptions = computed(() => {
   return {
-    workcenterGroups: options.workcenterGroups,
+    workcenterGroups: workcenterGroupOptions.value,
+    locations: locationOptions.value,
     families: familyOptions.value,
-    packageGroups: options.packageGroups,
+    packageGroups: packageGroupOptions.value,
   };
 });
 
@@ -515,6 +534,7 @@ function buildPrimarySnapshot(filters: Record<string, unknown>): string {
     start_date: p.start_date,
     end_date: p.end_date,
     workcenter_groups: p.workcenter_groups || [],
+    locations: p.locations || [],
     families: p.families || [],
     resource_ids: p.resource_ids || [],
     is_production: p.is_production || '',
@@ -587,6 +607,7 @@ async function executePrimaryQuery() {
       end_date: queryParams.end_date,
       granularity: queryParams.granularity,
       workcenter_groups: queryParams.workcenter_groups || [],
+      locations: queryParams.locations || [],
       families: queryParams.families || [],
       resource_ids: queryParams.resource_ids || [],
       is_production: !!queryParams.is_production,

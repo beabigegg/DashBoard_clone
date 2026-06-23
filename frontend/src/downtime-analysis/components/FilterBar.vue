@@ -12,6 +12,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'filter-change', state: FilterState): void;
   (e: 'update-state', patch: Partial<FilterState>): void;
+  (e: 'dimension-closed', dimension: string): void;
   (e: 'clear'): void;
 }>();
 
@@ -117,6 +118,18 @@ const isDisabled = computed(() => props.loading);
             :disabled="isDisabled"
             placeholder="全部站點"
             @update:model-value="emit('update-state', { workcenter_groups: $event })"
+            @dropdown-close="emit('dimension-closed', 'workcenter_groups')"
+          />
+        </div>
+        <div class="filter-field">
+          <label>設備區域</label>
+          <MultiSelect
+            :model-value="state.locations"
+            :options="options.locations"
+            :disabled="isDisabled"
+            placeholder="全部區域"
+            @update:model-value="emit('update-state', { locations: $event })"
+            @dropdown-close="emit('dimension-closed', 'locations')"
           />
         </div>
         <div class="filter-field">
@@ -127,6 +140,7 @@ const isDisabled = computed(() => props.loading);
             :disabled="isDisabled"
             placeholder="全部型號"
             @update:model-value="emit('update-state', { families: $event })"
+            @dropdown-close="emit('dimension-closed', 'families')"
           />
         </div>
         <div class="filter-field">
@@ -138,6 +152,7 @@ const isDisabled = computed(() => props.loading);
             placeholder="全部設備"
             searchable
             @update:model-value="emit('update-state', { resource_ids: $event })"
+            @dropdown-close="emit('dimension-closed', 'resource_ids')"
           />
         </div>
         <div class="filter-field">
@@ -148,6 +163,7 @@ const isDisabled = computed(() => props.loading);
             :disabled="isDisabled"
             placeholder="全部封裝群組"
             @update:model-value="emit('update-state', { package_groups: $event })"
+            @dropdown-close="emit('dimension-closed', 'package_groups')"
           />
         </div>
       </div>

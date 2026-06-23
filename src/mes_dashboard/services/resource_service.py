@@ -371,6 +371,7 @@ def get_merged_resource_status(
     families: Optional[List[str]] = None,
     resource_ids: Optional[List[str]] = None,
     package_groups: Optional[List[str]] = None,
+    locations: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Get merged resource status from three cache layers.
 
@@ -451,6 +452,8 @@ def get_merged_resource_status(
         # IP-6: exclude records where PACKAGEGROUPNAME not in package_groups list.
         # null PACKAGEGROUPNAME is also excluded when filter is active (data-shape §3.10.3).
         if package_groups and pgname not in package_groups:
+            continue
+        if locations and resource.get('LOCATIONNAME') not in locations:
             continue
 
         # Build merged record

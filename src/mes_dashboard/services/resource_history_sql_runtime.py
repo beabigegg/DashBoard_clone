@@ -677,6 +677,7 @@ def try_compute_query_from_canonical_spool(
     is_key: bool = False,
     is_monitor: bool = False,
     package_groups=None,
+    locations=None,
 ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """Check canonical base spool and compute query result with filter predicates in DuckDB.
 
@@ -773,6 +774,7 @@ def try_compute_query_from_canonical_spool(
             is_key=is_key,
             is_monitor=is_monitor,
             package_groups=package_groups,
+            locations=locations,
         )
         resource_lookup = _build_resource_lookup(resources)
         wc_mapping = _get_workcenter_mapping()

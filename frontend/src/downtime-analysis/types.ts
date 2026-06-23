@@ -98,6 +98,7 @@ export interface Pagination {
 
 export interface FilterOptions {
   workcenter_groups: string[];
+  locations: string[];
   families: string[];
   resources: string[];
   package_groups: string[];
@@ -107,6 +108,7 @@ export interface FilterOptions {
 
 export interface FilterState {
   workcenter_groups: string[];
+  locations: string[];
   families: string[];
   resource_ids: string[];
   package_groups: string[];
