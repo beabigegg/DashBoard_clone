@@ -1,3 +1,8 @@
+/* Override resource-shared's max-width: 1800px — fill the full shell-content area (same as hold-overview) */
+.theme-resource .dashboard {
+  max-width: none;
+}
+
 .theme-resource .filters-panel {
   padding: theme('spacing.token.p12') theme('spacing.token.p16');
   display: flex;
@@ -43,17 +48,21 @@
 }
 
 .theme-resource .filter-chip {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  padding: theme('spacing.token.p8') theme('spacing.token.p14');
   border-radius: 999px;
-  border: 1px solid var(--resource-border);
+  border: 1.5px solid var(--resource-border);
   background: theme('colors.token.hf8fafc');
   color: theme('colors.token.h334155');
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .theme-resource .filter-chip input[type='checkbox'] {
@@ -66,6 +75,8 @@
   background: theme('colors.token.hdbeafe');
   border-color: theme('colors.token.h93c5fd');
   color: theme('colors.token.h1d4ed8');
+  font-weight: 600;
+  animation: resource-chip-glow 2s ease-in-out infinite;
 }
 
 .theme-resource .equipment-grid {
@@ -81,6 +92,10 @@
   background: theme('colors.token.hffffff');
   padding: theme('spacing.token.p12');
   box-shadow: var(--resource-shadow);
+  transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+}
+
+.theme-resource .equipment-card {
   transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 
@@ -372,11 +387,9 @@
 
 .theme-resource .rings-strip {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  overflow-x: auto;
   padding-bottom: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: theme('colors.token.hdbe4ef') transparent;
 }
 
 .theme-resource .ring-card {
@@ -609,10 +622,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 580px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: theme('colors.token.hdbe4ef') transparent;
 }
 
 .theme-resource .alert-card {
@@ -799,4 +808,253 @@
   background: theme('colors.token.heff6ff');
   outline: 2px solid var(--resource-primary);
   outline-offset: -2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Visual polish & animations
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Filter chip: hover shimmer + active pulsing glow ─────── */
+
+.theme-resource .filter-chip:hover:not(:disabled) {
+  border-color: theme('colors.brand.400');
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.700');
+}
+
+/* Shimmer sweep element */
+.theme-resource .filter-chip::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+
+.theme-resource .filter-chip:hover:not(:disabled)::after {
+  animation: resource-chip-shimmer 0.5s ease forwards;
+}
+
+@keyframes resource-chip-shimmer {
+  from { left: -80%; }
+  to   { left: 130%; }
+}
+
+@keyframes resource-chip-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9), 0 0 0 0 rgba(59, 130, 246, 0.45);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.5), 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+}
+
+/* ── 2. Heatmap cells: left-to-right shimmer on hover ────────── */
+
+.theme-resource .heatmap-cell {
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-resource .heatmap-cell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  transform: skewX(-15deg);
+  pointer-events: none;
+}
+
+.theme-resource .heatmap-cell:hover {
+  filter: brightness(0.88);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+  transition: filter 0.15s, box-shadow 0.15s;
+}
+
+.theme-resource .heatmap-cell:hover::after {
+  animation: heatmap-cell-shimmer 0.4s ease forwards;
+}
+
+@keyframes heatmap-cell-shimmer {
+  from { left: -100%; }
+  to   { left: 130%; }
+}
+
+/* ── 3. Alert bars: continuous left-to-right shimmer ─────────── */
+
+.theme-resource .duration-bar-fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-resource .duration-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  animation: alert-bar-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes alert-bar-shimmer {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(250%); }
+}
+
+/* ── 4. Status matrix: row hover + selected cell glow ────────── */
+
+.theme-resource .matrix-table tr.row-level-0:hover > td,
+.theme-resource .matrix-table tr.row-level-1:hover > td {
+  background: color-mix(in srgb, theme('colors.brand.50') 70%, transparent);
+  transition: background 0.15s;
+}
+
+.theme-resource .matrix-table tr.row-level-2.clickable-row:hover > td {
+  background: theme('colors.token.hf0f4ff');
+  transition: background 0.15s;
+}
+
+.theme-resource .matrix-table td.clickable:hover {
+  background: color-mix(in srgb, theme('colors.brand.100') 60%, transparent) !important;
+  cursor: pointer;
+}
+
+.theme-resource .matrix-table td.selected {
+  box-shadow: inset 0 0 0 2px theme('colors.brand.400');
+  color: theme('colors.brand.700');
+  font-weight: 700;
+}
+
+.theme-resource .matrix-table tr.selected > td {
+  background: theme('colors.token.he0e7ff');
+}
+
+.theme-resource .ou-badge.high {
+  box-shadow: 0 0 0 1.5px rgba(22, 163, 74, 0.35);
+}
+
+.theme-resource .ou-badge.medium {
+  box-shadow: 0 0 0 1.5px rgba(202, 138, 4, 0.35);
+}
+
+.theme-resource .ou-badge.low {
+  box-shadow: 0 0 0 1.5px rgba(220, 38, 38, 0.35);
+}
+
+/* ── 5. Equipment cards: status-color glow on hover ──────────── */
+
+.theme-resource .equipment-card.status-prd:hover,
+.theme-resource .equipment-card.status-productive:hover {
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.28), 0 0 0 1px rgba(34, 197, 94, 0.18);
+}
+
+.theme-resource .equipment-card.status-sby:hover,
+.theme-resource .equipment-card.status-standby:hover {
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.28), 0 0 0 1px rgba(59, 130, 246, 0.18);
+}
+
+.theme-resource .equipment-card.status-udt:hover,
+.theme-resource .equipment-card.status-down:hover {
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.28), 0 0 0 1px rgba(239, 68, 68, 0.18);
+}
+
+.theme-resource .equipment-card.status-sdt:hover {
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28), 0 0 0 1px rgba(245, 158, 11, 0.18);
+}
+
+.theme-resource .equipment-card.status-egt:hover,
+.theme-resource .equipment-card.status-engineering:hover {
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.28), 0 0 0 1px rgba(139, 92, 246, 0.18);
+}
+
+.theme-resource .equipment-card.status-nst:hover,
+.theme-resource .equipment-card.status-not_scheduled:hover {
+  box-shadow: 0 8px 24px rgba(100, 116, 139, 0.22), 0 0 0 1px rgba(100, 116, 139, 0.14);
+}
+
+/* ── 6. Status matrix dots: per-status pulsing glow ─────────── */
+/* Row-level-2 active dot cell: col-prd:not(.zero) means statusKey === 'PRD' */
+
+.theme-resource .matrix-table tr.row-level-2 td.col-prd:not(.zero) {
+  color: var(--status-prd);
+  animation: matrix-dot-prd 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-prd {
+  0%, 100% { text-shadow: 0 0 3px rgba(34, 197, 94, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(34, 197, 94, 1), 0 0 18px rgba(34, 197, 94, 0.4); }
+}
+
+.theme-resource .matrix-table tr.row-level-2 td.col-sby:not(.zero) {
+  color: var(--status-sby);
+  animation: matrix-dot-sby 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-sby {
+  0%, 100% { text-shadow: 0 0 3px rgba(59, 130, 246, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(59, 130, 246, 1), 0 0 18px rgba(59, 130, 246, 0.4); }
+}
+
+.theme-resource .matrix-table tr.row-level-2 td.col-udt:not(.zero) {
+  color: var(--status-udt);
+  animation: matrix-dot-udt 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-udt {
+  0%, 100% { text-shadow: 0 0 3px rgba(239, 68, 68, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(239, 68, 68, 1), 0 0 18px rgba(239, 68, 68, 0.4); }
+}
+
+.theme-resource .matrix-table tr.row-level-2 td.col-sdt:not(.zero) {
+  color: var(--status-sdt);
+  animation: matrix-dot-sdt 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-sdt {
+  0%, 100% { text-shadow: 0 0 3px rgba(245, 158, 11, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(245, 158, 11, 1), 0 0 18px rgba(245, 158, 11, 0.4); }
+}
+
+.theme-resource .matrix-table tr.row-level-2 td.col-egt:not(.zero) {
+  color: var(--status-egt);
+  animation: matrix-dot-egt 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-egt {
+  0%, 100% { text-shadow: 0 0 3px rgba(139, 92, 246, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(139, 92, 246, 1), 0 0 18px rgba(139, 92, 246, 0.4); }
+}
+
+.theme-resource .matrix-table tr.row-level-2 td.col-nst:not(.zero) {
+  color: var(--status-nst);
+  animation: matrix-dot-nst 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-nst {
+  0%, 100% { text-shadow: 0 0 3px rgba(100, 116, 139, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(100, 116, 139, 1), 0 0 18px rgba(100, 116, 139, 0.4); }
+}
+
+.theme-resource .matrix-table tr.row-level-2 td.col-other:not(.zero) {
+  color: var(--status-other);
+  animation: matrix-dot-other 2s ease-in-out infinite;
+}
+@keyframes matrix-dot-other {
+  0%, 100% { text-shadow: 0 0 3px rgba(148, 163, 184, 0.5); }
+  50%       { text-shadow: 0 0 9px rgba(148, 163, 184, 1), 0 0 18px rgba(148, 163, 184, 0.4); }
+}
+
+/* ── Reduced motion guards ───────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-resource .filter-chip.active { animation: none; box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9); }
+  .theme-resource .filter-chip::after { display: none; }
+  .theme-resource .heatmap-cell::after { display: none; }
+  .theme-resource .duration-bar-fill::after { animation: none; }
+  .theme-resource .matrix-table tr.row-level-2 td:not(.zero) { animation: none; }
 }
