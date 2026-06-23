@@ -71,6 +71,7 @@ const chartBodyHeight = computed(() => {
 
 const chartOption = computed(() => {
   const payload = parsedHeatmap.value;
+  const showCellLabel = payload.dates.length <= 30;
 
   return {
     tooltip: {
@@ -82,13 +83,11 @@ const chartOption = computed(() => {
         const yIndex = Number(p.value?.[1] || 0);
         const value = Number(p.value?.[2] || 0);
 
-        return `${payload.workcenters[yIndex] || '--'}<br/>${payload.dates[xIndex] || '--'}<br/>${metricLabel.value}: <b>${value.toFixed(
-          1
-        )}%</b>`;
+        return `${payload.workcenters[yIndex] || '--'}<br/>${payload.dates[xIndex] || '--'}<br/>${metricLabel.value}: <b>${value.toFixed(1)}%</b>`;
       },
     },
     grid: {
-      left: 110,
+      left: 130,
       right: 20,
       top: 20,
       bottom: 100,
@@ -98,7 +97,7 @@ const chartOption = computed(() => {
       data: payload.dates,
       splitArea: { show: true },
       axisLabel: {
-        fontSize: 10,
+        fontSize: 11,
         rotate: 40,
       },
     },
@@ -108,7 +107,8 @@ const chartOption = computed(() => {
       inverse: true,
       splitArea: { show: true },
       axisLabel: {
-        fontSize: 10,
+        fontSize: 13,
+        fontWeight: 500,
       },
     },
     visualMap: {
@@ -116,19 +116,42 @@ const chartOption = computed(() => {
       max: 100,
       orient: 'horizontal',
       left: 'center',
-      bottom: 4,
+      bottom: 8,
+      text: ['100%', '0%'],
+      textStyle: { fontSize: 11, color: '#64748b' },
+      itemWidth: 14,
+      itemHeight: 120,
+      calculable: true,
       inRange: {
-        color: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(34, 197, 94)'],
+        color: ['#ef4444', '#f97316', '#eab308', '#22c55e'],
       },
     },
     series: [
       {
         type: 'heatmap',
         data: payload.matrixData,
+        itemStyle: {
+          borderColor: 'rgba(255,255,255,0.55)',
+          borderWidth: 1,
+        },
+        label: {
+          show: showCellLabel,
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#fff',
+          textShadowBlur: 3,
+          textShadowColor: 'rgba(0,0,0,0.55)',
+          formatter: (params: unknown) => {
+            const v = Number((params as { value?: unknown[] }).value?.[2] || 0);
+            return v > 0 ? v.toFixed(1) : '';
+          },
+        },
         emphasis: {
           itemStyle: {
-            shadowBlur: 10,
-            shadowColor: 'rgba(0, 0, 0, 0.3)',
+            shadowBlur: 22,
+            shadowColor: 'rgba(0,0,0,0.45)',
+            borderColor: 'rgba(255,255,255,0.95)',
+            borderWidth: 2,
           },
         },
       },
@@ -158,13 +181,31 @@ const chartOption = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+.chart-header .chart-title {
+  border-bottom: none;
+  padding: 0;
+  margin: 0;
 }
 .heatmap-metric-select {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 0.25rem;
-  font-size: 0.8125rem;
-  background: var(--color-surface, #fff);
-  color: var(--color-text, #1f2937);
+  padding: 4px 10px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.heatmap-metric-select:hover {
+  border-color: #93c5fd;
+}
+.heatmap-metric-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
 }
 </style>

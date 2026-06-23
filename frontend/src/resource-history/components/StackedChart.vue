@@ -17,6 +17,11 @@ function resolveCssVar(varExpr: unknown): string {
   return getComputedStyle(document.documentElement).getPropertyValue(match[1]).trim();
 }
 
+function toRgba(color: string, alpha: number): string {
+  const m = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  return m ? `rgba(${m[1]},${m[2]},${m[3]},${alpha})` : color;
+}
+
 const props = withDefaults(defineProps<{
   trend?: Record<string, unknown>[];
 }>(), {
@@ -80,15 +85,25 @@ const chartOption = computed(() => {
         formatter: '{value}h',
       },
     },
-    series: statuses.map((status) => ({
-      name: status,
-      type: 'bar',
-      stack: 'hours',
-      itemStyle: {
-        color: resolveCssVar(STATUS_COLORS[status]),
-      },
-      data: trend.map((item) => Number(item[`${status.toLowerCase()}_hours`] || 0)),
-    })),
+    series: statuses.map((status) => {
+      const color = resolveCssVar(STATUS_COLORS[status]);
+      return {
+        name: status,
+        type: 'bar',
+        stack: 'hours',
+        itemStyle: { color },
+        emphasis: {
+          focus: 'self',
+          itemStyle: {
+            shadowBlur: 22,
+            shadowColor: toRgba(color, 0.75),
+            borderColor: 'rgba(255,255,255,0.85)',
+            borderWidth: 1.5,
+          },
+        },
+        data: trend.map((item) => Number(item[`${status.toLowerCase()}_hours`] || 0)),
+      };
+    }),
   };
 });
 </script>
