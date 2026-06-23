@@ -283,6 +283,18 @@
   50%       { box-shadow: 0 0 0 7px rgba(0, 107, 168, 0); }
 }
 
+/* ── bar-chart hover: pulsing card glow ─────────────────────────── */
+
+@keyframes rh-bar-hover-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+  50%       { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2), 0 0 20px 4px rgba(59, 130, 246, 0.1); }
+}
+
+.theme-resource-history .chart-body.is-hovering {
+  animation: rh-bar-hover-glow 1.3s ease-in-out infinite;
+  border-radius: 0 0 10px 10px;
+}
+
 /* ── prefers-reduced-motion: disable all animations ─────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -300,6 +312,7 @@
     animation: none;
   }
   .theme-resource-history .rh-query-btn::after { display: none; }
+  .theme-resource-history .chart-body.is-hovering { animation: none; }
 }
 
 @media (max-width: 1180px) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
@@ -32,34 +32,38 @@ const hasData = computed(() => props.trend.length > 0);
 
 const statuses = ['PRD', 'SBY', 'UDT', 'SDT', 'EGT', 'NST'];
 
+const isHovering = ref(false);
+let _mouseoutTimer: ReturnType<typeof setTimeout> | null = null;
+function onChartMouseover() {
+  if (_mouseoutTimer) { clearTimeout(_mouseoutTimer); _mouseoutTimer = null; }
+  isHovering.value = true;
+}
+function onChartMouseout() {
+  _mouseoutTimer = setTimeout(() => { isHovering.value = false; }, 120);
+}
+onUnmounted(() => { if (_mouseoutTimer) clearTimeout(_mouseoutTimer); });
+
 const chartOption = computed(() => {
   const trend = props.trend || [];
 
   return {
     tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      // TODO: type echarts callback
+      trigger: 'item',
       formatter(params: unknown) {
-        const paramsList = params as Record<string, unknown>[];
-        if (!Array.isArray(paramsList) || !paramsList.length) {
-          return '';
-        }
-
-        const index = Number((paramsList[0] as Record<string, unknown>).dataIndex || 0);
+        const p = params as Record<string, unknown>;
+        const index = Number(p.dataIndex || 0);
         const current = trend[index] || {};
+        const value = Number(p.value || 0);
         const total = statuses.reduce(
           (sum, status) => sum + Number(current[`${status.toLowerCase()}_hours`] || 0),
-          0
+          0,
         );
-
-        const lines = paramsList.map((item) => {
-          const value = Number(item.value || 0);
-          const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-          return `${item.marker}${item.seriesName}: ${value.toFixed(1)}h (${pct}%)`;
-        });
-
-        return [`<b>${current.date || '--'}</b>`, ...lines, `<b>Total: ${total.toFixed(1)}h</b>`].join('<br/>');
+        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+        return [
+          `<b>${current.date || '--'}</b>`,
+          `${p.marker}${p.seriesName}: <b>${value.toFixed(1)}h</b> (${pct}%)`,
+          `<span style="color:#94a3b8">Total: ${total.toFixed(1)}h</span>`,
+        ].join('<br/>');
       },
     },
     legend: {
@@ -111,8 +115,8 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">E10 狀態時數分布</h3>
-    <div v-if="hasData" class="chart-body" role="img" aria-label="設備稼動率堆疊圖">
-      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
+    <div v-if="hasData" class="chart-body" :class="{ 'is-hovering': isHovering }" role="img" aria-label="設備稼動率堆疊圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @mouseover="onChartMouseover" @mouseout="onChartMouseout" />
     </div>
     <div v-else class="chart-no-data">No data</div>
   </article>

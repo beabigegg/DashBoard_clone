@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -30,6 +30,17 @@ const chartBodyHeight = computed(() => {
   const rows = rankedData.value.length;
   return Math.min(Math.max(280, rows * ROW_HEIGHT + GRID_OVERHEAD), 900);
 });
+
+const isHovering = ref(false);
+let _mouseoutTimer: ReturnType<typeof setTimeout> | null = null;
+function onChartMouseover() {
+  if (_mouseoutTimer) { clearTimeout(_mouseoutTimer); _mouseoutTimer = null; }
+  isHovering.value = true;
+}
+function onChartMouseout() {
+  _mouseoutTimer = setTimeout(() => { isHovering.value = false; }, 120);
+}
+onUnmounted(() => { if (_mouseoutTimer) clearTimeout(_mouseoutTimer); });
 
 const chartOption = computed(() => {
   const rows = rankedData.value;
@@ -111,8 +122,8 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">Workcenter OU%</h3>
-    <div v-if="hasData" class="chart-body" :style="{ height: chartBodyHeight + 'px' }" role="img" aria-label="設備稼動率比較圖">
-      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
+    <div v-if="hasData" class="chart-body" :class="{ 'is-hovering': isHovering }" :style="{ height: chartBodyHeight + 'px' }" role="img" aria-label="設備稼動率比較圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @mouseover="onChartMouseover" @mouseout="onChartMouseout" />
     </div>
     <div v-else class="chart-no-data" :style="{ height: chartBodyHeight + 'px' }">No data</div>
   </article>
