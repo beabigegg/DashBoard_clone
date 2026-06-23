@@ -1,3 +1,13 @@
+/* Override resource-shared's max-width and padding — fill the full shell-content area.
+   Compound selector (.A.B) matches the root element itself (both classes on same div). */
+.theme-resource-history.resource-page {
+  padding: 0;
+}
+.theme-resource-history .dashboard {
+  max-width: none;
+  margin: 0;
+}
+
 .theme-resource-history .filter-rows {
   display: flex;
   flex-direction: column;
