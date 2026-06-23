@@ -45,26 +45,77 @@
 .theme-resource-history .granularity-btns {
   display: inline-flex;
   gap: 4px;
-  padding: theme('spacing.token.p3');
-  border-radius: 8px;
+  padding: theme('spacing.token.p4');
+  border-radius: 10px;
   border: 1px solid var(--resource-border);
-  background: theme('colors.token.hf8fafc');
+  background: theme('colors.surface.muted');
 }
 
 .theme-resource-history .granularity-btn {
+  position: relative;
+  overflow: hidden;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: theme('colors.token.h475569');
   font-size: 12px;
-  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  font-weight: 600;
+  padding: theme('spacing.token.p6') theme('spacing.token.p14');
   cursor: pointer;
+  transition: background 0.2s var(--motion-ease), color 0.2s var(--motion-ease), box-shadow 0.2s var(--motion-ease);
 }
 
+/* Shimmer sweep on hover */
+.theme-resource-history .granularity-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+
+.theme-resource-history .granularity-btn:hover:not(:disabled) {
+  background: theme('colors.brand.50');
+  color: theme('colors.token.h3730a3');
+}
+
+.theme-resource-history .granularity-btn:hover:not(:disabled)::after {
+  animation: rh-gran-shimmer 0.5s ease forwards;
+}
+
+@keyframes rh-gran-shimmer {
+  from { left: -80%; }
+  to   { left: 130%; }
+}
+
+/* Active: continuous pulsing glow */
 .theme-resource-history .granularity-btn.active {
   background: theme('colors.token.hdbeafe');
-  color: theme('colors.token.h1d4ed8');
-  font-weight: 700;
+  color: theme('colors.brand.800');
+  animation: rh-gran-glow 2s ease-in-out infinite;
+}
+
+@keyframes rh-gran-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9), 0 0 0 0 rgba(59, 130, 246, 0.45);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.5), 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+}
+
+.theme-resource-history .granularity-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.theme-resource-history .granularity-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .theme-resource-history .checkbox-row {
@@ -75,22 +126,74 @@
 }
 
 .theme-resource-history .checkbox-pill {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--resource-border);
+  border: 1.5px solid var(--resource-border);
   border-radius: 999px;
-  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  padding: theme('spacing.token.p8') theme('spacing.token.p14');
   font-size: 13px;
+  font-weight: 500;
   color: theme('colors.token.h334155');
   background: theme('colors.token.hf8fafc');
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .theme-resource-history .checkbox-pill input[type='checkbox'] {
   margin: 0;
   width: 14px;
   height: 14px;
-  accent-color: theme('colors.brand.600');
+  accent-color: var(--resource-primary);
+}
+
+/* Shimmer sweep on hover */
+.theme-resource-history .checkbox-pill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+
+.theme-resource-history .checkbox-pill:hover:not(:has(input:checked))::after {
+  animation: rh-chip-shimmer 0.5s ease forwards;
+}
+
+.theme-resource-history .checkbox-pill:hover:not(:has(input:checked)) {
+  border-color: theme('colors.brand.400');
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.700');
+}
+
+/* Active: when checkbox is checked — pulsing glow */
+.theme-resource-history .checkbox-pill:has(input:checked) {
+  background: theme('colors.token.hdbeafe');
+  border-color: theme('colors.token.h93c5fd');
+  color: theme('colors.token.h1d4ed8');
+  font-weight: 600;
+  animation: rh-chip-glow 2s ease-in-out infinite;
+}
+
+@keyframes rh-chip-shimmer {
+  from { left: -80%; }
+  to   { left: 130%; }
+}
+
+@keyframes rh-chip-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9), 0 0 0 0 rgba(59, 130, 246, 0.45);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.5), 0 0 0 6px rgba(59, 130, 246, 0);
+  }
 }
 
 .theme-resource-history .chart-grid {
@@ -144,6 +247,59 @@
 .theme-resource-history .detail-cell {
   white-space: nowrap;
   font-size: 12px;
+}
+
+/* ── 查詢 button: shimmer + pulsing glow ────────────────────────── */
+
+.theme-resource-history .rh-query-btn {
+  position: relative;
+  overflow: hidden;
+  animation: rh-query-pulse 2.5s ease-in-out infinite;
+}
+
+.theme-resource-history .rh-query-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+
+.theme-resource-history .rh-query-btn:hover:not(:disabled)::after {
+  animation: rh-query-shimmer 0.45s ease forwards;
+}
+
+@keyframes rh-query-shimmer {
+  from { left: -80%; }
+  to   { left: 130%; }
+}
+
+@keyframes rh-query-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 107, 168, 0.5); }
+  50%       { box-shadow: 0 0 0 7px rgba(0, 107, 168, 0); }
+}
+
+/* ── prefers-reduced-motion: disable all animations ─────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-resource-history .granularity-btn.active {
+    animation: none;
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9);
+  }
+  .theme-resource-history .granularity-btn::after { display: none; }
+  .theme-resource-history .checkbox-pill:has(input:checked) {
+    animation: none;
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9);
+  }
+  .theme-resource-history .checkbox-pill::after { display: none; }
+  .theme-resource-history .rh-query-btn {
+    animation: none;
+  }
+  .theme-resource-history .rh-query-btn::after { display: none; }
 }
 
 @media (max-width: 1180px) {

@@ -175,7 +175,7 @@ function updateFilters(patch: Record<string, unknown>): void {
           </label>
         </div>
 
-        <button type="button" class="ui-btn ui-btn--primary" :disabled="loading" @click="$emit('query')">查詢</button>
+        <button type="button" class="ui-btn ui-btn--primary rh-query-btn" :disabled="loading" @click="$emit('query')">查詢</button>
         <button type="button" class="ui-btn ui-btn--ghost" :disabled="loading" @click="$emit('clear')">清除條件</button>
       </div>
     </div>
