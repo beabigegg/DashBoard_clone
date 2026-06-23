@@ -282,11 +282,29 @@
 }
 
 .theme-hold-detail .lot-table th.sortable-th {
+  cursor: pointer;
   user-select: none;
 }
 
 .theme-hold-detail .lot-table th.sortable-th:hover {
-  background: theme('colors.token.he2e8f0');
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.primary');
+}
+
+.theme-hold-detail .th-sort-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.theme-hold-detail .sort-icon {
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
+.theme-hold-detail .sort-icon--active {
+  opacity: 1;
+  color: theme('colors.brand.500');
 }
 
 .theme-hold-detail .lot-table th:nth-child(3),

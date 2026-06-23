@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
 import { useSortableTable } from '../../shared-composables/useSortableTable';
 import type { DataRow } from '../../shared-composables/useSortableTable';
 
@@ -20,11 +21,9 @@ const emit = defineEmits(['clear-filters', 'prev-page', 'next-page']);
 const lotsRef = computed((): DataRow[] => props.lots ?? []);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
 
-function currentSortLabel(key: string): string {
-  if (sortKey.value !== key) {
-    return '⇕';
-  }
-  return sortDirection.value === 'asc' ? '▲' : '▼';
+function sortIconFor(key: string) {
+  if (sortKey.value !== key) return ArrowUpDown;
+  return sortDirection.value === 'asc' ? ArrowUp : ArrowDown;
 }
 
 function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
@@ -84,19 +83,19 @@ const pageInfo = computed(() => {
       <table class="lot-table">
         <thead>
           <tr>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('lotId')" :aria-sort="ariaSortFor('lotId')">LOTID <span>{{ currentSortLabel('lotId') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('workorder')" :aria-sort="ariaSortFor('workorder')">WORKORDER <span>{{ currentSortLabel('workorder') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('qty')" :aria-sort="ariaSortFor('qty')">QTY <span>{{ currentSortLabel('qty') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('product')" :aria-sort="ariaSortFor('product')">Product <span>{{ currentSortLabel('product') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('package')" :aria-sort="ariaSortFor('package')">Package <span>{{ currentSortLabel('package') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('workcenter')" :aria-sort="ariaSortFor('workcenter')">Workcenter <span>{{ currentSortLabel('workcenter') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('holdReason')" :aria-sort="ariaSortFor('holdReason')">Hold Reason <span>{{ currentSortLabel('holdReason') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('spec')" :aria-sort="ariaSortFor('spec')">Spec <span>{{ currentSortLabel('spec') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('age')" :aria-sort="ariaSortFor('age')">Age <span>{{ currentSortLabel('age') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('holdBy')" :aria-sort="ariaSortFor('holdBy')">Hold By <span>{{ currentSortLabel('holdBy') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('dept')" :aria-sort="ariaSortFor('dept')">Dept <span>{{ currentSortLabel('dept') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('holdComment')" :aria-sort="ariaSortFor('holdComment')">Hold Comment <span>{{ currentSortLabel('holdComment') }}</span></th>
-            <th class="cursor-pointer sortable-th" @click="toggleSort('futureHoldComment')" :aria-sort="ariaSortFor('futureHoldComment')">Future Hold Comment <span>{{ currentSortLabel('futureHoldComment') }}</span></th>
+            <th class="sortable-th" @click="toggleSort('lotId')" :aria-sort="ariaSortFor('lotId')"><span class="th-sort-inner">LOTID <component :is="sortIconFor('lotId')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'lotId' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('workorder')" :aria-sort="ariaSortFor('workorder')"><span class="th-sort-inner">WORKORDER <component :is="sortIconFor('workorder')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'workorder' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('qty')" :aria-sort="ariaSortFor('qty')"><span class="th-sort-inner">QTY <component :is="sortIconFor('qty')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'qty' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('product')" :aria-sort="ariaSortFor('product')"><span class="th-sort-inner">Product <component :is="sortIconFor('product')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'product' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('package')" :aria-sort="ariaSortFor('package')"><span class="th-sort-inner">Package <component :is="sortIconFor('package')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'package' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('workcenter')" :aria-sort="ariaSortFor('workcenter')"><span class="th-sort-inner">Workcenter <component :is="sortIconFor('workcenter')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'workcenter' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('holdReason')" :aria-sort="ariaSortFor('holdReason')"><span class="th-sort-inner">Hold Reason <component :is="sortIconFor('holdReason')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdReason' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('spec')" :aria-sort="ariaSortFor('spec')"><span class="th-sort-inner">Spec <component :is="sortIconFor('spec')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'spec' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('age')" :aria-sort="ariaSortFor('age')"><span class="th-sort-inner">Age <component :is="sortIconFor('age')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'age' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('holdBy')" :aria-sort="ariaSortFor('holdBy')"><span class="th-sort-inner">Hold By <component :is="sortIconFor('holdBy')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdBy' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('dept')" :aria-sort="ariaSortFor('dept')"><span class="th-sort-inner">Dept <component :is="sortIconFor('dept')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'dept' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('holdComment')" :aria-sort="ariaSortFor('holdComment')"><span class="th-sort-inner">Hold Comment <component :is="sortIconFor('holdComment')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdComment' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('futureHoldComment')" :aria-sort="ariaSortFor('futureHoldComment')"><span class="th-sort-inner">Future Hold Comment <component :is="sortIconFor('futureHoldComment')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'futureHoldComment' }" :size="13" /></span></th>
           </tr>
         </thead>
         <tbody>

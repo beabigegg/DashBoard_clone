@@ -990,10 +990,15 @@ onBeforeUnmount(() => {
         <div class="card-header ui-card-header">
           <div class="card-title ui-card-title">Hold Lot Details</div>
           <div class="flex items-center gap-3 ml-auto">
-            <div v-if="hasLotFilterText" class="flex items-center gap-2 text-xs text-text-muted">
-              <span>篩選: {{ lotFilterText }}</span>
-              <button type="button" class="text-brand-500 hover:underline" @click="clearMatrixFilter">清除</button>
-            </div>
+            <button
+              v-if="hasLotFilterText"
+              type="button"
+              class="hold-filter-chip"
+              @click="clearMatrixFilter"
+            >
+              <span class="hold-filter-chip__text">{{ lotFilterText }}</span>
+              <span class="hold-filter-chip__x" aria-hidden="true">✕</span>
+            </button>
             <button
               type="button"
               class="ui-btn ui-btn--secondary ui-btn--sm"
