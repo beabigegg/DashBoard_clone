@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
 import { useSortableTable } from '../../shared-composables/useSortableTable';
 
 import Pagination from '../../shared-ui/components/PaginationControl.vue';
@@ -47,6 +48,11 @@ type LotRow = {
 
 const lotsRef = computed<LotRow[]>(() => (props.data.lots || []) as LotRow[]);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(lotsRef);
+
+function sortIconFor(key: string) {
+  if (sortKey.value !== key) return ArrowUpDown;
+  return sortDirection.value === 'asc' ? ArrowUp : ArrowDown;
+}
 
 function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === '-') {
@@ -120,11 +126,21 @@ const pageInfo = computed(() => {
       <table v-else>
         <thead>
           <tr>
-            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('lotId')" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">LOT ID <span>{{ sortKey === 'lotId' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('pjType')" :aria-sort="sortKey === 'pjType' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Type <span>{{ sortKey === 'pjType' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('equipment')" :aria-sort="sortKey === 'equipment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Equipment <span>{{ sortKey === 'equipment' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('wipStatus')" :aria-sort="sortKey === 'wipStatus' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">WIP Status <span>{{ sortKey === 'wipStatus' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
-            <th class="fixed-col cursor-pointer sortable-th" @click="toggleSort('package')" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">Package <span>{{ sortKey === 'package' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇕' }}</span></th>
+            <th class="fixed-col sortable-th" @click="toggleSort('lotId')" :aria-sort="sortKey === 'lotId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <span class="th-sort-inner">LOT ID <component :is="sortIconFor('lotId')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'lotId' }" :size="13" /></span>
+            </th>
+            <th class="fixed-col sortable-th" @click="toggleSort('pjType')" :aria-sort="sortKey === 'pjType' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <span class="th-sort-inner">Type <component :is="sortIconFor('pjType')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'pjType' }" :size="13" /></span>
+            </th>
+            <th class="fixed-col sortable-th" @click="toggleSort('equipment')" :aria-sort="sortKey === 'equipment' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <span class="th-sort-inner">Equipment <component :is="sortIconFor('equipment')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'equipment' }" :size="13" /></span>
+            </th>
+            <th class="fixed-col sortable-th" @click="toggleSort('wipStatus')" :aria-sort="sortKey === 'wipStatus' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <span class="th-sort-inner">WIP Status <component :is="sortIconFor('wipStatus')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'wipStatus' }" :size="13" /></span>
+            </th>
+            <th class="fixed-col sortable-th" @click="toggleSort('package')" :aria-sort="sortKey === 'package' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <span class="th-sort-inner">Package <component :is="sortIconFor('package')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'package' }" :size="13" /></span>
+            </th>
             <th v-for="spec in data.specs" :key="spec" class="spec-col">{{ spec }}</th>
           </tr>
         </thead>
@@ -142,7 +158,12 @@ const pageInfo = computed(() => {
             </td>
             <td class="fixed-col">{{ lot.pjType != null ? lot.pjType : '-' }}</td>
             <td class="fixed-col">{{ lot.equipment || '-' }}</td>
-            <td class="fixed-col" :class="statusClass(lot.wipStatus)">{{ statusText(lot) }}</td>
+            <td class="fixed-col">
+              <span class="wip-status-badge" :class="statusClass(lot.wipStatus)">
+                <span class="badge-dot"></span>
+                {{ statusText(lot) }}
+              </span>
+            </td>
             <td class="fixed-col">{{ lot.package || '-' }}</td>
             <td
               v-for="spec in data.specs"

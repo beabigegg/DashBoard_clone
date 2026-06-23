@@ -139,67 +139,88 @@
   margin-bottom: theme('spacing.token.p28');
 }
 
-.theme-wip-detail .detail-summary-row .summary-card.status-run,
-.theme-wip-detail .detail-summary-row .summary-card.status-queue,
-.theme-wip-detail .detail-summary-row .summary-card.status-quality-hold,
-.theme-wip-detail .detail-summary-row .summary-card.status-non-quality-hold {
-  cursor: pointer;
-  transition: all var(--motion-normal) var(--motion-ease);
-}
-
-.theme-wip-detail .detail-summary-row .summary-card.status-run:hover,
-.theme-wip-detail .detail-summary-row .summary-card.status-queue:hover,
-.theme-wip-detail .detail-summary-row .summary-card.status-quality-hold:hover,
-.theme-wip-detail .detail-summary-row .summary-card.status-non-quality-hold:hover {
-  transform: var(--hover-lift);
-}
+/* ── Status cards: colored bg + border + hover glow + breathing dot ─────── */
 
 .theme-wip-detail .detail-summary-row .summary-card.status-run {
   background: theme('colors.token.hf0fdf4');
-  border-color: theme('colors.state.success');
+  border-color: theme('colors.token.h22c55e');
+  --summary-glow-bg: rgba(34, 197, 94, 0.05);
+  --summary-glow-ring: rgba(34, 197, 94, 0.25);
+  --summary-glow-halo: rgba(34, 197, 94, 0.2);
 }
 
 .theme-wip-detail .detail-summary-row .summary-card.status-queue {
   background: theme('colors.token.hfffbeb');
-  border-color: theme('colors.state.warning');
+  border-color: theme('colors.token.hf59e0b');
+  --summary-glow-bg: rgba(245, 158, 11, 0.05);
+  --summary-glow-ring: rgba(245, 158, 11, 0.25);
+  --summary-glow-halo: rgba(245, 158, 11, 0.2);
 }
 
 .theme-wip-detail .detail-summary-row .summary-card.status-quality-hold {
   background: theme('colors.token.hfef2f2');
-  border-color: theme('colors.state.danger');
+  border-color: theme('colors.token.hef4444');
+  --summary-glow-bg: rgba(239, 68, 68, 0.05);
+  --summary-glow-ring: rgba(239, 68, 68, 0.25);
+  --summary-glow-halo: rgba(239, 68, 68, 0.2);
 }
 
 .theme-wip-detail .detail-summary-row .summary-card.status-non-quality-hold {
   background: theme('colors.token.hfff7ed');
   border-color: theme('colors.token.hf97316');
+  --summary-glow-bg: rgba(249, 115, 22, 0.05);
+  --summary-glow-ring: rgba(249, 115, 22, 0.25);
+  --summary-glow-halo: rgba(249, 115, 22, 0.2);
 }
 
-.theme-wip-detail .detail-summary-row .summary-card.status-run .summary-value {
-  color: theme('colors.token.h166534');
+/* Breathing dot prepended to label text */
+.theme-wip-detail .detail-summary-row .summary-card.status-run .summary-card__label::before,
+.theme-wip-detail .detail-summary-row .summary-card.status-queue .summary-card__label::before,
+.theme-wip-detail .detail-summary-row .summary-card.status-quality-hold .summary-card__label::before,
+.theme-wip-detail .detail-summary-row .summary-card.status-non-quality-hold .summary-card__label::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  animation: wip-detail-dot-breathe 2.4s ease-in-out infinite;
 }
 
-.theme-wip-detail .detail-summary-row .summary-card.status-queue .summary-value {
-  color: theme('colors.token.h92400e');
+@keyframes wip-detail-dot-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--detail-dot-glow, rgba(0,0,0,0.3)); opacity: 1; }
+  50%       { box-shadow: 0 0 0 4px transparent; opacity: 0.75; }
 }
 
-.theme-wip-detail .detail-summary-row .summary-card.status-quality-hold .summary-value {
-  color: theme('colors.token.h991b1b');
+.theme-wip-detail .detail-summary-row .summary-card.status-run .summary-card__label::before {
+  background: theme('colors.token.h22c55e');
+  --detail-dot-glow: rgba(34, 197, 94, 0.7);
+}
+.theme-wip-detail .detail-summary-row .summary-card.status-queue .summary-card__label::before {
+  background: theme('colors.token.hf59e0b');
+  --detail-dot-glow: rgba(245, 158, 11, 0.7);
+}
+.theme-wip-detail .detail-summary-row .summary-card.status-quality-hold .summary-card__label::before {
+  background: theme('colors.token.hef4444');
+  --detail-dot-glow: rgba(239, 68, 68, 0.7);
+}
+.theme-wip-detail .detail-summary-row .summary-card.status-non-quality-hold .summary-card__label::before {
+  background: theme('colors.token.hf97316');
+  --detail-dot-glow: rgba(249, 115, 22, 0.7);
 }
 
-.theme-wip-detail .detail-summary-row .summary-card.status-non-quality-hold .summary-value {
-  color: theme('colors.token.h9a3412');
-}
-
-.theme-wip-detail .detail-summary-row .summary-card.active {
-  border-width: 3px;
-  transform: scale(1.03);
-}
-
-.theme-wip-detail .detail-summary-row.filtering .summary-card.status-run:not(.active),
-.theme-wip-detail .detail-summary-row.filtering .summary-card.status-queue:not(.active),
-.theme-wip-detail .detail-summary-row.filtering .summary-card.status-quality-hold:not(.active),
-.theme-wip-detail .detail-summary-row.filtering .summary-card.status-non-quality-hold:not(.active) {
+.theme-wip-detail .detail-summary-row.filtering .summary-card.status-run:not(.summary-card--active),
+.theme-wip-detail .detail-summary-row.filtering .summary-card.status-queue:not(.summary-card--active),
+.theme-wip-detail .detail-summary-row.filtering .summary-card.status-quality-hold:not(.summary-card--active),
+.theme-wip-detail .detail-summary-row.filtering .summary-card.status-non-quality-hold:not(.summary-card--active) {
   opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wip-detail .detail-summary-row .summary-card .summary-card__label::before {
+    animation: none;
+  }
 }
 
 .theme-wip-detail .table-section {
@@ -254,17 +275,35 @@
   background: theme('colors.token.hf8f9fa');
   padding: theme('spacing.token.p10') theme('spacing.block');
   text-align: left;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 1px solid theme('colors.token.hf0f0f0');
   font-weight: 600;
   white-space: nowrap;
 }
 
 .theme-wip-detail .table-container th.sortable-th {
+  cursor: pointer;
   user-select: none;
 }
 
 .theme-wip-detail .table-container th.sortable-th:hover {
-  background: theme('colors.token.he2e8f0');
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.primary');
+}
+
+.theme-wip-detail .th-sort-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.theme-wip-detail .sort-icon {
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
+.theme-wip-detail .sort-icon--active {
+  opacity: 1;
+  color: theme('colors.brand.500');
 }
 
 .theme-wip-detail .table-container td {
@@ -335,22 +374,68 @@
   color: theme('colors.token.h155724');
 }
 
-.theme-wip-detail .wip-status-run {
+/* ── WIP Status capsule badge ──────────────────────────────────────────── */
+
+.theme-wip-detail .wip-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.theme-wip-detail .wip-status-badge .badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: wip-badge-dot-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes wip-badge-dot-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--badge-dot-glow, rgba(0,0,0,0.3)); opacity: 1; }
+  50%       { box-shadow: 0 0 0 4px transparent; opacity: 0.7; }
+}
+
+.theme-wip-detail .wip-status-badge.wip-status-run {
   color: theme('colors.token.h166534');
   background: theme('colors.token.hf0fdf4');
-  font-weight: 600;
+  border-color: theme('colors.token.h22c55e');
+}
+.theme-wip-detail .wip-status-badge.wip-status-run .badge-dot {
+  background: theme('colors.token.h22c55e');
+  --badge-dot-glow: rgba(34, 197, 94, 0.7);
 }
 
-.theme-wip-detail .wip-status-queue {
+.theme-wip-detail .wip-status-badge.wip-status-queue {
   color: theme('colors.token.h92400e');
   background: theme('colors.token.hfffbeb');
-  font-weight: 600;
+  border-color: theme('colors.token.hf59e0b');
+}
+.theme-wip-detail .wip-status-badge.wip-status-queue .badge-dot {
+  background: theme('colors.token.hf59e0b');
+  --badge-dot-glow: rgba(245, 158, 11, 0.7);
 }
 
-.theme-wip-detail .wip-status-hold {
+.theme-wip-detail .wip-status-badge.wip-status-hold {
   color: theme('colors.token.h991b1b');
   background: theme('colors.token.hfef2f2');
-  font-weight: 600;
+  border-color: theme('colors.token.hef4444');
+}
+.theme-wip-detail .wip-status-badge.wip-status-hold .badge-dot {
+  background: theme('colors.token.hef4444');
+  --badge-dot-glow: rgba(239, 68, 68, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wip-detail .wip-status-badge .badge-dot {
+    animation: none;
+  }
 }
 
 .theme-wip-detail .lot-id-link {
