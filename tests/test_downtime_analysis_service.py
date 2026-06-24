@@ -743,6 +743,8 @@ class TestFilterKwargsForwarding:
         app.config['TESTING'] = True
         return app
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_post_query_forwards_start_date(self, mock_svc):
         """POST /query forwards start_date to service."""
@@ -758,6 +760,8 @@ class TestFilterKwargsForwarding:
             )
         assert mock_svc.call_args.kwargs['start_date'] == '2026-05-01'
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_post_query_forwards_end_date(self, mock_svc):
         """POST /query forwards end_date to service."""
@@ -772,6 +776,8 @@ class TestFilterKwargsForwarding:
             )
         assert mock_svc.call_args.kwargs['end_date'] == '2026-05-28'
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_post_query_forwards_status_types(self, mock_svc):
         """POST /query forwards status_types to service."""
@@ -789,6 +795,8 @@ class TestFilterKwargsForwarding:
             )
         assert mock_svc.call_args.kwargs['status_types'] == ['SDT']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_post_query_forwards_resource_ids(self, mock_svc):
         """POST /query forwards resource_ids to service."""
@@ -806,6 +814,8 @@ class TestFilterKwargsForwarding:
             )
         assert mock_svc.call_args.kwargs['resource_ids'] == ['R-42']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_post_query_forwards_big_categories(self, mock_svc):
         """POST /query forwards big_categories to service."""

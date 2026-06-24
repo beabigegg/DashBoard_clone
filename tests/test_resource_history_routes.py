@@ -256,6 +256,7 @@ class TestResourceHistoryExportAPI(unittest.TestCase):
         data = json.loads(response.data)
         self.assertFalse(data['success'])
 
+    @patch('mes_dashboard.routes.resource_history_routes.RESOURCE_HISTORY_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.resource_history_routes.export_csv')
     def test_successful_export(self, mock_export):
         """Successful export should return CSV with correct headers."""
@@ -270,6 +271,7 @@ class TestResourceHistoryExportAPI(unittest.TestCase):
         self.assertIn('attachment', response.headers['Content-Disposition'])
         self.assertIn('resource_history', response.headers['Content-Disposition'])
 
+    @patch('mes_dashboard.routes.resource_history_routes.RESOURCE_HISTORY_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.resource_history_routes.export_csv')
     def test_export_filename_includes_dates(self, mock_export):
         """Export filename should include date range."""

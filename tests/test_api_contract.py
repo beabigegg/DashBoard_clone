@@ -497,6 +497,7 @@ class TestProductionHistoryQueryModeContract(unittest.TestCase):
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
 
+    @patch("mes_dashboard.routes.production_history_routes._PRODUCTION_HISTORY_USE_UNIFIED_JOB", False)
     @patch(
         "mes_dashboard.services.production_history_job_service.enqueue_production_history_query",
         return_value=("job-ph-test-123", None),

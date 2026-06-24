@@ -101,6 +101,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 1. Short query — async 202 on spool miss
     # ------------------------------------------------------------------
 
+    @patch("mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB", False)
     @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_short_query_returns_async_202_on_spool_miss(self, _mock_cache):
         """5-day date_range spool miss should enqueue async work."""
@@ -123,6 +124,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 2. Long query — async 202
     # ------------------------------------------------------------------
 
+    @patch("mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB", False)
     @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_long_query_returns_async_202(
         self, _mock_cache
@@ -209,6 +211,7 @@ class TestRejectHistoryQueryRoute(unittest.TestCase):
     # 5. Container mode — async 202 on spool miss
     # ------------------------------------------------------------------
 
+    @patch("mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB", False)
     @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
     def test_container_mode_returns_async_202(self, _mock_cache):
         """container mode now also routes through the background spool pipeline."""

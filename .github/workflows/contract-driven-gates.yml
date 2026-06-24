@@ -35,7 +35,7 @@ jobs:
         run: pip install jsonschema
 
       - name: Validate contracts and gates
-        run: cdd-kit validate
+        run: cdd-kit validate --contracts
 
       - name: Repository-specific fast gate
         run: |

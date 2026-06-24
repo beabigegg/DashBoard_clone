@@ -22,7 +22,7 @@ vi.mock('../../src/shared-composables/usePageUpdateBadge', () => ({
 vi.mock('../../src/shared-composables/useFilterOrchestrator', () => ({
   useFilterOrchestrator: () => ({
     committed: {
-      groups: [], isProduction: false, isKey: false, isMonitor: false,
+      groups: [], locations: [], isProduction: false, isKey: false, isMonitor: false,
       families: [], machines: [], packageGroups: [],
     },
     updateField: vi.fn(),

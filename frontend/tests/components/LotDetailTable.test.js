@@ -88,13 +88,13 @@ describe('LotTable - Type column', () => {
     const headers = wrapper.findAll('thead th');
     const typeHeader = headers.find((th) => th.text().replace(/[▲▼⇕]/g, '').trim() === 'Type');
     expect(typeHeader).toBeTruthy();
-    expect(typeHeader.classes()).toContain('cursor-pointer');
+    expect(typeHeader.classes()).toContain('sortable-th');
     // Click to sort ascending
     await typeHeader.trigger('click');
-    expect(typeHeader.text()).toContain('▲');
+    expect(typeHeader.attributes('aria-sort')).toBe('ascending');
     // Click again to sort descending
     await typeHeader.trigger('click');
-    expect(typeHeader.text()).toContain('▼');
+    expect(typeHeader.attributes('aria-sort')).toBe('descending');
   });
 
   it('sorting by pjType orders rows correctly', async () => {

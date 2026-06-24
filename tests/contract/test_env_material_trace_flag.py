@@ -22,7 +22,7 @@ _ENV_EXAMPLE = _CONTRACTS_DIR / ".env.example.template"
 _ENV_SCHEMA = _CONTRACTS_DIR / "env.schema.json"
 
 _EXPECTED_KEY = "MATERIAL_TRACE_USE_UNIFIED_JOB"
-_EXPECTED_DEFAULT = "off"
+_EXPECTED_DEFAULT = "on"
 
 
 class TestMaterialTraceFlagInEnvContract:

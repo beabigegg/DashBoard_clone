@@ -64,6 +64,8 @@ def _mock_view_result():
 class TestSummaryRoute:
     """POST /api/downtime-analysis/query kwarg forwarding tests."""
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_start_date_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -71,6 +73,8 @@ class TestSummaryRoute:
                     json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
         assert mock_svc.call_args.kwargs['start_date'] == '2026-04-01'
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_end_date_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -78,6 +82,8 @@ class TestSummaryRoute:
                     json={'start_date': '2026-04-01', 'end_date': '2026-04-30'})
         assert mock_svc.call_args.kwargs['end_date'] == '2026-04-30'
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_workcenter_groups_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -86,6 +92,8 @@ class TestSummaryRoute:
                           'workcenter_groups': ['WC_ASSY']})
         assert mock_svc.call_args.kwargs['workcenter_groups'] == ['WC_ASSY']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_families_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -94,6 +102,8 @@ class TestSummaryRoute:
                           'families': ['FAM-A']})
         assert mock_svc.call_args.kwargs['families'] == ['FAM-A']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_resource_ids_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -102,6 +112,8 @@ class TestSummaryRoute:
                           'resource_ids': ['R-42']})
         assert mock_svc.call_args.kwargs['resource_ids'] == ['R-42']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_package_groups_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -110,6 +122,8 @@ class TestSummaryRoute:
                           'package_groups': ['PKG-X']})
         assert mock_svc.call_args.kwargs['package_groups'] == ['PKG-X']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_big_categories_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -118,6 +132,8 @@ class TestSummaryRoute:
                           'big_categories': ['維修']})
         assert mock_svc.call_args.kwargs['big_categories'] == ['維修']
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_status_types_forwarded(self, mock_svc, client):
         mock_svc.return_value = _mock_query_result()
@@ -565,6 +581,8 @@ class TestQueryRoute:
         for legacy_key in ('summary', 'daily_trend', 'big_category', 'top_reasons'):
             assert legacy_key not in data, f"Legacy key '{legacy_key}' must not appear in flag-on response"
 
+    @patch('mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False)
+    @patch('mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.routes.downtime_analysis_routes.query_downtime_dataset')
     def test_feature_flag_off_returns_legacy_shape(self, mock_svc, client, monkeypatch):
         """Flag-off: legacy {query_id, summary, daily_trend, big_category, top_reasons} returned."""

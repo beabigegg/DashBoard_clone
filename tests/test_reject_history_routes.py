@@ -174,6 +174,7 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
         self.assertIn('190', payload['error']['message'])
         mock_execute.assert_not_called()
 
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
     @patch('mes_dashboard.services.reject_query_job_service.enqueue_reject_query', return_value=('reject-job-001', None))
     @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=False)
     def test_query_accepts_date_range_within_half_year(self, _mock_cache, _mock_enqueue):

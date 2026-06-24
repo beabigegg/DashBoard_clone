@@ -186,6 +186,7 @@ class TestQueryPagination:
         assert response.status_code == 200
         mock_runtime.get_page.assert_called_once_with(3, 50)
 
+    @patch("mes_dashboard.routes.material_trace_routes.MATERIAL_TRACE_USE_UNIFIED_JOB", False)
     @patch("mes_dashboard.routes.material_trace_routes.enqueue_job")
     @patch("mes_dashboard.routes.material_trace_routes.MaterialTraceDuckdbRuntime")
     def test_spool_miss_enqueues_async_job(self, mock_runtime_cls, mock_enqueue_job, client):

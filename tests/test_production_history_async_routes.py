@@ -52,6 +52,9 @@ class TestProductionHistoryQueryRoute(unittest.TestCase):
         fake_job_id = "prod-hist-0001"
 
         with patch(
+            "mes_dashboard.routes.production_history_routes._PRODUCTION_HISTORY_USE_UNIFIED_JOB",
+            False,
+        ), patch(
             "mes_dashboard.routes.production_history_routes.make_canonical_spool_id",
             return_value="ph-test-001",
         ), patch(
