@@ -1,0 +1,15 @@
+{
+  "change_id": "nav-config-to-code",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_page_registry.py tests/test_admin_routes.py tests/test_app_factory.py --collect-only -q",
+  "duration_ms": 3455,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/nav-config-to-code/test-runs/20260624-114014/summary.json",
+    "stdout": "specs/changes/nav-config-to-code/test-runs/20260624-114014/stdout.log",
+    "stderr": "specs/changes/nav-config-to-code/test-runs/20260624-114014/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

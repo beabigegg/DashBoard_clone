@@ -1,12 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Page registry service for managing page access status."""
+"""Page registry service for managing page access status.
+
+After nav-config-to-code:
+  - Runtime-writable store shape: {api_public: bool, statuses: {route: status}}.
+  - Structure (drawers, names, order) lives in the frontend navigationManifest.js.
+  - Back-compat read: legacy full-CMS file ({pages:[], drawers:[]}) yields correct
+    statuses from pages[].status; no forced rewrite.
+  - Fail-safe: missing file / absent route → 'released'.
+  - api_public MUST be preserved (gates is_api_public() site-wide auth bypass).
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 import os
-import re
 import tempfile
 from pathlib import Path
 from threading import Lock
@@ -19,52 +27,18 @@ DATA_FILE = Path(__file__).parent.parent.parent.parent / "data" / "page_status.j
 _lock = Lock()
 _cache: dict | None = None
 _cache_mtime: float = 0.0
-_UNSET = object()
-
-DEFAULT_DRAWERS = [
-    {"id": "reports", "name": "報表類", "order": 1, "admin_only": False},
-    {"id": "queries", "name": "查詢類", "order": 2, "admin_only": False},
-    {"id": "dev-tools", "name": "開發工具", "order": 3, "admin_only": True},
-]
-
-LEGACY_NAV_ASSIGNMENTS = {
-    "/wip-overview": {"drawer_id": "reports", "order": 1},
-    "/resource": {"drawer_id": "reports", "order": 2},
-    "/resource-history": {"drawer_id": "reports", "order": 3},
-    "/job-query": {"drawer_id": "queries", "order": 1},
-    "/query-tool": {"drawer_id": "queries", "order": 2},
-    "/admin/pages": {
-        "drawer_id": "dev-tools",
-        "order": 1,
-        "status": "dev",
-        "name": "頁面管理",
-    },
-    "/admin/dashboard": {
-        "drawer_id": "dev-tools",
-        "order": 2,
-        "status": "dev",
-        "name": "管理儀表板",
-    },
-}
-
-
-class DrawerError(Exception):
-    """Base drawer management error."""
-
-
-class DrawerNotFoundError(DrawerError):
-    """Raised when drawer cannot be found."""
-
-
-class DrawerConflictError(DrawerError):
-    """Raised when drawer operation conflicts with existing data."""
 
 
 def _load() -> dict:
     """Load page status configuration.
 
-    Detects file changes across gunicorn workers by comparing mtime,
-    so writes from one worker are visible to reads in another.
+    Returns a normalised dict with at least ``api_public`` and ``statuses`` keys.
+    Handles three input shapes:
+      1. New shrunk shape: {api_public, statuses}
+      2. Legacy full-CMS shape: {pages:[], drawers:[], api_public}
+      3. Missing / corrupt file → fail-safe defaults {api_public:false, statuses:{}}
+
+    Detects file changes across gunicorn workers by comparing mtime.
     """
     global _cache, _cache_mtime
 
@@ -80,26 +54,55 @@ def _load() -> dict:
     if _cache is None:
         if DATA_FILE.exists():
             try:
-                _cache = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+                raw = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+                _cache = _normalise_store(raw)
                 _cache_mtime = DATA_FILE.stat().st_mtime
                 logger.debug("Loaded page status from %s", DATA_FILE)
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Failed to load page status: %s", e)
-                _cache = {"pages": [], "api_public": False}
+                _cache = {"api_public": False, "statuses": {}}
                 _cache_mtime = 0.0
         else:
             logger.info("Page status file not found, using defaults")
-            _cache = {"pages": [], "api_public": False}
+            _cache = {"api_public": False, "statuses": {}}
             _cache_mtime = 0.0
-
-        if _migrate_navigation_schema(_cache):
-            _save(_cache)
-            logger.info("Migrated page status config to drawers schema")
     return _cache
 
 
+def _normalise_store(raw: dict) -> dict:
+    """Normalise a raw file payload to {api_public, statuses}.
+
+    Supports:
+      - New shape {api_public, statuses}
+      - Legacy full-CMS shape {pages:[], drawers:[], ...} — derives statuses
+        from pages[].status; ignores drawers/db_scan.
+    Always preserves api_public; absent key → False (safe default).
+    """
+    api_public = raw.get("api_public", False)
+
+    # New shrunk shape — already correct.
+    if "statuses" in raw:
+        return {
+            "api_public": api_public,
+            "statuses": dict(raw.get("statuses", {})),
+        }
+
+    # Legacy full-CMS shape — derive statuses from pages[].status.
+    statuses: dict[str, str] = {}
+    for page in raw.get("pages", []):
+        route = page.get("route")
+        status = page.get("status")
+        if route and status in ("released", "dev"):
+            statuses[route] = status
+
+    logger.debug(
+        "Back-compat: derived %d statuses from legacy full-CMS pages array", len(statuses)
+    )
+    return {"api_public": api_public, "statuses": statuses}
+
+
 def _save(data: dict) -> None:
-    """Save page status configuration."""
+    """Save page status configuration (shrunk {api_public, statuses} shape)."""
     global _cache, _cache_mtime
     tmp_path: Path | None = None
     try:
@@ -136,129 +139,22 @@ def _save(data: dict) -> None:
         raise
 
 
-def _migrate_navigation_schema(data: dict) -> bool:
-    """Migrate legacy schema to drawers schema when needed."""
-    if "drawers" in data:
-        return False
-
-    data["drawers"] = [drawer.copy() for drawer in DEFAULT_DRAWERS]
-    pages = data.setdefault("pages", [])
-    pages_by_route = {page.get("route"): page for page in pages if page.get("route")}
-
-    for route, assignment in LEGACY_NAV_ASSIGNMENTS.items():
-        page = pages_by_route.get(route)
-        if page is None and route.startswith("/admin/"):
-            page = {
-                "route": route,
-                "name": assignment.get("name", route),
-                "status": assignment.get("status", "dev"),
-            }
-            pages.append(page)
-            pages_by_route[route] = page
-
-        if page is None:
-            continue
-
-        page.setdefault("drawer_id", assignment["drawer_id"])
-        page.setdefault("order", assignment["order"])
-        if assignment.get("name"):
-            page.setdefault("name", assignment["name"])
-        if assignment.get("status"):
-            page.setdefault("status", assignment["status"])
-
-    return True
-
-
-def _safe_int(value: object, default: int) -> int:
-    try:
-        return int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return default
-
-
-def _as_positive_int(value: object, *, field: str) -> int:
-    try:
-        parsed = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field} must be an integer") from exc
-
-    if parsed < 1:
-        raise ValueError(f"{field} must be >= 1")
-    return parsed
-
-
-def _drawer_exists(data: dict, drawer_id: str) -> bool:
-    return any(drawer.get("id") == drawer_id for drawer in data.get("drawers", []))
-
-
-def _apply_page_drawer(data: dict, page: dict, drawer_id: str | None) -> None:
-    if drawer_id in (None, ""):
-        page.pop("drawer_id", None)
-        return
-
-    drawer_id = str(drawer_id)
-    if not _drawer_exists(data, drawer_id):
-        raise ValueError(f"Drawer not found: {drawer_id}")
-    page["drawer_id"] = drawer_id
-
-
-def _apply_page_order(page: dict, order: object) -> None:
-    if order in (None, ""):
-        page.pop("order", None)
-        return
-    page["order"] = _as_positive_int(order, field="order")
-
-
-def _slugify_drawer_id(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    return slug or "drawer"
-
-
-def _generate_drawer_id(name: str, existing_ids: set[str]) -> str:
-    base = _slugify_drawer_id(name)
-    candidate = base
-    suffix = 2
-    while candidate in existing_ids:
-        candidate = f"{base}-{suffix}"
-        suffix += 1
-    return candidate
-
-
-def _sorted_drawers(drawers: list[dict]) -> list[dict]:
-    return sorted(
-        drawers,
-        key=lambda drawer: (
-            _safe_int(drawer.get("order"), 9999),
-            str(drawer.get("name", "")),
-        ),
-    )
-
-
-def _sorted_pages(pages: list[dict]) -> list[dict]:
-    return sorted(
-        pages,
-        key=lambda page: (
-            _safe_int(page.get("order"), 9999),
-            str(page.get("name") or page.get("route", "")),
-        ),
-    )
-
-
 def get_page_status(route: str) -> str | None:
     """Get page status ('released' or 'dev').
+
+    After nav-config-to-code: reads from the ``statuses`` dict.
+    Absent route → None (not registered — let Flask handle it).
+    Fail-safe: missing file or absent key → None (treated as released by callers).
 
     Args:
         route: Page route path (e.g., '/wip-overview')
 
     Returns:
-        'released', 'dev', or None if page is not registered.
+        'released', 'dev', or None if route is not in statuses.
     """
     with _lock:
         data = _load()
-        for page in data.get("pages", []):
-            if page["route"] == route:
-                return page.get("status", "dev")
-        return None  # Not registered - let Flask handle it
+        return data.get("statuses", {}).get(route)
 
 
 def is_page_registered(route: str) -> bool:
@@ -268,213 +164,57 @@ def is_page_registered(route: str) -> bool:
         route: Page route path (e.g., '/wip-overview')
 
     Returns:
-        True if page is registered, False otherwise.
+        True if page has an explicit status entry, False otherwise.
     """
     return get_page_status(route) is not None
 
 
-def set_page_status(
-    route: str,
-    status: str,
-    name: str | None = None,
-    drawer_id: str | None | object = _UNSET,
-    order: int | None | object = _UNSET,
-) -> None:
-    """Set page status.
+def set_page_status(route: str, status: str) -> None:
+    """Set page status (status-only; structure fields not accepted).
 
     Args:
-        route: Page route path
+        route: Page route path (e.g., '/admin/dashboard')
         status: 'released' or 'dev'
-        name: Optional page display name
-        drawer_id: Optional drawer assignment (None/'': clear assignment)
-        order: Optional page order within drawer (None/'': clear order)
     """
     if status not in ("released", "dev"):
         raise ValueError(f"Invalid status: {status}")
 
     with _lock:
         data = _load()
-        pages = data.setdefault("pages", [])
-
-        # Update existing page
-        for page in pages:
-            if page["route"] == route:
-                page["status"] = status
-                if name:
-                    page["name"] = name
-                if drawer_id is not _UNSET:
-                    _apply_page_drawer(data, page, drawer_id)
-                if order is not _UNSET:
-                    _apply_page_order(page, order)
-                _save(data)
-                logger.info("Updated page status: %s -> %s", route, status)
-                return
-
-        # Add new page
-        new_page = {
-            "route": route,
-            "name": name or route,
-            "status": status,
-        }
-        if drawer_id is not _UNSET:
-            _apply_page_drawer(data, new_page, drawer_id)
-        if order is not _UNSET:
-            _apply_page_order(new_page, order)
-
-        pages.append(new_page)
+        statuses = data.setdefault("statuses", {})
+        statuses[route] = status
         _save(data)
-        logger.info("Added new page: %s (%s)", route, status)
+        logger.info("Set page status: %s -> %s", route, status)
 
 
 def get_all_pages() -> list[dict]:
-    """Get all page configurations.
+    """Get all page status entries as slim {route, status} dicts.
 
     Returns:
-        List of page dicts: [{route, name, status, drawer_id?, order?}, ...]
+        List of dicts: [{route: str, status: 'released'|'dev'}, ...]
+        Only routes with explicit statuses are included.
     """
     with _lock:
-        return _load().get("pages", [])
-
-
-def get_all_drawers() -> list[dict]:
-    """Get all drawer configurations sorted by order."""
-    with _lock:
         data = _load()
-        drawers = data.setdefault("drawers", [drawer.copy() for drawer in DEFAULT_DRAWERS])
-        return [dict(drawer) for drawer in _sorted_drawers(drawers)]
-
-
-def create_drawer(name: str, order: int | None = None, admin_only: bool = False) -> dict:
-    """Create a new drawer and persist it."""
-    normalized_name = (name or "").strip()
-    if not normalized_name:
-        raise ValueError("Drawer name is required")
-
-    with _lock:
-        data = _load()
-        drawers = data.setdefault("drawers", [drawer.copy() for drawer in DEFAULT_DRAWERS])
-        lower_names = {str(drawer.get("name", "")).strip().casefold() for drawer in drawers}
-        if normalized_name.casefold() in lower_names:
-            raise DrawerConflictError(f"Drawer name already exists: {normalized_name}")
-
-        existing_ids = {str(drawer.get("id", "")) for drawer in drawers}
-        drawer_id = _generate_drawer_id(normalized_name, existing_ids)
-        if order is None:
-            order = max((_safe_int(drawer.get("order"), 0) for drawer in drawers), default=0) + 1
-        else:
-            order = _as_positive_int(order, field="order")
-
-        created = {
-            "id": drawer_id,
-            "name": normalized_name,
-            "order": order,
-            "admin_only": bool(admin_only),
-        }
-        drawers.append(created)
-        _save(data)
-        logger.info("Created drawer: %s", drawer_id)
-        return dict(created)
-
-
-def update_drawer(
-    drawer_id: str,
-    *,
-    name: str | None = None,
-    order: int | None = None,
-    admin_only: bool | None = None,
-) -> dict:
-    """Update drawer fields and persist it."""
-    with _lock:
-        data = _load()
-        drawers = data.setdefault("drawers", [drawer.copy() for drawer in DEFAULT_DRAWERS])
-        target = next((drawer for drawer in drawers if drawer.get("id") == drawer_id), None)
-        if target is None:
-            raise DrawerNotFoundError(f"Drawer not found: {drawer_id}")
-
-        if name is not None:
-            normalized_name = name.strip()
-            if not normalized_name:
-                raise ValueError("Drawer name is required")
-            for drawer in drawers:
-                if drawer is target:
-                    continue
-                if str(drawer.get("name", "")).strip().casefold() == normalized_name.casefold():
-                    raise DrawerConflictError(f"Drawer name already exists: {normalized_name}")
-            target["name"] = normalized_name
-
-        if order is not None:
-            target["order"] = _as_positive_int(order, field="order")
-
-        if admin_only is not None:
-            target["admin_only"] = bool(admin_only)
-
-        _save(data)
-        logger.info("Updated drawer: %s", drawer_id)
-        return dict(target)
-
-
-def delete_drawer(drawer_id: str) -> None:
-    """Delete a drawer when no pages are assigned to it."""
-    with _lock:
-        data = _load()
-        drawers = data.setdefault("drawers", [drawer.copy() for drawer in DEFAULT_DRAWERS])
-        target = next((drawer for drawer in drawers if drawer.get("id") == drawer_id), None)
-        if target is None:
-            raise DrawerNotFoundError(f"Drawer not found: {drawer_id}")
-
-        assigned_pages = [
-            page.get("route")
-            for page in data.get("pages", [])
-            if page.get("drawer_id") == drawer_id
+        return [
+            {"route": route, "status": status}
+            for route, status in data.get("statuses", {}).items()
         ]
-        if assigned_pages:
-            assigned = ", ".join(str(route) for route in assigned_pages if route)
-            raise DrawerConflictError(f"Drawer has assigned pages: {assigned}")
-
-        data["drawers"] = [drawer for drawer in drawers if drawer.get("id") != drawer_id]
-        _save(data)
-        logger.info("Deleted drawer: %s", drawer_id)
 
 
-def get_navigation_config() -> list[dict]:
-    """Get drawers with nested pages sorted for portal sidebar rendering."""
+def get_navigation_config() -> dict[str, str]:
+    """Return the route→status map for portal navigation.
+
+    After nav-config-to-code: returns the raw statuses dict.
+    Structure (drawers/names/order) lives in the frontend navigationManifest.js.
+    Absent route defaults to 'released' in all consumers.
+
+    Returns:
+        dict mapping route → 'released'|'dev'
+    """
     with _lock:
         data = _load()
-        drawers = _sorted_drawers(data.get("drawers", []))
-        grouped: dict[str, dict] = {}
-        ordered_drawers: list[dict] = []
-
-        for drawer in drawers:
-            normalized_drawer = {
-                "id": str(drawer.get("id")),
-                "name": drawer.get("name") or str(drawer.get("id")),
-                "order": _safe_int(drawer.get("order"), 9999),
-                "admin_only": bool(drawer.get("admin_only", False)),
-                "pages": [],
-            }
-            grouped[normalized_drawer["id"]] = normalized_drawer
-            ordered_drawers.append(normalized_drawer)
-
-        for page in data.get("pages", []):
-            route = page.get("route")
-            drawer_id = page.get("drawer_id")
-            if not route or not drawer_id or drawer_id not in grouped:
-                continue
-
-            drawer = grouped[drawer_id]
-            drawer["pages"].append(
-                {
-                    "route": route,
-                    "name": page.get("name") or route,
-                    "status": page.get("status", "dev"),
-                    "order": _safe_int(page.get("order"), 9999),
-                }
-            )
-
-        for drawer in ordered_drawers:
-            drawer["pages"] = _sorted_pages(drawer["pages"])
-
-        return ordered_drawers
+        return dict(data.get("statuses", {}))
 
 
 def is_api_public() -> bool:

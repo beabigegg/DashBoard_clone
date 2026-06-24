@@ -84,16 +84,24 @@ class TestMaterialConsumptionRegistration:
         )
 
     def test_page_status_contains_material_consumption_in_drawer(self):
-        """page_status.json must have /material-consumption page in drawer (查詢工具)."""
+        """page_status.json must not set /material-consumption to 'dev' status.
+
+        Drawer membership moved to navigationManifest.js (nav-config-to-code).
+        page_status.json now stores {api_public, statuses} — drawer_id fields
+        are no longer present. A missing statuses entry defaults to 'released'
+        (fail-safe). Assert the file is in the new slim format and the route
+        is not accidentally blocked.
+        """
         page_status = self._load_page_status()
-        pages = page_status.get("pages", [])
-        mc_pages = [p for p in pages if p.get("route") == "/material-consumption"]
-        assert len(mc_pages) >= 1, (
-            "page_status.json missing '/material-consumption' page entry."
+        # New format: {api_public, statuses}
+        assert "api_public" in page_status, (
+            "page_status.json must preserve api_public key (auth bypass gate)."
         )
-        mc_page = mc_pages[0]
-        assert mc_page.get("drawer_id") == "drawer", (
-            f"Expected drawer for /material-consumption, got {mc_page.get('drawer_id')!r}"
+        statuses = page_status.get("statuses", {})
+        # Absent = released (fail-safe). Explicitly set dev would block the page.
+        mc_status = statuses.get("/material-consumption", "released")
+        assert mc_status == "released", (
+            f"/material-consumption must not be blocked; got status {mc_status!r}"
         )
 
 
@@ -140,18 +148,21 @@ class TestDowntimeAnalysisPage:
             return json.load(f)
 
     def test_page_status_contains_downtime_analysis_in_drawer_2(self):
-        """page_status.json must have /downtime-analysis in drawer-2 (歷史報表)."""
+        """page_status.json must not set /downtime-analysis to 'dev' status.
+
+        Drawer membership moved to navigationManifest.js (nav-config-to-code).
+        page_status.json now stores {api_public, statuses} — drawer_id fields
+        are no longer present. A missing statuses entry defaults to 'released'
+        (fail-safe). Assert the route is not accidentally blocked.
+        """
         page_status = self._load_page_status()
-        pages = page_status.get("pages", [])
-        da_pages = [p for p in pages if p.get("route") == "/downtime-analysis"]
-        assert len(da_pages) >= 1, (
-            "page_status.json missing '/downtime-analysis' page entry. "
-            "This will leave an orphan sidebar entry."
+        assert "api_public" in page_status, (
+            "page_status.json must preserve api_public key (auth bypass gate)."
         )
-        da_page = da_pages[0]
-        assert da_page.get("drawer_id") == "drawer-2", (
-            f"Expected drawer_id='drawer-2' for /downtime-analysis, "
-            f"got {da_page.get('drawer_id')!r}"
+        statuses = page_status.get("statuses", {})
+        da_status = statuses.get("/downtime-analysis", "released")
+        assert da_status == "released", (
+            f"/downtime-analysis must not be blocked; got status {da_status!r}"
         )
 
     def test_asset_readiness_manifest_contains_downtime_analysis(self):

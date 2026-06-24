@@ -4,7 +4,7 @@
 Tests that:
 - contracts/openapi.json exists and is valid JSON.
 - All $ref nodes in the document resolve within the document itself.
-- The HTTP operation count is >= 158 (one per endpoint).
+- The HTTP operation count is >= 154 (one per endpoint; nav-config-to-code: 158 - 4 drawer + 1 PUT pages = 155, floor 154).
 - At least 100 operations have response $ref linkages (not just description text).
 - All $ref values in responses resolve to known component schemas.
 """
@@ -84,9 +84,11 @@ class TestOpenApiSchemaResolution:
             + "\n".join(unresolved[:20])
         )
 
-    def test_openapi_operation_count_at_least_158(self):
-        """HTTP operation count in openapi.json must be >= 158.
+    def test_openapi_operation_count_at_least_154(self):
+        """HTTP operation count in openapi.json must be >= 154.
 
+        nav-config-to-code removed 4 drawer operations (GET/POST/PUT/DELETE /admin/api/drawers*)
+        and added 1 PUT /admin/api/pages/{route} = net -3. Floor updated from 158 to 154 (with 1 tolerance).
         Count method+path combinations (operations) from the paths object.
         """
         if not OPENAPI_PATH.exists():
@@ -100,8 +102,8 @@ class TestOpenApiSchemaResolution:
             len([m for m in methods if m.lower() in _HTTP_METHODS])
             for methods in paths_obj.values()
         )
-        assert total_ops >= 158, (
-            f"Expected >= 158 HTTP operations in openapi.json paths, found {total_ops}. "
+        assert total_ops >= 154, (
+            f"Expected >= 154 HTTP operations in openapi.json paths, found {total_ops}. "
             "Run: cdd-kit openapi export --out contracts/openapi.json"
         )
 
@@ -110,7 +112,7 @@ class TestOpenApiSchemaResolution:
 
         After response-shape-adr0007, all JSON-returning endpoints have typed
         schemas. Endpoints returning binary/stream or redirect have no JSON schema.
-        Minimum threshold: 100 (out of 158 total; ~14 binary/stream/redirect endpoints
+        Minimum threshold: 100 (out of ~155 total post nav-config-to-code; ~14 binary/stream/redirect endpoints
         and ~2 parameterized paths that the validator normalizes differently).
         """
         if not OPENAPI_PATH.exists():

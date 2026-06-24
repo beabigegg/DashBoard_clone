@@ -1,0 +1,42 @@
+change-id: nav-config-to-code
+status: in-progress
+tier: 2
+tier-floor-override: "Tier-2 confirmed by classifier + qa-reviewer: admin-only (@admin_required) navigation-config refactor. Floor scanner matches are false positives — 'migration' = config/manifest port (NO DB schema migration), 'rbac' occurs in prose stating there is NO per-user/role RBAC, 'route'/'session' are incidental navigation terms. The auth-adjacent api_public gate is preserved unchanged and pinned by a dedicated tripwire test. No payments / concurrency / secrets / DB-migration surface."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no CSS/design-token change" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no env var/config change" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "contract-reviewer: released/dev visibility semantics unchanged; no business-rules edit needed" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done, note: "ci-gate-contract.md edited by ci-cd-gatekeeper" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "backend pytest 133 + frontend vitest 613; contract samples + schema coverage" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "removed-endpoint 404 behavior under @admin_required" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "admin-pages + portal-shell-login Playwright specs updated; execute in CI playwright-critical-journeys gate (no local server)" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "TestShrunkStoreBackCompat (legacy/missing store) + api_public tripwire; monkey N/A" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "no load/queue/cache/long-running surface" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env/deploy-config change" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done, note: "ci-gates.md documents gate plan; admin-pages/portal-shell-login specs pre-existed (modified in place) — no workflow file change required" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "no blockers; orphaned CSS + a11y recorded as non-blocking follow-up" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no new visual design; menu-parity asserted structurally via unit/E2E" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contracts applied per spec; both openapi.json drawer-free; validate --contracts passes" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "qa verified AC-1..AC-8 green via live re-run; 2 blockers (gate, regression-report) now cleared → GO" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate nav-config-to-code passed" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 gates pass locally (pytest 133, vitest 613, validate --contracts)" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gates defined for this change" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

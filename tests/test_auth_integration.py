@@ -274,37 +274,38 @@ class TestAdminAPI:
         assert data["success"] is True
         assert "pages" in data["data"]
 
-    def test_get_drawers_without_login(self, client):
-        """Test drawer API requires login."""
+    def test_get_drawers_without_login_returns_404(self, client):
+        """Drawer API removed — GET /admin/api/drawers returns 404 even without login."""
         response = client.get("/admin/api/drawers", follow_redirects=False)
-        assert response.status_code in (302, 401, 403)
+        # 404 (removed) or 302/401/403 (auth redirect before 404 resolution)
+        assert response.status_code in (302, 401, 403, 404)
 
-    def test_mutate_drawers_without_login(self, client):
-        """Test drawer mutations require login."""
+    def test_mutate_drawers_without_login_returns_404(self, client):
+        """Drawer mutations removed — return 404 (or auth redirect) without login."""
         response = client.post(
             "/admin/api/drawers",
             data=json.dumps({"name": "Unauthorized Drawer"}),
             content_type="application/json",
             follow_redirects=False,
         )
-        assert response.status_code in (302, 401, 403)
+        assert response.status_code in (302, 401, 403, 404)
 
         response = client.delete("/admin/api/drawers/reports", follow_redirects=False)
-        assert response.status_code in (302, 401, 403)
+        assert response.status_code in (302, 401, 403, 404)
 
-    def test_get_drawers_with_login(self, client):
-        """Test list drawers API with login."""
+    def test_get_drawers_with_login_returns_404(self, client):
+        """Drawer API removed — GET /admin/api/drawers returns 404 (nav-config-to-code).
+
+        The 4 drawer CRUD endpoints are removed as part of nav-config-to-code.
+        Structure (drawer definitions) now lives in the frontend navigationManifest.js.
+        """
         _set_admin_session(client)
 
         response = client.get("/admin/api/drawers")
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data["success"] is True
-        assert "drawers" in data["data"]
-        assert any(drawer["id"] == "reports" for drawer in data["data"]["drawers"])
+        assert response.status_code == 404
 
-    def test_create_drawer_duplicate_name_conflict(self, client):
-        """Test creating duplicate drawer name returns 409."""
+    def test_create_drawer_with_login_returns_404(self, client):
+        """POST /admin/api/drawers removed — returns 404 (nav-config-to-code)."""
         _set_admin_session(client)
 
         response = client.post(
@@ -312,10 +313,10 @@ class TestAdminAPI:
             data=json.dumps({"name": "報表類", "order": 99}),
             content_type="application/json",
         )
-        assert response.status_code == 409
+        assert response.status_code == 404
 
     def test_update_page_status(self, client, temp_page_status):
-        """Test updating page status via API."""
+        """Test updating page status via API (status-only after nav-config-to-code)."""
         _set_admin_session(client)
 
         response = client.put(
@@ -343,8 +344,12 @@ class TestAdminAPI:
 
         assert response.status_code == 400
 
-    def test_update_page_drawer_assignment(self, client):
-        """Test assigning page drawer via page update API."""
+    def test_update_page_drawer_assignment_silently_ignored(self, client):
+        """drawer_id in PUT /admin/api/pages/<route> body is silently ignored (nav-config-to-code).
+
+        Structure fields (drawer_id, order) are no longer persisted; only status is accepted.
+        The endpoint returns 400 because no 'status' field is provided.
+        """
         _set_admin_session(client)
 
         response = client.put(
@@ -352,31 +357,32 @@ class TestAdminAPI:
             data=json.dumps({"drawer_id": "queries", "order": 3}),
             content_type="application/json",
         )
-        assert response.status_code == 200
+        # drawer_id/order without status → 400 (status is now required)
+        assert response.status_code == 400
 
-        page_registry._cache = None
-        pages = page_registry.get_all_pages()
-        page = next(item for item in pages if item["route"] == "/wip-overview")
-        assert page["drawer_id"] == "queries"
-        assert page["order"] == 3
-
-    def test_update_page_invalid_drawer_assignment(self, client):
-        """Test assigning a non-existent drawer returns bad request."""
+    def test_update_page_status_and_drawer_id_ignores_drawer_id(self, client, temp_page_status):
+        """drawer_id is silently ignored when status is also provided."""
         _set_admin_session(client)
 
         response = client.put(
             "/admin/api/pages/wip-overview",
-            data=json.dumps({"drawer_id": "missing-drawer"}),
+            data=json.dumps({"status": "dev", "drawer_id": "queries"}),
             content_type="application/json",
         )
-        assert response.status_code == 400
+        assert response.status_code == 200
+        # Verify drawer_id was NOT persisted
+        page_registry._cache = None
+        pages = page_registry.get_all_pages()
+        page = next((p for p in pages if p["route"] == "/wip-overview"), None)
+        if page:
+            assert "drawer_id" not in page
 
-    def test_delete_drawer_with_assigned_pages_conflict(self, client):
-        """Test deleting a non-empty drawer returns conflict."""
+    def test_delete_drawer_with_login_returns_404(self, client):
+        """DELETE /admin/api/drawers/<id> removed — returns 404 (nav-config-to-code)."""
         _set_admin_session(client)
 
         response = client.delete("/admin/api/drawers/reports")
-        assert response.status_code == 409
+        assert response.status_code == 404
 
 
 class TestContextProcessor:

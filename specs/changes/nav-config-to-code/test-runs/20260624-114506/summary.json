@@ -1,0 +1,15 @@
+{
+  "change_id": "nav-config-to-code",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard cdd-kit validate --contracts",
+  "duration_ms": 3363,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/nav-config-to-code/test-runs/20260624-114506/summary.json",
+    "stdout": "specs/changes/nav-config-to-code/test-runs/20260624-114506/stdout.log",
+    "stderr": "specs/changes/nav-config-to-code/test-runs/20260624-114506/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

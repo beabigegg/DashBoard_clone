@@ -1,0 +1,18 @@
+- type: tier-floor-override
+  change-id: nav-config-to-code
+  timestamp: '2026-06-24T04:30:45.040Z'
+  declared-tier: 2
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - migration
+    - rbac
+    - route
+    - session
+  reason: >-
+    Tier-2 confirmed by classifier + qa-reviewer: admin-only (@admin_required) navigation-config
+    refactor. Floor scanner matches are false positives — 'migration' = config/manifest port (NO DB
+    schema migration), 'rbac' occurs in prose stating there is NO per-user/role RBAC,
+    'route'/'session' are incidental navigation terms. The auth-adjacent api_public gate is
+    preserved unchanged and pinned by a dedicated tripwire test. No payments / concurrency / secrets
+    / DB-migration surface.

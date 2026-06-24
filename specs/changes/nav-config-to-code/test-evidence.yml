@@ -1,0 +1,27 @@
+change-id: nav-config-to-code
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test -- --reporter=verbose 2>&1 | tail -5
+    summary: specs/changes/nav-config-to-code/test-runs/20260624-121520/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npm run test -- --reporter=verbose --run src/portal-shell/__tests__/ 2>&1 | tail -20
+    summary: specs/changes/nav-config-to-code/test-runs/20260624-121539/summary.json
+  - phase: changed-area
+    status: passed
+    command: conda run -n mes-dashboard python -m pytest tests/ --ignore=tests/e2e --ignore=tests/stress -q
+    summary: specs/changes/nav-config-to-code/test-runs/20260624-130724/summary.json
+  - phase: contract
+    status: passed
+    command: >-
+      conda run -n mes-dashboard pytest tests/contract/ tests/test_page_registry.py tests/test_admin_routes.py
+      tests/test_auth_integration.py tests/test_app_factory.py -q
+    summary: specs/changes/nav-config-to-code/test-runs/20260624-115351/summary.json
+final-status: passed

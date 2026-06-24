@@ -1,0 +1,1 @@
+cd frontend && npm run test -- --reporter=verbose --run src/portal-shell/__tests__/ 2>&1 | tail -20

@@ -143,12 +143,12 @@ class TestSchemaCoverage:
             + "\n".join(violators)
         )
 
-    def test_endpoint_count_at_least_158(self):
-        """Endpoint table should have at least 158 rows (may be more post-migration)."""
+    def test_endpoint_count_at_least_154(self):
+        """Endpoint table should have at least 154 rows (158 minus 4 drawer endpoints + 1 PUT pages = 155; net -3 from 158; floor set to 154 for tolerance)."""
         content = CONTRACT_PATH.read_text(encoding="utf-8")
         rows = _parse_endpoint_rows(content)
-        assert len(rows) >= 158, (
-            f"Expected at least 158 endpoint rows, found {len(rows)}"
+        assert len(rows) >= 154, (
+            f"Expected at least 154 endpoint rows, found {len(rows)} (nav-config-to-code removed 4 drawer endpoints, added 1 PUT pages row)"
         )
 
     def test_no_prose_success_response_in_table(self):

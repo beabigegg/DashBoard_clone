@@ -1,4 +1,5 @@
 import { getRouteContract, normalizeRoutePath } from './routeContracts.js';
+import { drawers as manifestDrawers, routes as manifestRoutes } from './navigationManifest.js';
 
 const STANDALONE_DRILLDOWN_ROUTES = Object.freeze([
   '/wip-detail',
@@ -28,61 +29,193 @@ function sortByOrderThenName(items, nameKey = 'name') {
   });
 }
 
-export function normalizeNavigationDrawers(drawers, { isAdmin = false } = {}) {
-  const input = Array.isArray(drawers) ? drawers : [];
-  const normalizedDrawers = sortByOrderThenName(input).flatMap((drawer) => {
-    const drawerId = String(drawer?.id || '').trim();
-    if (!drawerId) {
-      return [];
-    }
+/**
+ * Build the merged drawer array from the manifest structure and a runtime
+ * status map returned by GET /api/portal/navigation.
+ *
+ * Supported call forms:
+ *   (A) normalizeNavigationDrawers(drawerList, statusMap, { isAdmin })
+ *       drawerList = manifest drawers array (no .pages — pages come from manifestRoutes)
+ *   (B) normalizeNavigationDrawers(legacyDrawers, { isAdmin })
+ *       legacyDrawers = old-style drawers[] that already have .pages[] on them
+ *       (backward compat for existing unit tests that pass drawer objects with pages)
+ *
+ * Mode is detected by the second argument:
+ *   - object with only isAdmin/includeStandaloneDrilldown keys → form (B) legacy
+ *   - otherwise → form (A) new
+ *
+ * @param {Array} drawerListOrLegacy
+ * @param {Record<string,string>|{isAdmin?:boolean}} statusMapOrOptions
+ * @param {{isAdmin?:boolean}} [options]
+ */
+export function normalizeNavigationDrawers(
+  drawerListOrLegacy,
+  statusMapOrOptions,
+  options,
+) {
+  // Detect legacy call: normalizeNavigationDrawers(legacyDrawers, { isAdmin })
+  // where only two args are passed and second arg has only isAdmin/includeStandaloneDrilldown keys.
+  // If a third `options` arg is explicitly provided (not undefined), we are in the new
+  // (manifest, statusMap, options) form even if statusMap happens to be empty {}.
+  const isLegacyPagesCall =
+    options === undefined &&
+    statusMapOrOptions !== null &&
+    typeof statusMapOrOptions === 'object' &&
+    !Array.isArray(statusMapOrOptions) &&
+    Object.keys(statusMapOrOptions).every(
+      (k) => k === 'isAdmin' || k === 'includeStandaloneDrilldown',
+    );
 
-    const adminOnly = Boolean(drawer?.admin_only);
-    if (adminOnly && !isAdmin) {
-      return [];
-    }
+  let resolvedStatusMap;
+  let effectiveIsAdmin;
+  let useLegacyPagesMode; // true = use drawer.pages[] directly (old format)
 
-    const pages = Array.isArray(drawer?.pages) ? drawer.pages : [];
-    const normalizedPages = sortByOrderThenName(pages).flatMap((page) => {
-      const route = String(page?.route || '').trim();
-      if (!route || !route.startsWith('/')) {
-        return [];
-      }
-      if (!canViewPage(page?.status, isAdmin)) {
-        return [];
-      }
-      return [
-        {
+  if (isLegacyPagesCall || statusMapOrOptions === undefined) {
+    // Legacy mode: second arg is options, drawers already have .pages[]
+    resolvedStatusMap = {};
+    effectiveIsAdmin = Boolean((statusMapOrOptions || {}).isAdmin);
+    useLegacyPagesMode = true;
+  } else {
+    resolvedStatusMap =
+      typeof statusMapOrOptions === 'object' ? statusMapOrOptions : {};
+    effectiveIsAdmin = Boolean((options || {}).isAdmin);
+    useLegacyPagesMode = false;
+  }
+
+  const drawerList = Array.isArray(drawerListOrLegacy) ? drawerListOrLegacy : manifestDrawers;
+
+  if (useLegacyPagesMode) {
+    // Legacy path: use drawer.pages[] arrays directly (existing test behaviour)
+    const normalizedDrawers = sortByOrderThenName(drawerList).flatMap((drawer) => {
+      const drawerId = String(drawer?.id || '').trim();
+      if (!drawerId) return [];
+
+      const adminOnly = Boolean(drawer?.admin_only);
+      if (adminOnly && !effectiveIsAdmin) return [];
+
+      const pages = Array.isArray(drawer?.pages) ? drawer.pages : [];
+      const normalizedPages = sortByOrderThenName(pages).flatMap((page) => {
+        const route = String(page?.route || '').trim();
+        if (!route || !route.startsWith('/')) return [];
+        if (!canViewPage(page?.status, effectiveIsAdmin)) return [];
+        return [{
           route,
           name: page?.name || route,
           status: page?.status || 'dev',
           order: safeInt(page?.order),
-        },
-      ];
-    });
+        }];
+      });
 
-    if (!normalizedPages.length) {
-      return [];
-    }
+      if (!normalizedPages.length) return [];
 
-    return [
-      {
+      return [{
         id: drawerId,
         name: drawer?.name || drawerId,
         order: safeInt(drawer?.order),
         admin_only: adminOnly,
         pages: normalizedPages,
-      },
-    ];
+      }];
+    });
+    return normalizedDrawers;
+  }
+
+  // New path: build pages from manifestRoutes + statusMap
+  const pagesByDrawer = {};
+  const routeEntries = manifestRoutes || {};
+  for (const [route, meta] of Object.entries(routeEntries)) {
+    const dId = meta.drawerId;
+    if (!dId) continue; // standalone / drilldown — excluded from drawer menu
+    const defaultStatus = meta.defaultStatus || 'released';
+    const runtimeStatus = resolvedStatusMap[route];
+    const status = runtimeStatus !== undefined ? runtimeStatus : defaultStatus;
+    if (!pagesByDrawer[dId]) pagesByDrawer[dId] = [];
+    pagesByDrawer[dId].push({
+      route,
+      order: meta.order,
+      name: meta.displayName || route,
+      status,
+    });
+  }
+
+  const normalizedDrawers = sortByOrderThenName(drawerList).flatMap((drawer) => {
+    const drawerId = String(drawer?.id || '').trim();
+    if (!drawerId) return [];
+
+    const adminOnly = Boolean(drawer?.admin_only);
+    if (adminOnly && !effectiveIsAdmin) return [];
+
+    const rawPages = pagesByDrawer[drawerId] || [];
+    const normalizedPages = sortByOrderThenName(rawPages).flatMap((page) => {
+      const route = String(page?.route || '').trim();
+      if (!route || !route.startsWith('/')) return [];
+      if (!canViewPage(page?.status, effectiveIsAdmin)) return [];
+      return [{
+        route,
+        name: page?.name || route,
+        status: page?.status || 'dev',
+        order: safeInt(page?.order),
+      }];
+    });
+
+    if (!normalizedPages.length) return [];
+
+    return [{
+      id: drawerId,
+      name: drawer?.name || drawerId,
+      order: safeInt(drawer?.order),
+      admin_only: adminOnly,
+      pages: normalizedPages,
+    }];
   });
 
   return normalizedDrawers;
 }
 
+/**
+ * Build the full dynamic navigation state from a manifest structure and
+ * a runtime status map (from GET /api/portal/navigation).
+ *
+ * Preferred signature (from router.js / App.vue):
+ *   buildDynamicNavigationState(statusMap, { isAdmin, includeStandaloneDrilldown })
+ *     where statusMap is a plain object (route → status).
+ *     The manifest drawers array is imported automatically from navigationManifest.js.
+ *
+ * Legacy signature (existing unit tests pass an array of drawer objects):
+ *   buildDynamicNavigationState(drawers[], { isAdmin, includeStandaloneDrilldown })
+ *     In this case drawers is used as-is (old API still works for tests).
+ *
+ * @param {Array|Record<string,string>} drawersOrStatusMap
+ * @param {{isAdmin?:boolean, includeStandaloneDrilldown?:boolean}} options
+ */
 export function buildDynamicNavigationState(
-  drawers,
+  drawersOrStatusMap,
   { isAdmin = false, includeStandaloneDrilldown = false } = {},
 ) {
-  const normalizedDrawers = normalizeNavigationDrawers(drawers, { isAdmin });
+  // Detect call mode by first argument type:
+  //   array  → legacy: drawers[]  (backward compat for unit tests)
+  //   object → new:    statusMap  (from App.vue / syncNavigationRoutes)
+  const isLegacyDrawersArray = Array.isArray(drawersOrStatusMap);
+
+  let resolvedStatusMap;
+  let resolvedManifestStructure;
+
+  if (isLegacyDrawersArray) {
+    // Legacy: drawers[] was passed directly (existing tests)
+    resolvedStatusMap = {};
+    resolvedManifestStructure = drawersOrStatusMap; // use passed drawers directly
+  } else {
+    // New: statusMap object passed; use manifest drawers from import
+    resolvedStatusMap =
+      drawersOrStatusMap && typeof drawersOrStatusMap === 'object' ? drawersOrStatusMap : {};
+    resolvedManifestStructure = manifestDrawers; // from navigationManifest.js import
+  }
+
+  const normalizedDrawers = isLegacyDrawersArray
+    // Legacy path: call with two args so normalizeNavigationDrawers uses drawer.pages[] directly
+    ? normalizeNavigationDrawers(resolvedManifestStructure, { isAdmin })
+    // New path: call with three args so normalizeNavigationDrawers uses manifestRoutes + statusMap
+    : normalizeNavigationDrawers(resolvedManifestStructure, resolvedStatusMap, { isAdmin });
+
   const allowedPaths = ['/'];
   const dynamicRoutes = [];
   const diagnostics = {

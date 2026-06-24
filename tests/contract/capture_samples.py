@@ -379,12 +379,6 @@ ENDPOINTS = [
     ("GET",  "/admin/api/user-usage-kpi", "get_admin_user_usage_kpi", True,
      None, "start_date=2024-01-01&end_date=2024-01-07"),
     ("GET",  "/admin/api/pages", "get_admin_pages", True, None, None),
-    ("GET",  "/admin/api/drawers", "get_admin_drawers", True, None, None),
-    ("POST", "/admin/api/drawers", "post_admin_drawers", True,
-     {"name": "test", "icon": "test", "path": "/test", "order": 1}, None),
-    ("PUT",  "/admin/api/drawers/1", "put_admin_drawers_id", True,
-     {"name": "test-updated"}, None),
-    ("DELETE", "/admin/api/drawers/1", "delete_admin_drawers_id", True, None, None),
     ("POST", "/admin/api/analytics/recalculate", "post_admin_analytics_recalculate",
      True, None, None),
     # ── Downtime Analysis ─────────────────────────────────────────────────
@@ -460,7 +454,6 @@ def _canonical_manifest_key(endpoint_tuple):
     path = _re.sub(r"/TEST-EQ-001(?=/|$)", "/{equipment_id}", path)
     path = _re.sub(r"/TEST-JOB-001(?=/|$)", "/{job_id}", path)
     path = _re.sub(r"/TEST(?=/|$)", "/{workcenter}", path)
-    path = _re.sub(r"/1(?=/|$)", "/{drawer_id}", path)
     return f"{method} {path}"
 
 def capture(client, authenticated_client, admin_client, endpoint_tuple):

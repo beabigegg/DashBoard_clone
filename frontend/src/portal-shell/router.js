@@ -53,8 +53,14 @@ export const router = createRouter({
   }
 });
 
+/**
+ * Sync router routes from a runtime status map (from GET /api/portal/navigation).
+ *
+ * @param {Record<string,string>} statusMap - route → 'released'|'dev' (absent = 'released')
+ * @param {{ isAdmin?: boolean, includeStandaloneDrilldown?: boolean }} options
+ */
 export function syncNavigationRoutes(
-  drawers,
+  statusMap,
   { isAdmin = false, includeStandaloneDrilldown = false } = {},
 ) {
   dynamicRouteNames.forEach((name) => {
@@ -64,7 +70,9 @@ export function syncNavigationRoutes(
   });
   dynamicRouteNames = [];
 
-  const state = buildDynamicNavigationState(drawers, { isAdmin, includeStandaloneDrilldown });
+  // Pass statusMap (plain object) as first arg; navigationState.js detects non-array
+  // first arg and uses the manifest drawers imported from navigationManifest.js.
+  const state = buildDynamicNavigationState(statusMap, { isAdmin, includeStandaloneDrilldown });
 
   state.dynamicRoutes.forEach((entry) => {
     router.addRoute({

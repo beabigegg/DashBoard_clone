@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/contract/ tests/test_page_registry.py tests/test_admin_routes.py tests/test_auth_integration.py tests/test_app_factory.py -q

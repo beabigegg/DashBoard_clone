@@ -1,51 +1,52 @@
 /**
  * E2E tests: admin-pages page (頁面管理)
  *
- * Scenarios covered:
- *   happy path      — page loads with drawer management and pages panels
- *   drawer table    — drawers render in table after API response
- *   pages table     — pages render in table after API response
- *   create drawer   — fill name + click "新增抽屜" triggers POST
- *   page status     — status button renders as Released/Dev badge
- *   resilience      — API error shows error panel
+ * Scenarios covered (post nav-config-to-code):
+ *   happy path       — page loads with pages panel (no drawer management panel)
+ *   pages table      — pages render in table after API response
+ *   status toggle    — status badge (Released/Dev) visible and round-trips via PUT
+ *   panel title      — shows "所有頁面"
+ *   drawer absent    — DrawerManagementPanel NOT in DOM; no GET /admin/api/drawers call
+ *   resilience       — API error shows error panel
  *
  * Network strategy:
  *   All API mocked. Standalone page at /admin/pages.
  *   Admin auth: /api/auth/me returns is_admin=true.
+ *
+ * Changed in nav-config-to-code:
+ *   - Removed: drawer creation tests (POST /api/drawers), MOCK_DRAWERS, MOCK_CREATE_DRAWER_RESP
+ *   - Removed: tests asserting "抽屜管理" panel title
+ *   - Added:  test_drawer_management_panel_absent
+ *   - Added:  test_status_toggle_released_to_dev_round_trip (AC-2)
+ *   - Updated: navigation mock uses new status-feed shape (statuses map, no drawers)
  */
 
 import { test, expect, type Page } from '@playwright/test';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:8080';
-// Navigate to portal-shell home; the shell auto-navigates to the first drawer page
-// (/admin/pages) when at route '/'. Navigating directly to /portal-shell/admin/pages
-// triggers a NavigationDuplicated error (same path re-replace) that resets routing.
 const PAGE_URL = `${BASE_URL}/portal-shell`;
 
-const MOCK_DRAWERS = {
-  success: true,
-  data: {
-    drawers: [
-      { id: 'live', name: '即時報表', order: 1, admin_only: false },
-      { id: 'history', name: '歷史查詢', order: 2, admin_only: false },
-    ],
-  },
-};
-
+// Slim pages list matching the new GET /admin/api/pages shape: {route, status}
 const MOCK_PAGES = {
   success: true,
   data: {
     pages: [
-      { route: '/wip-overview', name: 'WIP 即時', status: 'released', drawer_id: 'live', order: 1 },
-      { route: '/hold-history', name: 'Hold 歷史', status: 'released', drawer_id: 'history', order: 2 },
-      { route: '/downtime-analysis', name: '停機分析', status: 'dev', drawer_id: null, order: null },
+      { route: '/wip-overview', status: 'released' },
+      { route: '/hold-history', status: 'released' },
+      { route: '/downtime-analysis', status: 'dev' },
     ],
   },
 };
 
-const MOCK_CREATE_DRAWER_RESP = {
+const MOCK_PAGES_AFTER_TOGGLE = {
   success: true,
-  data: { id: 'new-drawer', name: '測試抽屜', order: 3, admin_only: false },
+  data: {
+    pages: [
+      { route: '/wip-overview', status: 'dev' },
+      { route: '/hold-history', status: 'released' },
+      { route: '/downtime-analysis', status: 'dev' },
+    ],
+  },
 };
 
 async function setupMocks(page: Page): Promise<void> {
@@ -62,50 +63,23 @@ async function setupMocks(page: Page): Promise<void> {
     }),
   );
 
-  // Portal-shell requires navigation config on boot.
-  // Include /admin/pages in drawers so the router adds it as a dynamic route,
-  // which triggers the shell-fallback → replace() re-navigation into NativeRouteView.
+  // New status-feed shape: statuses map (no drawers)
+  // /admin/pages must be in dev-tools drawer in manifest; portal-shell will
+  // auto-navigate to first route. We include /admin/pages as non-dev so it renders.
   await page.route('**/api/portal/navigation**', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        drawers: [
-          {
-            id: 'admin',
-            name: '管理',
-            order: 99,
-            admin_only: true,
-            pages: [
-              { route: '/admin/pages', name: '頁面管理', status: 'released', order: 1 },
-            ],
-          },
-        ],
+        statuses: {},            // all routes use manifest defaultStatus (released)
         is_admin: true,
         admin_user: { username: 'admin', displayName: 'Admin User' },
-        admin_links: { logout: '/api/auth/logout', dashboard: '/admin/dashboard' },
-        diagnostics: { filtered_drawers: 0, filtered_pages: 0, invalid_drawers: 0, invalid_pages: 0, contract_mismatch_routes: [] },
-        portal_spa_enabled: false,
+        admin_links: { logout: '/api/auth/logout', dashboard: '/admin/dashboard', pages: '/admin/pages' },
         features: { ai_query_enabled: false },
+        diagnostics: {},
       }),
     }),
   );
-
-  await page.route('**/admin/api/drawers**', (route) => {
-    if (route.request().method() === 'POST') {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_CREATE_DRAWER_RESP),
-      });
-    } else {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_DRAWERS),
-      });
-    }
-  });
 
   await page.route('**/admin/api/pages**', (route) =>
     route.fulfill({
@@ -117,9 +91,6 @@ async function setupMocks(page: Page): Promise<void> {
 }
 
 async function gotoAdminPagesPage(page: Page): Promise<void> {
-  // Navigate to portal-shell home; the shell auto-navigates to the first drawer
-  // page (/admin/pages) when the nav config is returned. Navigating directly to
-  // /portal-shell/admin/pages causes NavigationDuplicated (same-path re-replace).
   await page.goto(PAGE_URL).catch(() => {});
   await page.waitForSelector('[data-testid="admin-pages-app"]', { timeout: 30_000 });
   await page.waitForSelector('.empty-state:has-text("載入中...")', { state: 'detached', timeout: 15_000 }).catch(() => {});
@@ -129,74 +100,103 @@ async function gotoAdminPagesPage(page: Page): Promise<void> {
 // Tests
 // ---------------------------------------------------------------------------
 
-test('test_page_loads_with_panels', async ({ page }) => {
+test('test_page_loads_with_pages_panel', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  // Both panels should be visible
+  // Only the pages panel should be visible (no drawer management panel)
   const panelTitles = await page.locator('.panel-title').allTextContents();
-  expect(panelTitles.some((t) => t.includes('抽屜管理'))).toBe(true);
   expect(panelTitles.some((t) => t.includes('所有頁面'))).toBe(true);
 });
 
-test('test_drawer_table_renders_rows', async ({ page }) => {
+test('test_drawer_management_panel_absent (AC-2/AC-3)', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  // Drawer management table shows drawer IDs in the ID column (name is in an <input>)
-  await page.waitForSelector('[data-testid="create-drawer-name"]', { timeout: 10_000 });
-  const tableText = await page.locator('.panel').first().textContent();
-  expect(tableText).toContain('live');
-  expect(tableText).toContain('history');
+  // "抽屜管理" panel title must NOT be present
+  const panelTitles = await page.locator('.panel-title').allTextContents();
+  expect(panelTitles.some((t) => t.includes('抽屜管理'))).toBe(false);
+  // Drawer create button must NOT be in DOM
+  expect(await page.locator('[data-testid="create-drawer-btn"]').count()).toBe(0);
+  expect(await page.locator('[data-testid="create-drawer-name"]').count()).toBe(0);
+});
+
+test('test_no_get_admin_drawers_request (AC-3)', async ({ page }) => {
+  await setupMocks(page);
+  const drawerRequests: string[] = [];
+  page.on('request', (req) => {
+    if (req.url().includes('/admin/api/drawers')) {
+      drawerRequests.push(req.url());
+    }
+  });
+  await gotoAdminPagesPage(page);
+  await page.waitForTimeout(2_000); // wait for all requests to settle
+  expect(drawerRequests.length).toBe(0);
 });
 
 test('test_pages_table_renders_rows', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  await page.waitForSelector('[data-testid="create-drawer-name"]', { timeout: 10_000 });
-  // Second panel contains pages table
-  const panelTexts = await page.locator('.panel').allTextContents();
-  const pagesPanel = panelTexts.find((t) => t.includes('/wip-overview'));
-  expect(pagesPanel).toBeTruthy();
-  expect(pagesPanel).toContain('/hold-history');
-});
-
-test('test_create_drawer_form_visible', async ({ page }) => {
-  await setupMocks(page);
-  await gotoAdminPagesPage(page);
-  await expect(page.locator('[data-testid="create-drawer-name"]')).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('[data-testid="create-drawer-btn"]')).toBeVisible();
-});
-
-test('test_create_drawer_button_triggers_post', async ({ page }) => {
-  await setupMocks(page);
-  await gotoAdminPagesPage(page);
-
-  const postRequests: string[] = [];
-  page.on('request', (req) => {
-    if (req.url().includes('/admin/api/drawers') && req.method() === 'POST') {
-      postRequests.push(req.url());
-    }
-  });
-
-  await page.locator('[data-testid="create-drawer-name"]').fill('測試抽屜');
-  await page.locator('[data-testid="create-drawer-btn"]').click();
-  await page.waitForTimeout(1_000);
-  expect(postRequests.length).toBeGreaterThanOrEqual(1);
+  const panelText = await page.locator('.panel').textContent();
+  expect(panelText).toContain('/wip-overview');
+  expect(panelText).toContain('/hold-history');
 });
 
 test('test_page_status_badge_renders', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  await page.waitForSelector('[data-testid="create-drawer-name"]', { timeout: 10_000 });
-  // Pages panel has status buttons (released/dev)
   const statusBtns = page.locator('.status-badge, .status-released, .status-dev');
   const count = await statusBtns.count();
-  expect(count).toBeGreaterThanOrEqual(2); // At least the released/dev pages
+  expect(count).toBeGreaterThanOrEqual(2);
+});
+
+test('test_status_toggle_released_to_dev_round_trip (AC-2)', async ({ page }) => {
+  await setupMocks(page);
+
+  // Track PUT calls
+  const putCalls: Array<{ url: string; body: string }> = [];
+  page.on('request', (req) => {
+    if (req.method() === 'PUT' && req.url().includes('/admin/api/pages')) {
+      putCalls.push({ url: req.url(), body: req.postData() ?? '' });
+    }
+  });
+
+  // After the PUT, return the toggled state
+  let callCount = 0;
+  await page.route('**/admin/api/pages**', (route) => {
+    if (route.request().method() === 'PUT') {
+      callCount++;
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: {} }),
+      });
+    } else {
+      // GET: first call returns original, subsequent calls return toggled
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(callCount > 0 ? MOCK_PAGES_AFTER_TOGGLE : MOCK_PAGES),
+      });
+    }
+  });
+
+  await gotoAdminPagesPage(page);
+
+  // Click the first Released status badge (wip-overview)
+  const firstReleasedBtn = page.locator('button.status-released').first();
+  await expect(firstReleasedBtn).toBeVisible({ timeout: 10_000 });
+  await firstReleasedBtn.click();
+
+  // Wait for PUT call
+  await page.waitForTimeout(1_500);
+
+  expect(putCalls.length).toBeGreaterThanOrEqual(1);
+  const putBody = JSON.parse(putCalls[0].body || '{}');
+  expect(putBody.status).toBe('dev');
 });
 
 test('test_page_header_with_title', async ({ page }) => {
   await setupMocks(page);
   await gotoAdminPagesPage(page);
-  // Scope to admin-pages app to avoid grabbing portal-shell nav h1 ("MES 報表入口")
   const headerText = await page.locator('[data-testid="admin-pages-app"] h1').first().textContent();
   expect(headerText).toContain('頁面管理');
 });
@@ -210,15 +210,12 @@ test('test_api_error_shows_error_panel', async ({ page }) => {
   await page.route('**/api/portal/navigation**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({
-        drawers: [{ id: 'admin', name: '管理', order: 99, admin_only: true,
-          pages: [{ route: '/admin/pages', name: '頁面管理', status: 'released', order: 1 }] }],
-        is_admin: true, admin_links: {}, portal_spa_enabled: false, features: {},
-        diagnostics: { filtered_drawers: 0, filtered_pages: 0, invalid_drawers: 0, invalid_pages: 0, contract_mismatch_routes: [] },
+        statuses: {},
+        is_admin: true,
+        admin_links: { logout: '/api/auth/logout', pages: '/admin/pages' },
+        features: {},
+        diagnostics: {},
       }) }),
-  );
-  await page.route('**/admin/api/drawers**', (route) =>
-    route.fulfill({ status: 500, contentType: 'application/json',
-      body: JSON.stringify({ success: false, error: 'Server error' }) }),
   );
   await page.route('**/admin/api/pages**', (route) =>
     route.fulfill({ status: 500, contentType: 'application/json',

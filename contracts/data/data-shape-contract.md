@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.23.1
-last-changed: 2026-06-19
+schema-version: 1.24.0
+last-changed: 2026-06-24
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1253,7 +1253,117 @@ Any future column rename, addition, or removal in the `query_downtime_dataset` n
 
 ---
 
+---
+
+### §2.10 `GET /admin/api/pages` Slimmed Payload
+
+Admin-only. Returns only route + status per registered page. Name, drawer_id, and order fields are absent (structure moved to the frontend manifest).
+
+```json
+{
+  "success": true,
+  "data": {
+    "pages": [
+      { "route": "/wip-overview", "status": "released" },
+      { "route": "/admin/dashboard", "status": "dev" }
+    ]
+  },
+  "meta": { "app_version": "unknown", "timestamp": "2026-06-24T00:00:00" }
+}
+```
+
+One row per registered route. Absent route = unregistered (do not infer released).
+
+---
+
+### §2.11 `GET /api/portal/navigation` Status Feed Payload
+
+Status-only navigation feed. No drawers/names/order. Structure lives in `navigationManifest.js` (§3.11b). Absent route in `statuses` defaults to `released`.
+
+```json
+{
+  "statuses": { "/admin/dashboard": "dev" },
+  "is_admin": true,
+  "admin_user": {
+    "displayName": "Admin",
+    "username": "admin",
+    "mail": null,
+    "department": null
+  },
+  "admin_links": {
+    "logout": "/api/auth/logout",
+    "pages": "/admin/pages",
+    "dashboard": "/admin/dashboard",
+    "performance": "/admin/performance"
+  },
+  "features": { "ai_query_enabled": false },
+  "diagnostics": {}
+}
+```
+
+---
+
+### §3.11a Writable Page-Status Store (`data/page_status.json`)
+
+Target shape after nav-config-to-code shrink:
+
+```json
+{
+  "api_public": true,
+  "statuses": {
+    "/admin/dashboard": "dev"
+  }
+}
+```
+
+- `api_public` (bool, **REQUIRED**): read by `is_api_public()`; MUST NOT be dropped; default `false` if key absent. Dropping it silently disables the site-wide auth-bypass gate.
+- `statuses` (object, optional): map of `route → "released"|"dev"`. Absent route → `released` (fail-safe). Only non-default (`dev`) pages need explicit entries — currently only `/admin/dashboard`.
+- **REMOVED keys:** `pages`, `drawers`, `db_scan`.
+- **Back-compat read:** If file has legacy full-CMS shape (`pages[]` array present), `_load()` derives statuses from `pages[].status` and ignores `drawers`/`db_scan`; no error, no forced rewrite.
+- **Write path:** `set_page_status(route, status)` writes only to `statuses`. No drawer or name fields written.
+- **Rollback-safe:** Restored `_migrate_navigation_schema` rebuilds drawer array from `DEFAULT_DRAWERS` on first post-rollback read.
+
+---
+
+### §3.11b Navigation Manifest (`frontend/src/portal-shell/navigationManifest.js`)
+
+Frontend code-owned, single source of truth for navigation **structure** (drawer grouping, ordering, display names). No runtime write path.
+
+**Exports:**
+
+- `drawers`: array of `{id: string, name: string, order: int, admin_only: bool}`
+- `routes`: map of `route → {drawerId: string|null, order: int, displayName: string, defaultStatus?: string}`
+
+**Drawer id mapping (post-rename):**
+
+| id | display name | order | admin_only |
+|---|---|---|---|
+| reports | 即時報表 | 1 | false |
+| history-reports | 歷史報表 | 2 | false |
+| query-tools | 查詢工具 | 3 | false |
+| trace-tools | 追溯工具 | 4 | false |
+| dev-tools | 開發工具 | 5 | true |
+| eap-analysis | EAP | 6 | false |
+
+**Constraints:**
+- Every manifest route MUST exist in `nativeModuleRegistry.js` (mount gate).
+- `orders` MUST be distinct within a drawer.
+- `displayName` MUST match current live names exactly (AC-1/AC-5).
+- Standalone routes (`/`, `/wip-detail`, `/hold-detail`, `/anomaly-overview`) have `drawerId: null` (or absent).
+- Only `/admin/dashboard` has `defaultStatus: 'dev'`; all others `'released'` or omitted.
+- Manifest must NOT duplicate `nativeModuleRegistry` or `routeContracts` policy fields.
+
+---
+
+
 ## CHANGELOG
+
+## [data 1.24.0] — 2026-06-24
+### Changed (BREAKING)
+- nav-config-to-code: `data/page_status.json` shrunk from full-CMS shape (`{pages, drawers, db_scan, api_public}`) to `{api_public, statuses}`. `api_public` preserved (MUST NOT drop — gates `is_api_public()` site-wide auth bypass). Back-compat read: legacy full-CMS file derives statuses from `pages[].status`, no error.
+
+### Added
+- nav-config-to-code: §3.11a (Writable Page-Status Store shape — `{api_public, statuses}`; back-compat read; write path; rollback-safe semantics). §3.11b (Navigation Manifest — frontend code-owned structure SOT; drawer id map with renamed ids, distinct orders, display names verbatim; constraints). §2.10 (`GET /admin/api/pages` slimmed payload — route+status only). §2.11 (`GET /api/portal/navigation` status feed payload — statuses map + auth fields, no drawers).
 
 ## [data 1.23.0] — 2026-06-19
 ### Added

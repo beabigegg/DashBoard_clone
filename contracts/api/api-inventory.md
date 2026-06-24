@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.2.4
-last-changed: 2026-06-18
+schema-version: 1.2.5
+last-changed: 2026-06-24
 ---
 
 # API Inventory
@@ -29,7 +29,7 @@ last-changed: 2026-06-18
 | `resource_history_routes.py` | All JSON API endpoints — **Type A** (sync re-query on 410); **Also Type B** for `POST /api/resource/history/query` when date range ≥ `RESOURCE_ASYNC_DAY_THRESHOLD` AND `RESOURCE_ASYNC_ENABLED=true` → HTTP 202 `{async:true, job_id, status_url=/api/job/<id>?prefix=resource-history}`; short-range or flag-off → HTTP 200 sync unchanged (resource-history-rq-async)；`POST /api/resource/history/query` 先查 canonical base spool（DuckDB filter）；response: `{query_id, summary, detail}`；**新增** `GET /api/resource/history/query/progress?query_id=<uuid>` — batch 查詢進度 side-channel；progress state 存於 Redis key `resource:history:progress:<query_id>`；400 on missing param，404 on unknown query_id；auth required（與其他端點相同 `login_required` guard）（resource-history-perf）。 |
 | `yield_alert_routes.py` | All JSON API endpoints — **Type B** (async 202 polling) for initial query; **Type A** (spool-only, 410 on miss) for all view endpoints after query. `POST /api/yield-alert/query` accepts optional `process_type` (enum: `"GA%"` default / `"GC%"`); omitting defaults to `"GA%"`. `GET /api/yield-alert/alerts` rows gain `source_code: string \| null` (LOT ID; null = workorder-level; NOT NULL ⇒ TX=0). All four views (trend, summary, heatmap, alerts) now served from `yield_alert_dataset` DuckDB spool only — live Oracle trend/summary query paths retired. Spool gains `process_type`, `SOURCE_CODE`, `REJECT_LINKED` columns; `_SCHEMA_VERSION` bump + `rm -f tmp/query_spool/yield_alert_dataset/*.parquet` required on deploy/rollback. `GET /api/yield-alert/cross-filter-options?query_id=...&lines[]=...&packages[]=...`, 410 on spool expired. (yield-alert-spool-refactor) |
 | `production_history_routes.py` | All JSON API endpoints — `POST /api/production-history/query` 驗證 `pj_types`, `start_date`, `end_date`；缺少/無效 → 400 `VALIDATION_ERROR`；date range > 730d → 400；spool hit → 200，miss+RQ → 202；含 `POST /page`（DuckDB paged）、`/matrix`、`/options`；gated by `PROD_HISTORY_ENABLED`。**新增** `GET /api/production-history/filter-options?selected=<json>` — cross-filter cached options（4-tuple in-memory filter over `container_filter_cache`），auth required，400 on malformed `selected` JSON，404 on cache cold start failure，500 on Oracle build error；payload schema `{data: {pj_types, packages, bops, pj_functions}, meta: {updated_at, schema_version: 2}}`（prod-history-first-tier-cache-filters）。主查詢端點 `POST /api/production-history/query` 新增可選欄位 `pj_packages[]`、`pj_bops[]`、`pj_functions[]`（cached MultiSelect，plain `IN`）、`mfg_orders[]`、`lot_ids[]`、`wafer_lots[]`（多行 + `*` 萬用字元，依 PHF-02 規則 `LIKE ESCAPE '\'` bind）；全部 additive、缺省時保持 Type-only 行為。`start_date` / `end_date` 自 prod-history-query-mode-tabs 起為**條件必填**：classification mode（無 identifier token）仍必填；identifier mode（含 `mfg_orders` / `lot_ids` / `wafer_lots` token）可省略，省略時走 wide / all-time 查詢。 |
-| `admin_routes.py` | `POST /api/admin/analytics/recalculate`（admin required）、`GET /admin/api/user-usage-kpi`（params: `start_date`, `end_date`, `department`） |
+| `admin_routes.py` | `GET /admin/api/pages` (slimmed; returns `{pages:[{route,status}]}`; admin required)、`PUT /admin/api/pages/<route>` (status-only; accepts only `{status}`; admin required)、`GET /admin/api/user-usage-kpi`（params: `start_date`, `end_date`, `department`）、`POST /admin/api/analytics/recalculate`（admin required）. **REMOVED (nav-config-to-code):** `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}` → all 404. |
 | `job_query_routes.py` | All JSON API endpoints |
 | `qc_gate_routes.py` | All JSON API endpoints |
 | `trace_routes.py` | All JSON API endpoints — `GET /api/trace/lineage/job/<job_id>` / `/result`；`POST /api/trace/lineage` 非同步 capable → 202；MSD events → `{spool_hit, trace_query_id, aggregation}`；`trace_query_id` 為 stable hash-based canonical query id |
@@ -87,7 +87,7 @@ last-changed: 2026-06-18
 | `app.py` | `/api/query_table` | Legacy bridge |
 | `app.py` | `/api/get_table_columns` | Legacy bridge |
 | `app.py` | `/api/get_table_info` | Legacy bridge |
-| `app.py` | `/api/portal/navigation` | Legacy bridge |
+| `app.py` | `/api/portal/navigation` | Status feed; returns `{statuses, is_admin, admin_user, admin_links, features, diagnostics}`; drawers dropped (nav-config-to-code) |
 
 ## Excluded
 
@@ -98,6 +98,8 @@ last-changed: 2026-06-18
 ---
 
 ## Compatibility Notes
+
+- **2026-06-24 (nav-config-to-code):** `admin_routes.py` — 4 drawer endpoints removed (GET/POST/PUT/DELETE `/admin/api/drawers*`); `GET /admin/api/pages` slimmed to `{pages:[{route,status}]}`; `PUT /admin/api/pages/<route>` body narrowed to `{status}` only. `app.py` — `/api/portal/navigation` inverted from drawer-tree to status feed `{statuses, is_admin, admin_user, admin_links, features, diagnostics}`; drawers dropped. Breaking; monorepo atomic cutover.
 
 - **2026-06-18 (eap-alarm-analysis):** `eap_alarm_routes.py` — new module; 7 additive endpoints. `POST /api/eap-alarm/spool` always dispatches via RQ Type B (no date-range threshold; always async when worker available). Fine-filter options derived from DuckDB spool. Spool namespace `eap_alarm`. No existing routes changed.
 

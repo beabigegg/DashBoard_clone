@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.26.0"
+    "version": "1.27.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -4677,11 +4677,11 @@
         "summary": "GET /admin/api/pages",
         "responses": {
           "200": {
-            "description": "Contract response: GenericSuccessResponse",
+            "description": "Contract response: AdminPagesResponse",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                  "$ref": "#/components/schemas/AdminPagesResponse"
                 }
               }
             }
@@ -4701,115 +4701,9 @@
         "x-cdd-errors": "403/500"
       }
     },
-    "/admin/api/drawers": {
-      "get": {
-        "summary": "GET /admin/api/drawers",
-        "responses": {
-          "200": {
-            "description": "Contract response: GenericSuccessResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Error response (see contract error format)"
-          },
-          "500": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-cdd-errors": "403/500"
-      },
-      "post": {
-        "summary": "POST /admin/api/drawers",
-        "responses": {
-          "201": {
-            "description": "Contract response: GenericSuccessResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
-          "403": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
-          "content": {},
-          "x-cdd-unresolved": true
-        },
-        "x-cdd-errors": "400/403"
-      }
-    },
-    "/admin/api/drawers/{drawer_id}": {
+    "/admin/api/pages/{route}": {
       "put": {
-        "summary": "PUT /admin/api/drawers/{drawer_id}",
-        "responses": {
-          "200": {
-            "description": "Contract response: GenericSuccessResponse",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
-          "403": {
-            "description": "Error response (see contract error format)"
-          },
-          "404": {
-            "description": "Error response (see contract error format)"
-          }
-        },
-        "parameters": [
-          {
-            "name": "drawer_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
-          "content": {},
-          "x-cdd-unresolved": true
-        },
-        "x-cdd-errors": "400/403/404"
-      },
-      "delete": {
-        "summary": "DELETE /admin/api/drawers/{drawer_id}",
+        "summary": "PUT /admin/api/pages/{route}",
         "responses": {
           "200": {
             "description": "Contract response: AckResponse",
@@ -4821,6 +4715,9 @@
               }
             }
           },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
           "403": {
             "description": "Error response (see contract error format)"
           },
@@ -4830,7 +4727,7 @@
         },
         "parameters": [
           {
-            "name": "drawer_id",
+            "name": "route",
             "in": "path",
             "required": true,
             "schema": {
@@ -4844,11 +4741,11 @@
           }
         ],
         "requestBody": {
-          "description": "Contract request: — (schema not machine-resolved; see contract)",
+          "description": "Contract request: JSON body {status} (schema not machine-resolved; see contract)",
           "content": {},
           "x-cdd-unresolved": true
         },
-        "x-cdd-errors": "403/404"
+        "x-cdd-errors": "400/403/404"
       }
     },
     "/admin/api/analytics/recalculate": {
@@ -5098,11 +4995,11 @@
         "summary": "GET /api/portal/navigation",
         "responses": {
           "200": {
-            "description": "Contract response: GenericSuccessResponse",
+            "description": "Contract response: PortalNavigationResponse",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                  "$ref": "#/components/schemas/PortalNavigationResponse"
                 }
               }
             }
@@ -6827,6 +6724,96 @@
           "async",
           "job_id",
           "status_url"
+        ]
+      },
+      "AdminPagesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "route": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "released",
+                        "dev"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "route",
+                    "status"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "pages"
+            ]
+          },
+          "meta": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "PortalNavigationResponse": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "released",
+                "dev"
+              ]
+            },
+            "description": "Map of route → status; absent route defaults to released"
+          },
+          "is_admin": {
+            "type": "boolean"
+          },
+          "admin_user": {
+            "oneOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "admin_links": {
+            "type": "object"
+          },
+          "features": {
+            "type": "object"
+          },
+          "diagnostics": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "statuses",
+          "is_admin",
+          "admin_links",
+          "features",
+          "diagnostics"
         ]
       }
     }

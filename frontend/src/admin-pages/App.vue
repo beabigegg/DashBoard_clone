@@ -1,27 +1,32 @@
 <script setup lang="ts">
+/**
+ * Admin pages app — status-toggle only.
+ *
+ * Navigation structure (drawer assignment, order, display names) is now
+ * code-owned by navigationManifest.js. This page manages only the runtime
+ * `released` / `dev` status toggle via GET/PUT /admin/api/pages.
+ *
+ * Display names are joined from the manifest: the backend returns
+ * {route, status}; we look up the displayName from the manifest.
+ */
 import { computed, onMounted, ref } from 'vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
-import DrawerManagementPanel from './components/DrawerManagementPanel.vue';
 import PagesManagementPanel from './components/PagesManagementPanel.vue';
-import { apiGet, apiPost } from '../core/api';
+import { apiGet } from '../core/api';
+import { routes as manifestRoutes } from '../portal-shell/navigationManifest.js';
 
-interface Drawer {
-  id: string;
-  name: string;
-  order: number | null;
-  admin_only: boolean;
+interface PageStatus {
+  route: string;
+  status: 'released' | 'dev';
 }
 
-interface Page {
+interface PageDisplay {
   route: string;
   name: string;
   status: 'released' | 'dev';
-  drawer_id: string | null;
-  order: number | null;
 }
 
-const drawers = ref<Drawer[]>([]);
-const pages = ref<Page[]>([]);
+const pages = ref<PageDisplay[]>([]);
 const loading = ref(false);
 const refreshing = ref(false);
 const errorMessage = ref('');
@@ -46,29 +51,19 @@ async function putJson<T>(url: string, payload: unknown): Promise<T> {
   return (body?.data ?? body) as T;
 }
 
-async function deleteJson(url: string): Promise<void> {
-  const csrf = getCsrfToken();
-  const headers: Record<string, string> = {};
-  if (csrf) headers['X-CSRF-Token'] = csrf;
-  const resp = await fetch(url, { method: 'DELETE', headers });
-  if (!resp.ok) {
-    let body: { error?: { message?: string } | string } | null = null;
-    try { body = await resp.json(); } catch { /* empty */ }
-    const errMsg = typeof body?.error === 'string'
-      ? body.error
-      : (body?.error as { message?: string } | undefined)?.message ?? `HTTP ${resp.status}`;
-    throw new Error(errMsg);
-  }
-}
-
-async function loadDrawers(): Promise<void> {
-  const res = await apiGet<{ drawers: Drawer[] }>('/admin/api/drawers');
-  drawers.value = ('data' in res ? res.data : null)?.drawers ?? [];
+/** Join manifest display names onto a list of {route, status} items. */
+function joinManifestNames(statusList: PageStatus[]): PageDisplay[] {
+  return statusList.map((item) => {
+    const meta = manifestRoutes[item.route as keyof typeof manifestRoutes];
+    const name = meta?.displayName ?? item.route;
+    return { route: item.route, name, status: item.status };
+  });
 }
 
 async function loadPages(): Promise<void> {
-  const res = await apiGet<{ pages: Page[] }>('/admin/api/pages');
-  pages.value = ('data' in res ? res.data : null)?.pages ?? [];
+  const res = await apiGet<{ pages: PageStatus[] }>('/admin/api/pages');
+  const raw: PageStatus[] = ('data' in res ? res.data : null)?.pages ?? [];
+  pages.value = joinManifestNames(raw);
 }
 
 async function refreshAll(): Promise<void> {
@@ -76,7 +71,7 @@ async function refreshAll(): Promise<void> {
   refreshing.value = true;
   errorMessage.value = '';
   try {
-    await Promise.all([loadDrawers(), loadPages()]);
+    await loadPages();
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : '載入失敗';
   } finally {
@@ -84,35 +79,7 @@ async function refreshAll(): Promise<void> {
   }
 }
 
-async function handleCreateDrawer(payload: { name: string; order?: number; admin_only: boolean }): Promise<void> {
-  try {
-    await apiPost('/admin/api/drawers', payload);
-    await refreshAll();
-  } catch (err: unknown) {
-    window.alert(`新增抽屜失敗: ${err instanceof Error ? err.message : ''}`);
-  }
-}
-
-async function handleUpdateDrawer(id: string, payload: Partial<Drawer>): Promise<void> {
-  try {
-    await putJson(`/admin/api/drawers/${encodeURIComponent(id)}`, payload);
-    await refreshAll();
-  } catch (err: unknown) {
-    window.alert(`更新抽屜失敗: ${err instanceof Error ? err.message : ''}`);
-  }
-}
-
-async function handleDeleteDrawer(id: string): Promise<void> {
-  if (!window.confirm(`確定刪除抽屜「${id}」？`)) return;
-  try {
-    await deleteJson(`/admin/api/drawers/${encodeURIComponent(id)}`);
-    await refreshAll();
-  } catch (err: unknown) {
-    window.alert(`刪除抽屜失敗: ${err instanceof Error ? err.message : ''}`);
-  }
-}
-
-async function handleUpdatePage(route: string, payload: Partial<Page>): Promise<void> {
+async function handleUpdatePage(route: string, payload: { status: 'released' | 'dev' }): Promise<void> {
   try {
     await putJson(`/admin/api/pages${route}`, payload);
     await loadPages();
@@ -138,7 +105,7 @@ onMounted(async () => {
   <div class="theme-admin-pages" data-testid="admin-pages-app">
     <PageHeader title="頁面管理" :refreshing="refreshing" @refresh="refreshAll">
       <template #subtitle>
-        管理頁面狀態、抽屜分類與排序（Released：所有人可見 / Dev：僅管理員可見）
+        管理頁面顯示狀態（Released：所有人可見 / Dev：僅管理員可見）
       </template>
     </PageHeader>
 
@@ -149,32 +116,14 @@ onMounted(async () => {
     <div class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">抽屜管理</div>
-          <div class="panel-subtitle">可新增、改名、排序、設定 admin-only，空抽屜才能刪除</div>
-        </div>
-      </div>
-      <div v-if="isInitialLoading" class="empty-state">載入中...</div>
-      <DrawerManagementPanel
-        v-else
-        :drawers="drawers"
-        @create="handleCreateDrawer"
-        @update="handleUpdateDrawer"
-        @delete="handleDeleteDrawer"
-      />
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <div>
           <div class="panel-title">所有頁面</div>
-          <div class="panel-subtitle">可切換 Released/Dev，並設定抽屜歸屬與抽屜內排序</div>
+          <div class="panel-subtitle">切換 Released/Dev 狀態；導覽結構由程式碼管理</div>
         </div>
       </div>
       <div v-if="isInitialLoading" class="empty-state">載入中...</div>
       <PagesManagementPanel
         v-else
         :pages="pages"
-        :drawers="drawers"
         @update="handleUpdatePage"
       />
     </div>

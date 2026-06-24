@@ -40,15 +40,9 @@ from mes_dashboard.core.worker_recovery_policy import (
     load_restart_state,
 )
 from mes_dashboard.services.page_registry import (
-    DrawerConflictError,
-    DrawerNotFoundError,
-    create_drawer,
-    delete_drawer,
-    get_all_drawers,
     get_all_pages,
     get_page_status,
     set_page_status,
-    update_drawer,
 )
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -1372,119 +1366,30 @@ def pages():
 @admin_bp.route("/api/pages", methods=["GET"])
 @admin_required
 def api_get_pages():
-    """API: Get all page configurations."""
+    """API: Get all page status entries (route + status only; structure in frontend manifest)."""
     return success_response({"pages": get_all_pages()})
-
-
-@admin_bp.route("/api/drawers", methods=["GET"])
-@admin_required
-def api_get_drawers():
-    """API: Get all drawer configurations."""
-    return success_response({"drawers": get_all_drawers()})
-
-
-@admin_bp.route("/api/drawers", methods=["POST"])
-@admin_required
-def api_create_drawer():
-    """API: Create a new drawer."""
-    payload = request.get_json(silent=True) or {}
-    name = payload.get("name")
-    order = payload.get("order")
-    admin_only = bool(payload.get("admin_only", False))
-
-    try:
-        drawer = create_drawer(name=name, order=order, admin_only=admin_only)
-    except DrawerConflictError as exc:
-        return error_response("CONFLICT", str(exc), status_code=409)
-    except ValueError as exc:
-        return validation_error(str(exc))
-    except Exception as exc:  # pragma: no cover - defensive fallback
-        logger.exception("Failed to create drawer")
-        return internal_error(str(exc))
-
-    return success_response({"drawer": drawer}, status_code=201)
-
-
-@admin_bp.route("/api/drawers/<drawer_id>", methods=["PUT"])
-@admin_required
-def api_update_drawer(drawer_id: str):
-    """API: Update drawer name/order/admin_only."""
-    payload = request.get_json(silent=True) or {}
-    updates: dict[str, Any] = {}
-
-    if "name" in payload:
-        updates["name"] = payload.get("name")
-    if "order" in payload:
-        updates["order"] = payload.get("order")
-    if "admin_only" in payload:
-        updates["admin_only"] = bool(payload.get("admin_only"))
-
-    if not updates:
-        return validation_error("No drawer fields to update")
-
-    try:
-        drawer = update_drawer(drawer_id, **updates)
-    except DrawerNotFoundError as exc:
-        return not_found_error(str(exc))
-    except DrawerConflictError as exc:
-        return error_response("CONFLICT", str(exc), status_code=409)
-    except ValueError as exc:
-        return validation_error(str(exc))
-    except Exception as exc:  # pragma: no cover - defensive fallback
-        logger.exception("Failed to update drawer %s", drawer_id)
-        return internal_error(str(exc))
-
-    return success_response({"drawer": drawer})
-
-
-@admin_bp.route("/api/drawers/<drawer_id>", methods=["DELETE"])
-@admin_required
-def api_delete_drawer(drawer_id: str):
-    """API: Delete a drawer if no pages are assigned to it."""
-    try:
-        delete_drawer(drawer_id)
-    except DrawerNotFoundError as exc:
-        return not_found_error(str(exc))
-    except DrawerConflictError as exc:
-        return error_response("CONFLICT", str(exc), status_code=409)
-    except Exception as exc:  # pragma: no cover - defensive fallback
-        logger.exception("Failed to delete drawer %s", drawer_id)
-        return internal_error(str(exc))
-
-    return success_response({})
 
 
 @admin_bp.route("/api/pages/<path:route>", methods=["PUT"])
 @admin_required
 def api_update_page(route: str):
-    """API: Update page status/name/drawer assignment/order."""
+    """API: Update page status (status-only; name/drawer_id/order not accepted)."""
     data = request.get_json(silent=True) or {}
-    updatable_fields = {"status", "name", "drawer_id", "order"}
-    if not any(field in data for field in updatable_fields):
-        return validation_error("No page fields to update")
 
     # Ensure route starts with /
     if not route.startswith("/"):
         route = "/" + route
 
-    status = data.get("status")
-    if "status" in data and status not in ("released", "dev"):
-        return validation_error("Invalid status")
     if "status" not in data:
-        status = get_page_status(route)
-        if status is None:
-            return validation_error("Status is required for unregistered pages")
+        return validation_error("status is required")
 
-    update_kwargs: dict[str, Any] = {}
-    if "name" in data:
-        update_kwargs["name"] = data.get("name")
-    if "drawer_id" in data:
-        update_kwargs["drawer_id"] = data.get("drawer_id")
-    if "order" in data:
-        update_kwargs["order"] = data.get("order")
+    status = data.get("status")
+    if status not in ("released", "dev"):
+        return validation_error("Invalid status")
 
+    # Silently ignore (do not persist) name, drawer_id, order — structure is code-owned.
     try:
-        set_page_status(route, status, **update_kwargs)
+        set_page_status(route, status)
         return success_response({})
     except ValueError as exc:
         return validation_error(str(exc))

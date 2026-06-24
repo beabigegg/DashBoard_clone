@@ -1,0 +1,49 @@
+agent: backend-engineer
+change-id: nav-config-to-code
+timestamp: 2026-06-24T12:00:00
+status: complete
+
+summary: >
+  Completed all backend IP-1..IP-9 work items. Contracts updated (api, data, inventory,
+  CHANGELOG), openapi regenerated (both files), drawer samples retired, pages/navigation
+  samples regenerated, backend code inverted (page_registry shrunk, admin_routes drawer
+  CRUD removed, app.py portal_navigation_config returns statuses dict), and all backend
+  tests replaced/updated. Test ladder collect+targeted+changed-area+contract all pass.
+
+artifacts:
+  - { type: files-changed, pointer: "contracts/api/api-contract.md — removed 4 drawer rows; added PUT /admin/api/pages/{route}; changed GET /api/pages → AdminPagesResponse; changed portal/navigation → PortalNavigationResponse; added schemas; added Compatibility Notes + inline CHANGELOG entry" }
+  - { type: files-changed, pointer: "contracts/api/api-inventory.md:6 — bumped 1.2.4→1.2.5; admin_routes.py row updated; app.py portal/navigation row updated; compat note prepended" }
+  - { type: files-changed, pointer: "contracts/data/data-shape-contract.md — bumped 1.23.1→1.24.0; added §2.10 GET /admin/api/pages payload, §2.11 GET /api/portal/navigation payload, §3.11a writable store, §3.11b navigation manifest; CHANGELOG [data 1.24.0] prepended" }
+  - { type: files-changed, pointer: "contracts/CHANGELOG.md — prepended [api 1.27.0], [data 1.24.0], [ci 1.3.34] entries" }
+  - { type: files-changed, pointer: "contracts/openapi.json — regenerated (182 endpoints, 0 drawer paths)" }
+  - { type: files-changed, pointer: "contracts/api/openapi.json — regenerated (182 endpoints, 0 drawer paths)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/page_registry.py — FULL REWRITE: removed get_all_drawers/create_drawer/update_drawer/delete_drawer/DrawerError*/DrawerConflictError/DrawerNotFoundError/_migrate_navigation_schema/LEGACY_NAV_ASSIGNMENTS/DEFAULT_DRAWERS and all drawer helpers; set_page_status now status-only; get_all_pages returns [{route,status}]; get_navigation_config returns dict {route:status}; _load/_normalise_store handle shrunk+legacy+missing shape; is_api_public preserved" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/admin_routes.py:42-52 — import narrowed to {get_all_pages, get_page_status, set_page_status}; removed api_get_drawers/api_create_drawer/api_update_drawer/api_delete_drawer endpoints; api_get_pages → slim {pages:[{route,status}]}; api_update_page → status-only (name/drawer_id/order silently ignored)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/app.py:1107-1160 — portal_navigation_config() inverted: drops drawers/names/order; emits {statuses, is_admin, admin_user, admin_links, features, diagnostics}" }
+  - { type: files-changed, pointer: "data/page_status.json — shrunk to {api_public:true, statuses:{/admin/dashboard:dev}}" }
+  - { type: files-changed, pointer: "tests/contract/samples/ — retired get_admin_drawers.json, post_admin_drawers.json, put_admin_drawers_id.json, delete_admin_drawers_id.json; regenerated get_admin_pages.json (slim), get_portal_navigation.json (statuses, no drawers)" }
+  - { type: files-changed, pointer: "tests/contract/response-samples.json — removed 4 drawer entries (173→169 entries)" }
+  - { type: files-changed, pointer: "tests/contract/capture_samples.py — removed 4 drawer endpoint tuples; removed /1→{drawer_id} path normalization" }
+  - { type: tests-added, pointer: "tests/test_page_registry.py — FULL REWRITE: TestGetPageStatus (4), TestSetPageStatus (4), TestGetAllPages (2), TestGetNavigationConfig (3), TestShrunkStoreBackCompat (6 new AC-6 tests), TestIsApiPublic (5 incl. api_public_key_preserved_after_shrink tripwire), TestReloadCache (1), TestConcurrency (1); deleted TestDrawerCrud (5), TestSchemaMigration (2), TestNavigationConfig old shape (1)" }
+  - { type: tests-added, pointer: "tests/test_admin_routes.py — FULL REWRITE: added test_api_pages_slim_shape, test_get/post/put/delete_api_drawers_returns_404 (4 AC-3), test_put_page_with_valid/invalid/name/drawer_id/order (6 AC-3); deleted test_api_drawers_success_envelope + test_api_create_drawer_missing_name/success" }
+  - { type: tests-added, pointer: "tests/test_app_factory.py:test_api_contracts_unchanged_after_preload — updated to assert statuses key + not drawers key" }
+  - { type: tests-added, pointer: "tests/test_auth_integration.py — drawer tests updated to 404-assertion pattern; drawer-assignment tests updated to ignored-field pattern" }
+  - { type: tests-added, pointer: "tests/contract/test_schema_coverage.py — endpoint pin 158→154" }
+  - { type: tests-added, pointer: "tests/contract/test_openapi_schema_resolution.py — operation pin 158→154" }
+  - { type: tests-added, pointer: "tests/contract/test_manifest_completeness.py — manifest entry pin 158→154" }
+  - { type: test-output, pointer: "collect: PASSED; targeted: 43 passed (test_page_registry + test_admin_routes); changed-area: 109 passed; contract: passed (cdd-kit validate --contracts)" }
+  - { type: contracts-touched, pointer: "contracts/api/api-contract.md, contracts/api/api-inventory.md, contracts/data/data-shape-contract.md, contracts/CHANGELOG.md, contracts/openapi.json, contracts/api/openapi.json" }
+
+known-risks:
+  - AC-1 regression is purely client-side now (frontend manifest typo has no backend signal); mitigated only by frontend manifest unit tests (AC-5 — frontend-engineer scope)
+  - data/page_status.json shrunk; legacy full-CMS back-compat read is confirmed working by TestShrunkStoreBackCompat tests
+  - api_public preserved in shrunk file and in every set_page_status write (confirmed by test_api_public_key_preserved_after_shrink tripwire)
+  - portal_index() at L1060 still calls get_navigation_config() and passes result as drawers= to render_template('portal.html'); now returns a dict instead of a list. This legacy non-SPA path is only hit when PORTAL_SPA_ENABLED=False (default False but never hit in production); left unchanged per "do not opportunistically refactor app.py" constraint.
+
+next-reviewer: frontend-engineer
+handoff-note: >
+  Backend fully complete. data-shape §3.11b contract is established. get_portal_navigation.json
+  sample shows {statuses:{"/admin/dashboard":"dev"}, is_admin, admin_user, admin_links, features, diagnostics}.
+  Frontend engineer should create navigationManifest.js per §3.11b, rewire navigationState.js
+  to take (manifest, statusMap) instead of backend drawers, update App.vue/router.js, and
+  delete DrawerManagementPanel.vue. All backend tests pass. Gate-ready for backend scope.
