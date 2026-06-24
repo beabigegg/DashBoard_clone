@@ -6,6 +6,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 
@@ -87,6 +88,17 @@ const chartOption = computed(() => {
           },
           borderRadius: [0, 4, 4, 0],
         },
+        emphasis: {
+          focus: 'self',
+          itemStyle: {
+            shadowBlur: 18,
+            shadowOffsetX: 0,
+            shadowOffsetY: 0,
+            shadowColor: 'rgba(124, 58, 237, 0.75)',
+            borderColor: 'rgba(255, 255, 255, 0.9)',
+            borderWidth: 1.5,
+          },
+        },
         label: {
           show: true,
           position: 'right',
@@ -116,15 +128,13 @@ function handleChartClick(params: { seriesType?: string; dataIndex?: number }): 
 </script>
 
 <template>
-  <section class="card ui-card">
-    <div class="card-header ui-card-header">
-      <div class="card-title ui-card-title">Hold Duration Distribution</div>
+  <SectionCard variant="elevated">
+    <template #header>
+      <h3 class="hh-card-title">Hold Duration Distribution</h3>
+    </template>
+    <div v-if="hasData" class="duration-chart-wrap" role="img" aria-label="Hold 時長分佈圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" />
     </div>
-    <div class="card-body ui-card-body">
-      <div v-if="hasData" class="duration-chart-wrap" role="img" aria-label="Hold 時長分佈圖">
-        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" />
-      </div>
-      <div v-else class="placeholder">No data</div>
-    </div>
-  </section>
+    <div v-else class="hh-chart-empty">No data</div>
+  </SectionCard>
 </template>

@@ -166,7 +166,7 @@ function setMode(newMode: string): void {
     <div v-if="mode === 'range'" class="filter-group filter-action-group">
       <button
         type="button"
-        class="ui-btn ui-btn--primary"
+        class="ui-btn ui-btn--primary hh-query-btn"
         data-testid="query-submit-btn"
         :disabled="disabled"
         @click="handleApply"

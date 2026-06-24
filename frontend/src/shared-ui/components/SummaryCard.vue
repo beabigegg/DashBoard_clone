@@ -66,8 +66,10 @@ const formattedValue = computed(() => {
 
   const n = animatedMain.value
   if (props.format === 'number') {
-    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}KK`
-    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
+    const abs = Math.abs(n)
+    const sign = n < 0 ? '-' : ''
+    if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1)}KK`
+    if (abs >= 1e3) return `${sign}${(abs / 1e3).toFixed(1)}K`
     return Math.round(n).toLocaleString('zh-TW')
   }
   if (props.format === 'percent') return `${n.toFixed(1)}%`

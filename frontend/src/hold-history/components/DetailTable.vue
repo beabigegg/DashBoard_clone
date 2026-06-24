@@ -231,7 +231,7 @@ onUnmounted(() => {
         <div class="table-info">{{ pageSummary }}</div>
         <button
           type="button"
-          class="ui-btn ui-btn--secondary"
+          class="ui-btn ui-btn--secondary hh-export-btn"
           :class="{ 'is-loading': exporting }"
           :disabled="!pagination?.total || loading || exporting"
           @click="emit('export')"

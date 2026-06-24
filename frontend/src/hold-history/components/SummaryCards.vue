@@ -2,6 +2,11 @@
 import SummaryCard from '../../shared-ui/components/SummaryCard.vue'
 import SummaryCardGroup from '../../shared-ui/components/SummaryCardGroup.vue'
 
+function rawFor(v: number | undefined | null): number | undefined {
+  if (v == null) return undefined;
+  return Math.abs(v) >= 1000 ? v : undefined;
+}
+
 // ── Range mode tooltips ──────────────────────────────────────────────────────
 const RANGE_FUTURE_HOLD_TOOLTIP =
   '有標註 FUTURE HOLD 備註的 Hold 總量（PJMES043 原廠邏輯）。lot release 後 MES 可能清除備註，導致歷史數值衰減。'
@@ -60,18 +65,21 @@ const props = withDefaults(defineProps<Props>(), {
         :value="summary.newHoldQty ?? 0"
         format="number"
         accent="danger"
+        :sub-value="rawFor(summary.newHoldQty)"
       />
       <SummaryCard
         label="累計 Release"
         :value="summary.releaseQty ?? 0"
         format="number"
         accent="success"
+        :sub-value="rawFor(summary.releaseQty)"
       />
       <SummaryCard
         label="累計 FH"
         :value="summary.futureHoldQty ?? 0"
         format="number"
         accent="warning"
+        :sub-value="rawFor(summary.futureHoldQty)"
       />
       <SummaryCard
         label="品質重複 HOLD"
@@ -79,12 +87,14 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="RANGE_REPEAT_QUALITY_TOOLTIP"
+        :sub-value="rawFor(summary.repeatQualityHoldQty)"
       />
       <SummaryCard
         label="累計淨變動"
         :value="summary.netChange ?? 0"
         format="number"
         :accent="(summary.netChange ?? 0) >= 0 ? 'success' : 'danger'"
+        :sub-value="rawFor(summary.netChange)"
       />
       <SummaryCard
         label="RELEASE 平均時長"
@@ -130,6 +140,7 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="TODAY_ON_HOLD_LOTS_TOOLTIP"
+        :sub-value="rawFor(summary.onHoldLots)"
       />
       <SummaryCard
         label="ON HOLD (QTY)"
@@ -137,24 +148,28 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="TODAY_ON_HOLD_QTY_TOOLTIP"
+        :sub-value="rawFor(summary.onHoldQty)"
       />
       <SummaryCard
         label="當日新增"
         :value="summary.todayNewQty ?? 0"
         format="number"
         accent="warning"
+        :sub-value="rawFor(summary.todayNewQty)"
       />
       <SummaryCard
         label="當日 Release"
         :value="summary.todayReleaseQty ?? 0"
         format="number"
         accent="success"
+        :sub-value="rawFor(summary.todayReleaseQty)"
       />
       <SummaryCard
         label="當日 Future Hold"
         :value="summary.todayFutureHoldQty ?? 0"
         format="number"
         accent="warning"
+        :sub-value="rawFor(summary.todayFutureHoldQty)"
       />
       <SummaryCard
         label="品質重複 HOLD"
@@ -162,6 +177,7 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="TODAY_REPEAT_QUALITY_TOOLTIP"
+        :sub-value="rawFor(summary.repeatQualityHoldQty)"
       />
       <SummaryCard
         label="ON HOLD 平均時長"
@@ -192,6 +208,7 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="CURRENT_ON_HOLD_LOTS_TOOLTIP"
+        :sub-value="rawFor(summary.onHoldLots)"
       />
       <SummaryCard
         label="ON HOLD (QTY)"
@@ -199,24 +216,28 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="CURRENT_ON_HOLD_QTY_TOOLTIP"
+        :sub-value="rawFor(summary.onHoldQty)"
       />
       <SummaryCard
         label="現況新增"
         :value="summary.currentNewQty ?? 0"
         format="number"
         accent="warning"
+        :sub-value="rawFor(summary.currentNewQty)"
       />
       <SummaryCard
         label="現況 Release"
         :value="summary.currentReleaseQty ?? 0"
         format="number"
         accent="success"
+        :sub-value="rawFor(summary.currentReleaseQty)"
       />
       <SummaryCard
         label="現況 Future Hold"
         :value="summary.currentFutureHoldQty ?? 0"
         format="number"
         accent="warning"
+        :sub-value="rawFor(summary.currentFutureHoldQty)"
       />
       <SummaryCard
         label="品質重複 HOLD"
@@ -224,6 +245,7 @@ const props = withDefaults(defineProps<Props>(), {
         format="number"
         accent="danger"
         :tooltip="CURRENT_REPEAT_QUALITY_TOOLTIP"
+        :sub-value="rawFor(summary.repeatQualityHoldQty)"
       />
       <SummaryCard
         label="ON HOLD 平均時長"

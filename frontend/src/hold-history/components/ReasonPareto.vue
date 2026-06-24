@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { BarChart, LineChart } from 'echarts/charts';
+import { BarChart, EffectScatterChart, LineChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
+import SectionCard from '../../shared-ui/components/SectionCard.vue';
 
-use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
+use([CanvasRenderer, BarChart, LineChart, EffectScatterChart, GridComponent, TooltipComponent, LegendComponent]);
 
 interface ReasonParetoItem {
   reason?: string;
@@ -114,6 +115,17 @@ const chartOption = computed(() => {
           borderRadius: [4, 4, 0, 0],
         },
         barMaxWidth: 36,
+        emphasis: {
+          focus: 'self',
+          itemStyle: {
+            shadowBlur: 18,
+            shadowOffsetX: 0,
+            shadowOffsetY: 0,
+            shadowColor: 'rgba(29, 78, 216, 0.75)',
+            borderColor: 'rgba(255, 255, 255, 0.9)',
+            borderWidth: 1.5,
+          },
+        },
       },
       {
         name: '累積%',
@@ -123,6 +135,19 @@ const chartOption = computed(() => {
         lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
         itemStyle: { color: 'rgb(245, 158, 11)' },
         symbolSize: 6,
+      },
+      {
+        name: '_pulse',
+        type: 'effectScatter',
+        yAxisIndex: 1,
+        symbolSize: 7,
+        showEffectOn: 'render',
+        rippleEffect: { brushType: 'stroke', scale: 2.8, period: 2 },
+        data: reasons.map((r, i) => [r, cumPct[i]]),
+        itemStyle: { color: 'rgb(245, 158, 11)' },
+        silent: true,
+        legendHoverLink: false,
+        tooltip: { show: false },
       },
     ],
   };
@@ -141,15 +166,13 @@ function handleChartClick(params: { seriesType?: string; dataIndex?: number }): 
 </script>
 
 <template>
-  <section class="card ui-card">
-    <div class="card-header ui-card-header">
-      <div class="card-title ui-card-title">Reason Pareto</div>
+  <SectionCard variant="elevated">
+    <template #header>
+      <h3 class="hh-card-title">Reason Pareto</h3>
+    </template>
+    <div v-if="hasData" class="pareto-chart-wrap" role="img" aria-label="Hold 原因柏拉圖">
+      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" />
     </div>
-    <div class="card-body ui-card-body">
-      <div v-if="hasData" class="pareto-chart-wrap" role="img" aria-label="Hold 原因柏拉圖">
-        <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @click="handleChartClick" />
-      </div>
-      <div v-else class="placeholder">No data</div>
-    </div>
-  </section>
+    <div v-else class="hh-chart-empty">No data</div>
+  </SectionCard>
 </template>
