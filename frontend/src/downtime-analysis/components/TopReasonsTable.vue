@@ -1,9 +1,27 @@
 <script setup lang="ts">
 import type { TopReasonRow } from '../types';
 
-defineProps<{
+const props = defineProps<{
   rows: TopReasonRow[];
+  categoryColorMap?: Record<string, string>;
 }>();
+
+function categoryTagStyle(category: string): Record<string, string> {
+  const color = props.categoryColorMap?.[category];
+  if (!color) return {};
+  return {
+    '--cat-color': color,
+    background: `${color}1e`,
+    'border-color': `${color}70`,
+    color,
+  };
+}
+
+function catDotStyle(category: string): Record<string, string> {
+  const color = props.categoryColorMap?.[category];
+  if (!color) return {};
+  return { 'background-color': color, '--cat-color': color };
+}
 </script>
 
 <template>
@@ -13,7 +31,7 @@ defineProps<{
       暫無資料
     </div>
     <div v-else class="table-wrapper" role="region" aria-label="停機原因列表">
-      <table class="data-table" aria-label="停機原因列表">
+      <table class="data-table top-reasons-table" aria-label="停機原因列表">
         <thead>
           <tr>
             <th scope="col">#</th>
@@ -28,9 +46,16 @@ defineProps<{
         <tbody>
           <tr v-for="(row, idx) in rows" :key="row.reason + row.status">
             <td>{{ idx + 1 }}</td>
-            <td>{{ row.reason || '(未填寫)' }}</td>
+            <td class="reason-cell">{{ row.reason || '(未填寫)' }}</td>
             <td>
-              <span v-if="row.big_category" class="category-tag">{{ row.big_category }}</span>
+              <span
+                v-if="row.big_category"
+                class="category-tag"
+                :style="categoryTagStyle(row.big_category)"
+              >
+                <span class="cat-dot" :style="catDotStyle(row.big_category)" />
+                {{ row.big_category }}
+              </span>
               <span v-else class="category-tag category-tag--empty">—</span>
             </td>
             <td>
@@ -38,9 +63,9 @@ defineProps<{
                 {{ row.status }}
               </span>
             </td>
-            <td>{{ row.hours.toFixed(2) }}</td>
-            <td>{{ row.event_count }}</td>
-            <td>{{ row.avg_min.toFixed(1) }}</td>
+            <td class="num-cell">{{ row.hours.toFixed(2) }}</td>
+            <td class="num-cell">{{ row.event_count }}</td>
+            <td class="num-cell">{{ row.avg_min.toFixed(1) }}</td>
           </tr>
         </tbody>
       </table>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive } from 'vue';
+import { onMounted, ref, reactive, computed } from 'vue';
 
 import { ensureMesApiAvailable } from '../core/api';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
@@ -18,6 +18,7 @@ import { useFilterState } from './composables/useFilterState';
 import { useDowntimeData } from './composables/useDowntimeData';
 import { useDowntimeDuckDB } from './composables/useDowntimeDuckDB';
 import type { FilterState, ChartFilter, TierThreeEntry } from './types';
+import { CATEGORY_PALETTE } from './constants';
 
 ensureMesApiAvailable();
 
@@ -64,6 +65,16 @@ const tierThreeCache = reactive<Record<string, TierThreeEntry>>({});
 
 const isInitialLoad = ref(true);
 const exportingEquipment = ref(false);
+
+/** Maps category name → palette color, ranked by hours desc (consistent with treemap order) */
+const categoryColorMap = computed<Record<string, string>>(() => {
+  const sorted = [...summaryData.big_category].sort((a, b) => b.hours - a.hours);
+  const map: Record<string, string> = {};
+  sorted.forEach((r, i) => {
+    map[r.category] = CATEGORY_PALETTE[i % CATEGORY_PALETTE.length] as string;
+  });
+  return map;
+});
 
 /** Clear the Tier 3 cache (on re-query or chartFilter change per DQ-3) */
 function clearTierThreeCache(): void {
@@ -502,6 +513,7 @@ onMounted(() => {
             <BigCategoryChart
               :rows="summaryData.big_category"
               :selected-category="chartFilter.big_category"
+              :category-color-map="categoryColorMap"
               @click-category="handleCategoryClick"
             />
           </div>
@@ -511,7 +523,7 @@ onMounted(() => {
       <!-- Top reasons table -->
       <div class="section-card">
         <div class="section-inner">
-          <TopReasonsTable :rows="summaryData.top_reasons" />
+          <TopReasonsTable :rows="summaryData.top_reasons" :category-color-map="categoryColorMap" />
         </div>
       </div>
 
