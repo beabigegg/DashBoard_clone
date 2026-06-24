@@ -5723,6 +5723,32 @@
         ],
         "x-cdd-errors": "400/410"
       }
+    },
+    "/api/downtime-analysis/meta": {
+      "get": {
+        "summary": "GET /api/downtime-analysis/meta",
+        "responses": {
+          "200": {
+            "description": "Contract response: GenericSuccessResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
     }
   },
   "x-cdd-generated-from": "contracts/api/api-contract.md",

@@ -191,7 +191,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/query-tool/lot-history | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/query-tool/adjacent-lots | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/query-tool/lot-associations | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/query-tool/equipment-period | required | JSON body  | GenericSuccessResponse | 202/400/500 | route tests |
+| POST | /api/query-tool/equipment-period | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
 | GET | /api/query-tool/equipment-list | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/query-tool/workcenter-groups | required | — | GenericSuccessResponse | 500 | route tests |
 | POST | /api/query-tool/lot-equipment-lookup | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
@@ -252,6 +252,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/eap-alarm/pareto | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/trend | required | ?query_id=&granularity=(day or hour, default day)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/detail | required | ?query_id=&page=&per_page=(max 200)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 
 ## 5. Routing & Naming
 
