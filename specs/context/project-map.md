@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 191
-visible-files: 978
-omitted-dirs: 61
+visible-dirs: 183
+visible-files: 966
+omitted-dirs: 62
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -81,6 +81,7 @@ DashBoard_vite/
 |   |   |-- 0ce71eec09fdba96
 |   |   |-- 0e749cfd569a40b7
 |   |   |-- 0eaea0baf0eb7dcf
+|   |   |-- 0ec66aabb29bda7c
 |   |   |-- 0f2d4ac438e36262
 |   |   |-- 0f584482e7d3db29
 |   |   |-- 0fb4599ed66628f4
@@ -103,8 +104,7 @@ DashBoard_vite/
 |   |   |-- 1cc56ed5fc92eb40
 |   |   |-- 1fa576bc7d285941
 |   |   |-- 1fcb892092629696
-|   |   |-- 2079893a07ce42c4
-|   |   \-- ... (316 more entries truncated; cap=50)
+|   |   \-- ... (319 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -175,7 +175,8 @@ DashBoard_vite/
 |   |   |-- 0008-eap-alarm-coarse-spool-detail-join.md
 |   |   |-- 0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md
 |   |   |-- 0010-downtime-duckdb-time-overlap-join.md
-|   |   \-- 0011-global-concurrency-semaphore-rq-oracle-bound.md
+|   |   |-- 0011-global-concurrency-semaphore-rq-oracle-bound.md
+|   |   \-- 0012-navigation-source-of-truth-code-manifest.md
 |   |-- architecture/
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
@@ -362,6 +363,8 @@ DashBoard_vite/
 |   |   |   |-- main.js
 |   |   |   \-- portal.css
 |   |   |-- portal-shell/
+|   |   |   |-- __tests__/
+|   |   |   |   \-- ... (max depth)
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- composables/
@@ -374,6 +377,8 @@ DashBoard_vite/
 |   |   |   |-- index.html
 |   |   |   |-- main.js
 |   |   |   |-- nativeModuleRegistry.js
+|   |   |   |-- navigationManifest.d.ts
+|   |   |   |-- navigationManifest.js
 |   |   |   |-- navigationState.js
 |   |   |   |-- routeContracts.js
 |   |   |   |-- routeQuery.js
@@ -641,23 +646,8 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260624_095034.log
-|   |   |-- error_20260624_095034.log
-|   |   |-- rq_downtime_worker_20260624_095034.log
-|   |   |-- rq_eap_alarm_worker_20260624_095034.log
-|   |   |-- rq_hold_hist_worker_20260624_095034.log
-|   |   |-- rq_msd_worker_20260624_095034.log
-|   |   |-- rq_prod_hist_worker_20260624_095034.log
-|   |   |-- rq_reject_worker_20260624_095034.log
-|   |   |-- rq_resource_worker_20260624_095034.log
-|   |   |-- rq_warmup_worker_20260624_095034.log
-|   |   |-- rq_worker_20260624_095034.log
-|   |   |-- rq_yield_alert_worker_20260624_095034.log
-|   |   \-- watchdog_20260624_095034.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- flask_dev.log
 |   |-- login_sessions.sqlite
@@ -920,8 +910,6 @@ DashBoard_vite/
 |   |-- contract/
 |   |   |-- samples/
 |   |   |   |-- .gitkeep
-|   |   |   |-- delete_admin_drawers_id.json
-|   |   |   |-- get_admin_drawers.json
 |   |   |   |-- get_admin_logs.json
 |   |   |   |-- get_admin_metrics.json
 |   |   |   |-- get_admin_pages.json
@@ -969,7 +957,9 @@ DashBoard_vite/
 |   |   |   |-- get_mid_section_defect_analysis_detail.json
 |   |   |   |-- get_mid_section_defect_analysis.json
 |   |   |   |-- get_mid_section_defect_export.json
-|   |   |   \-- ... (129 more entries truncated; cap=50)
+|   |   |   |-- get_mid_section_defect_loss_reasons.json
+|   |   |   |-- get_mid_section_defect_station_options.json
+|   |   |   \-- ... (125 more entries truncated; cap=50)
 |   |   |-- capture_samples.py
 |   |   |-- README.md
 |   |   |-- response-samples.example.json
@@ -1171,29 +1161,10 @@ DashBoard_vite/
 |   |   |-- eap_alarm/
 |   |   \-- test_ns/
 |   |-- query_spool/
-|   |   |-- anomaly_hold_dataset/
-|   |   |   \-- 7c193f4e1ec6e300.parquet
-|   |   |-- anomaly_reject_dataset/
-|   |   |   \-- 858f092b53042f96.parquet
-|   |   |-- anomaly_resource_dataset/
-|   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- anomaly_yield_dataset/
-|   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- downtime_analysis_base_events/
-|   |   |   \-- 47444fd75771e9ab.parquet
-|   |   |-- downtime_analysis_job_bridge/
-|   |   |   \-- 47444fd75771e9ab.parquet
-|   |   |-- hold_dataset/
-|   |   |   |-- 0fff9d37f176e65b.parquet
-|   |   |   \-- 8e3433483cac52bf.parquet
-|   |   |-- reject_dataset/
-|   |   |   \-- 369246426dea93c7.parquet
-|   |   |-- resource_dataset/
-|   |   |   \-- 6b3acc8ae0dd19fd.parquet
-|   |   |-- resource_oee/
-|   |   |   \-- 8a48b4b75defd2c1.parquet
-|   |   |-- yield_alert_dataset/
-|   |   |   \-- 4a0aa6dea84f4525.parquet
+|   |   |-- downtime_analysis/
+|   |   |-- msd-events/
+|   |   |   |-- tmpu3xasnmq.parquet
+|   |   |   \-- tmpyy2u59q9.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_1038537.json
@@ -1233,9 +1204,19 @@ DashBoard_vite/
 |   |   |-- probe_1055122.json
 |   |   |-- probe_1056521.json
 |   |   |-- probe_1060804.json
-|   |   \-- ... (655 more entries truncated; cap=50)
+|   |   |-- probe_1064516.json
+|   |   |-- probe_1066070.json
+|   |   |-- probe_1067981.json
+|   |   |-- probe_10707.json
+|   |   |-- probe_10745.json
+|   |   |-- probe_10829.json
+|   |   |-- probe_10884.json
+|   |   |-- probe_1100761.json
+|   |   |-- probe_1104818.json
+|   |   \-- ... (688 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json
+|   |-- mes_dashboard_restart.flag
 |   \-- resource_history.duckdb
 |-- tools/
 |   |-- generate_documentation.py

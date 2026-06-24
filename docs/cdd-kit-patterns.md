@@ -109,3 +109,24 @@ git add specs/changes/unified-query-core-infra/
 ```
 
 Evidence: `unified-query-core-infra` close — pre-commit hook failed on `specs/changes/downtime-duckdb-join-migration/` (scaffolded but inactive, unfilled `<change-id>` placeholders); resolved by re-staging only `specs/changes/unified-query-core-infra/`.
+
+## Local Gate vs CI Full Suite — Stale Tests on Removals
+
+**`cdd-kit gate --strict` runs the bounded test ladder (changed-area files only).** CI's `unit-and-integration-tests` job runs the full pytest suite. When you remove or reshape a widely-referenced endpoint, data file, or response shape, tests in *other* files that assert the old behavior pass the local gate undetected and fail CI.
+
+Mitigation: before pushing any behavioral removal, `grep -r "<endpoint-or-field-name>" tests/` to locate all assertion sites, then run the full suite locally (`conda run -n mes-dashboard python -m pytest tests/ --ignore=tests/e2e --ignore=tests/stress`) to catch stale tests before CI does.
+
+Evidence: `nav-config-to-code` — `cdd-kit gate --strict` passed locally; CI `unit-and-integration-tests` failed with 11 stale assertions across `tests/test_portal_shell_routes.py` (×8), `tests/test_modernization_policy_hardening.py` (×2), `tests/test_reject_history_shell_coverage.py` (×1) asserting the old `/api/portal/navigation` drawers shape and old `page_status.json` structure.
+
+## Full Pytest Suite Regenerates All Contract Samples
+
+**`tests/contract/test_capture_samples.py` regenerates every sample in `tests/contract/samples/` with live runtime values whenever a test run includes it** — which happens on any full `pytest` run. This produces ~160 modified files unrelated to your change.
+
+Before committing after a full-suite run, revert the unrelated churn and re-stage only what your change altered:
+
+```bash
+git checkout tests/contract/samples/
+git add tests/contract/samples/get_admin_pages.json tests/contract/samples/get_portal_navigation.json
+```
+
+Evidence: `nav-config-to-code` — hit twice; reverted ~166 then ~160 sample files to keep the diff tight and avoid polluting contract sample history.

@@ -68,3 +68,4 @@
 | query-path-c-elimination-cleanup | 2026 | 2026-06-19 | specs/archive/2026/query-path-c-elimination-cleanup/ |
 | rq-semaphore-wiring | 2026 | 2026-06-20 | specs/archive/2026/rq-semaphore-wiring/ |
 | wip-rq-worker-chunks-cleanup | 2026 | 2026-06-20 | specs/archive/2026/wip-rq-worker-chunks-cleanup/ |
+| nav-config-to-code | 2026 | 2026-06-24 | specs/archive/2026/nav-config-to-code/ |
