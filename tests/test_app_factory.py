@@ -79,6 +79,37 @@ class AppFactoryTests(unittest.TestCase):
         missing = expected - rules
         self.assertFalse(missing, f"Missing routes: {sorted(missing)}")
 
+        # Route-name pin: '/' must be registered under the name 'portal_index'.
+        rule_names = {rule.endpoint: rule.rule for rule in app.url_map.iter_rules()}
+        self.assertIn("portal_index", rule_names, "'portal_index' route name must be registered")
+        self.assertEqual(rule_names["portal_index"], "/", "portal_index must map to '/'")
+
+        # portal_index must always redirect to the SPA shell regardless of PORTAL_SPA_ENABLED.
+        for flag_val in ("true", "false"):
+            old_flag = os.environ.get("PORTAL_SPA_ENABLED")
+            os.environ["PORTAL_SPA_ENABLED"] = flag_val
+            db._ENGINE = None
+            flag_app = create_app("testing")
+            flag_client = flag_app.test_client()
+            with flag_app.test_request_context():
+                with flag_client.session_transaction() as sess:
+                    sess["user"] = {"username": "A001", "displayName": "Test", "mail": "t@t.com", "is_admin": False}
+            resp = flag_client.get("/", follow_redirects=False)
+            self.assertEqual(
+                resp.status_code, 302,
+                f"portal_index must redirect (302) when PORTAL_SPA_ENABLED={flag_val}",
+            )
+            self.assertIn(
+                "/portal-shell",
+                resp.headers.get("Location", ""),
+                f"portal_index must redirect to /portal-shell when PORTAL_SPA_ENABLED={flag_val}",
+            )
+            if old_flag is None:
+                os.environ.pop("PORTAL_SPA_ENABLED", None)
+            else:
+                os.environ["PORTAL_SPA_ENABLED"] = old_flag
+            db._ENGINE = None
+
     def test_portal_spa_flag_default_enabled(self):
         old = os.environ.pop("PORTAL_SPA_ENABLED", None)
         try:
@@ -99,12 +130,20 @@ class AppFactoryTests(unittest.TestCase):
         os.environ["PORTAL_SPA_ENABLED"] = "false"
         try:
             app = create_app("testing")
+            # Flag resolution: app.config must reflect the env override.
             self.assertFalse(app.config.get("PORTAL_SPA_ENABLED"))
 
+            # Behavioral assertion: portal_index always redirects to the SPA
+            # shell even when PORTAL_SPA_ENABLED is false (non-SPA render path
+            # has been removed; portal.html no longer exists).
             client = app.test_client()
-            response = client.get("/")
-            html = response.data.decode("utf-8")
-            self.assertIn('data-portal-spa-enabled="false"', html)
+            response = client.get("/", follow_redirects=False)
+            self.assertEqual(response.status_code, 302)
+            location = response.headers.get("Location", "")
+            self.assertTrue(
+                location.startswith("/portal-shell"),
+                f"portal_index must redirect to /portal-shell even when flag=false; got {location}",
+            )
         finally:
             if old is None:
                 os.environ.pop("PORTAL_SPA_ENABLED", None)
@@ -156,6 +195,79 @@ class AppFactoryTests(unittest.TestCase):
                 os.environ.pop("REALTIME_EQUIPMENT_CACHE_ENABLED", None)
             else:
                 os.environ["REALTIME_EQUIPMENT_CACHE_ENABLED"] = old_realtime_cache
+
+
+def test_status_payload_exposes_portal_spa_enabled():
+    """Template context processor must still inject portal_spa_enabled (AC-5).
+
+    The flag is preserved in app.config even after the non-SPA render path is
+    removed; the context processor at app.py:1048 must keep exposing it so that
+    any remaining Jinja2 templates (admin, error pages) can reference it.
+    """
+    import mes_dashboard.core.database as _db
+    _db._ENGINE = None
+    app = create_app("testing")
+    ctx_processor_result = None
+    # The context processor calls is_admin_logged_in() which reads session,
+    # so we need a real request context with a minimal user session.
+    with app.test_request_context("/"):
+        with app.test_client().session_transaction() as sess:
+            pass  # establish session fixture via request context
+        from flask import session as flask_session
+        flask_session["user"] = {"username": "A001", "is_admin": False}
+        for processor in app.template_context_processors[None]:
+            try:
+                result = processor()
+                if isinstance(result, dict) and "portal_spa_enabled" in result:
+                    ctx_processor_result = result
+                    break
+            except Exception:
+                continue
+    assert ctx_processor_result is not None, (
+        "No template context processor exposes 'portal_spa_enabled'; "
+        "app.py context processor may have been removed"
+    )
+    assert "portal_spa_enabled" in ctx_processor_result, (
+        "portal_spa_enabled key missing from template context processor payload"
+    )
+
+
+def test_portal_html_template_deleted():
+    """templates/portal.html must not exist (AC-6: deliberate delete)."""
+    import pathlib
+    templates_dir = pathlib.Path(__file__).parent.parent / "src" / "mes_dashboard" / "templates"
+    portal_html = templates_dir / "portal.html"
+    assert not portal_html.exists(), (
+        f"templates/portal.html still exists at {portal_html}; "
+        "it should have been deleted as part of the legacy-portal-admin-cleanup change"
+    )
+
+
+def test_no_portal_html_reference_in_app_source():
+    """No source file under src/mes_dashboard/ should reference 'portal.html' (AC-6).
+
+    Uses ast.parse() + ast.walk() on every .py file to assert the string constant
+    'portal.html' does not appear in any AST Constant node (per test-discipline.md
+    §Use ast.parse() to Prove Absence of Removed Startup Calls).
+    """
+    import ast
+    import pathlib
+    src_root = pathlib.Path(__file__).parent.parent / "src" / "mes_dashboard"
+    violations = []
+    for py_file in src_root.rglob("*.py"):
+        source = py_file.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(source, filename=str(py_file))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if "portal.html" in node.value:
+                    violations.append(f"{py_file}:{node.lineno}: {node.value!r}")
+    assert not violations, (
+        "Found 'portal.html' string in source files — re-introduction detected:\n"
+        + "\n".join(violations)
+    )
 
 
 class PostForkHookTests(unittest.TestCase):

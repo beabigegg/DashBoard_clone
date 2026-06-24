@@ -1,0 +1,1 @@
+python -m pytest tests/ --ignore=tests/e2e --ignore=tests/stress -q --tb=short --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-142549/junit.xml' --maxfail=1 -ra

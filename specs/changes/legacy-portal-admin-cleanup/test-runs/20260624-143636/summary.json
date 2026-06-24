@@ -1,0 +1,15 @@
+{
+  "change_id": "legacy-portal-admin-cleanup",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- --run src/admin-pages/__tests__/",
+  "duration_ms": 1081,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143636/summary.json",
+    "stdout": "specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143636/stdout.log",
+    "stderr": "specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143636/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

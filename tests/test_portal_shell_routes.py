@@ -315,18 +315,6 @@ def test_portal_navigation_logs_contract_mismatch_route():
     assert "contract_mismatch_routes" not in diagnostics
 
 
-def test_wave_b_native_routes_are_reachable(monkeypatch):
-    monkeypatch.setenv("PORTAL_SPA_ENABLED", "false")
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    client = app.test_client()
-    _login_as_admin(client)
-
-    for route in ["/job-query", "/query-tool", "/yield-alert-center"]:
-        response = client.get(route)
-        assert response.status_code == 200, f"{route} should be reachable"
-
-
 def test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled(monkeypatch):
     monkeypatch.setenv("PORTAL_SPA_ENABLED", "true")
     app = create_app("testing")

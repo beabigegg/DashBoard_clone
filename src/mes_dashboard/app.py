@@ -1054,10 +1054,8 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route('/')
     def portal_index():
-        """Portal home with tabs."""
-        if bool(app.config.get("PORTAL_SPA_ENABLED", False)):
-            return redirect(url_for("portal_shell_page"))
-        return render_template('portal.html', drawers=get_navigation_config())
+        """Portal home: unconditionally redirect to the SPA shell."""
+        return redirect(url_for("portal_shell_page"))
 
     @app.route('/portal-shell')
     @app.route('/portal-shell/')

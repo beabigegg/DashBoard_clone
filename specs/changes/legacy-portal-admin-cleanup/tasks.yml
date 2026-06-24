@@ -1,0 +1,42 @@
+change-id: legacy-portal-admin-cleanup
+status: in-progress
+tier: 3
+tier-floor-override: "Tier-3 confirmed by classifier + qa-reviewer: low-risk, module-level cleanup. Floor scanner matches (index / integration / route) are false positives — 'index' = the portal_index function name, 'integration' = the test_template_integration.py filename, 'route' = route names — NOT an api / data-shape / queue / cache / external-integration surface. portal_index still returns 200 (redirect to the SPA); contract-reviewer confirmed ZERO contract changes; no data / queue / cache / external integration is touched."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "contract-reviewer: no contract change (API/env/css all preserved)" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "no API change — portal_index still 200; status payload key preserved" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "dead-CSS removal within already-scoped file; no css-contract/inventory change" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "PORTAL_SPA_ENABLED kept, not added/removed/default-changed" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "no data change" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "nav SoT already moved in ADR 0012; cleanup only" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no new gate" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "render tests deleted; portal_index route-name + status-key + template-deleted + AST pins added; frontend a11y vitest (3) pass" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: skipped, note: "none new; existing template/route tests must stay green" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "none new; existing e2e unaffected (default SPA path unchanged)" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "no data-boundary surface" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "no load/queue/cache surface" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "portal_index always-SPA; portal.html deleted; render tests removed; full suite 4881 pass" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "dead drawer-era CSS removed; aria-pressed + role=alert added; css:check + type-check pass" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env/deploy change" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no workflow change; a11y vitest rides existing frontend-tests" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "approved; aria-pressed + role=alert correct; dead-CSS removal clean (1 non-blocking low note)" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "a11y attrs are non-visual DOM semantics; no pixel change" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved — no contract changes required" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "GO — AC-1..AC-7 verified live (backend 4881/0, vitest 3/3, css:check pass, contracts empty-diff)" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 pass locally (pytest 4881, vitest 3, css:check)" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gate" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

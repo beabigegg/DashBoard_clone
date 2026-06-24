@@ -1,0 +1,13 @@
+agent: implementation-planner
+change-id: legacy-portal-admin-cleanup
+status: done
+summary: >
+  Wrote implementation-plan.md. Sequenced backend-engineer FIRST (collapse
+  portal_index to unconditional SPA redirect, delete portal.html, delete 8 render
+  tests + add 5 app-factory tests) then frontend-engineer (delete dead CSS
+  L192-272, add aria-pressed + role=alert + 2 vitest files). Shared
+  test-evidence.yml -> sequential to avoid ladder race. No contract/env/CI change.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/legacy-portal-admin-cleanup/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-5), frontend-engineer (IP-6..IP-9)" }
+  - { type: scope-summary, pointer: "5 in scope (route, template, backend tests, CSS, a11y); 8 explicit out-of-scope" }

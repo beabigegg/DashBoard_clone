@@ -1,0 +1,21 @@
+change-id: legacy-portal-admin-cleanup
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test -- --run src/admin-pages/__tests__/
+    summary: specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143636/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npm run test -- --run src/admin-pages/__tests__/
+    summary: specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143643/summary.json
+  - phase: changed-area
+    status: passed
+    command: cd frontend && npm run test -- --run src/admin-pages/__tests__/ && npm run css:check && npm run type-check
+    summary: specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143650/summary.json
+final-status: passed

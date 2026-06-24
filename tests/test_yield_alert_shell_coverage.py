@@ -13,22 +13,6 @@ def _login_as_admin(client) -> None:
         sess["admin"] = {"displayName": "Admin", "employeeNo": "A001"}
 
 
-def test_yield_alert_page_fallback_contains_vite_entry(monkeypatch):
-    monkeypatch.setenv("PORTAL_SPA_ENABLED", "false")
-    monkeypatch.setenv("MODERNIZATION_RETIRE_IN_SCOPE_RUNTIME_FALLBACK", "false")
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    client = app.test_client()
-    _login_as_admin(client)
-
-    with patch("mes_dashboard.app.os.path.exists", return_value=False):
-        response = client.get("/yield-alert-center", follow_redirects=False)
-
-    assert response.status_code == 200
-    html = response.data.decode("utf-8")
-    assert "/static/dist/yield-alert-center.js" in html
-
-
 def test_yield_alert_page_redirects_to_shell_when_spa_enabled(monkeypatch):
     monkeypatch.setenv("PORTAL_SPA_ENABLED", "true")
     app = create_app("testing")

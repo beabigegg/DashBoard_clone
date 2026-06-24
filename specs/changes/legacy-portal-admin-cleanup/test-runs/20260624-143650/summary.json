@@ -1,0 +1,15 @@
+{
+  "change_id": "legacy-portal-admin-cleanup",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- --run src/admin-pages/__tests__/ && npm run css:check && npm run type-check",
+  "duration_ms": 10646,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143650/summary.json",
+    "stdout": "specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143650/stdout.log",
+    "stderr": "specs/changes/legacy-portal-admin-cleanup/test-runs/20260624-143650/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

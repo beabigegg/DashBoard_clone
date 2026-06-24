@@ -109,7 +109,7 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <div v-if="errorMessage" class="panel error-panel">
+    <div v-if="errorMessage" class="panel error-panel" role="alert">
       {{ errorMessage }}
     </div>
 

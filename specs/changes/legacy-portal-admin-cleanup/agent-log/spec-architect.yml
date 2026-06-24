@@ -1,0 +1,6 @@
+artifacts:
+  - { type: adr-written, pointer: "none (cleanup downstream of docs/adr/0012)" }
+  - { type: affected-areas, pointer: "portal entry route, PORTAL_SPA_ENABLED flag, admin-pages frontend" }
+  - { type: decision-summary, pointer: "portal_index always serves SPA; delete portal.html; KEEP PORTAL_SPA_ENABLED as status/modernization signal" }
+  - { type: risks-noted, pointer: "0 high, 0 medium, 3 low (route-name pin, render-test deletions, stale drawer-CRUD JS in admin/pages.html)" }
+  - { type: design-doc, pointer: "specs/changes/legacy-portal-admin-cleanup/design.md" }
