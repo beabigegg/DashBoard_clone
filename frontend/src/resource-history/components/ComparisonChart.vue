@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -31,16 +31,37 @@ const chartBodyHeight = computed(() => {
   return Math.min(Math.max(280, rows * ROW_HEIGHT + GRID_OVERHEAD), 900);
 });
 
-const isHovering = ref(false);
-let _mouseoutTimer: ReturnType<typeof setTimeout> | null = null;
-function onChartMouseover() {
-  if (_mouseoutTimer) { clearTimeout(_mouseoutTimer); _mouseoutTimer = null; }
-  isHovering.value = true;
+// ── Bar-level shimmer overlay ────────────────────────────────────────────
+const chartRef = ref<InstanceType<typeof VChart> | null>(null);
+const shimmer = ref({ visible: false, style: {} as Record<string, string> });
+
+function attachShimmerListeners(instance: unknown) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inst = instance as any;
+  inst.on('mouseover', (params: { componentType: string; name: string; value: number }) => {
+    if (params.componentType !== 'series') return;
+    const x0 = inst.convertToPixel({ xAxisIndex: 0 }, 0) as number;
+    const x1 = inst.convertToPixel({ xAxisIndex: 0 }, params.value) as number;
+    const yCenter = inst.convertToPixel({ yAxisIndex: 0 }, params.name) as number;
+    const barH = 22;
+    shimmer.value = {
+      visible: true,
+      style: {
+        top: `${yCenter - barH / 2}px`,
+        left: `${Math.min(x0, x1)}px`,
+        width: `${Math.abs(x1 - x0)}px`,
+        height: `${barH}px`,
+      },
+    };
+  });
+  inst.on('mouseout', () => { shimmer.value.visible = false; });
 }
-function onChartMouseout() {
-  _mouseoutTimer = setTimeout(() => { isHovering.value = false; }, 120);
-}
-onUnmounted(() => { if (_mouseoutTimer) clearTimeout(_mouseoutTimer); });
+
+watch(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  () => (chartRef.value as any)?.chart,
+  (instance) => { if (instance) attachShimmerListeners(instance); },
+);
 
 const chartOption = computed(() => {
   const rows = rankedData.value;
@@ -122,8 +143,9 @@ const chartOption = computed(() => {
 <template>
   <article class="chart-card">
     <h3 class="chart-title">Workcenter OU%</h3>
-    <div v-if="hasData" class="chart-body" :class="{ 'is-hovering': isHovering }" :style="{ height: chartBodyHeight + 'px' }" role="img" aria-label="設備稼動率比較圖">
-      <VChart :option="chartOption" :autoresize="{ throttle: 100 }" @mouseover="onChartMouseover" @mouseout="onChartMouseout" />
+    <div v-if="hasData" class="chart-body" :style="{ height: chartBodyHeight + 'px' }" role="img" aria-label="設備稼動率比較圖">
+      <VChart ref="chartRef" :option="chartOption" :autoresize="{ throttle: 100 }" />
+      <div v-if="shimmer.visible" class="rh-bar-shimmer" :style="shimmer.style" />
     </div>
     <div v-else class="chart-no-data" :style="{ height: chartBodyHeight + 'px' }">No data</div>
   </article>
