@@ -1,6 +1,6 @@
-# generated: 2026-06-24T04:18:49Z by cdd-kit 3.4.0
-# files: 953, src-lines: 286661, map-lines: 20903, compression: 13.7x
-# sources-digest: 5de9359145477d18c4f9ececfcec9cc92f43a8b992a2071c4fe9f519eb3441ff
+# generated: 2026-06-24T05:13:34Z by cdd-kit 3.4.0
+# files: 953, src-lines: 286637, map-lines: 20903, compression: 13.7x
+# sources-digest: acd10a1dba32d3f85f5b984c903f3ded97a351ec502c55b3ff57986b862839fa
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -16402,28 +16402,28 @@ tests/test_mid_section_defect_service.py:  # 964 lines
     - { name: test_build_detail_table_deduplicates_machines, lines: 763-783 }
     - { name: test_export_csv_flattens_structured_fields, lines: 787-822 }  # @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
 
-tests/test_modernization_policy_hardening.py:  # 178 lines
+tests/test_modernization_policy_hardening.py:  # 189 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
     - { module: mes_dashboard.core, items: [policy], line: 8 }
   classes:
     - name: TestMaterialConsumptionRegistration
-      lines: 53-97
+      lines: 53-105
       methods:
         - { name: _load_asset_manifest, lines: 56-66 }
         - { name: _load_page_status, lines: 68-76 }
         - { name: test_asset_readiness_manifest_contains_material_consumption_key, lines: 78-84 }
-        - { name: test_page_status_contains_material_consumption_in_drawer, lines: 86-97 }
+        - { name: test_page_status_contains_material_consumption_in_drawer, lines: 86-105 }
     - name: TestDowntimeAnalysisPage
-      lines: 105-178
+      lines: 113-189
       methods:
-        - { name: _load_asset_manifest, lines: 108-118 }
-        - { name: _load_page_status, lines: 120-128 }
-        - { name: _load_scope_matrix, lines: 130-140 }
-        - { name: test_page_status_contains_downtime_analysis_in_drawer_2, lines: 142-155 }
-        - { name: test_asset_readiness_manifest_contains_downtime_analysis, lines: 157-170 }
-        - { name: test_route_scope_matrix_contains_downtime_analysis, lines: 172-178 }
+        - { name: _load_asset_manifest, lines: 116-126 }
+        - { name: _load_page_status, lines: 128-136 }
+        - { name: _load_scope_matrix, lines: 138-148 }
+        - { name: test_page_status_contains_downtime_analysis_in_drawer_2, lines: 150-166 }
+        - { name: test_asset_readiness_manifest_contains_downtime_analysis, lines: 168-181 }
+        - { name: test_route_scope_matrix_contains_downtime_analysis, lines: 183-189 }
   functions:
     - { name: test_scope_matrix_loader_returns_defensive_copy, lines: 11-25 }
     - { name: test_scope_matrix_cache_refresh_requires_explicit_clear, lines: 28-45 }
@@ -16939,7 +16939,7 @@ tests/test_permissions.py:  # 161 lines
   functions:
     - { name: app, lines: 21-26 }  # @pytest.fixture
 
-tests/test_portal_shell_routes.py:  # 472 lines
+tests/test_portal_shell_routes.py:  # 427 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -16952,21 +16952,21 @@ tests/test_portal_shell_routes.py:  # 472 lines
     - { name: test_portal_shell_fallback_html_served_when_dist_missing, lines: 24-40 }
     - { name: test_portal_shell_uses_nested_dist_html_when_top_level_missing, lines: 43-60 }
     - { name: test_portal_shell_fallback_html_when_nested_dist_html_unreadable, lines: 63-86 }
-    - { name: test_portal_navigation_non_admin_visibility_matches_release_only, lines: 89-112 }
-    - { name: test_portal_navigation_admin_includes_admin_drawer_routes, lines: 116-135 }
-    - { name: test_wrapper_telemetry_endpoint_removed_after_wrapper_decommission, lines: 139-154 }
-    - { name: test_navigation_drawer_and_page_order_deterministic_non_admin, lines: 157-170 }
-    - { name: test_navigation_contract_page_metadata_fields_present_and_typed, lines: 173-192 }
-    - { name: test_navigation_duplicate_order_values_still_resolve_deterministically, lines: 195-228 }
-    - { name: test_navigation_mixed_release_dev_visibility_admin_vs_non_admin, lines: 231-281 }
-    - { name: test_portal_navigation_includes_admin_links_by_auth_state, lines: 284-299 }
-    - { name: test_portal_navigation_emits_diagnostics_for_invalid_navigation_payload, lines: 302-330 }
-    - { name: test_portal_navigation_logs_contract_mismatch_route, lines: 333-360 }
-    - { name: test_wave_b_native_routes_are_reachable, lines: 363-372 }
-    - { name: test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 375-392 }
-    - { name: test_direct_entry_redirect_preserves_non_ascii_query_params, lines: 395-408 }
-    - { name: test_legacy_shell_contract_fallback_logs_warning, lines: 411-451 }
-    - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 454-472 }
+    - { name: test_portal_navigation_non_admin_visibility_matches_release_only, lines: 89-103 }
+    - { name: test_portal_navigation_admin_includes_admin_drawer_routes, lines: 107-124 }
+    - { name: test_wrapper_telemetry_endpoint_removed_after_wrapper_decommission, lines: 128-143 }
+    - { name: test_navigation_drawer_and_page_order_deterministic_non_admin, lines: 146-165 }
+    - { name: test_navigation_contract_page_metadata_fields_present_and_typed, lines: 168-199 }
+    - { name: test_navigation_duplicate_order_values_still_resolve_deterministically, lines: 202-223 }
+    - { name: test_navigation_mixed_release_dev_visibility_admin_vs_non_admin, lines: 226-256 }
+    - { name: test_portal_navigation_includes_admin_links_by_auth_state, lines: 259-274 }
+    - { name: test_portal_navigation_emits_diagnostics_for_invalid_navigation_payload, lines: 277-295 }
+    - { name: test_portal_navigation_logs_contract_mismatch_route, lines: 298-315 }
+    - { name: test_wave_b_native_routes_are_reachable, lines: 318-327 }
+    - { name: test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 330-347 }
+    - { name: test_direct_entry_redirect_preserves_non_ascii_query_params, lines: 350-363 }
+    - { name: test_legacy_shell_contract_fallback_logs_warning, lines: 366-406 }
+    - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 409-427 }
 
 tests/test_portal_shell_wave_b_native_smoke.py:  # 279 lines
   imports:
@@ -18438,7 +18438,7 @@ tests/test_reject_history_service.py:  # 403 lines
     - { name: test_query_list_pagination_and_caps, lines: 296-353 }
     - { name: test_export_csv_contains_semantic_headers, lines: 356-403 }
 
-tests/test_reject_history_shell_coverage.py:  # 38 lines
+tests/test_reject_history_shell_coverage.py:  # 48 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -18451,7 +18451,7 @@ tests/test_reject_history_shell_coverage.py:  # 38 lines
   functions:
     - { name: test_reject_history_route_contract_entry_exists, lines: 16-21 }
     - { name: test_reject_history_native_loader_entry_exists, lines: 24-28 }
-    - { name: test_reject_history_page_status_entry_exists, lines: 31-38 }
+    - { name: test_reject_history_page_status_entry_exists, lines: 31-48 }
 
 tests/test_reject_history_unified_job.py:  # 299 lines
   imports:

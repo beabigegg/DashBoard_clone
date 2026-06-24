@@ -16,8 +16,8 @@ runs:
     summary: specs/changes/nav-config-to-code/test-runs/20260624-121539/summary.json
   - phase: changed-area
     status: passed
-    command: cd frontend && npm run test:legacy 2>&1 | tail -5
-    summary: specs/changes/nav-config-to-code/test-runs/20260624-121545/summary.json
+    command: conda run -n mes-dashboard python -m pytest tests/ --ignore=tests/e2e --ignore=tests/stress -q
+    summary: specs/changes/nav-config-to-code/test-runs/20260624-130724/summary.json
   - phase: contract
     status: passed
     command: >-

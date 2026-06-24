@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/ --ignore=tests/e2e --ignore=tests/stress -q

@@ -97,19 +97,10 @@ def test_portal_navigation_non_admin_visibility_matches_release_only():
     assert payload["is_admin"] is False
     assert payload["admin_user"] is None
 
-    all_routes = {
-        page["route"]
-        for drawer in payload["drawers"]
-        for page in drawer["pages"]
-    }
-
-    # Non-admin baseline from current config.
-    assert "/wip-overview" in all_routes
-    assert "/resource" in all_routes
-    assert "/qc-gate" in all_routes
-    assert "/resource-history" in all_routes
-    assert "/job-query" in all_routes
-    assert "/admin/pages" not in all_routes
+    # Navigation structure is now frontend-owned (navigationManifest.js).
+    # The API returns a statuses dict; no drawers key is emitted.
+    assert "drawers" not in payload
+    assert isinstance(payload["statuses"], dict)
 
 
 
@@ -125,14 +116,12 @@ def test_portal_navigation_admin_includes_admin_drawer_routes():
     assert payload["is_admin"] is True
     assert payload["admin_user"]["displayName"] == "Admin"
 
-    all_routes = {
-        page["route"]
-        for drawer in payload["drawers"]
-        for page in drawer["pages"]
-    }
-    assert "/admin/pages" in all_routes
-    assert "/admin/dashboard" in all_routes
-    assert "/admin/dashboard" in all_routes
+    # Navigation structure is frontend-owned; the API returns statuses dict.
+    # Admin-only drawer routing is handled in navigationManifest.js.
+    assert "drawers" not in payload
+    assert isinstance(payload["statuses"], dict)
+    assert isinstance(payload["admin_links"], dict)
+    assert payload["admin_links"]["pages"] == "/admin/pages"
 
 
 
@@ -155,6 +144,10 @@ def test_wrapper_telemetry_endpoint_removed_after_wrapper_decommission():
 
 
 def test_navigation_drawer_and_page_order_deterministic_non_admin():
+    """Drawer order/membership is now owned by navigationManifest.js (frontend).
+
+    The backend status feed returns a stable dict; assert shape not order.
+    """
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
@@ -163,122 +156,104 @@ def test_navigation_drawer_and_page_order_deterministic_non_admin():
     assert response.status_code == 200
     payload = json.loads(response.data.decode("utf-8"))
 
-    drawer_ids = [drawer["id"] for drawer in payload["drawers"]]
-    assert drawer_ids == ["reports", "drawer-2", "drawer", "drawer-3", "eap-analysis"]
-
-    reports_routes = [page["route"] for page in payload["drawers"][0]["pages"]]
-    assert reports_routes == ["/wip-overview", "/hold-overview", "/resource", "/qc-gate"]
+    # API emits statuses dict, not a drawers list.
+    assert "drawers" not in payload
+    statuses = payload["statuses"]
+    assert isinstance(statuses, dict)
+    # All values are valid status tokens.
+    for route, status in statuses.items():
+        assert status in {"released", "dev"}, f"{route} has invalid status {status!r}"
 
 
 def test_navigation_contract_page_metadata_fields_present_and_typed():
+    """Top-level field contract for GET /api/portal/navigation after nav-config-to-code.
+
+    drawer/page metadata is now frontend-owned; backend emits the status feed shape.
+    """
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
 
     payload = json.loads(client.get("/api/portal/navigation").data.decode("utf-8"))
-    assert isinstance(payload["drawers"], list)
 
-    for drawer in payload["drawers"]:
-        assert isinstance(drawer["id"], str) and drawer["id"]
-        assert isinstance(drawer["name"], str) and drawer["name"]
-        assert isinstance(drawer["order"], int)
-        assert isinstance(drawer["admin_only"], bool)
-        assert isinstance(drawer["pages"], list)
+    # Required top-level keys.
+    assert "statuses" in payload
+    assert "is_admin" in payload
+    assert "admin_user" in payload
+    assert "admin_links" in payload
+    assert "features" in payload
+    assert "diagnostics" in payload
 
-        for page in drawer["pages"]:
-            assert isinstance(page["route"], str) and page["route"].startswith("/")
-            assert isinstance(page["name"], str) and page["name"]
-            assert page["status"] in {"released", "dev"}
-            assert isinstance(page["order"], int)
+    # drawers key MUST NOT appear in the response.
+    assert "drawers" not in payload
+
+    assert isinstance(payload["statuses"], dict)
+    assert isinstance(payload["is_admin"], bool)
+    assert isinstance(payload["admin_links"], dict)
+    assert isinstance(payload["features"], dict)
+    assert isinstance(payload["diagnostics"], dict)
+
+    # Each status value must be a valid token.
+    for route, status in payload["statuses"].items():
+        assert isinstance(route, str) and route.startswith("/")
+        assert status in {"released", "dev"}, f"{route}: unexpected status {status!r}"
 
 
 def test_navigation_duplicate_order_values_still_resolve_deterministically():
+    """Ordering is now frontend-owned (navigationManifest.js).
+
+    The backend returns statuses dict; assert the dict round-trips correctly
+    when get_navigation_config is patched to return a status map.
+    """
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
 
-    config = [
-        {
-            "id": "reports",
-            "name": "Reports",
-            "order": 1,
-            "admin_only": False,
-            "pages": [
-                {"route": "/qc-gate", "name": "QC", "status": "released", "order": 1},
-                {"route": "/resource", "name": "Resource", "status": "released", "order": 1},
-                {"route": "/wip-overview", "name": "WIP", "status": "released", "order": 1},
-            ],
-        },
-        {
-            "id": "tools",
-            "name": "Tools",
-            "order": 1,
-            "admin_only": False,
-            "pages": [
-                {"route": "/job-query", "name": "Job", "status": "released", "order": 1},
-            ],
-        },
-    ]
+    status_map = {
+        "/qc-gate": "released",
+        "/resource": "released",
+        "/wip-overview": "released",
+        "/job-query": "released",
+    }
 
-    with patch("mes_dashboard.app.get_navigation_config", return_value=config):
+    with patch("mes_dashboard.app.get_navigation_config", return_value=status_map):
         payload = json.loads(client.get("/api/portal/navigation").data.decode("utf-8"))
 
-    # Drawer tie breaks by name and page tie breaks by name.
-    assert [drawer["id"] for drawer in payload["drawers"]] == ["reports", "tools"]
-    assert [page["route"] for page in payload["drawers"][0]["pages"]] == ["/qc-gate", "/resource", "/wip-overview"]
+    assert "drawers" not in payload
+    assert payload["statuses"] == status_map
 
 
 def test_navigation_mixed_release_dev_visibility_admin_vs_non_admin():
+    """Status feed exposes all statuses regardless of admin state.
+
+    Visibility filtering (show/hide dev pages) is now a frontend concern.
+    Both admin and non-admin get the same statuses dict; the frontend
+    applies the visibility rule using navigationManifest.js.
+    """
     app = create_app("testing")
     app.config["TESTING"] = True
 
-    non_admin_client = app.test_client()
-    mixed_config = [
-        {
-            "id": "reports",
-            "name": "Reports",
-            "order": 1,
-            "admin_only": False,
-            "pages": [
-                {"route": "/wip-overview", "name": "WIP", "status": "released", "order": 1},
-                {"route": "/hold-overview", "name": "Hold", "status": "dev", "order": 2},
-            ],
-        }
-    ]
-    def fake_status(route: str):
-        if route == "/hold-overview":
-            return "dev"
-        if route == "/wip-overview":
-            return "released"
-        return None
+    status_map = {
+        "/wip-overview": "released",
+        "/hold-overview": "dev",
+    }
 
-    with (
-        patch("mes_dashboard.app.get_navigation_config", return_value=mixed_config),
-        patch("mes_dashboard.app.get_page_status", side_effect=fake_status),
-    ):
+    non_admin_client = app.test_client()
+    with patch("mes_dashboard.app.get_navigation_config", return_value=status_map):
         non_admin_resp = non_admin_client.get("/api/portal/navigation")
         assert non_admin_resp.status_code == 200
         non_admin_payload = json.loads(non_admin_resp.data.decode("utf-8"))
-        non_admin_routes = {
-            page["route"]
-            for drawer in non_admin_payload["drawers"]
-            for page in drawer["pages"]
-        }
-        assert "/wip-overview" in non_admin_routes
-        assert "/hold-overview" not in non_admin_routes
+        assert non_admin_payload["is_admin"] is False
+        # Backend returns the full status map; frontend applies visibility.
+        assert non_admin_payload["statuses"] == status_map
 
         admin_client = app.test_client()
         _login_as_admin(admin_client)
         admin_resp = admin_client.get("/api/portal/navigation")
         assert admin_resp.status_code == 200
         admin_payload = json.loads(admin_resp.data.decode("utf-8"))
-        admin_routes = {
-            page["route"]
-            for drawer in admin_payload["drawers"]
-            for page in drawer["pages"]
-        }
-        assert "/wip-overview" in admin_routes
-        assert "/hold-overview" in admin_routes
+        assert admin_payload["is_admin"] is True
+        assert admin_payload["statuses"] == status_map
 
 
 def test_portal_navigation_includes_admin_links_by_auth_state():
@@ -300,64 +275,44 @@ def test_portal_navigation_includes_admin_links_by_auth_state():
 
 
 def test_portal_navigation_emits_diagnostics_for_invalid_navigation_payload():
+    """Diagnostics field is present; validation moved to frontend manifest layer.
+
+    The backend status feed returns an empty diagnostics dict.
+    Structural validation of drawers/pages is navigationManifest.js concern.
+    """
     app = create_app("testing")
     app.config["TESTING"] = True
     client = app.test_client()
 
-    malformed = [
-        {"id": "", "name": "bad-drawer", "pages": []},
-        {
-            "id": "reports",
-            "name": "Reports",
-            "order": 1,
-            "admin_only": False,
-            "pages": [
-                {"route": "", "name": "invalid-route"},
-                {"route": "missing-leading-slash", "name": "invalid-route-2"},
-                "not-a-dict",
-            ],
-        },
-    ]
+    response = client.get("/api/portal/navigation")
 
-    with patch("mes_dashboard.app.get_navigation_config", return_value=malformed):
-        response = client.get("/api/portal/navigation")
+    assert response.status_code == 200
+    payload = json.loads(response.data.decode("utf-8"))
+    # diagnostics key must be present (shape contract).
+    assert "diagnostics" in payload
+    assert isinstance(payload["diagnostics"], dict)
+    # No drawers key in status-feed shape.
+    assert "drawers" not in payload
+
+
+def test_portal_navigation_logs_contract_mismatch_route():
+    """Contract-mismatch detection moved to frontend navigationManifest.js layer.
+
+    The backend status feed returns an empty diagnostics dict; no
+    contract_mismatch_routes key is emitted.
+    """
+    app = create_app("testing")
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    response = client.get("/api/portal/navigation")
 
     assert response.status_code == 200
     payload = json.loads(response.data.decode("utf-8"))
     diagnostics = payload["diagnostics"]
-    assert diagnostics["invalid_drawers"] >= 1
-    assert diagnostics["invalid_pages"] >= 2
-    assert payload["drawers"] == []
-
-
-def test_portal_navigation_logs_contract_mismatch_route():
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    client = app.test_client()
-
-    with (
-        patch("mes_dashboard.app._load_shell_route_contract_routes", return_value={"/wip-overview"}),
-        patch(
-            "mes_dashboard.app.get_navigation_config",
-            return_value=[
-                {
-                    "id": "reports",
-                    "name": "Reports",
-                    "order": 1,
-                    "admin_only": False,
-                    "pages": [
-                        {"route": "/wip-overview", "name": "WIP", "status": "released", "order": 1},
-                        {"route": "/resource", "name": "Resource", "status": "released", "order": 2},
-                    ],
-                }
-            ],
-        ),
-    ):
-        response = client.get("/api/portal/navigation")
-
-    assert response.status_code == 200
-    payload = json.loads(response.data.decode("utf-8"))
-    assert payload["diagnostics"]["contract_mismatch_routes"] == ["/resource"]
+    assert isinstance(diagnostics, dict)
+    # contract_mismatch_routes is no longer a backend concern.
+    assert "contract_mismatch_routes" not in diagnostics
 
 
 def test_wave_b_native_routes_are_reachable(monkeypatch):

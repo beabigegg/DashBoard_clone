@@ -29,10 +29,20 @@ def test_reject_history_native_loader_entry_exists():
 
 
 def test_reject_history_page_status_entry_exists():
-    payload = json.loads(PAGE_STATUS_FILE.read_text(encoding='utf-8'))
-    pages = payload.get('pages', [])
+    """page_status.json uses slim {api_public, statuses} format after nav-config-to-code.
 
-    entry = next((item for item in pages if item.get('route') == '/reject-history'), None)
-    assert entry is not None
-    assert entry.get('drawer_id')
-    assert isinstance(entry.get('order'), int)
+    Drawer membership moved to navigationManifest.js. The route is released
+    by default (absent from statuses dict = released, fail-safe).
+    """
+    payload = json.loads(PAGE_STATUS_FILE.read_text(encoding='utf-8'))
+
+    # New format: {api_public, statuses}
+    assert 'api_public' in payload, (
+        'page_status.json must have api_public key for auth bypass gate'
+    )
+    statuses = payload.get('statuses', {})
+    # /reject-history absent from statuses → released (fail-safe).
+    rh_status = statuses.get('/reject-history', 'released')
+    assert rh_status == 'released', (
+        f'/reject-history must not be blocked; got {rh_status!r}'
+    )
