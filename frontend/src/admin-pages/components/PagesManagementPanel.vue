@@ -1,38 +1,27 @@
 <script setup lang="ts">
-interface Drawer {
-  id: string;
-  name: string;
-}
+/**
+ * PagesManagementPanel — status-toggle only.
+ *
+ * Display name is joined from the manifest (passed in as `pages[].name`).
+ * Drawer assignment and order are now code-owned by navigationManifest.js
+ * and are NOT editable here.
+ */
 
 interface Page {
   route: string;
   name: string;
   status: 'released' | 'dev';
-  drawer_id: string | null;
-  order: number | null;
 }
 
-const props = defineProps<{ pages: Page[]; drawers: Drawer[] }>();
+const props = defineProps<{ pages: Page[] }>();
 
 const emit = defineEmits<{
-  update: [route: string, payload: Partial<Page>];
+  update: [route: string, payload: { status: 'released' | 'dev' }];
 }>();
 
 function toggleStatus(page: Page): void {
   const nextStatus: 'released' | 'dev' = page.status === 'released' ? 'dev' : 'released';
   emit('update', page.route, { status: nextStatus });
-}
-
-function changeDrawer(page: Page, event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  const drawerId = select.value || null;
-  emit('update', page.route, { drawer_id: drawerId });
-}
-
-function changeOrder(page: Page, event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const value = input.value.trim();
-  emit('update', page.route, { order: value === '' ? null : Number(value) });
 }
 </script>
 
@@ -44,13 +33,11 @@ function changeOrder(page: Page, event: Event): void {
           <th>路由</th>
           <th>名稱</th>
           <th>狀態</th>
-          <th>抽屜歸屬</th>
-          <th>排序</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="pages.length === 0">
-          <td colspan="5" class="empty-state">尚無頁面設定</td>
+          <td colspan="3" class="empty-state">尚無頁面設定</td>
         </tr>
         <tr v-for="page in pages" :key="page.route">
           <td class="route-cell">{{ page.route }}</td>
@@ -64,28 +51,6 @@ function changeOrder(page: Page, event: Event): void {
             >
               {{ page.status === 'released' ? 'Released' : 'Dev' }}
             </button>
-          </td>
-          <td>
-            <select
-              class="input"
-              :value="page.drawer_id ?? ''"
-              @change="changeDrawer(page, $event)"
-            >
-              <option value="">未分類</option>
-              <option v-for="drawer in drawers" :key="drawer.id" :value="drawer.id">
-                {{ drawer.name }}
-              </option>
-            </select>
-          </td>
-          <td>
-            <input
-              class="input order-input"
-              type="number"
-              min="1"
-              :value="page.order ?? ''"
-              placeholder="未設定"
-              @change="changeOrder(page, $event)"
-            />
           </td>
         </tr>
       </tbody>

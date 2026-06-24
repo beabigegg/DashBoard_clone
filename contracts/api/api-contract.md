@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.26.0
-last-changed: 2026-06-20
+schema-version: 1.27.0
+last-changed: 2026-06-24
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -219,11 +219,8 @@ breaking-change-policy: deprecate-2-minors
 | POST | /admin/api/worker/restart | admin | — | AckResponse | 403/500 | route tests |
 | GET | /admin/api/worker/status | admin | — | GenericSuccessResponse | 403/500 | route tests |
 | GET | /admin/api/user-usage-kpi | admin | ?start_date=&end_date=&department= | GenericSuccessResponse | 400/403 | route tests |
-| GET | /admin/api/pages | admin | — | GenericSuccessResponse | 403/500 | route tests |
-| GET | /admin/api/drawers | admin | — | GenericSuccessResponse | 403/500 | route tests |
-| POST | /admin/api/drawers | admin | JSON body | GenericSuccessResponse | 400/403 | route tests |
-| PUT | /admin/api/drawers/{drawer_id} | admin | JSON body | GenericSuccessResponse | 400/403/404 | route tests |
-| DELETE | /admin/api/drawers/{drawer_id} | admin | — | AckResponse | 403/404 | route tests |
+| GET | /admin/api/pages | admin | — | AdminPagesResponse | 403/500 | route tests |
+| PUT | /admin/api/pages/{route} | admin | JSON body {status} | AckResponse | 400/403/404 | route tests |
 | POST | /admin/api/analytics/recalculate | admin | — | AckResponse | 403/500 | route tests |
 | POST | /api/downtime-analysis/query | required | JSON body | DowntimeQueryResponse | 202/400/500 | route tests |
 | GET | /api/downtime-analysis/options | required | — | GenericSuccessResponse | 500 | route tests |
@@ -232,7 +229,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/event-detail | required | ?query_id= &page= &page_size= &big_category=(opt) &status_types=(opt,CSV) &resource_id=(opt) — **[DEPRECATED: removal target api 1.17.0]** | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/downtime-analysis/export-equipment-detail | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
 | GET | /api/downtime-analysis/export-event-detail | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
-| GET | /api/portal/navigation | required | — | GenericSuccessResponse | 500 | route tests |
+| GET | /api/portal/navigation | required | — | PortalNavigationResponse | 500 | route tests |
 | GET | /api/trace/seed/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
 | GET | /api/trace/seed/job/{job_id}/result | required | — | GenericSuccessResponse | 404/410 | route tests |
 | GET | /api/material-consumption/filter-options | required | — | GenericSuccessResponse | 500 | route tests |
@@ -451,8 +448,14 @@ breaking-change-policy: deprecate-2-minors
 
 Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprecate-2-minors 流程：先標記 deprecated，保留一個 minor 版本，再移除。
 
+
+## Compatibility Notes
+
+- **nav-config-to-code (2026-06-24):** BREAKING — 4 drawer endpoints removed (all return **404**): `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}`. `PUT /admin/api/pages/{route}` body narrows to `{status}` — `name`, `drawer_id`, `order` silently ignored, MUST NOT persist. `GET /admin/api/pages` response narrows to `{pages:[{route,status}]}` — `name`, `drawer_id`, `order` absent. `GET /api/portal/navigation` drops `drawers`, adds `statuses` (route → status map; absent route = released). Sole consumers `frontend/src/admin-pages/` + `portal-shell/` — monorepo atomic cutover, no deprecation window.
+
 ## CHANGELOG
 
+- **[api 1.27.0] — 2026-06-24 (nav-config-to-code):** Removed BREAKING: `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}` all return **404**. `name`/`drawer_id`/`order` removed from `GET /admin/api/pages` response body and `PUT /admin/api/pages` accepted body. Changed: `GET /api/portal/navigation` response drops `drawers`, adds `statuses` map; response schema renamed `GenericSuccessResponse` → `PortalNavigationResponse`. Added: `AdminPagesResponse` schema; `PUT /admin/api/pages/{route}` row. No deprecation window — monorepo atomic cutover.
 - **WIP detail async 202 routing (2026-06-20, wip-rq-worker-chunks-cleanup)**: `GET/POST /api/wip/detail/<workcenter>` now returns HTTP 202 + `{async: true, job_id, status_url}` when row count ≥ L3 (200,000) and RQ worker available. Sync 200 path is unchanged when row count < L3 or worker unavailable (fail-open). New spool namespace `wip_dataset` added to `/api/spool` whitelist. New schema `WipDetailJobAccepted`. Type B async; `prefix=wip-detail` for job status polling. Additive; no existing fields removed or renamed. Worker ships inert until `stress-soak-report.md` sign-off (see ci-gates.md §Promotion Policy).
 ## [api 1.25.0] — 2026-06-18
 ### Added
@@ -502,7 +505,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## Schemas
 
-> Typed response schemas for all 158 contract endpoints. Tier A = field table; Tier B = json-schema block. Referenced by `response schema` column above and resolved by `cdd-kit openapi export → contracts/openapi.json`.
+> Typed response schemas for all 155 contract endpoints (158 minus 4 drawer endpoints + 1 PUT /admin/api/pages/{route} = 155). Tier A = field table; Tier B = json-schema block. Referenced by `response schema` column above and resolved by `cdd-kit openapi export → contracts/openapi.json`.
 
 ### AckResponse
 
@@ -982,3 +985,58 @@ Tier-B — every `4xx`/`5xx` error envelope; see `contracts/api/error-format.md 
 | async | boolean | yes |  | 202 async branch indicator |
 | job_id | string | yes |  | RQ job identifier |
 | status_url | string | yes |  | polling URL; prefix=wip-detail |
+
+### AdminPagesResponse
+
+Tier-B — slim page-status list returned by `GET /admin/api/pages`.
+
+```json-schema
+{
+  "type": "object",
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "route":  {"type": "string"},
+              "status": {"type": "string", "enum": ["released", "dev"]}
+            },
+            "required": ["route", "status"]
+          }
+        }
+      },
+      "required": ["pages"]
+    },
+    "meta": {"type": "object"}
+  },
+  "required": ["success", "data"]
+}
+```
+
+### PortalNavigationResponse
+
+Tier-B — status feed returned by `GET /api/portal/navigation` (no drawers; structure lives in the frontend manifest).
+
+```json-schema
+{
+  "type": "object",
+  "properties": {
+    "statuses": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "enum": ["released", "dev"]},
+      "description": "Map of route → status; absent route defaults to released"
+    },
+    "is_admin":    {"type": "boolean"},
+    "admin_user":  {"oneOf": [{"type": "object"}, {"type": "null"}]},
+    "admin_links": {"type": "object"},
+    "features":    {"type": "object"},
+    "diagnostics": {"type": "object"}
+  },
+  "required": ["statuses", "is_admin", "admin_links", "features", "diagnostics"]
+}
+```

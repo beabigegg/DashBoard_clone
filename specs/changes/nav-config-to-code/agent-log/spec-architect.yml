@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0012-navigation-source-of-truth-code-manifest.md" }
+  - { type: affected-areas, pointer: "portal-shell nav pipeline, admin-pages UI, admin_routes, page_registry, page_status.json, app.py portal_navigation_config" }
+  - { type: decision-summary, pointer: "structure → frontend navigationManifest.js; status-only runtime store; merge moves client-side; /api/portal/navigation inverted to status feed" }
+  - { type: risks-noted, pointer: "0 high, 4 medium (CER-003 app.py out of scope; AC-1 is client-side nav-tree diff; orphaned server-side diagnostics; api_public must not be dropped on shrink)" }

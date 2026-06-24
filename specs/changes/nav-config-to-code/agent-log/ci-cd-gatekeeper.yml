@@ -1,0 +1,16 @@
+change-id: nav-config-to-code
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-24T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1 (playwright-critical-journeys command extended; openapi-sync added as required)" }
+  - { type: gate-promotions, pointer: "n/a (no tier promotions; all gates ride existing tiers)" }
+  - { type: workflow-files-changed, pointer: "contract-driven-gates.yml — playwright-critical-journeys run command: append admin-pages.spec.ts + portal-shell-login.spec.ts" }
+  - { type: required-status-checks, pointer: "response-shape-validate, unit-mock-integration, frontend-unit, playwright-critical-journeys, openapi-sync" }
+next-action: none
+notes: >
+  ci-gates.md written from scratch (replaced placeholder template).
+  contracts/ci/ci-gate-contract.md: (1) nav-config-to-code compatibility note inserted before ## Rollback Policy;
+  (2) material-part-consumption stale deploy step 5 and rollback step 2 annotated with Update supersession;
+  (3) schema-version bumped 1.3.33 → 1.3.34; (4) CHANGELOG entry [ci 1.3.34] prepended.
+  No new gate tiers or workflow files. playwright-critical-journeys command is the only workflow-level edit required.

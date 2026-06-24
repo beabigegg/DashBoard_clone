@@ -1,0 +1,45 @@
+agent: frontend-engineer
+change-id: nav-config-to-code
+date: 2026-06-24
+
+summary: >
+  Implemented the frontend half of nav-config-to-code.
+  Created navigationManifest.js (structure SOT per §3.11b), rewired
+  navigationState.js/App.vue/router.js to merge (manifest, statusMap)
+  client-side, deleted DrawerManagementPanel.vue, slimmed admin-pages/
+  to status-toggle only, and authored all required frontend tests.
+
+manifest-parity-confirmation: >
+  buildDynamicNavigationState(statusMap, { isAdmin }) produces the
+  baseline menu from current-behavior.md exactly:
+    non-admin: 5 drawers (reports/history-reports/query-tools/trace-tools/eap-analysis),
+    admin: 6 drawers (+dev-tools), /admin/dashboard visible only for admin.
+  Verified by new parity unit tests in portal-shell-navigation.test.js
+  (test_manifest_nav_tree_non_admin_matches_baseline,
+   test_manifest_nav_tree_admin_matches_baseline) — both pass.
+
+vitest-result: "57 test files, 613 passed | 2 skipped — 0 failures"
+type-check-result: "vue-tsc --noEmit — 0 errors"
+legacy-test-result: "fail 0 — all portal-shell-navigation parity tests pass"
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/portal-shell/navigationManifest.js" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/navigationManifest.d.ts" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/navigationState.js" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/App.vue" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/router.js" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/App.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/components/PagesManagementPanel.vue" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/__tests__/navigationManifest.test.ts" }
+  - { type: files-changed, pointer: "frontend/tests/legacy/portal-shell-navigation.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/legacy/portal-shell-app-contract.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/admin-pages.spec.ts" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/portal-shell-login.spec.ts" }
+  - { type: components-affected, pointer: "navigationManifest, navigationState, App.vue (portal-shell), router.js, admin-pages/App.vue, PagesManagementPanel" }
+  - { type: screenshot-paths, pointer: "n/a (structural parity test; no visual screenshot required)" }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements added)" }
+
+files-deleted:
+  - frontend/src/admin-pages/components/DrawerManagementPanel.vue
+
+blockers: none

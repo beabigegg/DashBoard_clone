@@ -148,7 +148,10 @@ async function loadNavigation() {
     adminUser.value = payload.admin_user || null;
     adminLinks.value = payload.admin_links || adminLinks.value;
     aiEnabled.value = Boolean(payload.features?.ai_query_enabled);
-    const state = syncNavigationRoutes(payload.drawers, {
+    const statusMap = (payload.statuses && typeof payload.statuses === 'object')
+      ? payload.statuses
+      : {};
+    const state = syncNavigationRoutes(statusMap, {
       isAdmin: isAdmin.value,
       includeStandaloneDrilldown: true,
     });
@@ -191,7 +194,7 @@ async function loadNavigation() {
       logout: null,
       dashboard: '/admin/dashboard',
     };
-    syncNavigationRoutes([]);
+    syncNavigationRoutes({}, { isAdmin: false, includeStandaloneDrilldown: false });
   } finally {
     loading.value = false;
   }

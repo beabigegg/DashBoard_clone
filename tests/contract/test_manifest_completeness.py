@@ -4,7 +4,7 @@
 Tests that:
 - Every key in response-samples.json maps to a valid endpoint key format.
 - All sample file paths referenced in the manifest exist on disk.
-- Manifest has >= 158 entries.
+- Manifest has >= 154 entries (nav-config-to-code: 4 drawer endpoints removed).
 """
 from __future__ import annotations
 
@@ -36,11 +36,11 @@ class TestManifestCompleteness:
             "Run: python tests/contract/capture_samples.py"
         )
 
-    def test_manifest_has_at_least_158_entries(self):
-        """Manifest must have >= 158 entries."""
+    def test_manifest_has_at_least_154_entries(self):
+        """Manifest must have >= 154 entries (nav-config-to-code: 4 drawer endpoints removed)."""
         manifest = _load_manifest()
-        assert len(manifest) >= 158, (
-            f"Expected >= 158 manifest entries, found {len(manifest)}"
+        assert len(manifest) >= 154, (
+            f"Expected >= 154 manifest entries, found {len(manifest)} (nav-config-to-code: 4 drawer entries removed)"
         )
 
     def test_manifest_keys_match_known_endpoints(self):

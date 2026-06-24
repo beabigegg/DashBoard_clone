@@ -255,12 +255,12 @@ class PostForkHookTests(unittest.TestCase):
             os.environ.pop("FLASK_TESTING", None)
 
     def test_api_contracts_unchanged_after_preload(self):
-        """Smoke test: the preload_app refactor must not change any API response shape (AC-10).
+        """Smoke test: portal_navigation_config must return status-feed shape (nav-config-to-code).
 
         Hits /api/portal/navigation (cheap, no Oracle required) and verifies the
-        documented response shape: {drawers: [...], is_admin: bool, ...}.
-        This endpoint returns a custom dict (not wrapped in success_response),
-        which is the contract established before this change.
+        new status-feed shape: {statuses: {...}, is_admin: bool, admin_links, features, diagnostics}.
+        The old 'drawers' key is removed; 'statuses' is the new top-level key.
+        This endpoint returns a custom dict (not wrapped in success_response).
         """
         app = create_app("testing")
         client = app.test_client()
@@ -270,12 +270,20 @@ class PostForkHookTests(unittest.TestCase):
         if response.status_code == 200:
             body = response.get_json()
             self.assertIsNotNone(body, "Response body is not JSON")
-            # These keys are the documented shape from the API contract.
-            for key in ("drawers", "is_admin"):
+            # These keys are the documented shape from the new contract (PortalNavigationResponse).
+            for key in ("statuses", "is_admin", "admin_links", "features", "diagnostics"):
                 self.assertIn(
                     key, body,
-                    f"Navigation response missing key '{key}' — API shape has drifted after preload refactor",
+                    f"Navigation response missing key '{key}' — API shape has drifted from nav-config-to-code contract",
                 )
+            # 'drawers' must NOT be present (removed by nav-config-to-code).
+            self.assertNotIn(
+                "drawers", body,
+                "Navigation response still emits 'drawers' — nav-config-to-code inversion not applied",
+            )
+            # statuses must be a dict (route → released|dev).
+            self.assertIsInstance(body["statuses"], dict,
+                                  "statuses must be a dict (route → status)")
 
 
 if __name__ == "__main__":

@@ -146,3 +146,66 @@ test('test_successful_login_redirects_away_from_login', async ({ page }) => {
   await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 15_000 });
   expect(page.url()).not.toContain('/login');
 });
+
+// ---------------------------------------------------------------------------
+// AC-1: non-admin sidebar drawers match baseline (nav-config-to-code)
+// ---------------------------------------------------------------------------
+
+test('test_non_admin_sidebar_drawers_match_baseline', async ({ page }) => {
+  /**
+   * After a successful login as a non-admin user, the portal-shell renders
+   * the sidebar with drawers from the manifest.
+   *
+   * Expected non-admin drawers (from current-behavior.md):
+   *   1. 即時報表 (reports)
+   *   2. 歷史報表 (history-reports)
+   *   3. 查詢工具 (query-tools)
+   *   4. 追溯工具 (trace-tools)
+   *   5. EAP (eap-analysis)
+   *
+   * dev-tools (開發工具) must NOT appear for non-admins.
+   */
+  await page.route('**/*', (route) => route.continue());
+
+  await page.route('**/api/auth/me**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { username: 'engineer', role: 'user', is_admin: false } }),
+    }),
+  );
+
+  // Status-feed shape: empty statuses → all pages use manifest defaultStatus (released)
+  await page.route('**/api/portal/navigation**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        statuses: {},
+        is_admin: false,
+        admin_user: null,
+        admin_links: { logout: '/api/auth/logout' },
+        features: { ai_query_enabled: false },
+        diagnostics: {},
+      }),
+    }),
+  );
+
+  await page.goto(SHELL_URL, { timeout: 30_000 }).catch(() => {});
+  // Wait for sidebar to render
+  await page.waitForSelector('.sidebar', { timeout: 20_000 });
+  await page.waitForSelector('.drawer', { timeout: 10_000 });
+
+  // Collect all drawer titles rendered in the sidebar
+  const drawerTitles = await page.locator('.drawer-title').allTextContents();
+
+  // Expected names from current-behavior.md (non-admin view, dev-tools excluded)
+  expect(drawerTitles).toContain('即時報表');
+  expect(drawerTitles).toContain('歷史報表');
+  expect(drawerTitles).toContain('查詢工具');
+  expect(drawerTitles).toContain('追溯工具');
+  expect(drawerTitles).toContain('EAP');
+
+  // dev-tools must NOT appear for non-admin
+  expect(drawerTitles).not.toContain('開發工具');
+});

@@ -1,0 +1,15 @@
+{
+  "change_id": "nav-config-to-code",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- --reporter=verbose 2>&1 | tail -5",
+  "duration_ms": 12889,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/nav-config-to-code/test-runs/20260624-121520/summary.json",
+    "stdout": "specs/changes/nav-config-to-code/test-runs/20260624-121520/stdout.log",
+    "stderr": "specs/changes/nav-config-to-code/test-runs/20260624-121520/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

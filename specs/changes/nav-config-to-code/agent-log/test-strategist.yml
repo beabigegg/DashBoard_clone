@@ -1,0 +1,8 @@
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/nav-config-to-code/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/portal-shell-navigation.test.js → frontend/src/portal-shell/navigationManifest.js" }
+  - { type: tdd-pairs, pointer: "frontend/src/portal-shell/__tests__/navigationManifest.test.js → frontend/src/portal-shell/navigationManifest.js" }
+  - { type: tdd-pairs, pointer: "tests/test_page_registry.py::TestShrunkStoreBackCompat → src/mes_dashboard/services/page_registry.py" }
+  - { type: tdd-pairs, pointer: "tests/test_admin_routes.py (drawer 404 replacements) → src/mes_dashboard/routes/admin_routes.py" }
+  - { type: coverage-tiers, pointer: "unit (JS + Python), integration, contract, e2e, data-boundary" }
+  - { type: mapping-completeness, pointer: "all AC-1..AC-8 covered; CER-003-blocked app.py shape test explicitly deferred" }

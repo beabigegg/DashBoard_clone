@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/test_page_registry.py tests/test_admin_routes.py -v

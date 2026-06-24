@@ -8,6 +8,24 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.27.0] — 2026-06-24
+### Removed (BREAKING)
+- nav-config-to-code: 4 drawer endpoints → all **404**: `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}`. `name`/`drawer_id`/`order` removed from `GET /admin/api/pages` response body and `PUT /admin/api/pages/{route}` accepted body. No deprecation window — monorepo atomic cutover. Sole consumers `frontend/src/admin-pages/` + `portal-shell/`.
+### Changed
+- nav-config-to-code: `GET /api/portal/navigation` response drops `drawers`; adds `statuses` (route → status map; absent route defaults to `released`). Response schema renamed from `GenericSuccessResponse` to `PortalNavigationResponse`.
+### Added
+- nav-config-to-code: New schema `AdminPagesResponse` (slim pages list). New endpoint row `PUT /admin/api/pages/{route}` formally documented. New schemas `AdminPagesResponse` and `PortalNavigationResponse` in `## Schemas`.
+
+## [data 1.24.0] — 2026-06-24
+### Changed (BREAKING)
+- nav-config-to-code: `data/page_status.json` shape → `{api_public, statuses}`. `api_public` preserved (auth bypass gate). REMOVED keys: `pages`, `drawers`, `db_scan`. Back-compat read: legacy full-CMS file yields correct statuses; no error; no forced rewrite.
+### Added
+- nav-config-to-code: §3.11a (Writable Page-Status Store), §3.11b (Navigation Manifest — frontend code-owned SOT for drawer structure + page placement), §2.10 (slimmed `GET /admin/api/pages` payload), §2.11 (`GET /api/portal/navigation` status feed payload).
+
+## [ci 1.3.34] — 2026-06-24
+### Changed
+- nav-config-to-code: Retire 4 drawer contract samples (`get_admin_drawers`, `post_admin_drawers`, `put_admin_drawers_id`, `delete_admin_drawers_id`) and their `response-samples.json` entries. Regenerate `get_admin_pages.json` (slim route+status), `get_portal_navigation.json` (statuses map, no drawers). Response-samples.json schema refs updated: `GET /admin/api/pages` → `AdminPagesResponse`; `GET /api/portal/navigation` → `PortalNavigationResponse`.
+
 ## [api 1.26.0] — 2026-06-20
 ### Added
 - wip-rq-worker-chunks-cleanup: WIP detail async 202 routing now active when row count ≥ L3 (200,000) and RQ worker available. `GET/POST /api/wip/detail/<workcenter>` error codes updated from 400/500 to 202/400/500. New spool namespace `wip_dataset` added to `/api/spool` whitelist. New schema `WipDetailJobAccepted` (async: bool, job_id: str, status_url: str). `wip_routes.py` added to Section 7 Type B async list. Section 10 compat note added. Additive; no existing fields removed or renamed. Worker ships inert until stress-soak-report.md sign-off.

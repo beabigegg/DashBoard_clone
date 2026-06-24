@@ -1106,8 +1106,15 @@ def create_app(config_name: str | None = None) -> Flask:
 
     @app.route('/api/portal/navigation', methods=['GET'])
     def portal_navigation_config():
-        """Return effective drawer/page navigation config for current user."""
-        nav_logger = logging.getLogger("mes_dashboard.portal_navigation")
+        """Return status feed + auth context for portal-shell navigation bootstrap.
+
+        After nav-config-to-code: structure (drawers/names/order) lives in the
+        frontend navigationManifest.js. This endpoint returns only:
+          - statuses: route → released|dev (absent route → released)
+          - is_admin, admin_user, admin_links (auth-derived; stays server-authoritative)
+          - features, diagnostics
+        The frontend merges (manifest, statuses) client-side via buildDynamicNavigationState.
+        """
         admin = is_admin_logged_in()
         admin_user_payload = None
         if is_user_logged_in():
@@ -1118,115 +1125,15 @@ def create_app(config_name: str | None = None) -> Flask:
                 "mail": raw_user.get("mail"),
                 "department": raw_user.get("department"),
             }
-        source = get_navigation_config()
-        drawers: list[dict] = []
-        shell_contract_routes = _load_shell_route_contract_routes()
-        deferred_routes = _load_shell_deferred_routes()
-        diagnostics: dict[str, object] = {
-            "filtered_drawers": 0,
-            "filtered_pages": 0,
-            "invalid_drawers": 0,
-            "invalid_pages": 0,
-            "contract_mismatch_routes": [],
-        }
-        mismatch_routes: set[str] = set()
 
-        for drawer_index, drawer in enumerate(source):
-            drawer_id = str(drawer.get("id") or "").strip()
-            if not drawer_id:
-                diagnostics["invalid_drawers"] = int(diagnostics["invalid_drawers"]) + 1
-                nav_logger.warning(
-                    "Skipping navigation drawer with missing id at index=%s",
-                    drawer_index,
-                )
-                continue
-
-            admin_only = bool(drawer.get("admin_only", False))
-            if admin_only and not admin:
-                diagnostics["filtered_drawers"] = int(diagnostics["filtered_drawers"]) + 1
-                continue
-
-            raw_pages = drawer.get("pages", [])
-            if not isinstance(raw_pages, list):
-                diagnostics["invalid_drawers"] = int(diagnostics["invalid_drawers"]) + 1
-                nav_logger.warning(
-                    "Skipping navigation drawer with invalid pages payload: drawer_id=%s type=%s",
-                    drawer_id,
-                    type(raw_pages).__name__,
-                )
-                continue
-
-            pages: list[dict] = []
-            for page_index, page in enumerate(raw_pages):
-                if not isinstance(page, dict):
-                    diagnostics["invalid_pages"] = int(diagnostics["invalid_pages"]) + 1
-                    nav_logger.warning(
-                        "Skipping invalid page payload under drawer_id=%s index=%s type=%s",
-                        drawer_id,
-                        page_index,
-                        type(page).__name__,
-                    )
-                    continue
-
-                route = str(page.get("route") or "").strip()
-                if not route or not route.startswith("/"):
-                    diagnostics["invalid_pages"] = int(diagnostics["invalid_pages"]) + 1
-                    nav_logger.warning(
-                        "Skipping page with invalid route: drawer_id=%s route=%s",
-                        drawer_id,
-                        route,
-                    )
-                    continue
-
-                if not _can_view_page_for_user(route, is_admin=admin):
-                    diagnostics["filtered_pages"] = int(diagnostics["filtered_pages"]) + 1
-                    continue
-
-                if shell_contract_routes and route not in shell_contract_routes and route not in deferred_routes:
-                    mismatch_routes.add(route)
-                    nav_logger.warning(
-                        "Navigation route missing shell contract: drawer_id=%s route=%s",
-                        drawer_id,
-                        route,
-                    )
-
-                pages.append(
-                    {
-                        "route": route,
-                        "name": page.get("name") or route,
-                        "status": page.get("status", "dev"),
-                        "order": _safe_order(page.get("order")),
-                    }
-                )
-
-            if not pages:
-                continue
-            pages = sorted(
-                pages,
-                key=lambda p: (_safe_order(p.get("order")), str(p.get("name") or p.get("route") or "")),
-            )
-
-            drawers.append(
-                {
-                    "id": drawer_id,
-                    "name": drawer.get("name"),
-                    "order": _safe_order(drawer.get("order")),
-                    "admin_only": admin_only,
-                    "pages": pages,
-                }
-            )
-        drawers = sorted(
-            drawers,
-            key=lambda d: (_safe_order(d.get("order")), str(d.get("name") or d.get("id") or "")),
-        )
-        diagnostics["contract_mismatch_routes"] = sorted(mismatch_routes)
+        statuses = get_navigation_config()  # returns dict {route: status}
 
         _ai_enabled = os.getenv("AI_QUERY_ENABLED", "false").strip().lower() in {
             "1", "true", "yes", "on"
         }
         return jsonify(
             {
-                "drawers": drawers,
+                "statuses": statuses,
                 "is_admin": admin,
                 "admin_user": admin_user_payload,
                 "admin_links": {
@@ -1235,8 +1142,7 @@ def create_app(config_name: str | None = None) -> Flask:
                     "dashboard": "/admin/dashboard" if admin else None,
                     "performance": "/admin/performance" if admin else None,
                 },
-                "diagnostics": diagnostics,
-                "portal_spa_enabled": bool(app.config.get("PORTAL_SPA_ENABLED", False)),
+                "diagnostics": {},
                 "features": {
                     "ai_query_enabled": _ai_enabled,
                 },

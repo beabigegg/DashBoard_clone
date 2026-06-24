@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.33
-last-changed: 2026-06-20
+schema-version: 1.3.34
+last-changed: 2026-06-24
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -272,11 +272,11 @@ Promote from informational to required after ALL of:
 2. Verify Admin Dashboard `/admin/api/worker/status` shows `material-consumption` queue with ≥ 1 worker.
 3. Verify `docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json` includes `/material-consumption` → dist asset. Missing entry crashes gunicorn via `_validate_in_scope_asset_readiness()`.
 4. Verify `docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json` classifies `/material-consumption` as in-scope.
-5. Verify `data/page_status.json` includes `/material-consumption` page object in drawer-2.
+5. Verify `data/page_status.json` includes `/material-consumption` page object in drawer-2. **Update (nav-config-to-code):** This step is superseded. After nav-config-to-code lands, the store no longer has a `pages` array or drawer assignments — it is a slim `{route:status}` map. `/material-consumption` now appears in the rendered menu via its entry in `navigationManifest.js` (code-owned), not via a `page_status.json` object. Verify navigation by checking the manifest entry, not the store.
 
 **Rollback checklist** (complete before gunicorn restart):
 1. Remove `/material-consumption` entry from `asset_readiness_manifest.json` BEFORE restart — stale entry with no dist asset crashes gunicorn.
-2. Remove `/material-consumption` entry from `data/page_status.json` — stale entry emits "缺少 route contract: /material-consumption" in sidebar.
+2. Remove `/material-consumption` entry from `data/page_status.json` — stale entry emits "缺少 route contract: /material-consumption" in sidebar. **Update (nav-config-to-code):** This rollback item no longer applies after nav-config-to-code lands. The shrunk store has no `pages` array; `/material-consumption` presence in the menu is controlled by its `navigationManifest.js` code entry, not by a `page_status.json` object. If rolling back `material-part-consumption` after nav-config-to-code is already merged, remove the manifest entry instead of editing `page_status.json`. The other rollback steps (steps 1, 3, 4) are unchanged.
 3. Run `rm -f tmp/query_spool/material_consumption/*.parquet` — spool files become orphaned after rollback (parquet schema is breaking-change surface per data-shape-contract.md §3.9).
 4. Disable + stop the `material-consumption` worker systemd unit and watchdog.
 
@@ -478,6 +478,53 @@ Bumping `SCHEMA_VERSION` in `downtime_analysis_cache.py` also orphans live raw p
 
 **Schema-version bump to 1.3.30 (patch)**: gate-compatibility note added; no gate tier, command, or status changed.
 
+## nav-config-to-code Gate Compatibility Note
+
+**Breaking API removal (drawer CRUD) + data-shape change (`page_status.json` → route→status map) + frontend nav refactor (new `navigationManifest.js`, `/api/portal/navigation` inverted to a status feed).**
+
+### Contract Sample Changes
+
+**Retire** the following samples and remove their entries from `tests/contract/response-samples.json` before `response-shape-validate` runs:
+- `tests/contract/samples/get_admin_drawers.json` (`GET /admin/api/drawers`)
+- `tests/contract/samples/delete_admin_drawers_id.json` (`DELETE /admin/api/drawers/{drawer_id}`)
+- `tests/contract/samples/post_admin_drawers.json` (`POST /admin/api/drawers`)
+- `tests/contract/samples/put_admin_drawers_id.json` (`PUT /admin/api/drawers/{drawer_id}`)
+
+**Regenerate** the following samples to reflect the new shapes:
+- `tests/contract/samples/get_admin_pages.json` — slimmed response: `{pages:[{route,status}]}` (no `drawer_id`, `name`, or `order`).
+- `tests/contract/samples/get_portal_navigation.json` — statuses map + auth payload: `{statuses:{"/route":"released"|"dev",…},is_admin,admin_user,admin_links,features,diagnostics}` — **no `drawers` key**.
+
+### Gate Tier / Command Impact
+
+No new gate tier or command. All new and updated tests fall within existing gate commands:
+- `response-shape-validate` (Tier 1) — validates regenerated samples and confirms retired entries are absent.
+- `unit-mock-integration` (Tier 1) — auto-discovers new `test_page_registry.py` back-compat/shrunk-store tests and updated `test_admin_routes.py` drawer-404 assertions.
+- `frontend-unit` (Tier 1) — auto-discovers new `navigationManifest.test.js` and extended `portal-shell-navigation.test.js`.
+- `playwright-critical-journeys` (Tier 1) — `tests/playwright/admin-pages.spec.ts` and `tests/playwright/portal-shell-login.spec.ts` appended to the gate command (see ci-gates.md §Workflow Changes Applied).
+- `openapi-sync` (Tier 1) — both `contracts/openapi.json` and `contracts/api/openapi.json` must be regenerated drawer-path-free.
+- `nightly-integration` (Tier 3) — informational for this change; auto-picks up any `integration_real` tests added by backend-engineer.
+
+### Deploy Checklist
+
+Verify the following before serving traffic:
+1. Shrink `data/page_status.json` to the `{route:status}` map form (absence defaults to `released`). Preserve the `api_public` key — `is_api_public()` reads it and the shrunk store must carry it or the service must source it from code defaults.
+2. Verify `GET /admin/api/pages` returns `{pages:[{route,status}]}` only — no `drawer_id`, `name`, or `order` fields.
+3. Verify `GET /api/portal/navigation` returns a `statuses` map and no `drawers` key.
+4. Verify admin status-toggle round-trip: toggle a page to `dev`, reload nav, page absent from non-admin menu; toggle back to `released`, page reappears.
+5. No parquet, Redis, or RQ worker ops required — this change has no async job or spool surface.
+
+### Rollback Checklist
+
+1. `git revert <merge-commit>` restores all removed endpoints and the full `page_status.json` read/write path.
+2. `data/page_status.json` self-heals: the restored `_migrate_navigation_schema` rebuilds the `drawers` array from `DEFAULT_DRAWERS` on first post-rollback load. No manual data repair required.
+3. For exact pre-change drawer ids, run `git checkout data/page_status.json` after revert.
+4. No parquet cleanup, no `redis-cli DEL`, no worker stop/start required.
+5. Contract samples (`get_admin_drawers.json`, `delete_admin_drawers_id.json`, `post_admin_drawers.json`, `put_admin_drawers_id.json`) are restored automatically by the code revert (git-tracked).
+
+**No new gate tier or command**: no new workflow file required.
+
+**Schema-version bump to 1.3.34 (patch)**: additive gate-compatibility note for nav-config-to-code. No gate tier, command, or status changed.
+
 ## Rollback Policy
 
 - 任何 Tier 1 gate 變紅後 main branch 不得合入新 PR，直到修復。
@@ -644,6 +691,9 @@ gate tier, command, or status changed.
 **Schema-version bump to 1.3.32 (patch)**: additive gate-compatibility note for cross-worker semaphore wiring. No gate tier, command, or status changed.
 
 ## CHANGELOG
+
+## [ci 1.3.34] — 2026-06-24
+- nav-config-to-code: Gate-compatibility note for breaking drawer CRUD removal, `page_status.json` → route→status map shrink, and `navigationManifest.js` frontend refactor. Sample retire/regen instructions (`get_admin_drawers.json`, `delete_admin_drawers_id.json`, `post_admin_drawers.json`, `put_admin_drawers_id.json` retired; `get_admin_pages.json` and `get_portal_navigation.json` regenerated). Deploy/rollback checklist (no parquet/Redis/RQ ops). `playwright-critical-journeys` gate command extended with `admin-pages.spec.ts` and `portal-shell-login.spec.ts`. Stale `material-part-consumption` deploy step 5 and rollback step 2 annotated with Update supersession. No new workflow file or gate tier. Additive; no existing gates changed.
 
 ## [ci 1.3.33] — 2026-06-20
 - wip-rq-worker-chunks-cleanup: Gate-compatibility note for new `"wip-detail"` RQ worker + `merge_chunks` dead-code removal. Tier-1 unit assertions (job-registry count bump, `wip_dataset` spool-namespace param, slot acquire/release wiring, merge_chunks AST-absence, env-var defaults). Tier-3 integration (`test_wip_worker_integration.py`, `integration_real` marker). Tier-4 stress (`test_wip_worker_stress.py`). `stress-soak-report.md` required before production activation (single Oracle connection per slot — not the 2-conn resource-worker case). No routing flag introduced (D1); activation = `app.py` import line + deployed worker unit. No new workflow file or gate tier. Additive; no existing gates changed.

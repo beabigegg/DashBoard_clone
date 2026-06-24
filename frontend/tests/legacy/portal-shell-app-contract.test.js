@@ -28,5 +28,6 @@ test('portal shell app keeps fallback notice and route sync wiring', () => {
 
   assert.doesNotMatch(source, /class="mode-badge"/);
   assert.match(source, /consumeNavigationNotice/);
-  assert.match(source, /syncNavigationRoutes\(payload\.drawers/);
+  // nav-config-to-code: App.vue now passes statusMap (from payload.statuses) not payload.drawers
+  assert.match(source, /syncNavigationRoutes\(statusMap/);
 });
