@@ -1,0 +1,17 @@
+- type: tier-floor-override
+  change-id: legacy-portal-admin-cleanup
+  timestamp: '2026-06-24T06:45:09.264Z'
+  declared-tier: 3
+  floor-tier: 2
+  label: behavioral surface (api / data shape / queue / cache / external integration)
+  matched:
+    - index
+    - integration
+    - route
+  reason: >-
+    Tier-3 confirmed by classifier + qa-reviewer: low-risk, module-level cleanup. Floor scanner
+    matches (index / integration / route) are false positives — 'index' = the portal_index function
+    name, 'integration' = the test_template_integration.py filename, 'route' = route names — NOT an
+    api / data-shape / queue / cache / external-integration surface. portal_index still returns 200
+    (redirect to the SPA); contract-reviewer confirmed ZERO contract changes; no data / queue /
+    cache / external integration is touched.

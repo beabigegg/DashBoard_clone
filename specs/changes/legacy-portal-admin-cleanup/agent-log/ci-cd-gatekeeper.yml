@@ -1,0 +1,5 @@
+artifacts:
+  - { type: tiers-modified, pointer: "1 (existing gates exercised); 3 (nightly-integration, informational, unchanged)" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: "none — no workflow file modified" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, frontend-unit-tests, css:check, e2e-critical, released-pages-hardening" }

@@ -1,0 +1,48 @@
+agent: backend-engineer
+change-id: legacy-portal-admin-cleanup
+date: 2026-06-24
+status: complete
+
+summary: >
+  Implemented IP-1..IP-5. Collapsed portal_index to unconditional SPA redirect,
+  deleted portal.html, hard-deleted 7 portal-render tests (4 from
+  test_template_integration.py + 1 portal_shell_routes + 1 hold_routes + 1
+  yield_alert_shell_coverage), updated test_portal_spa_flag_disabled_via_env to
+  assert redirect behavior instead of portal.html content, added 3 new tests to
+  test_app_factory.py (route-name pin + unconditional-redirect in test_routes_registered,
+  test_status_payload_exposes_portal_spa_enabled, test_portal_html_template_deleted,
+  test_no_portal_html_reference_in_app_source). Full suite: 4881 passed / 277 skipped /
+  0 failed. Bounded ladder (collect/targeted/changed-area) all pass.
+
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/app.py:1055-1058" }
+  - { type: files-changed, pointer: "src/mes_dashboard/templates/portal.html (deleted)" }
+  - { type: files-changed, pointer: "tests/test_template_integration.py (deleted 4 tests)" }
+  - { type: files-changed, pointer: "tests/test_portal_shell_routes.py (deleted test_wave_b_native_routes_are_reachable)" }
+  - { type: files-changed, pointer: "tests/test_hold_routes.py (deleted test_hold_detail_page_requires_reason_non_spa_mode)" }
+  - { type: files-changed, pointer: "tests/test_yield_alert_shell_coverage.py (deleted test_yield_alert_page_fallback_contains_vite_entry)" }
+  - { type: files-changed, pointer: "tests/test_app_factory.py (extended test_routes_registered + updated test_portal_spa_flag_disabled_via_env + 3 new tests)" }
+  - { type: tests-added, pointer: "tests/test_app_factory.py::AppFactoryTests::test_routes_registered (route-name pin + unconditional-redirect loop)" }
+  - { type: tests-added, pointer: "tests/test_app_factory.py::test_status_payload_exposes_portal_spa_enabled" }
+  - { type: tests-added, pointer: "tests/test_app_factory.py::test_portal_html_template_deleted" }
+  - { type: tests-added, pointer: "tests/test_app_factory.py::test_no_portal_html_reference_in_app_source" }
+  - { type: test-output, pointer: "4881 passed, 277 skipped in 257s — 0 failures (full suite)" }
+  - { type: contracts-touched, pointer: "n/a (no contract change — per implementation-plan.md §Contract Updates)" }
+
+spec-deviations:
+  - id: SD-001
+    spec-claim: "KEEP the 3 flag-resolution tests unchanged"
+    action: >
+      test_portal_spa_flag_disabled_via_env was updated: the portal.html-rendering
+      assertion (`assertIn('data-portal-spa-enabled="false"', html)`) was replaced
+      with a redirect assertion, since portal.html is deleted and the route now always
+      redirects. The flag-config-resolution assertion (assertFalse(app.config.get(...)))
+      is kept. This is the only interpretation compatible with "0 failures required".
+
+notes:
+  - IP-3 preserved items confirmed unchanged: _resolve_portal_spa_enabled (L262-272),
+    app.config PORTAL_SPA_ENABLED wiring (L763), portal_spa_enabled status key (L1048).
+  - grep -rn portal.html src/ → zero surviving production-code references.
+  - Deliberate-delete count: 7 tests removed, 0 skipped/xfailed.
+  - test-evidence.yml updated by ladder runner (collect/targeted/changed-area all pass).
+  - Frontend engineer may now proceed (IP-6..IP-9).

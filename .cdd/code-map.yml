@@ -1,6 +1,6 @@
-# generated: 2026-06-24T05:13:34Z by cdd-kit 3.4.0
-# files: 953, src-lines: 286637, map-lines: 20903, compression: 13.7x
-# sources-digest: acd10a1dba32d3f85f5b984c903f3ded97a351ec502c55b3ff57986b862839fa
+# generated: 2026-06-24T06:39:32Z by cdd-kit 3.4.0
+# files: 955, src-lines: 286669, map-lines: 20908, compression: 13.7x
+# sources-digest: 4a61a11317d4ecded215c3a2ab0032e31c5684e230d5ad5ccb11eff6cba9b7cf
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -285,7 +285,20 @@ frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
 
 frontend/src/admin-pages/App.vue:  # 131 lines
 
-frontend/src/admin-pages/components/PagesManagementPanel.vue:  # 59 lines
+frontend/src/admin-pages/__tests__/App.test.ts:  # 47 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 2 }
+    - { module: '@vue/test-utils', items: [mount, flushPromises], line: 3 }
+    - { module: vue, items: [defineComponent], line: 4 }
+    - { module: '../App.vue', items: ['default:App'], line: 36 }
+
+frontend/src/admin-pages/__tests__/PagesManagementPanel.test.ts:  # 28 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: '../components/PagesManagementPanel.vue', items: ['default:PagesManagementPanel'], line: 4 }
+
+frontend/src/admin-pages/components/PagesManagementPanel.vue:  # 60 lines
 
 frontend/src/admin-pages/main.ts:  # 7 lines
   imports:
@@ -3777,7 +3790,7 @@ src/mes_dashboard/__main__.py:  # 12 lines
   functions:
     - { name: main, lines: 6-8 }
 
-src/mes_dashboard/app.py:  # 1566 lines
+src/mes_dashboard/app.py:  # 1564 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: atexit, items: [], line: 6 }
@@ -3837,8 +3850,8 @@ src/mes_dashboard/app.py:  # 1566 lines
     - { name: _sanitize_nan, lines: 554-566 }
     - { name: _reinit_sqlite_handles, lines: 569-631 }
     - { name: _start_per_worker_services, lines: 634-746 }
-    - { name: create_app, lines: 755-1440 }
-    - { name: _register_error_handlers, lines: 1443-1566 }
+    - { name: create_app, lines: 755-1438 }
+    - { name: _register_error_handlers, lines: 1441-1564 }
 
 src/mes_dashboard/config/__init__.py:  # 63 lines
   imports:
@@ -12846,7 +12859,7 @@ tests/test_api_integration.py:  # 300 lines
         - { name: test_api_returns_json_content_type, lines: 273-283 }
         - { name: test_table_api_returns_json_content_type, lines: 286-296 }
 
-tests/test_app_factory.py:  # 290 lines
+tests/test_app_factory.py:  # 402 lines
   imports:
     - { module: unittest, items: [], line: 1 }
     - { module: os, items: [], line: 2 }
@@ -12856,25 +12869,29 @@ tests/test_app_factory.py:  # 290 lines
     - { module: mes_dashboard.core.database, items: [], line: 7 }
   classes:
     - name: AppFactoryTests
-      lines: 10-158
+      lines: 10-197
       methods:
         - { name: setUp, lines: 11-12 }
         - { name: test_create_app_default_config, lines: 14-21 }
         - { name: test_create_app_production_config, lines: 23-41 }
         - { name: test_create_app_independent_instances, lines: 43-47 }
-        - { name: test_routes_registered, lines: 49-80 }
-        - { name: test_portal_spa_flag_default_enabled, lines: 82-95 }
-        - { name: test_portal_spa_flag_disabled_via_env, lines: 97-112 }
-        - { name: test_portal_spa_flag_enabled_via_env, lines: 114-130 }
-        - { name: test_default_env_is_production_when_flask_env_missing, lines: 132-158 }
+        - { name: test_routes_registered, lines: 49-111 }
+        - { name: test_portal_spa_flag_default_enabled, lines: 113-126 }
+        - { name: test_portal_spa_flag_disabled_via_env, lines: 128-151 }
+        - { name: test_portal_spa_flag_enabled_via_env, lines: 153-169 }
+        - { name: test_default_env_is_production_when_flask_env_missing, lines: 171-197 }
     - name: PostForkHookTests
-      lines: 161-286
+      lines: 273-398
       methods:
-        - { name: test_post_fork_hook_registered_in_gunicorn_conf, lines: 164-196 }
-        - { name: test_post_fork_hook_callable_in_test_mode_no_crash, lines: 198-221 }
-        - { name: test_start_per_worker_services_does_not_crash_in_test_mode, lines: 223-244 }
-        - { name: test_reinit_sqlite_handles_does_not_crash_in_test_mode, lines: 246-255 }
-        - { name: test_api_contracts_unchanged_after_preload, lines: 257-286 }
+        - { name: test_post_fork_hook_registered_in_gunicorn_conf, lines: 276-308 }
+        - { name: test_post_fork_hook_callable_in_test_mode_no_crash, lines: 310-333 }
+        - { name: test_start_per_worker_services_does_not_crash_in_test_mode, lines: 335-356 }
+        - { name: test_reinit_sqlite_handles_does_not_crash_in_test_mode, lines: 358-367 }
+        - { name: test_api_contracts_unchanged_after_preload, lines: 369-398 }
+  functions:
+    - { name: test_status_payload_exposes_portal_spa_enabled, lines: 200-232 }
+    - { name: test_portal_html_template_deleted, lines: 235-243 }
+    - { name: test_no_portal_html_reference_in_app_source, lines: 246-270 }
 
 tests/test_app_startup.py:  # 85 lines
   imports:
@@ -15244,7 +15261,7 @@ tests/test_hold_overview_routes.py:  # 608 lines
         - { name: test_lots_export_false_does_not_bypass_pagination, lines: 574-583 }
         - { name: test_lots_export_forwards_all_filters, lines: 590-608 }
 
-tests/test_hold_routes.py:  # 411 lines
+tests/test_hold_routes.py:  # 404 lines
   imports:
     - { module: unittest, items: [], line: 7 }
     - { module: unittest.mock, items: [patch], line: 8 }
@@ -15257,48 +15274,47 @@ tests/test_hold_routes.py:  # 411 lines
       methods:
         - { name: setUp, lines: 18-23 }
     - name: TestHoldDetailPageRoute
-      lines: 26-63
+      lines: 26-56
       methods:
         - { name: setUp, lines: 29-31 }
         - { name: test_hold_detail_page_requires_reason, lines: 33-37 }
-        - { name: test_hold_detail_page_requires_reason_non_spa_mode, lines: 39-44 }
-        - { name: test_hold_detail_page_requires_reason_has_single_redirect_hop_in_spa_mode, lines: 46-51 }
-        - { name: test_hold_detail_page_with_reason, lines: 53-57 }
-        - { name: test_hold_detail_page_includes_vite_entry, lines: 59-63 }
+        - { name: test_hold_detail_page_requires_reason_has_single_redirect_hop_in_spa_mode, lines: 39-44 }
+        - { name: test_hold_detail_page_with_reason, lines: 46-50 }
+        - { name: test_hold_detail_page_includes_vite_entry, lines: 52-56 }
     - name: TestHoldDetailSummaryRoute
-      lines: 66-128
+      lines: 59-121
       methods:
-        - { name: test_returns_success_with_data, lines: 70-89 }
-        - { name: test_returns_error_without_reason, lines: 91-98 }
-        - { name: test_returns_error_on_failure, lines: 101-110 }
-        - { name: test_passes_include_dummy, lines: 113-128 }
+        - { name: test_returns_success_with_data, lines: 63-82 }
+        - { name: test_returns_error_without_reason, lines: 84-91 }
+        - { name: test_returns_error_on_failure, lines: 94-103 }
+        - { name: test_passes_include_dummy, lines: 106-121 }
     - name: TestHoldDetailDistributionRoute
-      lines: 131-198
+      lines: 124-191
       methods:
-        - { name: test_returns_success_with_distribution, lines: 135-163 }
-        - { name: test_returns_error_without_reason, lines: 165-171 }
-        - { name: test_returns_error_on_failure, lines: 174-182 }
-        - { name: test_passes_include_dummy, lines: 185-198 }
+        - { name: test_returns_success_with_distribution, lines: 128-156 }
+        - { name: test_returns_error_without_reason, lines: 158-164 }
+        - { name: test_returns_error_on_failure, lines: 167-175 }
+        - { name: test_passes_include_dummy, lines: 178-191 }
     - name: TestHoldDetailLotsRoute
-      lines: 201-363
+      lines: 194-356
       methods:
-        - { name: test_returns_success_with_lots, lines: 205-244 }
-        - { name: test_returns_error_without_reason, lines: 246-252 }
-        - { name: test_passes_filter_parameters, lines: 255-275 }
-        - { name: test_validates_age_range_parameter, lines: 277-284 }
-        - { name: test_limits_per_page_to_200, lines: 287-298 }
-        - { name: test_handles_page_less_than_one, lines: 301-312 }
-        - { name: test_handles_invalid_page_type, lines: 315-326 }
-        - { name: test_handles_invalid_per_page_type, lines: 329-340 }
-        - { name: test_returns_error_on_failure, lines: 343-351 }
-        - { name: test_lots_rate_limited_returns_429, lines: 355-363 }
+        - { name: test_returns_success_with_lots, lines: 198-237 }
+        - { name: test_returns_error_without_reason, lines: 239-245 }
+        - { name: test_passes_filter_parameters, lines: 248-268 }
+        - { name: test_validates_age_range_parameter, lines: 270-277 }
+        - { name: test_limits_per_page_to_200, lines: 280-291 }
+        - { name: test_handles_page_less_than_one, lines: 294-305 }
+        - { name: test_handles_invalid_page_type, lines: 308-319 }
+        - { name: test_handles_invalid_per_page_type, lines: 322-333 }
+        - { name: test_returns_error_on_failure, lines: 336-344 }
+        - { name: test_lots_rate_limited_returns_429, lines: 348-356 }
     - name: TestHoldDetailAgeRangeFilters
-      lines: 366-407
+      lines: 359-400
       methods:
-        - { name: test_valid_age_range_0_1, lines: 370-377 }
-        - { name: test_valid_age_range_1_3, lines: 380-387 }
-        - { name: test_valid_age_range_3_7, lines: 390-397 }
-        - { name: test_valid_age_range_7_plus, lines: 400-407 }
+        - { name: test_valid_age_range_0_1, lines: 363-370 }
+        - { name: test_valid_age_range_1_3, lines: 373-380 }
+        - { name: test_valid_age_range_3_7, lines: 383-390 }
+        - { name: test_valid_age_range_7_plus, lines: 393-400 }
 
 tests/test_hold_today_snapshot_service.py:  # 192 lines
   imports:
@@ -16939,7 +16955,7 @@ tests/test_permissions.py:  # 161 lines
   functions:
     - { name: app, lines: 21-26 }  # @pytest.fixture
 
-tests/test_portal_shell_routes.py:  # 427 lines
+tests/test_portal_shell_routes.py:  # 415 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -16962,11 +16978,10 @@ tests/test_portal_shell_routes.py:  # 427 lines
     - { name: test_portal_navigation_includes_admin_links_by_auth_state, lines: 259-274 }
     - { name: test_portal_navigation_emits_diagnostics_for_invalid_navigation_payload, lines: 277-295 }
     - { name: test_portal_navigation_logs_contract_mismatch_route, lines: 298-315 }
-    - { name: test_wave_b_native_routes_are_reachable, lines: 318-327 }
-    - { name: test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 330-347 }
-    - { name: test_direct_entry_redirect_preserves_non_ascii_query_params, lines: 350-363 }
-    - { name: test_legacy_shell_contract_fallback_logs_warning, lines: 366-406 }
-    - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 409-427 }
+    - { name: test_direct_entry_in_scope_report_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 318-335 }
+    - { name: test_direct_entry_redirect_preserves_non_ascii_query_params, lines: 338-351 }
+    - { name: test_legacy_shell_contract_fallback_logs_warning, lines: 354-394 }
+    - { name: test_promoted_deferred_routes_redirect_to_canonical_shell_when_spa_enabled, lines: 397-415 }
 
 tests/test_portal_shell_wave_b_native_smoke.py:  # 279 lines
   imports:
@@ -19740,7 +19755,7 @@ tests/test_sync_worker_deadlock_retry.py:  # 187 lines
         - { name: test_sync_logs_non_deadlock_error_does_not_retry, lines: 132-156 }
         - { name: test_batch_execute_passes_params_list_not_row_by_row, lines: 158-187 }
 
-tests/test_template_integration.py:  # 411 lines
+tests/test_template_integration.py:  # 292 lines
   imports:
     - { module: unittest, items: [], line: 8 }
     - { module: os, items: [], line: 9 }
@@ -19749,52 +19764,43 @@ tests/test_template_integration.py:  # 411 lines
     - { module: mes_dashboard.core.database, items: [], line: 13 }
   classes:
     - name: TestTemplateIntegration
-      lines: 29-99
+      lines: 29-90
       methods:
         - { name: setUp, lines: 32-39 }
         - { name: tearDown, lines: 41-45 }
-        - { name: test_portal_includes_base_scripts, lines: 47-54 }
-        - { name: test_wip_overview_serves_pure_vite_module, lines: 56-63 }
-        - { name: test_wip_detail_serves_pure_vite_module, lines: 65-72 }
-        - { name: test_hold_overview_serves_pure_vite_module, lines: 74-81 }
-        - { name: test_resource_page_serves_pure_vite_module, lines: 83-90 }
-        - { name: test_query_tool_page_includes_base_scripts, lines: 92-99 }
-    - name: TestPortalDynamicDrawerRendering
-      lines: 102-203
-      methods:
-        - { name: setUp, lines: 105-112 }
-        - { name: tearDown, lines: 114-118 }
-        - { name: test_portal_uses_navigation_config_for_sidebar_links_without_iframe, lines: 120-161 }
-        - { name: test_portal_hides_admin_only_drawer_for_non_admin, lines: 163-203 }
+        - { name: test_wip_overview_serves_pure_vite_module, lines: 47-54 }
+        - { name: test_wip_detail_serves_pure_vite_module, lines: 56-63 }
+        - { name: test_hold_overview_serves_pure_vite_module, lines: 65-72 }
+        - { name: test_resource_page_serves_pure_vite_module, lines: 74-81 }
+        - { name: test_query_tool_page_includes_base_scripts, lines: 83-90 }
     - name: TestToastCSSIntegration
-      lines: 206-243
+      lines: 94-124
       methods:
-        - { name: setUp, lines: 209-216 }
-        - { name: tearDown, lines: 218-222 }
-        - { name: test_portal_includes_toast_css, lines: 224-229 }
-        - { name: test_wip_overview_excludes_toast_css, lines: 231-236 }
-        - { name: test_wip_detail_excludes_toast_css, lines: 238-243 }
+        - { name: setUp, lines: 97-104 }
+        - { name: tearDown, lines: 106-110 }
+        - { name: test_wip_overview_excludes_toast_css, lines: 112-117 }
+        - { name: test_wip_detail_excludes_toast_css, lines: 119-124 }
     - name: TestMesApiUsageInTemplates
-      lines: 246-303
+      lines: 127-184
       methods:
-        - { name: setUp, lines: 249-254 }
-        - { name: test_wip_overview_uses_mesapi, lines: 256-265 }
-        - { name: test_wip_detail_uses_mesapi, lines: 267-276 }
-        - { name: test_resource_page_uses_mesapi_or_vite_module, lines: 278-291 }
-        - { name: test_query_tool_page_uses_vite_module, lines: 293-303 }
+        - { name: setUp, lines: 130-135 }
+        - { name: test_wip_overview_uses_mesapi, lines: 137-146 }
+        - { name: test_wip_detail_uses_mesapi, lines: 148-157 }
+        - { name: test_resource_page_uses_mesapi_or_vite_module, lines: 159-172 }
+        - { name: test_query_tool_page_uses_vite_module, lines: 174-184 }
     - name: TestViteModuleIntegration
-      lines: 307-361
+      lines: 188-242
       methods:
-        - { name: setUp, lines: 310-315 }
-        - { name: test_pages_render_vite_module_reference, lines: 317-361 }
+        - { name: setUp, lines: 191-196 }
+        - { name: test_pages_render_vite_module_reference, lines: 198-242 }
     - name: TestStaticFilesServing
-      lines: 364-407
+      lines: 245-288
       methods:
-        - { name: setUp, lines: 367-372 }
-        - { name: test_toast_js_is_served, lines: 374-383 }
-        - { name: test_mes_api_js_is_served, lines: 385-393 }
-        - { name: test_toast_js_contains_retry_button, lines: 395-400 }
-        - { name: test_mes_api_js_has_exponential_backoff, lines: 402-407 }
+        - { name: setUp, lines: 248-253 }
+        - { name: test_toast_js_is_served, lines: 255-264 }
+        - { name: test_mes_api_js_is_served, lines: 266-274 }
+        - { name: test_toast_js_contains_retry_button, lines: 276-281 }
+        - { name: test_mes_api_js_has_exponential_backoff, lines: 283-288 }
   functions:
     - { name: _login_as_admin, lines: 16-18 }
     - { name: _get_response_and_html, lines: 21-26 }
@@ -20811,15 +20817,14 @@ tests/test_yield_alert_service.py:  # 418 lines
     - { name: test_query_yield_trend_no_longer_calls_oracle, lines: 352-388 }
     - { name: test_query_yield_summary_no_longer_calls_oracle, lines: 391-418 }
 
-tests/test_yield_alert_shell_coverage.py:  # 42 lines
+tests/test_yield_alert_shell_coverage.py:  # 26 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
     - { module: mes_dashboard.app, items: [create_app], line: 8 }
   functions:
     - { name: _login_as_admin, lines: 11-13 }
-    - { name: test_yield_alert_page_fallback_contains_vite_entry, lines: 16-29 }
-    - { name: test_yield_alert_page_redirects_to_shell_when_spa_enabled, lines: 32-42 }
+    - { name: test_yield_alert_page_redirects_to_shell_when_spa_enabled, lines: 16-26 }
 
 tests/test_yield_alert_sql_runtime.py:  # 150 lines
   imports:

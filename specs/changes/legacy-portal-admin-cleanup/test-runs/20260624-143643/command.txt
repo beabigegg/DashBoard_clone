@@ -1,0 +1,1 @@
+cd frontend && npm run test -- --run src/admin-pages/__tests__/

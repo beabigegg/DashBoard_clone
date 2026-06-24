@@ -47,6 +47,7 @@ function toggleStatus(page: Page): void {
               type="button"
               class="status-badge"
               :class="page.status === 'released' ? 'status-released' : 'status-dev'"
+              :aria-pressed="page.status === 'released'"
               @click="toggleStatus(page)"
             >
               {{ page.status === 'released' ? 'Released' : 'Dev' }}

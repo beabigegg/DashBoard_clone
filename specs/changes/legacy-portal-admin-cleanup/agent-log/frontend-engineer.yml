@@ -1,0 +1,23 @@
+agent: frontend-engineer
+change-id: legacy-portal-admin-cleanup
+run-date: 2026-06-24
+
+summary: |
+  Implemented IP-6..IP-9 for the legacy-portal-admin-cleanup change:
+  removed dead drawer-era CSS, added aria-pressed to status toggle,
+  added role="alert" to load-error panel, wrote 2 new vitest tests.
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/admin-pages/style.css:192-272 (deleted)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/components/PagesManagementPanel.vue:50 (aria-pressed added)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/App.vue:112 (role=alert added)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/__tests__/PagesManagementPanel.test.ts (created)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/__tests__/App.test.ts (created)" }
+  - { type: components-affected, pointer: "PagesManagementPanel, App (admin-pages)" }
+  - { type: screenshot-paths, pointer: "n/a (no visual change — attribute-only a11y additions)" }
+  - { type: accessibility-audit, pointer: "aria-pressed true/false on status toggle; role=alert on load-error panel; vitest assertions pass" }
+
+test-ladder:
+  collect: passed
+  targeted: passed
+  changed-area: passed (vitest 3/3, css:check 0 errors, type-check clean)

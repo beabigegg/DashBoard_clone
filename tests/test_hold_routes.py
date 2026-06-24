@@ -36,13 +36,6 @@ class TestHoldDetailPageRoute(TestHoldRoutesBase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.location.endswith('/portal-shell/hold-overview'))
 
-    def test_hold_detail_page_requires_reason_non_spa_mode(self):
-        """Non-SPA mode should keep legacy overview redirect behavior."""
-        self.app.config['PORTAL_SPA_ENABLED'] = False
-        response = self.client.get('/hold-detail', follow_redirects=False)
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.location.endswith('/hold-overview'))
-
     def test_hold_detail_page_requires_reason_has_single_redirect_hop_in_spa_mode(self):
         """Follow-redirect flow should complete with exactly one redirect hop."""
         response = self.client.get('/hold-detail', follow_redirects=True)

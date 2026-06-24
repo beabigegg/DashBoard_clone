@@ -1,0 +1,11 @@
+agent: test-strategist
+change-id: legacy-portal-admin-cleanup
+timestamp: 2026-06-24
+status: done
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/legacy-portal-admin-cleanup/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_app_factory.py → src/mes_dashboard/app.py:portal_index (L1055-1060)" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-pages/__tests__/App.test.ts → frontend/src/admin-pages/App.vue" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-pages/__tests__/PagesManagementPanel.test.ts → frontend/src/admin-pages/components/PagesManagementPanel.vue" }
+  - { type: coverage-tiers, pointer: "unit (backend), unit (frontend vitest), deliberate-delete, css-governance" }
+  - { type: mapping-completeness, pointer: "all AC-1..AC-7 mapped to >= 1 concrete test or bounded command" }
