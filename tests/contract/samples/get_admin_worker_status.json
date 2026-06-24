@@ -5,8 +5,8 @@
       "remaining_seconds": 59
     },
     "last_restart": {
-      "completed_at": "2026-06-18T11:59:36.378493",
-      "requested_at": "2026-06-18T02:45:51.950479+00:00",
+      "completed_at": "2026-06-24T08:10:56.981804",
+      "requested_at": "2026-06-24T00:10:55.248373+00:00",
       "requested_by": "unknown",
       "requested_ip": "127.0.0.1",
       "success": true
@@ -32,9 +32,9 @@
         "reason": "healthy"
       },
       "restart_churn": {
-        "count": 0,
+        "count": 1,
         "exceeded": false,
-        "last_completed_at": "2026-06-18T11:59:36.378493+00:00",
+        "last_completed_at": "2026-06-24T08:10:56.981804+00:00",
         "threshold": 3,
         "window_seconds": 600
       },
@@ -176,6 +176,58 @@
         "requested_ip": "127.0.0.1",
         "source": "manual",
         "success": true
+      },
+      {
+        "completed_at": "2026-06-20T14:52:40.115916",
+        "decision": "executed",
+        "decision_reason": "signal_sighup",
+        "manual_override": false,
+        "policy_state": {
+          "allowed": true,
+          "attempts_in_window": 0,
+          "blocked": false,
+          "churn_exceeded": false,
+          "churn_threshold": 3,
+          "cooldown": false,
+          "cooldown_remaining_seconds": 0,
+          "cooldown_seconds": 60,
+          "guarded_mode": false,
+          "retry_budget": 3,
+          "retry_budget_exhausted": false,
+          "state": "allowed",
+          "window_seconds": 600
+        },
+        "requested_at": "2026-06-20T03:59:07.576184+00:00",
+        "requested_by": "unknown",
+        "requested_ip": "127.0.0.1",
+        "source": "manual",
+        "success": true
+      },
+      {
+        "completed_at": "2026-06-24T08:10:56.981804",
+        "decision": "executed",
+        "decision_reason": "signal_sighup",
+        "manual_override": false,
+        "policy_state": {
+          "allowed": true,
+          "attempts_in_window": 0,
+          "blocked": false,
+          "churn_exceeded": false,
+          "churn_threshold": 3,
+          "cooldown": false,
+          "cooldown_remaining_seconds": 0,
+          "cooldown_seconds": 60,
+          "guarded_mode": false,
+          "retry_budget": 3,
+          "retry_budget_exhausted": false,
+          "state": "allowed",
+          "window_seconds": 600
+        },
+        "requested_at": "2026-06-24T00:10:55.248373+00:00",
+        "requested_by": "unknown",
+        "requested_ip": "127.0.0.1",
+        "source": "manual",
+        "success": true
       }
     ],
     "runtime_contract": {
@@ -195,12 +247,12 @@
         "state_path": "/home/egg/Project/DashBoard_vite/tmp/mes_dashboard_restart_state.json"
       }
     },
-    "worker_pid": 457163,
-    "worker_start_time": "2026-06-20T03:57:35.020000+00:00"
+    "worker_pid": 1128754,
+    "worker_start_time": "2026-06-24T00:55:41.830000+00:00"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:07.578713"
+    "timestamp": "2026-06-24T08:57:14.537462"
   },
   "success": true
 }

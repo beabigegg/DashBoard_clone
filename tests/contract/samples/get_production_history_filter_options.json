@@ -4597,6 +4597,7 @@
       "RD-SBA120CH-AU",
       "RD-SBA120CS-AU",
       "RD-SBA130AS-AU",
+      "RD-SBA130CH-AU",
       "RD-SBA130CS-AU",
       "RD-SBA140A-AU",
       "RD-SBA140AS-AU",
@@ -5425,8 +5426,8 @@
   "meta": {
     "app_version": "unknown",
     "schema_version": 2,
-    "timestamp": "2026-06-20T11:58:30.209869",
-    "updated_at": "2026-06-20T03:58:30.200008+00:00"
+    "timestamp": "2026-06-24T08:56:36.877278",
+    "updated_at": "2026-06-24T00:56:36.866710+00:00"
   },
   "success": true
 }

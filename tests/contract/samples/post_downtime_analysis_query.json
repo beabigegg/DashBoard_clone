@@ -1,21 +1,11 @@
 {
-  "data": {
-    "big_category": [],
-    "daily_trend": [],
-    "query_id": "0754c4857f961a99",
-    "summary": {
-      "avg_event_min": 0.0,
-      "egt_hours": 0.0,
-      "event_count": 0,
-      "sdt_hours": 0.0,
-      "total_hours": 0.0,
-      "udt_hours": 0.0
-    },
-    "top_reasons": []
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "伺服器內部錯誤"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:08.279862"
+    "timestamp": "2026-06-24T08:57:14.724281"
   },
-  "success": true
+  "success": false
 }

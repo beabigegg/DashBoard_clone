@@ -12,6 +12,10 @@
         "size_bytes": 0
       },
       {
+        "path": "logs/flask_dev.log",
+        "size_bytes": 0
+      },
+      {
         "path": "logs/rq_downtime_worker.log",
         "size_bytes": 0
       },
@@ -33,6 +37,10 @@
       },
       {
         "path": "logs/rq_prod_hist_worker.log",
+        "size_bytes": 0
+      },
+      {
+        "path": "logs/rq_query_tool_worker.log",
         "size_bytes": 0
       },
       {
@@ -60,20 +68,24 @@
         "size_bytes": 0
       },
       {
+        "path": "logs/vite_dev.log",
+        "size_bytes": 0
+      },
+      {
         "path": "logs/watchdog.log",
         "size_bytes": 0
       }
     ],
     "mysql": {
-      "dashboard_logs_rows": 524756,
-      "dashboard_metrics_snapshots_rows": 191474,
+      "dashboard_logs_rows": 590470,
+      "dashboard_metrics_snapshots_rows": 216738,
       "enabled": true,
       "healthy": true
     },
     "sqlite_files": [
       {
         "path": "logs/admin_logs.sqlite",
-        "size_bytes": 46432256
+        "size_bytes": 46755840
       },
       {
         "path": "logs/login_sessions.sqlite",
@@ -84,11 +96,11 @@
         "size_bytes": 176128
       }
     ],
-    "total_bytes": 46641152
+    "total_bytes": 46964736
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:07.574395"
+    "timestamp": "2026-06-24T08:57:14.531653"
   },
   "success": true
 }

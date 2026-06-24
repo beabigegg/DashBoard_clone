@@ -6,8 +6,8 @@
         "enabled": true,
         "loaded": false,
         "lookup": {
-          "age_seconds": 5.858,
-          "built_at": "2026-06-20T11:59:01.311134",
+          "age_seconds": 5.977,
+          "built_at": "2026-06-24T08:57:08.083256",
           "count": 0,
           "ready": false
         },
@@ -46,7 +46,7 @@
       "enabled": true,
       "failure_count": 2,
       "failure_rate": 0.2,
-      "last_failure_time": "2026-06-20T11:59:06.332997",
+      "last_failure_time": "2026-06-24T08:57:13.209062",
       "open_until": null,
       "state": "CLOSED",
       "success_count": 8,
@@ -134,9 +134,9 @@
         "reason": "healthy"
       },
       "restart_churn": {
-        "count": 0,
+        "count": 1,
         "exceeded": false,
-        "last_completed_at": "2026-06-18T11:59:36.378493+00:00",
+        "last_completed_at": "2026-06-24T08:10:56.981804+00:00",
         "threshold": 3,
         "window_seconds": 600
       },
@@ -169,11 +169,11 @@
       }
     },
     "single_port_bind": "0.0.0.0:8080",
-    "worker_pid": 457163
+    "worker_pid": 1128754
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:07.168792"
+    "timestamp": "2026-06-24T08:57:14.060494"
   },
   "success": true
 }

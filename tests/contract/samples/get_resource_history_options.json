@@ -1,13 +1,14 @@
 {
   "data": {
     "families": [],
+    "locations": [],
     "package_groups": [],
     "resources": [],
     "workcenter_groups": []
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:57:55.805133"
+    "timestamp": "2026-06-24T08:56:02.683865"
   },
   "success": true
 }

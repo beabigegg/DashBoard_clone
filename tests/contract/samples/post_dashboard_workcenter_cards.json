@@ -13,14 +13,14 @@
       "run_pct": 0.0,
       "sby": 0,
       "sdt": 0,
-      "total": 1241,
+      "total": 1240,
       "udt": 0,
       "workcenter": "UNKNOWN"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:01.318259"
+    "timestamp": "2026-06-24T08:57:08.088912"
   },
   "success": true
 }

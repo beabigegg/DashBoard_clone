@@ -2,38 +2,6 @@
   "data": [
     {
       "avail_hours": 0.0,
-      "date": "2026-06-13",
-      "group": "元件切割",
-      "prd_hours": 0.0,
-      "prd_pct": 0,
-      "workcenter": "PKG_SAW"
-    },
-    {
-      "avail_hours": 0.0,
-      "date": "2026-06-14",
-      "group": "元件切割",
-      "prd_hours": 0.0,
-      "prd_pct": 0,
-      "workcenter": "PKG_SAW"
-    },
-    {
-      "avail_hours": 0.0,
-      "date": "2026-06-15",
-      "group": "元件切割",
-      "prd_hours": 0.0,
-      "prd_pct": 0,
-      "workcenter": "PKG_SAW"
-    },
-    {
-      "avail_hours": 0.0,
-      "date": "2026-06-16",
-      "group": "元件切割",
-      "prd_hours": 0.0,
-      "prd_pct": 0,
-      "workcenter": "PKG_SAW"
-    },
-    {
-      "avail_hours": 0.0,
       "date": "2026-06-17",
       "group": "元件切割",
       "prd_hours": 0.0,
@@ -57,36 +25,28 @@
       "workcenter": "PKG_SAW"
     },
     {
-      "avail_hours": 2119.7,
-      "date": "2026-06-13",
-      "group": "測試",
-      "prd_hours": 1748.1,
-      "prd_pct": 82.47,
-      "workcenter": "TMTT"
+      "avail_hours": 0.0,
+      "date": "2026-06-20",
+      "group": "元件切割",
+      "prd_hours": 0.0,
+      "prd_pct": 0,
+      "workcenter": "PKG_SAW"
     },
     {
-      "avail_hours": 2225.6,
-      "date": "2026-06-14",
-      "group": "測試",
-      "prd_hours": 1844.8,
-      "prd_pct": 82.89,
-      "workcenter": "TMTT"
+      "avail_hours": 32.4,
+      "date": "2026-06-21",
+      "group": "元件切割",
+      "prd_hours": 0.0,
+      "prd_pct": 0.0,
+      "workcenter": "PKG_SAW"
     },
     {
-      "avail_hours": 2356.1,
-      "date": "2026-06-15",
-      "group": "測試",
-      "prd_hours": 1940.6,
-      "prd_pct": 82.36,
-      "workcenter": "TMTT"
-    },
-    {
-      "avail_hours": 2460.2,
-      "date": "2026-06-16",
-      "group": "測試",
-      "prd_hours": 2045.8,
-      "prd_pct": 83.15,
-      "workcenter": "TMTT"
+      "avail_hours": 38.3,
+      "date": "2026-06-22",
+      "group": "元件切割",
+      "prd_hours": 0.0,
+      "prd_pct": 0.01,
+      "workcenter": "PKG_SAW"
     },
     {
       "avail_hours": 2305.1,
@@ -113,36 +73,36 @@
       "workcenter": "TMTT"
     },
     {
-      "avail_hours": 1204.1,
-      "date": "2026-06-13",
-      "group": "切割",
-      "prd_hours": 1028.5,
-      "prd_pct": 85.42,
-      "workcenter": "切割"
+      "avail_hours": 2331.1,
+      "date": "2026-06-20",
+      "group": "測試",
+      "prd_hours": 1910.2,
+      "prd_pct": 81.95,
+      "workcenter": "TMTT"
     },
     {
-      "avail_hours": 1282.3,
-      "date": "2026-06-14",
-      "group": "切割",
-      "prd_hours": 1093.8,
-      "prd_pct": 85.3,
-      "workcenter": "切割"
+      "avail_hours": 2211.9,
+      "date": "2026-06-21",
+      "group": "測試",
+      "prd_hours": 1840.1,
+      "prd_pct": 83.19,
+      "workcenter": "TMTT"
     },
     {
-      "avail_hours": 1335.3,
-      "date": "2026-06-15",
-      "group": "切割",
-      "prd_hours": 1115.6,
-      "prd_pct": 83.55,
-      "workcenter": "切割"
+      "avail_hours": 2186.5,
+      "date": "2026-06-22",
+      "group": "測試",
+      "prd_hours": 1811.7,
+      "prd_pct": 82.86,
+      "workcenter": "TMTT"
     },
     {
-      "avail_hours": 1367.8,
-      "date": "2026-06-16",
-      "group": "切割",
-      "prd_hours": 1164.6,
-      "prd_pct": 85.14,
-      "workcenter": "切割"
+      "avail_hours": 2130.3,
+      "date": "2026-06-23",
+      "group": "測試",
+      "prd_hours": 1841.0,
+      "prd_pct": 86.42,
+      "workcenter": "TMTT"
     },
     {
       "avail_hours": 1384.8,
@@ -169,36 +129,36 @@
       "workcenter": "切割"
     },
     {
-      "avail_hours": 458.6,
-      "date": "2026-06-13",
-      "group": "切彎腳",
-      "prd_hours": 339.4,
-      "prd_pct": 74.0,
-      "workcenter": "切彎腳"
+      "avail_hours": 1383.1,
+      "date": "2026-06-20",
+      "group": "切割",
+      "prd_hours": 1195.1,
+      "prd_pct": 86.41,
+      "workcenter": "切割"
     },
     {
-      "avail_hours": 434.8,
-      "date": "2026-06-14",
-      "group": "切彎腳",
-      "prd_hours": 328.7,
-      "prd_pct": 75.59,
-      "workcenter": "切彎腳"
+      "avail_hours": 1408.8,
+      "date": "2026-06-21",
+      "group": "切割",
+      "prd_hours": 1188.6,
+      "prd_pct": 84.37,
+      "workcenter": "切割"
     },
     {
-      "avail_hours": 463.3,
-      "date": "2026-06-15",
-      "group": "切彎腳",
-      "prd_hours": 348.3,
-      "prd_pct": 75.18,
-      "workcenter": "切彎腳"
+      "avail_hours": 1379.5,
+      "date": "2026-06-22",
+      "group": "切割",
+      "prd_hours": 1189.6,
+      "prd_pct": 86.24,
+      "workcenter": "切割"
     },
     {
-      "avail_hours": 436.5,
-      "date": "2026-06-16",
-      "group": "切彎腳",
-      "prd_hours": 301.2,
-      "prd_pct": 69.02,
-      "workcenter": "切彎腳"
+      "avail_hours": 1414.2,
+      "date": "2026-06-23",
+      "group": "切割",
+      "prd_hours": 1219.8,
+      "prd_pct": 86.25,
+      "workcenter": "切割"
     },
     {
       "avail_hours": 486.7,
@@ -225,36 +185,36 @@
       "workcenter": "切彎腳"
     },
     {
-      "avail_hours": 627.7,
-      "date": "2026-06-13",
-      "group": "去膠",
-      "prd_hours": 474.3,
-      "prd_pct": 75.56,
-      "workcenter": "去膠"
+      "avail_hours": 452.8,
+      "date": "2026-06-20",
+      "group": "切彎腳",
+      "prd_hours": 315.6,
+      "prd_pct": 69.69,
+      "workcenter": "切彎腳"
     },
     {
-      "avail_hours": 635.6,
-      "date": "2026-06-14",
-      "group": "去膠",
-      "prd_hours": 551.0,
-      "prd_pct": 86.69,
-      "workcenter": "去膠"
+      "avail_hours": 417.7,
+      "date": "2026-06-21",
+      "group": "切彎腳",
+      "prd_hours": 293.2,
+      "prd_pct": 70.18,
+      "workcenter": "切彎腳"
     },
     {
-      "avail_hours": 624.2,
-      "date": "2026-06-15",
-      "group": "去膠",
-      "prd_hours": 511.1,
-      "prd_pct": 81.88,
-      "workcenter": "去膠"
+      "avail_hours": 482.1,
+      "date": "2026-06-22",
+      "group": "切彎腳",
+      "prd_hours": 348.3,
+      "prd_pct": 72.25,
+      "workcenter": "切彎腳"
     },
     {
-      "avail_hours": 629.1,
-      "date": "2026-06-16",
-      "group": "去膠",
-      "prd_hours": 506.0,
-      "prd_pct": 80.44,
-      "workcenter": "去膠"
+      "avail_hours": 413.1,
+      "date": "2026-06-23",
+      "group": "切彎腳",
+      "prd_hours": 336.4,
+      "prd_pct": 81.43,
+      "workcenter": "切彎腳"
     },
     {
       "avail_hours": 625.6,
@@ -281,36 +241,36 @@
       "workcenter": "去膠"
     },
     {
-      "avail_hours": 3508.9,
-      "date": "2026-06-13",
-      "group": "成型",
-      "prd_hours": 169.7,
-      "prd_pct": 4.84,
-      "workcenter": "成型"
+      "avail_hours": 653.8,
+      "date": "2026-06-20",
+      "group": "去膠",
+      "prd_hours": 516.6,
+      "prd_pct": 79.01,
+      "workcenter": "去膠"
     },
     {
-      "avail_hours": 3528.0,
-      "date": "2026-06-14",
-      "group": "成型",
-      "prd_hours": 162.1,
-      "prd_pct": 4.59,
-      "workcenter": "成型"
+      "avail_hours": 636.1,
+      "date": "2026-06-21",
+      "group": "去膠",
+      "prd_hours": 559.0,
+      "prd_pct": 87.89,
+      "workcenter": "去膠"
     },
     {
-      "avail_hours": 3521.8,
-      "date": "2026-06-15",
-      "group": "成型",
-      "prd_hours": 164.1,
-      "prd_pct": 4.66,
-      "workcenter": "成型"
+      "avail_hours": 590.5,
+      "date": "2026-06-22",
+      "group": "去膠",
+      "prd_hours": 469.1,
+      "prd_pct": 79.45,
+      "workcenter": "去膠"
     },
     {
-      "avail_hours": 3488.2,
-      "date": "2026-06-16",
-      "group": "成型",
-      "prd_hours": 171.4,
-      "prd_pct": 4.91,
-      "workcenter": "成型"
+      "avail_hours": 600.6,
+      "date": "2026-06-23",
+      "group": "去膠",
+      "prd_hours": 530.1,
+      "prd_pct": 88.27,
+      "workcenter": "去膠"
     },
     {
       "avail_hours": 3504.0,
@@ -337,36 +297,36 @@
       "workcenter": "成型"
     },
     {
-      "avail_hours": 795.6,
-      "date": "2026-06-13",
+      "avail_hours": 3504.0,
+      "date": "2026-06-20",
       "group": "成型",
-      "prd_hours": 601.1,
-      "prd_pct": 75.55,
-      "workcenter": "成型_料"
+      "prd_hours": 145.7,
+      "prd_pct": 4.16,
+      "workcenter": "成型"
     },
     {
-      "avail_hours": 842.7,
-      "date": "2026-06-14",
+      "avail_hours": 3467.9,
+      "date": "2026-06-21",
       "group": "成型",
-      "prd_hours": 617.0,
-      "prd_pct": 73.22,
-      "workcenter": "成型_料"
+      "prd_hours": 143.3,
+      "prd_pct": 4.13,
+      "workcenter": "成型"
     },
     {
-      "avail_hours": 845.3,
-      "date": "2026-06-15",
+      "avail_hours": 3499.8,
+      "date": "2026-06-22",
       "group": "成型",
-      "prd_hours": 613.9,
-      "prd_pct": 72.63,
-      "workcenter": "成型_料"
+      "prd_hours": 145.0,
+      "prd_pct": 4.14,
+      "workcenter": "成型"
     },
     {
-      "avail_hours": 785.5,
-      "date": "2026-06-16",
+      "avail_hours": 176.6,
+      "date": "2026-06-23",
       "group": "成型",
-      "prd_hours": 610.1,
-      "prd_pct": 77.67,
-      "workcenter": "成型_料"
+      "prd_hours": 97.8,
+      "prd_pct": 55.4,
+      "workcenter": "成型"
     },
     {
       "avail_hours": 868.2,
@@ -393,36 +353,36 @@
       "workcenter": "成型_料"
     },
     {
-      "avail_hours": 30.3,
-      "date": "2026-06-13",
-      "group": "電鍍",
-      "prd_hours": 24.3,
-      "prd_pct": 80.38,
-      "workcenter": "掛鍍"
+      "avail_hours": 756.5,
+      "date": "2026-06-20",
+      "group": "成型",
+      "prd_hours": 589.3,
+      "prd_pct": 77.89,
+      "workcenter": "成型_料"
     },
     {
-      "avail_hours": 37.2,
-      "date": "2026-06-14",
-      "group": "電鍍",
-      "prd_hours": 29.0,
-      "prd_pct": 78.05,
-      "workcenter": "掛鍍"
+      "avail_hours": 788.7,
+      "date": "2026-06-21",
+      "group": "成型",
+      "prd_hours": 631.4,
+      "prd_pct": 80.06,
+      "workcenter": "成型_料"
     },
     {
-      "avail_hours": 36.8,
-      "date": "2026-06-15",
-      "group": "電鍍",
-      "prd_hours": 27.7,
-      "prd_pct": 75.24,
-      "workcenter": "掛鍍"
+      "avail_hours": 789.7,
+      "date": "2026-06-22",
+      "group": "成型",
+      "prd_hours": 596.4,
+      "prd_pct": 75.52,
+      "workcenter": "成型_料"
     },
     {
-      "avail_hours": 37.8,
-      "date": "2026-06-16",
-      "group": "電鍍",
-      "prd_hours": 29.2,
-      "prd_pct": 77.29,
-      "workcenter": "掛鍍"
+      "avail_hours": 794.5,
+      "date": "2026-06-23",
+      "group": "成型",
+      "prd_hours": 592.5,
+      "prd_pct": 74.58,
+      "workcenter": "成型_料"
     },
     {
       "avail_hours": 36.6,
@@ -449,36 +409,36 @@
       "workcenter": "掛鍍"
     },
     {
-      "avail_hours": 59.4,
-      "date": "2026-06-13",
+      "avail_hours": 31.6,
+      "date": "2026-06-20",
       "group": "電鍍",
-      "prd_hours": 46.2,
-      "prd_pct": 77.81,
-      "workcenter": "條鍍"
+      "prd_hours": 26.9,
+      "prd_pct": 85.08,
+      "workcenter": "掛鍍"
     },
     {
-      "avail_hours": 54.6,
-      "date": "2026-06-14",
+      "avail_hours": 41.6,
+      "date": "2026-06-21",
       "group": "電鍍",
-      "prd_hours": 46.7,
-      "prd_pct": 85.66,
-      "workcenter": "條鍍"
+      "prd_hours": 28.4,
+      "prd_pct": 68.24,
+      "workcenter": "掛鍍"
     },
     {
-      "avail_hours": 60.5,
-      "date": "2026-06-15",
+      "avail_hours": 31.8,
+      "date": "2026-06-22",
       "group": "電鍍",
-      "prd_hours": 46.1,
-      "prd_pct": 76.11,
-      "workcenter": "條鍍"
+      "prd_hours": 22.5,
+      "prd_pct": 70.52,
+      "workcenter": "掛鍍"
     },
     {
-      "avail_hours": 57.1,
-      "date": "2026-06-16",
+      "avail_hours": 31.0,
+      "date": "2026-06-23",
       "group": "電鍍",
-      "prd_hours": 42.5,
-      "prd_pct": 74.37,
-      "workcenter": "條鍍"
+      "prd_hours": 25.7,
+      "prd_pct": 82.99,
+      "workcenter": "掛鍍"
     },
     {
       "avail_hours": 61.0,
@@ -505,36 +465,36 @@
       "workcenter": "條鍍"
     },
     {
-      "avail_hours": 389.4,
-      "date": "2026-06-13",
-      "group": "水吹砂",
-      "prd_hours": 331.1,
-      "prd_pct": 85.03,
-      "workcenter": "水吹砂"
+      "avail_hours": 62.6,
+      "date": "2026-06-20",
+      "group": "電鍍",
+      "prd_hours": 46.9,
+      "prd_pct": 74.93,
+      "workcenter": "條鍍"
     },
     {
-      "avail_hours": 409.7,
-      "date": "2026-06-14",
-      "group": "水吹砂",
-      "prd_hours": 342.6,
-      "prd_pct": 83.62,
-      "workcenter": "水吹砂"
+      "avail_hours": 64.8,
+      "date": "2026-06-21",
+      "group": "電鍍",
+      "prd_hours": 51.6,
+      "prd_pct": 79.6,
+      "workcenter": "條鍍"
     },
     {
-      "avail_hours": 393.6,
-      "date": "2026-06-15",
-      "group": "水吹砂",
-      "prd_hours": 322.2,
-      "prd_pct": 81.86,
-      "workcenter": "水吹砂"
+      "avail_hours": 61.3,
+      "date": "2026-06-22",
+      "group": "電鍍",
+      "prd_hours": 46.6,
+      "prd_pct": 76.04,
+      "workcenter": "條鍍"
     },
     {
-      "avail_hours": 387.7,
-      "date": "2026-06-16",
-      "group": "水吹砂",
-      "prd_hours": 338.1,
-      "prd_pct": 87.2,
-      "workcenter": "水吹砂"
+      "avail_hours": 46.9,
+      "date": "2026-06-23",
+      "group": "電鍍",
+      "prd_hours": 35.2,
+      "prd_pct": 75.01,
+      "workcenter": "條鍍"
     },
     {
       "avail_hours": 406.1,
@@ -561,36 +521,36 @@
       "workcenter": "水吹砂"
     },
     {
-      "avail_hours": 16.2,
-      "date": "2026-06-13",
-      "group": "電鍍",
-      "prd_hours": 15.5,
-      "prd_pct": 95.8,
-      "workcenter": "滾鍍"
+      "avail_hours": 317.3,
+      "date": "2026-06-20",
+      "group": "水吹砂",
+      "prd_hours": 238.8,
+      "prd_pct": 75.27,
+      "workcenter": "水吹砂"
     },
     {
-      "avail_hours": 19.0,
-      "date": "2026-06-14",
-      "group": "電鍍",
-      "prd_hours": 15.2,
-      "prd_pct": 80.11,
-      "workcenter": "滾鍍"
+      "avail_hours": 399.7,
+      "date": "2026-06-21",
+      "group": "水吹砂",
+      "prd_hours": 353.2,
+      "prd_pct": 88.37,
+      "workcenter": "水吹砂"
     },
     {
-      "avail_hours": 14.4,
-      "date": "2026-06-15",
-      "group": "電鍍",
-      "prd_hours": 14.3,
-      "prd_pct": 99.09,
-      "workcenter": "滾鍍"
+      "avail_hours": 440.8,
+      "date": "2026-06-22",
+      "group": "水吹砂",
+      "prd_hours": 380.8,
+      "prd_pct": 86.4,
+      "workcenter": "水吹砂"
     },
     {
-      "avail_hours": 11.6,
-      "date": "2026-06-16",
-      "group": "電鍍",
-      "prd_hours": 11.6,
-      "prd_pct": 99.88,
-      "workcenter": "滾鍍"
+      "avail_hours": 358.9,
+      "date": "2026-06-23",
+      "group": "水吹砂",
+      "prd_hours": 309.1,
+      "prd_pct": 86.12,
+      "workcenter": "水吹砂"
     },
     {
       "avail_hours": 13.9,
@@ -617,36 +577,28 @@
       "workcenter": "滾鍍"
     },
     {
-      "avail_hours": 312.0,
-      "date": "2026-06-13",
-      "group": "焊接_DB",
-      "prd_hours": 145.7,
-      "prd_pct": 46.71,
-      "workcenter": "焊_DB_料"
+      "avail_hours": 12.3,
+      "date": "2026-06-20",
+      "group": "電鍍",
+      "prd_hours": 12.2,
+      "prd_pct": 99.37,
+      "workcenter": "滾鍍"
     },
     {
-      "avail_hours": 309.0,
-      "date": "2026-06-14",
-      "group": "焊接_DB",
-      "prd_hours": 171.7,
-      "prd_pct": 55.58,
-      "workcenter": "焊_DB_料"
+      "avail_hours": 3.5,
+      "date": "2026-06-21",
+      "group": "電鍍",
+      "prd_hours": 3.5,
+      "prd_pct": 99.55,
+      "workcenter": "滾鍍"
     },
     {
-      "avail_hours": 331.7,
-      "date": "2026-06-15",
-      "group": "焊接_DB",
-      "prd_hours": 140.9,
-      "prd_pct": 42.47,
-      "workcenter": "焊_DB_料"
-    },
-    {
-      "avail_hours": 336.0,
-      "date": "2026-06-16",
-      "group": "焊接_DB",
-      "prd_hours": 147.6,
-      "prd_pct": 43.94,
-      "workcenter": "焊_DB_料"
+      "avail_hours": 0.0,
+      "date": "2026-06-22",
+      "group": "電鍍",
+      "prd_hours": 0.0,
+      "prd_pct": 0,
+      "workcenter": "滾鍍"
     },
     {
       "avail_hours": 336.0,
@@ -674,35 +626,35 @@
     },
     {
       "avail_hours": 360.0,
-      "date": "2026-06-13",
-      "group": "焊接_WB",
-      "prd_hours": 184.9,
-      "prd_pct": 51.35,
-      "workcenter": "焊_WB_料"
+      "date": "2026-06-20",
+      "group": "焊接_DB",
+      "prd_hours": 175.2,
+      "prd_pct": 48.66,
+      "workcenter": "焊_DB_料"
     },
     {
       "avail_hours": 360.0,
-      "date": "2026-06-14",
-      "group": "焊接_WB",
-      "prd_hours": 202.5,
-      "prd_pct": 56.26,
-      "workcenter": "焊_WB_料"
+      "date": "2026-06-21",
+      "group": "焊接_DB",
+      "prd_hours": 170.2,
+      "prd_pct": 47.28,
+      "workcenter": "焊_DB_料"
     },
     {
       "avail_hours": 360.0,
-      "date": "2026-06-15",
-      "group": "焊接_WB",
-      "prd_hours": 187.3,
-      "prd_pct": 52.02,
-      "workcenter": "焊_WB_料"
+      "date": "2026-06-22",
+      "group": "焊接_DB",
+      "prd_hours": 182.7,
+      "prd_pct": 50.75,
+      "workcenter": "焊_DB_料"
     },
     {
-      "avail_hours": 360.0,
-      "date": "2026-06-16",
-      "group": "焊接_WB",
-      "prd_hours": 182.4,
-      "prd_pct": 50.66,
-      "workcenter": "焊_WB_料"
+      "avail_hours": 258.0,
+      "date": "2026-06-23",
+      "group": "焊接_DB",
+      "prd_hours": 136.8,
+      "prd_pct": 53.04,
+      "workcenter": "焊_DB_料"
     },
     {
       "avail_hours": 382.1,
@@ -729,36 +681,36 @@
       "workcenter": "焊_WB_料"
     },
     {
-      "avail_hours": 3053.8,
-      "date": "2026-06-13",
-      "group": "焊接_DB",
-      "prd_hours": 2594.4,
-      "prd_pct": 84.96,
-      "workcenter": "焊接_DB"
+      "avail_hours": 374.5,
+      "date": "2026-06-20",
+      "group": "焊接_WB",
+      "prd_hours": 155.0,
+      "prd_pct": 41.4,
+      "workcenter": "焊_WB_料"
     },
     {
-      "avail_hours": 2974.2,
-      "date": "2026-06-14",
-      "group": "焊接_DB",
-      "prd_hours": 2575.4,
-      "prd_pct": 86.59,
-      "workcenter": "焊接_DB"
+      "avail_hours": 359.0,
+      "date": "2026-06-21",
+      "group": "焊接_WB",
+      "prd_hours": 173.1,
+      "prd_pct": 48.22,
+      "workcenter": "焊_WB_料"
     },
     {
-      "avail_hours": 3078.4,
-      "date": "2026-06-15",
-      "group": "焊接_DB",
-      "prd_hours": 2650.8,
-      "prd_pct": 86.11,
-      "workcenter": "焊接_DB"
+      "avail_hours": 358.3,
+      "date": "2026-06-22",
+      "group": "焊接_WB",
+      "prd_hours": 173.4,
+      "prd_pct": 48.41,
+      "workcenter": "焊_WB_料"
     },
     {
-      "avail_hours": 3083.5,
-      "date": "2026-06-16",
-      "group": "焊接_DB",
-      "prd_hours": 2671.3,
-      "prd_pct": 86.63,
-      "workcenter": "焊接_DB"
+      "avail_hours": 323.2,
+      "date": "2026-06-23",
+      "group": "焊接_WB",
+      "prd_hours": 156.3,
+      "prd_pct": 48.36,
+      "workcenter": "焊_WB_料"
     },
     {
       "avail_hours": 3054.5,
@@ -785,36 +737,36 @@
       "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 4053.1,
-      "date": "2026-06-13",
-      "group": "焊接_DW",
-      "prd_hours": 2423.9,
-      "prd_pct": 59.8,
-      "workcenter": "焊接_DW"
+      "avail_hours": 3075.7,
+      "date": "2026-06-20",
+      "group": "焊接_DB",
+      "prd_hours": 2690.4,
+      "prd_pct": 87.47,
+      "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 4050.2,
-      "date": "2026-06-14",
-      "group": "焊接_DW",
-      "prd_hours": 2369.3,
-      "prd_pct": 58.5,
-      "workcenter": "焊接_DW"
+      "avail_hours": 2957.0,
+      "date": "2026-06-21",
+      "group": "焊接_DB",
+      "prd_hours": 2658.8,
+      "prd_pct": 89.92,
+      "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 4080.5,
-      "date": "2026-06-15",
-      "group": "焊接_DW",
-      "prd_hours": 2277.2,
-      "prd_pct": 55.81,
-      "workcenter": "焊接_DW"
+      "avail_hours": 2973.4,
+      "date": "2026-06-22",
+      "group": "焊接_DB",
+      "prd_hours": 2562.4,
+      "prd_pct": 86.18,
+      "workcenter": "焊接_DB"
     },
     {
-      "avail_hours": 4008.0,
-      "date": "2026-06-16",
-      "group": "焊接_DW",
-      "prd_hours": 2254.0,
-      "prd_pct": 56.24,
-      "workcenter": "焊接_DW"
+      "avail_hours": 2504.4,
+      "date": "2026-06-23",
+      "group": "焊接_DB",
+      "prd_hours": 2188.1,
+      "prd_pct": 87.37,
+      "workcenter": "焊接_DB"
     },
     {
       "avail_hours": 4008.0,
@@ -841,36 +793,36 @@
       "workcenter": "焊接_DW"
     },
     {
-      "avail_hours": 4233.7,
-      "date": "2026-06-13",
-      "group": "焊接_WB",
-      "prd_hours": 3238.0,
-      "prd_pct": 76.48,
-      "workcenter": "焊接_WB"
+      "avail_hours": 3843.6,
+      "date": "2026-06-20",
+      "group": "焊接_DW",
+      "prd_hours": 2103.6,
+      "prd_pct": 54.73,
+      "workcenter": "焊接_DW"
     },
     {
-      "avail_hours": 4250.3,
-      "date": "2026-06-14",
-      "group": "焊接_WB",
-      "prd_hours": 3200.1,
-      "prd_pct": 75.29,
-      "workcenter": "焊接_WB"
+      "avail_hours": 3907.4,
+      "date": "2026-06-21",
+      "group": "焊接_DW",
+      "prd_hours": 2067.0,
+      "prd_pct": 52.9,
+      "workcenter": "焊接_DW"
     },
     {
-      "avail_hours": 4201.5,
-      "date": "2026-06-15",
-      "group": "焊接_WB",
-      "prd_hours": 3063.7,
-      "prd_pct": 72.92,
-      "workcenter": "焊接_WB"
+      "avail_hours": 3953.0,
+      "date": "2026-06-22",
+      "group": "焊接_DW",
+      "prd_hours": 2253.6,
+      "prd_pct": 57.01,
+      "workcenter": "焊接_DW"
     },
     {
-      "avail_hours": 4204.9,
-      "date": "2026-06-16",
-      "group": "焊接_WB",
-      "prd_hours": 3062.8,
-      "prd_pct": 72.84,
-      "workcenter": "焊接_WB"
+      "avail_hours": 3182.9,
+      "date": "2026-06-23",
+      "group": "焊接_DW",
+      "prd_hours": 1918.4,
+      "prd_pct": 60.27,
+      "workcenter": "焊接_DW"
     },
     {
       "avail_hours": 4197.4,
@@ -897,36 +849,36 @@
       "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 491.7,
-      "date": "2026-06-13",
-      "group": "移印",
-      "prd_hours": 437.8,
-      "prd_pct": 89.06,
-      "workcenter": "移印"
+      "avail_hours": 4233.4,
+      "date": "2026-06-20",
+      "group": "焊接_WB",
+      "prd_hours": 3071.3,
+      "prd_pct": 72.55,
+      "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 503.6,
-      "date": "2026-06-14",
-      "group": "移印",
-      "prd_hours": 417.1,
-      "prd_pct": 82.83,
-      "workcenter": "移印"
+      "avail_hours": 4185.2,
+      "date": "2026-06-21",
+      "group": "焊接_WB",
+      "prd_hours": 3017.8,
+      "prd_pct": 72.11,
+      "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 555.0,
-      "date": "2026-06-15",
-      "group": "移印",
-      "prd_hours": 463.7,
-      "prd_pct": 83.55,
-      "workcenter": "移印"
+      "avail_hours": 4208.3,
+      "date": "2026-06-22",
+      "group": "焊接_WB",
+      "prd_hours": 3014.9,
+      "prd_pct": 71.64,
+      "workcenter": "焊接_WB"
     },
     {
-      "avail_hours": 498.8,
-      "date": "2026-06-16",
-      "group": "移印",
-      "prd_hours": 427.3,
-      "prd_pct": 85.67,
-      "workcenter": "移印"
+      "avail_hours": 3448.5,
+      "date": "2026-06-23",
+      "group": "焊接_WB",
+      "prd_hours": 2644.3,
+      "prd_pct": 76.68,
+      "workcenter": "焊接_WB"
     },
     {
       "avail_hours": 567.2,
@@ -953,36 +905,36 @@
       "workcenter": "移印"
     },
     {
-      "avail_hours": 34.2,
-      "date": "2026-06-13",
-      "group": "電鍍",
-      "prd_hours": 27.6,
-      "prd_pct": 80.85,
-      "workcenter": "電鍍"
+      "avail_hours": 484.4,
+      "date": "2026-06-20",
+      "group": "移印",
+      "prd_hours": 424.8,
+      "prd_pct": 87.69,
+      "workcenter": "移印"
     },
     {
-      "avail_hours": 30.3,
-      "date": "2026-06-14",
-      "group": "電鍍",
-      "prd_hours": 20.6,
-      "prd_pct": 68.21,
-      "workcenter": "電鍍"
+      "avail_hours": 458.3,
+      "date": "2026-06-21",
+      "group": "移印",
+      "prd_hours": 396.6,
+      "prd_pct": 86.54,
+      "workcenter": "移印"
     },
     {
-      "avail_hours": 29.5,
-      "date": "2026-06-15",
-      "group": "電鍍",
-      "prd_hours": 22.1,
-      "prd_pct": 74.8,
-      "workcenter": "電鍍"
+      "avail_hours": 582.8,
+      "date": "2026-06-22",
+      "group": "移印",
+      "prd_hours": 487.6,
+      "prd_pct": 83.66,
+      "workcenter": "移印"
     },
     {
-      "avail_hours": 36.7,
-      "date": "2026-06-16",
-      "group": "電鍍",
-      "prd_hours": 26.5,
-      "prd_pct": 72.15,
-      "workcenter": "電鍍"
+      "avail_hours": 517.1,
+      "date": "2026-06-23",
+      "group": "移印",
+      "prd_hours": 437.8,
+      "prd_pct": 84.65,
+      "workcenter": "移印"
     },
     {
       "avail_hours": 39.1,
@@ -1009,36 +961,36 @@
       "workcenter": "電鍍"
     },
     {
-      "avail_hours": 579.2,
-      "date": "2026-06-13",
-      "group": null,
-      "prd_hours": 567.7,
-      "prd_pct": 98.01,
-      "workcenter": "點測"
+      "avail_hours": 32.9,
+      "date": "2026-06-20",
+      "group": "電鍍",
+      "prd_hours": 23.7,
+      "prd_pct": 72.06,
+      "workcenter": "電鍍"
     },
     {
-      "avail_hours": 309.4,
-      "date": "2026-06-14",
-      "group": null,
-      "prd_hours": 298.1,
-      "prd_pct": 96.33,
-      "workcenter": "點測"
+      "avail_hours": 22.0,
+      "date": "2026-06-21",
+      "group": "電鍍",
+      "prd_hours": 15.8,
+      "prd_pct": 72.05,
+      "workcenter": "電鍍"
     },
     {
-      "avail_hours": 396.3,
-      "date": "2026-06-15",
-      "group": null,
-      "prd_hours": 384.9,
-      "prd_pct": 97.12,
-      "workcenter": "點測"
+      "avail_hours": 24.4,
+      "date": "2026-06-22",
+      "group": "電鍍",
+      "prd_hours": 18.1,
+      "prd_pct": 74.31,
+      "workcenter": "電鍍"
     },
     {
-      "avail_hours": 545.4,
-      "date": "2026-06-16",
-      "group": null,
-      "prd_hours": 538.6,
-      "prd_pct": 98.76,
-      "workcenter": "點測"
+      "avail_hours": 20.0,
+      "date": "2026-06-23",
+      "group": "電鍍",
+      "prd_hours": 15.2,
+      "prd_pct": 75.68,
+      "workcenter": "電鍍"
     },
     {
       "avail_hours": 404.6,
@@ -1063,11 +1015,43 @@
       "prd_hours": 317.4,
       "prd_pct": 98.08,
       "workcenter": "點測"
+    },
+    {
+      "avail_hours": 97.1,
+      "date": "2026-06-20",
+      "group": null,
+      "prd_hours": 96.7,
+      "prd_pct": 99.52,
+      "workcenter": "點測"
+    },
+    {
+      "avail_hours": 9.0,
+      "date": "2026-06-21",
+      "group": null,
+      "prd_hours": 9.0,
+      "prd_pct": 99.85,
+      "workcenter": "點測"
+    },
+    {
+      "avail_hours": 380.7,
+      "date": "2026-06-22",
+      "group": null,
+      "prd_hours": 370.7,
+      "prd_pct": 97.37,
+      "workcenter": "點測"
+    },
+    {
+      "avail_hours": 290.5,
+      "date": "2026-06-23",
+      "group": null,
+      "prd_hours": 288.3,
+      "prd_pct": 99.27,
+      "workcenter": "點測"
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:07.161699"
+    "timestamp": "2026-06-24T08:57:14.054982"
   },
   "success": true
 }

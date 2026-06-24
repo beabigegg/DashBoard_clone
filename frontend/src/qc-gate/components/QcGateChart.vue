@@ -9,6 +9,11 @@ import type { StationData } from '../composables/useQcGateData';
 
 use([CanvasRenderer, BarChart, GridComponent, LegendComponent, TooltipComponent]);
 
+function toRgba(color: string, alpha: number): string {
+  const m = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  return m ? `rgba(${m[1]},${m[2]},${m[3]},${alpha})` : color;
+}
+
 interface ActiveFilter {
   station: string;
   bucket: string;
@@ -122,7 +127,15 @@ const chartOption = computed(() => {
       color: bucket.color,
       barMaxWidth: 40,
       emphasis: {
-        focus: 'series',
+        focus: 'self',
+        itemStyle: {
+          shadowBlur: 20,
+          shadowOffsetX: 0,
+          shadowOffsetY: 0,
+          shadowColor: toRgba(bucket.color, 0.8),
+          borderColor: 'rgba(255, 255, 255, 0.9)',
+          borderWidth: 1.5,
+        },
       },
       data: props.stations.map((station) => {
         const count = Number(station?.buckets?.[bucket.key as keyof typeof station.buckets] || 0);

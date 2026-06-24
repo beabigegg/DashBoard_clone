@@ -1,79 +1,79 @@
 {
   "data": [
     {
-      "date": "2026-06-13",
-      "egt_hours": 77.9,
-      "ou_pct": 69.9,
-      "prd_hours": 25468.2,
-      "sby_hours": 9616.1,
-      "sdt_hours": 672.3,
-      "total_hours": 47064.0,
-      "udt_hours": 598.3
-    },
-    {
-      "date": "2026-06-14",
-      "egt_hours": 72.0,
-      "ou_pct": 69.47,
-      "prd_hours": 25265.7,
-      "sby_hours": 9531.7,
-      "sdt_hours": 747.3,
-      "total_hours": 47064.0,
-      "udt_hours": 751.6
-    },
-    {
-      "date": "2026-06-15",
-      "egt_hours": 72.0,
-      "ou_pct": 68.37,
-      "prd_hours": 25157.6,
-      "sby_hours": 9780.4,
-      "sdt_hours": 880.0,
-      "total_hours": 47057.8,
-      "udt_hours": 906.2
-    },
-    {
-      "date": "2026-06-16",
-      "egt_hours": 72.6,
-      "ou_pct": 69.74,
-      "prd_hours": 25681.7,
-      "sby_hours": 9554.3,
-      "sdt_hours": 792.5,
-      "total_hours": 47018.1,
-      "udt_hours": 722.5
-    },
-    {
       "date": "2026-06-17",
       "egt_hours": 73.6,
-      "ou_pct": 69.15,
-      "prd_hours": 25386.6,
+      "ou_pct": 69.22,
+      "prd_hours": 25468.6,
       "sby_hours": 9656.7,
       "sdt_hours": 912.6,
-      "total_hours": 46944.8,
+      "total_hours": 47026.8,
       "udt_hours": 681.5
     },
     {
       "date": "2026-06-18",
       "egt_hours": 72.0,
-      "ou_pct": 70.03,
-      "prd_hours": 25859.8,
+      "ou_pct": 70.12,
+      "prd_hours": 25965.0,
       "sby_hours": 9693.2,
       "sdt_hours": 716.9,
-      "total_hours": 46910.8,
+      "total_hours": 47016.0,
       "udt_hours": 582.5
     },
     {
       "date": "2026-06-19",
       "egt_hours": 72.0,
-      "ou_pct": 69.39,
-      "prd_hours": 25334.5,
+      "ou_pct": 69.51,
+      "prd_hours": 25478.4,
       "sby_hours": 9781.7,
       "sdt_hours": 716.4,
-      "total_hours": 46843.3,
+      "total_hours": 47016.0,
       "udt_hours": 607.4
+    },
+    {
+      "date": "2026-06-20",
+      "egt_hours": 72.0,
+      "ou_pct": 68.29,
+      "prd_hours": 24613.9,
+      "sby_hours": 9998.2,
+      "sdt_hours": 699.2,
+      "total_hours": 46940.2,
+      "udt_hours": 659.8
+    },
+    {
+      "date": "2026-06-21",
+      "egt_hours": 72.0,
+      "ou_pct": 68.48,
+      "prd_hours": 24440.1,
+      "sby_hours": 9806.2,
+      "sdt_hours": 748.6,
+      "total_hours": 46844.5,
+      "udt_hours": 623.4
+    },
+    {
+      "date": "2026-06-22",
+      "egt_hours": 87.4,
+      "ou_pct": 68.73,
+      "prd_hours": 24899.0,
+      "sby_hours": 9715.7,
+      "sdt_hours": 805.2,
+      "total_hours": 46768.7,
+      "udt_hours": 722.4
+    },
+    {
+      "date": "2026-06-23",
+      "egt_hours": 0.0,
+      "ou_pct": 78.53,
+      "prd_hours": 14690.8,
+      "sby_hours": 2727.1,
+      "sdt_hours": 706.4,
+      "total_hours": 20171.3,
+      "udt_hours": 584.0
     }
   ],
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:06.816031"
+    "timestamp": "2026-06-24T08:57:13.677469"
   },
   "success": true
 }

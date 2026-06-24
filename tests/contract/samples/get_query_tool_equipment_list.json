@@ -7113,12 +7113,6 @@
       },
       {
         "RESOURCEFAMILYNAME": "SMP_強茂自製R",
-        "RESOURCEID": "4880168000000391",
-        "RESOURCENAME": "GSMP-0027",
-        "WORKCENTERNAME": "移印"
-      },
-      {
-        "RESOURCEFAMILYNAME": "SMP_強茂自製R",
         "RESOURCEID": "4880168000000393",
         "RESOURCENAME": "GSMP-0029",
         "WORKCENTERNAME": "移印"
@@ -7448,11 +7442,11 @@
         "WORKCENTERNAME": "點測"
       }
     ],
-    "total": 1241
+    "total": 1240
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:00.700698"
+    "timestamp": "2026-06-24T08:57:07.462464"
   },
   "success": true
 }

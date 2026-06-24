@@ -32,6 +32,11 @@
   gap: 16px;
 }
 
+/* Remove SectionCard body padding so DataTable sits flush to card edges */
+.theme-qc-gate .shared-section-card-body {
+  padding: 0 !important;
+}
+
 .theme-qc-gate .is-refreshing {
   box-shadow: 0 0 0 2px rgba(0, 128, 200, 0.12);
 }
@@ -52,6 +57,7 @@
   align-items: center;
   justify-content: center;
   min-height: 280px;
+  padding: 20px;
   color: var(--muted);
   font-size: 14px;
 }
@@ -75,7 +81,9 @@
 .theme-qc-gate .qc-gate-chart {
   min-height: 320px;
   padding: theme('spacing.token.p10') theme('spacing.token.p14') theme('spacing.token.p2');
+  transition: box-shadow 0.15s;
 }
+
 
 .theme-qc-gate .chart-canvas {
   width: 100%;
@@ -98,13 +106,13 @@
 }
 
 .theme-qc-gate .lot-table-wrap {
-  padding: theme('spacing.token.p12') theme('spacing.token.p14') theme('spacing.token.p16');
+  padding: 0;
 }
 
 .theme-qc-gate .filter-chip {
   display: inline-flex;
   align-items: center;
-  margin-bottom: theme('spacing.token.p10');
+  margin: 10px 12px 0;
   border: 1px solid theme('colors.token.h93c5fd');
   background: theme('colors.token.heff6ff');
   color: theme('colors.token.h1e40af');

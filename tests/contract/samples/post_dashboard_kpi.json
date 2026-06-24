@@ -5,19 +5,19 @@
     "eng": 0,
     "idle": 0,
     "nst": 0,
-    "other": 1241,
+    "other": 1240,
     "ou_pct": 0,
     "prd": 0,
     "run": 0,
     "run_pct": 0.0,
     "sby": 0,
     "sdt": 0,
-    "total": 1241,
+    "total": 1240,
     "udt": 0
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:59:01.162212"
+    "timestamp": "2026-06-24T08:57:07.960524"
   },
   "success": true
 }

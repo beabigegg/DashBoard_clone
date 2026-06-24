@@ -10,7 +10,7 @@
       "data": [],
       "total": 0
     },
-    "query_id": "88244da4cd752d2a",
+    "query_id": "60c188fcac1dafd7",
     "summary": {
       "heatmap": [],
       "kpi": {
@@ -40,7 +40,7 @@
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-20T11:57:55.807393"
+    "timestamp": "2026-06-24T08:56:02.686544"
   },
   "success": true
 }

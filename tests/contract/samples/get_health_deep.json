@@ -53,7 +53,7 @@
       "window_size": 10
     },
     "database": {
-      "latency_ms": 0.02,
+      "latency_ms": 0.0,
       "pool": {
         "checked_in": 0,
         "checked_out": 0,
@@ -118,7 +118,7 @@
     "query_p99_ms": 0.0,
     "slow_query_count": 0,
     "slow_query_rate": 0.0,
-    "worker_pid": 457163
+    "worker_pid": 1128754
   },
   "resilience": {
     "alerts": {
@@ -141,9 +141,9 @@
       "reason": "healthy"
     },
     "restart_churn": {
-      "count": 0,
+      "count": 1,
       "exceeded": false,
-      "last_completed_at": "2026-06-18T11:59:36.378493+00:00",
+      "last_completed_at": "2026-06-24T08:10:56.981804+00:00",
       "threshold": 3,
       "window_seconds": 600
     },
@@ -175,10 +175,10 @@
   },
   "status": "healthy",
   "system_memory": {
-    "available_mb": 3049.0,
+    "available_mb": 3387.0,
     "pressure": "normal",
-    "total_mb": 6506.0,
-    "used_pct": 53.1
+    "total_mb": 7612.0,
+    "used_pct": 55.5
   },
   "warnings": [
     "RQ Worker 離線，非同步查詢不可用"
