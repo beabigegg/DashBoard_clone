@@ -230,11 +230,10 @@ async function refreshDuckdbViews(): Promise<void> {
     }));
 
     // ES-1: populate top_reasons from DuckDB so TopReasonsTable is not permanently blank in DuckDB mode
-    // Map to TopReasonRow shape (types.ts): reason/status/hours/event_count/avg_min
-    // Status is not available per-reason in the aggregated view, omitted (empty string).
     summaryData.top_reasons = topReasons.map((r) => ({
       reason: r.reason,
-      status: '',
+      status: r.status,
+      big_category: r.big_category,
       hours: r.total_hours,
       event_count: r.event_count,
       avg_min: r.avg_min,
@@ -251,9 +250,9 @@ async function refreshDuckdbViews(): Promise<void> {
       egt_hours: r.egt_hours,
       total_hours: r.total_hours,
       event_count: r.event_count,
-      udt_event_count: 0,
-      sdt_event_count: 0,
-      egt_event_count: 0,
+      udt_event_count: r.udt_event_count,
+      sdt_event_count: r.sdt_event_count,
+      egt_event_count: r.egt_event_count,
       top_reason: null,
     }));
     equipmentData.pagination = {

@@ -291,19 +291,24 @@ export function useDowntimeData() {
           const baseSpoolUrl = `/api/spool/downtime_analysis_base_events/${resultQueryId}.parquet`;
           const jobsSpoolUrl = `/api/spool/downtime_analysis_job_bridge/${resultQueryId}.parquet`;
 
+          // Fetch taxonomy + resource_lookup that the job status doesn't carry.
+          let metaTaxonomy: TaxonomyShape = { map: [], prefixes: [], egt_category: '', fallback: '' };
+          let metaResourceLookup: Record<string, { resource_name: string | null; workcenter: string | null; family: string | null }> = {};
+          try {
+            const metaResp = await apiGet('/api/downtime-analysis/meta', { timeout: API_TIMEOUT, silent: true });
+            if (metaResp.success && metaResp.data) {
+              const d = metaResp.data as Record<string, unknown>;
+              if (d.taxonomy) metaTaxonomy = d.taxonomy as TaxonomyShape;
+              if (d.resource_lookup) metaResourceLookup = d.resource_lookup as typeof metaResourceLookup;
+            }
+          } catch (_) { /* non-fatal: degrade gracefully */ }
+
           queryId.value = resultQueryId;
           duckdbSpoolUrls.value = {
             base_spool_url: baseSpoolUrl,
             jobs_spool_url: jobsSpoolUrl,
-            // taxonomy is not in the job status response; use empty structure.
-            // The browser-DuckDB composable handles missing taxonomy gracefully.
-            taxonomy: {
-              map: [],
-              prefixes: [],
-              egt_category: '',
-              fallback: '',
-            },
-            resource_lookup: {},
+            taxonomy: metaTaxonomy,
+            resource_lookup: metaResourceLookup,
           };
           // Reset pre-aggregated summary data — all views come from DuckDB-WASM
           resetSummaryData();

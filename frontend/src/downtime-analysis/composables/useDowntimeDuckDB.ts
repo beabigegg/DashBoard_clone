@@ -84,6 +84,9 @@ export interface EquipmentDetailRow {
   egt_hours: number;
   total_hours: number;
   event_count: number;
+  udt_event_count: number;
+  sdt_event_count: number;
+  egt_event_count: number;
 }
 
 export interface EquipmentDetailResult {
@@ -136,6 +139,8 @@ export interface EventDetailResult {
 
 export interface TopReasonRow {
   reason: string;
+  status: string;
+  big_category: string;
   total_hours: number;
   event_count: number;
   avg_min: number;
@@ -827,12 +832,14 @@ export function useDowntimeDuckDB() {
     const rawSQL = `
       SELECT
         COALESCE(NULLIF(TRIM(CAST(OLDREASONNAME AS VARCHAR)), ''), '(無原因)') AS reason,
+        TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) AS status,
+        big_category,
         SUM(hours)   AS total_hours,
         COUNT(*)     AS event_count,
         CASE WHEN COUNT(*) > 0 THEN SUM(hours) / COUNT(*) * 60.0 ELSE 0 END AS avg_min
       FROM bridged_events
       ${where}
-      GROUP BY 1
+      GROUP BY 1, 2, 3
       ORDER BY total_hours DESC
       LIMIT ${limit}
     `;
@@ -840,6 +847,8 @@ export function useDowntimeDuckDB() {
     const rows = await _client!.sendQuery(sql);
     return (rows as Record<string, unknown>[]).map((row) => ({
       reason: String(row.reason ?? ''),
+      status: String(row.status ?? ''),
+      big_category: String(row.big_category ?? ''),
       total_hours: Math.round(sf(row.total_hours) * 100) / 100,
       event_count: Math.round(sf(row.event_count)),
       avg_min: Math.round(sf(row.avg_min) * 10) / 10,
@@ -873,7 +882,10 @@ export function useDowntimeDuckDB() {
         SUM(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'SDT' THEN hours ELSE 0 END) AS sdt_hours,
         SUM(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'EGT' THEN hours ELSE 0 END) AS egt_hours,
         SUM(hours) AS total_hours,
-        COUNT(*)   AS event_count
+        COUNT(*) AS event_count,
+        COUNT(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'UDT' THEN 1 END) AS udt_event_count,
+        COUNT(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'SDT' THEN 1 END) AS sdt_event_count,
+        COUNT(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'EGT' THEN 1 END) AS egt_event_count
       FROM bridged_events
       ${where}
       GROUP BY TRIM(CAST(HISTORYID AS VARCHAR))
@@ -895,6 +907,9 @@ export function useDowntimeDuckDB() {
         egt_hours: Math.round(sf(row.egt_hours) * 100) / 100,
         total_hours: Math.round(sf(row.total_hours) * 100) / 100,
         event_count: Math.round(sf(row.event_count)),
+        udt_event_count: Math.round(sf(row.udt_event_count)),
+        sdt_event_count: Math.round(sf(row.sdt_event_count)),
+        egt_event_count: Math.round(sf(row.egt_event_count)),
       };
     });
 

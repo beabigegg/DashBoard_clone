@@ -68,6 +68,13 @@ function groupMachineCount(status: string): number {
   return allMachinesForStatus(status).length;
 }
 
+function groupEventCount(status: string): number {
+  return allMachinesForStatus(status).reduce(
+    (sum, m) => sum + machineStatusEventCount(m, status),
+    0
+  );
+}
+
 /** Hours a specific machine has for a specific status */
 function machineStatusHours(machine: EquipmentDetailRow, status: string): number {
   const key = `${status.toLowerCase()}_hours` as keyof EquipmentDetailRow;
@@ -159,8 +166,8 @@ function handleMachineEventMount(resourceId: string, statusType: string): void {
             </td>
             <td>{{ groupHours(status).toFixed(1) }}h</td>
             <td>
-              {{ groupMachineCount(status) }} 台
-              <span v-if="groupMachineCount(status) > 50" class="top50-note">（顯示前50）</span>
+              {{ groupEventCount(status) }} 件
+              <span v-if="groupMachineCount(status) > 50" class="top50-note">（顯示前50台）</span>
             </td>
             <td></td>
           </tr>

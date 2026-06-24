@@ -118,6 +118,29 @@ def _csv_param(val: str | None) -> list[str] | None:
 
 
 # ============================================================
+# GET /api/downtime-analysis/meta  (taxonomy + resource_lookup for browser-DuckDB)
+# ============================================================
+
+
+@downtime_analysis_bp.route('/meta', methods=['GET'])
+def api_downtime_meta():
+    """Return taxonomy JSON and resource lookup needed by browser-DuckDB.
+
+    Called by the frontend after an async RQ job completes, because the job
+    status response doesn't carry these payloads.  Both fields come from Redis
+    and are fast to build (<10 ms typical).
+    """
+    from mes_dashboard.services.downtime_analysis_service import (
+        _build_taxonomy_json,
+        _build_resource_lookup,
+    )
+    return success_response({
+        'taxonomy': _build_taxonomy_json(),
+        'resource_lookup': _build_resource_lookup(),
+    })
+
+
+# ============================================================
 # GET /api/downtime-analysis/options
 # ============================================================
 
