@@ -524,7 +524,7 @@
 
 .theme-hold-overview .hold-filter-chip:hover .hold-filter-chip__x {
   background: theme('colors.brand.400');
-  color: theme('colors.hffffff');
+  color: theme('colors.white');
 }
 
 .theme-hold-overview .table-header {
