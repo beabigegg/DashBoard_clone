@@ -13,7 +13,7 @@ import { computed, onMounted, ref } from 'vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import PagesManagementPanel from './components/PagesManagementPanel.vue';
 import { apiGet } from '../core/api';
-import { routes as manifestRoutes } from '../portal-shell/navigationManifest.js';
+import { routes as manifestRoutes, drawers as manifestDrawers } from '../portal-shell/navigationManifest.js';
 
 interface PageStatus {
   route: string;
@@ -51,19 +51,27 @@ async function putJson<T>(url: string, payload: unknown): Promise<T> {
   return (body?.data ?? body) as T;
 }
 
-/** Join manifest display names onto a list of {route, status} items. */
-function joinManifestNames(statusList: PageStatus[]): PageDisplay[] {
-  return statusList.map((item) => {
-    const meta = manifestRoutes[item.route as keyof typeof manifestRoutes];
-    const name = meta?.displayName ?? item.route;
-    return { route: item.route, name, status: item.status };
-  });
-}
-
 async function loadPages(): Promise<void> {
   const res = await apiGet<{ pages: PageStatus[] }>('/admin/api/pages');
   const raw: PageStatus[] = ('data' in res ? res.data : null)?.pages ?? [];
-  pages.value = joinManifestNames(raw);
+  const statusMap = new Map(raw.map(p => [p.route, p.status]));
+
+  // Build drawer order lookup for sorting
+  const drawerOrder = new Map(manifestDrawers.map(d => [d.id, d.order]));
+
+  // Enumerate all non-standalone routes from manifest; overlay with API statuses
+  pages.value = Object.entries(manifestRoutes)
+    .filter(([, meta]) => meta.drawerId !== null)
+    .sort(([, a], [, b]) => {
+      const dA = drawerOrder.get(a.drawerId as string) ?? 99;
+      const dB = drawerOrder.get(b.drawerId as string) ?? 99;
+      return dA !== dB ? dA - dB : a.order - b.order;
+    })
+    .map(([route, meta]) => ({
+      route,
+      name: meta.displayName,
+      status: statusMap.get(route) ?? ((meta.defaultStatus ?? 'released') as 'released' | 'dev'),
+    }));
 }
 
 async function refreshAll(): Promise<void> {

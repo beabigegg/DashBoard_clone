@@ -1,6 +1,7 @@
 {
   "api_public": true,
   "statuses": {
-    "/admin/dashboard": "dev"
+    "/admin/dashboard": "dev",
+    "/query-tool": "released"
   }
 }
