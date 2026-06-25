@@ -19,6 +19,8 @@ const props = defineProps<{
   exporting?: boolean;
   selectedParetoCount?: number;
   selectedParetoSummary?: string;
+  sortCol?: string;
+  sortDir?: 'asc' | 'desc';
 }>();
 
 const emit = defineEmits<{
@@ -72,6 +74,9 @@ function onPageChange(newPage: number): void {
         :data="items"
         :loading="loading || paginating"
         :pagination="tablePagination"
+        :server-sort="true"
+        :controlled-sort-key="sortCol"
+        :controlled-sort-dir="sortDir"
         @page-change="onPageChange"
         @sort="(p) => emit('sort', p)"
       >
