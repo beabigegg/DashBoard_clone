@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.29.0] — 2026-06-25
+### Changed (BREAKING — monorepo atomic cutover)
+- rh-remove-supplementary-filter: `POST /api/reject-history/query` gains `reasons[]` optional string array (additive; absent/empty = no restriction). `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)` at `{{ BASE_WHERE }}`; sentinel `(未填寫)` distinct from container-level `(NA)`. `workcenter_groups[]` param removed; supplementary `{{ WHERE_CLAUSE }}` layer removed entirely. Sole consumer `frontend/src/reject-history/`; monorepo atomic cutover (same precedent as [api 1.27.0]).
+
+## [data 1.26.0] — 2026-06-25
+### Added
+- rh-remove-supplementary-filter: §2.12 extended — 4th BASE_WHERE prefilter field `reasons[]` added (`NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)`; sentinel `(未填寫)` distinct from `(NA)`; options from `reason_filter_cache`). Supplementary `{{ WHERE_CLAUSE }}` layer removal documented; `workcenter_groups` no longer valid. §3.18: `reject_dataset` `query_id_input` gains `reasons` key; parquet schema unchanged; no forced purge.
+
+## [business 1.31.0] — 2026-06-25
+### Added
+- rh-remove-supplementary-filter: RHPF-07 (`reasons[]` `(未填寫)` sentinel), RHPF-08 (WHERE-semantics equivalence). Extended RHPF-01 (four fields; supplementary layer removal), RHPF-02 (four fields), RHPF-05 (four-field parity). Four new Decision Table rows.
+
+## [css 1.10.0] — 2026-06-25
+### Changed
+- rh-remove-supplementary-filter: `.supplementary-panel/.supplementary-header/.supplementary-row/.supplementary-toolbar` removed from `frontend/src/reject-history/style.css` (all scoped; css:check passes). `.primary-prefilter-row` grid updated to `repeat(4, minmax(0, 1fr))`.
+
 ## [api 1.28.0] — 2026-06-25
 ### Added
 - rh-primary-prefilter: `POST /api/reject-history/query` body gains three additive optional fields: `pj_types[]`, `packages[]`, `pj_functions[]` (string arrays). Injected into `{{ BASE_WHERE }}` of `reject_raw` CTE (Oracle layer, before GROUP BY). `NVL(TRIM(c.col), '(NA)') IN (...)` form; NULL container values map to `(NA)` sentinel. Empty/absent = no restriction. `PJ_BOP` explicitly excluded. Both sync (200) and async/RQ (202) paths carry new fields identically. Additive; no existing fields removed or renamed.

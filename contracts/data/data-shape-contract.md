@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.25.0
+schema-version: 1.26.0
 last-changed: 2026-06-25
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1184,6 +1184,8 @@ The `production_history` and `reject_dataset` spool parquet schemas are **explic
 
 Any future column rename, addition, or removal in either namespace **must** bump `_SCHEMA_VERSION` (or equivalent) and require parquet cleanup per the standard breaking-change policy.
 
+**Cache-key composition update (rh-remove-supplementary-filter):** `query_id_input` for `reject_dataset` now includes a `reasons` key (alongside the existing `pj_types`, `packages`, `pj_functions` from rh-primary-prefilter). The parquet column schema is unchanged. Adding `reasons` to the cache key prevents cross-selection cache bleed. Existing cache entries keyed without `reasons` are distinct from new entries keyed with `reasons` (even empty `reasons=[]`); production cache entries from before this change will miss and regenerate naturally — no forced purge required, as the key format changes.
+
 ---
 
 ### §3.19 Resource History Base and OEE Dataset Spool Schema — UNCHANGED Assertion (P3 Migration)
@@ -1358,9 +1360,9 @@ Frontend code-owned, single source of truth for navigation **structure** (drawer
 
 ### §2.12 Reject-History Primary Query — Request-Side Filter Params (`POST /api/reject-history/query`)
 
-Three optional prefilter fields added by change `rh-primary-prefilter`. All inject into the `{{ BASE_WHERE }}`
-placeholder of the `reject_raw` CTE in `performance_daily_lot.sql`, BEFORE the GROUP BY clause. This is
-distinct from the `{{ WHERE_CLAUSE }}` injection point used by supplementary (DuckDB/cache-layer) filters.
+Four optional prefilter fields that inject into the `{{ BASE_WHERE }}` placeholder of the `reject_raw` CTE
+in `performance_daily_lot.sql`, BEFORE the GROUP BY clause. The supplementary `{{ WHERE_CLAUSE }}` layer
+(workcenter_groups, packages, reasons, types) is fully removed as of change `rh-remove-supplementary-filter`.
 
 ```json
 {
@@ -1368,7 +1370,8 @@ distinct from the `{{ WHERE_CLAUSE }}` injection point used by supplementary (Du
   "end_date": "YYYY-MM-DD",
   "pj_types":     ["<string>"],
   "packages":     ["<string>"],
-  "pj_functions": ["<string>"]
+  "pj_functions": ["<string>"],
+  "reasons":      ["<string>"]
 }
 ```
 
@@ -1379,8 +1382,9 @@ distinct from the `{{ WHERE_CLAUSE }}` injection point used by supplementary (Du
 | `pj_types` | `string[]` | no | `DWH.DW_MES_CONTAINER.PJ_TYPE` | `NVL(TRIM(c.PJ_TYPE), '(NA)') IN (:bind_list)` |
 | `packages` | `string[]` | no | `DWH.DW_MES_CONTAINER.PRODUCTLINENAME` | `NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN (:bind_list)` |
 | `pj_functions` | `string[]` | no | `DWH.DW_MES_CONTAINER.PJ_FUNCTION` | `NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN (:bind_list)` |
+| `reasons` | `string[]` | no | `DWH.DW_MES_LOTREJECTHISTORY.LOSSREASONNAME` | `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (:bind_list)` |
 
-#### NULL / `(NA)` Sentinel Semantics
+#### NULL / `(NA)` Sentinel Semantics — container-level fields
 
 - Source columns come from a `LEFT JOIN DWH.DW_MES_CONTAINER c`; when a lot has no container record,
   `c.PJ_TYPE / c.PRODUCTLINENAME / c.PJ_FUNCTION` is Oracle NULL.
@@ -1389,29 +1393,50 @@ distinct from the `{{ WHERE_CLAUSE }}` injection point used by supplementary (Du
   sentinel and participate in the `IN (...)` match.
 - Selecting `(NA)` in the UI returns exactly those rows where the container lookup yielded no match.
 
+#### NULL / `(未填寫)` Sentinel Semantics — `reasons[]`
+
+- Source column is `LOTREJECTHISTORY.LOSSREASONNAME` (not a container column; no LEFT JOIN miss scenario).
+- `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)')` maps every Oracle NULL or blank-after-trim to `(未填寫)`.
+- Sentinel `(未填寫)` is distinct from `(NA)` — they cannot be confused.
+- Selecting `(未填寫)` in the UI returns reject records where LOSSREASONNAME is null or blank.
+- Options for `reasons[]` are sourced from `GET /api/reject-history/options` (via `reason_filter_cache.get_reject_reasons()`). No new endpoint required.
+- Bind param prefix: `reason_0`, `reason_1`, … (distinct from `pt_`, `pkg_`, `pf_` used by container fields).
+
 #### Injection Point
 
-- These filters are injected into `{{ BASE_WHERE }}` — the primary CTE clause applied **before** Oracle
+- All four fields are injected into `{{ BASE_WHERE }}` — the primary CTE clause applied **before** Oracle
   executes the `GROUP BY` inside `reject_raw`. This reduces I/O and GROUP BY cardinality at the Oracle layer.
-- The supplementary filter layer (`{{ WHERE_CLAUSE }}`) is applied to the materialized base result and is
-  a separate injection point. Both may be active simultaneously.
+- The supplementary filter layer (`{{ WHERE_CLAUSE }}`) is fully removed by change `rh-remove-supplementary-filter`.
+  `workcenter_groups` is no longer a valid request parameter.
 
 #### Parity Rule
 
-- The same three fields must be present and forwarded identically by both the sync (HTTP 200) and
-  async/RQ (HTTP 202) job paths.
-- Spool/cache keys for the `reject_dataset` namespace must include all three fields (even when empty —
+- The same four fields (`pj_types`, `packages`, `pj_functions`, `reasons`) must be present and forwarded
+  identically by both the sync (HTTP 200) and async/RQ (HTTP 202) job paths.
+- Spool/cache keys for the `reject_dataset` namespace must include all four fields (even when empty —
   empty encodes as no-restriction, but the key must reflect the effective filter state).
+
+#### Supplementary Filter Layer Removal
+
+The `{{ WHERE_CLAUSE }}` supplementary filter layer (previously applied to the materialized base result at the
+DuckDB/cache layer) is removed by change `rh-remove-supplementary-filter`. The following fields are no longer
+accepted as request params: `workcenter_groups`, and the supplementary forms of `packages`, `reasons`, `types`.
+The `{{ BASE_WHERE }}` layer (documented above) is now the sole filter injection point for reject-history queries.
 
 #### Scope Exclusions
 
 - `PJ_BOP` is explicitly excluded: `performance_daily_lot.sql` does not JOIN or SELECT `PJ_BOP`.
-- Options are sourced from the shared `container_filter_cache` (same as `GET /api/production-history/filter-options`).
+- Options for `pj_types`/`packages`/`pj_functions` from shared `container_filter_cache`.
+- Options for `reasons` from `reason_filter_cache` via `GET /api/reject-history/options`.
 
-Added by change `rh-primary-prefilter`.
+Added by changes `rh-primary-prefilter` (fields 1–3) and `rh-remove-supplementary-filter` (field 4 + supplementary removal).
 
 
 ## CHANGELOG
+## [data 1.26.0] — 2026-06-25
+### Added
+- rh-remove-supplementary-filter: §2.12 extended — added `reasons[]` as the 4th BASE_WHERE prefilter field. SQL form: `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (:reason_0, ...)`. Sentinel `(未填寫)` for null/blank LOSSREASONNAME is distinct from container-level `(NA)`. Bind prefix `reason_`. Options from `reason_filter_cache` via `GET /api/reject-history/options`. Updated JSON example (4 fields), field table (4 rows), parity rule (now covers all 4 fields). Added `(未填寫)` sentinel subsection. Added supplementary filter layer removal note (`{{ WHERE_CLAUSE }}` layer removed; `workcenter_groups` no longer a valid param). §3.18 cache-key composition note: `reject_dataset` `query_id_input` gains `reasons` key; parquet column schema unchanged; no forced purge needed. Additive to §2.12; supplementary-layer removal is a behavioral change with no data schema impact.
+
 ## [data 1.25.0] — 2026-06-25
 ### Added
 - rh-primary-prefilter: §2.12 (Reject-History Primary Query request-side filter params). Documents three new

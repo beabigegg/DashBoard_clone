@@ -1185,3 +1185,145 @@ class TestResourceHistoryCsvMidStreamSentinel:
         combined = "".join(chunks)
         # resource_history_service yields "Error: <msg>\n" on exception
         assert "Error:" in combined
+
+
+# ============================================================
+# rh-remove-supplementary-filter: route extraction/forwarding tests
+# ============================================================
+
+
+class TestRejectHistoryRoutesReasonForwarding(TestRejectHistoryRoutesBase):
+    """AC-3 / AC-5: reasons[] forwarded; workcenter_groups absent from query kwargs."""
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=False)
+    def test_route_extracts_reasons_and_forwards(self, _mock_cache, _mock_rl):
+        """reasons[] sent in body must be forwarded per-kwarg in job_params."""
+        captured_params = {}
+
+        def _capture_enqueue(mode, params, owner):
+            captured_params.update(params)
+            return ("reject-reasons-001", None)
+
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            side_effect=_capture_enqueue,
+        ):
+            response = self.client.post(
+                "/api/reject-history/query",
+                json={
+                    "mode": "date_range",
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-10",
+                    "reasons": ["001_CRACK", "002_BREAK"],
+                    "pj_types": [],
+                    "packages": [],
+                    "pj_functions": [],
+                },
+            )
+
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(payload["success"])
+        self.assertIn("reasons", captured_params)
+        self.assertEqual(sorted(captured_params["reasons"]), ["001_CRACK", "002_BREAK"])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=False)
+    def test_route_reasons_empty_no_sql(self, _mock_cache, _mock_rl):
+        """reasons=[] forwarded as empty list (no SQL restriction)."""
+        captured_params = {}
+
+        def _capture_enqueue(mode, params, owner):
+            captured_params.update(params)
+            return ("reject-reasons-empty", None)
+
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            side_effect=_capture_enqueue,
+        ):
+            response = self.client.post(
+                "/api/reject-history/query",
+                json={
+                    "mode": "date_range",
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-10",
+                    "reasons": [],
+                },
+            )
+
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 202)
+        self.assertIn("reasons", captured_params)
+        self.assertEqual(captured_params["reasons"], [])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=False)
+    def test_route_workcenter_groups_no_longer_extracted(self, _mock_cache, _mock_rl):
+        """workcenter_groups must NOT appear in job_params (removed from extraction)."""
+        captured_params = {}
+
+        def _capture_enqueue(mode, params, owner):
+            captured_params.update(params)
+            return ("reject-no-wc", None)
+
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            side_effect=_capture_enqueue,
+        ):
+            response = self.client.post(
+                "/api/reject-history/query",
+                json={
+                    "mode": "date_range",
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-10",
+                    "workcenter_groups": ["WB"],
+                    "reasons": [],
+                },
+            )
+
+        payload = json.loads(response.data)
+        self.assertEqual(response.status_code, 202)
+        # workcenter_groups must be absent from job_params
+        self.assertNotIn("workcenter_groups", captured_params)
+        # But reasons must be present
+        self.assertIn("reasons", captured_params)
+
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_sync_cache_hit_forwards_reasons(self, mock_execute):
+        """On cache-hit (sync 200 path), reasons must be in execute_primary_query kwargs."""
+        mock_execute.return_value = {
+            "query_id": "qid-reasons-sync",
+            "analytics_raw": [],
+            "summary": {},
+            "trend": {"items": [], "granularity": "day"},
+            "detail": {"items": [], "pagination": {"page": 1, "perPage": 50, "total": 0, "totalPages": 1}},
+            "available_filters": {},
+            "meta": {},
+        }
+
+        with patch(
+            "mes_dashboard.routes.reject_history_routes._has_cached_df",
+            return_value=True,
+        ):
+            response = self.client.post(
+                "/api/reject-history/query",
+                json={
+                    "mode": "date_range",
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-10",
+                    "reasons": ["001_A"],
+                    "pj_types": [],
+                    "packages": [],
+                    "pj_functions": [],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        kwargs = mock_execute.call_args.kwargs
+        self.assertIn("reasons", kwargs)
+        self.assertEqual(kwargs["reasons"], ["001_A"])
+        self.assertNotIn("workcenter_groups", kwargs)

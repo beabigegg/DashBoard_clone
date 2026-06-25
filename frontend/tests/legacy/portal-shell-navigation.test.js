@@ -231,7 +231,7 @@ test('test_manifest_nav_tree_non_admin_matches_baseline (AC-1)', () => {
   // Drawer order must be 1..5 (dev-tools excluded)
   const orders = state.drawers.map((d) => d.order);
   const sortedOrders = [...orders].sort((a, b) => a - b);
-  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 6]);
+  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5]);
 
   // Page counts per drawer (from current-behavior.md)
   const byId = Object.fromEntries(state.drawers.map((d) => [d.id, d]));

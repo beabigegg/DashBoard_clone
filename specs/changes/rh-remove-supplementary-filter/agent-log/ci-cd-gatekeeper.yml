@@ -1,0 +1,17 @@
+agent: ci-cd-gatekeeper
+change-id: rh-remove-supplementary-filter
+date: 2026-06-25
+status: complete
+
+summary: >
+  Wrote ci-gates.md for Tier 1/2 gate coverage. No new workflow files needed;
+  all gates run under existing backend-tests.yml, frontend-tests.yml,
+  openapi-sync.yml, and contract-driven-gates.yml. Key gates: openapi-sync
+  (both exports), css:check Rule 6, reject-history Playwright E2E, and
+  cdd-kit validate --versions for the four contract version bumps.
+
+artifacts:
+  - { type: tiers-modified, pointer: "1, 2" }
+  - { type: gate-promotions, pointer: "n/a (no tier moves; all gates map to existing tiers)" }
+  - { type: workflow-files-changed, pointer: "n/a (no workflow files modified; existing workflows sufficient)" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, contract-validators, openapi-sync, css-governance, frontend-unit-vitest, reject-history-e2e" }

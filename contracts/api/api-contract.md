@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.28.0
+schema-version: 1.29.0
 last-changed: 2026-06-25
 breaking-change-policy: deprecate-2-minors
 ---
@@ -135,7 +135,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/reject-history/export-cached | required | ?query_id= | GenericSuccessResponse | 400/410 | e2e tests |
 | POST | /api/reject-history/export-cached | required | JSON body | GenericSuccessResponse | 400/410 | e2e tests |
 | GET | /api/reject-history/analytics | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
-| POST | /api/reject-history/query | required | JSON body `{start_date, end_date, pj_types?(opt,list), packages?(opt,list), pj_functions?(opt,list), ...existing}` | GenericSuccessResponse | 202/400/500 | route tests |
+| POST | /api/reject-history/query | required | JSON body `{start_date, end_date, pj_types?(opt,list), packages?(opt,list), pj_functions?(opt,list), reasons?(opt,list)}` | GenericSuccessResponse | 202/400/500 | route tests |
 | GET | /api/reject-history/count | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/reject-history/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
 | GET | /api/reject-history/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
@@ -455,8 +455,11 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 - **rh-primary-prefilter (2026-06-25):** `POST /api/reject-history/query` body gains three new optional fields (additive, backward-compatible when absent): `pj_types[]`, `packages[]`, `pj_functions[]` (all string arrays). Injected into `{{ BASE_WHERE }}` of `reject_raw` CTE (Oracle-layer, before GROUP BY) via `NVL(TRIM(c.col), '(NA)') IN (...)` — NULL container values map to sentinel `(NA)`, not silently dropped. Empty list or field absent = no restriction. `PJ_BOP` not included. Options from shared `container_filter_cache`. Parity: same fields in both sync+async/RQ paths and spool/cache keys. Sole consumer: `frontend/src/reject-history/`.
 
+- **rh-remove-supplementary-filter (2026-06-25):** `POST /api/reject-history/query` body gains `reasons[]` optional string array (additive; absent/empty = no restriction). Injected into `{{ BASE_WHERE }}` of `reject_raw` CTE via `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (:reason_0, ...)` with `reason_`-prefixed bind params. Sentinel `(未填寫)` for null/blank LOSSREASONNAME is distinct from the `(NA)` sentinel used for container-level fields. `workcenter_groups[]` param removed — supplementary `{{ WHERE_CLAUSE }}` filter section (workcenter_groups, packages, reasons, types) fully removed. Breaking for callers sending `workcenter_groups`; sole consumer is monorepo frontend, atomic cutover, no deprecation window (same precedent as [api 1.27.0]).
+
 ## CHANGELOG
 
+- **[api 1.29.0] — 2026-06-25 (rh-remove-supplementary-filter):** `POST /api/reject-history/query` gains `reasons[]` optional string array (additive; absent/empty = no restriction). `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)` at `{{ BASE_WHERE }}` layer; sentinel `(未填寫)` distinct from container-level `(NA)`. `workcenter_groups[]` param removed; supplementary `{{ WHERE_CLAUSE }}` layer removed entirely. Sole consumer `frontend/src/reject-history/`; monorepo atomic cutover (same precedent as [api 1.27.0]).
 - **[api 1.28.0] — 2026-06-25 (rh-primary-prefilter):** `POST /api/reject-history/query` body gains three new optional fields: `pj_types[]`, `packages[]`, `pj_functions[]` (string arrays; absent or empty = no restriction). Injected into `{{ BASE_WHERE }}` of `reject_raw` CTE (Oracle-layer, before GROUP BY). SQL form: `NVL(TRIM(c.col), '(NA)') IN (...)` — NULL container values map to `(NA)` sentinel, not silently dropped. `PJ_BOP` explicitly excluded. Options from shared `container_filter_cache`. Both sync (200) and async/RQ (202) paths carry new fields identically. Additive; no existing fields removed or renamed.
 - **[api 1.27.0] — 2026-06-24 (nav-config-to-code):** Removed BREAKING: `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}` all return **404**. `name`/`drawer_id`/`order` removed from `GET /admin/api/pages` response body and `PUT /admin/api/pages` accepted body. Changed: `GET /api/portal/navigation` response drops `drawers`, adds `statuses` map; response schema renamed `GenericSuccessResponse` → `PortalNavigationResponse`. Added: `AdminPagesResponse` schema; `PUT /admin/api/pages/{route}` row. No deprecation window — monorepo atomic cutover.
 - **WIP detail async 202 routing (2026-06-20, wip-rq-worker-chunks-cleanup)**: `GET/POST /api/wip/detail/<workcenter>` now returns HTTP 202 + `{async: true, job_id, status_url}` when row count ≥ L3 (200,000) and RQ worker available. Sync 200 path is unchanged when row count < L3 or worker unavailable (fail-open). New spool namespace `wip_dataset` added to `/api/spool` whitelist. New schema `WipDetailJobAccepted`. Type B async; `prefix=wip-detail` for job status polling. Additive; no existing fields removed or renamed. Worker ships inert until `stress-soak-report.md` sign-off (see ci-gates.md §Promotion Policy).

@@ -1,0 +1,48 @@
+agent: backend-engineer
+change-id: rh-remove-supplementary-filter
+session-date: 2026-06-25
+status: complete
+
+summary: |
+  Implemented IP-1 through IP-6 (all backend items). Added reasons[] as a
+  4th primary Oracle prefilter through all three query paths (sync, legacy-async,
+  unified-job). workcenter_groups intentionally NOT extracted in /query POST path.
+  22 new test functions across 6 test files. All 3 required phases pass; gate passes.
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/reject_history_service.py:281-342 (_build_base_where reasons kwarg)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/reject_history_routes.py:641-824 (reasons parsing + forwarding)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/reject_dataset_cache.py:805-920 (execute_primary_query reasons kwarg + query_id_input)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/reject_query_job_service.py:153-194 (execute_reject_query_job reasons)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/workers/reject_history_worker.py:75-176 (pre_query reasons + binds)"
+  - type: tests-added
+    pointer: "tests/test_reject_history_service.py::test_build_base_where_reasons_single..test_build_where_clause_workcenter_groups_removed (8 tests)"
+  - type: tests-added
+    pointer: "tests/test_reject_history_routes.py::TestRejectHistoryRoutesReasonForwarding (4 tests)"
+  - type: tests-added
+    pointer: "tests/test_reject_dataset_cache.py::test_query_id_input_includes_reasons_key, test_query_id_distinct_different_reasons"
+  - type: tests-added
+    pointer: "tests/test_reject_query_job_service.py::TestExecuteRejectQueryJobReasonsForwarding (2 tests)"
+  - type: tests-added
+    pointer: "tests/test_reject_history_async_routes.py::TestRejectHistoryQueryPrefilterAsyncRoutes::test_async_route_forwards_reasons_to_job_params, test_async_route_workcenter_groups_absent_from_job_params"
+  - type: tests-added
+    pointer: "tests/test_reject_history_unified_job.py::TestRejectHistoryJobReasonsPlumbing (2 tests)"
+  - type: test-output
+    pointer: "206 passed in 4.78s (targeted phase); gate passed"
+  - type: contracts-touched
+    pointer: "n/a (contract edits are IP-12, owned by contract-reviewer agent)"
+
+notes:
+  - IP-2 scope: _build_where_clause keeps workcenter_groups/packages/reasons/categories because
+    the GET /view supplementary filter layer (apply_view → _apply_supplementary_filters) still
+    uses these. Only the POST /query primary-prefilter path was changed. Test
+    test_build_where_clause_workcenter_groups_removed documents this explicitly.
+  - alias r (not c) confirmed for LOSSREASONNAME in reject_raw CTE.
+  - sentinel '(未填寫)' (not '(NA)') used for NULL LOSSREASONNAME mapping.
+  - rate-limit mock added to 3 route tests in TestRejectHistoryRoutesReasonForwarding to
+    prevent 429 cross-contamination when run after other test classes.

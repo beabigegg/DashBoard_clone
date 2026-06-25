@@ -1,0 +1,15 @@
+{
+  "change_id": "rh-remove-supplementary-filter",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard cdd-kit validate --contracts 2>&1",
+  "duration_ms": 3240,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-204019/summary.json",
+    "stdout": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-204019/stdout.log",
+    "stderr": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-204019/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

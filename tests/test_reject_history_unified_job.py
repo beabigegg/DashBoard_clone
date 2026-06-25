@@ -297,3 +297,172 @@ class TestOomGuardAbsence:
             f"Found {len(offenders)} OOM guard raise pattern(s) in reject_dataset_cache.py "
             f"(AC-4 violation). Lines: {[o.lineno for o in offenders]}"
         )
+
+
+class TestRejectHistoryJobChunkToDuckDB:
+    """Regression: chunk_to_duckdb must use explicit DDL to prevent NULL-column INT32 inference.
+
+    When the first time-chunk returns no reject records, REJECTCOMMENT (and other
+    string columns) arrive as pa.null() in the Arrow batch. The base-class
+    'CREATE TABLE AS SELECT ... WHERE 1=0' then infers INT32 for those columns.
+    Subsequent chunks with real string values then fail with ConversionException.
+
+    Fix: RejectHistoryJob.chunk_to_duckdb overrides the base class to use an
+    explicit DDL (VARCHAR/BIGINT/DOUBLE) and INSERT BY NAME.
+    """
+
+    def test_null_rejectcomment_then_real_string_no_conversion_error(self, tmp_path):
+        """First batch has NULL REJECTCOMMENT; second batch has real string — must not raise."""
+        import duckdb
+
+        from mes_dashboard.workers.reject_history_worker import RejectHistoryJob
+
+        job = RejectHistoryJob.__new__(RejectHistoryJob)
+        job.job_id = "test-null-rejectcomment"
+        import threading
+        job._writer_lock = threading.Lock()
+
+        duckdb_path = str(tmp_path / "test.duckdb")
+
+        # Batch 1: all nulls in REJECTCOMMENT (simulates first chunk with no reject records)
+        null_batch = pa.record_batch({
+            "TXN_TIME": pa.array(["2026-01-01"], type=pa.string()),
+            "TXN_DAY": pa.array(["2026-01-01"], type=pa.string()),
+            "TXN_MONTH": pa.array(["2026-01"], type=pa.string()),
+            "WORKCENTER_GROUP": pa.array([None], type=pa.string()),
+            "WORKCENTERSEQUENCE_GROUP": pa.array([None], type=pa.string()),
+            "WORKCENTERNAME": pa.array(["WC1"], type=pa.string()),
+            "SPECNAME": pa.array([None], type=pa.string()),
+            "EQUIPMENTNAME": pa.array([None], type=pa.string()),
+            "PRODUCTLINENAME": pa.array(["PKG-A"], type=pa.string()),
+            "SCRAP_OBJECTTYPE": pa.array([None], type=pa.string()),
+            "PJ_TYPE": pa.array(["AP"], type=pa.string()),
+            "CONTAINERNAME": pa.array(["LOT001"], type=pa.string()),
+            "PJ_WORKORDER": pa.array([None], type=pa.string()),
+            "PJ_FUNCTION": pa.array(["FUNC1"], type=pa.string()),
+            "PRODUCTNAME": pa.array(["PROD-A"], type=pa.string()),
+            "LOSSREASONNAME": pa.array(["REASON-X"], type=pa.string()),
+            "LOSSREASON_CODE": pa.array(["CODE-X"], type=pa.string()),
+            "REJECTCOMMENT": pa.array([None], type=pa.null()),  # NULL — triggers bug
+            "AFFECTED_WORKORDER_COUNT": pa.array([0], type=pa.int64()),
+            "MOVEIN_QTY": pa.array([100.0], type=pa.float64()),
+            "REJECT_QTY": pa.array([0.0], type=pa.float64()),
+            "REJECT_TOTAL_QTY": pa.array([0.0], type=pa.float64()),
+            "DEFECT_QTY": pa.array([0.0], type=pa.float64()),
+            "STANDBY_QTY": pa.array([0.0], type=pa.float64()),
+            "QTYTOPROCESS_QTY": pa.array([0.0], type=pa.float64()),
+            "INPROCESS_QTY": pa.array([0.0], type=pa.float64()),
+            "PROCESSED_QTY": pa.array([0.0], type=pa.float64()),
+            "REJECT_RATE_PCT": pa.array([0.0], type=pa.float64()),
+            "DEFECT_RATE_PCT": pa.array([0.0], type=pa.float64()),
+            "REJECT_SHARE_PCT": pa.array([0.0], type=pa.float64()),
+        })
+
+        # Batch 2: REJECTCOMMENT has a real Chinese string value
+        real_batch = pa.record_batch({
+            **{k: null_batch.column(k) for k in null_batch.schema.names if k != "REJECTCOMMENT"},
+            "REJECTCOMMENT": pa.array(["自動上料異常"], type=pa.string()),
+        })
+
+        # Must not raise ConversionException
+        job.chunk_to_duckdb(null_batch, duckdb_path)
+        job.chunk_to_duckdb(real_batch, duckdb_path)
+
+        # Verify REJECTCOMMENT was correctly stored as VARCHAR
+        con = duckdb.connect(duckdb_path)
+        rows = con.execute("SELECT REJECTCOMMENT FROM raw ORDER BY REJECTCOMMENT NULLS LAST").fetchall()
+        con.close()
+        assert rows[0][0] == "自動上料異常"
+        assert rows[1][0] is None
+
+    def test_chunk_to_duckdb_override_present(self):
+        """RejectHistoryJob must override chunk_to_duckdb (explicit DDL, not inherited)."""
+        from mes_dashboard.workers.reject_history_worker import RejectHistoryJob
+        from mes_dashboard.core.base_chunked_duckdb_job import BaseChunkedDuckDBJob
+
+        assert RejectHistoryJob.chunk_to_duckdb is not BaseChunkedDuckDBJob.chunk_to_duckdb, (
+            "RejectHistoryJob.chunk_to_duckdb must be overridden to use explicit DDL; "
+            "the base class infers types from first batch which causes INT32 for NULL columns."
+        )
+
+
+# ============================================================
+# rh-remove-supplementary-filter: unified job reasons plumbing tests
+# ============================================================
+
+
+class TestRejectHistoryJobReasonsPlumbing:
+    """AC-4: reasons in unified job pre_query and query_id_input."""
+
+    def test_unified_job_parses_reasons_from_params(self, tmp_path, monkeypatch):
+        """RejectHistoryJob.pre_query() must parse reasons from job params."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.reject_history_worker import RejectHistoryJob
+
+        job = RejectHistoryJob("test-rh-reasons-001", params={
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-10",
+            "reasons": ["001_CRACK", "002_BREAK"],
+            "include_excluded_scrap": False,
+            "exclude_material_scrap": False,
+            "exclude_pb_diode": False,
+        })
+
+        captured_base_where_calls = []
+        original_build_base_where = None
+
+        import mes_dashboard.services.reject_history_service as _svc
+        original_build_base_where = _svc._build_base_where
+
+        def _capturing_build_base_where(*args, **kwargs):
+            captured_base_where_calls.append(kwargs)
+            return original_build_base_where(*args, **kwargs)
+
+        monkeypatch.setattr(_svc, "_build_base_where", _capturing_build_base_where)
+
+        with patch("mes_dashboard.services.reject_dataset_cache._make_query_id",
+                   return_value="rh-reasons-test123"), \
+             patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value=None):
+            job.pre_query()
+
+        # reasons must have been passed to _build_base_where
+        assert len(captured_base_where_calls) >= 1
+        last_call = captured_base_where_calls[-1]
+        assert "reasons" in last_call
+        assert sorted(last_call["reasons"]) == ["001_CRACK", "002_BREAK"]
+
+    def test_unified_job_reasons_in_query_id_input(self, tmp_path, monkeypatch):
+        """RejectHistoryJob.pre_query() must include reasons in query_id_input."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.reject_history_worker import RejectHistoryJob
+        from mes_dashboard.services.reject_dataset_cache import _CACHE_SCHEMA_VERSION
+
+        captured_query_id_inputs = []
+
+        import mes_dashboard.services.reject_dataset_cache as cache_mod
+        original_make = cache_mod._make_query_id
+
+        def _capturing_make(params):
+            captured_query_id_inputs.append(dict(params))
+            return original_make(params)
+
+        monkeypatch.setattr(cache_mod, "_make_query_id", _capturing_make)
+
+        job = RejectHistoryJob("test-rh-qid-001", params={
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-10",
+            "reasons": ["001_A"],
+            "include_excluded_scrap": False,
+            "exclude_material_scrap": False,
+            "exclude_pb_diode": False,
+        })
+
+        with patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value=None):
+            job.pre_query()
+
+        # Find the query_id_input call that contains the cache_schema_version
+        main_inputs = [c for c in captured_query_id_inputs if "cache_schema_version" in c]
+        assert len(main_inputs) >= 1, "query_id_input must be passed to _make_query_id"
+        qi = main_inputs[0]
+        assert "reasons" in qi, "reasons must be in query_id_input"
+        assert qi["reasons"] == ["001_A"]

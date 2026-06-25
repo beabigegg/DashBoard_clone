@@ -154,6 +154,7 @@ def execute_reject_query_job(
         _pj_types = sorted({str(v).strip() for v in (params.get("pj_types") or []) if str(v).strip()})
         _packages = sorted({str(v).strip() for v in (params.get("packages") or []) if str(v).strip()})
         _pj_functions = sorted({str(v).strip() for v in (params.get("pj_functions") or []) if str(v).strip()})
+        _reasons = sorted({str(v).strip() for v in (params.get("reasons") or []) if str(v).strip()})
         query_id_input = {
             "cache_schema_version": _CACHE_SCHEMA_VERSION,
             "mode": mode,
@@ -164,6 +165,7 @@ def execute_reject_query_job(
             "pj_types": _pj_types,
             "packages": _packages,
             "pj_functions": _pj_functions,
+            "reasons": _reasons,
         }
         query_id = _make_query_id(query_id_input)
 
@@ -188,6 +190,7 @@ def execute_reject_query_job(
             pj_types=params.get("pj_types") or [],
             packages=params.get("packages") or [],
             pj_functions=params.get("pj_functions") or [],
+            reasons=params.get("reasons") or [],
         )
 
         complete_job(_JOB_PREFIX, job_id, query_id=query_id)

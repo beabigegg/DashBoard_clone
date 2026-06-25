@@ -1,0 +1,19 @@
+{
+  "change_id": "rh-remove-supplementary-filter",
+  "phase": "targeted",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest tests/test_reject_history_service.py tests/test_reject_history_routes.py tests/test_reject_history_async_routes.py tests/test_reject_dataset_cache.py tests/test_reject_query_job_service.py tests/test_reject_history_unified_job.py -v 2>&1",
+  "duration_ms": 6312,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests/test_reject_history_service.py::test_build_base_where_reasons_single",
+    "message": "TypeError: _build_base_where() got an unexpected keyword argument 'reasons'"
+  },
+  "artifacts": {
+    "summary": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-203047/summary.json",
+    "stdout": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-203047/stdout.log",
+    "stderr": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-203047/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

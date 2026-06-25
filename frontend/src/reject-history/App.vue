@@ -49,20 +49,7 @@ interface CommittedPrimary {
   includeExcludedScrap: boolean;
   excludeMaterialScrap: boolean;
   excludePbDiode: boolean;
-}
-
-interface SupplementaryFilters {
-  packages: string[];
-  workcenterGroups: string[];
   reasons: string[];
-  types: string[];
-}
-
-interface AvailableFiltersState {
-  workcenterGroups: string[];
-  packages: string[];
-  reasons: string[];
-  types: string[];
 }
 
 interface LoadingState {
@@ -145,6 +132,11 @@ interface PrimaryPrefilterOptions {
   pj_functions: string[];
 }
 
+/** Options received from GET /api/reject-history/options for 報廢原因 primary prefilter. */
+interface RejectHistoryOptions {
+  reasons: string[];
+}
+
 interface KpiCard {
   key: string;
   label: string;
@@ -219,18 +211,21 @@ const containerInput = ref<string>('');
 const primaryPjTypes = ref<string[]>([]);
 const primaryPackages = ref<string[]>([]);
 const primaryPjFunctions = ref<string[]>([]);
+const primaryReasons = ref<string[]>([]);
 
 const primaryPrefilterOptions = ref<PrimaryPrefilterOptions>({
   pj_types: [],
   packages: [],
   pj_functions: [],
 });
+const primaryReasonOptions = ref<string[]>([]);
 const primaryPrefilterLoading = ref<boolean>(false);
 
 let _primaryPrefilterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let _primaryPrefilterInFlightToken = 0;
 
-/** Fetch cross-filter options from the shared container_filter_cache endpoint.
+/** Fetch cross-filter options from the shared container_filter_cache endpoint,
+ * and 報廢原因 options from /api/reject-history/options.
  * Called on mount (empty selection → full distinct sets) and after dropdown-close events.
  */
 async function fetchPrimaryPrefilterOptions(): Promise<void> {
@@ -244,7 +239,10 @@ async function fetchPrimaryPrefilterOptions(): Promise<void> {
 
     const url = _buildUrl('/api/production-history/filter-options', selected);
     // TODO: type — apiGet returns untyped result from core/api (JS); cast via unknown
-    const resp = (await apiGet(url)) as { data?: CachedFilterSelection };
+    const [resp, reasonsResp] = await Promise.all([
+      apiGet(url) as Promise<{ data?: CachedFilterSelection }>,
+      apiGet('/api/reject-history/options') as Promise<{ data?: RejectHistoryOptions }>,
+    ]);
     if (token !== _primaryPrefilterInFlightToken) return;
 
     const data = resp?.data || ({} as CachedFilterSelection);
@@ -254,6 +252,10 @@ async function fetchPrimaryPrefilterOptions(): Promise<void> {
       pj_functions: Array.isArray(data.pj_functions) ? data.pj_functions : [],
     };
     primaryPrefilterOptions.value = nextOptions;
+
+    const reasonsData = reasonsResp?.data || ({} as RejectHistoryOptions);
+    const nextReasonOptions: string[] = Array.isArray(reasonsData.reasons) ? reasonsData.reasons : [];
+    primaryReasonOptions.value = nextReasonOptions;
 
     // Prune selections that disappeared from the new option set (fail-open).
     const prunedPjTypes = primaryPjTypes.value.filter((v) => nextOptions.pj_types.includes(v));
@@ -267,6 +269,10 @@ async function fetchPrimaryPrefilterOptions(): Promise<void> {
     const prunedPjFunctions = primaryPjFunctions.value.filter((v) => nextOptions.pj_functions.includes(v));
     if (prunedPjFunctions.length !== primaryPjFunctions.value.length) {
       primaryPjFunctions.value = prunedPjFunctions;
+    }
+    const prunedReasons = primaryReasons.value.filter((v) => nextReasonOptions.includes(v));
+    if (prunedReasons.length !== primaryReasons.value.length) {
+      primaryReasons.value = prunedReasons;
     }
   } catch {
     // Fail-open: leave current options in place; don't block primary query.
@@ -289,7 +295,7 @@ function _schedulePrimaryPrefilterRefresh(): void {
   }, 200);
 }
 
-function onPrimaryPrefilterClose(field: 'pj_types' | 'packages' | 'pj_functions'): void {
+function onPrimaryPrefilterClose(field: 'pj_types' | 'packages' | 'pj_functions' | 'reasons'): void {
   // Only re-fetch when the closed dropdown's selection can affect other fields.
   void field; // used only to signal intent; actual selection is already updated via v-model
   _schedulePrimaryPrefilterRefresh();
@@ -299,6 +305,7 @@ function resetPrimaryPrefilters(): void {
   primaryPjTypes.value = [];
   primaryPackages.value = [];
   primaryPjFunctions.value = [];
+  primaryReasons.value = [];
 }
 
 const draftFilters = reactive<DraftFilters>({
@@ -319,20 +326,12 @@ const committedPrimary = reactive<CommittedPrimary>({
   includeExcludedScrap: false,
   excludeMaterialScrap: true,
   excludePbDiode: true,
+  reasons: [],
 });
 
 // ---- Query result state ----
 const queryId = ref<string>('');
 const resolutionInfo = ref<ResolutionInfo | null>(null);
-const availableFilters = ref<AvailableFiltersState>({ workcenterGroups: [], packages: [], reasons: [], types: [] });
-
-// ---- Supplementary filters (post-query, applied via /view) ----
-const supplementaryFilters = reactive<SupplementaryFilters>({
-  packages: [],
-  workcenterGroups: [],
-  reasons: [],
-  types: [],
-});
 
 // ---- Interactive state ----
 const page = ref<number>(1);
@@ -418,7 +417,7 @@ function isStaleParetoRequest(id: number): boolean {
   return id !== activeParetoRequestId;
 }
 
-// -- useFilterOrchestrator: two-phase (primary query -> supplementary filters unlock) --
+// -- useFilterOrchestrator: primary query orchestration --
 // TODO: type — useFilterOrchestrator accepts a loose config object; _committed param is untyped from the JS composable
 const filterOrchestrator = useFilterOrchestrator({
   fields: {
@@ -427,10 +426,6 @@ const filterOrchestrator = useFilterOrchestrator({
     includeExcludedScrap: { trigger: 'draft-apply', initial: false },
     excludeMaterialScrap: { trigger: 'draft-apply', initial: true },
     excludePbDiode:       { trigger: 'draft-apply', initial: true },
-    packages:             { trigger: 'immediate', initial: [] },
-    workcenterGroups:     { trigger: 'immediate', initial: [] },
-    reasons:              { trigger: 'immediate', initial: [] },
-    types:                { trigger: 'immediate', initial: [] },
   },
   pagination: { resetOn: ['*'] },
   onPrimaryQuery(_committed) {
@@ -438,7 +433,7 @@ const filterOrchestrator = useFilterOrchestrator({
     void executePrimaryQuery();
   },
   onViewRefresh(_committed) {
-    // Supplementary filter change -> refreshView + fetchBatchPareto
+    // View refresh -> refreshView + fetchBatchPareto
     page.value = 1;
     selectedTrendDates.value = [];
     resetParetoSelections();
@@ -504,18 +499,6 @@ function buildBatchParetoParams(): Record<string, unknown> {
     exclude_pb_diode: committedPrimary.excludePbDiode ? 'true' : 'false',
   };
 
-  if (supplementaryFilters.packages.length > 0) {
-    params.packages = supplementaryFilters.packages;
-  }
-  if (supplementaryFilters.workcenterGroups.length > 0) {
-    params.workcenter_groups = supplementaryFilters.workcenterGroups;
-  }
-  if (supplementaryFilters.reasons.length > 0) {
-    params.reasons = supplementaryFilters.reasons;
-  }
-  if (supplementaryFilters.types.length > 0) {
-    params.types = supplementaryFilters.types;
-  }
   if (selectedTrendDates.value.length > 0) {
     params.trend_dates = selectedTrendDates.value;
   }
@@ -593,6 +576,7 @@ async function _loadViewAfterQuery(queryIdValue: string): Promise<void> {
   committedPrimary.includeExcludedScrap = draftFilters.includeExcludedScrap;
   committedPrimary.excludeMaterialScrap = draftFilters.excludeMaterialScrap;
   committedPrimary.excludePbDiode = draftFilters.excludePbDiode;
+  committedPrimary.reasons = [...primaryReasons.value];
 
   queryId.value = queryIdValue;
 }
@@ -615,18 +599,6 @@ async function _applyQueryResult(result: Record<string, unknown>): Promise<void>
   }
 
   resolutionInfo.value = (result.resolution_info as ResolutionInfo | null | undefined) ?? null;
-  const af = (result.available_filters || {}) as Record<string, unknown>;
-  availableFilters.value = {
-    workcenterGroups: (af.workcenter_groups as string[] | undefined) || (af.workcenterGroups as string[] | undefined) || [],
-    packages: (af.packages as string[] | undefined) || [],
-    reasons: (af.reasons as string[] | undefined) || [],
-    types: (af.types as string[] | undefined) || [],
-  };
-
-  supplementaryFilters.packages = [];
-  supplementaryFilters.workcenterGroups = [];
-  supplementaryFilters.reasons = [];
-  supplementaryFilters.types = [];
   page.value = 1;
   selectedTrendDates.value = [];
   resetParetoSelections();
@@ -706,17 +678,15 @@ async function executePrimaryQuery(): Promise<void> {
     if (primaryPjFunctions.value.length > 0) {
       body.pj_functions = primaryPjFunctions.value;
     }
+    if (primaryReasons.value.length > 0) {
+      body.reasons = primaryReasons.value;
+    }
 
     // Reset display state before new query — hide stale data from previous queryId
     queryId.value = '';
     analyticsRawItems.value = [];
     summary.value = { MOVEIN_QTY: 0, REJECT_TOTAL_QTY: 0, DEFECT_QTY: 0, REJECT_RATE_PCT: 0, DEFECT_RATE_PCT: 0, REJECT_SHARE_PCT: 0, AFFECTED_LOT_COUNT: 0, AFFECTED_WORKORDER_COUNT: 0 };
     detail.value = { items: [], pagination: { page: 1, perPage: DEFAULT_PER_PAGE, total: 0, totalPages: 1 } };
-    supplementaryFilters.packages = [];
-    supplementaryFilters.workcenterGroups = [];
-    supplementaryFilters.reasons = [];
-    supplementaryFilters.types = [];
-    availableFilters.value = { workcenterGroups: [], packages: [], reasons: [], types: [] };
     resolutionInfo.value = null;
     page.value = 1;
     selectedTrendDates.value = [];
@@ -829,10 +799,9 @@ async function refreshView(): Promise<void> {
           excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
           excludePbDiode: committedPrimary.excludePbDiode,
         },
-        packages: supplementaryFilters.packages,
-        workcenterGroups: supplementaryFilters.workcenterGroups,
-        reasons: supplementaryFilters.reasons,
-        types: supplementaryFilters.types,
+        packages: [],
+        reasons: [],
+        types: [],
         trendDates: selectedTrendDates.value,
         metricFilter: metricFilterParam(),
         metricMode: paretoMetricApiMode(),
@@ -861,16 +830,6 @@ async function refreshView(): Promise<void> {
         };
       }
 
-      const af = result.available_filters;
-      if (af) {
-        availableFilters.value = {
-          workcenterGroups: (af.workcenter_groups as string[] | undefined) || [],
-          packages: (af.packages as string[] | undefined) || [],
-          reasons: (af.reasons as string[] | undefined) || [],
-          types: (af.types as string[] | undefined) || [],
-        };
-      }
-
       updateUrlState();
       loading.list = false;
       return;
@@ -888,7 +847,6 @@ async function refreshView(): Promise<void> {
   // ── Server-side path ──────────────────────────────────────────────────
   try {
     const params = buildViewParams(queryId.value, {
-      supplementaryFilters,
       metricFilter: metricFilterParam(),
       trendDates: selectedTrendDates.value,
       paretoSelections,
@@ -921,17 +879,6 @@ async function refreshView(): Promise<void> {
       : analyticsRawItems.value;
     summary.value = (data.summary as SummaryData) || summary.value;
     detail.value = (data.detail as DetailState) || detail.value;
-
-    // Populate available filters (needed for async path and refreshes)
-    const af = data.available_filters as Record<string, unknown> | undefined;
-    if (af) {
-      availableFilters.value = {
-        workcenterGroups: (af.workcenter_groups as string[] | undefined) || (af.workcenterGroups as string[] | undefined) || [],
-        packages: (af.packages as string[] | undefined) || [],
-        reasons: (af.reasons as string[] | undefined) || [],
-        types: (af.types as string[] | undefined) || [],
-      };
-    }
 
     // Activate DuckDB-WASM in background (fire-and-forget so loading.list is not blocked).
     // fetchBatchPareto() will still run from server since duckdbMode is still false here.
@@ -975,9 +922,8 @@ async function refreshDetailPage(): Promise<void> {
             excludeMaterialScrap: committedPrimary.excludeMaterialScrap,
             excludePbDiode: committedPrimary.excludePbDiode,
           },
-          packages: supplementaryFilters.packages,
-          workcenterGroups: supplementaryFilters.workcenterGroups,
-          reasons: supplementaryFilters.reasons,
+          packages: [],
+          reasons: [],
           trendDates: selectedTrendDates.value,
           metricFilter: metricFilterParam(),
           metricMode: paretoMetricApiMode(),
@@ -1002,7 +948,6 @@ async function refreshDetailPage(): Promise<void> {
     }
 
     const params = buildViewParams(queryId.value, {
-      supplementaryFilters,
       metricFilter: metricFilterParam(),
       trendDates: selectedTrendDates.value,
       paretoSelections,
@@ -1136,18 +1081,6 @@ function clearParetoSelection(): void {
   void Promise.all([fetchBatchPareto(), refreshView()]);
 }
 
-function onSupplementaryChange(filters: { packages?: string[]; workcenterGroups?: string[]; reasons?: string[]; types?: string[] }): void {
-  supplementaryFilters.packages = filters.packages || [];
-  supplementaryFilters.workcenterGroups = filters.workcenterGroups || [];
-  supplementaryFilters.reasons = filters.reasons || [];
-  supplementaryFilters.types = filters.types || [];
-  page.value = 1;
-  selectedTrendDates.value = [];
-  resetParetoSelections();
-  updateUrlState();
-  void Promise.all([refreshView(), fetchBatchPareto()]);
-}
-
 function removeFilterChip(chip: FilterChip): void {
   if (!chip?.removable) return;
 
@@ -1164,42 +1097,6 @@ function removeFilterChip(chip: FilterChip): void {
     return;
   }
 
-  if (chip.type === 'reason') {
-    supplementaryFilters.reasons = supplementaryFilters.reasons.filter((r: string) => r !== chip.value);
-    page.value = 1;
-    updateUrlState();
-    void Promise.all([refreshView(), fetchBatchPareto()]);
-    return;
-  }
-
-  if (chip.type === 'workcenter') {
-    supplementaryFilters.workcenterGroups = supplementaryFilters.workcenterGroups.filter(
-      (g: string) => g !== chip.value,
-    );
-    page.value = 1;
-    updateUrlState();
-    void Promise.all([refreshView(), fetchBatchPareto()]);
-    return;
-  }
-
-  if (chip.type === 'package') {
-    supplementaryFilters.packages = supplementaryFilters.packages.filter(
-      (p: string) => p !== chip.value,
-    );
-    page.value = 1;
-    updateUrlState();
-    void Promise.all([refreshView(), fetchBatchPareto()]);
-    return;
-  }
-
-  if (chip.type === 'pj-type') {
-    supplementaryFilters.types = supplementaryFilters.types.filter(
-      (t: string) => t !== chip.value,
-    );
-    page.value = 1;
-    updateUrlState();
-    void Promise.all([refreshView(), fetchBatchPareto()]);
-  }
 }
 
 // ---- CSV export (from cache, via POST to avoid URL length limits) ----
@@ -1212,9 +1109,6 @@ async function exportCsv(): Promise<void> {
   try {
     const body: Record<string, unknown> = {
       query_id: queryId.value,
-      packages: supplementaryFilters.packages,
-      workcenter_groups: supplementaryFilters.workcenterGroups,
-      reasons: supplementaryFilters.reasons,
       metric_filter: metricFilterParam(),
       trend_dates: selectedTrendDates.value,
       ...Object.fromEntries(
@@ -1394,46 +1288,6 @@ const activeFilterChips = computed<FilterChip[]>(() => {
     value: '',
   });
 
-  for (const reason of supplementaryFilters.reasons) {
-    chips.push({
-      key: `reason:${reason}`,
-      label: `原因: ${reason}`,
-      removable: true,
-      type: 'reason',
-      value: reason,
-    });
-  }
-
-  supplementaryFilters.workcenterGroups.forEach((group: string) => {
-    chips.push({
-      key: `workcenter:${group}`,
-      label: `WC: ${group}`,
-      removable: true,
-      type: 'workcenter',
-      value: group,
-    });
-  });
-
-  supplementaryFilters.packages.forEach((pkg: string) => {
-    chips.push({
-      key: `package:${pkg}`,
-      label: `Package: ${pkg}`,
-      removable: true,
-      type: 'package',
-      value: pkg,
-    });
-  });
-
-  supplementaryFilters.types.forEach((t: string) => {
-    chips.push({
-      key: `pj-type:${t}`,
-      label: `TYPE: ${t}`,
-      removable: true,
-      type: 'pj-type',
-      value: t,
-    });
-  });
-
   if (selectedTrendDates.value.length > 0) {
     const dates = selectedTrendDates.value;
     const label =
@@ -1443,6 +1297,20 @@ const activeFilterChips = computed<FilterChip[]>(() => {
       label,
       removable: true,
       type: 'trend-dates',
+      value: '',
+    });
+  }
+
+  if (committedPrimary.reasons.length > 0) {
+    const label =
+      committedPrimary.reasons.length === 1
+        ? `報廢原因: ${committedPrimary.reasons[0]}`
+        : `報廢原因: ${committedPrimary.reasons.length} 項`;
+    chips.push({
+      key: 'primary-reasons',
+      label,
+      removable: false,
+      type: 'policy',
       value: '',
     });
   }
@@ -1508,11 +1376,7 @@ function updateUrlState(): void {
   params.set('exclude_material_scrap', String(committedPrimary.excludeMaterialScrap));
   params.set('exclude_pb_diode', String(committedPrimary.excludePbDiode));
 
-  appendArrayParams(params, 'packages', supplementaryFilters.packages);
-  appendArrayParams(params, 'workcenter_groups', supplementaryFilters.workcenterGroups);
-  appendArrayParams(params, 'reasons', supplementaryFilters.reasons);
-  appendArrayParams(params, 'types', supplementaryFilters.types);
-
+  appendArrayParams(params, 'reasons', primaryReasons.value);
   appendArrayParams(params, 'trend_dates', selectedTrendDates.value);
   for (const [dimension, key] of Object.entries(PARETO_SELECTION_PARAM_MAP)) {
     appendArrayParams(params, key, paretoSelections[dimension as keyof ParetoSelectionsState] || []);
@@ -1579,10 +1443,10 @@ function restoreFromUrl(): void {
   );
   draftFilters.excludePbDiode = readBooleanParam(params, 'exclude_pb_diode', true);
 
-  supplementaryFilters.packages = readArrayParam(params, 'packages');
-  supplementaryFilters.workcenterGroups = readArrayParam(params, 'workcenter_groups');
-  supplementaryFilters.reasons = readArrayParam(params, 'reasons');
-  supplementaryFilters.types = readArrayParam(params, 'types');
+  const restoredReasons = readArrayParam(params, 'reasons');
+  if (restoredReasons.length > 0) {
+    primaryReasons.value = restoredReasons;
+  }
 
   selectedTrendDates.value = readArrayParam(params, 'trend_dates');
 
@@ -1635,8 +1499,6 @@ onUnmounted(() => {
       :query-mode="queryMode"
       :container-input-type="containerInputType"
       :container-input="containerInput"
-      :available-filters="availableFilters"
-      :supplementary-filters="supplementaryFilters"
       :query-id="queryId"
       :resolution-info="resolutionInfo"
       :loading="loading"
@@ -1645,7 +1507,9 @@ onUnmounted(() => {
       :primary-pj-types="primaryPjTypes"
       :primary-packages="primaryPackages"
       :primary-pj-functions="primaryPjFunctions"
+      :primary-reasons="primaryReasons"
       :primary-prefilter-options="primaryPrefilterOptions"
+      :primary-reason-options="primaryReasonOptions"
       :primary-prefilter-loading="primaryPrefilterLoading"
       @apply="applyFilters"
       @clear="clearFilters"
@@ -1654,10 +1518,10 @@ onUnmounted(() => {
       @update:query-mode="queryMode = $event"
       @update:container-input-type="containerInputType = $event"
       @update:container-input="containerInput = $event"
-      @supplementary-change="onSupplementaryChange"
       @update:primary-pj-types="primaryPjTypes = $event"
       @update:primary-packages="primaryPackages = $event"
       @update:primary-pj-functions="primaryPjFunctions = $event"
+      @update:primary-reasons="primaryReasons = $event"
       @primary-prefilter-close="onPrimaryPrefilterClose"
     />
 

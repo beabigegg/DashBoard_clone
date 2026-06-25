@@ -1,0 +1,41 @@
+change-id: rh-remove-supplementary-filter
+status: in-progress
+tier: 2
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "Architecture Review not required; follows rh-primary-prefilter precedent" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "No new env vars" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "No CI/CD gate changes" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "Backend unit tests added (22 new); Playwright E2E pending frontend" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "test_reject_history_async_routes.py updated; workcenter_groups assertions removed" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "Playwright spec updated — supplementary workcenter test removed, primary-reason-multiselect + reasons-in-POST tests added" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "cache-key isolation test added; sentinel distinctness verified" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "No new concurrency or queue introduced; test-strategist confirmed not required" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "No env changes" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "No new workflow files" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "BLK-1/2/3 fixed: :loading added, URL state + restore added, filter chip added; medium removed workcenterGroups from ComputeViewParams" }
+  - { id: "5.2", section: Review, title: "Visual review", status: done, note: "All 6 dimensions pass; no blocking issues" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "openapi-sync pass; sentinel typo fixed in api-contract.md:458; validate --versions pass" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "BLK-1/2/3 fixed; gate_wiring tests fixed (contract-driven-gates.yml now has validate --contracts step); 4889 passed, 132 skipped" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate pass; 4889 backend tests pass; 634 frontend tests pass; css:check 0 errors; type-check clean; openapi-sync both files" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "All Tier-1 gates verified locally: unit-and-integration-tests, contract-validators, openapi-sync, css-governance, frontend-unit-vitest" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "type-check: 0 errors (clean, not just informational)" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates required per test-plan.md" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

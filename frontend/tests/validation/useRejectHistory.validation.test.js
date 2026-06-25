@@ -24,6 +24,7 @@ import {
 } from '../../src/core/endpoint-schemas.js';
 import { assertShape, _resetWarned as _resetSchemaWarned } from '../../src/core/schema-guard.js';
 import { toRejectFilterSnapshot } from '../../src/core/reject-history-filters.ts';
+import { useRejectHistoryDuckDB } from '../../src/reject-history/useRejectHistoryDuckDB.ts';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -229,6 +230,7 @@ function buildPrimaryQueryBody({
   pjTypes = [],
   primaryPackages = [],
   pjFunctions = [],
+  reasons = [],
 } = {}) {
   const body = {
     mode,
@@ -241,6 +243,7 @@ function buildPrimaryQueryBody({
   if (pjTypes.length > 0) body.pj_types = pjTypes;
   if (primaryPackages.length > 0) body.packages = primaryPackages;
   if (pjFunctions.length > 0) body.pj_functions = pjFunctions;
+  if (reasons.length > 0) body.reasons = reasons;
   return body;
 }
 
@@ -260,14 +263,25 @@ describe('primary prefilter payload — pj_types multiselect value included in p
     expect(body.pj_functions).toEqual(['FN-LASER', 'FN-EDGE']);
   });
 
+  it('reasons (報廢原因) included in primary filter payload as primary prefilter (AC-2)', () => {
+    const body = buildPrimaryQueryBody({ reasons: ['SCRATCH', 'PARTICLE'] });
+    expect(body.reasons).toEqual(['SCRATCH', 'PARTICLE']);
+  });
+
+  it('empty reasons array omitted from POST body (AC-2)', () => {
+    const body = buildPrimaryQueryBody({ reasons: [] });
+    expect('reasons' in body).toBe(false);
+  });
+
   it('empty prefilter arrays sent as empty list not undefined', () => {
-    // When all selections are empty, the body must NOT contain pj_types/packages/pj_functions
+    // When all selections are empty, the body must NOT contain pj_types/packages/pj_functions/reasons
     // (omit from body per IP-13 "don't send empty arrays")
-    const body = buildPrimaryQueryBody({ pjTypes: [], primaryPackages: [], pjFunctions: [] });
+    const body = buildPrimaryQueryBody({ pjTypes: [], primaryPackages: [], pjFunctions: [], reasons: [] });
     // The fields should be absent (undefined), not empty arrays, per IP-13
     expect('pj_types' in body).toBe(false);
     expect('packages' in body).toBe(false);
     expect('pj_functions' in body).toBe(false);
+    expect('reasons' in body).toBe(false);
   });
 
   it('pj_bop field absent from all request payloads', () => {
@@ -276,6 +290,13 @@ describe('primary prefilter payload — pj_types multiselect value included in p
     expect('pj_bop' in body).toBe(false);
     expect('pj_bops' in body).toBe(false);
     expect('bop' in body).toBe(false);
+  });
+
+  it('workcenter_groups field absent from POST body (AC-5)', () => {
+    // workcenter_groups must never appear in primary query payload
+    const body = buildPrimaryQueryBody({ pjTypes: ['TYPE_A'] });
+    expect('workcenter_groups' in body).toBe(false);
+    expect('workcenterGroups' in body).toBe(false);
   });
 });
 
@@ -313,5 +334,43 @@ describe('toRejectFilterSnapshot — primary prefilter fields normalized', () =>
     });
     expect(snap.packages).toEqual(['SUPP-PKG-A']);
     expect(snap.primaryPackages).toEqual(['PRIM-PKG-X']);
+  });
+
+  it('normalizes primaryReasons from unknown input (AC-2)', () => {
+    const snap = toRejectFilterSnapshot({ primaryReasons: ['SCRATCH', '  PARTICLE  ', ''] });
+    expect(snap.primaryReasons).toEqual(['SCRATCH', 'PARTICLE']);
+  });
+
+  it('returns empty primaryReasons when absent (AC-2)', () => {
+    const snap = toRejectFilterSnapshot({});
+    expect(snap.primaryReasons).toEqual([]);
+  });
+
+  it('deduplicates primaryReasons (AC-2)', () => {
+    const snap = toRejectFilterSnapshot({ primaryReasons: ['SCRATCH', 'SCRATCH', 'PARTICLE'] });
+    expect(snap.primaryReasons).toEqual(['SCRATCH', 'PARTICLE']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-5: getAvailableFilters not callable on useRejectHistoryDuckDB (IP-10)
+// ---------------------------------------------------------------------------
+
+describe('useRejectHistoryDuckDB — getAvailableFilters removed (AC-5)', () => {
+  it('getAvailableFilters is not exported from useRejectHistoryDuckDB', () => {
+    const composable = useRejectHistoryDuckDB();
+    // The function must not exist on the composable return value
+    expect(typeof composable.getAvailableFilters).toBe('undefined');
+  });
+
+  it('computeView does not return available_filters in result (AC-5)', async () => {
+    // The ComputeViewResult no longer includes available_filters field
+    // This is a type-level check: the result shape should not have the key
+    // We verify at runtime that the composable API does not expose this
+    const composable = useRejectHistoryDuckDB();
+    // Verify the composable only exposes the expected keys
+    const keys = Object.keys(composable);
+    expect(keys).not.toContain('getAvailableFilters');
+    expect(keys).not.toContain('availableFilters');
   });
 });

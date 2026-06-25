@@ -816,6 +816,7 @@ def execute_primary_query(
     pj_types: Optional[List[str]] = None,
     packages: Optional[List[str]] = None,
     pj_functions: Optional[List[str]] = None,
+    reasons: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute Oracle query → cache DataFrame → return structured result."""
 
@@ -823,6 +824,7 @@ def execute_primary_query(
     _pj_types: List[str] = sorted({str(v).strip() for v in (pj_types or []) if str(v).strip()})
     _packages: List[str] = sorted({str(v).strip() for v in (packages or []) if str(v).strip()})
     _pj_functions: List[str] = sorted({str(v).strip() for v in (pj_functions or []) if str(v).strip()})
+    _reasons: List[str] = sorted({str(v).strip() for v in (reasons or []) if str(v).strip()})
 
     # ---- Build base_where + params for the primary filter ----
     base_params: Dict[str, Any] = {}
@@ -840,6 +842,7 @@ def execute_primary_query(
             pj_types=_pj_types,
             packages=_packages,
             pj_functions=_pj_functions,
+            reasons=_reasons,
         )
 
     elif mode == "container":
@@ -886,6 +889,13 @@ def execute_primary_query(
                 base_params[key] = val
                 pf_names.append(f":{key}")
             base_where_parts.append(f"NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN ({', '.join(pf_names)})")
+        if _reasons:
+            reason_names = []
+            for idx, val in enumerate(_reasons):
+                key = f"reason_{idx}"
+                base_params[key] = val
+                reason_names.append(f":{key}")
+            base_where_parts.append(f"NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN ({', '.join(reason_names)})")
         base_where = " AND ".join(base_where_parts)
 
     else:
@@ -909,6 +919,7 @@ def execute_primary_query(
         "pj_types": _pj_types,
         "packages": _packages,
         "pj_functions": _pj_functions,
+        "reasons": _reasons,
     }
     query_id = _make_query_id(query_id_input)
 

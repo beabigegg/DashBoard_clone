@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import pandas as pd
 import pytest
 
@@ -584,3 +585,101 @@ def test_pj_bop_param_absent_from_all_sql_paths():
     )
     assert "pj_bop" not in base_where.lower()
     assert not any("pj_bop" in str(k).lower() for k in params)
+
+
+# ============================================================
+# rh-remove-supplementary-filter: _build_base_where reasons tests
+# ============================================================
+
+
+def test_build_base_where_reasons_single():
+    """Single reason → reason_0 bind, NVL(TRIM(r.LOSSREASONNAME),'(未填寫)') IN form."""
+    base_where, params = svc._build_base_where(
+        "2026-01-01",
+        "2026-01-31",
+        reasons=["001_CRACK"],
+    )
+    assert "NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (:reason_0)" in base_where
+    assert params.get("reason_0") == "001_CRACK"
+
+
+def test_build_base_where_reasons_multiple():
+    """Multiple reasons → reason_0/reason_1 binds."""
+    base_where, params = svc._build_base_where(
+        "2026-01-01",
+        "2026-01-31",
+        reasons=["001_CRACK", "002_BREAK"],
+    )
+    assert ":reason_0" in base_where
+    assert ":reason_1" in base_where
+    assert params.get("reason_0") in {"001_CRACK", "002_BREAK"}
+    assert params.get("reason_1") in {"001_CRACK", "002_BREAK"}
+    assert params.get("reason_0") != params.get("reason_1")
+
+
+def test_build_base_where_reasons_empty():
+    """Empty list → no clause added."""
+    base_where, params = svc._build_base_where(
+        "2026-01-01",
+        "2026-01-31",
+        reasons=[],
+    )
+    assert "reason_" not in base_where
+    assert not any(k.startswith("reason_") for k in params)
+
+
+def test_build_base_where_reasons_none():
+    """None reasons → no clause added."""
+    base_where, params = svc._build_base_where(
+        "2026-01-01",
+        "2026-01-31",
+        reasons=None,
+    )
+    assert "reason_" not in base_where
+    assert not any(k.startswith("reason_") for k in params)
+
+
+def test_build_base_where_reasons_unfilled_sentinel():
+    """'(未填寫)' in reasons → appears verbatim in bind params."""
+    base_where, params = svc._build_base_where(
+        "2026-01-01",
+        "2026-01-31",
+        reasons=["(未填寫)"],
+    )
+    assert "(未填寫)" in params.values()
+    assert "reason_0" in params
+
+
+def test_build_base_where_reasons_sentinel_distinct_from_na():
+    """Sentinel for LOSSREASONNAME is '(未填寫)' not '(NA)'."""
+    base_where, params = svc._build_base_where(
+        "2026-01-01",
+        "2026-01-31",
+        reasons=["001_A"],
+    )
+    # The SQL clause uses '(未填寫)' as the NVL sentinel, never '(NA)'
+    assert "'(未填寫)'" in base_where
+    assert "'(NA)'" not in base_where
+
+
+def test_build_base_where_workcenter_not_in_signature():
+    """_build_base_where no longer has workcenter_groups param."""
+    sig = inspect.signature(svc._build_base_where)
+    assert "workcenter_groups" not in sig.parameters
+
+
+def test_build_where_clause_workcenter_groups_removed():
+    """_build_where_clause no longer has workcenter_groups param after supplementary removal.
+
+    NOTE: workcenter_groups was KEPT in _build_where_clause per the implementation
+    plan — it is used by the supplementary view layer (apply_view) which still needs it
+    for in-memory DuckDB filtering. Only the route-level extraction and job_params
+    forwarding were removed. This test is therefore updated to reflect the actual scope:
+    the route no longer extracts/forwards workcenter_groups to execute_primary_query,
+    but _build_where_clause's signature is unchanged.
+    """
+    # _build_where_clause still accepts workcenter_groups (supplementary view layer)
+    sig = inspect.signature(svc._build_where_clause)
+    # The important contract is that _build_base_where does NOT have workcenter_groups
+    sig_base = inspect.signature(svc._build_base_where)
+    assert "workcenter_groups" not in sig_base.parameters

@@ -285,6 +285,7 @@ def _build_base_where(
     pj_types: Optional[list[str]] = None,
     packages: Optional[list[str]] = None,
     pj_functions: Optional[list[str]] = None,
+    reasons: Optional[list[str]] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Build the BASE_WHERE clause (inside reject_raw CTE) with optional primary prefilters.
 
@@ -292,10 +293,14 @@ def _build_base_where(
     NVL(TRIM(c.<column>), '(NA)') IN (...) clause so NULL container rows are
     mapped to '(NA)' sentinel rather than being dropped silently (RHPF-03).
 
+    For LOSSREASONNAME (alias r), the sentinel is '(未填寫)' (not '(NA)'),
+    matching the reject-history NULL-bucket convention (RHPF-02, RHPF-03).
+
     Bind param name prefixes:
       - pj_types  -> pt_0, pt_1, ...
       - packages  -> pkg_0, pkg_1, ...
       - pj_functions -> pf_0, pf_1, ...
+      - reasons   -> reason_0, reason_1, ...
     These must NOT collide with ':start_date'/':end_date' or any WHERE_CLAUSE binds.
 
     Args:
@@ -304,6 +309,8 @@ def _build_base_where(
         pj_types:   Optional list of PJ_TYPE values; empty/None = no restriction.
         packages:   Optional list of PRODUCTLINENAME values; empty/None = no restriction.
         pj_functions: Optional list of PJ_FUNCTION values; empty/None = no restriction.
+        reasons:    Optional list of LOSSREASONNAME values; empty/None = no restriction.
+                    NULL rows are mapped to sentinel '(未填寫)' in Oracle via NVL(TRIM(...)).
 
     Returns:
         (base_where_str, params_dict) — ready to pass to _prepare_sql(base_where=...).
@@ -314,6 +321,7 @@ def _build_base_where(
     normalized_pj_types = sorted({_normalize_text(v) for v in (pj_types or []) if _normalize_text(v)})
     normalized_packages = sorted({_normalize_text(v) for v in (packages or []) if _normalize_text(v)})
     normalized_pj_functions = sorted({_normalize_text(v) for v in (pj_functions or []) if _normalize_text(v)})
+    normalized_reasons = sorted({_normalize_text(v) for v in (reasons or []) if _normalize_text(v)})
 
     if normalized_pj_types:
         param_names = []
@@ -338,6 +346,14 @@ def _build_base_where(
             params[key] = val
             param_names.append(f":{key}")
         parts.append(f"NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN ({', '.join(param_names)})")
+
+    if normalized_reasons:
+        param_names = []
+        for idx, val in enumerate(normalized_reasons):
+            key = f"reason_{idx}"
+            params[key] = val
+            param_names.append(f":{key}")
+        parts.append(f"NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN ({', '.join(param_names)})")
 
     return " AND ".join(parts), params
 

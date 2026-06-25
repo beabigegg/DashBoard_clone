@@ -69,7 +69,7 @@ last-changed: 2026-06-18
 | `frontend/src/mid-section-defect/style.css` | `theme-mid-section-defect` | mid-section-defect |
 | `frontend/src/qc-gate/style.css` | `theme-qc-gate` | qc-gate |
 | `frontend/src/query-tool/style.css` | `theme-query-tool` | query-tool |
-| `frontend/src/reject-history/style.css` | `theme-reject-history` | reject-history |
+| `frontend/src/reject-history/style.css` | `theme-reject-history` | reject-history — `.supplementary-panel/.supplementary-header/.supplementary-row/.supplementary-toolbar` removed (rh-remove-supplementary-filter); `.primary-prefilter-row` grid is `repeat(4, minmax(0, 1fr))` |
 | `frontend/src/resource-history/style.css` | `theme-resource-history` | resource-history |
 | `frontend/src/resource-status/style.css` | `theme-resource` | resource-status |
 | `frontend/src/wip-detail/style.css` | `theme-wip-detail` | wip-detail |

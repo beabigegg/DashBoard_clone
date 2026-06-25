@@ -488,3 +488,71 @@ class TestExecuteRejectQueryJobPrefilterForwarding:
         assert call_kwargs.get("pj_types") == []
         assert call_kwargs.get("packages") == []
         assert call_kwargs.get("pj_functions") == []
+
+
+# ============================================================
+# rh-remove-supplementary-filter: reasons forwarding in job service
+# ============================================================
+
+
+class TestExecuteRejectQueryJobReasonsForwarding:
+    """AC-4: reasons must be forwarded from job_params to execute_primary_query."""
+
+    def _make_mock_cache_module(self, cache_hit=False):
+        mock_cache = MagicMock()
+        mock_cache._CACHE_SCHEMA_VERSION = "v5"
+        mock_cache._has_cached_df.return_value = cache_hit
+        mock_cache._make_query_id.return_value = "qry-reasons-id-001"
+        mock_cache.execute_primary_query.return_value = None
+        mock_cache.RejectPrimaryQueryOverloadError = Exception
+        return mock_cache
+
+    def test_job_service_forwards_reasons_to_execute(self):
+        """reasons from job_params must appear in execute_primary_query call."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_qb = MagicMock()
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.services.reject_dataset_cache": mock_cache,
+            "mes_dashboard.sql": mock_qb,
+        }), \
+        patch.object(rjs, "complete_job", mock_complete_job), \
+        patch.object(rjs, "update_job_progress", mock_update_progress):
+            rjs.execute_reject_query_job(
+                job_id="reject-reasons-fwd",
+                mode="date_range",
+                params={
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-02-01",
+                    "reasons": ["001_CRACK", "002_BREAK"],
+                },
+            )
+
+        mock_cache.execute_primary_query.assert_called_once()
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        assert "reasons" in call_kwargs, "reasons must be forwarded to execute_primary_query"
+        assert sorted(call_kwargs["reasons"]) == ["001_CRACK", "002_BREAK"]
+
+    def test_reasons_absent_in_params_forwarded_as_empty_list(self):
+        """When reasons absent from job_params, execute_primary_query gets empty list."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_qb = MagicMock()
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.services.reject_dataset_cache": mock_cache,
+            "mes_dashboard.sql": mock_qb,
+        }), \
+        patch.object(rjs, "complete_job", mock_complete_job), \
+        patch.object(rjs, "update_job_progress", mock_update_progress):
+            rjs.execute_reject_query_job(
+                job_id="reject-reasons-absent",
+                mode="date_range",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        assert call_kwargs.get("reasons") == []

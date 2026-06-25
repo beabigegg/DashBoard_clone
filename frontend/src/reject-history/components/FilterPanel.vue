@@ -9,20 +9,6 @@ interface DraftFilters {
   excludePbDiode: boolean;
 }
 
-interface AvailableFilters {
-  workcenterGroups?: string[];
-  packages?: string[];
-  reasons?: string[];
-  types?: string[];
-}
-
-interface SupplementaryFilters {
-  packages?: string[];
-  workcenterGroups?: string[];
-  reasons?: string[];
-  types?: string[];
-}
-
 /** Options available for the primary prefilter MultiSelects (BASE_WHERE layer). */
 interface PrimaryPrefilterOptions {
   pj_types?: string[];
@@ -56,8 +42,6 @@ const props = defineProps<{
   queryMode?: string;
   containerInputType?: string;
   containerInput?: string;
-  availableFilters?: AvailableFilters;
-  supplementaryFilters?: SupplementaryFilters;
   queryId?: string;
   resolutionInfo?: ResolutionInfo | null;
   loading: LoadingState;
@@ -67,8 +51,10 @@ const props = defineProps<{
   primaryPjTypes?: string[];
   primaryPackages?: string[];
   primaryPjFunctions?: string[];
+  primaryReasons?: string[];
   // Primary prefilter options (from container_filter_cache cross-filter API)
   primaryPrefilterOptions?: PrimaryPrefilterOptions;
+  primaryReasonOptions?: string[];
   primaryPrefilterLoading?: boolean;
 }>();
 
@@ -80,22 +66,12 @@ const emit = defineEmits<{
   (e: 'update:queryMode', value: string): void;
   (e: 'update:containerInputType', value: string): void;
   (e: 'update:containerInput', value: string): void;
-  (e: 'supplementary-change', value: { packages: string[]; workcenterGroups: string[]; reasons: string[]; types: string[] }): void;
   (e: 'update:primaryPjTypes', value: string[]): void;
   (e: 'update:primaryPackages', value: string[]): void;
   (e: 'update:primaryPjFunctions', value: string[]): void;
-  (e: 'primary-prefilter-close', field: 'pj_types' | 'packages' | 'pj_functions'): void;
+  (e: 'update:primaryReasons', value: string[]): void;
+  (e: 'primary-prefilter-close', field: 'pj_types' | 'packages' | 'pj_functions' | 'reasons'): void;
 }>();
-
-function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups: string[]; reasons: string[]; types: string[] }>): void {
-  emit('supplementary-change', {
-    packages: props.supplementaryFilters?.packages || [],
-    workcenterGroups: props.supplementaryFilters?.workcenterGroups || [],
-    reasons: props.supplementaryFilters?.reasons || [],
-    types: props.supplementaryFilters?.types || [],
-    ...patch,
-  });
-}
 </script>
 
 <template>
@@ -229,6 +205,21 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
             @dropdown-close="$emit('primary-prefilter-close', 'pj_functions')"
           />
         </div>
+
+        <div class="filter-group" data-testid="primary-reason-select">
+          <label class="filter-label">報廢原因</label>
+          <MultiSelect
+            :model-value="primaryReasons || []"
+            :options="primaryReasonOptions || []"
+            placeholder="全部報廢原因"
+            aria-label="報廢原因 預篩選"
+            :searchable="true"
+            :loading="primaryPrefilterLoading"
+            data-testid="primary-reason-multiselect"
+            @update:model-value="$emit('update:primaryReasons', $event)"
+            @dropdown-close="$emit('primary-prefilter-close', 'reasons')"
+          />
+        </div>
       </div>
 
       <div class="filter-toolbar">
@@ -298,62 +289,6 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           }}{{ (resolutionInfo.not_found?.length ?? 0) > 10 ? '...' : '' }})
         </span>
       </template>
-    </div>
-
-    <!-- Supplementary filters (only after primary query) -->
-    <div v-if="queryId" class="supplementary-panel">
-      <div class="supplementary-header">補充篩選</div>
-      <div class="supplementary-toolbar">
-        <div class="pareto-fixed-note">
-          Pareto 固定累計前 80%，且 TYPE / EQUIPMENT 僅顯示 TOP 20。
-          明細與匯出 CSV 仍保留完整篩選結果，不受此顯示限制影響。
-        </div>
-      </div>
-      <div class="supplementary-row">
-        <div class="filter-group" data-testid="workcenter-select">
-          <label class="filter-label">WORKCENTER GROUP</label>
-          <MultiSelect
-            :model-value="supplementaryFilters?.workcenterGroups"
-            :options="availableFilters?.workcenterGroups || []"
-            placeholder="全部工作中心群組"
-            searchable
-            @update:model-value="emitSupplementary({ workcenterGroups: $event })"
-          />
-        </div>
-
-        <div class="filter-group" data-testid="package-select">
-          <label class="filter-label">Package</label>
-          <MultiSelect
-            :model-value="supplementaryFilters?.packages"
-            :options="availableFilters?.packages || []"
-            placeholder="全部 Package"
-            searchable
-            @update:model-value="emitSupplementary({ packages: $event })"
-          />
-        </div>
-
-        <div class="filter-group" data-testid="reason-select">
-          <label class="filter-label">報廢原因</label>
-          <MultiSelect
-            :model-value="supplementaryFilters?.reasons"
-            :options="availableFilters?.reasons || []"
-            placeholder="全部原因"
-            searchable
-            @update:model-value="emitSupplementary({ reasons: $event })"
-          />
-        </div>
-
-        <div class="filter-group" data-testid="type-select">
-          <label class="filter-label">TYPE</label>
-          <MultiSelect
-            :model-value="supplementaryFilters?.types"
-            :options="availableFilters?.types || []"
-            placeholder="全部 TYPE"
-            searchable
-            @update:model-value="emitSupplementary({ types: $event })"
-          />
-        </div>
-      </div>
     </div>
 
     <div

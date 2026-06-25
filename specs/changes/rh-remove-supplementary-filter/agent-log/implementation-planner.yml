@@ -1,0 +1,4 @@
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/rh-remove-supplementary-filter/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-6, IP-13), frontend-engineer (IP-7..IP-11, IP-13), contract-reviewer (IP-12)" }
+  - { type: scope-summary, pointer: "13 required changes; in-scope: reject-history route/service/cache/worker + frontend filter UI/composable/CSS + 6 contracts; out-of-scope: cross-app workcenter_groups, pareto/DIM_TO_COLUMN refactor, new endpoints, schema-version bump, stress/soak" }

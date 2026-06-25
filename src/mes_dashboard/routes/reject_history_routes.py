@@ -679,10 +679,11 @@ def api_reject_history_query():
             return validation_error("container mode 需要 container_values 陣列")
         container_values = [str(v).strip() for v in raw_container_values if str(v).strip()]
 
-    # Parse three optional primary prefilter params (pj_bop is silently ignored per AC-6)
+    # Parse four optional primary prefilter params (pj_bop is silently ignored per AC-6)
     _raw_pj_types = body.get("pj_types") or []
     _raw_packages = body.get("packages") or []
     _raw_pj_functions = body.get("pj_functions") or []
+    _raw_reasons = body.get("reasons") or []
 
     prefilter_pj_types: list[str] = sorted({
         str(v).strip() for v in _raw_pj_types if str(v).strip()
@@ -693,6 +694,9 @@ def api_reject_history_query():
     prefilter_pj_functions: list[str] = sorted({
         str(v).strip() for v in _raw_pj_functions if str(v).strip()
     }) if isinstance(_raw_pj_functions, list) else []
+    prefilter_reasons: list[str] = sorted({
+        str(v).strip() for v in _raw_reasons if str(v).strip()
+    }) if isinstance(_raw_reasons, list) else []
 
     _query_id_input = {
         "cache_schema_version": _CACHE_SCHEMA_VERSION,
@@ -704,6 +708,7 @@ def api_reject_history_query():
         "pj_types": prefilter_pj_types,
         "packages": prefilter_packages,
         "pj_functions": prefilter_pj_functions,
+        "reasons": prefilter_reasons,
     }
     _pre_query_id = _make_query_id(_query_id_input)
 
@@ -721,6 +726,7 @@ def api_reject_history_query():
                 pj_types=prefilter_pj_types,
                 packages=prefilter_packages,
                 pj_functions=prefilter_pj_functions,
+                reasons=prefilter_reasons,
             )
             return success_response(result)
         except ValueError as exc:
@@ -746,6 +752,7 @@ def api_reject_history_query():
         "pj_types": prefilter_pj_types,
         "packages": prefilter_packages,
         "pj_functions": prefilter_pj_functions,
+        "reasons": prefilter_reasons,
     }
     if mode == "container":
         job_params["container_input_type"] = container_input_type
