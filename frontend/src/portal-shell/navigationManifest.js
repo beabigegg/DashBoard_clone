@@ -123,7 +123,7 @@ export const routes = Object.freeze({
     displayName: '原物料追溯查詢',
   },
 
-  // ── 開發工具 (dev-tools, order 5, admin_only) ───────────────────────────
+  // ── 開發工具 (dev-tools, order 6, admin_only) ───────────────────────────
   '/admin/pages': {
     drawerId: 'dev-tools',
     order: 1,
@@ -136,7 +136,7 @@ export const routes = Object.freeze({
     defaultStatus: 'dev',
   },
 
-  // ── EAP (eap-analysis, order 6) ─────────────────────────────────────────
+  // ── EAP (eap-analysis, order 5) ─────────────────────────────────────────
   '/eap-alarm': {
     drawerId: 'eap-analysis',
     order: 1,
