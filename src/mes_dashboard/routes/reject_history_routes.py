@@ -738,7 +738,7 @@ def api_reject_history_query():
             job_id_result, err, status_hint = enqueue_query_job(
                 "reject_unified",
                 owner=get_owner_token(),
-                params={"job_id": job_id, **job_params},
+                params={"params": job_params},
                 sync_fallback_allowed=True,
                 job_id=job_id,
             )

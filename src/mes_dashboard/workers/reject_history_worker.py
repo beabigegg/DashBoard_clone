@@ -153,6 +153,7 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
                 "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
                 " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
             ),
+            base_variant="lot",
         )
         return sql, chunk_params["bind_params"]
 
