@@ -202,6 +202,7 @@ async function refreshDuckdbViews(): Promise<void> {
     statusTypes: chartFilter.value.status_types && chartFilter.value.status_types.length > 0
       ? chartFilter.value.status_types
       : undefined,
+    granularity: (filterState.granularity || 'day') as 'day' | 'week' | 'month',
   };
 
   try {
@@ -287,16 +288,16 @@ function handleUpdateState(patch: Partial<FilterState>): void {
     (draftFilters as Record<string, unknown>)[key] = patch[key];
   }
   updateAll({ ...draftFilters });
-
+  if (Object.prototype.hasOwnProperty.call(patch, 'granularity')) {
+    void handleGranularityChange({ ...draftFilters });
+  }
 }
 
-function handleDimensionClosed(dimension: string): void {
-  // Cross-filter: reload options when a dropdown closes.
-  // Exclude the dimension that just closed from its own filter param so
-  // the backend doesn't narrow that dimension's options by its own selection.
-  const optionsFilter = { ...(draftFilters as Record<string, unknown>) };
-  optionsFilter[dimension] = [];
-  void loadOptions(optionsFilter as Record<string, unknown>);
+function handleDimensionClosed(_dimension: string): void {
+  // Cross-filter: reload options after a dropdown closes so sibling dimensions
+  // are narrowed by the just-committed selection.  Pass the full draftFilters —
+  // the backend handles each dimension's own option list independently.
+  void loadOptions(draftFilters as Record<string, unknown>);
 }
 
 async function handleFilterChange(next: FilterState): Promise<void> {
@@ -330,7 +331,6 @@ async function handleGranularityChange(next: FilterState): Promise<void> {
   updateAll(next);
   syncDraftFromState();
   if (duckdb.state.value === 'ready') {
-    // DuckDB path: granularity is not used (daily grouping only per design), re-run views
     await refreshDuckdbViews();
     return;
   }

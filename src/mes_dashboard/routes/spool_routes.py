@@ -76,26 +76,13 @@ def download_spool_parquet(namespace: str, query_id: str):
             mimetype="application/json",
         )
 
-    # Stream file
+    # Stream file — open handle FIRST, then stat via the fd.
+    # os.path.getsize() followed by open() creates a TOCTOU window: a concurrent
+    # atomic rename (tmp → path) can swap in a new parquet between the two calls,
+    # making Content-Length disagree with the bytes actually yielded.  That size
+    # mismatch causes Snappy decompression failures in DuckDB-WASM on the client.
     try:
-        file_size = os.path.getsize(parquet_path)
-        filename = f"{namespace}_{query_id}.parquet"
-
-        def _stream():
-            with open(parquet_path, "rb") as fh:
-                while True:
-                    chunk = fh.read(65536)
-                    if not chunk:
-                        break
-                    yield chunk
-
-        headers = {
-            "Content-Type": "application/octet-stream",
-            "Content-Length": str(file_size),
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        }
-        return Response(_stream(), status=200, headers=headers, direct_passthrough=True)
-
+        fh = open(parquet_path, "rb")  # noqa: WPS515
     except FileNotFoundError:
         return Response(
             '{"success": false, "error": "spool_expired", '
@@ -103,9 +90,32 @@ def download_spool_parquet(namespace: str, query_id: str):
             status=410,
             mimetype="application/json",
         )
+
+    try:
+        file_size = os.fstat(fh.fileno()).st_size
     except OSError as exc:
+        fh.close()
         return Response(
             f'{{"success": false, "error": "spool_read_error", "message": "{exc}"}}',
             status=500,
             mimetype="application/json",
         )
+
+    filename = f"{namespace}_{query_id}.parquet"
+
+    def _stream():
+        try:
+            while True:
+                chunk = fh.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            fh.close()
+
+    headers = {
+        "Content-Type": "application/octet-stream",
+        "Content-Length": str(file_size),
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    }
+    return Response(_stream(), status=200, headers=headers, direct_passthrough=True)

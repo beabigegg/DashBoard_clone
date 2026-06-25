@@ -1464,22 +1464,27 @@ def _build_summary(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def _build_daily_trend(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    """Build DailyTrendRow list (§3.12.2)."""
+def _build_daily_trend(df: pd.DataFrame, granularity: str = 'day') -> List[Dict[str, Any]]:
+    """Build DailyTrendRow list (§3.12.2).  granularity: 'day'|'week'|'month'."""
     if df.empty:
         return []
 
     df = df.copy()
-    df['date'] = pd.to_datetime(df['start_ts'], errors='coerce').dt.date
-    grouped = df.groupby('date')
+    ts = pd.to_datetime(df['start_ts'], errors='coerce')
+    if granularity == 'week':
+        df['period'] = ts.dt.strftime('%G-W%V')
+    elif granularity == 'month':
+        df['period'] = ts.dt.strftime('%Y-%m')
+    else:
+        df['period'] = ts.dt.date
 
     rows = []
-    for d, grp in sorted(grouped, key=lambda x: x[0]):
+    for period, grp in sorted(df.groupby('period'), key=lambda x: str(x[0])):
         udt = float(grp.loc[grp['status'] == 'UDT', 'hours'].sum())
         sdt = float(grp.loc[grp['status'] == 'SDT', 'hours'].sum())
         egt = float(grp.loc[grp['status'] == 'EGT', 'hours'].sum())
         rows.append({
-            'date': str(d),
+            'date': str(period),
             'udt_hours': round(udt, 4),
             'sdt_hours': round(sdt, 4),
             'egt_hours': round(egt, 4),
@@ -1585,7 +1590,7 @@ def apply_view(
     if view_name == 'summary':
         return {
             'summary': _build_summary(events_df),
-            'daily_trend': _build_daily_trend(events_df),
+            'daily_trend': _build_daily_trend(events_df, granularity=granularity),
             'big_category': _build_big_category(events_df),
             'top_reasons': _build_top_reasons(events_df, top_n=top_n),
         }

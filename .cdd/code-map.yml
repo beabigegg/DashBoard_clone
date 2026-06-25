@@ -1,6 +1,6 @@
-# generated: 2026-06-24T06:39:32Z by cdd-kit 3.4.0
-# files: 955, src-lines: 286669, map-lines: 20908, compression: 13.7x
-# sources-digest: 4a61a11317d4ecded215c3a2ab0032e31c5684e230d5ad5ccb11eff6cba9b7cf
+# generated: 2026-06-24T23:35:32Z by cdd-kit 3.4.0
+# files: 955, src-lines: 286980, map-lines: 20909, compression: 13.7x
+# sources-digest: 2a0b037fbc5b09bdd58637f022f928aab9febfc5f3fea682e406c5b29787a0c7
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -754,7 +754,7 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
-frontend/src/downtime-analysis/App.vue:  # 564 lines
+frontend/src/downtime-analysis/App.vue:  # 576 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
   imports:
@@ -803,9 +803,9 @@ frontend/src/downtime-analysis/__tests__/useFilterState.test.ts:  # 161 lines
     - { module: vitest, items: [describe, it, expect, vi], line: 1 }
     - { module: '../composables/useFilterState', items: [useFilterState], line: 2 }
 
-frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 103 lines
+frontend/src/downtime-analysis/components/BigCategoryChart.vue:  # 123 lines
 
-frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 110 lines
+frontend/src/downtime-analysis/components/DailyTrendChart.vue:  # 219 lines
 
 frontend/src/downtime-analysis/components/EquipmentDetail.vue:  # 85 lines
 
@@ -819,7 +819,7 @@ frontend/src/downtime-analysis/components/MachineEventRows.vue:  # 149 lines
 
 frontend/src/downtime-analysis/components/StatusMachineJobTable.vue:  # 222 lines
 
-frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 49 lines
+frontend/src/downtime-analysis/components/TopReasonsTable.vue:  # 74 lines
 
 frontend/src/downtime-analysis/components/__tests__/MachineEventRows.test.ts:  # 111 lines
   imports:
@@ -915,9 +915,10 @@ frontend/src/downtime-analysis/composables/useFilterState.ts:  # 106 lines
   functions:
     - { name: useFilterState, lines: 27-106 }
 
-frontend/src/downtime-analysis/constants.ts:  # 11 lines
+frontend/src/downtime-analysis/constants.ts:  # 19 lines
   constants:
     - { name: STATUS_COLORS, line: 7 }
+    - { name: CATEGORY_PALETTE, line: 16 }
 
 frontend/src/downtime-analysis/formatDowntimeDate.ts:  # 50 lines
   functions:
@@ -1001,21 +1002,21 @@ frontend/src/hold-detail/main.ts:  # 8 lines
 
 frontend/src/hold-history/App.vue:  # 1290 lines
 
-frontend/src/hold-history/components/DailyTrend.vue:  # 145 lines
+frontend/src/hold-history/components/DailyTrend.vue:  # 203 lines
 
 frontend/src/hold-history/components/DetailTable.vue:  # 321 lines
 
-frontend/src/hold-history/components/DurationChart.vue:  # 130 lines
+frontend/src/hold-history/components/DurationChart.vue:  # 140 lines
 
 frontend/src/hold-history/components/FilterBar.vue:  # 183 lines
 
 frontend/src/hold-history/components/FilterIndicator.vue:  # 34 lines
 
-frontend/src/hold-history/components/ReasonPareto.vue:  # 155 lines
+frontend/src/hold-history/components/ReasonPareto.vue:  # 178 lines
 
 frontend/src/hold-history/components/RecordTypeFilter.vue:  # 87 lines
 
-frontend/src/hold-history/components/SummaryCards.vue:  # 247 lines
+frontend/src/hold-history/components/SummaryCards.vue:  # 269 lines
 
 frontend/src/hold-history/main.ts:  # 9 lines
   imports:
@@ -1868,7 +1869,7 @@ frontend/src/reject-history/useRejectHistoryDuckDB.ts:  # 804 lines
 
 frontend/src/resource-history/App.vue:  # 1003 lines
 
-frontend/src/resource-history/components/ComparisonChart.vue:  # 130 lines
+frontend/src/resource-history/components/ComparisonChart.vue:  # 152 lines
 
 frontend/src/resource-history/components/DetailSection.vue:  # 349 lines
 
@@ -2193,7 +2194,7 @@ frontend/src/shared-ui/components/SkeletonLoader.vue:  # 153 lines
 
 frontend/src/shared-ui/components/StatusBadge.vue:  # 57 lines
 
-frontend/src/shared-ui/components/SummaryCard.vue:  # 271 lines
+frontend/src/shared-ui/components/SummaryCard.vue:  # 273 lines
 
 frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 

@@ -263,47 +263,43 @@ def api_downtime_query():
                 'resource_lookup': _build_resource_lookup(),
             })
 
-    # ── Async RQ branch (DOWNTIME_ASYNC_ENABLED + threshold + worker available) ──
-    # Only enter when: browser-DuckDB flag is ON (raw-spool path), AND the async
-    # flag is enabled, AND the date span meets the threshold, AND a worker is live.
-    # Falls through to the sync path on any false condition (ASYNC-02/ASYNC-DA-01).
+    # ── Async RQ branch (DOWNTIME_BROWSER_DUCKDB + DOWNTIME_ASYNC_ENABLED) ──────
+    # When browser-DuckDB is on every cold query needs Oracle → two-parquet write,
+    # so always enqueue async regardless of date span.  Spool cache hits already
+    # returned above, so every query reaching here is cold.
+    # Falls through to the sync path when the worker is unavailable (ASYNC-02).
     if _BROWSER_DUCKDB_ENABLED and _ASYNC_ENABLED:
-        _downtime_cost = _classify_query_cost(
-            domain="downtime",
-            params={"date_from": start_date, "date_to": end_date},
-        )
-        if _downtime_cost == "ASYNC":
-            if is_async_available():
-                query_params = dict(
-                    start_date=start_date,
-                    end_date=end_date,
-                    workcenter_groups=workcenter_groups,
-                    families=families,
-                    resource_ids=resource_ids,
-                    package_groups=package_groups,
-                    locations=locations,
-                    big_categories=big_categories,
-                    status_types=status_types,
-                    is_production=is_production,
-                    is_key=is_key,
-                    is_monitor=is_monitor,
-                    owner=get_owner_token(),
+        if is_async_available():
+            query_params = dict(
+                start_date=start_date,
+                end_date=end_date,
+                workcenter_groups=workcenter_groups,
+                families=families,
+                resource_ids=resource_ids,
+                package_groups=package_groups,
+                locations=locations,
+                big_categories=big_categories,
+                status_types=status_types,
+                is_production=is_production,
+                is_key=is_key,
+                is_monitor=is_monitor,
+                owner=get_owner_token(),
+            )
+            job_id, err = enqueue_job_dynamic(
+                "downtime",
+                owner=get_owner_token(),
+                params=query_params,
+            )
+            if job_id is not None:
+                return success_response(
+                    {
+                        "async": True,
+                        "job_id": job_id,
+                        "status_url": f"/api/job/{job_id}?prefix=downtime",
+                    },
+                    status_code=202,
                 )
-                job_id, err = enqueue_job_dynamic(
-                    "downtime",
-                    owner=get_owner_token(),
-                    params=query_params,
-                )
-                if job_id is not None:
-                    return success_response(
-                        {
-                            "async": True,
-                            "job_id": job_id,
-                            "status_url": f"/api/job/{job_id}?prefix=downtime",
-                        },
-                        status_code=202,
-                    )
-                # enqueue failed — fall through to sync path
+            # enqueue failed — fall through to sync path
 
     try:
         if _BROWSER_DUCKDB_ENABLED:
@@ -410,8 +406,8 @@ def api_downtime_view():
     if not query_id:
         return validation_error("必須提供 query_id")
 
-    if granularity != 'day':
-        return validation_error('granularity must be "day" (week/month not yet implemented)')
+    if granularity not in ('day', 'week', 'month'):
+        return validation_error('granularity must be "day", "week", or "month"')
 
     result = apply_view(
         view_name='summary',

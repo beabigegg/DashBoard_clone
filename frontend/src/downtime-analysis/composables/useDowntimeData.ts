@@ -163,7 +163,10 @@ export function useDowntimeData() {
    * Load filter options from GET /api/downtime-analysis/options.
    * Pass filterState to narrow options via cross-filter (backend does the narrowing).
    */
+  let _loadOptionsSeq = 0;
+
   async function loadOptions(filterState?: Record<string, unknown>): Promise<void> {
+    const mySeq = ++_loadOptionsSeq;
     loading.options = true;
     error.value = '';
     try {
@@ -181,6 +184,7 @@ export function useDowntimeData() {
         timeout: API_TIMEOUT,
         silent: true,
       });
+      if (mySeq !== _loadOptionsSeq) return;
       const data = (response as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (data) {
         filterOptions.workcenter_groups = Array.isArray(data.workcenter_groups) ? (data.workcenter_groups as string[]) : [];
@@ -192,9 +196,13 @@ export function useDowntimeData() {
         filterOptions.reasons = Array.isArray(data.reasons) ? (data.reasons as string[]) : [];
       }
     } catch (err) {
-      error.value = (err as Error)?.message || '載入篩選選項失敗';
+      if (mySeq === _loadOptionsSeq) {
+        error.value = (err as Error)?.message || '載入篩選選項失敗';
+      }
     } finally {
-      loading.options = false;
+      if (mySeq === _loadOptionsSeq) {
+        loading.options = false;
+      }
     }
   }
 

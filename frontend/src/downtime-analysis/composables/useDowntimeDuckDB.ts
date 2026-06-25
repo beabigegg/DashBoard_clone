@@ -41,7 +41,7 @@ export interface DowntimeFilters {
   resourceIds?: string[];
   bigCategories?: string[];
   statusTypes?: string[];
-  granularity?: 'day';
+  granularity?: 'day' | 'week' | 'month';
 }
 
 export interface KpiResult {
@@ -764,9 +764,15 @@ export function useDowntimeDuckDB() {
   async function queryDailyTrend(filters: DowntimeFilters): Promise<DailyTrendRow[]> {
     _assertReady('queryDailyTrend');
     const { sql: where, params } = buildFilterClause(filters);
+    const gran = filters.granularity ?? 'day';
+    const dateExpr = gran === 'week'
+      ? "strftime(date_trunc('week', CAST(event_start AS DATE)), '%G-W%V')"
+      : gran === 'month'
+        ? "strftime(date_trunc('month', CAST(event_start AS DATE)), '%Y-%m')"
+        : "strftime(CAST(event_start AS DATE), '%Y-%m-%d')";
     const rawSQL = `
       SELECT
-        strftime(CAST(event_start AS DATE), '%Y-%m-%d') AS date,
+        ${dateExpr} AS date,
         SUM(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'UDT' THEN hours ELSE 0 END) AS udt_hours,
         SUM(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'SDT' THEN hours ELSE 0 END) AS sdt_hours,
         SUM(CASE WHEN TRIM(CAST(OLDSTATUSNAME AS VARCHAR)) = 'EGT' THEN hours ELSE 0 END) AS egt_hours,

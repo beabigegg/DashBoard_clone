@@ -177,12 +177,20 @@ class TestBigCategoryRoute:
         client.get('/api/downtime-analysis/view?query_id=ABC123&granularity=day')
         assert mock_apply.call_args.kwargs['granularity'] == 'day'
 
-    def test_granularity_week_returns_400(self, client):
-        resp = client.get('/api/downtime-analysis/view?query_id=ABC123&granularity=week')
-        assert resp.status_code == 400
+    @patch('mes_dashboard.routes.downtime_analysis_routes.apply_view')
+    def test_granularity_week_forwarded(self, mock_apply, client):
+        mock_apply.return_value = _mock_view_result()
+        client.get('/api/downtime-analysis/view?query_id=ABC123&granularity=week')
+        assert mock_apply.call_args.kwargs['granularity'] == 'week'
 
-    def test_granularity_month_returns_400(self, client):
-        resp = client.get('/api/downtime-analysis/view?query_id=ABC123&granularity=month')
+    @patch('mes_dashboard.routes.downtime_analysis_routes.apply_view')
+    def test_granularity_month_forwarded(self, mock_apply, client):
+        mock_apply.return_value = _mock_view_result()
+        client.get('/api/downtime-analysis/view?query_id=ABC123&granularity=month')
+        assert mock_apply.call_args.kwargs['granularity'] == 'month'
+
+    def test_granularity_invalid_returns_400(self, client):
+        resp = client.get('/api/downtime-analysis/view?query_id=ABC123&granularity=hourly')
         assert resp.status_code == 400
 
     @patch('mes_dashboard.routes.downtime_analysis_routes.apply_view')
