@@ -268,6 +268,63 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
         from mes_dashboard.services.async_query_job_service import update_job_progress
         update_job_progress(_JOB_PREFIX, self.job_id, pct=str(pct))
 
+    def chunk_to_duckdb(self, batch: "pa.RecordBatch", job_duckdb_path: str) -> None:
+        """Override base class to use explicit DDL for the raw table.
+
+        The base class infers column types from the first batch via
+        'CREATE TABLE AS SELECT ... WHERE 1=0'. When the first time-chunk
+        returns no reject records, columns like REJECTCOMMENT arrive as
+        pa.null() and DuckDB infers them as INT32, causing ConversionException
+        when subsequent chunks carry real VARCHAR values.
+
+        Fix: create raw with an explicit schema; insert by column name
+        (INSERT BY NAME) to be resilient against column-order variance.
+        """
+        import duckdb
+
+        with self._writer_lock:
+            conn = duckdb.connect(job_duckdb_path)
+            try:
+                conn.register("_chunk_batch", batch)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS raw (
+                        TXN_TIME VARCHAR,
+                        TXN_DAY VARCHAR,
+                        TXN_MONTH VARCHAR,
+                        WORKCENTER_GROUP VARCHAR,
+                        WORKCENTERSEQUENCE_GROUP VARCHAR,
+                        WORKCENTERNAME VARCHAR,
+                        SPECNAME VARCHAR,
+                        EQUIPMENTNAME VARCHAR,
+                        PRODUCTLINENAME VARCHAR,
+                        SCRAP_OBJECTTYPE VARCHAR,
+                        PJ_TYPE VARCHAR,
+                        CONTAINERNAME VARCHAR,
+                        PJ_WORKORDER VARCHAR,
+                        PJ_FUNCTION VARCHAR,
+                        PRODUCTNAME VARCHAR,
+                        LOSSREASONNAME VARCHAR,
+                        LOSSREASON_CODE VARCHAR,
+                        REJECTCOMMENT VARCHAR,
+                        AFFECTED_WORKORDER_COUNT BIGINT,
+                        MOVEIN_QTY DOUBLE,
+                        REJECT_QTY DOUBLE,
+                        REJECT_TOTAL_QTY DOUBLE,
+                        DEFECT_QTY DOUBLE,
+                        STANDBY_QTY DOUBLE,
+                        QTYTOPROCESS_QTY DOUBLE,
+                        INPROCESS_QTY DOUBLE,
+                        PROCESSED_QTY DOUBLE,
+                        REJECT_RATE_PCT DOUBLE,
+                        DEFECT_RATE_PCT DOUBLE,
+                        REJECT_SHARE_PCT DOUBLE
+                    )
+                """)
+                conn.execute("INSERT INTO raw BY NAME SELECT * FROM _chunk_batch")
+                conn.unregister("_chunk_batch")
+            finally:
+                conn.close()
+
 
 def _write_empty_reject_spool(spool_path: str) -> None:
     """Write an empty parquet file with the reject primary schema."""
