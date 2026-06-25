@@ -89,7 +89,18 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
         exclude_pb_diode: bool = bool(self.params.get("exclude_pb_diode", True))
         mode: str = str(self.params.get("mode", "date_range"))
 
-        # Compute deterministic query_id (same as legacy)
+        # Parse prefilter params (RHPF-05: must match sync path and legacy async path)
+        _pj_types: List[str] = sorted({
+            str(v).strip() for v in (self.params.get("pj_types") or []) if str(v).strip()
+        })
+        _packages: List[str] = sorted({
+            str(v).strip() for v in (self.params.get("packages") or []) if str(v).strip()
+        })
+        _pj_functions: List[str] = sorted({
+            str(v).strip() for v in (self.params.get("pj_functions") or []) if str(v).strip()
+        })
+
+        # Compute deterministic query_id (same as legacy + sync paths — includes prefilters)
         query_id_input = {
             "cache_schema_version": _CACHE_SCHEMA_VERSION,
             "mode": mode,
@@ -97,6 +108,9 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
             "end_date": end_date,
             "container_input_type": self.params.get("container_input_type"),
             "container_values": sorted(self.params.get("container_values") or []),
+            "pj_types": _pj_types,
+            "packages": _packages,
+            "pj_functions": _pj_functions,
         }
         self._query_id = _make_query_id(query_id_input)
         self._spool_key = self._query_id
@@ -113,11 +127,25 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
         self._where_clause = where_clause
         self._where_params = where_params
 
-        # Base WHERE clause (date range only — applied per-chunk)
-        self._base_where = (
-            "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
-            " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+        # Base WHERE clause — includes date filter AND prefilters (NVL form)
+        # This is the per-chunk base_where; chunk start/end override start_date/end_date per chunk.
+        from mes_dashboard.services.reject_history_service import _build_base_where
+        _base_where_full, _base_params_full = _build_base_where(
+            start_date,
+            end_date,
+            pj_types=_pj_types,
+            packages=_packages,
+            pj_functions=_pj_functions,
         )
+        self._base_where = _base_where_full
+        self._base_params = _base_params_full
+
+        # Extract prefilter bind params (pt_*, pkg_*, pf_*) from _base_params_full
+        # so each chunk carries them alongside its per-chunk date range.
+        prefilter_bind: Dict[str, Any] = {
+            k: v for k, v in _base_params_full.items()
+            if k not in ("start_date", "end_date")
+        }
 
         # Build time chunks
         grain = _ENGINE_GRAIN_DAYS
@@ -134,10 +162,14 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
                 "end_date": chunk_end_str,
             }
             chunk_bind.update(where_params)
+            chunk_bind.update(prefilter_bind)  # pt_*, pkg_*, pf_* params
             chunks.append({
                 "chunk_start": chunk_start_str,
                 "chunk_end_excl": chunk_end_str,
                 "where_clause": where_clause,
+                # Store the prefilter-extended base_where template — chunk dates still override
+                # start_date/end_date in chunk_bind, so the date clause remains per-chunk.
+                "base_where": _base_where_full,
                 "bind_params": chunk_bind,
             })
             current = chunk_end_dt + timedelta(days=1)
@@ -146,13 +178,15 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
     def build_chunk_sql(self, chunk_params: dict) -> tuple[str, dict]:
         """Return (sql, binds) for a single time chunk."""
         from mes_dashboard.services.reject_history_service import _prepare_sql
+        # Use the prefilter-extended base_where stored per-chunk (includes NVL prefilters)
+        chunk_base_where = chunk_params.get("base_where") or (
+            "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
+            " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+        )
         sql = _prepare_sql(
             "primary",
             where_clause=chunk_params["where_clause"],
-            base_where=(
-                "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
-                " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
-            ),
+            base_where=chunk_base_where,
             base_variant="lot",
         )
         return sql, chunk_params["bind_params"]

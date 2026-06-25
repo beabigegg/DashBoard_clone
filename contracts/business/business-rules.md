@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.29.0
-last-changed: 2026-06-20
+schema-version: 1.30.0
+last-changed: 2026-06-25
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -175,6 +175,18 @@ breaking-change-policy: deprecate-2-minors
 | YA-08 | ERP_WIP_MOVETXN_DETAIL as data source | Trend and summary aggregations use `ERP_WIP_MOVETXN_DETAIL` (row-level detail table) instead of `ERP_WIP_MOVETXN` (pre-aggregated). Verified by direct Oracle comparison: GA% totals identical (TX=70,494,377, SCRAP=81,972). `ERP_WIP_MOVETXN_DETAIL` provides `SOURCE_CODE` (LOT ID) which the aggregate table does not. | parity test (totals match) |
 | YA-09 | Spool schema version | `yield_alert_dataset_cache.py` contains a `_SCHEMA_VERSION` integer constant that participates in the spool cache key. Bumping `_SCHEMA_VERSION` orphans stale parquets by key without requiring a manual `rm`. Any column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. Schema-breaking rollback also requires: `rm -f tmp/query_spool/yield_alert_dataset/*.parquet`. | env-validation / constant-pin test |
 
+## Reject-History Prefilter Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| RHPF-01 | BASE_WHERE injection | `pj_types`, `packages`, `pj_functions` prefilter conditions are injected into `{{ BASE_WHERE }}` inside the `reject_raw` CTE of `performance_daily_lot.sql`, BEFORE the GROUP BY clause. This is distinct from `{{ WHERE_CLAUSE }}` (applied to the materialized base result at the supplementary/DuckDB layer). | unit tests |
+| RHPF-02 | Empty selection = no restriction | When any of the three prefilter fields is absent from the request body OR is an empty array, no SQL condition is added for that field. Results are identical to current behavior (backward-compatible). | unit + route tests |
+| RHPF-03 | NVL/TRIM NULL-container sentinel | Prefilter SQL conditions use `NVL(TRIM(c.PJ_TYPE/PRODUCTLINENAME/PJ_FUNCTION), '(NA)') IN (:bind_list)`. Oracle NULL values (rows whose container is absent from DW_MES_CONTAINER) map to the sentinel string `(NA)` and are NOT silently dropped. Selecting `(NA)` explicitly returns NULL-container rows. | unit + data-boundary tests |
+| RHPF-04 | PJ_BOP explicitly excluded | `performance_daily_lot.sql` does not JOIN or SELECT `PJ_BOP`. No `pj_bop` request parameter, no SQL clause, no UI control is added by this change. Requests containing `pj_bop` must silently ignore it. | unit tests |
+| RHPF-05 | Sync/async parity | The three prefilter fields must be forwarded identically in both the sync (HTTP 200 fallback) and async/RQ (HTTP 202) job paths. Spool/cache keys for the `reject_dataset` namespace must incorporate all three fields to prevent cross-query cache collisions. | unit + integration tests |
+| RHPF-06 | Options from shared container_filter_cache | Filter option values for `pj_types`, `packages`, and `pj_functions` are sourced from the existing `container_filter_cache` 4-tuple set (same backing store used by `GET /api/production-history/filter-options`). No new cache namespace, no new Oracle query path, no modification to the shared producer. | unit tests |
+
+
 ## Analytics / Anomaly Detection Rules
 
 | rule id | name | current behavior | tests |
@@ -271,6 +283,10 @@ breaking-change-policy: deprecate-2-minors
 | Downtime query: `DOWNTIME_USE_UNIFIED_JOB=off` (default) | legacy path unchanged (_bridge_jobid Path B pd.merge) | DDA-01, AC-8 | regression tests |
 | N concurrent heavy RQ workers (N > HEAVY_QUERY_MAX_CONCURRENT) | Peak simultaneous Oracle-phase executions ≤ HEAVY_QUERY_MAX_CONCURRENT (default 3); all N complete; no deadlock | ASYNC-15 | stress gate (`tests/stress/test_rq_semaphore_stress.py`) |
 | Oracle phase raises exception during slot hold | Slot released in finally block; subsequent job can acquire; no leak | ASYNC-15 | resilience tests (`tests/integration/test_rq_semaphore_wiring.py`) |
+| Reject-history prefilter: non-empty `pj_types`/`packages`/`pj_functions` | `NVL(TRIM(c.col), '(NA)') IN (...)` injected into `{{ BASE_WHERE }}` of `reject_raw` CTE | RHPF-01, RHPF-03 | unit tests |
+| Reject-history prefilter: empty list or field absent | No SQL clause added; results equivalent to omitting the filter entirely | RHPF-02 | unit + route tests |
+| Reject-history prefilter: `(NA)` in selection | Returns rows where `DW_MES_CONTAINER` has no matching record (NULL container → `(NA)` sentinel matches) | RHPF-03 | data-boundary tests |
+| Reject-history prefilter: `pj_bop` sent by caller | Silently ignored; no `PJ_BOP` clause added; no error | RHPF-04 | route tests |
 
 ## Material Consumption Rules
 
@@ -358,6 +374,15 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.30.0] — 2026-06-25
+### Added
+- rh-primary-prefilter: Added `## Reject-History Prefilter Rules` section (RHPF-01..RHPF-06):
+  BASE_WHERE injection point distinction from WHERE_CLAUSE (RHPF-01); empty-selection = no restriction /
+  backward-compatible (RHPF-02); NVL/TRIM NULL-container sentinel `(NA)` — NULL rows not silently dropped,
+  selecting `(NA)` returns NULL-container rows (RHPF-03); PJ_BOP explicitly excluded (RHPF-04);
+  sync/async path parity + spool/cache key inclusion (RHPF-05); options from shared `container_filter_cache`
+  read-only (RHPF-06). Four new Decision Table rows. Additive; no existing rules changed.
 
 ## [business 1.29.0] — 2026-06-20
 ### Added

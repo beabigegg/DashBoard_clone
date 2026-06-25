@@ -53,6 +53,7 @@ from mes_dashboard.services.container_resolution_policy import (
 from mes_dashboard.services.reject_history_service import (
     _as_float,
     _as_int,
+    _build_base_where,
     _build_where_clause,
     _extract_distinct_text_values,
     _extract_workcenter_group_options,
@@ -812,11 +813,18 @@ def execute_primary_query(
     exclude_material_scrap: bool = True,
     exclude_pb_diode: bool = True,
     build_response: bool = True,
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
+    pj_functions: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute Oracle query → cache DataFrame → return structured result."""
 
+    # Normalize prefilter lists (None → empty list)
+    _pj_types: List[str] = sorted({str(v).strip() for v in (pj_types or []) if str(v).strip()})
+    _packages: List[str] = sorted({str(v).strip() for v in (packages or []) if str(v).strip()})
+    _pj_functions: List[str] = sorted({str(v).strip() for v in (pj_functions or []) if str(v).strip()})
+
     # ---- Build base_where + params for the primary filter ----
-    base_where_parts: List[str] = []
     base_params: Dict[str, Any] = {}
     resolution_info: Optional[Dict[str, Any]] = None
     container_ids: List[str] = []  # populated in container mode
@@ -825,12 +833,14 @@ def execute_primary_query(
         if not start_date or not end_date:
             raise ValueError("date_range mode 需要 start_date 和 end_date")
         _validate_range(start_date, end_date)
-        base_where_parts.append(
-            "r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD')"
-            " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+        # Use _build_base_where so prefilter NVL conditions are appended
+        base_where, base_params = _build_base_where(
+            start_date,
+            end_date,
+            pj_types=_pj_types,
+            packages=_packages,
+            pj_functions=_pj_functions,
         )
-        base_params["start_date"] = start_date
-        base_params["end_date"] = end_date
 
     elif mode == "container":
         if not container_values:
@@ -850,13 +860,36 @@ def execute_primary_query(
         cid_condition = cid_where.strip()
         if cid_condition.upper().startswith("WHERE "):
             cid_condition = cid_condition[6:].strip()
-        base_where_parts.append(cid_condition)
+        # Container mode: no date params so _build_base_where not used here;
+        # instead manually compose container id filter with prefilter extensions.
+        base_where_parts: List[str] = [cid_condition]
         base_params.update(cid_params)
+        # Append prefilter clauses for container mode as well
+        if _pj_types:
+            pt_names = []
+            for idx, val in enumerate(_pj_types):
+                key = f"pt_{idx}"
+                base_params[key] = val
+                pt_names.append(f":{key}")
+            base_where_parts.append(f"NVL(TRIM(c.PJ_TYPE), '(NA)') IN ({', '.join(pt_names)})")
+        if _packages:
+            pkg_names = []
+            for idx, val in enumerate(_packages):
+                key = f"pkg_{idx}"
+                base_params[key] = val
+                pkg_names.append(f":{key}")
+            base_where_parts.append(f"NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN ({', '.join(pkg_names)})")
+        if _pj_functions:
+            pf_names = []
+            for idx, val in enumerate(_pj_functions):
+                key = f"pf_{idx}"
+                base_params[key] = val
+                pf_names.append(f":{key}")
+            base_where_parts.append(f"NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN ({', '.join(pf_names)})")
+        base_where = " AND ".join(base_where_parts)
 
     else:
         raise ValueError(f"不支援的查詢模式: {mode}")
-
-    base_where = " AND ".join(base_where_parts)
 
     # ---- Build policy meta (for response only, NOT for SQL) ----
     _, _, meta = _build_where_clause(
@@ -865,7 +898,7 @@ def execute_primary_query(
         exclude_pb_diode=exclude_pb_diode,
     )
 
-    # ---- Compute query_id from base params only (policy filters applied in-memory) ----
+    # ---- Compute query_id from base params + prefilters (policy filters applied in-memory) ----
     query_id_input = {
         "cache_schema_version": _CACHE_SCHEMA_VERSION,
         "mode": mode,
@@ -873,6 +906,9 @@ def execute_primary_query(
         "end_date": end_date,
         "container_input_type": container_input_type,
         "container_values": sorted(container_values or []),
+        "pj_types": _pj_types,
+        "packages": _packages,
+        "pj_functions": _pj_functions,
     }
     query_id = _make_query_id(query_id_input)
 

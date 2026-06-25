@@ -151,6 +151,9 @@ def execute_reject_query_job(
         container_values = params.get("container_values") or []
 
         # Compute deterministic query_id (same formula as execute_primary_query)
+        _pj_types = sorted({str(v).strip() for v in (params.get("pj_types") or []) if str(v).strip()})
+        _packages = sorted({str(v).strip() for v in (params.get("packages") or []) if str(v).strip()})
+        _pj_functions = sorted({str(v).strip() for v in (params.get("pj_functions") or []) if str(v).strip()})
         query_id_input = {
             "cache_schema_version": _CACHE_SCHEMA_VERSION,
             "mode": mode,
@@ -158,6 +161,9 @@ def execute_reject_query_job(
             "end_date": end_date,
             "container_input_type": container_input_type,
             "container_values": sorted(container_values),
+            "pj_types": _pj_types,
+            "packages": _packages,
+            "pj_functions": _pj_functions,
         }
         query_id = _make_query_id(query_id_input)
 
@@ -179,6 +185,9 @@ def execute_reject_query_job(
             exclude_material_scrap=bool(params.get("exclude_material_scrap", True)),
             exclude_pb_diode=bool(params.get("exclude_pb_diode", True)),
             build_response=False,
+            pj_types=params.get("pj_types") or [],
+            packages=params.get("packages") or [],
+            pj_functions=params.get("pj_functions") or [],
         )
 
         complete_job(_JOB_PREFIX, job_id, query_id=query_id)

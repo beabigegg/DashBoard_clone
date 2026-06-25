@@ -196,6 +196,13 @@
   color: theme('colors.token.h475569');
 }
 
+.theme-reject-history .primary-prefilter-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
 .theme-reject-history .filter-label {
   font-size: 12px;
   font-weight: 700;
@@ -681,6 +688,10 @@
   }
 
   .theme-reject-history .supplementary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-reject-history .primary-prefilter-row {
     grid-template-columns: 1fr;
   }
 

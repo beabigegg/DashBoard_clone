@@ -679,6 +679,21 @@ def api_reject_history_query():
             return validation_error("container mode 需要 container_values 陣列")
         container_values = [str(v).strip() for v in raw_container_values if str(v).strip()]
 
+    # Parse three optional primary prefilter params (pj_bop is silently ignored per AC-6)
+    _raw_pj_types = body.get("pj_types") or []
+    _raw_packages = body.get("packages") or []
+    _raw_pj_functions = body.get("pj_functions") or []
+
+    prefilter_pj_types: list[str] = sorted({
+        str(v).strip() for v in _raw_pj_types if str(v).strip()
+    }) if isinstance(_raw_pj_types, list) else []
+    prefilter_packages: list[str] = sorted({
+        str(v).strip() for v in _raw_packages if str(v).strip()
+    }) if isinstance(_raw_packages, list) else []
+    prefilter_pj_functions: list[str] = sorted({
+        str(v).strip() for v in _raw_pj_functions if str(v).strip()
+    }) if isinstance(_raw_pj_functions, list) else []
+
     _query_id_input = {
         "cache_schema_version": _CACHE_SCHEMA_VERSION,
         "mode": mode,
@@ -686,6 +701,9 @@ def api_reject_history_query():
         "end_date": end_date,
         "container_input_type": container_input_type,
         "container_values": sorted(container_values),
+        "pj_types": prefilter_pj_types,
+        "packages": prefilter_packages,
+        "pj_functions": prefilter_pj_functions,
     }
     _pre_query_id = _make_query_id(_query_id_input)
 
@@ -700,6 +718,9 @@ def api_reject_history_query():
                 include_excluded_scrap=include_excluded_scrap,
                 exclude_material_scrap=exclude_material_scrap,
                 exclude_pb_diode=exclude_pb_diode,
+                pj_types=prefilter_pj_types,
+                packages=prefilter_packages,
+                pj_functions=prefilter_pj_functions,
             )
             return success_response(result)
         except ValueError as exc:
@@ -722,6 +743,9 @@ def api_reject_history_query():
         "exclude_pb_diode": exclude_pb_diode,
         "start_date": start_date,
         "end_date": end_date,
+        "pj_types": prefilter_pj_types,
+        "packages": prefilter_packages,
+        "pj_functions": prefilter_pj_functions,
     }
     if mode == "container":
         job_params["container_input_type"] = container_input_type

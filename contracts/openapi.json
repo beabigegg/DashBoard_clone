@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.27.0"
+    "version": "1.28.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -2040,7 +2040,7 @@
           }
         ],
         "requestBody": {
-          "description": "Contract request: JSON body (schema not machine-resolved; see contract)",
+          "description": "Contract request: JSON body `{start_date, end_date, pj_types?(opt,list), packages?(opt,list), pj_functions?(opt,list), ...existing}` (schema not machine-resolved; see contract)",
           "content": {},
           "x-cdd-unresolved": true
         },

@@ -41,6 +41,10 @@ export interface RejectFilterInput {
   excludeMaterialScrap?: unknown;
   excludePbDiode?: unknown;
   paretoTop80?: unknown;
+  // Primary prefilter fields (BASE_WHERE layer — separate from supplementary packages)
+  pjTypes?: unknown;
+  primaryPackages?: unknown;
+  pjFunctions?: unknown;
   [key: string]: unknown;
 }
 
@@ -54,6 +58,10 @@ export interface RejectFilterSnapshot {
   excludeMaterialScrap: boolean;
   excludePbDiode: boolean;
   paretoTop80: boolean;
+  // Primary prefilter fields (BASE_WHERE layer — separate from supplementary packages)
+  pjTypes: string[];
+  primaryPackages: string[];
+  pjFunctions: string[];
 }
 
 export function toRejectFilterSnapshot(input: RejectFilterInput = {}): RejectFilterSnapshot {
@@ -67,6 +75,9 @@ export function toRejectFilterSnapshot(input: RejectFilterInput = {}): RejectFil
     excludeMaterialScrap: normalizeBoolean(input.excludeMaterialScrap, true),
     excludePbDiode: normalizeBoolean(input.excludePbDiode, true),
     paretoTop80: normalizeBoolean(input.paretoTop80, true),
+    pjTypes: normalizeArray(input.pjTypes),
+    primaryPackages: normalizeArray(input.primaryPackages),
+    pjFunctions: normalizeArray(input.pjFunctions),
   };
 }
 

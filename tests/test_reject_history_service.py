@@ -401,3 +401,186 @@ def test_export_csv_contains_semantic_headers(monkeypatch):
     assert "不扣帳報廢量" in payload
     assert "WORKFLOW" not in payload
     assert "2026-02-03" in payload
+
+
+# ============================================================
+# rh-primary-prefilter: _build_base_where tests
+# ============================================================
+
+def test_build_where_clause_injects_pj_types_into_base_where():
+    """Non-empty pj_types list produces NVL(TRIM(c.PJ_TYPE), '(NA)') IN (...) in base_where."""
+    base_where, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=["TYPE-A", "TYPE-B"],
+        packages=[],
+        pj_functions=[],
+    )
+    assert "NVL(TRIM(c.PJ_TYPE), '(NA)') IN" in base_where
+    assert "TYPE-A" in params.values()
+    assert "TYPE-B" in params.values()
+
+
+def test_build_where_clause_injects_packages_into_base_where():
+    """Non-empty packages list produces NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN (...) in base_where."""
+    base_where, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=[],
+        packages=["PKG-A"],
+        pj_functions=[],
+    )
+    assert "NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN" in base_where
+    assert "PKG-A" in params.values()
+
+
+def test_build_where_clause_injects_pj_functions_into_base_where():
+    """Non-empty pj_functions list produces NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN (...) in base_where."""
+    base_where, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=[],
+        packages=[],
+        pj_functions=["FUNC-X", "FUNC-Y"],
+    )
+    assert "NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN" in base_where
+    assert "FUNC-X" in params.values()
+    assert "FUNC-Y" in params.values()
+
+
+def test_build_where_clause_all_three_prefilters_combined():
+    """All three prefilter lists present produce all three NVL IN clauses."""
+    base_where, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=["TYPE-A"],
+        packages=["PKG-B"],
+        pj_functions=["FUNC-C"],
+    )
+    assert "NVL(TRIM(c.PJ_TYPE), '(NA)') IN" in base_where
+    assert "NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN" in base_where
+    assert "NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN" in base_where
+    assert "TYPE-A" in params.values()
+    assert "PKG-B" in params.values()
+    assert "FUNC-C" in params.values()
+
+
+def test_build_where_clause_empty_prefilters_produce_no_restriction():
+    """Empty lists add nothing beyond the date predicate — result identical to no prefilters."""
+    base_where_empty, params_empty = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=[],
+        packages=[],
+        pj_functions=[],
+    )
+    base_where_none, params_none = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+    )
+    assert base_where_empty == base_where_none
+    assert params_empty == params_none
+    # Only date params — no prefilter params in result
+    assert "NVL" not in base_where_empty
+    assert set(params_empty.keys()) == {"start_date", "end_date"}
+
+
+def test_build_where_clause_absent_prefilters_produce_no_restriction():
+    """Calling _build_base_where with no prefilter kwargs yields the date-only predicate."""
+    base_where, params = svc._build_base_where(
+        start_date="2026-06-01",
+        end_date="2026-06-30",
+    )
+    assert "r.TXNDATE" in base_where
+    assert "NVL" not in base_where
+    assert params.get("start_date") == "2026-06-01"
+    assert params.get("end_date") == "2026-06-30"
+
+
+def test_build_where_clause_nvl_trim_form_not_raw_column_reference():
+    """Prefilter must use NVL(TRIM(...)) form, not raw c.PJ_TYPE IN (...)."""
+    base_where, _ = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=["TYPE-A"],
+        packages=["PKG-B"],
+        pj_functions=["FUNC-C"],
+    )
+    # Raw column IN is forbidden — NVL(TRIM) is required
+    assert "c.PJ_TYPE IN" not in base_where
+    assert "c.PRODUCTLINENAME IN" not in base_where
+    assert "c.PJ_FUNCTION IN" not in base_where
+    # NVL form present
+    assert "NVL(TRIM(c.PJ_TYPE), '(NA)')" in base_where
+    assert "NVL(TRIM(c.PRODUCTLINENAME), '(NA)')" in base_where
+    assert "NVL(TRIM(c.PJ_FUNCTION), '(NA)')" in base_where
+
+
+def test_build_where_clause_prefilters_absent_from_where_clause_fragment():
+    """_build_where_clause (WHERE_CLAUSE) must NOT include PJ_TYPE/PRODUCTLINENAME/PJ_FUNCTION NVL IN clauses.
+
+    AC-2: prefilters live in BASE_WHERE only (reject_raw CTE), not WHERE_CLAUSE (b.* scope).
+    """
+    import mes_dashboard.services.reject_history_service as _svc
+    monkeypatch_helper = lambda: None  # just to confirm we can import the svc
+    where_clause, _, _ = _svc._build_where_clause()
+
+    assert "NVL(TRIM(c.PJ_TYPE)" not in where_clause
+    assert "NVL(TRIM(c.PRODUCTLINENAME)" not in where_clause
+    assert "NVL(TRIM(c.PJ_FUNCTION)" not in where_clause
+
+
+def test_na_sentinel_in_pj_types_matches_null_pj_type_rows():
+    """(NA) sentinel value appears verbatim in bind params so Oracle NVL maps NULL → '(NA)'."""
+    _, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=["(NA)", "TYPE-A"],
+    )
+    param_values = list(params.values())
+    assert "(NA)" in param_values
+    assert "TYPE-A" in param_values
+
+
+def test_na_sentinel_in_packages_matches_null_package_rows():
+    """(NA) sentinel in packages list is preserved in bind params."""
+    _, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        packages=["(NA)", "PKG-A"],
+    )
+    param_values = list(params.values())
+    assert "(NA)" in param_values
+    assert "PKG-A" in param_values
+
+
+def test_na_sentinel_in_pj_functions_matches_null_pj_function_rows():
+    """(NA) sentinel in pj_functions list is preserved in bind params."""
+    _, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_functions=["(NA)"],
+    )
+    param_values = list(params.values())
+    assert "(NA)" in param_values
+
+
+def test_pj_bop_param_absent_from_all_sql_paths():
+    """pj_bop must not appear in _build_base_where or _build_where_clause outputs (AC-6)."""
+    import inspect
+    # _build_base_where signature must not accept pj_bop
+    sig = inspect.signature(svc._build_base_where)
+    assert "pj_bop" not in sig.parameters
+
+    # _build_where_clause signature must not accept pj_bop
+    sig_where = inspect.signature(svc._build_where_clause)
+    assert "pj_bop" not in sig_where.parameters
+
+    # Even if (hypothetically) called with arbitrary kwargs, no pj_bop in SQL output
+    base_where, params = svc._build_base_where(
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        pj_types=["TYPE-A"],
+    )
+    assert "pj_bop" not in base_where.lower()
+    assert not any("pj_bop" in str(k).lower() for k in params)

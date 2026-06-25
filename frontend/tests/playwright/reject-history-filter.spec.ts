@@ -12,6 +12,10 @@
  *   - Pagination controls (page-prev / page-next) appear with multi-page data
  *   - datatable-row count matches mocked response
  *   - Empty state / zero-row table on empty response
+ *   - Primary prefilter MultiSelects (pj_types, packages, pj_functions) in primary section
+ *   - Primary prefilter values included in POST body when selected
+ *   - PJ_BOP not present anywhere in the FilterPanel
+ *   - cross-filter options populate primary MultiSelects
  *
  * All API calls are mocked. No real backend required.
  * Routes registered FIRST (catch-all) then LAST (specific) per LIFO rule.
@@ -31,6 +35,20 @@ const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:8080';
 // ---------------------------------------------------------------------------
 
 const MOCK_QUERY_ID = 'test-reject-filter-001';
+
+function makeFilterOptionsResult(overrides: Record<string, unknown> = {}) {
+  return {
+    success: true,
+    data: {
+      pj_types: ['TYPE_A', 'TYPE_B', '(NA)'],
+      packages: ['PKG-X', 'PKG-Y'],
+      bops: [],
+      pj_functions: ['FN-LASER', 'FN-EDGE'],
+      ...overrides,
+    },
+    meta: { timestamp: new Date().toISOString(), app_version: 'test', updated_at: new Date().toISOString() },
+  };
+}
 
 function makeSyncResult(overrides: Record<string, unknown> = {}) {
   return {
@@ -162,6 +180,14 @@ async function setupBaseRoutes(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(makeSyncResult()),
+    }),
+  );
+  // Cross-filter options for primary prefilter MultiSelects
+  await page.route('**/api/production-history/filter-options**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(makeFilterOptionsResult()),
     }),
   );
 }
@@ -520,6 +546,205 @@ test.describe('reject-history — filter panel interactions', () => {
     // No data rows should exist
     const rows = page.locator('[data-testid="datatable-row"]');
     expect(await rows.count()).toBe(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Primary prefilter tests (AC-5, AC-6, AC-7)
+// ---------------------------------------------------------------------------
+
+test.describe('reject-history — primary prefilter MultiSelects', () => {
+
+  test('primary section renders pj_types MultiSelect before query', async ({ page }) => {
+    await setupBaseRoutes(page);
+    await navigateToRejectHistory(page);
+
+    // Primary prefilter row and pj_type MultiSelect must be visible without submitting a query
+    const pjTypeSelect = page.locator('[data-testid="primary-pj-type-select"]');
+    await expect(pjTypeSelect).toBeVisible({ timeout: 15_000 });
+    const trigger = pjTypeSelect.locator('[data-testid="multiselect-trigger"]');
+    await expect(trigger).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('primary section renders packages MultiSelect before query', async ({ page }) => {
+    await setupBaseRoutes(page);
+    await navigateToRejectHistory(page);
+
+    const pkgSelect = page.locator('[data-testid="primary-package-select"]');
+    await expect(pkgSelect).toBeVisible({ timeout: 15_000 });
+    const trigger = pkgSelect.locator('[data-testid="multiselect-trigger"]');
+    await expect(trigger).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('primary section renders pj_functions MultiSelect before query', async ({ page }) => {
+    await setupBaseRoutes(page);
+    await navigateToRejectHistory(page);
+
+    const fnSelect = page.locator('[data-testid="primary-pj-function-select"]');
+    await expect(fnSelect).toBeVisible({ timeout: 15_000 });
+    const trigger = fnSelect.locator('[data-testid="multiselect-trigger"]');
+    await expect(trigger).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('pj_bop control not present anywhere in FilterPanel', async ({ page }) => {
+    await setupBaseRoutes(page);
+    await navigateToRejectHistory(page);
+
+    // AC-6: no BOP control must exist in the filter panel at any time
+    await expect(page.locator('[data-testid="primary-pj-bop-select"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid*="bop"]')).toHaveCount(0);
+
+    // Also confirm after query submission
+    await page.fill('[data-testid="start-date"]', '2026-01-01');
+    await page.fill('[data-testid="end-date"]', '2026-01-31');
+    await submitQueryAndWait(page);
+
+    await expect(page.locator('[data-testid*="bop"]')).toHaveCount(0);
+  });
+
+  test('selecting pj_types value sends it in POST body', async ({ page }) => {
+    await setupBaseRoutes(page);
+
+    let capturedBody: Record<string, unknown> | null = null;
+    // Override query route to capture body — registered LAST (LIFO priority)
+    await page.route('**/api/reject-history/query**', async (route) => {
+      capturedBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeSyncResult()),
+      });
+    });
+
+    await navigateToRejectHistory(page);
+
+    // Wait for the filter-options response to populate the MultiSelect options
+    await page.waitForTimeout(300);
+
+    // Click the pj_types MultiSelect trigger to open dropdown
+    const pjTypeSelect = page.locator('[data-testid="primary-pj-type-select"]');
+    await expect(pjTypeSelect.locator('[data-testid="multiselect-trigger"]')).toBeVisible({ timeout: 10_000 });
+    await pjTypeSelect.locator('[data-testid="multiselect-trigger"]').click();
+
+    // Select TYPE_A from the dropdown
+    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
+    await expect(dropdown).toBeVisible({ timeout: 10_000 });
+
+    const typeAOption = page.locator('[data-testid="multiselect-option"]').filter({ hasText: 'TYPE_A' });
+    await expect(typeAOption).toBeVisible({ timeout: 10_000 });
+    await typeAOption.click();
+
+    // Close the dropdown by pressing Escape
+    await page.keyboard.press('Escape');
+
+    // Fill dates and submit
+    await page.fill('[data-testid="start-date"]', '2026-01-01');
+    await page.fill('[data-testid="end-date"]', '2026-01-31');
+    await submitQueryAndWait(page);
+
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody!['pj_types']).toEqual(['TYPE_A']);
+  });
+
+  test('selecting (NA) sentinel in pj_types sends sentinel string in POST body', async ({ page }) => {
+    await setupBaseRoutes(page);
+
+    let capturedBody: Record<string, unknown> | null = null;
+    await page.route('**/api/reject-history/query**', async (route) => {
+      capturedBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeSyncResult()),
+      });
+    });
+
+    await navigateToRejectHistory(page);
+    await page.waitForTimeout(300);
+
+    const pjTypeSelect = page.locator('[data-testid="primary-pj-type-select"]');
+    await pjTypeSelect.locator('[data-testid="multiselect-trigger"]').click();
+
+    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
+    await expect(dropdown).toBeVisible({ timeout: 10_000 });
+
+    const naOption = page.locator('[data-testid="multiselect-option"]').filter({ hasText: '(NA)' });
+    await expect(naOption).toBeVisible({ timeout: 10_000 });
+    await naOption.click();
+
+    await page.keyboard.press('Escape');
+
+    await page.fill('[data-testid="start-date"]', '2026-01-01');
+    await page.fill('[data-testid="end-date"]', '2026-01-31');
+    await submitQueryAndWait(page);
+
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody!['pj_types']).toContain('(NA)');
+  });
+
+  test('prefilter selection combined with supplementary filter in end-to-end query POST', async ({ page }) => {
+    await setupBaseRoutes(page);
+
+    let capturedQueryBody: Record<string, unknown> | null = null;
+    await page.route('**/api/reject-history/query**', async (route) => {
+      capturedQueryBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeSyncResult()),
+      });
+    });
+
+    await navigateToRejectHistory(page);
+    await page.waitForTimeout(300);
+
+    // Select a PJ Function via primary prefilter
+    const fnSelect = page.locator('[data-testid="primary-pj-function-select"]');
+    await fnSelect.locator('[data-testid="multiselect-trigger"]').click();
+
+    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
+    await expect(dropdown).toBeVisible({ timeout: 10_000 });
+
+    const fnOption = page.locator('[data-testid="multiselect-option"]').filter({ hasText: 'FN-LASER' });
+    await expect(fnOption).toBeVisible({ timeout: 10_000 });
+    await fnOption.click();
+    await page.keyboard.press('Escape');
+
+    // Submit query
+    await page.fill('[data-testid="start-date"]', '2026-01-01');
+    await page.fill('[data-testid="end-date"]', '2026-01-31');
+    await submitQueryAndWait(page);
+
+    expect(capturedQueryBody).not.toBeNull();
+    expect(capturedQueryBody!['pj_functions']).toEqual(['FN-LASER']);
+    // Baseline POST body fields must still be present
+    expect(capturedQueryBody!['start_date']).toBe('2026-01-01');
+    expect(capturedQueryBody!['end_date']).toBe('2026-01-31');
+  });
+
+  test('container_filter_cache options populate primary MultiSelects', async ({ page }) => {
+    await setupBaseRoutes(page);
+    await navigateToRejectHistory(page);
+
+    // Wait for filter-options response to populate options
+    await page.waitForTimeout(300);
+
+    // Click pj_types trigger and verify options from mocked filter-options
+    const pjTypeSelect = page.locator('[data-testid="primary-pj-type-select"]');
+    await pjTypeSelect.locator('[data-testid="multiselect-trigger"]').click();
+
+    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
+    await expect(dropdown).toBeVisible({ timeout: 10_000 });
+
+    // The mock returns pj_types: ['TYPE_A', 'TYPE_B', '(NA)'] — all three should appear
+    const options = page.locator('[data-testid="multiselect-option"]');
+    await expect(options.first()).toBeVisible({ timeout: 10_000 });
+    const count = await options.count();
+    expect(count).toBeGreaterThanOrEqual(3);
+
+    // Close
+    await page.keyboard.press('Escape');
   });
 
 });

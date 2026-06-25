@@ -23,6 +23,13 @@ interface SupplementaryFilters {
   types?: string[];
 }
 
+/** Options available for the primary prefilter MultiSelects (BASE_WHERE layer). */
+interface PrimaryPrefilterOptions {
+  pj_types?: string[];
+  packages?: string[];
+  pj_functions?: string[];
+}
+
 interface LoadingState {
   querying?: boolean;
   exporting?: boolean;
@@ -56,6 +63,13 @@ const props = defineProps<{
   loading: LoadingState;
   activeFilterChips?: FilterChip[];
   primaryQueryMaxDays?: number;
+  // Primary prefilter selections (BASE_WHERE layer)
+  primaryPjTypes?: string[];
+  primaryPackages?: string[];
+  primaryPjFunctions?: string[];
+  // Primary prefilter options (from container_filter_cache cross-filter API)
+  primaryPrefilterOptions?: PrimaryPrefilterOptions;
+  primaryPrefilterLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -67,6 +81,10 @@ const emit = defineEmits<{
   (e: 'update:containerInputType', value: string): void;
   (e: 'update:containerInput', value: string): void;
   (e: 'supplementary-change', value: { packages: string[]; workcenterGroups: string[]; reasons: string[]; types: string[] }): void;
+  (e: 'update:primaryPjTypes', value: string[]): void;
+  (e: 'update:primaryPackages', value: string[]): void;
+  (e: 'update:primaryPjFunctions', value: string[]): void;
+  (e: 'primary-prefilter-close', field: 'pj_types' | 'packages' | 'pj_functions'): void;
 }>();
 
 function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups: string[]; reasons: string[]; types: string[] }>): void {
@@ -164,6 +182,54 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           ></textarea>
         </div>
       </template>
+
+      <!-- Primary prefilter row (BASE_WHERE layer, optional; narrows Oracle query scope) -->
+      <div class="filter-group-full primary-prefilter-row" data-testid="primary-prefilter-row">
+        <div class="filter-group" data-testid="primary-pj-type-select">
+          <label class="filter-label">PJ Type</label>
+          <MultiSelect
+            :model-value="primaryPjTypes || []"
+            :options="primaryPrefilterOptions?.pj_types || []"
+            placeholder="全部 PJ Type"
+            aria-label="PJ Type 預篩選"
+            searchable
+            :loading="primaryPrefilterLoading"
+            data-testid="primary-pj-type-multiselect"
+            @update:model-value="$emit('update:primaryPjTypes', $event)"
+            @dropdown-close="$emit('primary-prefilter-close', 'pj_types')"
+          />
+        </div>
+
+        <div class="filter-group" data-testid="primary-package-select">
+          <label class="filter-label">Package</label>
+          <MultiSelect
+            :model-value="primaryPackages || []"
+            :options="primaryPrefilterOptions?.packages || []"
+            placeholder="全部 Package"
+            aria-label="Package 預篩選"
+            searchable
+            :loading="primaryPrefilterLoading"
+            data-testid="primary-package-multiselect"
+            @update:model-value="$emit('update:primaryPackages', $event)"
+            @dropdown-close="$emit('primary-prefilter-close', 'packages')"
+          />
+        </div>
+
+        <div class="filter-group" data-testid="primary-pj-function-select">
+          <label class="filter-label">PJ Function</label>
+          <MultiSelect
+            :model-value="primaryPjFunctions || []"
+            :options="primaryPrefilterOptions?.pj_functions || []"
+            placeholder="全部 PJ Function"
+            aria-label="PJ Function 預篩選"
+            searchable
+            :loading="primaryPrefilterLoading"
+            data-testid="primary-pj-function-multiselect"
+            @update:model-value="$emit('update:primaryPjFunctions', $event)"
+            @dropdown-close="$emit('primary-prefilter-close', 'pj_functions')"
+          />
+        </div>
+      </div>
 
       <div class="filter-toolbar">
         <div class="checkbox-row">

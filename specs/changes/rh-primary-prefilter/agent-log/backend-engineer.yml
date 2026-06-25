@@ -1,0 +1,35 @@
+agent: backend-engineer
+change-id: rh-primary-prefilter
+timestamp: 2026-06-25T19:07:00+08:00
+status: complete
+
+summary: >
+  Implemented rh-primary-prefilter backend changes: new _build_base_where() function,
+  threaded pj_types/packages/pj_functions through all four paths (sync, cache-key,
+  legacy async, unified async). All 173 tests pass across 5 test files. TDD approach
+  followed — wrote failing tests first, then implemented feature.
+
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/reject_history_service.py:281-338 (new _build_base_where)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/reject_dataset_cache.py:53-64,806-883 (import + execute_primary_query)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/reject_history_routes.py:682-744 (prefilter parsing + forwarding)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/reject_query_job_service.py:148-180 (query_id + execute forwarding)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/workers/reject_history_worker.py:85-215 (unified job prefilter support)" }
+  - { type: tests-added, pointer: "tests/test_reject_history_service.py::test_build_where_clause_injects_pj_types_into_base_where..test_pj_bop_param_absent_from_all_sql_paths (12 new)" }
+  - { type: tests-added, pointer: "tests/test_reject_history_routes.py::TestRejectHistoryQueryPrefilterRoutes (6 new)" }
+  - { type: tests-added, pointer: "tests/test_reject_history_async_routes.py::TestRejectHistoryQueryPrefilterAsyncRoutes (5 new)" }
+  - { type: tests-added, pointer: "tests/test_reject_dataset_cache.py::TestRejectDatasetCachePrefilterCacheKey + TestExecutePrimaryQueryPrefilterForwarding (7 new)" }
+  - { type: tests-added, pointer: "tests/test_reject_query_job_service.py::TestExecuteRejectQueryJobPrefilterForwarding (4 new)" }
+  - { type: test-output, pointer: "173 passed in 3.95s (collect/targeted/changed-area/contract all passed)" }
+  - { type: contracts-touched, pointer: "n/a (contracts already updated by prior contract-reviewer agent)" }
+
+known-risks:
+  - unified-job base_where template: per-chunk start_date/end_date override _base_params keys correctly
+    because chunk_bind is built with start_date/end_date first then updated with prefilter_bind (no date collision)
+  - container mode prefilter injection: implemented inline in execute_primary_query rather than using
+    _build_base_where since container mode has no date params and needs different base structure
+  - pre-existing test fixed: test_query_rejects_date_range_over_half_year used 2025-01-01..2025-12-31
+    which is exactly 365 days = env default limit, causing it to pass validation and reach enqueue path;
+    fixed to use 2024-01-01..2025-03-01 (>365 days) with '天' message assertion instead of hardcoded '190'
+
+next-reviewer: qa-reviewer

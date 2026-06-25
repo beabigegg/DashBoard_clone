@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.28.0] — 2026-06-25
+### Added
+- rh-primary-prefilter: `POST /api/reject-history/query` body gains three additive optional fields: `pj_types[]`, `packages[]`, `pj_functions[]` (string arrays). Injected into `{{ BASE_WHERE }}` of `reject_raw` CTE (Oracle layer, before GROUP BY). `NVL(TRIM(c.col), '(NA)') IN (...)` form; NULL container values map to `(NA)` sentinel. Empty/absent = no restriction. `PJ_BOP` explicitly excluded. Both sync (200) and async/RQ (202) paths carry new fields identically. Additive; no existing fields removed or renamed.
+
+## [data 1.25.0] — 2026-06-25
+### Added
+- rh-primary-prefilter: §2.12 (Reject-History Primary Query request-side filter params). Documents three new optional JSON body fields, `{{ BASE_WHERE }}` injection point, `NVL(TRIM)` NULL-sentinel semantics, parity rule (sync+async paths), spool/cache key inclusion, and `PJ_BOP` explicit exclusion. Additive.
+
+## [business 1.30.0] — 2026-06-25
+### Added
+- rh-primary-prefilter: `## Reject-History Prefilter Rules` section (RHPF-01..RHPF-06) — BASE_WHERE injection layer distinction, empty=no-restriction/backward-compat, NVL/TRIM NULL-container sentinel `(NA)`, PJ_BOP exclusion, sync/async parity + spool/cache key, shared `container_filter_cache` read-only. Four new Decision Table rows. Additive; no existing rules changed.
+
 ## [api 1.27.0] — 2026-06-24
 ### Removed (BREAKING)
 - nav-config-to-code: 4 drawer endpoints → all **404**: `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}`. `name`/`drawer_id`/`order` removed from `GET /admin/api/pages` response body and `PUT /admin/api/pages/{route}` accepted body. No deprecation window — monorepo atomic cutover. Sole consumers `frontend/src/admin-pages/` + `portal-shell/`.

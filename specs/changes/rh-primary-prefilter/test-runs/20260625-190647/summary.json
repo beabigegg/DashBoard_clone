@@ -1,0 +1,15 @@
+{
+  "change_id": "rh-primary-prefilter",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/contract/ -v -k reject",
+  "duration_ms": 3229,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/rh-primary-prefilter/test-runs/20260625-190647/summary.json",
+    "stdout": "specs/changes/rh-primary-prefilter/test-runs/20260625-190647/stdout.log",
+    "stderr": "specs/changes/rh-primary-prefilter/test-runs/20260625-190647/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

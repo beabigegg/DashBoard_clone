@@ -277,6 +277,71 @@ _DEFAULT_BASE_WHERE = (
     " AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
 )
 
+
+def _build_base_where(
+    start_date: str,
+    end_date: str,
+    *,
+    pj_types: Optional[list[str]] = None,
+    packages: Optional[list[str]] = None,
+    pj_functions: Optional[list[str]] = None,
+) -> tuple[str, dict[str, Any]]:
+    """Build the BASE_WHERE clause (inside reject_raw CTE) with optional primary prefilters.
+
+    Always includes the date predicate. For each non-empty list, appends a
+    NVL(TRIM(c.<column>), '(NA)') IN (...) clause so NULL container rows are
+    mapped to '(NA)' sentinel rather than being dropped silently (RHPF-03).
+
+    Bind param name prefixes:
+      - pj_types  -> pt_0, pt_1, ...
+      - packages  -> pkg_0, pkg_1, ...
+      - pj_functions -> pf_0, pf_1, ...
+    These must NOT collide with ':start_date'/':end_date' or any WHERE_CLAUSE binds.
+
+    Args:
+        start_date: ISO date string for the lower bound (inclusive).
+        end_date:   ISO date string for the upper bound (inclusive via + 1).
+        pj_types:   Optional list of PJ_TYPE values; empty/None = no restriction.
+        packages:   Optional list of PRODUCTLINENAME values; empty/None = no restriction.
+        pj_functions: Optional list of PJ_FUNCTION values; empty/None = no restriction.
+
+    Returns:
+        (base_where_str, params_dict) — ready to pass to _prepare_sql(base_where=...).
+    """
+    parts: list[str] = [_DEFAULT_BASE_WHERE]
+    params: dict[str, Any] = {"start_date": start_date, "end_date": end_date}
+
+    normalized_pj_types = sorted({_normalize_text(v) for v in (pj_types or []) if _normalize_text(v)})
+    normalized_packages = sorted({_normalize_text(v) for v in (packages or []) if _normalize_text(v)})
+    normalized_pj_functions = sorted({_normalize_text(v) for v in (pj_functions or []) if _normalize_text(v)})
+
+    if normalized_pj_types:
+        param_names = []
+        for idx, val in enumerate(normalized_pj_types):
+            key = f"pt_{idx}"
+            params[key] = val
+            param_names.append(f":{key}")
+        parts.append(f"NVL(TRIM(c.PJ_TYPE), '(NA)') IN ({', '.join(param_names)})")
+
+    if normalized_packages:
+        param_names = []
+        for idx, val in enumerate(normalized_packages):
+            key = f"pkg_{idx}"
+            params[key] = val
+            param_names.append(f":{key}")
+        parts.append(f"NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN ({', '.join(param_names)})")
+
+    if normalized_pj_functions:
+        param_names = []
+        for idx, val in enumerate(normalized_pj_functions):
+            key = f"pf_{idx}"
+            params[key] = val
+            param_names.append(f":{key}")
+        parts.append(f"NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN ({', '.join(param_names)})")
+
+    return " AND ".join(parts), params
+
+
 def _prepare_sql(
     name: str,
     *,

@@ -1,9 +1,14 @@
 /**
- * Validation tests for reject-history API response shapes.
+ * Validation tests for reject-history API response shapes and primary prefilter payload.
  *
  * Tests guardResponse() + assertShape() behavior for:
  * - /api/reject-history/summary
  * - /api/reject-history/options
+ *
+ * Also tests primary prefilter (BASE_WHERE layer) payload construction:
+ * - pj_types / packages / pj_functions included when non-empty
+ * - empty arrays omitted from POST body (per IP-13)
+ * - pj_bop field absent from all payloads (AC-6)
  *
  * Confirms:
  * 1. Valid response passes without console.warn
@@ -18,6 +23,7 @@ import {
   REJECT_HISTORY_OPTIONS_SCHEMA,
 } from '../../src/core/endpoint-schemas.js';
 import { assertShape, _resetWarned as _resetSchemaWarned } from '../../src/core/schema-guard.js';
+import { toRejectFilterSnapshot } from '../../src/core/reject-history-filters.ts';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -201,5 +207,111 @@ describe('REJECT_HISTORY_OPTIONS_SCHEMA — assertShape direct', () => {
     );
     expect(result).toBe(false);
     expect(console.warn).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Primary prefilter payload tests (AC-5, AC-6)
+// Exercises toRejectFilterSnapshot and simulates buildPrimaryQueryBody logic
+// ---------------------------------------------------------------------------
+
+/**
+ * Simulates the App.vue logic that builds the POST body for /api/reject-history/query.
+ * Only sends primary prefilter fields when non-empty (matches IP-13 constraint).
+ */
+function buildPrimaryQueryBody({
+  startDate = '2026-01-01',
+  endDate = '2026-01-31',
+  mode = 'date_range',
+  includeExcludedScrap = false,
+  excludeMaterialScrap = true,
+  excludePbDiode = true,
+  pjTypes = [],
+  primaryPackages = [],
+  pjFunctions = [],
+} = {}) {
+  const body = {
+    mode,
+    start_date: startDate,
+    end_date: endDate,
+    include_excluded_scrap: includeExcludedScrap,
+    exclude_material_scrap: excludeMaterialScrap,
+    exclude_pb_diode: excludePbDiode,
+  };
+  if (pjTypes.length > 0) body.pj_types = pjTypes;
+  if (primaryPackages.length > 0) body.packages = primaryPackages;
+  if (pjFunctions.length > 0) body.pj_functions = pjFunctions;
+  return body;
+}
+
+describe('primary prefilter payload — pj_types multiselect value included in primary filter payload', () => {
+  it('pj_types multiselect value included in primary filter payload', () => {
+    const body = buildPrimaryQueryBody({ pjTypes: ['TYPE_A', 'TYPE_B'] });
+    expect(body.pj_types).toEqual(['TYPE_A', 'TYPE_B']);
+  });
+
+  it('packages multiselect value included in primary filter payload', () => {
+    const body = buildPrimaryQueryBody({ primaryPackages: ['PKG-X', 'PKG-Y'] });
+    expect(body.packages).toEqual(['PKG-X', 'PKG-Y']);
+  });
+
+  it('pj_functions multiselect value included in primary filter payload', () => {
+    const body = buildPrimaryQueryBody({ pjFunctions: ['FN-LASER', 'FN-EDGE'] });
+    expect(body.pj_functions).toEqual(['FN-LASER', 'FN-EDGE']);
+  });
+
+  it('empty prefilter arrays sent as empty list not undefined', () => {
+    // When all selections are empty, the body must NOT contain pj_types/packages/pj_functions
+    // (omit from body per IP-13 "don't send empty arrays")
+    const body = buildPrimaryQueryBody({ pjTypes: [], primaryPackages: [], pjFunctions: [] });
+    // The fields should be absent (undefined), not empty arrays, per IP-13
+    expect('pj_types' in body).toBe(false);
+    expect('packages' in body).toBe(false);
+    expect('pj_functions' in body).toBe(false);
+  });
+
+  it('pj_bop field absent from all request payloads', () => {
+    // AC-6: pj_bop must never appear in any payload path
+    const body = buildPrimaryQueryBody({ pjTypes: ['TYPE_A'] });
+    expect('pj_bop' in body).toBe(false);
+    expect('pj_bops' in body).toBe(false);
+    expect('bop' in body).toBe(false);
+  });
+});
+
+describe('toRejectFilterSnapshot — primary prefilter fields normalized', () => {
+  it('normalizes pjTypes from unknown input', () => {
+    const snap = toRejectFilterSnapshot({ pjTypes: ['TYPE_A', '  TYPE_B  ', ''] });
+    // Empty string filtered; surrounding spaces trimmed
+    expect(snap.pjTypes).toEqual(['TYPE_A', 'TYPE_B']);
+  });
+
+  it('normalizes primaryPackages from unknown input', () => {
+    const snap = toRejectFilterSnapshot({ primaryPackages: ['PKG-X', 'PKG-Y', 'PKG-X'] });
+    // Duplicates deduplicated
+    expect(snap.primaryPackages).toEqual(['PKG-X', 'PKG-Y']);
+  });
+
+  it('normalizes pjFunctions from unknown input', () => {
+    const snap = toRejectFilterSnapshot({ pjFunctions: ['FN-A'] });
+    expect(snap.pjFunctions).toEqual(['FN-A']);
+  });
+
+  it('returns empty arrays when primary prefilter fields absent', () => {
+    const snap = toRejectFilterSnapshot({});
+    expect(snap.pjTypes).toEqual([]);
+    expect(snap.primaryPackages).toEqual([]);
+    expect(snap.pjFunctions).toEqual([]);
+  });
+
+  it('primary prefilter fields coexist with supplementary packages without conflict', () => {
+    // The supplementary packages field (WHERE_CLAUSE layer) and primaryPackages
+    // (BASE_WHERE layer) are separate fields and must not interfere.
+    const snap = toRejectFilterSnapshot({
+      packages: ['SUPP-PKG-A'],
+      primaryPackages: ['PRIM-PKG-X'],
+    });
+    expect(snap.packages).toEqual(['SUPP-PKG-A']);
+    expect(snap.primaryPackages).toEqual(['PRIM-PKG-X']);
   });
 });

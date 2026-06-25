@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 
 import { apiGet, apiPost } from '../core/api';
+import type { CachedFilterSelection } from '../production-history/composables/useFirstTierFilters';
+import { _buildUrl } from '../production-history/composables/useFirstTierFilters';
 import { unwrapApiResult } from '../core/unwrap-api-result';
 import { isDuckDBSupported } from '../core/duckdb-client';
 import {
@@ -136,6 +138,13 @@ interface FilterChip {
   dimension?: string;
 }
 
+/** Options received from GET /api/production-history/filter-options (primary prefilter). */
+interface PrimaryPrefilterOptions {
+  pj_types: string[];
+  packages: string[];
+  pj_functions: string[];
+}
+
 interface KpiCard {
   key: string;
   label: string;
@@ -205,6 +214,92 @@ function getDimensionLabel(dimension: string): string {
 const queryMode = ref<string>('date_range');
 const containerInputType = ref<string>('lot');
 const containerInput = ref<string>('');
+
+// ---- Primary prefilter state (BASE_WHERE layer, from container_filter_cache) ----
+const primaryPjTypes = ref<string[]>([]);
+const primaryPackages = ref<string[]>([]);
+const primaryPjFunctions = ref<string[]>([]);
+
+const primaryPrefilterOptions = ref<PrimaryPrefilterOptions>({
+  pj_types: [],
+  packages: [],
+  pj_functions: [],
+});
+const primaryPrefilterLoading = ref<boolean>(false);
+
+let _primaryPrefilterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _primaryPrefilterInFlightToken = 0;
+
+/** Fetch cross-filter options from the shared container_filter_cache endpoint.
+ * Called on mount (empty selection → full distinct sets) and after dropdown-close events.
+ */
+async function fetchPrimaryPrefilterOptions(): Promise<void> {
+  const token = ++_primaryPrefilterInFlightToken;
+  primaryPrefilterLoading.value = true;
+  try {
+    const selected: Partial<CachedFilterSelection> = {};
+    if (primaryPjTypes.value.length) selected.pj_types = primaryPjTypes.value;
+    if (primaryPackages.value.length) selected.packages = primaryPackages.value;
+    if (primaryPjFunctions.value.length) selected.pj_functions = primaryPjFunctions.value;
+
+    const url = _buildUrl('/api/production-history/filter-options', selected);
+    // TODO: type — apiGet returns untyped result from core/api (JS); cast via unknown
+    const resp = (await apiGet(url)) as { data?: CachedFilterSelection };
+    if (token !== _primaryPrefilterInFlightToken) return;
+
+    const data = resp?.data || ({} as CachedFilterSelection);
+    const nextOptions: PrimaryPrefilterOptions = {
+      pj_types: Array.isArray(data.pj_types) ? data.pj_types : [],
+      packages: Array.isArray(data.packages) ? data.packages : [],
+      pj_functions: Array.isArray(data.pj_functions) ? data.pj_functions : [],
+    };
+    primaryPrefilterOptions.value = nextOptions;
+
+    // Prune selections that disappeared from the new option set (fail-open).
+    const prunedPjTypes = primaryPjTypes.value.filter((v) => nextOptions.pj_types.includes(v));
+    if (prunedPjTypes.length !== primaryPjTypes.value.length) {
+      primaryPjTypes.value = prunedPjTypes;
+    }
+    const prunedPackages = primaryPackages.value.filter((v) => nextOptions.packages.includes(v));
+    if (prunedPackages.length !== primaryPackages.value.length) {
+      primaryPackages.value = prunedPackages;
+    }
+    const prunedPjFunctions = primaryPjFunctions.value.filter((v) => nextOptions.pj_functions.includes(v));
+    if (prunedPjFunctions.length !== primaryPjFunctions.value.length) {
+      primaryPjFunctions.value = prunedPjFunctions;
+    }
+  } catch {
+    // Fail-open: leave current options in place; don't block primary query.
+  } finally {
+    if (token === _primaryPrefilterInFlightToken) {
+      primaryPrefilterLoading.value = false;
+    }
+  }
+}
+
+/** Debounced cross-filter re-fetch (200 ms, triggered on dropdown-close). */
+function _schedulePrimaryPrefilterRefresh(): void {
+  if (_primaryPrefilterDebounceTimer !== null) {
+    clearTimeout(_primaryPrefilterDebounceTimer);
+    _primaryPrefilterDebounceTimer = null;
+  }
+  _primaryPrefilterDebounceTimer = setTimeout(() => {
+    _primaryPrefilterDebounceTimer = null;
+    void fetchPrimaryPrefilterOptions();
+  }, 200);
+}
+
+function onPrimaryPrefilterClose(field: 'pj_types' | 'packages' | 'pj_functions'): void {
+  // Only re-fetch when the closed dropdown's selection can affect other fields.
+  void field; // used only to signal intent; actual selection is already updated via v-model
+  _schedulePrimaryPrefilterRefresh();
+}
+
+function resetPrimaryPrefilters(): void {
+  primaryPjTypes.value = [];
+  primaryPackages.value = [];
+  primaryPjFunctions.value = [];
+}
 
 const draftFilters = reactive<DraftFilters>({
   startDate: '',
@@ -601,6 +696,17 @@ async function executePrimaryQuery(): Promise<void> {
     body.exclude_material_scrap = draftFilters.excludeMaterialScrap;
     body.exclude_pb_diode = draftFilters.excludePbDiode;
 
+    // Primary prefilters (BASE_WHERE layer) — only send when non-empty
+    if (primaryPjTypes.value.length > 0) {
+      body.pj_types = primaryPjTypes.value;
+    }
+    if (primaryPackages.value.length > 0) {
+      body.packages = primaryPackages.value;
+    }
+    if (primaryPjFunctions.value.length > 0) {
+      body.pj_functions = primaryPjFunctions.value;
+    }
+
     // Reset display state before new query — hide stale data from previous queryId
     queryId.value = '';
     analyticsRawItems.value = [];
@@ -956,6 +1062,7 @@ function clearFilters(): void {
   draftFilters.excludeMaterialScrap = true;
   draftFilters.excludePbDiode = true;
   resetParetoSelections();
+  resetPrimaryPrefilters();
   void executePrimaryQuery();
 }
 
@@ -1505,6 +1612,8 @@ function restoreFromUrl(): void {
 onMounted(() => {
   setDefaultDateRange();
   restoreFromUrl();
+  // Fetch initial cross-filter options for primary prefilter MultiSelects
+  void fetchPrimaryPrefilterOptions();
 });
 
 onUnmounted(() => {
@@ -1533,6 +1642,11 @@ onUnmounted(() => {
       :loading="loading"
       :active-filter-chips="activeFilterChips"
       :primary-query-max-days="PRIMARY_QUERY_MAX_DAYS"
+      :primary-pj-types="primaryPjTypes"
+      :primary-packages="primaryPackages"
+      :primary-pj-functions="primaryPjFunctions"
+      :primary-prefilter-options="primaryPrefilterOptions"
+      :primary-prefilter-loading="primaryPrefilterLoading"
       @apply="applyFilters"
       @clear="clearFilters"
       @export-csv="exportCsv"
@@ -1541,6 +1655,10 @@ onUnmounted(() => {
       @update:container-input-type="containerInputType = $event"
       @update:container-input="containerInput = $event"
       @supplementary-change="onSupplementaryChange"
+      @update:primary-pj-types="primaryPjTypes = $event"
+      @update:primary-packages="primaryPackages = $event"
+      @update:primary-pj-functions="primaryPjFunctions = $event"
+      @primary-prefilter-close="onPrimaryPrefilterClose"
     />
 
     <!-- Async job inline status bar (non-blocking, shows progress text + cancel) -->

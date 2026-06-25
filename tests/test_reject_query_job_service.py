@@ -355,3 +355,136 @@ class TestExecuteRejectQueryJob:
             )
 
         mock_complete_job.assert_called_once()
+
+
+# ============================================================
+# rh-primary-prefilter: legacy job param forwarding tests (CER-2 / CER-5)
+# ============================================================
+
+
+class TestExecuteRejectQueryJobPrefilterForwarding:
+    """execute_reject_query_job must forward pj_types/packages/pj_functions from job_params
+    to execute_primary_query so the async path has parity with the sync path (RHPF-05).
+    """
+
+    def _make_mock_cache_module(self, cache_hit=False):
+        mock_cache = MagicMock()
+        mock_cache._CACHE_SCHEMA_VERSION = "v5"
+        mock_cache._has_cached_df.return_value = cache_hit
+        mock_cache._make_query_id.return_value = "qry-prefilter-id-001"
+        mock_cache.execute_primary_query.return_value = None
+        mock_cache.RejectPrimaryQueryOverloadError = Exception
+        return mock_cache
+
+    def test_pj_types_forwarded_to_execute_primary_query(self):
+        """pj_types from job_params must appear in execute_primary_query call."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_qb = MagicMock()
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.services.reject_dataset_cache": mock_cache,
+            "mes_dashboard.sql": mock_qb,
+        }), \
+        patch.object(rjs, "complete_job", mock_complete_job), \
+        patch.object(rjs, "update_job_progress", mock_update_progress):
+            rjs.execute_reject_query_job(
+                job_id="reject-pf-pt",
+                mode="date_range",
+                params={
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-02-01",
+                    "pj_types": ["TYPE-A", "TYPE-B"],
+                    "packages": [],
+                    "pj_functions": [],
+                },
+            )
+
+        mock_cache.execute_primary_query.assert_called_once()
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        assert "pj_types" in call_kwargs, "pj_types must be forwarded"
+        assert sorted(call_kwargs["pj_types"]) == ["TYPE-A", "TYPE-B"]
+
+    def test_packages_forwarded_to_execute_primary_query(self):
+        """packages from job_params must appear in execute_primary_query call."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_qb = MagicMock()
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.services.reject_dataset_cache": mock_cache,
+            "mes_dashboard.sql": mock_qb,
+        }), \
+        patch.object(rjs, "complete_job", mock_complete_job), \
+        patch.object(rjs, "update_job_progress", mock_update_progress):
+            rjs.execute_reject_query_job(
+                job_id="reject-pf-pkg",
+                mode="date_range",
+                params={
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-02-01",
+                    "pj_types": [],
+                    "packages": ["PKG-X"],
+                    "pj_functions": [],
+                },
+            )
+
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        assert "packages" in call_kwargs, "packages must be forwarded"
+        assert "PKG-X" in call_kwargs["packages"]
+
+    def test_pj_functions_forwarded_to_execute_primary_query(self):
+        """pj_functions from job_params must appear in execute_primary_query call."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_qb = MagicMock()
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.services.reject_dataset_cache": mock_cache,
+            "mes_dashboard.sql": mock_qb,
+        }), \
+        patch.object(rjs, "complete_job", mock_complete_job), \
+        patch.object(rjs, "update_job_progress", mock_update_progress):
+            rjs.execute_reject_query_job(
+                job_id="reject-pf-fn",
+                mode="date_range",
+                params={
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-02-01",
+                    "pj_types": [],
+                    "packages": [],
+                    "pj_functions": ["FUNC-Z"],
+                },
+            )
+
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        assert "pj_functions" in call_kwargs, "pj_functions must be forwarded"
+        assert "FUNC-Z" in call_kwargs["pj_functions"]
+
+    def test_prefilter_absent_in_params_forwarded_as_empty_list(self):
+        """When prefilter fields absent from job_params, execute_primary_query gets empty lists."""
+        mock_cache = self._make_mock_cache_module(cache_hit=False)
+        mock_qb = MagicMock()
+        mock_complete_job = MagicMock()
+        mock_update_progress = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "mes_dashboard.services.reject_dataset_cache": mock_cache,
+            "mes_dashboard.sql": mock_qb,
+        }), \
+        patch.object(rjs, "complete_job", mock_complete_job), \
+        patch.object(rjs, "update_job_progress", mock_update_progress):
+            rjs.execute_reject_query_job(
+                job_id="reject-pf-absent",
+                mode="date_range",
+                params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
+            )
+
+        call_kwargs = mock_cache.execute_primary_query.call_args.kwargs
+        # When absent, must forward as empty list (not raise KeyError or pass None)
+        assert call_kwargs.get("pj_types") == []
+        assert call_kwargs.get("packages") == []
+        assert call_kwargs.get("pj_functions") == []

@@ -1,6 +1,6 @@
-# generated: 2026-06-25T07:36:48Z by cdd-kit 3.5.0
-# files: 955, src-lines: 287021, map-lines: 20910, compression: 13.7x
-# sources-digest: 71be59f0b83277d36c5ad17ee420533a0abe86758af88dcc3b673baa21a7e11f
+# generated: 2026-06-25T11:26:19Z by cdd-kit 3.5.0
+# files: 955, src-lines: 288683, map-lines: 20967, compression: 13.8x
+# sources-digest: c75af5ba1997a58f0bed9502843244a8ec1563de170f1c8325467a3b3e88c950
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -612,31 +612,31 @@ frontend/src/core/post-export.ts:  # 45 lines
   functions:
     - { name: async postExport, lines: 15-45 }
 
-frontend/src/core/reject-history-filters.ts:  # 366 lines
+frontend/src/core/reject-history-filters.ts:  # 377 lines
   constants:
     - { name: PRIMARY_QUERY_MAX_DAYS, line: 32 }
   functions:
     - { name: normalizeText, lines: 1-6 }
     - { name: normalizeArray, lines: 8-23 }
     - { name: normalizeBoolean, lines: 25-30 }
-    - { name: toRejectFilterSnapshot, lines: 59-71 }
-    - { name: extractWorkcenterGroupValues, lines: 80-101 }
-    - { name: pruneRejectFilterSelections, lines: 119-175 }
-    - { name: buildRejectOptionsRequestParams, lines: 188-203 }
-    - { name: buildRejectCommonQueryParams, lines: 213-232 }
-    - { name: parseMultiLineInput, lines: 234-250 }
-    - { name: validateDateRange, lines: 252-273 }
-    - { name: buildViewParams, lines: 303-366 }
+    - { name: toRejectFilterSnapshot, lines: 67-82 }
+    - { name: extractWorkcenterGroupValues, lines: 91-112 }
+    - { name: pruneRejectFilterSelections, lines: 130-186 }
+    - { name: buildRejectOptionsRequestParams, lines: 199-214 }
+    - { name: buildRejectCommonQueryParams, lines: 224-243 }
+    - { name: parseMultiLineInput, lines: 245-261 }
+    - { name: validateDateRange, lines: 263-284 }
+    - { name: buildViewParams, lines: 314-377 }
   interfaces:
-    - { name: RejectFilterInput, lines: 34-45 }
-    - { name: RejectFilterSnapshot, lines: 47-57 }
-    - { name: WorkcenterGroupOption, lines: 73-78 }
-    - { name: RejectFilterOptions, lines: 103-107 }
-    - { name: PruneRejectFilterResult, lines: 109-117 }
-    - { name: RejectOptionsRequestParams, lines: 177-186 }
-    - { name: RejectCommonQueryParams, lines: 205-207 }
-    - { name: BuildRejectCommonQueryOptions, lines: 209-211 }
-    - { name: ViewParamsOptions, lines: 275-301 }
+    - { name: RejectFilterInput, lines: 34-49 }
+    - { name: RejectFilterSnapshot, lines: 51-65 }
+    - { name: WorkcenterGroupOption, lines: 84-89 }
+    - { name: RejectFilterOptions, lines: 114-118 }
+    - { name: PruneRejectFilterResult, lines: 120-128 }
+    - { name: RejectOptionsRequestParams, lines: 188-197 }
+    - { name: RejectCommonQueryParams, lines: 216-218 }
+    - { name: BuildRejectCommonQueryOptions, lines: 220-222 }
+    - { name: ViewParamsOptions, lines: 286-312 }
 
 frontend/src/core/resource-history-filters.ts:  # 319 lines
   functions:
@@ -1801,19 +1801,19 @@ frontend/src/query-tool/utils/values.ts:  # 93 lines
     - { name: formatCellValue, lines: 74-82 }
     - { name: hashColor, lines: 84-93 }
 
-frontend/src/reject-history/App.vue:  # 1570 lines
+frontend/src/reject-history/App.vue:  # 1717 lines
 
-frontend/src/reject-history/components/DetailTable.vue:  # 182 lines
+frontend/src/reject-history/components/DetailTable.vue:  # 187 lines
 
-frontend/src/reject-history/components/FilterPanel.vue:  # 317 lines
+frontend/src/reject-history/components/FilterPanel.vue:  # 383 lines
 
 frontend/src/reject-history/components/ParetoGrid.vue:  # 51 lines
 
-frontend/src/reject-history/components/ParetoSection.vue:  # 204 lines
+frontend/src/reject-history/components/ParetoSection.vue:  # 226 lines
 
 frontend/src/reject-history/components/SummaryCards.vue:  # 35 lines
 
-frontend/src/reject-history/components/TrendChart.vue:  # 120 lines
+frontend/src/reject-history/components/TrendChart.vue:  # 172 lines
 
 frontend/src/reject-history/main.ts:  # 9 lines
   imports:
@@ -3257,20 +3257,21 @@ frontend/tests/playwright/query-tool.spec.js:  # 298 lines
     - { name: MOCK_RESOLVE, line: 59 }
     - { name: DUMMY_LOT_ID, line: 66 }
 
-frontend/tests/playwright/reject-history-filter.spec.ts:  # 525 lines
+frontend/tests/playwright/reject-history-filter.spec.ts:  # 750 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 24 }
-    - { module: './_auth.js', items: [navigateViaSidebar], line: 25 }
+    - { module: '@playwright/test', items: [test, expect], line: 28 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 29 }
   constants:
-    - { name: BASE_URL, line: 27 }
-    - { name: MOCK_QUERY_ID, line: 33 }
+    - { name: BASE_URL, line: 31 }
+    - { name: MOCK_QUERY_ID, line: 37 }
   functions:
-    - { name: makeSyncResult, lines: 35-62 }
-    - { name: makeViewResult, lines: 64-85 }
-    - { name: makeBatchParetoResult, lines: 87-99 }
-    - { name: async setupBaseRoutes, lines: 105-167 }
-    - { name: async navigateToRejectHistory, lines: 169-173 }
-    - { name: async submitQueryAndWait, lines: 175-184 }
+    - { name: makeFilterOptionsResult, lines: 39-51 }
+    - { name: makeSyncResult, lines: 53-80 }
+    - { name: makeViewResult, lines: 82-103 }
+    - { name: makeBatchParetoResult, lines: 105-117 }
+    - { name: async setupBaseRoutes, lines: 123-193 }
+    - { name: async navigateToRejectHistory, lines: 195-199 }
+    - { name: async submitQueryAndWait, lines: 201-210 }
 
 frontend/tests/playwright/reject-history.spec.js:  # 274 lines
   imports:
@@ -3563,12 +3564,15 @@ frontend/tests/validation/useProductionHistory.validation.test.js:  # 554 lines
     - { module: '../../src/production-history/composables/useFirstTierFilters.ts', items: [parseWildcardInput, _buildUrl, useFirstTierFilters], line: 24 }
     - { module: '../../src/production-history/composables/useProductionHistory.ts', items: [validateQueryMode, buildModePayload, useProductionHistory], line: 29 }
 
-frontend/tests/validation/useRejectHistory.validation.test.js:  # 205 lines
+frontend/tests/validation/useRejectHistory.validation.test.js:  # 317 lines
   imports:
-    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 14 }
-    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 15 }
-    - { module: '../../src/core/endpoint-schemas.js', items: [REJECT_HISTORY_SUMMARY_SCHEMA, REJECT_HISTORY_OPTIONS_SCHEMA], line: 16 }
-    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 20 }
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 19 }
+    - { module: '../../src/core/dev-warnings.js', items: [guardResponse, _resetWarned], line: 20 }
+    - { module: '../../src/core/endpoint-schemas.js', items: [REJECT_HISTORY_SUMMARY_SCHEMA, REJECT_HISTORY_OPTIONS_SCHEMA], line: 21 }
+    - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 25 }
+    - { module: '../../src/core/reject-history-filters.ts', items: [toRejectFilterSnapshot], line: 26 }
+  functions:
+    - { name: buildPrimaryQueryBody, lines: 222-245 }
 
 frontend/tests/validation/useYieldAlert.validation.test.js:  # 291 lines
   imports:
@@ -5637,7 +5641,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 1043 lines
     - { name: get_equipment_recent_jobs_route, lines: 847-860 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 870-1043 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 1034 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 1058 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5674,12 +5678,12 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 1034 lines
     - { name: api_reject_history_list, lines: 516-554 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
     - { name: api_reject_history_export, lines: 559-593 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
     - { name: api_reject_history_analytics, lines: 597-631 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
-    - { name: api_reject_history_query, lines: 641-793 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
-    - { name: api_reject_history_count, lines: 797-823 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
-    - { name: api_reject_history_job_status, lines: 828-838 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
-    - { name: _inject_reject_spool_info, lines: 845-858 }
-    - { name: api_reject_history_view, lines: 862-952 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 956-1034 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: api_reject_history_query, lines: 641-817 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
+    - { name: api_reject_history_count, lines: 821-847 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
+    - { name: api_reject_history_job_status, lines: 852-862 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
+    - { name: _inject_reject_spool_info, lines: 869-882 }
+    - { name: api_reject_history_view, lines: 886-976 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 980-1058 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
 src/mes_dashboard/routes/resource_history_routes.py:  # 543 lines
   imports:
@@ -7544,7 +7548,7 @@ src/mes_dashboard/services/reject_cache_sql_runtime.py:  # 1067 lines
     - { name: try_compute_view_from_spool, lines: 644-912 }
     - { name: try_iter_export_rows_from_spool, lines: 915-1067 }
 
-src/mes_dashboard/services/reject_dataset_cache.py:  # 2039 lines
+src/mes_dashboard/services/reject_dataset_cache.py:  # 2075 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -7565,58 +7569,58 @@ src/mes_dashboard/services/reject_dataset_cache.py:  # 2039 lines
     - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta, parse_partial_failure_meta, serialize_partial_failure_meta], line: 40 }
     - { module: mes_dashboard.services.filter_cache, items: [get_specs_for_groups], line: 45 }
     - { module: mes_dashboard.services.container_resolution_policy, items: [assess_resolution_result, extract_container_ids, normalize_input_values, validate_resolution_request, validate_resolution_result], line: 46 }
-    - { module: mes_dashboard.services.reject_history_service, items: [_as_float, _as_int, _build_where_clause, _extract_distinct_text_values, _extract_workcenter_group_options, _normalize_text, _prepare_sql, _to_date_str, _to_datetime_str, _validate_range], line: 53 }
-    - { module: mes_dashboard.services.query_tool_service, items: [_resolve_by_lot_id, _resolve_by_wafer_lot, _resolve_by_work_order], line: 65 }
-    - { module: mes_dashboard.sql, items: [QueryBuilder], line: 70 }
-    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 74 }
+    - { module: mes_dashboard.services.reject_history_service, items: [_as_float, _as_int, _build_base_where, _build_where_clause, _extract_distinct_text_values, _extract_workcenter_group_options, _normalize_text, _prepare_sql, _to_date_str, _to_datetime_str, _validate_range], line: 53 }
+    - { module: mes_dashboard.services.query_tool_service, items: [_resolve_by_lot_id, _resolve_by_wafer_lot, _resolve_by_work_order], line: 66 }
+    - { module: mes_dashboard.sql, items: [QueryBuilder], line: 71 }
+    - { module: mes_dashboard.config.constants, items: [CACHE_TTL_DATASET], line: 75 }
   classes:
     - name: RejectPrimaryQueryOverloadError
-      lines: 139-145
+      lines: 140-146
       methods:
-        - { name: __init__, lines: 142-145 }
+        - { name: __init__, lines: 143-146 }
   functions:
-    - { name: _make_query_id, lines: 154-157 }
-    - { name: _redis_delete_df, lines: 168-175 }
-    - { name: _partial_failure_key, lines: 178-179 }
-    - { name: _store_partial_failure_flag, lines: 182-203 }
-    - { name: _load_partial_failure_flag, lines: 206-216 }
-    - { name: _clear_partial_failure_flag, lines: 219-226 }
-    - { name: _query_lock_key, lines: 229-230 }
-    - { name: _acquire_query_lock, lines: 233-249 }
-    - { name: _release_query_lock, lines: 261-269 }
-    - { name: _is_query_lock_active, lines: 272-280 }
-    - { name: _wait_for_inflight_query_result, lines: 283-298 }
-    - { name: _has_cached_df, lines: 307-312 }
-    - { name: _store_df, lines: 315-319 }
-    - { name: _optimize_groupby_dtypes, lines: 322-339 }
-    - { name: _store_query_result, lines: 342-379 }
-    - { name: _df_memory_mb, lines: 382-384 }
-    - { name: _enforce_interactive_memory_guard, lines: 387-397 }
-    - { name: _maybe_collect_after_interactive_compute, lines: 400-402 }
-    - { name: _read_sql_with_caller, lines: 405-411 }
-    - { name: resolve_containers, lines: 426-473 }
-    - { name: _execute_and_spool, lines: 481-796 }
-    - { name: execute_primary_query, lines: 804-1233 }
-    - { name: ensure_dataset_loaded, lines: 1236-1273 }
-    - { name: _apply_policy_filters, lines: 1276-1324 }
-    - { name: apply_view, lines: 1332-1389 }
-    - { name: _apply_supplementary_filters, lines: 1392-1431 }
-    - { name: _normalize_pareto_values, lines: 1434-1443 }
-    - { name: _apply_pareto_selection_filter, lines: 1446-1493 }
-    - { name: _paginate_detail, lines: 1496-1588 }
-    - { name: _extract_available_filters, lines: 1591-1598 }
-    - { name: _project_pareto_guard_frame, lines: 1619-1636 }
-    - { name: _normalize_metric_mode, lines: 1639-1643 }
-    - { name: _normalize_pareto_scope, lines: 1646-1650 }
-    - { name: _normalize_pareto_display_scope, lines: 1653-1657 }
-    - { name: _normalize_pareto_selections, lines: 1660-1673 }
-    - { name: _build_dimension_pareto_items, lines: 1676-1741 }
-    - { name: _apply_cross_filter, lines: 1744-1771 }
-    - { name: compute_dimension_pareto, lines: 1774-1882 }
-    - { name: compute_batch_pareto, lines: 1885-1978 }
-    - { name: export_csv_from_cache, lines: 1986-2039 }
+    - { name: _make_query_id, lines: 155-158 }
+    - { name: _redis_delete_df, lines: 169-176 }
+    - { name: _partial_failure_key, lines: 179-180 }
+    - { name: _store_partial_failure_flag, lines: 183-204 }
+    - { name: _load_partial_failure_flag, lines: 207-217 }
+    - { name: _clear_partial_failure_flag, lines: 220-227 }
+    - { name: _query_lock_key, lines: 230-231 }
+    - { name: _acquire_query_lock, lines: 234-250 }
+    - { name: _release_query_lock, lines: 262-270 }
+    - { name: _is_query_lock_active, lines: 273-281 }
+    - { name: _wait_for_inflight_query_result, lines: 284-299 }
+    - { name: _has_cached_df, lines: 308-313 }
+    - { name: _store_df, lines: 316-320 }
+    - { name: _optimize_groupby_dtypes, lines: 323-340 }
+    - { name: _store_query_result, lines: 343-380 }
+    - { name: _df_memory_mb, lines: 383-385 }
+    - { name: _enforce_interactive_memory_guard, lines: 388-398 }
+    - { name: _maybe_collect_after_interactive_compute, lines: 401-403 }
+    - { name: _read_sql_with_caller, lines: 406-412 }
+    - { name: resolve_containers, lines: 427-474 }
+    - { name: _execute_and_spool, lines: 482-797 }
+    - { name: execute_primary_query, lines: 805-1269 }
+    - { name: ensure_dataset_loaded, lines: 1272-1309 }
+    - { name: _apply_policy_filters, lines: 1312-1360 }
+    - { name: apply_view, lines: 1368-1425 }
+    - { name: _apply_supplementary_filters, lines: 1428-1467 }
+    - { name: _normalize_pareto_values, lines: 1470-1479 }
+    - { name: _apply_pareto_selection_filter, lines: 1482-1529 }
+    - { name: _paginate_detail, lines: 1532-1624 }
+    - { name: _extract_available_filters, lines: 1627-1634 }
+    - { name: _project_pareto_guard_frame, lines: 1655-1672 }
+    - { name: _normalize_metric_mode, lines: 1675-1679 }
+    - { name: _normalize_pareto_scope, lines: 1682-1686 }
+    - { name: _normalize_pareto_display_scope, lines: 1689-1693 }
+    - { name: _normalize_pareto_selections, lines: 1696-1709 }
+    - { name: _build_dimension_pareto_items, lines: 1712-1777 }
+    - { name: _apply_cross_filter, lines: 1780-1807 }
+    - { name: compute_dimension_pareto, lines: 1810-1918 }
+    - { name: compute_batch_pareto, lines: 1921-2014 }
+    - { name: export_csv_from_cache, lines: 2022-2075 }
 
-src/mes_dashboard/services/reject_history_service.py:  # 1228 lines
+src/mes_dashboard/services/reject_history_service.py:  # 1293 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: csv, items: [], line: 6 }
@@ -7648,32 +7652,33 @@ src/mes_dashboard/services/reject_history_service.py:  # 1228 lines
     - { name: _split_with_query, lines: 136-177 }
     - { name: _base_with_cte_sql, lines: 180-186 }
     - { name: _build_where_clause, lines: 189-272 }
-    - { name: _prepare_sql, lines: 280-298 }
-    - { name: _common_params, lines: 301-305 }
-    - { name: _list_to_csv, lines: 308-330 }
-    - { name: _extract_distinct_text_values, lines: 333-340 }
-    - { name: _extract_workcenter_group_options, lines: 343-362 }
-    - { name: _has_material_scrap, lines: 365-373 }
-    - { name: get_filter_options, lines: 376-418 }
-    - { name: query_summary, lines: 421-457 }
-    - { name: query_trend, lines: 460-511 }
-    - { name: query_reason_pareto, lines: 514-585 }
-    - { name: query_dimension_pareto, lines: 596-687 }
-    - { name: _apply_metric_filter, lines: 690-700 }
-    - { name: query_list, lines: 703-793 }
-    - { name: export_csv, lines: 796-876 }
-    - { name: _derive_summary, lines: 879-913 }
-    - { name: _derive_trend, lines: 916-940 }
-    - { name: _derive_pareto, lines: 943-977 }
-    - { name: _derive_raw_items, lines: 980-995 }
-    - { name: _apply_view, lines: 1013-1016 }
-    - { name: _analytics_dataframe, lines: 1019-1029 }
-    - { name: _bucket_trend, lines: 1032-1068 }
-    - { name: view_summary, lines: 1071-1093 }
-    - { name: view_trend, lines: 1096-1125 }
-    - { name: view_list, lines: 1128-1162 }
-    - { name: view_count, lines: 1165-1184 }
-    - { name: view_analytics, lines: 1187-1228 }
+    - { name: _build_base_where, lines: 281-342 }
+    - { name: _prepare_sql, lines: 345-363 }
+    - { name: _common_params, lines: 366-370 }
+    - { name: _list_to_csv, lines: 373-395 }
+    - { name: _extract_distinct_text_values, lines: 398-405 }
+    - { name: _extract_workcenter_group_options, lines: 408-427 }
+    - { name: _has_material_scrap, lines: 430-438 }
+    - { name: get_filter_options, lines: 441-483 }
+    - { name: query_summary, lines: 486-522 }
+    - { name: query_trend, lines: 525-576 }
+    - { name: query_reason_pareto, lines: 579-650 }
+    - { name: query_dimension_pareto, lines: 661-752 }
+    - { name: _apply_metric_filter, lines: 755-765 }
+    - { name: query_list, lines: 768-858 }
+    - { name: export_csv, lines: 861-941 }
+    - { name: _derive_summary, lines: 944-978 }
+    - { name: _derive_trend, lines: 981-1005 }
+    - { name: _derive_pareto, lines: 1008-1042 }
+    - { name: _derive_raw_items, lines: 1045-1060 }
+    - { name: _apply_view, lines: 1078-1081 }
+    - { name: _analytics_dataframe, lines: 1084-1094 }
+    - { name: _bucket_trend, lines: 1097-1133 }
+    - { name: view_summary, lines: 1136-1158 }
+    - { name: view_trend, lines: 1161-1190 }
+    - { name: view_list, lines: 1193-1227 }
+    - { name: view_count, lines: 1230-1249 }
+    - { name: view_analytics, lines: 1252-1293 }
 
 src/mes_dashboard/services/reject_pareto_materialized.py:  # 807 lines
   imports:
@@ -7727,7 +7732,7 @@ src/mes_dashboard/services/reject_pareto_materialized.py:  # 807 lines
     - { name: try_materialized_dimension_pareto, lines: 727-778 }
     - { name: _meta, lines: 785-807 }
 
-src/mes_dashboard/services/reject_query_job_service.py:  # 203 lines
+src/mes_dashboard/services/reject_query_job_service.py:  # 212 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: logging, items: [], line: 14 }
@@ -7735,7 +7740,7 @@ src/mes_dashboard/services/reject_query_job_service.py:  # 203 lines
     - { module: uuid, items: [], line: 16 }
     - { module: typing, items: [Any, Dict, Optional, Tuple], line: 17 }
     - { module: mes_dashboard.services.async_query_job_service, items: [complete_job, enqueue_job, is_async_available, update_job_progress], line: 22 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 197 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 206 }
   constants:
     - { name: REJECT_ASYNC_ENABLED, line: 34 }
     - { name: REJECT_WORKER_QUEUE, line: 37 }
@@ -7745,7 +7750,7 @@ src/mes_dashboard/services/reject_query_job_service.py:  # 203 lines
     - { name: _build_retry, lines: 45-48 }
     - { name: should_use_async, lines: 55-84 }
     - { name: enqueue_reject_query, lines: 91-117 }
-    - { name: execute_reject_query_job, lines: 124-191 }
+    - { name: execute_reject_query_job, lines: 124-200 }
 
 src/mes_dashboard/services/resource_cache.py:  # 1263 lines
   imports:
@@ -8627,7 +8632,7 @@ src/mes_dashboard/workers/production_history_worker.py:  # 242 lines
   functions:
     - { name: execute_production_history_unified_job, lines: 201-229 }
 
-src/mes_dashboard/workers/reject_history_worker.py:  # 319 lines
+src/mes_dashboard/workers/reject_history_worker.py:  # 354 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: logging, items: [], line: 23 }
@@ -8636,23 +8641,23 @@ src/mes_dashboard/workers/reject_history_worker.py:  # 319 lines
     - { module: pathlib, items: [Path], line: 26 }
     - { module: typing, items: [Any, Dict, List], line: 27 }
     - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 29 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 310 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 345 }
   constants:
     - { name: REJECT_QUERY_WORKER_QUEUE, line: 34 }
     - { name: REJECT_HISTORY_JOB_TIMEOUT_SECONDS, line: 36 }
     - { name: REJECT_HISTORY_JOB_TTL_SECONDS, line: 39 }
   classes:
     - name: RejectHistoryJob
-      lines: 49-234
+      lines: 49-269
       methods:
         - { name: __init__, lines: 64-73 }
-        - { name: pre_query, lines: 75-144 }
-        - { name: build_chunk_sql, lines: 146-157 }
-        - { name: post_aggregate, lines: 159-229 }
-        - { name: progress_report, lines: 231-234 }
+        - { name: pre_query, lines: 75-176 }
+        - { name: build_chunk_sql, lines: 178-192 }
+        - { name: post_aggregate, lines: 194-264 }
+        - { name: progress_report, lines: 266-269 }
   functions:
-    - { name: _write_empty_reject_spool, lines: 237-275 }
-    - { name: execute_reject_history_unified_job, lines: 278-306 }
+    - { name: _write_empty_reject_spool, lines: 272-310 }
+    - { name: execute_reject_history_unified_job, lines: 313-341 }
 
 src/mes_dashboard/workers/resource_history_base_worker.py:  # 229 lines
   imports:
@@ -18235,7 +18240,7 @@ tests/test_reject_cache_sql_runtime.py:  # 136 lines
         - { name: test_spool_miss_value, lines: 132-133 }
         - { name: test_runtime_error_value, lines: 135-136 }
 
-tests/test_reject_dataset_cache.py:  # 1729 lines
+tests/test_reject_dataset_cache.py:  # 1858 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -18276,6 +18281,20 @@ tests/test_reject_dataset_cache.py:  # 1729 lines
         - { name: test_no_op_when_redis_unavailable, lines: 1695-1700 }
         - { name: test_warning_logged_on_eval_exception, lines: 1702-1715 }
         - { name: test_does_not_delete_foreign_owner, lines: 1717-1729 }
+    - name: TestRejectDatasetCachePrefilterCacheKey
+      lines: 1737-1784
+      methods:
+        - { name: _base_input, lines: 1740-1753 }
+        - { name: test_pj_types_changes_cache_key, lines: 1755-1759 }
+        - { name: test_packages_changes_cache_key, lines: 1761-1765 }
+        - { name: test_pj_functions_changes_cache_key, lines: 1767-1771 }
+        - { name: test_cache_key_deterministic_with_prefilters, lines: 1773-1776 }
+        - { name: test_cache_key_all_three_differ_from_base, lines: 1778-1784 }
+    - name: TestExecutePrimaryQueryPrefilterForwarding
+      lines: 1787-1858
+      methods:
+        - { name: test_execute_primary_query_accepts_prefilter_kwargs, lines: 1790-1818 }
+        - { name: test_execute_primary_query_prefilters_in_query_id, lines: 1820-1858 }
   functions:
     - { name: test_compute_dimension_pareto_applies_policy_filters_before_grouping, lines: 17-74 }
     - { name: _build_detail_filter_df, lines: 77-144 }
@@ -18309,7 +18328,7 @@ tests/test_reject_dataset_cache.py:  # 1729 lines
     - { name: test_has_cached_df_returns_false_when_spool_absent, lines: 1567-1572 }
     - { name: test_ensure_dataset_loaded_short_circuits_on_spool_hit, lines: 1575-1586 }
 
-tests/test_reject_history_async_routes.py:  # 336 lines
+tests/test_reject_history_async_routes.py:  # 522 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: json, items: [], line: 16 }
@@ -18319,21 +18338,30 @@ tests/test_reject_history_async_routes.py:  # 336 lines
     - { module: mes_dashboard.app, items: [create_app], line: 21 }
   classes:
     - name: TestRejectHistoryQueryRoute
-      lines: 76-238
+      lines: 82-244
       methods:
-        - { name: setUp, lines: 78-82 }
-        - { name: test_short_query_returns_async_202_on_spool_miss, lines: 106-121 }
-        - { name: test_long_query_returns_async_202, lines: 129-155 }
-        - { name: test_cache_hit_serves_sync_result, lines: 162-183 }
-        - { name: test_async_enqueue_failure_returns_503, lines: 190-208 }
-        - { name: test_container_mode_returns_async_202, lines: 216-238 }
+        - { name: setUp, lines: 84-88 }
+        - { name: test_short_query_returns_async_202_on_spool_miss, lines: 112-127 }
+        - { name: test_long_query_returns_async_202, lines: 135-161 }
+        - { name: test_cache_hit_serves_sync_result, lines: 168-189 }
+        - { name: test_async_enqueue_failure_returns_503, lines: 196-214 }
+        - { name: test_container_mode_returns_async_202, lines: 222-244 }
     - name: TestRejectHistoryJobStatusRoute
-      lines: 245-332
+      lines: 251-338
       methods:
-        - { name: setUp, lines: 247-251 }
-        - { name: test_job_status_found, lines: 262-283 }
-        - { name: test_job_status_not_found, lines: 289-305 }
-        - { name: test_job_status_completed, lines: 311-332 }
+        - { name: setUp, lines: 253-257 }
+        - { name: test_job_status_found, lines: 268-289 }
+        - { name: test_job_status_not_found, lines: 295-311 }
+        - { name: test_job_status_completed, lines: 317-338 }
+    - name: TestRejectHistoryQueryPrefilterAsyncRoutes
+      lines: 350-522
+      methods:
+        - { name: setUp, lines: 357-361 }
+        - { name: test_async_query_route_forwards_pj_types_kwarg, lines: 366-394 }
+        - { name: test_async_query_route_forwards_packages_kwarg, lines: 399-427 }
+        - { name: test_async_query_route_forwards_pj_functions_kwarg, lines: 432-460 }
+        - { name: test_async_spool_cache_key_includes_all_three_prefilter_fields, lines: 462-491 }
+        - { name: test_async_empty_prefilters_cache_key_equivalent_to_omitted, lines: 493-522 }
   functions:
     - { name: _parse, lines: 28-29 }
 
@@ -18352,7 +18380,7 @@ tests/test_reject_history_post_contract.py:  # 141 lines
     - { name: test_reject_view_native_bool_post, lines: 96-119 }
     - { name: test_reject_batch_pareto_get_still_works, lines: 122-141 }
 
-tests/test_reject_history_routes.py:  # 965 lines
+tests/test_reject_history_routes.py:  # 1187 lines
   imports:
     - { module: json, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
@@ -18370,7 +18398,7 @@ tests/test_reject_history_routes.py:  # 965 lines
       methods:
         - { name: test_reject_history_page_fallback_contains_vite_entry, lines: 32-42 }
     - name: TestRejectHistoryApiRoutes
-      lines: 45-766
+      lines: 45-769
       methods:
         - { name: test_options_uses_cache_hit_without_service_call, lines: 48-63 }
         - { name: test_options_passes_full_draft_filters, lines: 66-97 }
@@ -18378,61 +18406,70 @@ tests/test_reject_history_routes.py:  # 965 lines
         - { name: test_summary_invalid_include_excluded_scrap_returns_400, lines: 107-115 }
         - { name: test_summary_invalid_exclude_material_scrap_returns_400, lines: 117-125 }
         - { name: test_summary_passes_filters_and_meta, lines: 128-155 }
-        - { name: test_query_rejects_date_range_over_half_year, lines: 158-175 }
-        - { name: test_query_accepts_date_range_within_half_year, lines: 180-197 }
-        - { name: test_query_returns_503_when_async_enqueue_fails, lines: 201-219 }
-        - { name: test_trend_invalid_granularity_returns_400, lines: 222-231 }
-        - { name: test_reason_pareto_defaults_top80, lines: 234-243 }
-        - { name: test_dimension_pareto_accepts_package, lines: 246-263 }
-        - { name: test_dimension_pareto_accepts_equipment, lines: 266-282 }
-        - { name: test_dimension_pareto_with_query_id_passes_policy_flags_to_cached_path, lines: 285-315 }
-        - { name: test_batch_pareto_passes_multi_dimension_selection_params, lines: 318-351 }
-        - { name: test_batch_pareto_cache_miss_returns_400, lines: 354-360 }
-        - { name: test_reason_pareto_memory_guard_returns_503, lines: 363-375 }
-        - { name: test_batch_pareto_memory_guard_returns_503, lines: 378-388 }
-        - { name: test_view_memory_guard_returns_503, lines: 391-401 }
-        - { name: test_export_cached_memory_guard_returns_503, lines: 404-414 }
-        - { name: test_view_passes_pareto_multi_select_filters, lines: 417-440 }
-        - { name: test_view_cache_expired_returns_410, lines: 443-449 }
-        - { name: test_view_invalid_pareto_dimension_returns_400, lines: 452-463 }
-        - { name: test_view_passes_multi_dimension_selection_filters, lines: 466-489 }
-        - { name: test_view_sel_filters_take_precedence_over_legacy_dimension, lines: 492-513 }
-        - { name: test_export_cached_passes_pareto_multi_select_filters, lines: 517-536 }
-        - { name: test_export_cached_invalid_pareto_dimension_returns_400, lines: 539-550 }
-        - { name: test_export_cached_cache_expired_returns_410, lines: 553-559 }
-        - { name: test_export_cached_passes_multi_dimension_selection_filters, lines: 563-585 }
-        - { name: test_list_route_preserves_pagination_contract, lines: 588-615 }
-        - { name: test_list_rate_limited_returns_429, lines: 619-626 }
-        - { name: test_export_returns_csv_response, lines: 629-636 }
-        - { name: test_batch_pareto_exposes_materialized_metadata_on_hit, lines: 644-668 }
-        - { name: test_batch_pareto_exposes_fallback_metadata, lines: 671-690 }
-        - { name: test_batch_pareto_no_meta_when_absent, lines: 693-707 }
-        - { name: test_reason_pareto_exposes_materialized_metadata, lines: 710-732 }
-        - { name: test_batch_pareto_stale_fallback_reason, lines: 735-749 }
-        - { name: test_batch_pareto_build_failed_fallback_reason, lines: 752-766 }
+        - { name: test_query_rejects_date_range_over_half_year, lines: 158-178 }
+        - { name: test_query_accepts_date_range_within_half_year, lines: 183-200 }
+        - { name: test_query_returns_503_when_async_enqueue_fails, lines: 204-222 }
+        - { name: test_trend_invalid_granularity_returns_400, lines: 225-234 }
+        - { name: test_reason_pareto_defaults_top80, lines: 237-246 }
+        - { name: test_dimension_pareto_accepts_package, lines: 249-266 }
+        - { name: test_dimension_pareto_accepts_equipment, lines: 269-285 }
+        - { name: test_dimension_pareto_with_query_id_passes_policy_flags_to_cached_path, lines: 288-318 }
+        - { name: test_batch_pareto_passes_multi_dimension_selection_params, lines: 321-354 }
+        - { name: test_batch_pareto_cache_miss_returns_400, lines: 357-363 }
+        - { name: test_reason_pareto_memory_guard_returns_503, lines: 366-378 }
+        - { name: test_batch_pareto_memory_guard_returns_503, lines: 381-391 }
+        - { name: test_view_memory_guard_returns_503, lines: 394-404 }
+        - { name: test_export_cached_memory_guard_returns_503, lines: 407-417 }
+        - { name: test_view_passes_pareto_multi_select_filters, lines: 420-443 }
+        - { name: test_view_cache_expired_returns_410, lines: 446-452 }
+        - { name: test_view_invalid_pareto_dimension_returns_400, lines: 455-466 }
+        - { name: test_view_passes_multi_dimension_selection_filters, lines: 469-492 }
+        - { name: test_view_sel_filters_take_precedence_over_legacy_dimension, lines: 495-516 }
+        - { name: test_export_cached_passes_pareto_multi_select_filters, lines: 520-539 }
+        - { name: test_export_cached_invalid_pareto_dimension_returns_400, lines: 542-553 }
+        - { name: test_export_cached_cache_expired_returns_410, lines: 556-562 }
+        - { name: test_export_cached_passes_multi_dimension_selection_filters, lines: 566-588 }
+        - { name: test_list_route_preserves_pagination_contract, lines: 591-618 }
+        - { name: test_list_rate_limited_returns_429, lines: 622-629 }
+        - { name: test_export_returns_csv_response, lines: 632-639 }
+        - { name: test_batch_pareto_exposes_materialized_metadata_on_hit, lines: 647-671 }
+        - { name: test_batch_pareto_exposes_fallback_metadata, lines: 674-693 }
+        - { name: test_batch_pareto_no_meta_when_absent, lines: 696-710 }
+        - { name: test_reason_pareto_exposes_materialized_metadata, lines: 713-735 }
+        - { name: test_batch_pareto_stale_fallback_reason, lines: 738-752 }
+        - { name: test_batch_pareto_build_failed_fallback_reason, lines: 755-769 }
     - name: TestRejectHistoryEdgeCases
-      lines: 769-864
+      lines: 772-867
       methods:
-        - { name: test_job_status_not_found_returns_error_envelope, lines: 772-783 }
-        - { name: test_sync_200_small_range, lines: 787-808 }
-        - { name: test_nested_pareto_aggregates_shape, lines: 811-842 }
-        - { name: test_batch_pareto_post_json_reasons, lines: 845-857 }
-        - { name: test_options_returns_envelope, lines: 859-864 }
+        - { name: test_job_status_not_found_returns_error_envelope, lines: 775-786 }
+        - { name: test_sync_200_small_range, lines: 790-811 }
+        - { name: test_nested_pareto_aggregates_shape, lines: 814-845 }
+        - { name: test_batch_pareto_post_json_reasons, lines: 848-860 }
+        - { name: test_options_returns_envelope, lines: 862-867 }
+    - name: TestRejectHistoryQueryPrefilterRoutes
+      lines: 879-1090
+      methods:
+        - { name: test_query_route_forwards_pj_types_kwarg_to_service, lines: 889-921 }
+        - { name: test_query_route_forwards_packages_kwarg_to_service, lines: 927-954 }
+        - { name: test_query_route_forwards_pj_functions_kwarg_to_service, lines: 960-987 }
+        - { name: test_query_route_empty_prefilters_forwarded_as_empty_list, lines: 993-1024 }
+        - { name: test_query_route_absent_prefilters_forwarded_as_empty_list, lines: 1030-1058 }
+        - { name: test_pj_bop_param_silently_ignored_not_forwarded, lines: 1064-1090 }
     - name: TestRejectHistoryCsvMidStreamError
-      lines: 877-944
+      lines: 1099-1166
       methods:
-        - { name: test_sentinel_emitted_on_mid_stream_exception, lines: 880-892 }
-        - { name: test_no_sentinel_when_rows_complete_successfully, lines: 894-907 }
-        - { name: test_header_row_emitted_before_sentinel, lines: 909-922 }
-        - { name: test_export_csv_uses_sentinel_on_oracle_failure, lines: 924-944 }
+        - { name: test_sentinel_emitted_on_mid_stream_exception, lines: 1102-1114 }
+        - { name: test_no_sentinel_when_rows_complete_successfully, lines: 1116-1129 }
+        - { name: test_header_row_emitted_before_sentinel, lines: 1131-1144 }
+        - { name: test_export_csv_uses_sentinel_on_oracle_failure, lines: 1146-1166 }
     - name: TestResourceHistoryCsvMidStreamSentinel
-      lines: 947-965
+      lines: 1169-1187
       methods:
-        - { name: test_error_trailer_present_in_resource_history_export, lines: 950-965 }
+        - { name: test_error_trailer_present_in_resource_history_export, lines: 1172-1187 }
   functions:
     - { name: _login_as_admin, lines: 13-15 }
 
-tests/test_reject_history_service.py:  # 403 lines
+tests/test_reject_history_service.py:  # 586 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: pandas, items: [], line: 6 }
@@ -18454,6 +18491,18 @@ tests/test_reject_history_service.py:  # 403 lines
     - { name: test_query_reason_pareto_top80_scope, lines: 261-293 }
     - { name: test_query_list_pagination_and_caps, lines: 296-353 }
     - { name: test_export_csv_contains_semantic_headers, lines: 356-403 }
+    - { name: test_build_where_clause_injects_pj_types_into_base_where, lines: 410-421 }
+    - { name: test_build_where_clause_injects_packages_into_base_where, lines: 424-434 }
+    - { name: test_build_where_clause_injects_pj_functions_into_base_where, lines: 437-448 }
+    - { name: test_build_where_clause_all_three_prefilters_combined, lines: 451-465 }
+    - { name: test_build_where_clause_empty_prefilters_produce_no_restriction, lines: 468-485 }
+    - { name: test_build_where_clause_absent_prefilters_produce_no_restriction, lines: 488-497 }
+    - { name: test_build_where_clause_nvl_trim_form_not_raw_column_reference, lines: 500-516 }
+    - { name: test_build_where_clause_prefilters_absent_from_where_clause_fragment, lines: 519-530 }
+    - { name: test_na_sentinel_in_pj_types_matches_null_pj_type_rows, lines: 533-542 }
+    - { name: test_na_sentinel_in_packages_matches_null_package_rows, lines: 545-554 }
+    - { name: test_na_sentinel_in_pj_functions_matches_null_pj_function_rows, lines: 557-565 }
+    - { name: test_pj_bop_param_absent_from_all_sql_paths, lines: 568-586 }
 
 tests/test_reject_history_shell_coverage.py:  # 48 lines
   imports:
@@ -18576,7 +18625,7 @@ tests/test_reject_pareto_materialized.py:  # 670 lines
   functions:
     - { name: _build_sample_df, lines: 22-46 }
 
-tests/test_reject_query_job_service.py:  # 357 lines
+tests/test_reject_query_job_service.py:  # 490 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 16 }
@@ -18615,6 +18664,14 @@ tests/test_reject_query_job_service.py:  # 357 lines
         - { name: test_execute_primary_query_called_with_correct_params, lines: 286-310 }
         - { name: test_failure_on_query_still_calls_complete_job, lines: 312-335 }
         - { name: test_job_completes_regardless_of_mode_parameter, lines: 337-357 }
+    - name: TestExecuteRejectQueryJobPrefilterForwarding
+      lines: 365-490
+      methods:
+        - { name: _make_mock_cache_module, lines: 370-377 }
+        - { name: test_pj_types_forwarded_to_execute_primary_query, lines: 379-407 }
+        - { name: test_packages_forwarded_to_execute_primary_query, lines: 409-436 }
+        - { name: test_pj_functions_forwarded_to_execute_primary_query, lines: 438-465 }
+        - { name: test_prefilter_absent_in_params_forwarded_as_empty_list, lines: 467-490 }
 
 tests/test_resilience.py:  # 58 lines
   imports:

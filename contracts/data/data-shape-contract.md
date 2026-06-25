@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.24.0
-last-changed: 2026-06-24
+schema-version: 1.25.0
+last-changed: 2026-06-25
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1356,7 +1356,72 @@ Frontend code-owned, single source of truth for navigation **structure** (drawer
 ---
 
 
+### §2.12 Reject-History Primary Query — Request-Side Filter Params (`POST /api/reject-history/query`)
+
+Three optional prefilter fields added by change `rh-primary-prefilter`. All inject into the `{{ BASE_WHERE }}`
+placeholder of the `reject_raw` CTE in `performance_daily_lot.sql`, BEFORE the GROUP BY clause. This is
+distinct from the `{{ WHERE_CLAUSE }}` injection point used by supplementary (DuckDB/cache-layer) filters.
+
+```json
+{
+  "start_date": "YYYY-MM-DD",
+  "end_date": "YYYY-MM-DD",
+  "pj_types":     ["<string>"],
+  "packages":     ["<string>"],
+  "pj_functions": ["<string>"]
+}
+```
+
+#### Field Specifications
+
+| field | type | required | SQL column | SQL form |
+|---|---|---|---|---|
+| `pj_types` | `string[]` | no | `DWH.DW_MES_CONTAINER.PJ_TYPE` | `NVL(TRIM(c.PJ_TYPE), '(NA)') IN (:bind_list)` |
+| `packages` | `string[]` | no | `DWH.DW_MES_CONTAINER.PRODUCTLINENAME` | `NVL(TRIM(c.PRODUCTLINENAME), '(NA)') IN (:bind_list)` |
+| `pj_functions` | `string[]` | no | `DWH.DW_MES_CONTAINER.PJ_FUNCTION` | `NVL(TRIM(c.PJ_FUNCTION), '(NA)') IN (:bind_list)` |
+
+#### NULL / `(NA)` Sentinel Semantics
+
+- Source columns come from a `LEFT JOIN DWH.DW_MES_CONTAINER c`; when a lot has no container record,
+  `c.PJ_TYPE / c.PRODUCTLINENAME / c.PJ_FUNCTION` is Oracle NULL.
+- `NVL(TRIM(col), '(NA)')` maps every Oracle NULL (or blank-after-trim) to the literal string `(NA)`.
+- Rows whose container is absent from `DW_MES_CONTAINER` are **not silently dropped** — they receive the
+  sentinel and participate in the `IN (...)` match.
+- Selecting `(NA)` in the UI returns exactly those rows where the container lookup yielded no match.
+
+#### Injection Point
+
+- These filters are injected into `{{ BASE_WHERE }}` — the primary CTE clause applied **before** Oracle
+  executes the `GROUP BY` inside `reject_raw`. This reduces I/O and GROUP BY cardinality at the Oracle layer.
+- The supplementary filter layer (`{{ WHERE_CLAUSE }}`) is applied to the materialized base result and is
+  a separate injection point. Both may be active simultaneously.
+
+#### Parity Rule
+
+- The same three fields must be present and forwarded identically by both the sync (HTTP 200) and
+  async/RQ (HTTP 202) job paths.
+- Spool/cache keys for the `reject_dataset` namespace must include all three fields (even when empty —
+  empty encodes as no-restriction, but the key must reflect the effective filter state).
+
+#### Scope Exclusions
+
+- `PJ_BOP` is explicitly excluded: `performance_daily_lot.sql` does not JOIN or SELECT `PJ_BOP`.
+- Options are sourced from the shared `container_filter_cache` (same as `GET /api/production-history/filter-options`).
+
+Added by change `rh-primary-prefilter`.
+
+
 ## CHANGELOG
+## [data 1.25.0] — 2026-06-25
+### Added
+- rh-primary-prefilter: §2.12 (Reject-History Primary Query request-side filter params). Documents three new
+  optional JSON body fields (`pj_types[]`, `packages[]`, `pj_functions[]`) on `POST /api/reject-history/query`.
+  Specifies `{{ BASE_WHERE }}` injection point (Oracle-layer, before GROUP BY in `reject_raw` CTE),
+  `NVL(TRIM(col), '(NA)')` NULL-sentinel semantics (NULL container → `(NA)`, not silently dropped;
+  selecting `(NA)` returns NULL-container rows), distinction from `{{ WHERE_CLAUSE }}` supplementary filter
+  layer, parity rule (sync+async paths identical), spool/cache key inclusion rule, and `PJ_BOP` explicit
+  exclusion. Additive; no existing schemas changed.
+
 
 ## [data 1.24.0] — 2026-06-24
 ### Changed (BREAKING)

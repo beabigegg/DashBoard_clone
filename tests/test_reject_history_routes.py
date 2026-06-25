@@ -156,12 +156,14 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
     @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
     def test_query_rejects_date_range_over_half_year(self, mock_execute):
+        # Use a range >365 days to exceed default REJECT_HISTORY_PRIMARY_MAX_QUERY_DAYS (365).
+        # The test asserts rejection before any Oracle/job call.
         response = self.client.post(
             '/api/reject-history/query',
             json={
                 'mode': 'date_range',
-                'start_date': '2025-01-01',
-                'end_date': '2025-12-31',
+                'start_date': '2024-01-01',
+                'end_date': '2025-03-01',  # >365 days
                 'include_excluded_scrap': False,
                 'exclude_material_scrap': True,
                 'exclude_pb_diode': True,
@@ -171,7 +173,8 @@ class TestRejectHistoryApiRoutes(TestRejectHistoryRoutesBase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(payload['success'])
-        self.assertIn('190', payload['error']['message'])
+        # Message contains the day limit figure (currently 365 from env default)
+        self.assertIn('天', payload['error']['message'])
         mock_execute.assert_not_called()
 
     @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
@@ -866,6 +869,225 @@ class TestRejectHistoryEdgeCases(TestRejectHistoryRoutesBase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ============================================================
+# rh-primary-prefilter: route forwarding tests (pytest style)
+# ============================================================
+
+
+class TestRejectHistoryQueryPrefilterRoutes(TestRejectHistoryRoutesBase):
+    """Route forwarding tests for the three new primary-query prefilter params.
+
+    AC-1: Params accepted; AC-4: empty list forwarded; pj_bop silently ignored.
+    """
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_query_route_forwards_pj_types_kwarg_to_service(
+        self, mock_execute, _mock_cache, _mock_rl
+    ):
+        """pj_types in POST body must appear as kwarg in execute_primary_query call."""
+        mock_execute.return_value = {
+            'query_id': 'qid-t1',
+            'summary': {},
+            'trend': {'items': [], 'granularity': 'day'},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 0}},
+            'available_filters': {},
+            'meta': {},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2026-01-01',
+                'end_date': '2026-01-05',
+                'include_excluded_scrap': False,
+                'exclude_material_scrap': True,
+                'exclude_pb_diode': True,
+                'pj_types': ['TYPE-A', 'TYPE-B'],
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload['success'])
+        mock_execute.assert_called_once()
+        call_kwargs = mock_execute.call_args.kwargs
+        self.assertIn('pj_types', call_kwargs)
+        self.assertEqual(sorted(call_kwargs['pj_types']), ['TYPE-A', 'TYPE-B'])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_query_route_forwards_packages_kwarg_to_service(
+        self, mock_execute, _mock_cache, _mock_rl
+    ):
+        """packages in POST body (primary prefilter) must appear as kwarg in execute_primary_query."""
+        mock_execute.return_value = {
+            'query_id': 'qid-t2',
+            'summary': {},
+            'trend': {'items': [], 'granularity': 'day'},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 0}},
+            'available_filters': {},
+            'meta': {},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2026-01-01',
+                'end_date': '2026-01-05',
+                'packages': ['PKG-A'],
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_execute.call_args.kwargs
+        self.assertIn('packages', call_kwargs)
+        self.assertIn('PKG-A', call_kwargs['packages'])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_query_route_forwards_pj_functions_kwarg_to_service(
+        self, mock_execute, _mock_cache, _mock_rl
+    ):
+        """pj_functions in POST body must appear as kwarg in execute_primary_query call."""
+        mock_execute.return_value = {
+            'query_id': 'qid-t3',
+            'summary': {},
+            'trend': {'items': [], 'granularity': 'day'},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 0}},
+            'available_filters': {},
+            'meta': {},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2026-01-01',
+                'end_date': '2026-01-05',
+                'pj_functions': ['FUNC-X'],
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_execute.call_args.kwargs
+        self.assertIn('pj_functions', call_kwargs)
+        self.assertIn('FUNC-X', call_kwargs['pj_functions'])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_query_route_empty_prefilters_forwarded_as_empty_list(
+        self, mock_execute, _mock_cache, _mock_rl
+    ):
+        """Empty prefilter arrays in body are forwarded as [] (not None or missing)."""
+        mock_execute.return_value = {
+            'query_id': 'qid-t4',
+            'summary': {},
+            'trend': {'items': [], 'granularity': 'day'},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 0}},
+            'available_filters': {},
+            'meta': {},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2026-01-01',
+                'end_date': '2026-01-05',
+                'pj_types': [],
+                'packages': [],
+                'pj_functions': [],
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_execute.call_args.kwargs
+        # All three must be present and empty
+        self.assertEqual(call_kwargs.get('pj_types', None), [])
+        self.assertEqual(call_kwargs.get('packages', None), [])
+        self.assertEqual(call_kwargs.get('pj_functions', None), [])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_query_route_absent_prefilters_forwarded_as_empty_list(
+        self, mock_execute, _mock_cache, _mock_rl
+    ):
+        """Missing prefilter fields default to [] when forwarded to execute_primary_query."""
+        mock_execute.return_value = {
+            'query_id': 'qid-t5',
+            'summary': {},
+            'trend': {'items': [], 'granularity': 'day'},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 0}},
+            'available_filters': {},
+            'meta': {},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2026-01-01',
+                'end_date': '2026-01-05',
+                # No pj_types / packages / pj_functions in body
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_execute.call_args.kwargs
+        self.assertEqual(call_kwargs.get('pj_types', None), [])
+        self.assertEqual(call_kwargs.get('packages', None), [])
+        self.assertEqual(call_kwargs.get('pj_functions', None), [])
+
+    @patch('mes_dashboard.core.rate_limit.check_and_record', return_value=(False, 0))
+    @patch('mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB', False)
+    @patch('mes_dashboard.routes.reject_history_routes._has_cached_df', return_value=True)
+    @patch('mes_dashboard.routes.reject_history_routes.execute_primary_query')
+    def test_pj_bop_param_silently_ignored_not_forwarded(
+        self, mock_execute, _mock_cache, _mock_rl
+    ):
+        """pj_bop in POST body must NOT appear as kwarg to execute_primary_query (AC-6)."""
+        mock_execute.return_value = {
+            'query_id': 'qid-t6',
+            'summary': {},
+            'trend': {'items': [], 'granularity': 'day'},
+            'detail': {'items': [], 'pagination': {'page': 1, 'perPage': 50, 'total': 0, 'totalPages': 0}},
+            'available_filters': {},
+            'meta': {},
+        }
+
+        response = self.client.post(
+            '/api/reject-history/query',
+            json={
+                'mode': 'date_range',
+                'start_date': '2026-01-01',
+                'end_date': '2026-01-05',
+                'pj_bop': ['BOP-1'],  # must be silently ignored
+            },
+        )
+        payload = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_execute.call_args.kwargs
+        self.assertNotIn('pj_bop', call_kwargs)
 
 
 # ============================================================

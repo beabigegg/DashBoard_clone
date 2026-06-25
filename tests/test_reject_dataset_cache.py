@@ -1727,3 +1727,132 @@ class TestReleaseQueryLockAtomic:
         # Should complete without error regardless of return value
         svc._release_query_lock("q1", "wrong-owner")
         client.eval.assert_called_once()
+
+
+# ============================================================
+# rh-primary-prefilter: _make_query_id and execute_primary_query tests
+# ============================================================
+
+
+class TestRejectDatasetCachePrefilterCacheKey:
+    """_make_query_id must include pj_types, packages, pj_functions in the hash (RHPF-05)."""
+
+    def _base_input(self, **overrides):
+        base = {
+            "cache_schema_version": cache_svc._CACHE_SCHEMA_VERSION,
+            "mode": "date_range",
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31",
+            "container_input_type": None,
+            "container_values": [],
+            "pj_types": [],
+            "packages": [],
+            "pj_functions": [],
+        }
+        base.update(overrides)
+        return base
+
+    def test_pj_types_changes_cache_key(self):
+        """Different pj_types must produce different cache keys."""
+        id_empty = cache_svc._make_query_id(self._base_input())
+        id_typed = cache_svc._make_query_id(self._base_input(pj_types=["TYPE-A"]))
+        assert id_empty != id_typed, "pj_types must change the cache key"
+
+    def test_packages_changes_cache_key(self):
+        """Different packages must produce different cache keys."""
+        id_empty = cache_svc._make_query_id(self._base_input())
+        id_pkged = cache_svc._make_query_id(self._base_input(packages=["PKG-B"]))
+        assert id_empty != id_pkged, "packages must change the cache key"
+
+    def test_pj_functions_changes_cache_key(self):
+        """Different pj_functions must produce different cache keys."""
+        id_empty = cache_svc._make_query_id(self._base_input())
+        id_funced = cache_svc._make_query_id(self._base_input(pj_functions=["FUNC-C"]))
+        assert id_empty != id_funced, "pj_functions must change the cache key"
+
+    def test_cache_key_deterministic_with_prefilters(self):
+        """Same prefilter combination always produces the same key."""
+        params = self._base_input(pj_types=["TYPE-A"], packages=["PKG-B"], pj_functions=["FUNC-C"])
+        assert cache_svc._make_query_id(params) == cache_svc._make_query_id(params)
+
+    def test_cache_key_all_three_differ_from_base(self):
+        """All-three-populated hash differs from base (no prefilters)."""
+        base_id = cache_svc._make_query_id(self._base_input())
+        full_id = cache_svc._make_query_id(
+            self._base_input(pj_types=["T1"], packages=["P1"], pj_functions=["F1"])
+        )
+        assert base_id != full_id
+
+
+class TestExecutePrimaryQueryPrefilterForwarding:
+    """execute_primary_query must forward prefilter lists to _build_base_where and include them in spool key."""
+
+    def test_execute_primary_query_accepts_prefilter_kwargs(self, monkeypatch):
+        """execute_primary_query must accept pj_types/packages/pj_functions without TypeError."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+
+        monkeypatch.setattr(svc, "_validate_range", lambda s, e: None)
+        monkeypatch.setattr(svc, "_has_cached_df", lambda qid: True)
+        monkeypatch.setattr(svc, "_load_partial_failure_flag", lambda qid: {})
+
+        # apply_view is called on cache hit — stub it to avoid DuckDB
+        monkeypatch.setattr(svc, "apply_view", lambda **kw: {
+            "analytics_raw": [],
+            "summary": {},
+            "detail": {
+                "items": [],
+                "pagination": {"page": 1, "perPage": 50, "total": 0, "totalPages": 0},
+            },
+            "available_filters": {},
+        })
+
+        # Must not raise TypeError — the signature must accept these kwargs
+        result = svc.execute_primary_query(
+            mode="date_range",
+            start_date="2026-01-01",
+            end_date="2026-01-31",
+            pj_types=["TYPE-A"],
+            packages=["PKG-B"],
+            pj_functions=["FUNC-C"],
+        )
+        assert result is not None  # returns a dict from spool
+
+    def test_execute_primary_query_prefilters_in_query_id(self, monkeypatch):
+        """execute_primary_query must include pj_types/packages/pj_functions in the query_id computation."""
+        import mes_dashboard.services.reject_dataset_cache as svc
+
+        monkeypatch.setattr(svc, "_validate_range", lambda s, e: None)
+
+        captured_ids = {}
+        original_make = svc._make_query_id
+
+        def _capturing_make(params):
+            qid = original_make(params)
+            captured_ids.update(params)
+            captured_ids["_result_id"] = qid
+            return qid
+
+        monkeypatch.setattr(svc, "_make_query_id", _capturing_make)
+        # Make cache always return True to short-circuit Oracle call
+        monkeypatch.setattr(svc, "_has_cached_df", lambda qid: True)
+        monkeypatch.setattr(svc, "_load_partial_failure_flag", lambda qid: {})
+        monkeypatch.setattr(svc, "apply_view", lambda **kw: {
+            "analytics_raw": [],
+            "summary": {},
+            "detail": {"items": [], "pagination": {"page": 1, "perPage": 50, "total": 0, "totalPages": 0}},
+            "available_filters": {},
+        })
+
+        svc.execute_primary_query(
+            mode="date_range",
+            start_date="2026-01-01",
+            end_date="2026-01-31",
+            pj_types=["TYPE-A"],
+            packages=["PKG-B"],
+            pj_functions=["FUNC-C"],
+        )
+
+        # The query_id input dict must contain the prefilter fields
+        assert captured_ids.get("pj_types") == ["TYPE-A"]
+        assert captured_ids.get("packages") == ["PKG-B"]
+        assert captured_ids.get("pj_functions") == ["FUNC-C"]
