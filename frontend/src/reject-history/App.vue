@@ -242,6 +242,7 @@ const supplementaryFilters = reactive<SupplementaryFilters>({
 // ---- Interactive state ----
 const page = ref<number>(1);
 const selectedTrendDates = ref<string[]>([]);
+const trendGranularity = ref<'day' | 'week' | 'month'>('day');
 const trendLegendSelected = ref<Record<string, boolean>>({ '扣帳報廢量': true, '不扣帳報廢量': true });
 const paretoSelections = reactive<ParetoSelectionsState>(createEmptyParetoSelections());
 const paretoData = reactive<ParetoDataState>(createEmptyParetoData());
@@ -998,6 +999,10 @@ function onTrendLegendChange(selected: Record<string, boolean>): void {
   void Promise.all([refreshView(), fetchBatchPareto()]);
 }
 
+function onTrendGranularityChange(gran: 'day' | 'week' | 'month'): void {
+  trendGranularity.value = gran;
+}
+
 function onParetoItemToggle(dimension: string, itemValue: string): void {
   if (!Object.prototype.hasOwnProperty.call(PARETO_SELECTION_PARAM_MAP, dimension)) {
     return;
@@ -1129,14 +1134,34 @@ async function exportCsv(): Promise<void> {
   }
 }
 
+// ---- Trend granularity bucketing ----
+function _trendBucketKey(dateStr: string, gran: 'day' | 'week' | 'month'): string {
+  if (gran === 'day') return dateStr;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+  if (!m) return dateStr;
+  const y = parseInt(m[1]);
+  const mo = parseInt(m[2]) - 1;
+  const d = parseInt(m[3]);
+  if (gran === 'month') {
+    return `${String(y).padStart(4, '0')}-${String(mo + 1).padStart(2, '0')}-01`;
+  }
+  // week: find the Monday of that week (local time, no TZ shift)
+  const date = new Date(y, mo, d);
+  const dow = date.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(y, mo, d + diff);
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+}
+
 // ---- Computed: trend items (derived from analytics_raw) ----
 const trendItems = computed<TrendItem[]>(() => {
   const raw = analyticsRawItems.value;
   if (!raw || raw.length === 0) return [];
 
+  const gran = trendGranularity.value;
   const byDate: Record<string, { MOVEIN_QTY: number; REJECT_TOTAL_QTY: number; DEFECT_QTY: number }> = {};
   for (const item of raw) {
-    const d = item.bucket_date;
+    const d = _trendBucketKey(item.bucket_date, gran);
     if (!byDate[d]) {
       byDate[d] = { MOVEIN_QTY: 0, REJECT_TOTAL_QTY: 0, DEFECT_QTY: 0 };
     }
@@ -1537,8 +1562,10 @@ onUnmounted(() => {
         :items="trendItems"
         :selected-dates="selectedTrendDates"
         :loading="loading.querying"
+        :granularity="trendGranularity"
         @date-click="onTrendDateClick"
         @legend-change="onTrendLegendChange"
+        @granularity-change="onTrendGranularityChange"
       />
 
       <ParetoGrid

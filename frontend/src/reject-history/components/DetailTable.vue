@@ -50,7 +50,7 @@ function onPageChange(newPage: number): void {
 
 <template>
   <section class="card ui-card">
-    <div class="card-header ui-card-header">
+    <div class="card-header ui-card-header rh-detail-header">
       <div class="card-title ui-card-title">
         明細列表
         <span v-if="(selectedParetoCount ?? 0) > 0" class="detail-reason-badge">
@@ -60,7 +60,7 @@ function onPageChange(newPage: number): void {
       </div>
       <button
         type="button"
-        class="ui-btn ui-btn--secondary ui-btn--sm"
+        class="ui-btn ui-btn--secondary ui-btn--sm rh-export-btn"
         :class="{ 'is-loading': exporting }"
         :disabled="exporting || (pagination?.total ?? 0) === 0"
         @click="emit('export-csv')"

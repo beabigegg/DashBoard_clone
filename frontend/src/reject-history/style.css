@@ -31,6 +31,18 @@
 .theme-reject-history .mode-tab.active {
   background: theme('colors.brand.600');
   color: theme('colors.token.hffffff');
+  position: relative;
+  overflow: hidden;
+  animation: rh-tab-glow 2.4s ease-in-out infinite;
+}
+
+.theme-reject-history .mode-tab.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%);
+  animation: rh-tab-shimmer 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .theme-reject-history .mode-tab:hover:not(.active) {
@@ -540,6 +552,95 @@
 
 .theme-reject-history .section-gap {
   height: theme('spacing.token.p18');
+}
+
+/* ── Keyframes ──────────────────────────────────────────────────── */
+@keyframes rh-tab-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(37, 99, 235, 0.38); }
+  50%       { box-shadow: 0 0 14px rgba(37, 99, 235, 0.75), 0 0 28px rgba(37, 99, 235, 0.2); }
+}
+
+@keyframes rh-tab-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes rh-gran-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(37, 99, 235, 0.32); }
+  50%       { box-shadow: 0 0 12px rgba(37, 99, 235, 0.7), 0 0 22px rgba(37, 99, 235, 0.18); }
+}
+
+@keyframes rh-export-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(14, 165, 233, 0.25); }
+  50%       { box-shadow: 0 0 10px rgba(14, 165, 233, 0.55), 0 0 20px rgba(14, 165, 233, 0.18); }
+}
+
+/* ── Trend chart header layout ──────────────────────────────────── */
+.theme-reject-history .rh-trend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── Trend granularity buttons ──────────────────────────────────── */
+.theme-reject-history .rh-gran-row {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.theme-reject-history .rh-gran-btn {
+  padding: 4px 12px;
+  border: none;
+  background: theme('colors.token.hf8fafc');
+  font-size: 12px;
+  font-weight: 600;
+  color: theme('colors.token.h475569');
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-reject-history .rh-gran-btn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.theme-reject-history .rh-gran-btn:hover:not(.active) {
+  background: theme('colors.token.heef2f7');
+  color: theme('colors.brand.700');
+}
+
+.theme-reject-history .rh-gran-btn.active {
+  background: theme('colors.brand.600');
+  color: theme('colors.token.hffffff');
+  animation: rh-gran-glow 2.4s ease-in-out infinite;
+}
+
+/* ── Detail card header flex ────────────────────────────────────── */
+.theme-reject-history .rh-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── Export CSV button glow ─────────────────────────────────────── */
+.theme-reject-history .rh-export-btn:not(:disabled) {
+  animation: rh-export-glow 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-reject-history .mode-tab.active,
+  .theme-reject-history .mode-tab.active::after,
+  .theme-reject-history .rh-gran-btn.active,
+  .theme-reject-history .rh-export-btn {
+    animation: none;
+  }
 }
 
 @media (max-width: 1400px) {

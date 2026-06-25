@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { BarChart, LineChart } from 'echarts/charts';
+import { BarChart, EffectScatterChart, LineChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 import type { ParetoItem } from '../useRejectHistoryDuckDB';
 
-use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
+use([CanvasRenderer, BarChart, LineChart, EffectScatterChart, GridComponent, TooltipComponent, LegendComponent]);
 
 const DISPLAY_SCOPE_TOP20_DIMENSIONS = new Set(['type']);
 
@@ -129,6 +129,14 @@ const chartOption = computed(() => {
           },
           borderRadius: [4, 4, 0, 0],
         },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 20,
+            shadowColor: 'rgba(37, 99, 235, 0.65)',
+            borderColor: 'rgba(255, 255, 255, 0.7)',
+            borderWidth: 1.5,
+          },
+        },
       },
       {
         name: '累積%',
@@ -137,7 +145,21 @@ const chartOption = computed(() => {
         data: items.map((item: ParetoItem) => Number(item.cumPct || 0)),
         lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
         itemStyle: { color: 'rgb(245, 158, 11)' },
-        symbolSize: 6,
+        symbolSize: 0,
+        z: 2,
+      },
+      {
+        name: '累積%_dots',
+        type: 'effectScatter',
+        yAxisIndex: 1,
+        data: items.map((item: ParetoItem) => Number(item.cumPct || 0)),
+        symbolSize: 7,
+        rippleEffect: { period: 2.8, scale: 2.6, brushType: 'fill' },
+        itemStyle: { color: 'rgb(245, 158, 11)' },
+        z: 10,
+        silent: true,
+        legendHoverLink: false,
+        tooltip: { show: false },
       },
     ],
   };

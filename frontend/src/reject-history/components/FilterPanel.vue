@@ -129,7 +129,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
           />
         </div>
         <div class="filter-group-full date-limit-hint">
-          日期區間最多 {{ primaryQueryMaxDays }} 天（約半年）。超過請改用較短區間分次查詢。
+          日期區間最多 {{ primaryQueryMaxDays }} 天（約一年）。超過請改用較短區間分次查詢。
         </div>
       </template>
 
@@ -236,7 +236,7 @@ function emitSupplementary(patch: Partial<{ packages: string[]; workcenterGroups
 
     <!-- Supplementary filters (only after primary query) -->
     <div v-if="queryId" class="supplementary-panel">
-      <div class="supplementary-header">補充篩選 (快取內篩選)</div>
+      <div class="supplementary-header">補充篩選</div>
       <div class="supplementary-toolbar">
         <div class="pareto-fixed-note">
           Pareto 固定累計前 80%，且 TYPE / EQUIPMENT 僅顯示 TOP 20。
