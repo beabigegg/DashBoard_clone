@@ -1,0 +1,26 @@
+change-id: rh-remove-supplementary-filter
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+  - contract
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test -- --reporter=verbose 2>&1 | head -5
+    summary: specs/changes/rh-remove-supplementary-filter/test-runs/20260625-205617/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npm run test
+    summary: specs/changes/rh-remove-supplementary-filter/test-runs/20260625-205414/summary.json
+  - phase: changed-area
+    status: passed
+    command: cd frontend && npm run type-check
+    summary: specs/changes/rh-remove-supplementary-filter/test-runs/20260625-205433/summary.json
+  - phase: contract
+    status: passed
+    command: conda run -n mes-dashboard cdd-kit validate --contracts 2>&1
+    summary: specs/changes/rh-remove-supplementary-filter/test-runs/20260625-204019/summary.json
+final-status: passed

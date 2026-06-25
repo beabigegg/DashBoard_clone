@@ -1,0 +1,43 @@
+agent: frontend-engineer
+change-id: rh-remove-supplementary-filter
+timestamp: 2026-06-25T20:56:00Z
+status: complete
+
+summary: |
+  Removed the reject-history supplementary (second-layer) filter panel entirely and
+  promoted 報廢原因 (LOSSREASONNAME) to the 4th column in the primary-prefilter-row
+  (BASE_WHERE layer). Removed all supplementaryFilters state, availableFilters ref,
+  onSupplementaryChange handler, getAvailableFilters/queryAvailableFilters from the
+  DuckDB composable, and AvailableFilters type. Added primaryReasons ref, primaryReasonOptions
+  fetched from /api/reject-history/options, and wired through App.vue → FilterPanel.
+  Updated CSS grid from repeat(3) to repeat(4) for primary-prefilter-row, removed
+  supplementary CSS rule blocks. Extended test files per test-plan.
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/reject-history/components/FilterPanel.vue" }
+  - { type: files-changed, pointer: "frontend/src/reject-history/App.vue" }
+  - { type: files-changed, pointer: "frontend/src/reject-history/useRejectHistoryDuckDB.ts" }
+  - { type: files-changed, pointer: "frontend/src/reject-history/style.css" }
+  - { type: files-changed, pointer: "frontend/src/core/reject-history-filters.ts" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/reject-history-filter.spec.ts" }
+  - { type: files-changed, pointer: "frontend/tests/validation/useRejectHistory.validation.test.js" }
+  - { type: components-affected, pointer: "FilterPanel (reject-history), App (reject-history)" }
+  - { type: screenshot-paths, pointer: "n/a (no E2E screenshots; mocked API)" }
+  - { type: accessibility-audit, pointer: "aria-label added: '報廢原因 預篩選', data-testid='primary-reason-multiselect'" }
+
+test-phases-run:
+  - { phase: collect, result: pass }
+  - { phase: targeted, result: pass, command: "cd frontend && npm run test" }
+  - { phase: changed-area, result: pass, command: "cd frontend && npm run type-check" }
+
+pre-push-grep:
+  - { check: "supplementary in reject-history/src", result: zero }
+  - { check: "getAvailableFilters in frontend/src", result: zero }
+  - { check: "css:check", result: "0 errors, 129 warnings (pre-existing)" }
+  - { check: "type-check", result: pass }
+  - { check: "npm run test (634 passing)", result: pass }
+
+known-residuals:
+  - workcenterGroups param still in useRejectHistoryDuckDB ComputeViewParams and buildUserConditions;
+    App.vue passes [] so it is never activated; removal from queryDetail/queryBatchPareto
+    was never applicable (those functions receive pre-built condition arrays, not raw params).

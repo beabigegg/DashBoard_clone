@@ -111,21 +111,12 @@ export interface BatchParetoResult {
   pareto_display_scope: string;
 }
 
-/** Available filter options returned after policy conditions are applied. */
-export interface AvailableFilters {
-  workcenter_groups: string[];
-  packages: string[];
-  reasons: string[];
-  types: string[];
-}
-
 /** Full result object from computeView(). */
 export interface ComputeViewResult {
   analytics_raw: AnalyticsRawRow[];
   summary: SummaryData;
   detail: DetailResult;
   batch_pareto: BatchParetoResult;
-  available_filters: AvailableFilters;
 }
 
 /** Policy-level filter flags (mirrors backend reject_cache_sql_runtime.py). */
@@ -143,7 +134,6 @@ export type ParetoSelections = Record<string, string[]>;
 export interface ComputeViewParams {
   policyFilters?: PolicyFilters;
   packages?: string[];
-  workcenterGroups?: string[];
   reasons?: string[];
   types?: string[];
   trendDates?: string[];
@@ -267,7 +257,6 @@ function buildPolicyConditions({
 
 interface UserConditionParams {
   packages: string[];
-  workcenterGroups: string[];
   reasons: string[];
   types: string[];
   trendDates: string[];
@@ -276,7 +265,6 @@ interface UserConditionParams {
 
 function buildUserConditions({
   packages,
-  workcenterGroups,
   reasons,
   types,
   trendDates,
@@ -287,11 +275,6 @@ function buildUserConditions({
   if (packages?.length) {
     const inList = packages.map(qs).join(', ');
     conditions.push(`${normValueExpr('PRODUCTLINENAME')} IN (${inList})`);
-  }
-
-  if (workcenterGroups?.length) {
-    const inList = workcenterGroups.map(qs).join(', ');
-    conditions.push(`${normValueExpr('WORKCENTER_GROUP')} IN (${inList})`);
   }
 
   if (reasons?.length) {
@@ -584,44 +567,6 @@ async function queryBatchPareto(
   };
 }
 
-async function queryAvailableFilters(
-  client: DuckDBClient,
-  policyConditions: string[],
-): Promise<AvailableFilters> {
-  const policyWhere = buildWhereClause(policyConditions);
-  const result: AvailableFilters = { workcenter_groups: [], packages: [], reasons: [], types: [] };
-
-  const wcRows = await client.sendQuery(
-    `SELECT DISTINCT TRIM(CAST(${qid('WORKCENTER_GROUP')} AS VARCHAR)) AS v FROM ${TABLE_NAME} ${policyWhere} ORDER BY 1`,
-  );
-  result.workcenter_groups = [
-    ...new Set(wcRows.map((r) => String((r as Record<string, unknown>).v || '').trim()).filter(Boolean)),
-  ].sort();
-
-  const pkgRows = await client.sendQuery(
-    `SELECT DISTINCT TRIM(CAST(${qid('PRODUCTLINENAME')} AS VARCHAR)) AS v FROM ${TABLE_NAME} ${policyWhere} ORDER BY 1`,
-  );
-  result.packages = [
-    ...new Set(pkgRows.map((r) => String((r as Record<string, unknown>).v || '').trim()).filter(Boolean)),
-  ].sort();
-
-  const reasonRows = await client.sendQuery(
-    `SELECT DISTINCT TRIM(CAST(${qid('LOSSREASONNAME')} AS VARCHAR)) AS v FROM ${TABLE_NAME} ${policyWhere} ORDER BY 1`,
-  );
-  result.reasons = [
-    ...new Set(reasonRows.map((r) => String((r as Record<string, unknown>).v || '').trim()).filter(Boolean)),
-  ].sort();
-
-  const typeRows = await client.sendQuery(
-    `SELECT DISTINCT TRIM(CAST(${qid('PJ_TYPE')} AS VARCHAR)) AS v FROM ${TABLE_NAME} ${policyWhere} ORDER BY 1`,
-  );
-  result.types = [
-    ...new Set(typeRows.map((r) => String((r as Record<string, unknown>).v || '').trim()).filter(Boolean)),
-  ].sort();
-
-  return result;
-}
-
 async function querySummaryDirect(
   client: DuckDBClient,
   baseWhere: string,
@@ -711,7 +656,6 @@ export function useRejectHistoryDuckDB() {
   async function computeView({
     policyFilters = {},
     packages = [],
-    workcenterGroups = [],
     reasons = [],
     types = [],
     trendDates = [],
@@ -742,7 +686,6 @@ export function useRejectHistoryDuckDB() {
     });
     const userConditions = buildUserConditions({
       packages,
-      workcenterGroups,
       reasons,
       types,
       trendDates,
@@ -751,7 +694,7 @@ export function useRejectHistoryDuckDB() {
     const allConditions = [...policyConditions, ...userConditions];
     const baseWhere = buildWhereClause(allConditions);
 
-    const [analyticsRaw, detailResult, paretoResult, availableFilters, summaryDirect] = await Promise.all([
+    const [analyticsRaw, detailResult, paretoResult, summaryDirect] = await Promise.all([
       queryAnalyticsRaw(_client, baseWhere),
       queryDetail(_client, allConditions, {
         page,
@@ -766,7 +709,6 @@ export function useRejectHistoryDuckDB() {
         paretoScope,
         paretoSelections,
       }),
-      queryAvailableFilters(_client, policyConditions),
       querySummaryDirect(_client, baseWhere),
     ]);
 
@@ -779,7 +721,6 @@ export function useRejectHistoryDuckDB() {
       },
       detail: detailResult,
       batch_pareto: paretoResult,
-      available_filters: availableFilters,
     };
   }
 

@@ -7,22 +7,20 @@
  *   - Container input type selection (lot / work_order)
  *   - Checkbox filters present and in correct initial state
  *   - Checkbox state reflected in POST payload
- *   - Workcenter supplementary filter options appear after query
+ *   - 報廢原因 (reasons) as 4th primary prefilter column (AC-2)
+ *   - 報廢原因 included in POST body when selected (AC-2)
+ *   - Supplementary panel absent (AC-1)
  *   - Date range included in POST payload
  *   - Pagination controls (page-prev / page-next) appear with multi-page data
  *   - datatable-row count matches mocked response
  *   - Empty state / zero-row table on empty response
- *   - Primary prefilter MultiSelects (pj_types, packages, pj_functions) in primary section
+ *   - Primary prefilter MultiSelects (pj_types, packages, pj_functions, reasons) in primary section
  *   - Primary prefilter values included in POST body when selected
  *   - PJ_BOP not present anywhere in the FilterPanel
  *   - cross-filter options populate primary MultiSelects
  *
  * All API calls are mocked. No real backend required.
  * Routes registered FIRST (catch-all) then LAST (specific) per LIFO rule.
- *
- * Note: supplementary filters (workcenter-select, package-select, reason-select)
- * only render after queryId is set (i.e. after a successful primary query).
- * Tests that check those must click submit first.
  */
 
 import { test, expect } from '@playwright/test';
@@ -190,6 +188,18 @@ async function setupBaseRoutes(page: import('@playwright/test').Page) {
       body: JSON.stringify(makeFilterOptionsResult()),
     }),
   );
+  // 報廢原因 options from /api/reject-history/options
+  await page.route('**/api/reject-history/options**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: { reasons: ['SCRATCH', 'PARTICLE', 'CRACK'] },
+        meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+      }),
+    }),
+  );
 }
 
 async function navigateToRejectHistory(page: import('@playwright/test').Page) {
@@ -334,32 +344,90 @@ test.describe('reject-history — filter panel interactions', () => {
     expect(capturedBody!['exclude_pb_diode']).toBe(true);
   });
 
-  test('test_workcenter_filter_options', async ({ page }) => {
+  test('test_primary_reason_filter_present', async ({ page }) => {
     await setupBaseRoutes(page);
+
+    // Mock /api/reject-history/options to return reasons
+    await page.route('**/api/reject-history/options**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { reasons: ['SCRATCH', 'PARTICLE', 'CRACK'] },
+          meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+        }),
+      }),
+    );
+
     await navigateToRejectHistory(page);
 
-    // Submit a query first so queryId is set and supplementary panel renders
+    // 報廢原因 is in the primary prefilter row — visible WITHOUT submitting a query
+    const reasonSelect = page.locator('[data-testid="primary-reason-select"]');
+    await expect(reasonSelect).toBeVisible({ timeout: 10_000 });
+
+    // MultiSelect trigger should exist inside the wrapper
+    const trigger = reasonSelect.locator('[data-testid="multiselect-trigger"]');
+    await expect(trigger).toBeVisible({ timeout: 10_000 });
+
+    // The supplementary panel (workcenter-select) must NOT exist
+    await expect(page.locator('[data-testid="workcenter-select"]')).toHaveCount(0);
+  });
+
+  test('test_primary_reason_in_post_body', async ({ page }) => {
+    await setupBaseRoutes(page);
+
+    // Mock /api/reject-history/options to return reasons
+    await page.route('**/api/reject-history/options**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { reasons: ['SCRATCH', 'PARTICLE', 'CRACK'] },
+          meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+        }),
+      }),
+    );
+
+    let capturedBody: Record<string, unknown> | null = null;
+    await page.route('**/api/reject-history/query**', async (route) => {
+      capturedBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeSyncResult()),
+      });
+    });
+
+    await navigateToRejectHistory(page);
+
+    // Wait for options to populate
+    await page.waitForTimeout(300);
+
+    // Click 報廢原因 MultiSelect trigger to open dropdown
+    const reasonSelect = page.locator('[data-testid="primary-reason-select"]');
+    await expect(reasonSelect.locator('[data-testid="multiselect-trigger"]')).toBeVisible({ timeout: 10_000 });
+    await reasonSelect.locator('[data-testid="multiselect-trigger"]').click();
+
+    // Select SCRATCH from the dropdown
+    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
+    await expect(dropdown).toBeVisible({ timeout: 10_000 });
+
+    const scratchOption = page.locator('[data-testid="multiselect-option"]').filter({ hasText: 'SCRATCH' });
+    await expect(scratchOption).toBeVisible({ timeout: 10_000 });
+    await scratchOption.click();
+
+    // Close the dropdown
+    await page.keyboard.press('Escape');
+
+    // Submit query
     await page.fill('[data-testid="start-date"]', '2026-01-01');
     await page.fill('[data-testid="end-date"]', '2026-01-31');
     await submitQueryAndWait(page);
 
-    // Supplementary panel (workcenter-select) should now be visible
-    const wcSelect = page.locator('[data-testid="workcenter-select"]');
-    await expect(wcSelect).toBeVisible({ timeout: 10_000 });
-
-    // MultiSelect trigger should exist inside the workcenter-select wrapper
-    const trigger = wcSelect.locator('[data-testid="multiselect-trigger"]');
-    await expect(trigger).toBeVisible({ timeout: 10_000 });
-
-    // Click trigger to open dropdown and verify options appear
-    await trigger.click();
-    // Dropdown is Teleported to <body> — must use page.locator, not wcSelect.locator
-    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
-    await expect(dropdown).toBeVisible({ timeout: 10_000 });
-
-    const options = page.locator('[data-testid="multiselect-option"]');
-    await expect(options.first()).toBeVisible({ timeout: 10_000 });
-    expect(await options.count()).toBeGreaterThanOrEqual(1);
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody!['reasons']).toEqual(['SCRATCH']);
   });
 
   test('test_date_range_in_payload', async ({ page }) => {
@@ -683,7 +751,7 @@ test.describe('reject-history — primary prefilter MultiSelects', () => {
     expect(capturedBody!['pj_types']).toContain('(NA)');
   });
 
-  test('prefilter selection combined with supplementary filter in end-to-end query POST', async ({ page }) => {
+  test('prefilter selection combined in end-to-end query POST', async ({ page }) => {
     await setupBaseRoutes(page);
 
     let capturedQueryBody: Record<string, unknown> | null = null;

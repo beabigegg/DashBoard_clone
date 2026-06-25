@@ -1,0 +1,19 @@
+{
+  "change_id": "rh-remove-supplementary-filter",
+  "phase": "targeted",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "pytest tests/test_reject_history_service.py tests/test_reject_history_routes.py tests/test_reject_dataset_cache.py tests/test_reject_query_job_service.py tests/test_reject_history_unified_job.py tests/test_reject_history_async_routes.py -v 2>&1",
+  "duration_ms": 6234,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests/test_reject_history_async_routes.py::TestRejectHistoryQueryRoute::test_container_mode_returns_async_202",
+    "message": "AssertionError: 429 != 202"
+  },
+  "artifacts": {
+    "summary": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-203421/summary.json",
+    "stdout": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-203421/stdout.log",
+    "stderr": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-203421/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

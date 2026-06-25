@@ -45,6 +45,7 @@ export interface RejectFilterInput {
   pjTypes?: unknown;
   primaryPackages?: unknown;
   pjFunctions?: unknown;
+  primaryReasons?: unknown;
   [key: string]: unknown;
 }
 
@@ -62,6 +63,7 @@ export interface RejectFilterSnapshot {
   pjTypes: string[];
   primaryPackages: string[];
   pjFunctions: string[];
+  primaryReasons: string[];
 }
 
 export function toRejectFilterSnapshot(input: RejectFilterInput = {}): RejectFilterSnapshot {
@@ -78,6 +80,7 @@ export function toRejectFilterSnapshot(input: RejectFilterInput = {}): RejectFil
     pjTypes: normalizeArray(input.pjTypes),
     primaryPackages: normalizeArray(input.primaryPackages),
     pjFunctions: normalizeArray(input.pjFunctions),
+    primaryReasons: normalizeArray(input.primaryReasons),
   };
 }
 

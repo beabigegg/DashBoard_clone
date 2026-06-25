@@ -384,3 +384,85 @@ class TestRejectHistoryJobChunkToDuckDB:
             "RejectHistoryJob.chunk_to_duckdb must be overridden to use explicit DDL; "
             "the base class infers types from first batch which causes INT32 for NULL columns."
         )
+
+
+# ============================================================
+# rh-remove-supplementary-filter: unified job reasons plumbing tests
+# ============================================================
+
+
+class TestRejectHistoryJobReasonsPlumbing:
+    """AC-4: reasons in unified job pre_query and query_id_input."""
+
+    def test_unified_job_parses_reasons_from_params(self, tmp_path, monkeypatch):
+        """RejectHistoryJob.pre_query() must parse reasons from job params."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.reject_history_worker import RejectHistoryJob
+
+        job = RejectHistoryJob("test-rh-reasons-001", params={
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-10",
+            "reasons": ["001_CRACK", "002_BREAK"],
+            "include_excluded_scrap": False,
+            "exclude_material_scrap": False,
+            "exclude_pb_diode": False,
+        })
+
+        captured_base_where_calls = []
+        original_build_base_where = None
+
+        import mes_dashboard.services.reject_history_service as _svc
+        original_build_base_where = _svc._build_base_where
+
+        def _capturing_build_base_where(*args, **kwargs):
+            captured_base_where_calls.append(kwargs)
+            return original_build_base_where(*args, **kwargs)
+
+        monkeypatch.setattr(_svc, "_build_base_where", _capturing_build_base_where)
+
+        with patch("mes_dashboard.services.reject_dataset_cache._make_query_id",
+                   return_value="rh-reasons-test123"), \
+             patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value=None):
+            job.pre_query()
+
+        # reasons must have been passed to _build_base_where
+        assert len(captured_base_where_calls) >= 1
+        last_call = captured_base_where_calls[-1]
+        assert "reasons" in last_call
+        assert sorted(last_call["reasons"]) == ["001_CRACK", "002_BREAK"]
+
+    def test_unified_job_reasons_in_query_id_input(self, tmp_path, monkeypatch):
+        """RejectHistoryJob.pre_query() must include reasons in query_id_input."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.reject_history_worker import RejectHistoryJob
+        from mes_dashboard.services.reject_dataset_cache import _CACHE_SCHEMA_VERSION
+
+        captured_query_id_inputs = []
+
+        import mes_dashboard.services.reject_dataset_cache as cache_mod
+        original_make = cache_mod._make_query_id
+
+        def _capturing_make(params):
+            captured_query_id_inputs.append(dict(params))
+            return original_make(params)
+
+        monkeypatch.setattr(cache_mod, "_make_query_id", _capturing_make)
+
+        job = RejectHistoryJob("test-rh-qid-001", params={
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-10",
+            "reasons": ["001_A"],
+            "include_excluded_scrap": False,
+            "exclude_material_scrap": False,
+            "exclude_pb_diode": False,
+        })
+
+        with patch("mes_dashboard.core.query_spool_store.get_spool_file_path", return_value=None):
+            job.pre_query()
+
+        # Find the query_id_input call that contains the cache_schema_version
+        main_inputs = [c for c in captured_query_id_inputs if "cache_schema_version" in c]
+        assert len(main_inputs) >= 1, "query_id_input must be passed to _make_query_id"
+        qi = main_inputs[0]
+        assert "reasons" in qi, "reasons must be in query_id_input"
+        assert qi["reasons"] == ["001_A"]

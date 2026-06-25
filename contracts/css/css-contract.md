@@ -3,7 +3,7 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.9.0
+schema-version: 1.10.0
 last-changed: 2026-06-18
 breaking-change-policy: deprecate-2-minors
 ---
@@ -148,6 +148,10 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.10.0] — 2026-06-25
+### Changed
+- rh-remove-supplementary-filter: `frontend/src/reject-history/style.css` — `.supplementary-panel`, `.supplementary-header`, `.supplementary-row`, `.supplementary-toolbar` CSS rules removed (all were scoped under `.theme-reject-history`; Rule 6 compliance maintained). `.primary-prefilter-row` grid updated from `repeat(3, ...)` to `repeat(4, minmax(0, 1fr))` for 4th primary-prefilter column (報廢原因). All changes scoped under `.theme-reject-history`; `css:check` continues to pass. Sole consumer `frontend/src/reject-history/`.
 
 ## [css 1.9.0] — 2026-06-18
 ### Added

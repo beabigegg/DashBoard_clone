@@ -99,6 +99,9 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
         _pj_functions: List[str] = sorted({
             str(v).strip() for v in (self.params.get("pj_functions") or []) if str(v).strip()
         })
+        _reasons: List[str] = sorted({
+            str(v).strip() for v in (self.params.get("reasons") or []) if str(v).strip()
+        })
 
         # Compute deterministic query_id (same as legacy + sync paths — includes prefilters)
         query_id_input = {
@@ -111,6 +114,7 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
             "pj_types": _pj_types,
             "packages": _packages,
             "pj_functions": _pj_functions,
+            "reasons": _reasons,
         }
         self._query_id = _make_query_id(query_id_input)
         self._spool_key = self._query_id
@@ -136,11 +140,12 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
             pj_types=_pj_types,
             packages=_packages,
             pj_functions=_pj_functions,
+            reasons=_reasons,
         )
         self._base_where = _base_where_full
         self._base_params = _base_params_full
 
-        # Extract prefilter bind params (pt_*, pkg_*, pf_*) from _base_params_full
+        # Extract prefilter bind params (pt_*, pkg_*, pf_*, reason_*) from _base_params_full
         # so each chunk carries them alongside its per-chunk date range.
         prefilter_bind: Dict[str, Any] = {
             k: v for k, v in _base_params_full.items()

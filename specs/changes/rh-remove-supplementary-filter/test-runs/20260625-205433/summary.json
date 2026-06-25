@@ -1,0 +1,15 @@
+{
+  "change_id": "rh-remove-supplementary-filter",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run type-check",
+  "duration_ms": 9247,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-205433/summary.json",
+    "stdout": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-205433/stdout.log",
+    "stderr": "specs/changes/rh-remove-supplementary-filter/test-runs/20260625-205433/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

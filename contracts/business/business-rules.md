@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.30.0
+schema-version: 1.31.0
 last-changed: 2026-06-25
 breaking-change-policy: deprecate-2-minors
 ---
@@ -179,12 +179,14 @@ breaking-change-policy: deprecate-2-minors
 
 | rule id | name | current behavior | tests |
 |---|---|---|---|
-| RHPF-01 | BASE_WHERE injection | `pj_types`, `packages`, `pj_functions` prefilter conditions are injected into `{{ BASE_WHERE }}` inside the `reject_raw` CTE of `performance_daily_lot.sql`, BEFORE the GROUP BY clause. This is distinct from `{{ WHERE_CLAUSE }}` (applied to the materialized base result at the supplementary/DuckDB layer). | unit tests |
-| RHPF-02 | Empty selection = no restriction | When any of the three prefilter fields is absent from the request body OR is an empty array, no SQL condition is added for that field. Results are identical to current behavior (backward-compatible). | unit + route tests |
-| RHPF-03 | NVL/TRIM NULL-container sentinel | Prefilter SQL conditions use `NVL(TRIM(c.PJ_TYPE/PRODUCTLINENAME/PJ_FUNCTION), '(NA)') IN (:bind_list)`. Oracle NULL values (rows whose container is absent from DW_MES_CONTAINER) map to the sentinel string `(NA)` and are NOT silently dropped. Selecting `(NA)` explicitly returns NULL-container rows. | unit + data-boundary tests |
+| RHPF-01 | BASE_WHERE injection | `pj_types`, `packages`, `pj_functions`, and `reasons` prefilter conditions are injected into `{{ BASE_WHERE }}` inside the `reject_raw` CTE of `performance_daily_lot.sql`, BEFORE the GROUP BY clause. The supplementary `{{ WHERE_CLAUSE }}` layer (workcenter_groups, packages, reasons, types) is fully removed by change `rh-remove-supplementary-filter`. | unit tests |
+| RHPF-02 | Empty selection = no restriction | When any of the four prefilter fields is absent from the request body OR is an empty array, no SQL condition is added for that field. Results are identical to current behavior (backward-compatible). | unit + route tests |
+| RHPF-03 | NVL/TRIM NULL-container sentinel | Prefilter SQL conditions for container-level fields use `NVL(TRIM(c.PJ_TYPE/PRODUCTLINENAME/PJ_FUNCTION), '(NA)') IN (:bind_list)`. Oracle NULL values (rows whose container is absent from DW_MES_CONTAINER) map to the sentinel string `(NA)` and are NOT silently dropped. Selecting `(NA)` explicitly returns NULL-container rows. | unit + data-boundary tests |
 | RHPF-04 | PJ_BOP explicitly excluded | `performance_daily_lot.sql` does not JOIN or SELECT `PJ_BOP`. No `pj_bop` request parameter, no SQL clause, no UI control is added by this change. Requests containing `pj_bop` must silently ignore it. | unit tests |
-| RHPF-05 | Sync/async parity | The three prefilter fields must be forwarded identically in both the sync (HTTP 200 fallback) and async/RQ (HTTP 202) job paths. Spool/cache keys for the `reject_dataset` namespace must incorporate all three fields to prevent cross-query cache collisions. | unit + integration tests |
+| RHPF-05 | Sync/async parity | The four prefilter fields (`pj_types`, `packages`, `pj_functions`, `reasons`) must be forwarded identically in both the sync (HTTP 200 fallback) and async/RQ (HTTP 202) job paths. Spool/cache keys for the `reject_dataset` namespace must incorporate all four fields to prevent cross-query cache collisions. | unit + integration tests |
 | RHPF-06 | Options from shared container_filter_cache | Filter option values for `pj_types`, `packages`, and `pj_functions` are sourced from the existing `container_filter_cache` 4-tuple set (same backing store used by `GET /api/production-history/filter-options`). No new cache namespace, no new Oracle query path, no modification to the shared producer. | unit tests |
+| RHPF-07 | NVL/TRIM NULL-LOSSREASONNAME sentinel | `reasons[]` prefilter uses `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (:bind_list)`. Source is `LOTREJECTHISTORY.LOSSREASONNAME` (direct column, not a LEFT JOIN miss). Sentinel `(未填寫)` is distinct from `(NA)` used for container-level fields. Selecting `(未填寫)` returns reject records where LOSSREASONNAME is null or blank. Options sourced from `GET /api/reject-history/options` via `reason_filter_cache.get_reject_reasons()`. | unit + data-boundary tests |
+| RHPF-08 | WHERE-semantics equivalence | The BASE_WHERE `reasons[]` prefilter produces result sets equivalent to the prior supplementary DuckDB-layer reason filter for the same selection, including the `(未填寫)` bucket. Equivalence holds because NVL/TRIM at Oracle layer maps null rows identically to `(未填寫)` as the prior DuckDB filter did. AC-7. | data-boundary tests |
 
 
 ## Analytics / Anomaly Detection Rules
@@ -287,6 +289,10 @@ breaking-change-policy: deprecate-2-minors
 | Reject-history prefilter: empty list or field absent | No SQL clause added; results equivalent to omitting the filter entirely | RHPF-02 | unit + route tests |
 | Reject-history prefilter: `(NA)` in selection | Returns rows where `DW_MES_CONTAINER` has no matching record (NULL container → `(NA)` sentinel matches) | RHPF-03 | data-boundary tests |
 | Reject-history prefilter: `pj_bop` sent by caller | Silently ignored; no `PJ_BOP` clause added; no error | RHPF-04 | route tests |
+| Reject-history `reasons[]` prefilter: non-empty | `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)` injected into `{{ BASE_WHERE }}`; `reason_`-prefixed bind params | RHPF-01, RHPF-07 | unit tests |
+| Reject-history `reasons[]` prefilter: empty list or field absent | No SQL clause added; results equivalent to omitting the filter entirely | RHPF-02 | unit + route tests |
+| Reject-history `reasons[]` prefilter: `(未填寫)` in selection | Returns reject records where LOSSREASONNAME is null or blank | RHPF-07 | data-boundary tests |
+| Reject-history `workcenter_groups` sent by caller | No longer accepted; silently ignored (supplementary WHERE layer removed) | RHPF-01 | route tests |
 
 ## Material Consumption Rules
 
@@ -374,6 +380,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.31.0] — 2026-06-25
+### Added
+- rh-remove-supplementary-filter: RHPF-07 (NVL/TRIM NULL-LOSSREASONNAME sentinel — `reasons[]` uses `(未填寫)` sentinel distinct from container-level `(NA)`; source is LOTREJECTHISTORY direct column, not LEFT JOIN; selecting `(未填寫)` returns null/blank LOSSREASONNAME rows; options from `reason_filter_cache`). RHPF-08 (WHERE-semantics equivalence — BASE_WHERE `reasons[]` produces identical result sets to prior supplementary DuckDB-layer reason filter for same selection including `(未填寫)` bucket). Extended RHPF-01 (now covers all four prefilter fields; supplementary `{{ WHERE_CLAUSE }}` layer removal noted). Extended RHPF-02 (now covers four fields). Updated RHPF-05 (parity rule now covers all four fields). Four new Decision Table rows (`reasons[]` non-empty, `reasons[]` empty, `(未填寫)` bucket, `workcenter_groups` ignored). Additive; no existing rules removed.
 
 ## [business 1.30.0] — 2026-06-25
 ### Added

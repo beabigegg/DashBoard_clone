@@ -1856,3 +1856,82 @@ class TestExecutePrimaryQueryPrefilterForwarding:
         assert captured_ids.get("pj_types") == ["TYPE-A"]
         assert captured_ids.get("packages") == ["PKG-B"]
         assert captured_ids.get("pj_functions") == ["FUNC-C"]
+
+
+# ============================================================
+# rh-remove-supplementary-filter: reasons in execute_primary_query / query_id_input
+# ============================================================
+
+
+def test_query_id_input_includes_reasons_key(monkeypatch):
+    """execute_primary_query must include 'reasons' key in query_id_input when provided."""
+    from mes_dashboard.services import reject_dataset_cache as svc
+
+    captured_ids = {}
+
+    original_make_query_id = svc._make_query_id
+
+    def _capturing_make_query_id(params):
+        captured_ids.update(params)
+        return original_make_query_id(params)
+
+    monkeypatch.setattr(svc, "_make_query_id", _capturing_make_query_id)
+    monkeypatch.setattr(svc, "_has_cached_df", lambda qid: True)
+    monkeypatch.setattr(svc, "_validate_range", lambda s, e: None)
+
+    def _fake_apply_view(**kwargs):
+        return {
+            "summary": {"MOVEIN_QTY": 0, "REJECT_TOTAL_QTY": 0, "DEFECT_QTY": 0,
+                        "REJECT_RATE_PCT": 0, "DEFECT_RATE_PCT": 0, "REJECT_SHARE_PCT": 0,
+                        "AFFECTED_LOT_COUNT": 0, "AFFECTED_WORKORDER_COUNT": 0},
+            "detail": {"items": [], "pagination": {"page": 1, "perPage": 50, "total": 0, "totalPages": 1}},
+            "analytics_raw": [],
+            "available_filters": {},
+        }
+
+    monkeypatch.setattr(svc, "apply_view", _fake_apply_view)
+    monkeypatch.setattr(
+        "mes_dashboard.services.scrap_reason_exclusion_cache.get_excluded_reasons",
+        lambda: [],
+    )
+
+    svc.execute_primary_query(
+        mode="date_range",
+        start_date="2026-01-01",
+        end_date="2026-01-31",
+        reasons=["001_CRACK"],
+    )
+
+    assert "reasons" in captured_ids
+    assert captured_ids["reasons"] == ["001_CRACK"]
+
+
+def test_query_id_distinct_different_reasons(monkeypatch):
+    """Different reasons must produce different query_id_input hashes."""
+    from mes_dashboard.services.reject_dataset_cache import _make_query_id, _CACHE_SCHEMA_VERSION
+
+    base = {
+        "cache_schema_version": _CACHE_SCHEMA_VERSION,
+        "mode": "date_range",
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-31",
+        "container_input_type": None,
+        "container_values": [],
+        "pj_types": [],
+        "packages": [],
+        "pj_functions": [],
+        "reasons": [],
+    }
+
+    with_reason_a = dict(base, reasons=["001_A"])
+    with_reason_b = dict(base, reasons=["002_B"])
+    with_unfilled = dict(base, reasons=["(未填寫)"])
+
+    id_base = _make_query_id(base)
+    id_a = _make_query_id(with_reason_a)
+    id_b = _make_query_id(with_reason_b)
+    id_unfilled = _make_query_id(with_unfilled)
+
+    assert id_base != id_a, "reason_a must change cache key"
+    assert id_a != id_b, "different reasons must produce distinct keys"
+    assert id_base != id_unfilled, "(未填寫) selection must change cache key"

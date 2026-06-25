@@ -490,6 +490,74 @@ class TestRejectHistoryQueryPrefilterAsyncRoutes(unittest.TestCase):
         assert id_base != id_pj_functions, "pj_functions must change cache key"
         assert id_pj_types != id_packages, "pj_types and packages must produce distinct keys"
 
+    @patch("mes_dashboard.core.rate_limit.check_and_record", return_value=(False, 0))
+    @patch("mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB", False)
+    @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
+    def test_async_route_forwards_reasons_to_job_params(self, _mock_cache, _mock_rl):
+        """reasons sent in body must appear in job_params passed to enqueue_reject_query."""
+        captured_params = {}
+
+        def _capture_enqueue(mode, params, owner):
+            captured_params.update(params)
+            return ("reject-async-reasons", None)
+
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            side_effect=_capture_enqueue,
+        ):
+            response = self.client.post(
+                "/api/reject-history/query",
+                json={
+                    "mode": "date_range",
+                    "start_date": _SHORT_START,
+                    "end_date": _SHORT_END,
+                    "reasons": ["001_A", "002_B"],
+                    "pj_types": [],
+                    "packages": [],
+                    "pj_functions": [],
+                },
+            )
+
+        payload = _parse(response)
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(payload["success"])
+        self.assertIn("reasons", captured_params)
+        self.assertEqual(sorted(captured_params["reasons"]), ["001_A", "002_B"])
+
+    @patch("mes_dashboard.core.rate_limit.check_and_record", return_value=(False, 0))
+    @patch("mes_dashboard.routes.reject_history_routes._REJECT_HISTORY_USE_UNIFIED_JOB", False)
+    @patch("mes_dashboard.routes.reject_history_routes._has_cached_df", return_value=False)
+    def test_async_route_workcenter_groups_absent_from_job_params(self, _mock_cache, _mock_rl):
+        """workcenter_groups must NOT appear in job_params (removed from route extraction)."""
+        captured_params = {}
+
+        def _capture_enqueue(mode, params, owner):
+            captured_params.update(params)
+            return ("reject-async-no-wc", None)
+
+        with patch(
+            "mes_dashboard.services.reject_query_job_service.enqueue_reject_query",
+            side_effect=_capture_enqueue,
+        ):
+            response = self.client.post(
+                "/api/reject-history/query",
+                json={
+                    "mode": "date_range",
+                    "start_date": _SHORT_START,
+                    "end_date": _SHORT_END,
+                    "workcenter_groups": ["WB"],
+                    "reasons": [],
+                    "pj_types": [],
+                    "packages": [],
+                    "pj_functions": [],
+                },
+            )
+
+        payload = _parse(response)
+        self.assertEqual(response.status_code, 202)
+        self.assertNotIn("workcenter_groups", captured_params)
+        self.assertIn("reasons", captured_params)
+
     def test_async_empty_prefilters_cache_key_equivalent_to_omitted(self):
         """Empty prefilter lists produce the same cache key as when fields are absent.
 
