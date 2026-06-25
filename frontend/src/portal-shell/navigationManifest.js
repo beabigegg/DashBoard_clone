@@ -25,8 +25,8 @@ export const drawers = Object.freeze([
   { id: 'history-reports', name: '歷史報表', order: 2, admin_only: false },
   { id: 'query-tools',     name: '查詢工具', order: 3, admin_only: false },
   { id: 'trace-tools',     name: '追溯工具', order: 4, admin_only: false },
-  { id: 'dev-tools',       name: '開發工具', order: 5, admin_only: true  },
-  { id: 'eap-analysis',    name: 'EAP',      order: 6, admin_only: false },
+  { id: 'eap-analysis',    name: 'EAP',      order: 5, admin_only: false },
+  { id: 'dev-tools',       name: '開發工具', order: 6, admin_only: true  },
 ]);
 
 /**

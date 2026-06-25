@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 183
-visible-files: 966
+visible-dirs: 192
+visible-files: 1055
 omitted-dirs: 62
-truncated-dirs: 5
+truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -104,7 +104,7 @@ DashBoard_vite/
 |   |   |-- 1cc56ed5fc92eb40
 |   |   |-- 1fa576bc7d285941
 |   |   |-- 1fcb892092629696
-|   |   \-- ... (319 more entries truncated; cap=50)
+|   |   \-- ... (323 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -232,6 +232,8 @@ DashBoard_vite/
 |   |   |   |-- main.ts
 |   |   |   \-- style.css
 |   |   |-- admin-pages/
+|   |   |   |-- __tests__/
+|   |   |   |   \-- ... (max depth)
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
@@ -646,12 +648,69 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
+|   |   |-- access_20260624_175609.log
+|   |   |-- access_20260624_180538.log
+|   |   |-- access_20260624_195019.log
+|   |   |-- access_20260625_084406.log
+|   |   |-- access_20260625_095630.log
+|   |   |-- access_20260625_153310.log
+|   |   |-- error_20260624_175609.log
+|   |   |-- error_20260624_180538.log
+|   |   |-- error_20260624_195019.log
+|   |   |-- error_20260625_084406.log
+|   |   |-- error_20260625_095630.log
+|   |   |-- error_20260625_153310.log
+|   |   |-- rq_downtime_worker_20260624_175609.log
+|   |   |-- rq_downtime_worker_20260624_180538.log
+|   |   |-- rq_downtime_worker_20260624_195019.log
+|   |   |-- rq_downtime_worker_20260625_084406.log
+|   |   |-- rq_downtime_worker_20260625_095630.log
+|   |   |-- rq_downtime_worker_20260625_153310.log
+|   |   |-- rq_eap_alarm_worker_20260624_175609.log
+|   |   |-- rq_eap_alarm_worker_20260624_180538.log
+|   |   |-- rq_eap_alarm_worker_20260624_195019.log
+|   |   |-- rq_eap_alarm_worker_20260625_084406.log
+|   |   |-- rq_eap_alarm_worker_20260625_095630.log
+|   |   |-- rq_eap_alarm_worker_20260625_153310.log
+|   |   |-- rq_hold_hist_worker_20260624_175609.log
+|   |   |-- rq_hold_hist_worker_20260624_180538.log
+|   |   |-- rq_hold_hist_worker_20260624_195019.log
+|   |   |-- rq_hold_hist_worker_20260625_084406.log
+|   |   |-- rq_hold_hist_worker_20260625_095630.log
+|   |   |-- rq_hold_hist_worker_20260625_153310.log
+|   |   |-- rq_msd_worker_20260624_175609.log
+|   |   |-- rq_msd_worker_20260624_180538.log
+|   |   |-- rq_msd_worker_20260624_195019.log
+|   |   |-- rq_msd_worker_20260625_084406.log
+|   |   |-- rq_msd_worker_20260625_095630.log
+|   |   |-- rq_msd_worker_20260625_153310.log
+|   |   |-- rq_prod_hist_worker_20260624_175609.log
+|   |   |-- rq_prod_hist_worker_20260624_180538.log
+|   |   |-- rq_prod_hist_worker_20260624_195019.log
+|   |   |-- rq_prod_hist_worker_20260625_084406.log
+|   |   |-- rq_prod_hist_worker_20260625_095630.log
+|   |   |-- rq_prod_hist_worker_20260625_153310.log
+|   |   |-- rq_reject_worker_20260624_175609.log
+|   |   |-- rq_reject_worker_20260624_180538.log
+|   |   |-- rq_reject_worker_20260624_195019.log
+|   |   |-- rq_reject_worker_20260625_084406.log
+|   |   |-- rq_reject_worker_20260625_095630.log
+|   |   |-- rq_reject_worker_20260625_153310.log
+|   |   |-- rq_resource_worker_20260624_175609.log
+|   |   |-- rq_resource_worker_20260624_180538.log
+|   |   \-- ... (28 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- flask_dev.log
 |   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
 |   |-- rq_eap_alarm_worker.log
 |   |-- rq_hold_hist_worker.log
@@ -885,14 +944,11 @@ DashBoard_vite/
 |       |   |   \-- ... (max depth)
 |       |   \-- favicon.svg
 |       |-- templates/
-|       |   |-- admin/
-|       |   |   \-- ... (max depth)
 |       |   |-- _base.html
 |       |   |-- 403.html
 |       |   |-- 404.html
 |       |   |-- 500.html
 |       |   |-- job_query.html
-|       |   |-- portal.html
 |       |   \-- query_tool.html
 |       |-- workers/
 |       |   |-- __init__.py
@@ -1161,10 +1217,50 @@ DashBoard_vite/
 |   |   |-- eap_alarm/
 |   |   \-- test_ns/
 |   |-- query_spool/
-|   |   |-- downtime_analysis/
-|   |   |-- msd-events/
-|   |   |   |-- tmpu3xasnmq.parquet
-|   |   |   \-- tmpyy2u59q9.parquet
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- anomaly_reject_dataset/
+|   |   |   \-- 858f092b53042f96.parquet
+|   |   |-- anomaly_resource_dataset/
+|   |   |   \-- daa76e309ed12ee6.parquet
+|   |   |-- anomaly_yield_dataset/
+|   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- downtime_analysis_base_events/
+|   |   |   |-- 1db298de85f9d1b1.parquet
+|   |   |   |-- 261b71c6b96f81a3.parquet
+|   |   |   |-- 453d7018134ee597.parquet
+|   |   |   |-- 47444fd75771e9ab.parquet
+|   |   |   |-- 4e194f0fcbc59bd2.parquet
+|   |   |   |-- 57898a9bb49b0a9a.parquet
+|   |   |   |-- 84bb4cda27d33f7d.parquet
+|   |   |   |-- 8e43b10612c14164.parquet
+|   |   |   |-- a020d98e4099254a.parquet
+|   |   |   |-- dbf2cd295d6d82ea.parquet
+|   |   |   |-- ebed4a6684299e73.parquet
+|   |   |   \-- fd1ba71c175f442a.parquet
+|   |   |-- downtime_analysis_job_bridge/
+|   |   |   |-- 1db298de85f9d1b1.parquet
+|   |   |   |-- 261b71c6b96f81a3.parquet
+|   |   |   |-- 453d7018134ee597.parquet
+|   |   |   |-- 47444fd75771e9ab.parquet
+|   |   |   |-- 4e194f0fcbc59bd2.parquet
+|   |   |   |-- 57898a9bb49b0a9a.parquet
+|   |   |   |-- 84bb4cda27d33f7d.parquet
+|   |   |   |-- 8e43b10612c14164.parquet
+|   |   |   |-- a020d98e4099254a.parquet
+|   |   |   |-- dbf2cd295d6d82ea.parquet
+|   |   |   |-- ebed4a6684299e73.parquet
+|   |   |   \-- fd1ba71c175f442a.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- 60e0f8f9445a85de.parquet
+|   |   |-- reject_dataset/
+|   |   |   \-- 54ce388a318d846a.parquet
+|   |   |-- resource_dataset/
+|   |   |   \-- d0e298bc5ebbfcfd.parquet
+|   |   |-- resource_oee/
+|   |   |   \-- db6da8a8b2921de7.parquet
+|   |   |-- yield_alert_dataset/
+|   |   |   \-- 192edd7de18c3eaa.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
 |   |   |-- probe_1038537.json
@@ -1204,20 +1300,23 @@ DashBoard_vite/
 |   |   |-- probe_1055122.json
 |   |   |-- probe_1056521.json
 |   |   |-- probe_1060804.json
-|   |   |-- probe_1064516.json
-|   |   |-- probe_1066070.json
-|   |   |-- probe_1067981.json
-|   |   |-- probe_10707.json
-|   |   |-- probe_10745.json
-|   |   |-- probe_10829.json
-|   |   |-- probe_10884.json
-|   |   |-- probe_1100761.json
-|   |   |-- probe_1104818.json
-|   |   \-- ... (688 more entries truncated; cap=50)
+|   |   \-- ... (743 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
+|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   |-- mes_dashboard_restart.flag
-|   \-- resource_history.duckdb
+|   |-- resource_history.duckdb
+|   |-- rq_downtime_worker.pid
+|   |-- rq_eap_alarm_worker.pid
+|   |-- rq_hold_hist_worker.pid
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_query_tool_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_resource_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_warmup_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
 |-- tools/
 |   |-- generate_documentation.py
 |   |-- query_table_schema.py

@@ -1,6 +1,6 @@
-# generated: 2026-06-24T23:35:32Z by cdd-kit 3.4.0
-# files: 955, src-lines: 286980, map-lines: 20909, compression: 13.7x
-# sources-digest: 2a0b037fbc5b09bdd58637f022f928aab9febfc5f3fea682e406c5b29787a0c7
+# generated: 2026-06-25T07:36:48Z by cdd-kit 3.5.0
+# files: 955, src-lines: 287021, map-lines: 20910, compression: 13.7x
+# sources-digest: 71be59f0b83277d36c5ad17ee420533a0abe86758af88dcc3b673baa21a7e11f
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -283,7 +283,7 @@ frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
   functions:
     - { name: mountWorker, lines: 86-90 }
 
-frontend/src/admin-pages/App.vue:  # 131 lines
+frontend/src/admin-pages/App.vue:  # 139 lines
 
 frontend/src/admin-pages/__tests__/App.test.ts:  # 47 lines
   imports:
@@ -853,7 +853,7 @@ frontend/src/downtime-analysis/composables/useBigCategory.ts:  # 100 lines
     - { name: getBigCategory, lines: 49-74 }
     - { name: useBigCategory, lines: 94-100 }
 
-frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 701 lines
+frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 709 lines
   imports:
     - { module: vue, items: [ref, reactive], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost], line: 2 }
@@ -863,13 +863,13 @@ frontend/src/downtime-analysis/composables/useDowntimeData.ts:  # 701 lines
   constants:
     - { name: API_TIMEOUT, line: 17 }
   functions:
-    - { name: useDowntimeData, lines: 58-701 }
+    - { name: useDowntimeData, lines: 58-709 }
   interfaces:
     - { name: DowntimeAsyncJobProgress, lines: 20-27 }
     - { name: SummaryData, lines: 29-34 }  # local
     - { name: EventDetailData, lines: 36-39 }  # local
 
-frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1105 lines
+frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1111 lines
   imports:
     - { module: vue, items: [ref, readonly], line: 27 }
     - { module: '../../core/duckdb-client', items: [getDuckDBClient, fetchParquetBuffer], line: 28 }
@@ -888,7 +888,7 @@ frontend/src/downtime-analysis/composables/useDowntimeDuckDB.ts:  # 1105 lines
     - { name: interpolateParams, lines: 537-546 }
     - { name: rowsToCsv, lines: 550-564 }
     - { name: downloadCsv, lines: 566-577 }
-    - { name: useDowntimeDuckDB, lines: 581-1105 }
+    - { name: useDowntimeDuckDB, lines: 581-1111 }
   interfaces:
     - { name: TaxonomyShape, lines: 33-38 }
     - { name: DowntimeFilters, lines: 40-45 }
@@ -5289,7 +5289,7 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 614 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 610 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: os, items: [], line: 19 }
@@ -5307,13 +5307,13 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 614 lines
     - { name: _csv_param, lines: 112-117 }
     - { name: api_downtime_meta, lines: 126-140 }  # @downtime_analysis_bp.route('/meta', methods=['GET'])
     - { name: api_downtime_options, lines: 149-183 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 192-383 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 392-425 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 434-478 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 487-527 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 536-561 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 570-595 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 603-614 }
+    - { name: api_downtime_query, lines: 192-379 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 388-421 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 430-474 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 483-523 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 532-557 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 566-591 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 599-610 }
 
 src/mes_dashboard/routes/eap_alarm_routes.py:  # 399 lines
   imports:
@@ -5744,7 +5744,7 @@ src/mes_dashboard/routes/resource_routes.py:  # 480 lines
     - { name: api_resource_status_summary, lines: 395-436 }  # @resource_bp.route('/status/summary')
     - { name: api_resource_status_matrix, lines: 441-480 }  # @resource_bp.route('/status/matrix')
 
-src/mes_dashboard/routes/spool_routes.py:  # 111 lines
+src/mes_dashboard/routes/spool_routes.py:  # 121 lines
   imports:
     - { module: os, items: [], line: 8 }
     - { module: re, items: [], line: 9 }
@@ -5753,7 +5753,7 @@ src/mes_dashboard/routes/spool_routes.py:  # 111 lines
     - { module: mes_dashboard.core.query_spool_store, items: [get_spool_file_path], line: 14 }
     - { module: mes_dashboard.core.response, items: [validation_error], line: 15 }
   functions:
-    - { name: download_spool_parquet, lines: 36-111 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
+    - { name: download_spool_parquet, lines: 36-121 }  # @spool_bp.route('/<namespace>/<query_id>.parquet', methods=['GET'])
 
 src/mes_dashboard/routes/trace_routes.py:  # 1096 lines
   imports:
@@ -6362,7 +6362,7 @@ src/mes_dashboard/services/downtime_analysis_duckdb_cache.py:  # 384 lines
     - { name: run_prewarm_job, lines: 351-373 }
     - { name: start_duckdb_prewarm, lines: 376-384 }
 
-src/mes_dashboard/services/downtime_analysis_service.py:  # 1863 lines
+src/mes_dashboard/services/downtime_analysis_service.py:  # 1868 lines
   imports:
     - { module: __future__, items: [annotations], line: 13 }
     - { module: hashlib, items: [], line: 15 }
@@ -6397,15 +6397,15 @@ src/mes_dashboard/services/downtime_analysis_service.py:  # 1863 lines
     - { name: _empty_events_df, lines: 1408-1415 }
     - { name: _build_response, lines: 1422-1435 }
     - { name: _build_summary, lines: 1438-1464 }
-    - { name: _build_daily_trend, lines: 1467-1488 }
-    - { name: _build_big_category, lines: 1491-1510 }
-    - { name: _build_top_reasons, lines: 1513-1542 }
-    - { name: apply_view, lines: 1549-1606 }
-    - { name: _build_equipment_detail_page, lines: 1609-1634 }
-    - { name: _build_equipment_detail, lines: 1637-1680 }
-    - { name: _build_event_detail_page, lines: 1683-1750 }
-    - { name: export_equipment_detail_csv, lines: 1758-1801 }
-    - { name: export_event_detail_csv, lines: 1804-1863 }
+    - { name: _build_daily_trend, lines: 1467-1493 }
+    - { name: _build_big_category, lines: 1496-1515 }
+    - { name: _build_top_reasons, lines: 1518-1547 }
+    - { name: apply_view, lines: 1554-1611 }
+    - { name: _build_equipment_detail_page, lines: 1614-1639 }
+    - { name: _build_equipment_detail, lines: 1642-1685 }
+    - { name: _build_event_detail_page, lines: 1688-1755 }
+    - { name: export_equipment_detail_csv, lines: 1763-1806 }
+    - { name: export_event_detail_csv, lines: 1809-1868 }
 
 src/mes_dashboard/services/downtime_query_job_service.py:  # 138 lines
   imports:
@@ -14020,7 +14020,7 @@ tests/test_downtime_analysis_duckdb_cache.py:  # 186 lines
         - { name: test_loaded_at_yesterday_triggers_fresh_load, lines: 168-178 }
         - { name: test_run_prewarm_job_exists_as_module_callable, lines: 180-186 }
 
-tests/test_downtime_analysis_routes.py:  # 855 lines
+tests/test_downtime_analysis_routes.py:  # 863 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: json, items: [], line: 12 }
@@ -14044,103 +14044,104 @@ tests/test_downtime_analysis_routes.py:  # 855 lines
         - { name: test_invalid_date_format_returns_400, lines: 149-152 }
         - { name: test_reversed_dates_returns_400, lines: 154-157 }
     - name: TestBigCategoryRoute
-      lines: 165-202
+      lines: 165-210
       methods:
         - { name: test_query_id_forwarded, lines: 169-172 }
         - { name: test_granularity_day_forwarded, lines: 175-178 }
-        - { name: test_granularity_week_returns_400, lines: 180-182 }
-        - { name: test_granularity_month_returns_400, lines: 184-186 }
-        - { name: test_top_n_forwarded, lines: 189-192 }
-        - { name: test_expired_spool_returns_410, lines: 195-198 }
-        - { name: test_missing_query_id_returns_400, lines: 200-202 }
+        - { name: test_granularity_week_forwarded, lines: 181-184 }
+        - { name: test_granularity_month_forwarded, lines: 187-190 }
+        - { name: test_granularity_invalid_returns_400, lines: 192-194 }
+        - { name: test_top_n_forwarded, lines: 197-200 }
+        - { name: test_expired_spool_returns_410, lines: 203-206 }
+        - { name: test_missing_query_id_returns_400, lines: 208-210 }
     - name: TestTopReasonsRoute
-      lines: 210-223
+      lines: 218-231
       methods:
-        - { name: test_top_n_default_is_10, lines: 214-217 }
-        - { name: test_top_n_custom_forwarded, lines: 220-223 }
+        - { name: test_top_n_default_is_10, lines: 222-225 }
+        - { name: test_top_n_custom_forwarded, lines: 228-231 }
     - name: TestEquipmentDetailRoute
-      lines: 231-257
+      lines: 239-265
       methods:
-        - { name: test_query_id_forwarded, lines: 236-239 }
-        - { name: test_view_name_is_equipment_detail, lines: 243-246 }
-        - { name: test_expired_returns_410, lines: 250-253 }
-        - { name: test_missing_query_id_returns_400, lines: 255-257 }
+        - { name: test_query_id_forwarded, lines: 244-247 }
+        - { name: test_view_name_is_equipment_detail, lines: 251-254 }
+        - { name: test_expired_returns_410, lines: 258-261 }
+        - { name: test_missing_query_id_returns_400, lines: 263-265 }
     - name: TestEventDetailRoute
-      lines: 265-313
+      lines: 273-321
       methods:
-        - { name: test_query_id_forwarded, lines: 270-273 }
-        - { name: test_page_forwarded, lines: 277-280 }
-        - { name: test_page_size_forwarded, lines: 284-287 }
-        - { name: test_view_name_is_event_detail, lines: 291-294 }
-        - { name: test_expired_returns_410, lines: 298-301 }
-        - { name: test_missing_query_id_returns_400, lines: 303-305 }
-        - { name: test_page_size_capped_at_200, lines: 309-313 }
+        - { name: test_query_id_forwarded, lines: 278-281 }
+        - { name: test_page_forwarded, lines: 285-288 }
+        - { name: test_page_size_forwarded, lines: 292-295 }
+        - { name: test_view_name_is_event_detail, lines: 299-302 }
+        - { name: test_expired_returns_410, lines: 306-309 }
+        - { name: test_missing_query_id_returns_400, lines: 311-313 }
+        - { name: test_page_size_capped_at_200, lines: 317-321 }
     - name: TestEquipmentDetailFilterRoute
-      lines: 326-374
+      lines: 334-382
       methods:
-        - { name: test_big_category_forwarded, lines: 331-336 }
-        - { name: test_status_types_csv_forwarded, lines: 340-345 }
-        - { name: test_resource_id_forwarded, lines: 349-354 }
-        - { name: test_omit_filter_params_calls_service_without_filter_kwargs, lines: 358-365 }
-        - { name: test_page_size_cap_raised_to_1000, lines: 369-374 }
+        - { name: test_big_category_forwarded, lines: 339-344 }
+        - { name: test_status_types_csv_forwarded, lines: 348-353 }
+        - { name: test_resource_id_forwarded, lines: 357-362 }
+        - { name: test_omit_filter_params_calls_service_without_filter_kwargs, lines: 366-373 }
+        - { name: test_page_size_cap_raised_to_1000, lines: 377-382 }
     - name: TestEventDetailFilterRoute
-      lines: 382-410
+      lines: 390-418
       methods:
-        - { name: test_big_category_forwarded, lines: 387-392 }
-        - { name: test_status_types_csv_forwarded, lines: 396-401 }
-        - { name: test_resource_id_forwarded, lines: 405-410 }
+        - { name: test_big_category_forwarded, lines: 395-400 }
+        - { name: test_status_types_csv_forwarded, lines: 404-409 }
+        - { name: test_resource_id_forwarded, lines: 413-418 }
     - name: TestFilterDataBoundary
-      lines: 418-477
+      lines: 426-485
       methods:
-        - { name: test_equipment_detail_empty_big_category_returns_200, lines: 423-430 }
-        - { name: test_equipment_detail_invalid_status_types_returns_200, lines: 434-441 }
-        - { name: test_event_detail_missing_resource_id_returns_200, lines: 445-451 }
-        - { name: test_equipment_detail_response_has_equipment_detail_key, lines: 455-464 }
-        - { name: test_event_detail_response_has_events_key, lines: 468-477 }
+        - { name: test_equipment_detail_empty_big_category_returns_200, lines: 431-438 }
+        - { name: test_equipment_detail_invalid_status_types_returns_200, lines: 442-449 }
+        - { name: test_event_detail_missing_resource_id_returns_200, lines: 453-459 }
+        - { name: test_equipment_detail_response_has_equipment_detail_key, lines: 463-472 }
+        - { name: test_event_detail_response_has_events_key, lines: 476-485 }
     - name: TestQueryRoute
-      lines: 500-653
+      lines: 508-661
       methods:
-        - { name: test_response_shape_has_all_four_keys, lines: 508-524 }
-        - { name: test_base_spool_url_non_null, lines: 527-535 }
-        - { name: test_jobs_spool_url_non_null, lines: 538-546 }
-        - { name: test_query_id_non_null, lines: 549-557 }
-        - { name: test_taxonomy_non_null, lines: 560-568 }
-        - { name: test_legacy_keys_absent_when_flag_on, lines: 571-582 }
-        - { name: test_feature_flag_off_returns_legacy_shape, lines: 587-598 }
-        - { name: test_range_over_90_days_returns_200_not_400, lines: 600-610 }
-        - { name: test_range_over_730_days_still_returns_400, lines: 612-616 }
-        - { name: test_start_date_forwarded_flag_on, lines: 621-629 }
-        - { name: test_workcenter_groups_forwarded_flag_on, lines: 632-641 }
-        - { name: test_resource_ids_forwarded_flag_on, lines: 644-653 }
+        - { name: test_response_shape_has_all_four_keys, lines: 516-532 }
+        - { name: test_base_spool_url_non_null, lines: 535-543 }
+        - { name: test_jobs_spool_url_non_null, lines: 546-554 }
+        - { name: test_query_id_non_null, lines: 557-565 }
+        - { name: test_taxonomy_non_null, lines: 568-576 }
+        - { name: test_legacy_keys_absent_when_flag_on, lines: 579-590 }
+        - { name: test_feature_flag_off_returns_legacy_shape, lines: 595-606 }
+        - { name: test_range_over_90_days_returns_200_not_400, lines: 608-618 }
+        - { name: test_range_over_730_days_still_returns_400, lines: 620-624 }
+        - { name: test_start_date_forwarded_flag_on, lines: 629-637 }
+        - { name: test_workcenter_groups_forwarded_flag_on, lines: 640-649 }
+        - { name: test_resource_ids_forwarded_flag_on, lines: 652-661 }
     - name: TestQueryRouteContract
-      lines: 656-678
+      lines: 664-686
       methods:
-        - { name: test_response_shape_conforms_to_api_contract_v1_15, lines: 660-678 }
+        - { name: test_response_shape_conforms_to_api_contract_v1_15, lines: 668-686 }
     - name: TestMaxOracleDaysRemoved
-      lines: 686-713
+      lines: 694-721
       methods:
-        - { name: test_max_oracle_days_constant_absent, lines: 689-694 }
-        - { name: test_validate_dates_accepts_180_days, lines: 696-700 }
-        - { name: test_validate_dates_accepts_91_days_oracle_path, lines: 702-706 }
-        - { name: test_duckdb_window_days_constant_absent, lines: 708-713 }
+        - { name: test_max_oracle_days_constant_absent, lines: 697-702 }
+        - { name: test_validate_dates_accepts_180_days, lines: 704-708 }
+        - { name: test_validate_dates_accepts_91_days_oracle_path, lines: 710-714 }
+        - { name: test_duckdb_window_days_constant_absent, lines: 716-721 }
     - name: TestDowntimeAsyncQuery
-      lines: 721-823
+      lines: 729-831
       methods:
-        - { name: test_long_range_returns_202, lines: 727-748 }
-        - { name: test_short_range_returns_200, lines: 750-767 }
-        - { name: test_flag_disabled_returns_200, lines: 769-783 }
-        - { name: test_worker_unavailable_falls_back_to_200, lines: 785-801 }
-        - { name: test_status_url_contains_prefix_downtime, lines: 803-823 }
+        - { name: test_long_range_returns_202, lines: 735-756 }
+        - { name: test_short_range_returns_200, lines: 758-775 }
+        - { name: test_flag_disabled_returns_200, lines: 777-791 }
+        - { name: test_worker_unavailable_falls_back_to_200, lines: 793-809 }
+        - { name: test_status_url_contains_prefix_downtime, lines: 811-831 }
     - name: TestDowntimeJobDispatch
-      lines: 831-855
+      lines: 839-863
       methods:
-        - { name: test_job_type_registered, lines: 834-855 }
+        - { name: test_job_type_registered, lines: 842-863 }
   functions:
     - { name: app, lines: 22-26 }  # @pytest.fixture
     - { name: client, lines: 30-31 }  # @pytest.fixture
     - { name: _mock_query_result, lines: 34-44 }
     - { name: _mock_view_result, lines: 47-56 }
-    - { name: _mock_raw_result, lines: 485-497 }
+    - { name: _mock_raw_result, lines: 493-505 }
 
 tests/test_downtime_analysis_service.py:  # 1966 lines
   imports:
