@@ -1,1 +1,0 @@
-cd /home/egg/Project/DashBoard_vite/frontend && npm run test -- --reporter=verbose --run tests/validation/useRejectHistory.validation.test.js 2>&1 | tail -10

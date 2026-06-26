@@ -1,1 +1,0 @@
-conda run -n mes-dashboard pytest tests/contract/ -v -k reject

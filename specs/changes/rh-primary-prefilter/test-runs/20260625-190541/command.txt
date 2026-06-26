@@ -1,1 +1,0 @@
-conda run -n mes-dashboard pytest tests/test_reject_history_service.py tests/test_reject_history_routes.py tests/test_reject_history_async_routes.py tests/test_reject_dataset_cache.py tests/test_reject_query_job_service.py --collect-only -q
