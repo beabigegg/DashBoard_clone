@@ -186,6 +186,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - New modules using `oracle_arrow_reader` or `base_chunked_duckdb_job`: add stem to `_APPROVED_CALLERS` in `tests/test_query_cost_policy.py` in the same PR; also update `tests/test_job_registry.py` count for new `register_job_type()` calls — see docs/architecture/test-discipline.md
 - `BaseChunkedDuckDBJob` domain migrations: dual-tier parity test required (mock chunk-seam unit + real-path parquet diff on business key); see docs/architecture/test-discipline.md §P2+ Domain Migration
 - `cdd-kit gate --strict` runs only the bounded (changed-area) test ladder; before pushing a behavioral removal or endpoint/data-shape change, `grep` the full test tree for references and run the full pytest suite locally — stale assertions in other files pass the local gate but fail CI's `unit-and-integration-tests` — see docs/cdd-kit-patterns.md
+- Over-limit boundary tests must strictly *exceed* the configured cap (e.g., date range > 365 days for a 365-day limit), not equal it — equal-to-cap passes validation silently and the test asserts the wrong code path — see docs/architecture/test-discipline.md
 
 **CI workflow & GunicornHarness** — see `docs/architecture/ci-workflow.md` for full detail:
 - New Playwright specs: add `npx playwright install --with-deps chromium` step in CI before running tests — see docs/architecture/ci-workflow.md

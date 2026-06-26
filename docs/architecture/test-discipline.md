@@ -164,6 +164,22 @@ def test_async_row_schema_matches_sync_path():
 
 Evidence: `wip-rq-worker-chunks-cleanup` `tests/integration/test_wip_rowcount_rq_routing.py::TestAsyncRowSchemaMatchesSyncPath`; qa-reviewer.yml ac-summary.
 
+## Over-Limit Boundary Tests Must Strictly Exceed the Cap
+
+When testing that a configurable limit (date range, row count, file size) is enforced, the test input must strictly *exceed* the cap — not equal it. An input that equals the cap passes validation (inclusive upper-bound check) and silently routes to the success path, making the test assert the wrong branch without ever failing.
+
+**Pattern:**
+```python
+# BAD — 2025-01-01 to 2025-12-31 is exactly 365 days = cap → passes validation → test hits enqueue path
+start_date, end_date = "2025-01-01", "2025-12-31"
+
+# GOOD — range strictly exceeds 365-day cap → validation fires → assert rejection keyword
+start_date, end_date = "2024-01-01", "2025-03-01"
+assert "天" in response.json["message"]  # or whatever the rejection token is
+```
+
+Evidence: `rh-primary-prefilter` backend-engineer.yml §known-risks #3; commit `6988392b` fixed `test_query_rejects_date_range_over_half_year` reaching the enqueue path instead of the rejection path.
+
 ## Legacy Test Suite — Constant Pin Drift
 
 `tests/legacy/*.test.js` runs as a glob in CI (`node --test tests/legacy/*.test.js`); a stale pin in any file fails the entire suite.
