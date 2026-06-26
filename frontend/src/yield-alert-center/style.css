@@ -487,6 +487,13 @@
   font-size: 12px;
 }
 
+.theme-yield-alert-center .alerts-hint {
+  margin: 0 0 theme('spacing.token.p8') 0;
+  font-size: 11px;
+  color: var(--ya-muted);
+  line-height: 1.5;
+}
+
 .theme-yield-alert-center .btn-export-csv {
   display: inline-flex;
   align-items: center;

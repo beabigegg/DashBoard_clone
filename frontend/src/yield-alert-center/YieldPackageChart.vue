@@ -29,6 +29,10 @@ const sortedRows = computed(() =>
 const chartOption = computed(() => {
   const rows = sortedRows.value;
   const threshold = props.riskThreshold;
+  const yieldVals = rows.map((r) => Number(r.yield_pct ?? 0));
+  const yieldMin = yieldVals.length ? Math.min(...yieldVals) : 0;
+  const rightMin = Math.max(0, Math.floor(Math.min(yieldMin, threshold) - 2));
+  const rightMax = 100;
   const labels = rows.map((r) => r.package || '(NA)');
 
   const barColors = rows.map((r) => {
@@ -75,7 +79,7 @@ const chartOption = computed(() => {
       itemHeight: 10,
       textStyle: { fontSize: 12, color: '#555' },
     },
-    grid: { left: 60, right: 64, top: 44, bottom: 64 },
+    grid: { left: 60, right: 72, top: 52, bottom: 64 },
     xAxis: {
       type: 'category',
       data: labels,
@@ -93,18 +97,14 @@ const chartOption = computed(() => {
     yAxis: [
       {
         type: 'value',
-        name: '報廢量',
-        nameTextStyle: { fontSize: 11, color: '#888' },
         axisLabel: { fontSize: 11, color: '#888' },
         splitLine: { lineStyle: { type: 'dashed', color: '#eee' } },
       },
       {
         type: 'value',
-        name: '良率(%)',
-        nameTextStyle: { fontSize: 11, color: '#888' },
-        min: 0,
-        max: 100,
-        axisLabel: { formatter: '{value}%', fontSize: 11, color: '#888' },
+        min: rightMin,
+        max: rightMax,
+        axisLabel: { formatter: '{value}%', fontSize: 11, color: '#888', margin: 10 },
         splitLine: { show: false },
       },
     ],
@@ -144,7 +144,7 @@ const chartOption = computed(() => {
           silent: true,
           symbol: 'none',
           lineStyle: { type: 'dashed', color: 'rgb(239, 68, 68)', width: 1.5, opacity: 0.7 },
-          label: { formatter: `門檻 ${threshold}%`, fontSize: 10, color: 'rgb(239,68,68)', position: 'end' },
+          label: { formatter: `門檻 ${threshold}%`, fontSize: 10, color: 'rgb(239,68,68)', position: 'insideStartTop' },
           data: [{ yAxis: threshold }],
         },
       },

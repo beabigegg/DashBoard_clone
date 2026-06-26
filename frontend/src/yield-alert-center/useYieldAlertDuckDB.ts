@@ -565,14 +565,18 @@ async function queryAlerts(client: DuckDBClient, { fullWhere, reasonWhere, riskT
   // Sort
   const SORT_COL_MAP: Record<string, string> = {
     date_bucket: 'date_bucket', workorder: 'workorder', reason_code: 'reason_code',
-    package: 'package', type: 'type', scrap_qty: 'scrap_qty',
-    yield_pct: 'yield_pct', risk_score: 'risk_score',
+    department: 'department', source_code: 'source_code',
+    package: 'package', type: 'type', transaction_qty: 'transaction_qty',
+    scrap_qty: 'scrap_qty', yield_pct: 'yield_pct', risk_score: 'risk_score',
   };
   const sortField = SORT_COL_MAP[sortBy] || 'date_bucket';
   const dir = sortDir === 'asc' ? 1 : -1;
   enriched.sort((a, b) => {
     const av = (a as Record<string, unknown>)[sortField];
     const bv = (b as Record<string, unknown>)[sortField];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;   // nulls sort last
+    if (bv == null) return -1;
     if (typeof av === 'number' && typeof bv === 'number') return dir * (av - bv);
     return dir * String(av).localeCompare(String(bv));
   });

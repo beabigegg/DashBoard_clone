@@ -45,6 +45,7 @@ const trendLoading = ref(false);
 const summaryLoading = ref(false);
 const alertLoading = ref(false);
 const paginationLoading = ref(false);
+const isExporting = ref(false);
 
 const errorMessage = ref('');
 const warningMessage = ref('');
@@ -589,7 +590,9 @@ function onSort(field) {
     sortState.sort_by = field;
     sortState.sort_dir = field === 'date_bucket' ? 'desc' : 'asc';
   }
-  void runQuery(1);
+  // Sort only affects alert row order — use runAlertPage to avoid a full-page
+  // overlay and avoid re-fetching summary/trend/heatmap which haven't changed.
+  void runAlertPage(1);
 }
 
 function goToPage(nextPage) {
@@ -615,10 +618,9 @@ function sortIconComponent(field: string) {
   return sortState.sort_dir === 'asc' ? ArrowUp : ArrowDown;
 }
 
-function downloadAlertsCSV() {
-  if (!alerts.value.length) return;
+function _buildAlertsCSV(items) {
   const header = ['\u65e5\u671f', '\u5de5\u55ae', 'LOT', '\u539f\u56e0\u78bc', '\u7ad9\u5225\u7fa4\u7d44', 'Package', 'Type', '\u8f49\u51fa\u6578', '\u5831\u5ee2\u91cf', '\u826f\u7387(%)', '\u98a8\u96aa\u7b49\u7d1a', '\u98a8\u96aa\u5206\u6578'].join(',');
-  const rows = alerts.value.map((r) => [
+  const rows = items.map((r) => [
     r.date_bucket,
     r.workorder,
     r.source_code ?? '',
@@ -632,16 +634,80 @@ function downloadAlertsCSV() {
     r.risk_level ?? '',
     Number(r.risk_score ?? 0).toFixed(2),
   ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','));
-  const csv = [header, ...rows].join('\n');
+  return [header, ...rows].join('\n');
+}
+
+function _triggerCSVDownload(csv: string, filename: string) {
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `\u544a\u8b66\u5019\u9078\u6e05\u55ae_${filters.start_date}_${filters.end_date}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+async function exportAllAlertsCSV() {
+  if (!queryId.value || isExporting.value) return;
+  isExporting.value = true;
+  try {
+    let allItems: unknown[] = [];
+
+    if (duckdbMode.value && duckdb.isActive.value) {
+      // DuckDB path: all records in memory \u2014 get everything in one shot
+      const result = await duckdb.computeView({
+        filters: {
+          departments: parsedFilters.value.workcenter_groups,
+          lines: parsedFilters.value.lines,
+          packages: parsedFilters.value.packages,
+          types: parsedFilters.value.types,
+          functions: parsedFilters.value.functions,
+        },
+        granularity: granularity.value,
+        riskThreshold: Number(parsedFilters.value.risk_threshold) || 98,
+        minScrapQty: Number(parsedFilters.value.min_scrap_qty) || 1,
+        sortBy: sortState.sort_by,
+        sortDir: sortState.sort_dir,
+        page: 1,
+        perPage: 1_000_000,
+      });
+      allItems = result.alerts?.items || [];
+    } else {
+      // Server path: fetch all pages with max per_page (200)
+      const EXPORT_PER_PAGE = 200;
+      const baseParams = {
+        query_id: queryId.value,
+        workcenter_groups: parsedFilters.value.workcenter_groups,
+        lines: parsedFilters.value.lines,
+        packages: parsedFilters.value.packages,
+        types: parsedFilters.value.types,
+        functions: parsedFilters.value.functions,
+        risk_threshold: parsedFilters.value.risk_threshold,
+        min_scrap_qty: parsedFilters.value.min_scrap_qty,
+        granularity: granularity.value,
+        sort_by: sortState.sort_by,
+        sort_dir: sortState.sort_dir,
+        per_page: EXPORT_PER_PAGE,
+      };
+      const first = await apiGet('/api/yield-alert/alerts', { params: { ...baseParams, page: 1 }, timeout: API_TIMEOUT });
+      if (!first.success) throw new Error(first.error || '\u532f\u51fa\u5931\u6557');
+      allItems = [...(first.data?.items || [])];
+      const totalPages = first.data?.pagination?.total_pages || 1;
+      for (let p = 2; p <= totalPages; p++) {
+        const resp = await apiGet('/api/yield-alert/alerts', { params: { ...baseParams, page: p }, timeout: API_TIMEOUT });
+        if (resp.success) allItems.push(...(resp.data?.items || []));
+      }
+    }
+
+    if (!allItems.length) return;
+    _triggerCSVDownload(_buildAlertsCSV(allItems), `\u544a\u8b66\u5019\u9078\u6e05\u55ae_${filters.start_date}_${filters.end_date}.csv`);
+  } catch (_err) {
+    errorMessage.value = '\u532f\u51fa\u5931\u6557\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66';
+  } finally {
+    isExporting.value = false;
+  }
 }
 
 function riskClass(level) {
@@ -666,6 +732,7 @@ async function toggleReasonDetail(row) {
         date_bucket: row.date_bucket,
         reason_code: row.reason_code || '',
         department: row.department || '',
+        source_code: row.source_code || '',
         granularity: granularity.value,
       },
       timeout: API_TIMEOUT,
@@ -996,26 +1063,42 @@ onUnmounted(() => {
         </div>
         <button
           class="ui-btn ui-btn--ghost ui-btn--sm btn-export-csv"
-          :disabled="!hasData"
-          @click="downloadAlertsCSV"
-          title="匯出目前頁面資料為 CSV"
+          :disabled="!hasData || isExporting"
+          @click="exportAllAlertsCSV"
+          :title="isExporting ? '匯出中...' : `匯出全部 ${pagination.total} 筆資料為 CSV`"
         >
-          <Download :size="13" />
-          匯出 CSV
+          <LoadingSpinner v-if="isExporting" size="sm" />
+          <Download v-else :size="13" />
+          {{ isExporting ? '匯出中...' : '匯出全部 CSV' }}
         </button>
       </header>
+      <p class="alerts-hint">風險分數 = 良率缺口（門檻 − 實際良率，%）+ 報廢量權重（每 20 pcs 加 1 分，上限 10 分）；分數越高代表優先處理順序越前</p>
       <div class="ya-table-scroll" :class="{ 'is-loading': paginationLoading }" v-if="hasData" data-testid="alerts-table">
         <table class="ya-table">
           <thead class="ya-table-head">
             <tr>
               <th class="ya-th ya-th--expand"></th>
-              <th class="ya-th">日期</th>
-              <th class="ya-th">工單</th>
-              <th class="ya-th">LOT</th>
-              <th class="ya-th">原因碼</th>
-              <th class="ya-th">站別群組</th>
-              <th class="ya-th">Package</th>
-              <th class="ya-th">Type</th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'date_bucket' }" @click="onSort('date_bucket')">
+                <span class="ya-th-inner">日期 <component :is="sortIconComponent('date_bucket')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'date_bucket' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'workorder' }" @click="onSort('workorder')">
+                <span class="ya-th-inner">工單 <component :is="sortIconComponent('workorder')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'workorder' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'source_code' }" @click="onSort('source_code')">
+                <span class="ya-th-inner">LOT <component :is="sortIconComponent('source_code')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'source_code' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'reason_code' }" @click="onSort('reason_code')">
+                <span class="ya-th-inner">原因碼 <component :is="sortIconComponent('reason_code')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'reason_code' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'department' }" @click="onSort('department')">
+                <span class="ya-th-inner">站別群組 <component :is="sortIconComponent('department')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'department' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'package' }" @click="onSort('package')">
+                <span class="ya-th-inner">Package <component :is="sortIconComponent('package')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'package' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'type' }" @click="onSort('type')">
+                <span class="ya-th-inner">Type <component :is="sortIconComponent('type')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'type' }" /></span>
+              </th>
               <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'transaction_qty' }" @click="onSort('transaction_qty')">
                 <span class="ya-th-inner">轉出數 <component :is="sortIconComponent('transaction_qty')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'transaction_qty' }" /></span>
               </th>

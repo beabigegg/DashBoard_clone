@@ -54,37 +54,59 @@ const chartOption = computed(() => {
   const yMin = Math.max(0, Math.floor(Math.min(dataMin, threshold) - 2));
   const yMax = Math.ceil(Math.max(dataMax, 100) + 1);
 
-  const rotateLabel = items.length > 20 ? 40 : 0;
+  const dense = items.length > 40;
+  const rotateLabel = items.length > 20 ? 35 : 0;
+
+  // Bar color: reflect yield health for each period
+  const barColors = yieldVals.map((yld) => {
+    if (yld < threshold - 3) return 'rgba(239,68,68,0.28)';
+    if (yld < threshold)     return 'rgba(245,158,11,0.32)';
+    return 'rgba(148,163,184,0.38)';
+  });
 
   return {
+    animation: true,
+    animationDuration: 900,
+    animationEasing: 'cubicOut',
+    animationDurationUpdate: 400,
+    animationEasingUpdate: 'cubicInOut',
     legend: {
-      top: 4,
+      top: 6,
       right: 16,
-      itemWidth: 12,
-      itemHeight: 12,
-      textStyle: { fontSize: 11 },
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { fontSize: 11, color: '#6b7280' },
     },
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross', crossStyle: { color: 'rgb(153, 153, 153)' } },
+      axisPointer: { type: 'line', lineStyle: { color: '#6366f1', width: 1, opacity: 0.4, type: 'dashed' } },
+      backgroundColor: 'rgba(255,255,255,0.97)',
+      borderColor: '#e5e7eb',
+      borderWidth: 1,
+      padding: [10, 14],
+      extraCssText: 'box-shadow:0 4px 20px rgba(0,0,0,0.1);border-radius:8px;',
       // TODO: type echarts callback
       formatter(params: unknown) {
         const p = Array.isArray(params) ? params : [];
-        const idx = (p[0] as Record<string, unknown>)?.dataIndex ?? 0;
-        const item = items[Number(idx)] || {};
+        const idx = Number((p[0] as Record<string, unknown>)?.dataIndex ?? 0);
+        const item = items[idx] || {};
+        const yld = Number(item.yield_pct ?? 0);
+        const yldColor = yld < threshold ? '#ef4444' : '#10b981';
         return [
-          `<b>${(p[0] as Record<string, unknown>)?.name ?? ''}</b>`,
-          `良率：<b>${Number(item.yield_pct ?? 0).toFixed(2)}%</b>`,
-          `Input：${Number(item.transaction_qty ?? 0).toLocaleString()} pcs`,
-          `報廢量：${Number(item.scrap_qty ?? 0).toLocaleString()} pcs`,
-        ].join('<br/>');
+          `<div style="font-weight:600;color:#111827;margin-bottom:6px;font-size:12px">${(p[0] as Record<string, unknown>)?.name ?? ''}</div>`,
+          `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:3px"><span style="color:#6b7280">良率</span><b style="color:${yldColor}">${yld.toFixed(2)}%</b></div>`,
+          `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:3px"><span style="color:#6b7280">Input</span><span>${Number(item.transaction_qty ?? 0).toLocaleString()} pcs</span></div>`,
+          `<div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6b7280">報廢</span><span>${Number(item.scrap_qty ?? 0).toLocaleString()} pcs</span></div>`,
+        ].join('');
       },
     },
-    grid: { left: 56, right: 60, top: 36, bottom: rotateLabel > 0 ? 80 : 50 },
+    grid: { left: 60, right: 72, top: 44, bottom: rotateLabel > 0 ? 80 : 52 },
     xAxis: {
       type: 'category',
       data: items.map((i) => i.date_bucket),
-      axisLabel: { fontSize: 11, rotate: rotateLabel },
+      axisLabel: { fontSize: 11, color: '#9ca3af', rotate: rotateLabel },
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      axisTick: { show: false },
       boundaryGap: true,
     },
     yAxis: [
@@ -92,15 +114,21 @@ const chartOption = computed(() => {
         type: 'value',
         min: yMin,
         max: yMax,
-        axisLabel: { formatter: '{value}%', fontSize: 11 },
-        splitLine: { lineStyle: { type: 'dashed', color: 'rgb(229, 231, 235)' } },
+        axisLabel: { formatter: '{value}%', fontSize: 11, color: '#9ca3af' },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
       },
       {
         type: 'value',
         axisLabel: {
           fontSize: 11,
-          formatter: (v: number) => v >= 10000 ? `${(v / 1000).toFixed(0)}k` : String(v),
+          color: '#9ca3af',
+          formatter: (v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
+          margin: 10,
         },
+        axisLine: { show: false },
+        axisTick: { show: false },
         splitLine: { show: false },
       },
     ],
@@ -109,32 +137,66 @@ const chartOption = computed(() => {
         name: 'Input',
         type: 'bar',
         yAxisIndex: 1,
-        barMaxWidth: 18,
-        itemStyle: { color: 'rgba(148, 163, 184, 0.55)' },
+        barMaxWidth: 22,
+        barMinWidth: 4,
+        itemStyle: {
+          color: (params: unknown) => barColors[(params as Record<string, unknown>).dataIndex as number] ?? 'rgba(148,163,184,0.38)',
+          borderRadius: [2, 2, 0, 0],
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 8,
+            shadowColor: 'rgba(0,0,0,0.18)',
+          },
+        },
         data: inputVals,
       },
       {
         name: '良率%',
         type: 'line',
         yAxisIndex: 0,
-        smooth: true,
-        symbolSize: 5,
+        smooth: 0.3,
+        symbolSize: dense ? 4 : 7,
         symbol: 'circle',
+        showSymbol: !dense,
         z: 3,
-        areaStyle: { opacity: 0.12, color: 'rgb(37, 99, 235)' },
-        lineStyle: { width: 2, color: 'rgb(37, 99, 235)' },
-        itemStyle: { color: 'rgb(37, 99, 235)' },
+        lineStyle: { width: 2.5, color: '#6366f1' },
+        itemStyle: { color: '#6366f1', borderColor: '#fff', borderWidth: 2 },
+        emphasis: {
+          disabled: false,
+          scale: true,
+          focus: 'series',
+          itemStyle: {
+            symbolSize: dense ? 8 : 11,
+            shadowBlur: 12,
+            shadowColor: 'rgba(99,102,241,0.55)',
+            borderWidth: 2.5,
+            borderColor: '#fff',
+          },
+        },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(99,102,241,0.22)' },
+              { offset: 1, color: 'rgba(99,102,241,0)' },
+            ],
+          },
+        },
         data: yieldVals,
         markLine: {
           silent: true,
           symbol: 'none',
           data: [{ yAxis: threshold }],
-          lineStyle: { color: 'rgb(239, 68, 68)', type: 'dashed', width: 1.5 },
+          lineStyle: { color: '#ef4444', type: 'dashed', width: 1.5, opacity: 0.65 },
           label: {
             formatter: `門檻 ${threshold}%`,
-            color: 'rgb(239, 68, 68)',
+            color: '#ef4444',
             fontSize: 11,
-            position: 'end',
+            position: 'insideStartTop',
+            backgroundColor: 'rgba(254,242,242,0.9)',
+            borderRadius: 3,
+            padding: [2, 6],
           },
         },
       },

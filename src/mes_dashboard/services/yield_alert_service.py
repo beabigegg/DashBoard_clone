@@ -35,6 +35,8 @@ VALID_SORT_FIELDS = {
     "date_bucket": "date_bucket",
     "workorder": "workorder",
     "reason_code": "reason_code",
+    "department": "department",
+    "source_code": "source_code",
     "package": "package",
     "type": "type",
     "transaction_qty": "transaction_qty",
@@ -42,6 +44,8 @@ VALID_SORT_FIELDS = {
     "yield_pct": "yield_pct",
     "risk_score": "risk_score",
 }
+
+_NUMERIC_SORT_FIELDS = {"transaction_qty", "scrap_qty", "yield_pct", "risk_score"}
 
 _DETAIL_FILTER_COLUMNS = {
     "departments": "NVL(TRIM(d.DEPARTMENT_NAME), '(NA)')",
@@ -755,7 +759,17 @@ def query_alert_candidates(
             unmatched_qty += item["scrap_qty"]
 
     reverse = normalized_sort_dir == "desc"
-    rows.sort(key=lambda item: item.get(normalized_sort_by), reverse=reverse)
+    _is_numeric = normalized_sort_by in _NUMERIC_SORT_FIELDS
+
+    def _sort_key(item):
+        val = item.get(normalized_sort_by)
+        if val is None:
+            return (1, 0.0, "")
+        if _is_numeric:
+            return (0, float(val), "")
+        return (0, 0.0, str(val))
+
+    rows.sort(key=_sort_key, reverse=reverse)
 
     total = len(rows)
     total_pages = max(1, int(math.ceil(total / normalized_per_page)))
@@ -849,13 +863,14 @@ def _bucket_to_date_range(date_bucket: str, granularity: str) -> tuple[str, str]
     return date_bucket, date_bucket
 
 
-def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = "", department: str = "", granularity: str = "day") -> list[dict]:
+def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = "", department: str = "", source_code: str = "", granularity: str = "day") -> list[dict]:
     if not workorder or not date_bucket:
         return []
 
     start_date, end_date = _bucket_to_date_range(date_bucket, granularity)
     norm_reason = reason_code.strip().upper() if reason_code and reason_code.strip() else None
     norm_dept   = department.strip() if department and department.strip() else None
+    norm_source = source_code.strip() if source_code and source_code.strip() else None
 
     sql = SQLLoader.load("yield_alert/reason_detail")
     params: dict = {
@@ -881,6 +896,9 @@ def query_reason_detail(*, workorder: str, date_bucket: str, reason_code: str = 
         wc_name = str(row.get("WORKCENTERNAME") or "")
         py_group = _normalize_yield_department_group(wc_name)
         if norm_dept and py_group != norm_dept:
+            continue
+        containername = str(row.get("CONTAINERNAME") or row.get("CONTAINERID") or "").strip()
+        if norm_source and containername != norm_source:
             continue
         txn_time = row.get("TXN_TIME")
         if hasattr(txn_time, "strftime"):

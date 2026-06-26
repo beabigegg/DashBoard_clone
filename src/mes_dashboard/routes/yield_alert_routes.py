@@ -578,13 +578,14 @@ def api_yield_alert_reason_detail():
     date_bucket = str(request.args.get("date_bucket", "")).strip()
     reason_code = str(request.args.get("reason_code", "")).strip()
     department = str(request.args.get("department", "")).strip()
+    source_code = str(request.args.get("source_code", "")).strip()
     granularity = str(request.args.get("granularity", "day") or "day").strip().lower()
 
     if not workorder or not date_bucket:
         return validation_error("缺少必要參數: workorder, date_bucket")
 
     try:
-        items = query_reason_detail(workorder=workorder, date_bucket=date_bucket, reason_code=reason_code, department=department, granularity=granularity)
+        items = query_reason_detail(workorder=workorder, date_bucket=date_bucket, reason_code=reason_code, department=department, source_code=source_code, granularity=granularity)
         return success_response({
             "items": items,
             "workorder": workorder,
