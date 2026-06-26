@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { Download } from 'lucide-vue-next';
 import { BarChart, LineChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
 import { use } from 'echarts/core';
@@ -18,6 +19,29 @@ const props = defineProps({
 });
 
 const hasData = computed(() => props.trend.length > 0);
+
+function downloadCSV() {
+  const items = props.trend || [];
+  if (!items.length) return;
+  const granLabel = props.granularity || 'day';
+  const header = ['日期', '移轉量', '報廢量', '良率(%)'].join(',');
+  const rows = items.map((r) => [
+    r.date_bucket,
+    Number(r.transaction_qty ?? 0),
+    Number(r.scrap_qty ?? 0),
+    Number(r.yield_pct ?? 0).toFixed(4),
+  ].join(','));
+  const csv = ['﻿', header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `良率趨勢_${granLabel}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const chartOption = computed(() => {
   const items = props.trend || [];
@@ -121,9 +145,20 @@ const chartOption = computed(() => {
 
 <template>
   <article class="chart-card">
-    <h3 class="chart-title">
-      良率趨勢 ({{ GRANULARITY_LABEL[granularity] ?? granularity }})
-    </h3>
+    <div class="trend-title-row">
+      <h3 class="chart-title chart-title--inline">
+        良率趨勢 ({{ GRANULARITY_LABEL[granularity] ?? granularity }})
+      </h3>
+      <button
+        class="trend-download-btn"
+        :disabled="!hasData"
+        @click="downloadCSV"
+        title="下載聚合資料 CSV"
+      >
+        <Download :size="13" />
+        下載資料
+      </button>
+    </div>
     <div v-if="hasData" class="chart-body" role="img" aria-label="良率趨勢圖">
       <VChart :option="chartOption" :autoresize="{ throttle: 100 }" />
     </div>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
+import { ArrowDown, ArrowUp, ArrowUpDown, Download } from 'lucide-vue-next';
+
 import { apiGet, apiPost } from '../core/api';
 import { pollJobUntilComplete } from '../shared-composables/useAsyncJobPolling';
 import { useYieldAlertDuckDB } from './useYieldAlertDuckDB';
@@ -608,6 +610,40 @@ function sortIcon(field) {
   return sortState.sort_dir === 'asc' ? ' \u2191' : ' \u2193';
 }
 
+function sortIconComponent(field: string) {
+  if (sortState.sort_by !== field) return ArrowUpDown;
+  return sortState.sort_dir === 'asc' ? ArrowUp : ArrowDown;
+}
+
+function downloadAlertsCSV() {
+  if (!alerts.value.length) return;
+  const header = ['\u65e5\u671f', '\u5de5\u55ae', 'LOT', '\u539f\u56e0\u78bc', '\u7ad9\u5225\u7fa4\u7d44', 'Package', 'Type', '\u8f49\u51fa\u6578', '\u5831\u5ee2\u91cf', '\u826f\u7387(%)', '\u98a8\u96aa\u7b49\u7d1a', '\u98a8\u96aa\u5206\u6578'].join(',');
+  const rows = alerts.value.map((r) => [
+    r.date_bucket,
+    r.workorder,
+    r.source_code ?? '',
+    r.reason_code ?? '',
+    r.department ?? '',
+    r.package ?? '',
+    r.type ?? '',
+    Number(r.transaction_qty ?? 0),
+    Number(r.scrap_qty ?? 0),
+    Number(r.yield_pct ?? 0).toFixed(4),
+    r.risk_level ?? '',
+    Number(r.risk_score ?? 0).toFixed(2),
+  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `\u544a\u8b66\u5019\u9078\u6e05\u55ae_${filters.start_date}_${filters.end_date}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function riskClass(level) {
   if (level === 'high') return 'risk-high';
   if (level === 'medium') return 'risk-medium';
@@ -768,8 +804,8 @@ onUnmounted(() => {
   <div class="dashboard theme-yield-alert-center" data-testid="yield-alert-app">
     <section class="filter-panel primary-query-panel">
       <header class="panel-header">
-        <h2>第一階段：日期主查詢</h2>
-        <span>{{ queryId ? `已建立快取: ${queryId}` : '尚未查詢' }}</span>
+        <h2>日期查詢</h2>
+        <span v-if="queryId" class="query-status-badge">資料已載入</span>
       </header>
       <div class="filter-row two">
         <label>
@@ -825,8 +861,7 @@ onUnmounted(() => {
 
     <section class="filter-panel supplementary-query-panel">
       <header class="panel-header">
-        <h2>第二階段：補充篩選 (快取內計算)</h2>
-        <span>不重新查 Oracle</span>
+        <h2>快取內計算</h2>
       </header>
       <template v-if="queryId">
         <!-- Dimension selects -->
@@ -890,7 +925,7 @@ onUnmounted(() => {
             <input v-model="filters.min_scrap_qty" class="text-input ctrl-input" type="number" step="0.1" min="0" data-testid="min-scrap-qty-input" />
           </label>
           <div class="ctrl-item">
-            <span class="ctrl-label">時間聚合</span>
+            <span class="ctrl-label">時間粒度</span>
             <div class="granularity-toggle" data-testid="granularity-select">
               <button
                 v-for="opt in GRANULARITY_OPTIONS"
@@ -932,19 +967,12 @@ onUnmounted(() => {
     </section>
 
     <div v-if="hasQueried" class="chart-grid">
-      <section class="trend-panel" data-testid="trend-chart">
+      <section class="trend-panel chart-grid-full" data-testid="trend-chart">
         <LoadingSpinner v-if="trendLoading" size="sm" />
         <YieldTrendChart
           :trend="trend"
           :risk-threshold="Number(filters.risk_threshold || 98)"
           :granularity="granularity"
-        />
-      </section>
-
-      <section v-if="stationSummary.length > 0" class="station-summary-panel">
-        <YieldStationChart
-          :station-summary="stationSummary"
-          :risk-threshold="Number(filters.risk_threshold || 98)"
         />
       </section>
 
@@ -961,58 +989,80 @@ onUnmounted(() => {
     </div>
 
     <section class="alerts-panel">
-      <header>
-        <h2>告警候選清單</h2>
-        <span>{{ pagination.total }} 筆</span>
+      <header class="alerts-header">
+        <div class="alerts-header-left">
+          <h2>告警候選清單</h2>
+          <span class="alerts-count">{{ pagination.total }} 筆</span>
+        </div>
+        <button
+          class="ui-btn ui-btn--ghost ui-btn--sm btn-export-csv"
+          :disabled="!hasData"
+          @click="downloadAlertsCSV"
+          title="匯出目前頁面資料為 CSV"
+        >
+          <Download :size="13" />
+          匯出 CSV
+        </button>
       </header>
-      <div class="table-wrap ui-table-wrap" :class="{ 'is-loading': paginationLoading }" v-if="hasData" data-testid="alerts-table">
-        <table class="alert-table">
-          <thead>
+      <div class="ya-table-scroll" :class="{ 'is-loading': paginationLoading }" v-if="hasData" data-testid="alerts-table">
+        <table class="ya-table">
+          <thead class="ya-table-head">
             <tr>
-              <th>日期</th>
-              <th>工單</th>
-              <th>LOT</th>
-              <th>原因碼</th>
-              <th>站別群組</th>
-              <th>Package</th>
-              <th>Type</th>
-              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'transaction_qty' }" @click="onSort('transaction_qty')">轉出數{{ sortIcon('transaction_qty') }}</button></th>
-              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'scrap_qty' }" @click="onSort('scrap_qty')">報廢量{{ sortIcon('scrap_qty') }}</button></th>
-              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'yield_pct' }" @click="onSort('yield_pct')">良率(%){{ sortIcon('yield_pct') }}</button></th>
-              <th><button class="th-btn" :class="{ active: sortState.sort_by === 'risk_score' }" @click="onSort('risk_score')">風險分數{{ sortIcon('risk_score') }}</button></th>
-              <th>操作</th>
+              <th class="ya-th ya-th--expand"></th>
+              <th class="ya-th">日期</th>
+              <th class="ya-th">工單</th>
+              <th class="ya-th">LOT</th>
+              <th class="ya-th">原因碼</th>
+              <th class="ya-th">站別群組</th>
+              <th class="ya-th">Package</th>
+              <th class="ya-th">Type</th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'transaction_qty' }" @click="onSort('transaction_qty')">
+                <span class="ya-th-inner">轉出數 <component :is="sortIconComponent('transaction_qty')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'transaction_qty' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'scrap_qty' }" @click="onSort('scrap_qty')">
+                <span class="ya-th-inner">報廢量 <component :is="sortIconComponent('scrap_qty')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'scrap_qty' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'yield_pct' }" @click="onSort('yield_pct')">
+                <span class="ya-th-inner">良率(%) <component :is="sortIconComponent('yield_pct')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'yield_pct' }" /></span>
+              </th>
+              <th class="ya-th ya-th--sortable" :class="{ 'ya-th--sorted': sortState.sort_by === 'risk_score' }" @click="onSort('risk_score')">
+                <span class="ya-th-inner">風險分數 <component :is="sortIconComponent('risk_score')" :size="12" class="ya-sort-icon" :class="{ 'ya-sort-icon--active': sortState.sort_by === 'risk_score' }" /></span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <template v-for="row in alerts" :key="alertRowKey(row)">
-              <tr>
-                <td>{{ row.date_bucket }}</td>
-                <td>{{ row.workorder }}</td>
-                <td>{{ row.source_code != null ? row.source_code : '—' }}</td>
-                <td>{{ row.reason_code }}</td>
-                <td>{{ row.department }}</td>
-                <td>{{ row.package || '' }}</td>
-                <td>{{ row.type || '' }}</td>
-                <td>{{ Number(row.transaction_qty || 0).toLocaleString() }}</td>
-                <td>{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
-                <td>{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
-                <td>
+            <template v-for="(row, rowIdx) in alerts" :key="alertRowKey(row)">
+              <tr class="ya-tr" :class="{ 'ya-tr--even': rowIdx % 2 === 1 }">
+                <td class="ya-td ya-td--expand">
+                  <button
+                    class="ya-expand-btn"
+                    :aria-expanded="expandedRowKey === alertRowKey(row)"
+                    @click="toggleReasonDetail(row)"
+                    data-testid="row-expand-btn"
+                  >
+                    <svg class="ya-expand-icon" :class="{ 'ya-expand-icon--open': expandedRowKey === alertRowKey(row) }" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                </td>
+                <td class="ya-td">{{ row.date_bucket }}</td>
+                <td class="ya-td">{{ row.workorder }}</td>
+                <td class="ya-td">{{ row.source_code != null ? row.source_code : '—' }}</td>
+                <td class="ya-td">{{ row.reason_code }}</td>
+                <td class="ya-td">{{ row.department }}</td>
+                <td class="ya-td">{{ row.package || '' }}</td>
+                <td class="ya-td">{{ row.type || '' }}</td>
+                <td class="ya-td ya-td--right">{{ Number(row.transaction_qty || 0).toLocaleString() }}</td>
+                <td class="ya-td ya-td--right">{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
+                <td class="ya-td ya-td--right">{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
+                <td class="ya-td">
                   <span class="risk-pill" :class="riskClass(row.risk_level)">
                     {{ row.risk_level }} · {{ Number(row.risk_score || 0).toFixed(2) }}
                   </span>
                 </td>
-                <td>
-                  <button
-                    class="ui-btn ui-btn--ghost ui-btn--sm"
-                    @click="toggleReasonDetail(row)"
-                    data-testid="row-expand-btn"
-                  >
-                    {{ reasonDetailLoading && expandedRowKey === alertRowKey(row) ? '載入中...' : expandedRowKey === alertRowKey(row) ? '收合' : '查看原因' }}
-                  </button>
-                </td>
               </tr>
-              <tr v-if="expandedRowKey === alertRowKey(row)" class="reason-detail-row" data-testid="row-detail">
-                <td colspan="12">
+              <tr v-if="expandedRowKey === alertRowKey(row)" class="ya-expand-row" data-testid="row-detail">
+                <td colspan="12" class="ya-expand-td">
                   <EmptyState v-if="reasonDetailLoading" type="loading" />
                   <EmptyState v-else-if="reasonDetailRows.length === 0" type="filter-empty" />
                   <div v-else class="reason-sub-wrap">

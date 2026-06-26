@@ -31,35 +31,60 @@ const chartOption = computed(() => {
   const threshold = props.riskThreshold;
   const labels = rows.map((r) => r.package || '(NA)');
 
+  const barColors = rows.map((r) => {
+    const yld = Number(r.yield_pct ?? 0);
+    if (yld < threshold - 3) return { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgb(239, 68, 68)' }, { offset: 1, color: 'rgba(239, 68, 68, 0.6)' }] };
+    if (yld < threshold)     return { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgb(245, 158, 11)' }, { offset: 1, color: 'rgba(245, 158, 11, 0.6)' }] };
+    return { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgb(99, 102, 241)' }, { offset: 1, color: 'rgba(99, 102, 241, 0.55)' }] };
+  });
+
   return {
+    animation: true,
+    animationDuration: 700,
+    animationEasing: 'cubicOut',
+    animationDurationUpdate: 400,
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross' },
+      axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(0,0,0,0.04)' } },
+      backgroundColor: 'rgba(255,255,255,0.97)',
+      borderColor: '#e2e6ef',
+      borderWidth: 1,
+      textStyle: { fontSize: 12, color: '#222' },
+      extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px;',
       // TODO: type echarts callback
       formatter(params: unknown) {
         if (!Array.isArray(params) || !params.length) return '';
         const idx = Number((params[0] as Record<string, unknown>).dataIndex ?? 0);
         const row = rows[idx] || {};
+        const yldPct = Number(row.yield_pct ?? 0);
+        const color = yldPct < threshold ? '#ef4444' : '#22c55e';
         return [
-          `<b>${row.package || '(NA)'}</b>`,
-          `報廢量：<b>${Number(row.scrap_qty ?? 0).toLocaleString()}</b>`,
-          `移轉量：${Number(row.transaction_qty ?? 0).toLocaleString()}`,
-          `良率：<b>${Number(row.yield_pct ?? 0).toFixed(2)}%</b>`,
+          `<b style="font-size:13px">${row.package || '(NA)'}</b>`,
+          `<span style="color:#666">報廢量：</span><b>${Number(row.scrap_qty ?? 0).toLocaleString()}</b> pcs`,
+          `<span style="color:#666">移轉量：</span>${Number(row.transaction_qty ?? 0).toLocaleString()} pcs`,
+          `<span style="color:#666">良率：</span><b style="color:${color}">${yldPct.toFixed(2)}%</b>`,
         ].join('<br/>');
       },
     },
     legend: {
       data: ['報廢量', '良率(%)'],
-      top: 0,
-      textStyle: { fontSize: 12 },
+      top: 4,
+      right: 12,
+      icon: 'roundRect',
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { fontSize: 12, color: '#555' },
     },
-    grid: { left: 60, right: 60, top: 40, bottom: 60 },
+    grid: { left: 60, right: 64, top: 44, bottom: 64 },
     xAxis: {
       type: 'category',
       data: labels,
+      axisLine: { lineStyle: { color: '#e2e6ef' } },
+      axisTick: { show: false },
       axisLabel: {
         rotate: labels.length > 8 ? 35 : 0,
         fontSize: 11,
+        color: '#555',
         interval: 0,
         overflow: 'truncate',
         width: 70,
@@ -69,16 +94,18 @@ const chartOption = computed(() => {
       {
         type: 'value',
         name: '報廢量',
-        nameTextStyle: { fontSize: 11 },
-        axisLabel: { fontSize: 11 },
+        nameTextStyle: { fontSize: 11, color: '#888' },
+        axisLabel: { fontSize: 11, color: '#888' },
+        splitLine: { lineStyle: { type: 'dashed', color: '#eee' } },
       },
       {
         type: 'value',
         name: '良率(%)',
-        nameTextStyle: { fontSize: 11 },
+        nameTextStyle: { fontSize: 11, color: '#888' },
         min: 0,
         max: 100,
-        axisLabel: { formatter: '{value}%', fontSize: 11 },
+        axisLabel: { formatter: '{value}%', fontSize: 11, color: '#888' },
+        splitLine: { show: false },
       },
     ],
     series: [
@@ -86,30 +113,39 @@ const chartOption = computed(() => {
         name: '報廢量',
         type: 'bar',
         yAxisIndex: 0,
-        barMaxWidth: 36,
-        data: rows.map((r) => {
-          const v = Number(r.scrap_qty ?? 0);
-          return { value: v, itemStyle: { color: 'rgb(99, 102, 241)' } };
-        }),
+        barMaxWidth: 40,
+        barMinHeight: 2,
+        itemStyle: {
+          color: (params: unknown) => barColors[(params as Record<string, unknown>).dataIndex as number] ?? 'rgb(99,102,241)',
+          borderRadius: [4, 4, 0, 0],
+        },
+        emphasis: {
+          itemStyle: { shadowBlur: 12, shadowColor: 'rgba(99,102,241,0.4)' },
+        },
+        data: rows.map((r) => Number(r.scrap_qty ?? 0)),
       },
       {
         name: '良率(%)',
         type: 'line',
         yAxisIndex: 1,
-        smooth: true,
+        smooth: 0.4,
         symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: { width: 2, color: 'rgb(245, 158, 11)' },
-        itemStyle: { color: 'rgb(245, 158, 11)' },
-        data: rows.map((r) => {
-          const v = Number(r.yield_pct ?? 0);
-          return v;
-        }),
+        symbolSize: 7,
+        lineStyle: { width: 2.5, color: 'rgb(245, 158, 11)', shadowBlur: 6, shadowColor: 'rgba(245,158,11,0.3)' },
+        itemStyle: { color: 'rgb(245, 158, 11)', borderWidth: 2, borderColor: '#fff' },
+        areaStyle: { opacity: 0.08, color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(245,158,11,0.25)' }, { offset: 1, color: 'rgba(245,158,11,0)' }] } },
+        emphasis: {
+          scale: true,
+          lineStyle: { width: 3 },
+          itemStyle: { shadowBlur: 8, shadowColor: 'rgba(245,158,11,0.5)' },
+        },
+        data: rows.map((r) => Number(r.yield_pct ?? 0)),
         markLine: {
           silent: true,
           symbol: 'none',
-          lineStyle: { type: 'dashed', color: 'rgb(239, 68, 68)', width: 1 },
-          data: [{ yAxis: threshold, label: { formatter: `門檻 ${threshold}%`, fontSize: 10 } }],
+          lineStyle: { type: 'dashed', color: 'rgb(239, 68, 68)', width: 1.5, opacity: 0.7 },
+          label: { formatter: `門檻 ${threshold}%`, fontSize: 10, color: 'rgb(239,68,68)', position: 'end' },
+          data: [{ yAxis: threshold }],
         },
       },
     ],

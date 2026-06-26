@@ -33,7 +33,7 @@ const parsedHeatmap = computed(() => {
   });
 
   const stations = [...new Set(rows.map((row) => row.station))].sort(
-    (a, b) => (seqByStation[a] ?? 999) - (seqByStation[b] ?? 999),
+    (a, b) => (seqByStation[b] ?? 999) - (seqByStation[a] ?? 999),
   );
   const dates = [...new Set(rows.map((row) => row.date))].sort();
 
