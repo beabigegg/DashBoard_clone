@@ -1,6 +1,6 @@
-# generated: 2026-06-25T23:32:22Z by cdd-kit 3.5.0
-# files: 955, src-lines: 289277, map-lines: 21003, compression: 13.8x
-# sources-digest: 7dee6795a8d1c25c1a9d80d7a1126bef47ff2a2e0b86c1c84f7894dd2322804d
+# generated: 2026-06-26T03:54:16Z by cdd-kit 3.6.0
+# files: 955, src-lines: 289283, map-lines: 21003, compression: 13.8x
+# sources-digest: 8d926a4646ad4323dc19bf34b189189d869c8eeb1af201052833ad726cd6fbd7
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -2302,7 +2302,7 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 1064 lines
+frontend/src/yield-alert-center/App.vue:  # 1070 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
