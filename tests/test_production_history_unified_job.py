@@ -206,5 +206,5 @@ class TestProductionHistoryJobProgress:
         })
         job.progress_report(15)
         assert len(calls) == 1
-        assert calls[0][0] == "production_history"
+        assert calls[0][0] == "production_history_unified"
         assert calls[0][2].get("pct") == "15"
