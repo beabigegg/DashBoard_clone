@@ -320,6 +320,11 @@ function isCacheExpiredError(error) {
 }
 
 async function executePrimaryQuery() {
+  // New primary query means new spool — stale DuckDB data must be discarded.
+  duckdbMode.value = false;
+  duckdbActivating.value = false;
+  duckdb.deactivate();
+
   // Cancel any in-progress polling
   if (_jobAbortController) {
     _jobAbortController.abort();
@@ -808,6 +813,16 @@ onUnmounted(() => {
       </div>
     </section>
 
+    <AsyncQueryProgress
+      :active="jobProgress.active"
+      :progress="jobProgress.progress"
+      :pct="jobProgress.pct"
+      :elapsed-seconds="0"
+      :status="jobProgress.status"
+      @cancel="cancelAsyncJob"
+      data-testid="loading-state"
+    />
+
     <section class="filter-panel supplementary-query-panel">
       <header class="panel-header">
         <h2>第二階段：補充篩選 (快取內計算)</h2>
@@ -1050,15 +1065,6 @@ onUnmounted(() => {
         <button class="ui-btn ui-btn--ghost" :disabled="loading || paginationLoading || pagination.page >= pagination.total_pages" @click="goToPage(pagination.page + 1)">下一頁</button>
       </footer>
     </section>
-    <AsyncQueryProgress
-      :active="jobProgress.active"
-      :progress="jobProgress.progress"
-      :pct="jobProgress.pct"
-      :elapsed-seconds="0"
-      :status="jobProgress.status"
-      @cancel="cancelAsyncJob"
-      data-testid="loading-state"
-    />
     <LoadingOverlay v-if="loading && !jobProgress.active" tier="page" />
   </div>
 </template>
