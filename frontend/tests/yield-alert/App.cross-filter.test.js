@@ -137,7 +137,7 @@ describe('Yield Alert App URL and cross-filter behavior', () => {
 
     const selectTexts = wrapper.findAll('.multi-select-stub').map((node) => node.text());
     expect(selectTexts[0]).toBe('焊接_WB');
-    expect(wrapper.text()).toContain('已建立快取: qid-legacy-001');
+    expect(wrapper.text()).toContain('資料已載入');
   });
 
   it('requests cross-filter options after supplementary filter changes on queried data', async () => {
@@ -330,9 +330,9 @@ describe('Yield Alert App URL and cross-filter behavior', () => {
     await nextTick();
     await nextTick();
 
-    const sortButtons = wrapper.findAll('button.th-btn');
-    expect(sortButtons.length).toBe(4); // transaction_qty, scrap_qty, yield_pct, risk_score
-    await sortButtons[1].trigger('click'); // sortButtons[1] = scrap_qty (was [0] before 轉出數 was added)
+    const sortButtons = wrapper.findAll('th.ya-th--sortable');
+    expect(sortButtons.length).toBe(11); // date_bucket, workorder, source_code, reason_code, department, package, type, transaction_qty, scrap_qty, yield_pct, risk_score
+    await sortButtons[8].trigger('click'); // sortButtons[8] = scrap_qty
     await nextTick();
     await nextTick();
 
