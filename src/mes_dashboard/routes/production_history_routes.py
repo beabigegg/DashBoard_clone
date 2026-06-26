@@ -279,7 +279,7 @@ def api_production_history_query():
         job_id_result, err, status_hint = enqueue_query_job(
             "production_history_unified",
             owner=get_owner_token(),
-            params={"job_id": job_id, **body},
+            params={"params": body},
             sync_fallback_allowed=True,
             job_id=job_id,
         )
@@ -353,7 +353,7 @@ def api_production_history_query():
 def api_production_history_job_status(job_id: str):
     """Get async query job status."""
     from mes_dashboard.services.async_query_job_service import get_job_status
-    status = get_job_status("production_history", job_id)
+    status = get_job_status("production_history_unified", job_id)
     if status is None:
         return not_found_error("Job not found")
     return success_response(status)

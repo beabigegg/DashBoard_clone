@@ -38,7 +38,7 @@ PRODUCTION_HISTORY_JOB_TTL_SECONDS: int = max(
     3600, int(os.getenv("PRODUCTION_HISTORY_JOB_TTL_SECONDS", "3600"))
 )
 
-_JOB_PREFIX = "production_history"
+_JOB_PREFIX = "production_history_unified"  # matches enqueue_job_dynamic prefix (job_type=production_history_unified)
 
 # Grain size for time-chunking (days per Oracle query).
 _ENGINE_GRAIN_DAYS: int = max(1, int(os.getenv("PROD_HISTORY_ENGINE_GRAIN_DAYS", "31")))
