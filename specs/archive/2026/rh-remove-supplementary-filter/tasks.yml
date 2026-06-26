@@ -37,5 +37,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "All Tier-1 gates verified locally: unit-and-integration-tests, contract-validators, openapi-sync, css-governance, frontend-unit-vitest" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "type-check: 0 errors (clean, not just informational)" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates required per test-plan.md" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "Promoted: legacy test pin drift rule to docs/architecture/test-discipline.md §Legacy Test Suite; rejected: _build_base_where scope boundary (service-specific)" }

@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 9132faeef793205e475c93a9f4d998330afc443c6f573e04aca386c05532503c
+inputs-digest: 68044adcd53f0bb54a8a3cc4ea51901bd11a6d05e95a9be73baf87bcfefa04b0
 ---
 
 # Contracts Index
@@ -35,7 +35,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.28.0
+- schema-version: 1.29.0
 - last-changed: 2026-06-25
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
@@ -48,7 +48,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Inventory
 - owner: application-team
 - surface: api
-- schema-version: 1.2.6
+- schema-version: 1.2.7
 - last-changed: 2026-06-25
 - summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 
@@ -72,7 +72,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.30.0
+- schema-version: 1.31.0
 - last-changed: 2026-06-25
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
@@ -98,7 +98,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CSS / UI Contract — MES Dashboard
 - owner: application-team
 - surface: ui
-- schema-version: 1.9.0
+- schema-version: 1.10.0
 - last-changed: 2026-06-18
 - breaking-change-policy: deprecate-2-minors
 - summary: UI token policy, component styling rules, and visual review constraints.
@@ -135,7 +135,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.25.0
+- schema-version: 1.26.0
 - last-changed: 2026-06-25
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.

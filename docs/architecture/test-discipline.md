@@ -163,3 +163,11 @@ def test_async_row_schema_matches_sync_path():
 ```
 
 Evidence: `wip-rq-worker-chunks-cleanup` `tests/integration/test_wip_rowcount_rq_routing.py::TestAsyncRowSchemaMatchesSyncPath`; qa-reviewer.yml ac-summary.
+
+## Legacy Test Suite — Constant Pin Drift
+
+`tests/legacy/*.test.js` runs as a glob in CI (`node --test tests/legacy/*.test.js`); a stale pin in any file fails the entire suite.
+
+When a commit changes a module-level constant (e.g., `PRIMARY_QUERY_MAX_DAYS`) or a manifest-derived structure (e.g., drawer order arrays in `navigationManifest.js`), grep `tests/legacy/` for the old value and update all pin assertions in the same commit.
+
+Evidence: `rh-remove-supplementary-filter` archive.md §Production Reality Findings #6; commit `6988392b` fixed `reject-history-date-range-limit.test.js` (190→365) and `portal-shell-navigation.test.js` (drawer order `[1,2,3,4,6]`→`[1,2,3,4,5]`).
