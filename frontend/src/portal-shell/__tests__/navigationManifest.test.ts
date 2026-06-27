@@ -50,7 +50,7 @@ describe('navigationManifest structural invariants (AC-5)', () => {
     const orders = drawers.map((d) => d.order);
     const unique = new Set(orders);
     expect(unique.size).toBe(drawers.length);
-    expect(orders.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(orders.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   it('test_no_test_drawer', () => {
