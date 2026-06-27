@@ -372,11 +372,16 @@
   width: 100%;
 }
 
+/* --- Detail card: no padding so table stretches edge-to-edge --- */
+.theme-material-consumption .detail-card-body {
+  padding: 0 !important;
+}
+
 /* --- Detail table section --- */
 .theme-material-consumption .detail-table-wrap {
   display: flex;
   flex-direction: column;
-  gap: theme('spacing.token.p12');
+  gap: 0;
   position: relative;
   min-height: theme('spacing.token.p80');
 }
@@ -386,6 +391,8 @@
   gap: theme('spacing.token.p8');
   flex-wrap: wrap;
   align-items: center;
+  padding: theme('spacing.token.p12') theme('spacing.token.p16');
+  border-bottom: 1px solid theme('colors.stroke.soft');
 }
 
 .theme-material-consumption .detail-actions {
@@ -400,6 +407,7 @@
   justify-content: center;
   gap: theme('spacing.token.p12');
   min-height: 120px;
+  padding: theme('spacing.token.p16');
   position: relative;
 }
 
@@ -412,10 +420,12 @@
 .theme-material-consumption .detail-loading-wrap {
   position: relative;
   min-height: 120px;
+  padding: theme('spacing.token.p16');
 }
 
 .theme-material-consumption .data-table-container {
   overflow-x: auto;
+  /* Table is inside a padding-0 card body — no extra offset needed */
 }
 
 /* --- Empty state --- */

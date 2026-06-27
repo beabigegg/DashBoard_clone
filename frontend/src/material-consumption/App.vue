@@ -320,8 +320,8 @@ onMounted(() => {
         aria-labelledby="tab-detail"
         v-show="activeTab === 'detail'"
       >
-        <div class="ui-card">
-          <div class="ui-card-body">
+        <div class="ui-card detail-card">
+          <div class="ui-card-body detail-card-body">
             <DetailTable
               :rows="detailRows"
               :pagination="detailPagination"
