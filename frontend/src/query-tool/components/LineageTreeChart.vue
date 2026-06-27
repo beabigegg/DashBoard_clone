@@ -217,6 +217,22 @@ function nodeColor(type: string): string {
 // Tree data builder (D3-compatible plain objects)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Mark all descendants of `cid` as visited without building NodeData.
+ * Called when a node is collapsed so its subtree nodes don't "escape"
+ * to higher levels via other parent paths.
+ */
+function collectDescendants(cid: string, visited: Set<string>) {
+  const lm = props.lineageMap as Map<string, { children?: string[] }>;
+  const childIds = (lm?.get?.(cid)?.children || []) as string[];
+  for (const rawChild of childIds) {
+    const childId = normalizeText(rawChild);
+    if (!childId || visited.has(childId)) continue;
+    visited.add(childId);
+    collectDescendants(childId, visited);
+  }
+}
+
 function buildNode(cid: unknown, visited: Set<string>, parentCid = ''): NodeData | null {
   const id = normalizeText(cid);
   if (!id || visited.has(id)) return null;
@@ -251,6 +267,9 @@ function buildNode(cid: unknown, visited: Set<string>, parentCid = ''): NodeData
   let children: NodeData[] = [];
 
   if (isCollapsed && childIds.length > 0) {
+    // Pre-mark the entire collapsed subtree so those nodes don't appear
+    // at higher levels via other parent paths (DAG multi-parent case).
+    collectDescendants(id, visited);
     children = [{
       id: `__expand__${id}`, name: `+${childIds.length}`, type: 'toggle',
       edgeType: '', edgeReversed: false, parentName: '', relationTag: '',

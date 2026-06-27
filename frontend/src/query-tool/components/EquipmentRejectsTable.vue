@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
 
 import { useSortableTable } from '../../shared-composables/useSortableTable';
 import { formatDateTime, parseDateTime } from '../utils/values';
@@ -137,9 +138,9 @@ const defaultSorted = computed(() => {
 
 const { sortKey, sortDirection, sortedData: displayRows, toggleSort } = useSortableTable(defaultSorted);
 
-function sortLabel(key: string): string {
-  if (sortKey.value !== key) return '⇕';
-  return sortDirection.value === 'asc' ? '▲' : '▼';
+function sortIcon(key: string) {
+  if (sortKey.value !== key) return ArrowUpDown;
+  return sortDirection.value === 'asc' ? ArrowUp : ArrowDown;
 }
 
 function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
@@ -176,11 +177,11 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
       <table class="query-tool-table">
         <thead>
           <tr>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('CONTAINERNAME')" @click="toggleSort('CONTAINERNAME')" @keydown.enter.space.prevent="toggleSort('CONTAINERNAME')">批次ID <span class="sort-indicator">{{ sortLabel('CONTAINERNAME') }}</span></th>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('PRODUCTLINENAME')" @click="toggleSort('PRODUCTLINENAME')" @keydown.enter.space.prevent="toggleSort('PRODUCTLINENAME')">Package <span class="sort-indicator">{{ sortLabel('PRODUCTLINENAME') }}</span></th>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('WORKCENTERNAME')" @click="toggleSort('WORKCENTERNAME')" @keydown.enter.space.prevent="toggleSort('WORKCENTERNAME')">站點 <span class="sort-indicator">{{ sortLabel('WORKCENTERNAME') }}</span></th>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('SPECNAME')" @click="toggleSort('SPECNAME')" @keydown.enter.space.prevent="toggleSort('SPECNAME')">製程規格 <span class="sort-indicator">{{ sortLabel('SPECNAME') }}</span></th>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('LOSSREASONNAME')" @click="toggleSort('LOSSREASONNAME')" @keydown.enter.space.prevent="toggleSort('LOSSREASONNAME')">報廢原因 <span class="sort-indicator">{{ sortLabel('LOSSREASONNAME') }}</span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('CONTAINERNAME')" @click="toggleSort('CONTAINERNAME')" @keydown.enter.space.prevent="toggleSort('CONTAINERNAME')"><span class="qt-th-inner">批次ID <component :is="sortIcon('CONTAINERNAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'CONTAINERNAME' }" :size="13" /></span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('PRODUCTLINENAME')" @click="toggleSort('PRODUCTLINENAME')" @keydown.enter.space.prevent="toggleSort('PRODUCTLINENAME')"><span class="qt-th-inner">Package <component :is="sortIcon('PRODUCTLINENAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'PRODUCTLINENAME' }" :size="13" /></span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('WORKCENTERNAME')" @click="toggleSort('WORKCENTERNAME')" @keydown.enter.space.prevent="toggleSort('WORKCENTERNAME')"><span class="qt-th-inner">站點 <component :is="sortIcon('WORKCENTERNAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'WORKCENTERNAME' }" :size="13" /></span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('SPECNAME')" @click="toggleSort('SPECNAME')" @keydown.enter.space.prevent="toggleSort('SPECNAME')"><span class="qt-th-inner">製程規格 <component :is="sortIcon('SPECNAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'SPECNAME' }" :size="13" /></span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('LOSSREASONNAME')" @click="toggleSort('LOSSREASONNAME')" @keydown.enter.space.prevent="toggleSort('LOSSREASONNAME')"><span class="qt-th-inner">報廢原因 <component :is="sortIcon('LOSSREASONNAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'LOSSREASONNAME' }" :size="13" /></span></th>
             <th
               class="sortable-th"
               tabindex="0"
@@ -188,24 +189,22 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
               @click.exact="toggleSort('REJECT_TOTAL_QTY')"
               @keydown.enter.space.prevent="toggleSort('REJECT_TOTAL_QTY')"
             >
-              總報廢量 <span class="sort-indicator">{{ sortLabel('REJECT_TOTAL_QTY') }}</span>
+              <span class="qt-th-inner">總報廢量 <component :is="sortIcon('REJECT_TOTAL_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECT_TOTAL_QTY' }" :size="13" /></span>
               <button class="expand-toggle" type="button" :aria-label="showRejectBreakdown ? '收合報廢細項' : '展開報廢細項'" @click.stop="showRejectBreakdown = !showRejectBreakdown" @keydown.enter.space.prevent.stop="showRejectBreakdown = !showRejectBreakdown">{{ showRejectBreakdown ? '▾' : '▸' }}</button>
             </th>
             <template v-if="showRejectBreakdown">
-              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('REJECT_QTY')" @click="toggleSort('REJECT_QTY')" @keydown.enter.space.prevent="toggleSort('REJECT_QTY')">REJECT <span class="sort-indicator">{{ sortLabel('REJECT_QTY') }}</span></th>
-              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('STANDBY_QTY')" @click="toggleSort('STANDBY_QTY')" @keydown.enter.space.prevent="toggleSort('STANDBY_QTY')">STANDBY <span class="sort-indicator">{{ sortLabel('STANDBY_QTY') }}</span></th>
-              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('QTYTOPROCESS_QTY')" @click="toggleSort('QTYTOPROCESS_QTY')" @keydown.enter.space.prevent="toggleSort('QTYTOPROCESS_QTY')">QTYTOPROCESS <span class="sort-indicator">{{ sortLabel('QTYTOPROCESS_QTY') }}</span></th>
-              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('INPROCESS_QTY')" @click="toggleSort('INPROCESS_QTY')" @keydown.enter.space.prevent="toggleSort('INPROCESS_QTY')">INPROCESS <span class="sort-indicator">{{ sortLabel('INPROCESS_QTY') }}</span></th>
-              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('PROCESSED_QTY')" @click="toggleSort('PROCESSED_QTY')" @keydown.enter.space.prevent="toggleSort('PROCESSED_QTY')">PROCESSED <span class="sort-indicator">{{ sortLabel('PROCESSED_QTY') }}</span></th>
+              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('REJECT_QTY')" @click="toggleSort('REJECT_QTY')" @keydown.enter.space.prevent="toggleSort('REJECT_QTY')"><span class="qt-th-inner">REJECT <component :is="sortIcon('REJECT_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECT_QTY' }" :size="13" /></span></th>
+              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('STANDBY_QTY')" @click="toggleSort('STANDBY_QTY')" @keydown.enter.space.prevent="toggleSort('STANDBY_QTY')"><span class="qt-th-inner">STANDBY <component :is="sortIcon('STANDBY_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'STANDBY_QTY' }" :size="13" /></span></th>
+              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('QTYTOPROCESS_QTY')" @click="toggleSort('QTYTOPROCESS_QTY')" @keydown.enter.space.prevent="toggleSort('QTYTOPROCESS_QTY')"><span class="qt-th-inner">QTYTOPROCESS <component :is="sortIcon('QTYTOPROCESS_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'QTYTOPROCESS_QTY' }" :size="13" /></span></th>
+              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('INPROCESS_QTY')" @click="toggleSort('INPROCESS_QTY')" @keydown.enter.space.prevent="toggleSort('INPROCESS_QTY')"><span class="qt-th-inner">INPROCESS <component :is="sortIcon('INPROCESS_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'INPROCESS_QTY' }" :size="13" /></span></th>
+              <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('PROCESSED_QTY')" @click="toggleSort('PROCESSED_QTY')" @keydown.enter.space.prevent="toggleSort('PROCESSED_QTY')"><span class="qt-th-inner">PROCESSED <component :is="sortIcon('PROCESSED_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'PROCESSED_QTY' }" :size="13" /></span></th>
             </template>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('DEFECT_QTY')" @click="toggleSort('DEFECT_QTY')" @keydown.enter.space.prevent="toggleSort('DEFECT_QTY')">不良品數 <span class="sort-indicator">{{ sortLabel('DEFECT_QTY') }}</span></th>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('REJECTCOMMENT')" @click="toggleSort('REJECTCOMMENT')" @keydown.enter.space.prevent="toggleSort('REJECTCOMMENT')">備註 <span class="sort-indicator">{{ sortLabel('REJECTCOMMENT') }}</span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('DEFECT_QTY')" @click="toggleSort('DEFECT_QTY')" @keydown.enter.space.prevent="toggleSort('DEFECT_QTY')"><span class="qt-th-inner">不良品數 <component :is="sortIcon('DEFECT_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'DEFECT_QTY' }" :size="13" /></span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('REJECTCOMMENT')" @click="toggleSort('REJECTCOMMENT')" @keydown.enter.space.prevent="toggleSort('REJECTCOMMENT')"><span class="qt-th-inner">備註 <component :is="sortIcon('REJECTCOMMENT')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECTCOMMENT' }" :size="13" /></span></th>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('EQUIPMENTNAME')" @click="toggleSort('EQUIPMENTNAME')" @keydown.enter.space.prevent="toggleSort('EQUIPMENTNAME')">
-              報廢登錄設備
-              <span class="cross-station-note" title="此設備為報廢事件登錄的設備，可能與查詢設備不同（跨站報廢）">(可能不同於查詢設備)</span>
-              <span class="sort-indicator">{{ sortLabel('EQUIPMENTNAME') }}</span>
+              <span class="qt-th-inner">報廢登錄設備 <span class="cross-station-note" title="此設備為報廢事件登錄的設備，可能與查詢設備不同（跨站報廢）">(可能不同於查詢設備)</span> <component :is="sortIcon('EQUIPMENTNAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'EQUIPMENTNAME' }" :size="13" /></span>
             </th>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('TXN_TIME')" @click="toggleSort('TXN_TIME')" @keydown.enter.space.prevent="toggleSort('TXN_TIME')">報廢時間 <span class="sort-indicator">{{ sortLabel('TXN_TIME') }}</span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('TXN_TIME')" @click="toggleSort('TXN_TIME')" @keydown.enter.space.prevent="toggleSort('TXN_TIME')"><span class="qt-th-inner">報廢時間 <component :is="sortIcon('TXN_TIME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'TXN_TIME' }" :size="13" /></span></th>
           </tr>
         </thead>
 
