@@ -676,6 +676,7 @@ def query_equipment_period():
                         "async": True,
                         "job_id": job_id,
                         "status_url": f"/api/job/{job_id}?prefix=query-tool",
+                        "result_url": f"/api/job/{job_id}/result?prefix=query-tool",
                     },
                     status_code=202,
                 )

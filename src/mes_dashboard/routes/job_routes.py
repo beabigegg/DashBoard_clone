@@ -76,6 +76,43 @@ def get_job(job_id: str):
     return success_response(status_data)
 
 
+@job_bp.route("/api/job/<job_id>/result", methods=["GET"])
+def get_job_result(job_id: str):
+    """Return the stored result payload for a completed async job.
+
+    Query parameters:
+        prefix (required): The job namespace (e.g. ``"query-tool"``).
+
+    The worker must have called ``redis.setex(f"{prefix}:job:{job_id}:result", ...)``
+    before marking the job completed.  Returns 404 if the key has expired or the
+    job never stored a result.
+    """
+    import json as _json
+    from mes_dashboard.core.redis_client import get_redis_client, get_key
+
+    prefix = request.args.get("prefix", "").strip()
+    if not prefix:
+        return validation_error("prefix query parameter is required")
+
+    conn = get_redis_client()
+    if conn is None:
+        from mes_dashboard.core.response import internal_error
+        return internal_error("Redis unavailable")
+
+    result_key = get_key(f"{prefix}:job:{job_id}:result")
+    raw = conn.get(result_key)
+    if raw is None:
+        return not_found_error(f"result for job {job_id!r} not found (prefix={prefix!r})")
+
+    try:
+        data = _json.loads(raw)
+    except Exception:
+        from mes_dashboard.core.response import internal_error
+        return internal_error("failed to parse stored job result")
+
+    return success_response(data)
+
+
 @job_bp.route("/api/job/<job_id>/abandon", methods=["POST"])
 @_JOB_ABANDON_RATE_LIMIT
 def abandon_job(job_id: str):

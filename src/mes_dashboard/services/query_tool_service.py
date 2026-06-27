@@ -2886,10 +2886,10 @@ def execute_query_tool_job(*, job_id: str, owner: str, **query_params) -> None:
 
         # Store result in Redis for polling
         import json
-        from mes_dashboard.core.redis_client import get_redis_client
+        from mes_dashboard.core.redis_client import get_redis_client, get_key
         conn = get_redis_client()
         if conn is not None:
-            result_key = f"{_JOB_PREFIX}:job:{job_id}:result"
+            result_key = get_key(f"{_JOB_PREFIX}:job:{job_id}:result")
             conn.setex(result_key, 3600, json.dumps(result, default=str))
 
         update_job_progress(

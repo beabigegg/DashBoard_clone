@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
 import { exportCsv } from '../utils/csv';
 import { normalizeText, toDateInputValue, uniqueValues } from '../utils/values';
 
@@ -139,13 +140,28 @@ export function useEquipmentQuery(initial: EquipmentQueryInitial = {}) {
       throw new Error(validation);
     }
 
-    const payload = await apiPost(
+    const envelope = await apiPost(
       '/api/query-tool/equipment-period',
       buildQueryPayload(queryType, options),
       { timeout: 360000, silent: true },
     );
 
-    return (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
+    const data = (envelope as Record<string, unknown>)?.data as Record<string, unknown> || {};
+
+    if (data?.async === true && data?.status_url) {
+      await pollJobUntilComplete(data.status_url as string);
+      const resultUrl = data.result_url as string || '';
+      if (!resultUrl) {
+        throw new Error('非同步查詢完成但未返回 result_url');
+      }
+      const resultEnvelope = await apiGet(resultUrl, {
+        timeout: 360000,
+        silent: true,
+      });
+      return (resultEnvelope as Record<string, unknown>)?.data as Record<string, unknown> || {};
+    }
+
+    return data;
   }
 
   async function loadEquipmentOptions() {
