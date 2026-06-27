@@ -251,7 +251,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/eap-alarm/detail | required | ?query_id=&page=&per_page=(max 200)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
-| GET | /api/db-scheduling/equipment-detail | required | - | - | 400/500 | route tests |
+| GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -1070,3 +1070,34 @@ Tier-B — status feed returned by `GET /api/portal/navigation` (no drawers; str
 | targetSpec | string | yes |  | DB process SPEC name |
 | equipment | string | yes |  | single equipment ID; one row per equipment |
 | matchSource | string | yes |  | enum: workflow / bop-fallback / none |
+
+### EquipmentDetailResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| equipment | string | yes |  | equipment ID |
+| e10Status | string | no |  | E10 asset status code (PRD/SBY/UDT/SDT/NST) |
+| e10Reason | string | no |  | E10 status reason code |
+| jobOrder | string | no |  | maintenance job order number |
+| jobModel | string | no |  | maintenance job model |
+| jobStage | string | no |  | maintenance job stage |
+| jobId | string | no |  | maintenance job ID |
+| jobStatus | string | no |  | maintenance job status |
+| lotId | string | no |  | running lot ID on the equipment |
+| workorder | string | no |  | running lot work order |
+| wipStatus | string | no |  | WIP status (Active/Hold) |
+| runcardStatus | string | no |  | runcard status |
+| qty | integer | no |  | lot quantity (pcs) |
+| waferLotQty | integer | no |  | wafer lot quantity |
+| ageByDays | number | no |  | lot age in days |
+| priorityCodeName | string | no |  | work order priority code name |
+| productName | string | no |  | product P/N (PRODUCT column) |
+| package | string | no |  | package type (PRODUCTLINENAME) |
+| packageLef | string | no |  | Package+LeadFrame (PACKAGE_LEF) |
+| pjType | string | no |  | PJ TYPE classification |
+| pjFunction | string | no |  | PJ FUNCTION classification |
+| bop | string | no |  | Bill of Process |
+| dateCodeReq | string | no |  | date code requirement (DATECODE) |
+| produceRegion | string | no |  | produce region (PJ_PRODUCEREGION) |
+| specName | string | no |  | spec name |
+| workflowName | string | no |  | workflow name |

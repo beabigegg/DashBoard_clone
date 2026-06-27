@@ -5681,7 +5681,14 @@
         "summary": "GET /api/db-scheduling/equipment-detail",
         "responses": {
           "200": {
-            "description": "Contract response: -"
+            "description": "Contract response: EquipmentDetailResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentDetailResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Error response (see contract error format)"
@@ -5695,7 +5702,6 @@
             "bearerAuth": []
           }
         ],
-        "x-cdd-response-contract": "-",
         "x-cdd-errors": "400/500"
       }
     }
@@ -6936,6 +6942,122 @@
           "targetSpec",
           "equipment",
           "matchSource"
+        ]
+      },
+      "EquipmentDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "equipment": {
+            "type": "string",
+            "description": "equipment ID"
+          },
+          "e10Status": {
+            "type": "string",
+            "description": "E10 asset status code (PRD/SBY/UDT/SDT/NST)"
+          },
+          "e10Reason": {
+            "type": "string",
+            "description": "E10 status reason code"
+          },
+          "jobOrder": {
+            "type": "string",
+            "description": "maintenance job order number"
+          },
+          "jobModel": {
+            "type": "string",
+            "description": "maintenance job model"
+          },
+          "jobStage": {
+            "type": "string",
+            "description": "maintenance job stage"
+          },
+          "jobId": {
+            "type": "string",
+            "description": "maintenance job ID"
+          },
+          "jobStatus": {
+            "type": "string",
+            "description": "maintenance job status"
+          },
+          "lotId": {
+            "type": "string",
+            "description": "running lot ID on the equipment"
+          },
+          "workorder": {
+            "type": "string",
+            "description": "running lot work order"
+          },
+          "wipStatus": {
+            "type": "string",
+            "description": "WIP status (Active/Hold)"
+          },
+          "runcardStatus": {
+            "type": "string",
+            "description": "runcard status"
+          },
+          "qty": {
+            "type": "integer",
+            "description": "lot quantity (pcs)"
+          },
+          "waferLotQty": {
+            "type": "integer",
+            "description": "wafer lot quantity"
+          },
+          "ageByDays": {
+            "type": "number",
+            "description": "lot age in days"
+          },
+          "priorityCodeName": {
+            "type": "string",
+            "description": "work order priority code name"
+          },
+          "productName": {
+            "type": "string",
+            "description": "product P/N (PRODUCT column)"
+          },
+          "package": {
+            "type": "string",
+            "description": "package type (PRODUCTLINENAME)"
+          },
+          "packageLef": {
+            "type": "string",
+            "description": "Package+LeadFrame (PACKAGE_LEF)"
+          },
+          "pjType": {
+            "type": "string",
+            "description": "PJ TYPE classification"
+          },
+          "pjFunction": {
+            "type": "string",
+            "description": "PJ FUNCTION classification"
+          },
+          "bop": {
+            "type": "string",
+            "description": "Bill of Process"
+          },
+          "dateCodeReq": {
+            "type": "string",
+            "description": "date code requirement (DATECODE)"
+          },
+          "produceRegion": {
+            "type": "string",
+            "description": "produce region (PJ_PRODUCEREGION)"
+          },
+          "specName": {
+            "type": "string",
+            "description": "spec name"
+          },
+          "workflowName": {
+            "type": "string",
+            "description": "workflow name"
+          }
+        },
+        "required": [
+          "success",
+          "equipment"
         ]
       }
     }
