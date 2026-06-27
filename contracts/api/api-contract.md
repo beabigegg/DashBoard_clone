@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.30.0
-last-changed: 2026-06-26
+schema-version: 1.31.0
+last-changed: 2026-06-27
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -252,6 +252,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
+| GET | /api/job/{job_id}/result | required | ?prefix= | GenericSuccessResponse | 400/404 | route tests |
 
 ## 5. Routing & Naming
 

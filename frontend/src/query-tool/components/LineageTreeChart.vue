@@ -625,9 +625,9 @@ function removeSelection(cid: unknown) {
             序列號
           </span>
           <span class="lt-legend-item"><span class="lt-legend-line" />split</span>
-          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dashed" style="border-color:#f59e0b" />merge</span>
-          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dotted" style="border-color:#2563eb" />wafer</span>
-          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dashed" style="border-color:#ef4444" />rework</span>
+          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dashed" :style="{ borderColor: EDGE_LINE.merge_source.stroke }" />merge</span>
+          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dotted" :style="{ borderColor: EDGE_LINE.wafer_origin.stroke }" />wafer</span>
+          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dashed" :style="{ borderColor: EDGE_LINE.gd_rework_source.stroke }" />rework</span>
         </div><!-- /lt-legend -->
       </div><!-- /lt-toolbar -->
     </div><!-- /lt-toolbar-row -->

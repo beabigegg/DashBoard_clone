@@ -47,7 +47,13 @@ let dropdownScopeErrors = 0;
 // Valid CSS hex only (3/4/6/8 digits). Excludes HTML entities like &#10003; via negative lookbehind.
 const HEX_COLOR_RE = /(?<!&)#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/;
 const SPACING_PX_RE = /(margin|padding)\s*:\s*[^;]*-?\d+px\b/;
-const CHART_IMPORT_RE = /(vue-echarts|from\s+['"]echarts(?:\/[^'"]+)?['"]|import\s+\*\s+as\s+echarts\s+from\s+['"]echarts(?:\/[^'"]+)?['"])/;
+const CHART_IMPORT_RE = /(vue-echarts|from\s+['"]echarts(?:\/[^'"]+)?['"]|import\s+\*\s+as\s+echarts\s+from\s+['"]echarts(?:\/[^'"]+)?['"]|from\s+['"]d3(?:-[^'"]+)?['"])/;
+
+// SVG/canvas chart components that legitimately use HEX for programmatic rendering
+// but do not import a chart library detectable by CHART_IMPORT_RE.
+const SVG_CHART_COMPONENTS = new Set([
+  'shared-ui/components/TimelineChart.vue',
+]);
 
 function walk(dir, callback) {
   for (const entry of readdirSync(dir)) {
@@ -276,7 +282,7 @@ function checkCssFile(full) {
 function checkVueFile(full) {
   const rel = relPath(full);
   const content = readFileSync(full, 'utf8');
-  const hasChartImport = CHART_IMPORT_RE.test(content);
+  const hasChartImport = CHART_IMPORT_RE.test(content) || SVG_CHART_COMPONENTS.has(rel);
 
   // Extract only the template section
   const templateMatch = content.match(/<template[\s\S]*?>([\s\S]*?)<\/template>/);

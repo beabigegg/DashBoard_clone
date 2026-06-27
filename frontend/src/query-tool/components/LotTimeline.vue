@@ -359,7 +359,7 @@ const timeRange = computed(() => {
       </span>
       <div class="lot-tl-meta-badges">
         <span class="lot-tl-badge lot-tl-badge--info">
-          <span class="lot-tl-badge-dot" style="background:#f59e0b;" />
+          <span class="lot-tl-badge-dot lot-tl-badge-dot--hold" />
           Hold / Material 事件已覆蓋標記
         </span>
         <span
@@ -412,7 +412,7 @@ const timeRange = computed(() => {
 .lot-tl-meta-range {
   font-size: 11.5px;
   font-family: ui-monospace, monospace;
-  color: #64748b;
+  color: theme('colors.text.secondary');
   font-weight: 500;
 }
 
@@ -431,14 +431,14 @@ const timeRange = computed(() => {
   border-radius: 5px;
   font-size: 11px;
   font-weight: 500;
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.subtle');
+  border: 1px solid theme('colors.stroke.soft');
 }
 
-.lot-tl-badge--info { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
-.lot-tl-badge--ok   { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
-.lot-tl-badge--warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.lot-tl-badge--info { background: theme('colors.sky.50'); color: theme('colors.sky.700'); border-color: theme('colors.sky.200'); }
+.lot-tl-badge--ok   { background: theme('colors.token.hf0fdf4'); color: theme('colors.token.h166534'); border-color: theme('colors.token.hbbf7d0'); }
+.lot-tl-badge--warn { background: theme('colors.token.hfffbeb'); color: theme('colors.token.h92400e'); border-color: theme('colors.token.hfde68a'); }
 
 .lot-tl-badge-dot {
   width: 7px;
@@ -447,6 +447,7 @@ const timeRange = computed(() => {
   display: inline-block;
   flex-shrink: 0;
 }
+.lot-tl-badge-dot--hold { background: theme('colors.state.warning'); }
 
 .timeline-scroll-area {
   max-height: 520px;
