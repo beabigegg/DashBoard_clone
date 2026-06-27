@@ -59,9 +59,9 @@ const chartOption = computed(() => {
 
   // Bar color: reflect yield health for each period
   const barColors = yieldVals.map((yld) => {
-    if (yld < threshold - 3) return 'rgba(239,68,68,0.28)';
-    if (yld < threshold)     return 'rgba(245,158,11,0.32)';
-    return 'rgba(148,163,184,0.38)';
+    if (yld < threshold - 3) return 'rgba(239,68,68,0.65)';
+    if (yld < threshold)     return 'rgba(245,158,11,0.65)';
+    return 'rgba(0,128,200,0.5)';
   });
 
   return {
@@ -140,7 +140,7 @@ const chartOption = computed(() => {
         barMaxWidth: 22,
         barMinWidth: 4,
         itemStyle: {
-          color: (params: unknown) => barColors[(params as Record<string, unknown>).dataIndex as number] ?? 'rgba(148,163,184,0.38)',
+          color: (params: unknown) => barColors[(params as Record<string, unknown>).dataIndex as number] ?? 'rgba(0,128,200,0.5)',
           borderRadius: [2, 2, 0, 0],
         },
         emphasis: {
