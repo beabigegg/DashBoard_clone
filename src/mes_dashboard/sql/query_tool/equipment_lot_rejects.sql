@@ -1,10 +1,17 @@
 -- Equipment Lot Reject Detail Query
 -- Resolves equipment IDs to lot CONTAINERID set via LOTWIPHISTORY, then returns
--- one detail row per LOTREJECTHISTORY event for those lots.
+-- one detail row per LOTREJECTHISTORY event for those lots,
+-- restricted to the WORK_CENTER matching the equipment's spec.
+--
+-- Filter logic: equipment SPECNAME → spec_map → WORK_CENTER → matched against
+-- LOTREJECTHISTORY.WORKCENTERNAME. Filtering on WORKCENTERNAME (not SPECNAME)
+-- handles rejects logged after a lot exits the spec step but before it exits
+-- the workcenter. Rejects at unrelated workcenters are excluded.
 --
 -- Cross-station semantic (QT-07): EQUIPMENTNAME in the result reflects the
 -- reject event's equipment, which may differ from the queried equipment IDs
 -- (a lot processed on Furnace-A may have its reject logged under Furnace-B).
+-- Both share the same WORKCENTERNAME, so the cross-station row is retained.
 --
 -- Parameters:
 --   :start_date - Start date (YYYY-MM-DD) — applied on TRACKINTIMESTAMP
@@ -34,8 +41,14 @@ WITH spec_map AS (
     GROUP BY SPEC
 ),
 wip_lots AS (
-    SELECT DISTINCT h.CONTAINERID
+    -- Resolve equipment's SPECNAME → WORK_CENTER via spec_map.
+    -- Filtering on WORKCENTERNAME (not SPECNAME) handles the case where a reject is
+    -- logged after the lot exits the spec step but before it exits the workcenter.
+    SELECT DISTINCT
+        h.CONTAINERID,
+        NVL(TRIM(sm_eq.WORK_CENTER), TRIM(h.WORKCENTERNAME)) AS EQ_WORKCENTERNAME
     FROM DWH.DW_MES_LOTWIPHISTORY h
+    LEFT JOIN spec_map sm_eq ON sm_eq.SPEC = TRIM(h.SPECNAME)
     WHERE h.TRACKINTIMESTAMP >= TO_DATE(:start_date, 'YYYY-MM-DD')
       AND h.TRACKINTIMESTAMP < TO_DATE(:end_date, 'YYYY-MM-DD') + 1
       AND h.EQUIPMENTID IS NOT NULL
@@ -73,6 +86,7 @@ reject_data AS (
         TRUNC(r.TXNDATE) AS TXN_DAY
     FROM wip_lots w
     JOIN DWH.DW_MES_LOTREJECTHISTORY r ON r.CONTAINERID = w.CONTAINERID
+                                       AND TRIM(r.WORKCENTERNAME) = w.EQ_WORKCENTERNAME
     LEFT JOIN DWH.DW_MES_CONTAINER c ON c.CONTAINERID = r.CONTAINERID
     LEFT JOIN spec_map sm ON sm.SPEC = TRIM(r.SPECNAME)
 )
