@@ -1,0 +1,10 @@
+agent: implementation-planner
+change-id: add-db-scheduling-page
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/add-db-scheduling-page/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-5), frontend-engineer (IP-6..IP-10)" }
+  - { type: scope-summary, pointer: "in: new sync GET /api/db-scheduling/queue over WIP cache + new Vue app/drawer; out: Oracle JOIN, endpoint cache, async, MES writes" }
+notes:
+  - "Blueprint registration goes in routes/__init__.py::register_routes, not app.py ~904 (design.md mismatch noted in plan)."
+  - "navigationManifest header comment caps drawer orders at 1..6; order 7 requires comment/nav-contract update."
+  - "EQUIPMENTS single-vs-delimited representation must be confirmed at implementation (drives DB-02 fan-out cardinality)."

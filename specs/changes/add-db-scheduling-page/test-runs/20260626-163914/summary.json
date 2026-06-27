@@ -1,0 +1,15 @@
+{
+  "change_id": "add-db-scheduling-page",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard cdd-kit validate --contracts",
+  "duration_ms": 3502,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-db-scheduling-page/test-runs/20260626-163914/summary.json",
+    "stdout": "specs/changes/add-db-scheduling-page/test-runs/20260626-163914/stdout.log",
+    "stderr": "specs/changes/add-db-scheduling-page/test-runs/20260626-163914/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

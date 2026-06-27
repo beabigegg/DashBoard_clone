@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.29.0"
+    "version": "1.30.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -5646,6 +5646,58 @@
         ],
         "x-cdd-errors": "500"
       }
+    },
+    "/api/db-scheduling/queue": {
+      "get": {
+        "summary": "GET /api/db-scheduling/queue",
+        "responses": {
+          "200": {
+            "description": "Contract response: DbSchedulingQueueResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DbSchedulingQueueResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/db-scheduling/equipment-detail": {
+      "get": {
+        "summary": "GET /api/db-scheduling/equipment-detail",
+        "responses": {
+          "200": {
+            "description": "Contract response: -"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-response-contract": "-",
+        "x-cdd-errors": "400/500"
+      }
     }
   },
   "x-cdd-generated-from": "contracts/api/api-contract.md",
@@ -6814,6 +6866,76 @@
           "admin_links",
           "features",
           "diagnostics"
+        ]
+      },
+      "DbSchedulingQueueResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "lotId": {
+            "type": "string"
+          },
+          "workflowName": {
+            "type": "string"
+          },
+          "packageLef": {
+            "type": "string"
+          },
+          "pjType": {
+            "type": "string"
+          },
+          "waferLot": {
+            "type": "string"
+          },
+          "uts": {
+            "type": "string",
+            "description": "date string YYYY/MM/DD"
+          },
+          "qty": {
+            "type": "integer"
+          },
+          "bop": {
+            "type": "string"
+          },
+          "eqpPackageLef": {
+            "type": "string",
+            "description": "running lot Package LEF on equipment (priority-column key, primary)"
+          },
+          "eqpPjType": {
+            "type": "string",
+            "description": "running lot PJ Type on equipment (priority-column key, secondary)"
+          },
+          "eqpWaferLot": {
+            "type": "string",
+            "description": "running lot Wafer Lot on equipment (priority-column key, tertiary)"
+          },
+          "eqpUts": {
+            "type": "string",
+            "description": "running lot UTS on equipment (priority-column key, quaternary)"
+          },
+          "targetSpec": {
+            "type": "string",
+            "description": "DB process SPEC name"
+          },
+          "equipment": {
+            "type": "string",
+            "description": "single equipment ID; one row per equipment"
+          },
+          "matchSource": {
+            "type": "string",
+            "description": "enum: workflow / bop-fallback / none"
+          }
+        },
+        "required": [
+          "success",
+          "lotId",
+          "workflowName",
+          "qty",
+          "targetSpec",
+          "equipment",
+          "matchSource"
         ]
       }
     }

@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.31.0
-last-changed: 2026-06-25
+schema-version: 1.32.0
+last-changed: 2026-06-26
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -293,6 +293,11 @@ breaking-change-policy: deprecate-2-minors
 | Reject-history `reasons[]` prefilter: empty list or field absent | No SQL clause added; results equivalent to omitting the filter entirely | RHPF-02 | unit + route tests |
 | Reject-history `reasons[]` prefilter: `(未填寫)` in selection | Returns reject records where LOSSREASONNAME is null or blank | RHPF-07 | data-boundary tests |
 | Reject-history `workcenter_groups` sent by caller | No longer accepted; silently ignored (supplementary WHERE layer removed) | RHPF-01 | route tests |
+| D/B-START lot: WORKFLOWNAME match found (STATUS=ACTIVE, EQUIPMENTS NOT NULL) | One row per distinct EQUIPMENT; matchSource="workflow" | DB-02 | unit tests |
+| D/B-START lot: no WORKFLOWNAME match, BOP[0]=U | Query Eutectic D/B + 1DB/2DB group; matchSource="bop-fallback" | DB-03 | unit tests |
+| D/B-START lot: no WORKFLOWNAME match, BOP[0]=E | Query Epoxy D/B only; matchSource="bop-fallback" | DB-03 | unit tests |
+| D/B-START lot: no WORKFLOWNAME match, BOP[0]=P | Query DBCB + Solder Paste + 錫膏網印 group; matchSource="bop-fallback" | DB-03 | unit tests |
+| D/B-START lot: no WORKFLOWNAME match, BOP[0] other or BOP null | No recommendation row; matchSource="none"; no error | DB-03 | unit tests |
 
 ## Material Consumption Rules
 
@@ -371,6 +376,22 @@ breaking-change-policy: deprecate-2-minors
 | 64 | 繼續錯誤 |
 | _any other_ | 未知 |
 
+## DB Scheduling Rules
+
+### DB Process SPEC List (DB-00)
+
+The 焊接_DB workcenter group contains the following 12 DB process SPECs (authoritative; any addition or removal is a business-rules breaking change requiring a new rule revision):
+
+`1DB`, `1DB1WB`, `1DB2WB`, `2DB`, `2DB1WB`, `2DB2WB`, `DBCB`, `Epoxy D/B`, `Eutectic D/B`, `Eutectic D/B-雙晶`, `Solder Paste D/B+E-Clip`, `錫膏網印`
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| DB-01 | D/B-START lot identification | Source lots identified by `SPECNAME = 'D/B-START'` in `DWH.DW_MES_LOT_V` (焊_DB_料 workcenter). Only these lots appear in recommendation output. | unit tests |
+| DB-02 | Primary WORKFLOWNAME match | For each D/B-START lot, query `DWH.DW_MES_LOT_V` for lots at any DB-00 SPEC WHERE `STATUS = 'ACTIVE'` AND `EQUIPMENTS IS NOT NULL` AND `WORKFLOWNAME = <lot's WORKFLOWNAME>`. All distinct non-null `EQUIPMENTS` values collected as recommended equipment. One output row per equipment ID. `matchSource = "workflow"`. | unit tests |
+| DB-03 | BOP fallback when no WORKFLOWNAME match | When DB-02 yields no equipment: inspect `BOP[0]` (first char of lot's BOP field). Dispatch: `U` → query ACTIVE equipment at `{1DB, 1DB1WB, 1DB2WB, 2DB, 2DB1WB, 2DB2WB, Eutectic D/B, Eutectic D/B-雙晶}`; `E` → query ACTIVE equipment at `{Epoxy D/B}`; `P` → query ACTIVE equipment at `{DBCB, Solder Paste D/B+E-Clip, 錫膏網印}`; other/null → `matchSource = "none"`, no row emitted, no error. `matchSource = "bop-fallback"` for U/E/P matches. | unit tests |
+| DB-04 | Sort order | Output rows sorted: `PACKAGE_LEF ASC` → `PJ_TYPE ASC` → `WAFERLOT ASC` → `UTS ASC`. Null values in any sort key sorted last (NULLS LAST). | unit tests |
+| DB-05 | Read-only; no MES writes | Endpoint is strictly GET-only. Queries `DWH.DW_MES_LOT_V` (existing 5-min WIP cache). Does NOT write to Oracle, MES, Redis, or any store. Equipment assignment is advisory only. | — (by design, AC-7) |
+
 ## Change Policy
 
 任何業務邏輯變更必須：
@@ -380,6 +401,10 @@ breaking-change-policy: deprecate-2-minors
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.32.0] — 2026-06-26
+### Added
+- add-db-scheduling-page: `## DB Scheduling Rules` section (DB-01..DB-05) + DB-00 authoritative 12-SPEC list: D/B-START lot identification (SPECNAME='D/B-START'), primary WORKFLOWNAME match (STATUS=ACTIVE + EQUIPMENTS NOT NULL), BOP fallback U/E/P dispatch groups, NULLS LAST sort order, read-only constraint. Five new Decision Table rows. Additive; no existing rules changed.
 
 ## [business 1.31.0] — 2026-06-25
 ### Added

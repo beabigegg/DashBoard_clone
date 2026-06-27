@@ -1,0 +1,26 @@
+change-id: add-db-scheduling-page
+timestamp: 2026-06-26
+agent: contract-reviewer
+status: complete
+
+summary: "Updated 6 contract files; all additive, no breaking changes; 5 version bumps"
+
+artifacts:
+  - type: contracts-updated
+    pointer: "contracts/api/api-contract.md schema-version 1.29.0→1.30.0"
+  - type: contracts-updated
+    pointer: "contracts/api/api-inventory.md schema-version 1.2.7→1.2.8"
+  - type: contracts-updated
+    pointer: "contracts/data/data-shape-contract.md schema-version 1.26.0→1.27.0"
+  - type: contracts-updated
+    pointer: "contracts/business/business-rules.md schema-version 1.31.0→1.32.0"
+  - type: contracts-updated
+    pointer: "contracts/css/css-inventory.md schema-version 1.2.6→1.2.7"
+  - type: contracts-updated
+    pointer: "contracts/CHANGELOG.md 4 entries prepended"
+  - type: breaking-changes
+    pointer: "none — all additive"
+  - type: validation-note
+    pointer: "cdd-kit validate fails on API conformance (expected: backend not yet implemented)"
+
+next-action: test-strategist writes test-plan.md

@@ -281,6 +281,19 @@
       "scope": "in_scope",
       "status": "released",
       "notes": "EAP ALARM Analysis (eap-alarm-analysis change)"
+    },
+    {
+      "route": "/db-scheduling",
+      "route_id": "db-scheduling",
+      "render_mode": "native",
+      "owner": "frontend-mes-reporting",
+      "title": "DB 生產排程助手",
+      "rollback_strategy": "fallback_to_legacy_route",
+      "visibility_policy": "released_or_admin",
+      "scope": "in-scope",
+      "compatibility_policy": "redirect_to_shell_when_spa_enabled",
+      "canonical_shell_path": "/portal-shell/db-scheduling",
+      "notes": "DB scheduling assistant (add-db-scheduling-page change)"
     }
   ]
 }

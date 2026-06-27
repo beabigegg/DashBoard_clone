@@ -1,0 +1,15 @@
+{
+  "change_id": "add-db-scheduling-page",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check 2>&1 && npm run css:check 2>&1 || true",
+  "duration_ms": 9113,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-db-scheduling-page/test-runs/20260626-165358/summary.json",
+    "stdout": "specs/changes/add-db-scheduling-page/test-runs/20260626-165358/stdout.log",
+    "stderr": "specs/changes/add-db-scheduling-page/test-runs/20260626-165358/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -314,6 +314,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     scope: 'in-scope',
     compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
+  '/db-scheduling': buildContract({
+    route: '/db-scheduling',
+    routeId: 'db-scheduling',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: 'DB 生產排程助手',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
 });
 
 const REQUIRED_FIELDS = Object.freeze([

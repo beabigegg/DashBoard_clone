@@ -8,6 +8,22 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.30.0] — 2026-06-26
+### Added
+- add-db-scheduling-page: `GET /api/db-scheduling/queue` (auth required; sync; read-only). Returns D/B-START lot recommended equipment list from `DWH.DW_MES_LOT_V` 5-min WIP cache. Response schema `DbSchedulingQueueResponse` (15 fields including 4 eqp* priority-column keys). One row per equipment per lot; matchSource closed enum `workflow | bop-fallback | none`. Additive; no existing endpoints changed.
+
+## [data 1.27.0] — 2026-06-26
+### Added
+- add-db-scheduling-page: §3.22 DB Scheduling Queue Row — 15-column shape (11 lot/dispatch fields + 4 eqp* priority-column keys from running lot on candidate equipment: `eqpPackageLef`, `eqpPjType`, `eqpWaferLot`, `eqpUts`). One row per equipment per D/B-START lot; sort keys PACKAGE_LEF/PJ_TYPE/WAFERLOT/UTS (NULLS LAST); matchSource closed enum; sync-only; null BOP → zero rows. Additive; no existing schemas changed.
+
+## [business 1.32.0] — 2026-06-26
+### Added
+- add-db-scheduling-page: `## DB Scheduling Rules` section (DB-01..DB-05): D/B-START lot identification (SPECNAME='D/B-START'), primary WORKFLOWNAME match (STATUS=ACTIVE + EQUIPMENTS NOT NULL), BOP fallback U/E/P dispatch groups (authoritative 12-SPEC list), NULLS LAST sort order, read-only constraint. Five new Decision Table rows. Additive; no existing rules changed.
+
+## [css-inventory 1.2.7] — 2026-06-26
+### Added
+- add-db-scheduling-page: `frontend/src/db-scheduling/style.css` registered with `theme-db-scheduling` root. Route-Local Feature Layers table.
+
 ## [api 1.29.0] — 2026-06-25
 ### Changed (BREAKING — monorepo atomic cutover)
 - rh-remove-supplementary-filter: `POST /api/reject-history/query` gains `reasons[]` optional string array (additive; absent/empty = no restriction). `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)` at `{{ BASE_WHERE }}`; sentinel `(未填寫)` distinct from container-level `(NA)`. `workcenter_groups[]` param removed; supplementary `{{ WHERE_CLAUSE }}` layer removed entirely. Sole consumer `frontend/src/reject-history/`; monorepo atomic cutover (same precedent as [api 1.27.0]).

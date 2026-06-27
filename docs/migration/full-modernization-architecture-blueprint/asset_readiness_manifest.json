@@ -56,6 +56,9 @@
     ],
     "/eap-alarm": [
       "eap-alarm.js"
+    ],
+    "/db-scheduling": [
+      "db-scheduling.js"
     ]
   },
   "deferred_routes": []

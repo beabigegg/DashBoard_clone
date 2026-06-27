@@ -75,6 +75,10 @@
     {
       "route": "/eap-alarm",
       "category": "report"
+    },
+    {
+      "route": "/db-scheduling",
+      "category": "report"
     }
   ],
   "deferred": []

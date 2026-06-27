@@ -1,0 +1,15 @@
+{
+  "change_id": "add-db-scheduling-page",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest --collect-only -q tests/test_db_scheduling_navigation.py 2>&1 || true",
+  "duration_ms": 7038,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-db-scheduling-page/test-runs/20260626-165338/summary.json",
+    "stdout": "specs/changes/add-db-scheduling-page/test-runs/20260626-165338/stdout.log",
+    "stderr": "specs/changes/add-db-scheduling-page/test-runs/20260626-165338/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

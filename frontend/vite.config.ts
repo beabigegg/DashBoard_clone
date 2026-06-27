@@ -35,6 +35,7 @@ const INPUT_MAP: Record<string, string> = {
   'material-consumption': resolve(__dirname, 'src/material-consumption/index.html'),
   'downtime-analysis':    resolve(__dirname, 'src/downtime-analysis/index.html'),
   'eap-alarm':            resolve(__dirname, 'src/eap-alarm/index.html'),
+  'db-scheduling':        resolve(__dirname, 'src/db-scheduling/index.html'),
 };
 
 // After each bundle write (including --watch rebuilds), copy HTML entry points

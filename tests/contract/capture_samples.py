@@ -421,6 +421,9 @@ ENDPOINTS = [
      {"table_name": "TEST_TABLE"}, None),
     ("POST", "/api/query_table", "post_query_table", True,
      {"table_name": "TEST_TABLE"}, None),
+    # ── DB Scheduling ─────────────────────────────────────────────────────
+    ("GET",  "/api/db-scheduling/queue", "get_db_scheduling_queue", True,
+     None, None),
 ]
 
 

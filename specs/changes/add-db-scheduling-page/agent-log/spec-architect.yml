@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0013-db-scheduling-reuse-wip-cache-no-dedicated-query.md" }
+  - { type: affected-areas, pointer: "db-scheduling route+service, app.py blueprint, portal-shell nav, db-scheduling Vue app" }
+  - { type: decision-summary, pointer: "reuse 5-min WIP cache view (pandas join + Python BOP fallback); no dedicated Oracle query, no endpoint cache" }
+  - { type: risks-noted, pointer: "0 high, 3 medium (DB-00 list drift, EQUIPMENTS fan-out cardinality, cache-miss fallback coverage)" }

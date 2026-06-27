@@ -121,15 +121,18 @@ class TestCaptureSamples:
             f"stderr: {result.stderr[-2000:]}"
         )
 
-    def test_samples_dir_has_158_files(self):
-        """samples/ dir must have ≥ 158 .json files after a capture run."""
+    def test_samples_dir_has_159_files(self):
+        """samples/ dir must have ≥ 159 .json files after a capture run.
+
+        +1 for GET /api/db-scheduling/queue (add-db-scheduling-page).
+        """
         if not SAMPLES_DIR.exists():
             pytest.skip(
                 "samples/ directory not found — run capture_samples.py first"
             )
         sample_files = list(SAMPLES_DIR.glob("*.json"))
-        assert len(sample_files) >= 158, (
-            f"Expected ≥ 158 sample files, found {len(sample_files)}"
+        assert len(sample_files) >= 159, (
+            f"Expected ≥ 159 sample files, found {len(sample_files)}"
         )
 
     def test_manifest_exists_after_capture(self):

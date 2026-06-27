@@ -1,0 +1,17 @@
+change-id: add-db-scheduling-page
+timestamp: 2026-06-26
+agent: qa-reviewer
+status: complete
+verdict: APPROVED_WITH_NOTES
+
+summary: "All gates green; AC-1..AC-8 covered; 4 non-blocking notes addressed during review"
+
+artifacts:
+  - type: verdict
+    pointer: "APPROVED_WITH_NOTES"
+  - type: gate-results
+    pointer: "collect+targeted+changed-area+contract+full: all pass; 4908 pytest pass; type-check+css:check pass"
+  - type: blocking-findings
+    pointer: "none"
+  - type: non-blocking-notes
+    notes: "§3.22 CONTAINERNAME→LOTID fixed; test-plan tier 1→2 fixed; stale test refs reconciled; EQUIPMENTS single-value assumption documented (no split, consistent with WIP cache)"

@@ -1,0 +1,15 @@
+{
+  "change_id": "add-db-scheduling-page",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/test_db_scheduling_navigation.py -q --maxfail=1 --tb=short -ra 2>&1 || true",
+  "duration_ms": 1409,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-db-scheduling-page/test-runs/20260626-165350/summary.json",
+    "stdout": "specs/changes/add-db-scheduling-page/test-runs/20260626-165350/stdout.log",
+    "stderr": "specs/changes/add-db-scheduling-page/test-runs/20260626-165350/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

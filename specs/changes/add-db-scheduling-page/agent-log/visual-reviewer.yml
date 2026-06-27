@@ -1,0 +1,17 @@
+change-id: add-db-scheduling-page
+timestamp: 2026-06-26
+agent: visual-reviewer
+status: complete
+verdict: APPROVED_WITH_NOTES
+
+summary: "CSS contract fully compliant; badge contrast is pre-existing pattern issue (not new violation); 3 minor non-blocking suggestions"
+
+artifacts:
+  - type: verdict
+    pointer: "APPROVED_WITH_NOTES"
+  - type: blocking-findings
+    pointer: "none"
+  - type: css-compliance
+    pointer: "all rules scoped under .theme-db-scheduling; no @layer; css-inventory.md updated; tokens all resolve"
+  - type: non-blocking-notes
+    notes: "badge contrast (#22c55e+white ~2.3:1) pre-existing pattern; header flex needs flex-wrap for <480px; consider shared LoadingSpinner/ErrorBanner"

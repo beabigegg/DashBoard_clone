@@ -1,0 +1,482 @@
+/* ============================================================
+ * db-scheduling/style.css
+ * ALL top-level rules MUST start with .theme-db-scheduling
+ * Enforced by npm run css:check Rule 6 (portal-shell caches CSS permanently)
+ * ============================================================ */
+
+.theme-db-scheduling {
+  padding: 0 0 32px;
+  background: theme('colors.surface.app');
+  min-height: 100vh;
+}
+
+.theme-db-scheduling .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  margin-bottom: 16px;
+}
+
+.theme-db-scheduling .page-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-db-scheduling .page-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: theme('colors.text.primary');
+  margin: 0;
+}
+
+.theme-db-scheduling .page-subtitle {
+  font-size: 13px;
+  color: theme('colors.text.subtle');
+  margin: 0;
+}
+
+.theme-db-scheduling .btn-refresh {
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.secondary');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.theme-db-scheduling .btn-refresh:hover:not(:disabled) {
+  background: theme('colors.surface.hover');
+}
+
+.theme-db-scheduling .btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Filter bar */
+.theme-db-scheduling .filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 12px 20px 14px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  margin-bottom: 12px;
+  align-items: flex-end;
+}
+
+.theme-db-scheduling .filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.theme-db-scheduling .filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: theme('colors.text.subtle');
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.theme-db-scheduling .multi-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 6px;
+  background: theme('colors.surface.card');
+  color: theme('colors.text.primary');
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: left;
+}
+
+.theme-db-scheduling .multi-select-trigger:hover:not(:disabled) {
+  border-color: theme('colors.brand.500');
+}
+
+.theme-db-scheduling .filter-hint {
+  padding: 40px 20px;
+  text-align: center;
+  color: theme('colors.text.muted');
+  font-size: 14px;
+}
+
+/* Loading state */
+.theme-db-scheduling .loading-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 20px;
+  color: theme('colors.text.muted');
+  font-size: 14px;
+}
+
+.theme-db-scheduling .loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid theme('colors.stroke.soft');
+  border-top-color: theme('colors.brand.500');
+  border-radius: 50%;
+  animation: db-sched-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes db-sched-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error state */
+.theme-db-scheduling .error-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  background: theme('colors.surface.card');
+  border: 1px solid theme('colors.state.danger');
+  border-radius: 6px;
+  margin: 0 20px;
+  color: theme('colors.state.danger');
+  font-size: 14px;
+}
+
+.theme-db-scheduling .error-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Empty state */
+.theme-db-scheduling .empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: theme('colors.text.muted');
+  font-size: 14px;
+}
+
+/* Table */
+.theme-db-scheduling .table-wrap {
+  padding: 0 20px;
+  overflow-x: auto;
+}
+
+.theme-db-scheduling .data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.theme-db-scheduling .data-table thead th {
+  background: theme('colors.token.hf8f9fa');
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 2px solid theme('colors.stroke.soft');
+  font-weight: 600;
+  white-space: nowrap;
+  color: theme('colors.text.subtle');
+}
+
+.theme-db-scheduling .data-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  color: theme('colors.text.primary');
+  white-space: nowrap;
+}
+
+.theme-db-scheduling .data-table tr:hover td {
+  background: theme('colors.surface.hover');
+}
+
+/* Match-source badges */
+.theme-db-scheduling .match-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.theme-db-scheduling .match-badge.badge-success {
+  background: theme('colors.state.success');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-db-scheduling .match-badge.badge-warning {
+  background: theme('colors.state.warning');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-db-scheduling .match-badge.badge-muted {
+  background: theme('colors.state.neutral');
+  color: theme('colors.token.hffffff');
+}
+
+/* Two-level grouped headers */
+.theme-db-scheduling .group-header-row th {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: none;
+}
+
+.theme-db-scheduling .group-header.group-lot {
+  background: theme('colors.token.hf0f4ff');
+  color: theme('colors.text.secondary');
+  border-right: 2px solid theme('colors.stroke.soft');
+}
+
+.theme-db-scheduling .group-header.group-match {
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.subtle');
+}
+
+.theme-db-scheduling .group-header.group-priority {
+  background: theme('colors.token.hf0fdf4');
+  color: theme('colors.text.secondary');
+  border-left: 2px solid theme('colors.stroke.soft');
+}
+
+/* Priority column headers */
+.theme-db-scheduling .priority-col-header {
+  min-width: 130px;
+  font-size: 12px;
+  color: theme('colors.text.subtle');
+  border-left: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-db-scheduling .priority-col-header.priority-pkg_type_wl {
+  color: theme('colors.state.success');
+}
+
+/* Machine cells */
+.theme-db-scheduling .machine-cell {
+  vertical-align: top;
+  padding: 5px 8px;
+  border-left: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-db-scheduling .machine-cell.cell-expandable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.theme-db-scheduling .machine-cell.cell-expandable:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-db-scheduling .pills-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+
+/* 2-column grid for expanded overflow pills */
+.theme-db-scheduling .pills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed theme('colors.stroke.soft');
+}
+
+.theme-db-scheduling .machine-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: theme('colors.surface.muted');
+  color: theme('colors.text.secondary');
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid theme('colors.stroke.soft');
+  white-space: nowrap;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.theme-db-scheduling .machine-pill:hover,
+.theme-db-scheduling .machine-pill:focus-visible {
+  border-color: theme('colors.brand.500');
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.primary');
+  outline: none;
+}
+
+.theme-db-scheduling .pill-overflow {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: theme('colors.surface.app');
+  color: theme('colors.text.muted');
+  font-size: 11px;
+  border: 1px dashed theme('colors.stroke.soft');
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.theme-db-scheduling .cell-empty {
+  color: theme('colors.text.muted');
+  font-size: 12px;
+}
+
+/* ── Pill detail popup ─────────────────────────────────────────────────── */
+
+.theme-db-scheduling .pill-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-db-scheduling .pill-detail-card {
+  background: theme('colors.surface.card');
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 10px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.theme-db-scheduling .pill-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  position: sticky;
+  top: 0;
+  background: theme('colors.surface.card');
+  z-index: 1;
+}
+
+.theme-db-scheduling .pill-detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: theme('colors.text.primary');
+  font-family: monospace;
+}
+
+.theme-db-scheduling .pill-detail-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: theme('colors.text.muted');
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.theme-db-scheduling .pill-detail-close:hover {
+  background: theme('colors.surface.hover');
+  color: theme('colors.text.primary');
+}
+
+.theme-db-scheduling .pill-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  color: theme('colors.text.muted');
+  font-size: 13px;
+}
+
+.theme-db-scheduling .pill-detail-error {
+  padding: 16px;
+  color: theme('colors.state.danger');
+  font-size: 13px;
+}
+
+.theme-db-scheduling .pill-detail-no-lot {
+  padding: 16px;
+  color: theme('colors.text.muted');
+  font-size: 13px;
+  font-style: italic;
+}
+
+.theme-db-scheduling .pill-detail-section {
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-db-scheduling .pill-detail-section:last-child {
+  border-bottom: none;
+}
+
+.theme-db-scheduling .pill-detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: theme('colors.text.subtle');
+  margin-bottom: 8px;
+}
+
+.theme-db-scheduling .pill-detail-grid {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+
+.theme-db-scheduling .pd-label {
+  color: theme('colors.text.muted');
+  padding: 2px 0;
+  align-self: start;
+}
+
+.theme-db-scheduling .pd-value {
+  color: theme('colors.text.primary');
+  font-weight: 500;
+  padding: 2px 0;
+  word-break: break-all;
+}
+
+.theme-db-scheduling .pd-mono {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* E10 status badges */
+.theme-db-scheduling .e10-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.theme-db-scheduling .e10-prd  { background: theme('colors.state.success'); color: theme('colors.token.hffffff'); }
+.theme-db-scheduling .e10-sby  { background: theme('colors.state.warning'); color: theme('colors.token.hffffff'); }
+.theme-db-scheduling .e10-down { background: theme('colors.state.danger');  color: theme('colors.token.hffffff'); }
+.theme-db-scheduling .e10-nst  { background: theme('colors.state.neutral'); color: theme('colors.token.hffffff'); }
+.theme-db-scheduling .e10-other { background: theme('colors.surface.muted'); color: theme('colors.text.secondary'); border: 1px solid theme('colors.stroke.soft'); }
+
+/* prefers-reduced-motion: disable animation */
+@media (prefers-reduced-motion: reduce) {
+  .theme-db-scheduling .loading-spinner {
+    animation: none;
+    border-top-color: theme('colors.stroke.soft');
+  }
+}

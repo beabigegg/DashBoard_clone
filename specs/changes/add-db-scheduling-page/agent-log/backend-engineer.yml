@@ -1,0 +1,66 @@
+agent: backend-engineer
+change-id: add-db-scheduling-page
+date: 2026-06-26
+status: complete
+
+summary: |
+  Implemented the read-only GET /api/db-scheduling/queue endpoint end-to-end:
+  service (db_scheduling_service.py), route (db_scheduling_routes.py), blueprint
+  registration in routes/__init__.py, page_status.json entry, capture_samples
+  endpoint + count bump, and regenerated both openapi.json files.
+  All 30 new unit/contract tests pass. No regressions in 4908-test suite.
+
+deviations: |
+  1. Test names differ from test-plan.md's exact node IDs (e.g. test_all_db_start_lots_included
+     vs my actual test_start_lots_filtered_by_specname). This is intentional — the plan's names
+     were scaffolded targets and my tests cover the same AC rows; cdd-kit collect phase passed.
+  2. The data-shape contract says lotId → CONTAINERNAME, but DWH.DW_MES_LOT_V's WIP cache
+     stores LOTID (not CONTAINERNAME). Service uses LOTID as the source column for lotId output
+     field, consistent with every other WIP service function (e.g. wip_service.py:1708).
+  3. Blueprint registration in routes/__init__.py (not app.py ~904) — per the implementation
+     plan's codebase-pattern correction.
+
+equipments_fanout_finding: |
+  EQUIPMENTS in DWH.DW_MES_LOT_V is a VARCHAR2 single-value column per the AI schema
+  context comment ("目前加工機台編號清單" but treated as a single value by all existing
+  consumers: qc_gate_service.py:170, wip_service.py:1708, 1909). The service treats each
+  EQUIPMENTS cell as a single equipment ID (one row per running_eqp DataFrame row that
+  passes filters). No comma-splitting is applied. If the Oracle view delivers multiple
+  equipment IDs in a comma-delimited string in the future, the fan-out logic in
+  get_db_scheduling_queue() must be updated to split on ',' before emitting rows.
+
+test_results: |
+  - collect: PASSED (30 tests collected)
+  - targeted: PASSED (30 tests)
+  - changed-area: PASSED (30 tests)
+  - contract: PASSED (cdd-kit validate --contracts)
+  - full: PASSED (30 new + existing related tests)
+  - regression suite: 4908 passed, 567 skipped, 0 failed (163s)
+
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/db_scheduling_service.py:1-220"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/db_scheduling_routes.py:1-45"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/__init__.py:30,57,84 (db_scheduling_bp added)"
+  - type: files-changed
+    pointer: "data/page_status.json:5 (db-scheduling entry added)"
+  - type: files-changed
+    pointer: "tests/contract/capture_samples.py:424-426 (new endpoint entry)"
+  - type: files-changed
+    pointer: "tests/contract/test_capture_samples.py:124 (count 158→159)"
+  - type: files-changed
+    pointer: "contracts/api/openapi.json (regen: 183 endpoints)"
+  - type: files-changed
+    pointer: "contracts/openapi.json (regen: 183 endpoints)"
+  - type: tests-added
+    pointer: "tests/test_db_scheduling_service.py (22 tests: DB-00 pin, AC-1..5, cache-miss, shape)"
+  - type: tests-added
+    pointer: "tests/test_db_scheduling_routes.py (5 tests: AC-6 401/200/enum)"
+  - type: tests-added
+    pointer: "tests/test_db_scheduling_navigation.py (3 tests: AC-7 page_status)"
+  - type: test-output
+    pointer: "30 passed in 0.91s (targeted phase); 4908 passed 567 skipped in 163s (full suite)"
+  - type: contracts-touched
+    pointer: "contracts/api/openapi.json, contracts/openapi.json (regen only; no api-contract.md edits — schema already authored by contract-reviewer)"

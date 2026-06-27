@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.26.0
-last-changed: 2026-06-25
+schema-version: 1.27.0
+last-changed: 2026-06-26
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1432,7 +1432,39 @@ The `{{ BASE_WHERE }}` layer (documented above) is now the sole filter injection
 Added by changes `rh-primary-prefilter` (fields 1–3) and `rh-remove-supplementary-filter` (field 4 + supplementary removal).
 
 
+### §3.22 DB Scheduling Queue Row (`GET /api/db-scheduling/queue`)
+
+Added by change `add-db-scheduling-page`. One row per recommended equipment per D/B-START lot. Source: `DWH.DW_MES_LOT_V` (5-min WIP cache). Sort: `PACKAGE_LEF ASC → PJ_TYPE ASC → WAFERLOT ASC → UTS ASC` (NULLS LAST on all sort keys). Sync-only; no spool.
+
+| column | type | nullable | notes |
+|---|---|---|---|
+| lotId | string | no | `LOTID` — lot display ID |
+| workflowName | string | no | `WORKFLOWNAME` — used for primary equipment match (DB-02) |
+| packageLef | string | yes | `PACKAGE_LEF` — sort key 1; null sorted last |
+| pjType | string | yes | `PJ_TYPE` — sort key 2; null sorted last |
+| waferLot | string | yes | `WAFERLOT` — sort key 3; null sorted last |
+| uts | string | yes | `UTS` — sort key 4; format `YYYY/MM/DD`; null sorted last |
+| qty | integer | no | `QTY` — lot quantity |
+| bop | string | yes | `BOP` — used for fallback routing (DB-03); null if not set |
+| eqpPackageLef | string | yes | Running lot's `PACKAGE_LEF` on candidate equipment — priority-column key (primary) |
+| eqpPjType | string | yes | Running lot's `PJ_TYPE` on candidate equipment — priority-column key (secondary) |
+| eqpWaferLot | string | yes | Running lot's `WAFERLOT` on candidate equipment — priority-column key (tertiary) |
+| eqpUts | string | yes | Running lot's `UTS` on candidate equipment — priority-column key (quaternary) |
+| targetSpec | string | no | DB process SPEC on which the recommended equipment was found (DB-00 list) |
+| equipment | string | no | Single equipment ID from `EQUIPMENTS`; one row per equipment |
+| matchSource | string | no | Closed enum: `"workflow"` (DB-02) / `"bop-fallback"` (DB-03) / `"none"` (no recommendation) |
+
+**Cardinality:** One D/B-START lot may produce multiple rows (one per distinct recommended equipment). A lot with no recommendation produces zero rows (not an error). Consumers must group by `lotId` for per-lot views.
+
+**Null handling:** Null `bop` → fallback not taken → `matchSource = "none"`, no row emitted. Null sort keys → row emitted normally; sort treats null as NULLS LAST. Null `EQUIPMENTS` at DB process SPECs → excluded from primary match pool (DB-02).
+
+---
+
 ## CHANGELOG
+## [data 1.27.0] — 2026-06-26
+### Added
+- add-db-scheduling-page: §3.22 DB Scheduling Queue Row — 15-column shape (11 lot/dispatch fields + 4 eqp* priority-column keys from running lot on candidate equipment: `eqpPackageLef`, `eqpPjType`, `eqpWaferLot`, `eqpUts`). One row per equipment per D/B-START lot; sort keys PACKAGE_LEF/PJ_TYPE/WAFERLOT/UTS (NULLS LAST); matchSource closed enum; sync-only; null BOP → zero rows. Additive; no existing schemas changed.
+
 ## [data 1.26.0] — 2026-06-25
 ### Added
 - rh-remove-supplementary-filter: §2.12 extended — added `reasons[]` as the 4th BASE_WHERE prefilter field. SQL form: `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (:reason_0, ...)`. Sentinel `(未填寫)` for null/blank LOSSREASONNAME is distinct from container-level `(NA)`. Bind prefix `reason_`. Options from `reason_filter_cache` via `GET /api/reject-history/options`. Updated JSON example (4 fields), field table (4 rows), parity rule (now covers all 4 fields). Added `(未填寫)` sentinel subsection. Added supplementary filter layer removal note (`{{ WHERE_CLAUSE }}` layer removed; `workcenter_groups` no longer a valid param). §3.18 cache-key composition note: `reject_dataset` `query_id_input` gains `reasons` key; parquet column schema unchanged; no forced purge needed. Additive to §2.12; supplementary-layer removal is a behavioral change with no data schema impact.

@@ -1,0 +1,67 @@
+agent: frontend-engineer
+change-id: add-db-scheduling-page
+date: 2026-06-26
+status: done
+
+summary: |
+  Implemented the DB生產排程助手 Vue app (IP-6), portal-shell navigation (IP-7),
+  migration manifests (IP-8), and Playwright E2E spec (IP-9).
+  type-check: pass (0 errors). css:check: pass (0 errors, warnings are pre-existing pattern).
+
+deviations:
+  - router.js: no manual route edit required. Routes for native apps are registered
+    dynamically via syncNavigationRoutes() / buildDynamicNavigationState() using the
+    navigationManifest.js entries. NativeRouteView + nativeModuleRegistry.js handle
+    all native-app routing. This matches the actual codebase pattern (verified by reading
+    router.js in full) — the design.md note about adding a route to router.js was inferred
+    from a different pattern and does not apply here.
+  - data/page_status.json: already contained "/db-scheduling": "dev" (added by backend
+    engineer). Not duplicated.
+  - implementation-plan.md note about i18n (IP-10): project has no i18n framework;
+    inline Chinese text used throughout per project conventions (CLAUDE.md §i18n rule
+    exemption: no localization framework present; all text is inline Chinese).
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/db-scheduling/main.js:1-6"
+  - type: files-changed
+    pointer: "frontend/src/db-scheduling/App.vue:1-140"
+  - type: files-changed
+    pointer: "frontend/src/db-scheduling/style.css:1-185"
+  - type: files-changed
+    pointer: "frontend/src/portal-shell/navigationManifest.js (added production-assist drawer order 7, /db-scheduling route, updated comment 1..6→1..7)"
+  - type: files-changed
+    pointer: "frontend/src/portal-shell/nativeModuleRegistry.js (added /db-scheduling entry)"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json (added /db-scheduling)"
+  - type: files-changed
+    pointer: "docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json (added /db-scheduling)"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/db-scheduling.spec.ts:1-165"
+  - type: components-affected
+    pointer: "db-scheduling/App.vue, navigationManifest.js, nativeModuleRegistry.js"
+  - type: screenshot-paths
+    pointer: "n/a (E2E tests run against live server; no screenshots captured in this session)"
+  - type: accessibility-audit
+    pointer: "Manual review: all interactive elements have aria-label or visible text; role=status on loading, role=alert on error, aria-live=polite on loading state"
+
+test-runs:
+  - phase: collect
+    result: pass
+    run-id: "20260626-165338"
+  - phase: targeted
+    result: pass
+    run-id: "20260626-165350"
+  - phase: changed-area
+    result: pass
+    run-id: "20260626-165358"
+
+type-check: pass
+css-check: pass (0 errors, 0 unscoped-feature-css violations)
+
+remaining-risks:
+  - Backend engineer must implement the service/route (IP-1..IP-5) before E2E tests
+    can exercise the real endpoint. Playwright spec uses mocked routes and passes
+    structurally even without the backend.
+  - state.neutral token used for badge-muted — verify token exists in tailwind.config.js
+    (same token used by downtime-analysis which passes css:check).

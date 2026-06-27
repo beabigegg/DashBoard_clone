@@ -1,0 +1,15 @@
+{
+  "change_id": "add-db-scheduling-page",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest --collect-only -q tests/test_db_scheduling_service.py tests/test_db_scheduling_routes.py tests/test_db_scheduling_navigation.py",
+  "duration_ms": 3400,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-db-scheduling-page/test-runs/20260626-163838/summary.json",
+    "stdout": "specs/changes/add-db-scheduling-page/test-runs/20260626-163838/stdout.log",
+    "stderr": "specs/changes/add-db-scheduling-page/test-runs/20260626-163838/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

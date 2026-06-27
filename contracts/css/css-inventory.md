@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.6
+schema-version: 1.2.7
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-06-18
+last-changed: 2026-06-26
 ---
 
 # CSS Inventory (Governed Source List)
@@ -59,6 +59,7 @@ last-changed: 2026-06-18
 | `frontend/src/admin-pages/style.css` | `theme-admin-pages` | admin-pages |
 | `frontend/src/anomaly-overview/style.css` | `theme-anomaly-overview` | anomaly-overview |
 | `frontend/src/eap-alarm/style.css` | `theme-eap-alarm` | eap-alarm |
+| `frontend/src/db-scheduling/style.css` | `theme-db-scheduling` | db-scheduling |
 | `frontend/src/downtime-analysis/style.css` | `theme-downtime-analysis` | downtime-analysis |
 | `frontend/src/hold-detail/style.css` | `theme-hold-detail` | hold-detail |
 | `frontend/src/hold-history/style.css` | `theme-hold-history` | hold-history |
@@ -82,3 +83,9 @@ last-changed: 2026-06-18
 ## Synchronization Rule
 
 任何新增/刪除/重新命名/搬移 `frontend/src/**/*.css` 的 PR 必須在同一變更同步更新此清單。
+
+## CHANGELOG
+
+## [css-inventory 1.2.7] — 2026-06-26
+### Added
+- add-db-scheduling-page: `frontend/src/db-scheduling/style.css` registered with `theme-db-scheduling` root. Route-Local Feature Layers table.

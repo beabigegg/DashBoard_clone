@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest --collect-only -q tests/test_db_scheduling_service.py tests/test_db_scheduling_routes.py tests/test_db_scheduling_navigation.py

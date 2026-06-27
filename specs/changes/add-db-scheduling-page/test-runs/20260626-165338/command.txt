@@ -1,0 +1,1 @@
+python -m pytest --collect-only -q tests/test_db_scheduling_navigation.py 2>&1 || true

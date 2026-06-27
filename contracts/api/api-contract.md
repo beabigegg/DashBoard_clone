@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.29.0
-last-changed: 2026-06-25
+schema-version: 1.30.0
+last-changed: 2026-06-26
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -250,6 +250,8 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/eap-alarm/trend | required | ?query_id=&granularity=(day or hour, default day)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/detail | required | ?query_id=&page=&per_page=(max 200)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
+| GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
+| GET | /api/db-scheduling/equipment-detail | required | - | - | 400/500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -450,6 +452,8 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 
 ## Compatibility Notes
+
+- **add-db-scheduling-page (2026-06-26):** 新增 `GET /api/db-scheduling/queue`（auth required；sync；read-only）。返回 D/B-START lot 的推薦設備清單；資料來源 `DWH.DW_MES_LOT_V` 5-min WIP cache。結果按 PACKAGE_LEF → PJ_TYPE → WAFERLOT → UTS 排序。一個 lot 可對應多筆 row（一筆設備一行）。matchSource 閉合 enum：workflow / bop-fallback / none。Additive；無現有端點變更。
 
 - **nav-config-to-code (2026-06-24):** BREAKING — 4 drawer endpoints removed (all return **404**): `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}`. `PUT /admin/api/pages/{route}` body narrows to `{status}` — `name`, `drawer_id`, `order` silently ignored, MUST NOT persist. `GET /admin/api/pages` response narrows to `{pages:[{route,status}]}` — `name`, `drawer_id`, `order` absent. `GET /api/portal/navigation` drops `drawers`, adds `statuses` (route → status map; absent route = released). Sole consumers `frontend/src/admin-pages/` + `portal-shell/` — monorepo atomic cutover, no deprecation window.
 
@@ -1046,3 +1050,23 @@ Tier-B — status feed returned by `GET /api/portal/navigation` (no drawers; str
   "required": ["statuses", "is_admin", "admin_links", "features", "diagnostics"]
 }
 ```
+
+### DbSchedulingQueueResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| lotId | string | yes |  |  |
+| workflowName | string | yes |  |  |
+| packageLef | string | no |  |  |
+| pjType | string | no |  |  |
+| waferLot | string | no |  |  |
+| uts | string | no |  | date string YYYY/MM/DD |
+| qty | integer | yes |  |  |
+| bop | string | no |  |  |
+| eqpPackageLef | string | no |  | running lot Package LEF on equipment (priority-column key, primary) |
+| eqpPjType | string | no |  | running lot PJ Type on equipment (priority-column key, secondary) |
+| eqpWaferLot | string | no |  | running lot Wafer Lot on equipment (priority-column key, tertiary) |
+| eqpUts | string | no |  | running lot UTS on equipment (priority-column key, quaternary) |
+| targetSpec | string | yes |  | DB process SPEC name |
+| equipment | string | yes |  | single equipment ID; one row per equipment |
+| matchSource | string | yes |  | enum: workflow / bop-fallback / none |

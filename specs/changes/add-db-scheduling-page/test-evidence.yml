@@ -1,0 +1,32 @@
+change-id: add-db-scheduling-page
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: python -m pytest --collect-only -q tests/test_db_scheduling_navigation.py 2>&1 || true
+    summary: specs/changes/add-db-scheduling-page/test-runs/20260626-165338/summary.json
+  - phase: targeted
+    status: passed
+    command: python -m pytest tests/test_db_scheduling_navigation.py -q --maxfail=1 --tb=short -ra 2>&1 || true
+    summary: specs/changes/add-db-scheduling-page/test-runs/20260626-165350/summary.json
+  - phase: changed-area
+    status: passed
+    command: cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check 2>&1 && npm run css:check 2>&1 || true
+    summary: specs/changes/add-db-scheduling-page/test-runs/20260626-165358/summary.json
+  - phase: contract
+    status: passed
+    command: conda run -n mes-dashboard cdd-kit validate --contracts
+    summary: specs/changes/add-db-scheduling-page/test-runs/20260626-163914/summary.json
+  - phase: full
+    status: passed
+    command: >-
+      conda run -n mes-dashboard python -m pytest tests/test_db_scheduling_service.py tests/test_db_scheduling_routes.py
+      tests/test_db_scheduling_navigation.py tests/test_navigation_contract.py tests/test_wip_routes.py
+      tests/test_qc_gate_routes.py -v --tb=short
+    summary: specs/changes/add-db-scheduling-page/test-runs/20260626-164135/summary.json
+final-status: passed

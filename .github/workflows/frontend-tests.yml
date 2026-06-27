@@ -66,6 +66,14 @@ jobs:
         # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
         run: npx playwright test tests/playwright/resource-history-async.spec.ts
 
+      - name: Run db-scheduling e2e spec (add-db-scheduling-page, Tier 2 informational)
+        working-directory: frontend
+        # ci-gates.md gate: e2e-db-scheduling (Tier 2, informational — continue-on-error: true)
+        # Covers: drawer 生產輔助 appears, /db-scheduling loads, table renders (test-plan.md E2E rows)
+        # Promote to Tier 1 (required) after 10 consecutive green PR runs with no flakes.
+        run: npx playwright test tests/playwright/db-scheduling.spec.ts
+        continue-on-error: true
+
       - name: Verify test discovery
         working-directory: frontend
         run: |

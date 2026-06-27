@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/test_db_scheduling_service.py tests/test_db_scheduling_routes.py tests/test_db_scheduling_navigation.py tests/test_navigation_contract.py tests/test_wip_routes.py tests/test_qc_gate_routes.py -v --tb=short

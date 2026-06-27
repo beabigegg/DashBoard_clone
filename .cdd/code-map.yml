@@ -1,6 +1,6 @@
-# generated: 2026-06-26T03:54:16Z by cdd-kit 3.6.0
-# files: 955, src-lines: 289283, map-lines: 21003, compression: 13.8x
-# sources-digest: 8d926a4646ad4323dc19bf34b189189d869c8eeb1af201052833ad726cd6fbd7
+# generated: 2026-06-27T03:53:34Z by cdd-kit 3.6.0
+# files: 963, src-lines: 291722, map-lines: 21163, compression: 13.8x
+# sources-digest: 7b79c4ca2becc1709ecd0f0842e3b026661f2e9e549f253c814bd2333f17b1d2
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -754,6 +754,14 @@ frontend/src/core/wip-navigation-state.ts:  # 99 lines
     - { name: WipNavigationFilters, lines: 7-19 }
     - { name: WipNavigationState, lines: 21-34 }
 
+frontend/src/db-scheduling/App.vue:  # 619 lines
+
+frontend/src/db-scheduling/main.js:  # 6 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+
 frontend/src/downtime-analysis/App.vue:  # 576 lines
 
 frontend/src/downtime-analysis/__tests__/css-scope.test.ts:  # 147 lines
@@ -1395,19 +1403,19 @@ frontend/src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-frontend/src/portal-shell/nativeModuleRegistry.js:  # 109 lines
+frontend/src/portal-shell/nativeModuleRegistry.js:  # 113 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 107-109 }
+    - { name: getNativeModuleLoader, lines: 111-113 }
 
 frontend/src/portal-shell/navigationManifest.d.ts:  # 21 lines
   interfaces:
     - { name: ManifestDrawer, lines: 6-11 }
     - { name: ManifestRoute, lines: 13-18 }
 
-frontend/src/portal-shell/navigationManifest.js:  # 168 lines
+frontend/src/portal-shell/navigationManifest.js:  # 176 lines
 
 frontend/src/portal-shell/navigationState.js:  # 299 lines
   imports:
@@ -1422,26 +1430,26 @@ frontend/src/portal-shell/navigationState.js:  # 299 lines
     - { name: normalizeNavigationDrawers, lines: 51-172 }
     - { name: buildDynamicNavigationState, lines: 190-299 }
 
-frontend/src/portal-shell/routeContracts.js:  # 398 lines
+frontend/src/portal-shell/routeContracts.js:  # 409 lines
   constants:
     - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
     - { name: IN_SCOPE_ADMIN_ROUTES, line: 24 }
     - { name: DEFERRED_ROUTES, line: 30 }
     - { name: ALL_KNOWN_ROUTES, line: 32 }
     - { name: ROUTE_CONTRACTS, line: 63 }
-    - { name: REQUIRED_FIELDS, line: 319 }
-    - { name: VALID_RENDER_MODES, line: 332 }
-    - { name: VALID_VISIBILITY_POLICIES, line: 333 }
-    - { name: VALID_SCOPES, line: 334 }
+    - { name: REQUIRED_FIELDS, line: 330 }
+    - { name: VALID_RENDER_MODES, line: 343 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 344 }
+    - { name: VALID_SCOPES, line: 345 }
   functions:
     - { name: buildContract, lines: 38-61 }
-    - { name: normalizeRoutePath, lines: 336-342 }
-    - { name: getRouteContract, lines: 344-346 }
-    - { name: getRouteContractMap, lines: 348-350 }
-    - { name: getInScopeRoutes, lines: 352-354 }
-    - { name: getDeferredRoutes, lines: 356-358 }
-    - { name: getKnownRoutes, lines: 360-362 }
-    - { name: validateRouteContractMap, lines: 364-398 }
+    - { name: normalizeRoutePath, lines: 347-353 }
+    - { name: getRouteContract, lines: 355-357 }
+    - { name: getRouteContractMap, lines: 359-361 }
+    - { name: getInScopeRoutes, lines: 363-365 }
+    - { name: getDeferredRoutes, lines: 367-369 }
+    - { name: getKnownRoutes, lines: 371-373 }
+    - { name: validateRouteContractMap, lines: 375-409 }
 
 frontend/src/portal-shell/routeQuery.js:  # 36 lines
   functions:
@@ -2302,15 +2310,15 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 1070 lines
+frontend/src/yield-alert-center/App.vue:  # 1203 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
-frontend/src/yield-alert-center/YieldPackageChart.vue:  # 128 lines
+frontend/src/yield-alert-center/YieldPackageChart.vue:  # 164 lines
 
 frontend/src/yield-alert-center/YieldStationChart.vue:  # 94 lines
 
-frontend/src/yield-alert-center/YieldTrendChart.vue:  # 132 lines
+frontend/src/yield-alert-center/YieldTrendChart.vue:  # 229 lines
 
 frontend/src/yield-alert-center/main.ts:  # 10 lines
   imports:
@@ -2321,7 +2329,7 @@ frontend/src/yield-alert-center/main.ts:  # 10 lines
     - { module: './style.css', items: [], line: 6 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 706 lines
+frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 710 lines
   imports:
     - { module: vue, items: [ref, readonly, Ref], line: 15 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported, DuckDBClient], line: 16 }
@@ -2344,9 +2352,9 @@ frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 706 lines
     - { name: async queryHeatmap, lines: 320-370 }
     - { name: async queryStationSummary, lines: 372-413 }
     - { name: async queryPackageSummary, lines: 415-453 }
-    - { name: async queryAlerts, lines: 455-592 }
-    - { name: async queryFilterOptions, lines: 594-617 }
-    - { name: useYieldAlertDuckDB, lines: 621-706 }
+    - { name: async queryAlerts, lines: 455-596 }
+    - { name: async queryFilterOptions, lines: 598-621 }
+    - { name: useYieldAlertDuckDB, lines: 625-710 }
   interfaces:
     - { name: SummaryResult, lines: 56-60 }  # local
     - { name: TrendItem, lines: 62-67 }  # local
@@ -2895,6 +2903,18 @@ frontend/tests/playwright/data-boundary/resource-history-progress-malformed.spec
     - { name: MALFORMED_PROGRESS, line: 22 }
   functions:
     - { name: async setupResourceHistoryWithMalformedProgress, lines: 32-72 }
+
+frontend/tests/playwright/db-scheduling.spec.ts:  # 291 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect, Page], line: 20 }
+  constants:
+    - { name: PAGE_URL, line: 26 }
+    - { name: MOCK_QUEUE_ROWS, line: 32 }
+    - { name: MOCK_QUEUE_RESPONSE_DATA, line: 61 }
+    - { name: MOCK_QUEUE_RESPONSE_EMPTY, line: 67 }
+  functions:
+    - { name: async setupBaseRoutes, lines: 81-117 }
+    - { name: async isPageRendered, lines: 123-128 }
 
 frontend/tests/playwright/downtime-analysis.spec.js:  # 629 lines
   imports:
@@ -3598,7 +3618,7 @@ frontend/tests/yield-alert/App.cross-filter.test.js:  # 454 lines
     - { name: MultiSelectStub, lines: 42-50 }
     - { name: buildViewPayload, lines: 52-86 }
 
-frontend/vite.config.ts:  # 124 lines
+frontend/vite.config.ts:  # 125 lines
   imports:
     - { module: 'node:fs', items: [copyFileSync, existsSync], line: 1 }
     - { module: 'node:path', items: [join, relative, resolve], line: 2 }
@@ -3611,7 +3631,7 @@ frontend/vite.config.ts:  # 124 lines
     - { name: OUT_DIR, line: 9 }
     - { name: INPUT_MAP, line: 14 }
   functions:
-    - { name: copyHtmlPlugin, lines: 42-57 }
+    - { name: copyHtmlPlugin, lines: 43-58 }
 
 frontend/vitest.config.js:  # 24 lines
   imports:
@@ -5158,7 +5178,7 @@ src/mes_dashboard/core/worker_recovery_policy.py:  # 220 lines
     - { name: evaluate_worker_recovery_state, lines: 95-156 }
     - { name: decide_restart_request, lines: 159-219 }
 
-src/mes_dashboard/routes/__init__.py:  # 85 lines
+src/mes_dashboard/routes/__init__.py:  # 88 lines
   imports:
     - { module: '.wip_routes', items: [wip_bp], line: 7 }
     - { module: '.resource_routes', items: [resource_bp], line: 8 }
@@ -5184,8 +5204,9 @@ src/mes_dashboard/routes/__init__.py:  # 85 lines
     - { module: '.material_consumption_routes', items: [material_consumption_bp], line: 28 }
     - { module: '.downtime_analysis_routes', items: [downtime_analysis_bp], line: 29 }
     - { module: '.eap_alarm_routes', items: [eap_alarm_bp], line: 30 }
+    - { module: '.db_scheduling_routes', items: [db_scheduling_bp], line: 31 }
   functions:
-    - { name: register_routes, lines: 33-57 }
+    - { name: register_routes, lines: 34-59 }
 
 src/mes_dashboard/routes/admin_routes.py:  # 1410 lines
   imports:
@@ -5291,6 +5312,15 @@ src/mes_dashboard/routes/dashboard_routes.py:  # 113 lines
     - { name: api_dashboard_detail, lines: 61-77 }  # @dashboard_bp.route('/detail', methods=['POST'])
     - { name: api_dashboard_ou_trend, lines: 81-95 }  # @dashboard_bp.route('/ou_trend', methods=['POST'])
     - { name: api_dashboard_utilization_heatmap, lines: 99-113 }  # @dashboard_bp.route('/utilization_heatmap', methods=['POST'])
+
+src/mes_dashboard/routes/db_scheduling_routes.py:  # 77 lines
+  imports:
+    - { module: flask, items: [Blueprint, request], line: 11 }
+    - { module: mes_dashboard.core.response, items: [INTERNAL_ERROR, error_response, success_response], line: 13 }
+    - { module: mes_dashboard.services.db_scheduling_service, items: [get_db_scheduling_queue, get_equipment_detail], line: 18 }
+  functions:
+    - { name: get_queue, lines: 29-48 }  # @db_scheduling_bp.route('/queue', methods=['GET'])
+    - { name: equipment_detail, lines: 52-77 }  # @db_scheduling_bp.route('/equipment-detail', methods=['GET'])
 
 src/mes_dashboard/routes/downtime_analysis_routes.py:  # 610 lines
   imports:
@@ -5870,7 +5900,7 @@ src/mes_dashboard/routes/wip_routes.py:  # 566 lines
     - { name: api_meta_filter_options, lines: 462-498 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
     - { name: api_meta_search, lines: 502-566 }  # @wip_bp.route('/meta/search')
 
-src/mes_dashboard/routes/yield_alert_routes.py:  # 657 lines
+src/mes_dashboard/routes/yield_alert_routes.py:  # 658 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5899,10 +5929,10 @@ src/mes_dashboard/routes/yield_alert_routes.py:  # 657 lines
     - { name: api_yield_alert_summary, lines: 415-451 }  # @yield_alert_bp.route('/api/yield-alert/summary', methods=['GET'])
     - { name: api_yield_alert_trend, lines: 456-484 }  # @yield_alert_bp.route('/api/yield-alert/trend', methods=['GET'])
     - { name: api_yield_alert_alerts, lines: 489-568 }  # @yield_alert_bp.route('/api/yield-alert/alerts', methods=['GET'])
-    - { name: api_yield_alert_reason_detail, lines: 573-595 }  # @yield_alert_bp.route('/api/yield-alert/reason-detail', methods=['GET'])
-    - { name: api_yield_alert_drilldown_context, lines: 600-620 }  # @yield_alert_bp.route('/api/yield-alert/drilldown-context', methods=['GET'])
-    - { name: api_yield_alert_filter_options, lines: 625-636 }  # @yield_alert_bp.route('/api/yield-alert/filter-options', methods=['GET'])
-    - { name: api_yield_alert_cross_filter_options, lines: 641-657 }  # @yield_alert_bp.route('/api/yield-alert/cross-filter-options', methods=['GET'])
+    - { name: api_yield_alert_reason_detail, lines: 573-596 }  # @yield_alert_bp.route('/api/yield-alert/reason-detail', methods=['GET'])
+    - { name: api_yield_alert_drilldown_context, lines: 601-621 }  # @yield_alert_bp.route('/api/yield-alert/drilldown-context', methods=['GET'])
+    - { name: api_yield_alert_filter_options, lines: 626-637 }  # @yield_alert_bp.route('/api/yield-alert/filter-options', methods=['GET'])
+    - { name: api_yield_alert_cross_filter_options, lines: 642-658 }  # @yield_alert_bp.route('/api/yield-alert/cross-filter-options', methods=['GET'])
 
 src/mes_dashboard/rq_worker_preload.py:  # 55 lines
   imports:
@@ -6318,6 +6348,27 @@ src/mes_dashboard/services/dashboard_service.py:  # 504 lines
     - { name: query_resource_detail_with_job, lines: 217-336 }
     - { name: query_ou_trend, lines: 343-420 }
     - { name: query_utilization_heatmap, lines: 427-504 }
+
+src/mes_dashboard/services/db_scheduling_service.py:  # 378 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: logging, items: [], line: 17 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 18 }
+    - { module: pandas, items: [], line: 20 }
+    - { module: mes_dashboard.core.cache, items: [get_cached_wip_data], line: 22 }
+    - { module: mes_dashboard.core.database, items: [read_sql_df], line: 23 }
+  constants:
+    - { name: DB_PROCESS_SPECS, line: 31 }
+    - { name: REGION_LOCATION_MAP, line: 38 }
+    - { name: BOP_FALLBACK_GROUPS, line: 45 }
+  functions:
+    - { name: _safe_value, lines: 72-86 }
+    - { name: _safe_int, lines: 89-96 }
+    - { name: _load_wip_df, lines: 99-117 }
+    - { name: _make_row, lines: 120-152 }
+    - { name: get_db_scheduling_queue, lines: 159-298 }
+    - { name: _safe_float, lines: 305-312 }
+    - { name: get_equipment_detail, lines: 315-378 }
 
 src/mes_dashboard/services/downtime_analysis_cache.py:  # 206 lines
   imports:
@@ -8366,7 +8417,7 @@ src/mes_dashboard/services/yield_alert_job_service.py:  # 164 lines
     - { name: enqueue_yield_alert_query, lines: 62-86 }
     - { name: execute_yield_alert_job, lines: 93-152 }
 
-src/mes_dashboard/services/yield_alert_service.py:  # 952 lines
+src/mes_dashboard/services/yield_alert_service.py:  # 970 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -8391,37 +8442,37 @@ src/mes_dashboard/services/yield_alert_service.py:  # 952 lines
     - { name: VALID_GRANULARITY, line: 33 }
     - { name: VALID_SORT_FIELDS, line: 34 }
   functions:
-    - { name: _normalize_process_category, lines: 96-101 }
-    - { name: _parse_date, lines: 104-105 }
-    - { name: validate_date_range, lines: 108-115 }
-    - { name: normalize_reason_code, lines: 118-144 }
-    - { name: build_canonical_key, lines: 147-151 }
-    - { name: _normalize_yield_department_group, lines: 154-176 }
-    - { name: expand_workcenter_groups_to_departments, lines: 179-203 }
-    - { name: get_yield_workcenter_group_options, lines: 206-236 }
-    - { name: _normalize_tokens, lines: 239-252 }
-    - { name: normalize_query_key_payload, lines: 255-269 }
-    - { name: build_query_cache_key, lines: 272-274 }
-    - { name: _load_sql, lines: 277-278 }
-    - { name: _bucket_expr, lines: 281-286 }
-    - { name: _build_optional_where, lines: 289-299 }
-    - { name: _load_excluded_reason_tokens, lines: 302-308 }
-    - { name: _build_normalized_exclusion_tokens, lines: 311-317 }
-    - { name: _build_reason_exclusion_clause, lines: 320-334 }
-    - { name: _namespace_bind_params, lines: 337-347 }
-    - { name: _bucket_to_text, lines: 350-353 }
-    - { name: _query_filtered_scrap_total, lines: 356-388 }
-    - { name: _query_filtered_scrap_trend, lines: 391-428 }
-    - { name: _safe_float, lines: 431-437 }
-    - { name: _chunked, lines: 440-443 }
-    - { name: query_yield_summary, lines: 446-461 }
-    - { name: query_yield_trend, lines: 464-480 }
-    - { name: _risk_level, lines: 483-490 }
-    - { name: _compute_reject_linkage, lines: 493-569 }
-    - { name: query_alert_candidates, lines: 572-814 }
-    - { name: _bucket_to_date_range, lines: 817-849 }
-    - { name: query_reason_detail, lines: 852-913 }
-    - { name: build_drilldown_payload, lines: 916-952 }
+    - { name: _normalize_process_category, lines: 100-105 }
+    - { name: _parse_date, lines: 108-109 }
+    - { name: validate_date_range, lines: 112-119 }
+    - { name: normalize_reason_code, lines: 122-148 }
+    - { name: build_canonical_key, lines: 151-155 }
+    - { name: _normalize_yield_department_group, lines: 158-180 }
+    - { name: expand_workcenter_groups_to_departments, lines: 183-207 }
+    - { name: get_yield_workcenter_group_options, lines: 210-240 }
+    - { name: _normalize_tokens, lines: 243-256 }
+    - { name: normalize_query_key_payload, lines: 259-273 }
+    - { name: build_query_cache_key, lines: 276-278 }
+    - { name: _load_sql, lines: 281-282 }
+    - { name: _bucket_expr, lines: 285-290 }
+    - { name: _build_optional_where, lines: 293-303 }
+    - { name: _load_excluded_reason_tokens, lines: 306-312 }
+    - { name: _build_normalized_exclusion_tokens, lines: 315-321 }
+    - { name: _build_reason_exclusion_clause, lines: 324-338 }
+    - { name: _namespace_bind_params, lines: 341-351 }
+    - { name: _bucket_to_text, lines: 354-357 }
+    - { name: _query_filtered_scrap_total, lines: 360-392 }
+    - { name: _query_filtered_scrap_trend, lines: 395-432 }
+    - { name: _safe_float, lines: 435-441 }
+    - { name: _chunked, lines: 444-447 }
+    - { name: query_yield_summary, lines: 450-465 }
+    - { name: query_yield_trend, lines: 468-484 }
+    - { name: _risk_level, lines: 487-494 }
+    - { name: _compute_reject_linkage, lines: 497-573 }
+    - { name: query_alert_candidates, lines: 576-828 }
+    - { name: _bucket_to_date_range, lines: 831-863 }
+    - { name: query_reason_detail, lines: 866-931 }
+    - { name: build_drilldown_payload, lines: 934-970 }
 
 src/mes_dashboard/services/yield_alert_sql_runtime.py:  # 980 lines
   imports:
@@ -8736,7 +8787,7 @@ tests/conftest.py:  # 196 lines
     - { name: pytest_addoption, lines: 144-169 }
     - { name: pytest_collection_modifyitems, lines: 172-196 }
 
-tests/contract/capture_samples.py:  # 631 lines
+tests/contract/capture_samples.py:  # 634 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: json, items: [], line: 23 }
@@ -8744,20 +8795,20 @@ tests/contract/capture_samples.py:  # 631 lines
     - { module: pathlib, items: [], line: 25 }
     - { module: sys, items: [], line: 26 }
     - { module: mes_dashboard.app, items: [create_app], line: 50 }
-    - { module: re, items: [], line: 443 }
+    - { module: re, items: [], line: 446 }
   constants:
     - { name: REPO_ROOT, line: 29 }
     - { name: SAMPLES_DIR, line: 52 }
     - { name: MANIFEST_PATH, line: 53 }
     - { name: ENDPOINTS, line: 59 }
   functions:
-    - { name: _make_key, lines: 427-428 }
-    - { name: _need_admin, lines: 431-439 }
-    - { name: _canonical_manifest_key, lines: 446-457 }
-    - { name: capture, lines: 459-522 }
-    - { name: main, lines: 525-627 }
+    - { name: _make_key, lines: 430-431 }
+    - { name: _need_admin, lines: 434-442 }
+    - { name: _canonical_manifest_key, lines: 449-460 }
+    - { name: capture, lines: 462-525 }
+    - { name: main, lines: 528-630 }
 
-tests/contract/test_capture_samples.py:  # 144 lines
+tests/contract/test_capture_samples.py:  # 147 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: json, items: [], line: 11 }
@@ -8774,13 +8825,13 @@ tests/contract/test_capture_samples.py:  # 144 lines
     - { name: OFFLINE_ENV, line: 25 }
   classes:
     - name: TestCaptureSamples
-      lines: 44-144
+      lines: 44-147
       methods:
         - { name: test_capture_script_exists, lines: 47-51 }
         - { name: test_auth_endpoints_get_session_cookie, lines: 53-104 }
         - { name: test_capture_runs_without_error, lines: 106-122 }
-        - { name: test_samples_dir_has_158_files, lines: 124-133 }
-        - { name: test_manifest_exists_after_capture, lines: 135-144 }
+        - { name: test_samples_dir_has_159_files, lines: 124-136 }
+        - { name: test_manifest_exists_after_capture, lines: 138-147 }
 
 tests/contract/test_doctor_clean.py:  # 78 lines
   imports:
@@ -13943,6 +13994,115 @@ tests/test_datetime_normalization.py:  # 168 lines
     - { name: _import_reject_default, lines: 25-27 }
     - { name: _import_yield_default, lines: 30-32 }
     - { name: _import_validate, lines: 35-37 }
+
+tests/test_db_scheduling_navigation.py:  # 56 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: json, items: [], line: 14 }
+    - { module: pathlib, items: [Path], line: 15 }
+    - { module: pytest, items: [], line: 17 }
+  constants:
+    - { name: ROOT, line: 19 }
+    - { name: PAGE_STATUS_FILE, line: 20 }
+  classes:
+    - name: TestPageStatusEntry
+      lines: 23-43
+      methods:
+        - { name: test_page_status_entry_exists, lines: 26-33 }
+        - { name: test_page_status_db_scheduling_is_dev_or_released, lines: 35-43 }
+    - name: TestDbSchedulingInAllPages
+      lines: 46-56
+      methods:
+        - { name: test_db_scheduling_in_all_pages, lines: 49-56 }
+
+tests/test_db_scheduling_routes.py:  # 166 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 10 }
+    - { module: json, items: [], line: 12 }
+    - { module: unittest.mock, items: [patch], line: 13 }
+    - { module: pytest, items: [], line: 15 }
+    - { module: mes_dashboard.core.database, items: [], line: 17 }
+    - { module: mes_dashboard.app, items: [create_app], line: 18 }
+  classes:
+    - name: TestQueueAuth
+      lines: 47-58
+      methods:
+        - { name: test_queue_unauthenticated, lines: 48-58 }
+    - name: TestQueueShape
+      lines: 65-125
+      methods:
+        - { name: test_queue_authenticated_shape, lines: 68-104 }
+        - { name: test_queue_empty_list_is_valid, lines: 107-115 }
+        - { name: test_queue_500_on_service_exception, lines: 118-125 }
+    - name: TestMatchSourceEnum
+      lines: 132-166
+      methods:
+        - { name: test_queue_match_source_values, lines: 137-166 }
+  functions:
+    - { name: app, lines: 22-26 }  # @pytest.fixture()
+    - { name: client, lines: 30-31 }  # @pytest.fixture()
+    - { name: auth_client, lines: 35-40 }  # @pytest.fixture()
+
+tests/test_db_scheduling_service.py:  # 524 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 14 }
+    - { module: pandas, items: [], line: 16 }
+    - { module: pytest, items: [], line: 17 }
+    - { module: unittest.mock, items: [patch], line: 18 }
+    - { module: mes_dashboard.services.db_scheduling_service, items: [get_db_scheduling_queue, DB_PROCESS_SPECS, BOP_FALLBACK_GROUPS], line: 20 }
+  classes:
+    - name: TestDb00SpecList
+      lines: 31-50
+      methods:
+        - { name: test_db_process_specs_has_12_items, lines: 34-35 }
+        - { name: test_db_process_specs_contains_all_expected, lines: 37-43 }
+        - { name: test_bop_fallback_groups_union_subset_of_db_process_specs, lines: 45-50 }
+    - name: TestStartLotFiltering
+      lines: 85-123
+      methods:
+        - { name: test_start_lots_filtered_by_specname, lines: 88-103 }
+        - { name: test_null_bop_returns_empty_rows, lines: 105-123 }
+    - name: TestWorkflowMatch
+      lines: 130-200
+      methods:
+        - { name: test_workflow_match_primary, lines: 133-149 }
+        - { name: test_workflow_match_sets_equipment, lines: 151-166 }
+        - { name: test_workflow_match_requires_active_status, lines: 168-184 }
+        - { name: test_workflow_match_requires_non_null_equipments, lines: 186-200 }
+    - name: TestBopFallback
+      lines: 207-313
+      methods:
+        - { name: _start_lot, lines: 210-212 }
+        - { name: _running_lot, lines: 214-217 }
+        - { name: test_bop_fallback_U, lines: 219-232 }
+        - { name: test_bop_fallback_E, lines: 234-247 }
+        - { name: test_bop_fallback_P, lines: 249-262 }
+        - { name: test_bop_fallback_unknown, lines: 264-275 }
+        - { name: test_bop_fallback_no_match_source_none_is_not_emitted, lines: 277-288 }
+        - { name: test_bop_fallback_only_fires_when_no_workflow_match, lines: 290-313 }
+    - name: TestSortOrder
+      lines: 320-377
+      methods:
+        - { name: test_sort_order_nulls_last, lines: 323-355 }
+        - { name: test_sort_primary_key_is_package_lef, lines: 357-377 }
+    - name: TestNoMatchNoBop
+      lines: 384-399
+      methods:
+        - { name: test_no_match_no_bop_returns_none_source, lines: 387-399 }
+    - name: TestCacheMissFallback
+      lines: 406-441
+      methods:
+        - { name: test_cache_miss_returns_empty_list, lines: 409-421 }
+        - { name: test_cache_miss_with_oracle_fallback_returns_data, lines: 423-441 }
+    - name: TestRowShape
+      lines: 448-524
+      methods:
+        - { name: test_row_has_all_required_fields, lines: 461-478 }
+        - { name: test_eqp_fields_come_from_running_lot_not_start_lot, lines: 480-508 }
+        - { name: test_qty_is_integer, lines: 510-524 }
+  functions:
+    - { name: _make_wip_df, lines: 57-73 }
+    - { name: _df, lines: 76-78 }
 
 tests/test_degraded_responses.py:  # 86 lines
   imports:

@@ -1,0 +1,16 @@
+change-id: add-db-scheduling-page
+timestamp: 2026-06-26
+agent: ci-cd-gatekeeper
+status: complete
+
+summary: "Tier 2 change; no new workflows needed; openapi-sync is required gate; one informational Playwright step added to frontend-tests.yml"
+
+artifacts:
+  - type: tiers-modified
+    pointer: "1, 2"
+  - type: gate-promotions
+    pointer: "n/a (no gate moved between tiers; e2e-db-scheduling placed at Tier 2 informational)"
+  - type: workflow-files-changed
+    pointer: ".github/workflows/frontend-tests.yml (one step added: Run db-scheduling e2e spec)"
+  - type: required-status-checks
+    pointer: "unit-and-integration-tests, type-check, openapi-sync, css:check, frontend-unit-vitest"

@@ -102,6 +102,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../admin-pages/App.vue'),
     [() => import('../styles/tailwind.css'), () => import('../admin-pages/style.css')],
   ),
+  '/db-scheduling': createNativeLoader(
+    () => import('../db-scheduling/App.vue'),
+    [() => import('../db-scheduling/style.css')],
+  ),
 });
 
 export function getNativeModuleLoader(route) {

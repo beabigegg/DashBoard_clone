@@ -1,0 +1,10 @@
+agent: test-strategist
+date: 2026-06-26
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/add-db-scheduling-page/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_db_scheduling_service.py → src/mes_dashboard/services/db_scheduling_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_db_scheduling_routes.py → src/mes_dashboard/routes/db_scheduling_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/test_db_scheduling_navigation.py → frontend/src/portal-shell/navigationManifest.js + data/page_status.json" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/db-scheduling.spec.ts → frontend/src/db-scheduling/" }
+  - { type: coverage-tiers, pointer: "unit (tier-0), contract (tier-1), e2e (tier-1), data-boundary (tier-1)" }
+  - { type: mapping-completeness, pointer: "all 8 ACs covered; 17 test cases mapped across 4 new files + 2 extensions" }

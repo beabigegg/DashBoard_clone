@@ -1,0 +1,15 @@
+change-id: add-db-scheduling-page
+timestamp: 2026-06-26
+agent: ui-ux-reviewer
+status: complete
+verdict: APPROVED_WITH_NOTES
+
+summary: "7 non-blocking notes; no blocking issues; matchSource badge contrast and UTS label accuracy are key observations"
+
+artifacts:
+  - type: verdict
+    pointer: "APPROVED_WITH_NOTES"
+  - type: blocking-findings
+    pointer: "none"
+  - type: non-blocking-notes
+    notes: "badge-warning contrast (white-on-amber ~2.8:1); error state lacks inline retry; empty state missing 5-min cadence hint; UTS/完工日期 label accuracy needs domain confirm; no last-updated timestamp; matchSource column order (ergonomic); drawer item label could be more precise"

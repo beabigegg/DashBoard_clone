@@ -9,7 +9,7 @@
  *
  * Rules:
  *   - Every route key MUST exist in nativeModuleRegistry.js (mount gate).
- *   - drawer orders MUST be distinct integers (1..6).
+ *   - drawer orders MUST be distinct integers (1..7).
  *   - page orders MUST be distinct within each drawer.
  *   - displayName values are verbatim from current-behavior.md (AC-1/AC-5).
  *   - Standalone routes (/, /wip-detail, /hold-detail, /anomaly-overview)
@@ -26,7 +26,8 @@ export const drawers = Object.freeze([
   { id: 'query-tools',     name: '查詢工具', order: 3, admin_only: false },
   { id: 'trace-tools',     name: '追溯工具', order: 4, admin_only: false },
   { id: 'eap-analysis',    name: 'EAP',      order: 5, admin_only: false },
-  { id: 'dev-tools',       name: '開發工具', order: 6, admin_only: true  },
+  { id: 'dev-tools',          name: '開發工具', order: 6, admin_only: true  },
+  { id: 'production-assist',  name: '生產輔助', order: 7, admin_only: false },
 ]);
 
 /**
@@ -141,6 +142,13 @@ export const routes = Object.freeze({
     drawerId: 'eap-analysis',
     order: 1,
     displayName: 'EAP ALARM 分析',
+  },
+
+  // ── 生產輔助 (production-assist, order 7) ──────────────────────────────
+  '/db-scheduling': {
+    drawerId: 'production-assist',
+    order: 1,
+    displayName: 'DB 排程助手',
   },
 
   // ── Standalone / drilldown routes (no drawer) ───────────────────────────

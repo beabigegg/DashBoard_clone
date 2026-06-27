@@ -1,0 +1,1 @@
+python -m pytest tests/test_db_scheduling_navigation.py -q --maxfail=1 --tb=short -ra 2>&1 || true
