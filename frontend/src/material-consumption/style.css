@@ -7,11 +7,10 @@
  */
 
 .theme-material-consumption {
-  /* Layout */
+  /* Layout — no extra padding; shell-content already provides 16px */
   display: flex;
   flex-direction: column;
   gap: theme('spacing.token.p16');
-  padding: theme('spacing.token.p16');
   min-height: 100vh;
   background: theme('colors.surface.app');
 }
@@ -123,11 +122,13 @@
   height: 36px;
   width: 100%;
   box-sizing: border-box;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .theme-material-consumption .filter-input:focus {
-  outline: 2px solid theme('colors.brand.500');
-  outline-offset: 1px;
+  outline: none;
+  border-color: theme('colors.brand.500');
+  box-shadow: 0 0 0 3px rgba(0,128,200,0.12);
 }
 
 .theme-material-consumption .filter-textarea {
@@ -179,30 +180,67 @@
 }
 
 .theme-material-consumption .granularity-btn {
-  padding: theme('spacing.token.p4') theme('spacing.token.p12');
+  position: relative;
+  overflow: hidden;
+  padding: theme('spacing.token.p5') theme('spacing.token.p14');
   border: 1px solid theme('colors.stroke.soft');
   border-radius: theme('borderRadius.button');
   background: theme('colors.surface.card');
   font-size: theme('fontSize.xs.0');
+  font-weight: 500;
   cursor: pointer;
-  color: theme('colors.text.primary');
-  transition: background 120ms ease, border-color 120ms ease;
+  color: theme('colors.text.secondary');
+  transition: background 160ms ease, border-color 160ms ease,
+              color 160ms ease, transform 100ms ease, box-shadow 160ms ease;
+}
+
+.theme-material-consumption .granularity-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,128,200,0.06);
+  opacity: 0;
+  transition: opacity 160ms ease;
 }
 
 .theme-material-consumption .granularity-btn:hover {
   background: theme('colors.surface.hover');
+  border-color: theme('colors.brand.400');
+  color: theme('colors.brand.500');
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,128,200,0.12);
+}
+
+.theme-material-consumption .granularity-btn:active {
+  transform: translateY(0);
+}
+
+/* Active state — solid brand + persistent glow pulse */
+@keyframes mc-btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,128,200,0.35), 0 2px 8px rgba(0,128,200,0.3); }
+  50%       { box-shadow: 0 0 0 4px rgba(0,128,200,0.12), 0 2px 8px rgba(0,128,200,0.3); }
 }
 
 .theme-material-consumption .granularity-btn--active {
   background: theme('colors.brand.500');
   color: theme('colors.surface.card');
   border-color: theme('colors.brand.500');
+  font-weight: 600;
+  animation: mc-btn-pulse 2.4s ease-in-out infinite;
 }
 
 .theme-material-consumption .granularity-btn--active:hover {
   background: theme('colors.brand.600');
   color: theme('colors.surface.card');
   border-color: theme('colors.brand.600');
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-material-consumption .granularity-btn--active {
+    animation: none;
+    box-shadow: 0 2px 8px rgba(0,128,200,0.3);
+  }
 }
 
 /* --- Filter actions --- */
@@ -264,7 +302,7 @@
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color 150ms ease, border-color 150ms ease;
 }
 
 .theme-material-consumption .tab-btn:hover {
@@ -297,9 +335,10 @@
 }
 
 .theme-material-consumption .chart-title {
-  font-size: theme('fontSize.sm.0');
+  font-size: theme('fontSize.base.0');
   font-weight: 600;
   color: theme('colors.text.primary');
+  letter-spacing: 0.01em;
 }
 
 .theme-material-consumption .chart-loading {
@@ -324,12 +363,12 @@
 
 /* --- VChart sizing --- */
 .theme-material-consumption .vchart-trend {
-  height: 320px;
+  height: 340px;
   width: 100%;
 }
 
 .theme-material-consumption .vchart-breakdown {
-  height: 320px;
+  height: 340px;
   width: 100%;
 }
 
@@ -346,6 +385,7 @@
   display: flex;
   gap: theme('spacing.token.p8');
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .theme-material-consumption .detail-actions {
@@ -394,6 +434,8 @@
 
 /* --- Buttons (ui-btn base) --- */
 .theme-material-consumption .ui-btn {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: theme('spacing.token.p6');
@@ -403,13 +445,35 @@
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease,
+              transform 100ms ease, box-shadow 150ms ease;
   white-space: nowrap;
 }
 
 .theme-material-consumption .ui-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.theme-material-consumption .ui-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Sheen overlay (re-triggered on every hover via transition trick) */
+.theme-material-consumption .ui-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%);
+  transform: skewX(-18deg);
+}
+
+.theme-material-consumption .ui-btn:hover:not(:disabled)::before {
+  left: 160%;
+  transition: left 0.5s ease;
 }
 
 .theme-material-consumption .ui-btn--primary {
@@ -421,6 +485,8 @@
 .theme-material-consumption .ui-btn--primary:hover:not(:disabled) {
   background: theme('colors.brand.600');
   border-color: theme('colors.brand.600');
+  box-shadow: 0 4px 12px rgba(0,128,200,0.35);
+  transform: translateY(-1px);
 }
 
 .theme-material-consumption .ui-btn--secondary {
@@ -431,6 +497,19 @@
 
 .theme-material-consumption .ui-btn--secondary:hover:not(:disabled) {
   background: theme('colors.surface.hover');
+  border-color: theme('colors.brand.400');
+  color: theme('colors.brand.500');
+  box-shadow: 0 2px 8px rgba(0,128,200,0.12);
+  transform: translateY(-1px);
+}
+
+/* Export CSV button — accent glow on hover */
+.theme-material-consumption .export-csv-btn {
+  gap: theme('spacing.token.p6');
+}
+
+.theme-material-consumption .export-csv-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(0,128,200,0.3);
 }
 
 /* --- MultiSelect visual styles --- */
@@ -447,6 +526,13 @@
   color: theme('colors.text.primary');
   background: theme('colors.surface.card');
   cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.theme-material-consumption .multi-select-trigger:focus,
+.theme-material-consumption .multi-select-trigger[aria-expanded="true"] {
+  border-color: theme('colors.brand.500');
+  box-shadow: 0 0 0 3px rgba(0,128,200,0.12);
 }
 
 .theme-material-consumption .multi-select-trigger:disabled {
@@ -466,14 +552,12 @@
   font-size: 11px;
 }
 
-
-/* --- Pagination (BasePagination has no scoped styles; style from theme scope) --- */
+/* --- Pagination --- */
 .theme-material-consumption .pagination {
   display: flex;
   align-items: center;
   gap: theme('spacing.token.p8');
 }
-
 
 .theme-material-consumption .page-info {
   font-size: theme('fontSize.xs.0');

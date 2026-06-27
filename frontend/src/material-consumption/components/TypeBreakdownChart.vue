@@ -15,6 +15,14 @@ import BlockLoadingState from '../../shared-ui/components/BlockLoadingState.vue'
 
 use([CanvasRenderer, BarChart, GridComponent, LegendComponent, TooltipComponent]);
 
+// Brand-aligned series palette (same as trend chart for consistency)
+const SERIES_COLORS = [
+  '#0080C8', '#00A3E0', '#006BA8', '#2998d8', '#004A76',
+  '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899',
+  '#10b981', '#f97316', '#3b82f6', '#6366f1', '#eab308',
+  '#14b8a6', '#a855f7', '#06b6d4', '#84cc16', '#f43f5e',
+];
+
 // --- Types ---
 export interface TrendItem {
   period: string;
@@ -80,45 +88,89 @@ const chartOption = computed(() => {
     periodTotals.set(period, total);
   }
 
-  const series = parts.map((part) => ({
-    name: partLabel(part),
-    type: 'bar',
-    stack: 'total',
-    data: periods.map((p) => {
-      const total = periodTotals.get(p) ?? 0;
-      const val = partMap.get(part)?.get(p) ?? 0;
-      return total > 0 ? Math.round((val / total) * 1000) / 10 : 0; // 1 decimal %
-    }),
-    emphasis: { focus: 'series' },
-  }));
+  const series = parts.map((part, idx) => {
+    const color = SERIES_COLORS[idx % SERIES_COLORS.length];
+    return {
+      name: partLabel(part),
+      type: 'bar',
+      stack: 'total',
+      barMaxWidth: 60,
+      itemStyle: {
+        color,
+        borderRadius: idx === parts.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0],
+      },
+      emphasis: {
+        focus: 'series',
+        itemStyle: { shadowBlur: 8, shadowColor: `${color}55` },
+      },
+      data: periods.map((p) => {
+        const total = periodTotals.get(p) ?? 0;
+        const val = partMap.get(part)?.get(p) ?? 0;
+        return total > 0 ? Math.round((val / total) * 1000) / 10 : 0;
+      }),
+    };
+  });
 
   const legendLabels = parts.map(partLabel);
 
   return {
+    animation: true,
+    animationDuration: 900,
+    animationEasing: 'cubicOut',
+    animationDurationUpdate: 500,
+    color: SERIES_COLORS,
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      // TODO: type echarts callback
+      axisPointer: {
+        type: 'shadow',
+        shadowStyle: { color: 'rgba(0,128,200,0.04)' },
+      },
+      backgroundColor: 'rgba(255,255,255,0.97)',
+      borderColor: '#e2e8f0',
+      borderWidth: 1,
+      padding: [10, 14],
+      extraCssText: 'box-shadow:0 4px 20px rgba(0,0,0,0.1);border-radius:8px;',
+      textStyle: { fontSize: 12, color: '#374151' },
       formatter(params: unknown) {
-        // TODO: type echarts callback
         const items = params as Array<{ seriesName: string; value: number; marker: string }>;
         const period = (params as Array<{ axisValue: string }>)[0]?.axisValue ?? '';
-        const lines = items.map((p) => `${p.marker}${p.seriesName}: ${p.value}%`);
-        return `<strong>${period}</strong><br>${lines.join('<br>')}`;
+        const lines = items
+          .filter(p => p.value > 0)
+          .sort((a, b) => b.value - a.value)
+          .map(p => `${p.marker}<span style="color:#6b7280">${p.seriesName}</span>: <b>${p.value}%</b>`);
+        return `<div style="font-weight:600;color:#1f2937;margin-bottom:6px;font-size:12px">${period}</div>${lines.join('<br>')}`;
       },
     },
-    legend: { data: legendLabels, bottom: 0, type: 'scroll' },
-    grid: { left: 48, right: 24, top: 22, bottom: 72, containLabel: false },
+    legend: {
+      data: legendLabels,
+      bottom: 0,
+      type: 'scroll',
+      textStyle: { fontSize: 11, color: '#6b7280' },
+      itemWidth: 12,
+      itemHeight: 12,
+      pageTextStyle: { color: '#6b7280', fontSize: 11 },
+    },
+    grid: { left: 48, right: 24, top: 24, bottom: 72, containLabel: false },
     xAxis: {
       type: 'category',
       data: periods,
-      axisLabel: { rotate: periods.length > 10 ? 30 : 0 },
+      axisLabel: {
+        rotate: periods.length > 10 ? 30 : 0,
+        fontSize: 11,
+        color: '#9ca3af',
+      },
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      axisTick: { lineStyle: { color: '#e5e7eb' } },
     },
     yAxis: {
       type: 'value',
       max: 100,
-      // TODO: type echarts callback
-      axisLabel: { formatter: (v: unknown) => `${v}%` },
+      splitLine: { lineStyle: { color: '#f3f4f6', type: 'dashed' } },
+      axisLabel: {
+        fontSize: 11,
+        color: '#9ca3af',
+        formatter: (v: unknown) => `${v}%`,
+      },
     },
     series,
   };
@@ -132,7 +184,6 @@ const hasData = computed(() => (props.trend ?? []).length > 0);
     <div class="chart-toolbar">
       <span class="chart-title">料號消耗佔比</span>
     </div>
-    <!-- BLOCKING-3 fix: use contracted BlockLoadingState; handles prefers-reduced-motion -->
     <BlockLoadingState v-if="loading" />
     <div v-else-if="!hasData" class="chart-empty">
       <span>無資料</span>

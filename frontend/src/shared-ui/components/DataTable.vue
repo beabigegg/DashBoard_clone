@@ -64,9 +64,11 @@ const { sortKey, sortDirection, sortedData, setSortKey } = useSortableTable(data
 function handleSort(col: ColumnDefinition) {
   if (!col.sortable) return
   if (props.serverSort) {
-    // Toggle direction for same key
-    const newDir =
-      sortKey.value === col.key && sortDirection.value === 'asc' ? 'desc' : 'asc'
+    // Use effectiveSortKey/Dir (controlled by parent when set) so a parent reset
+    // clears the toggle state — otherwise internal state diverges from display
+    const currentKey = effectiveSortKey.value
+    const currentDir = effectiveSortDir.value
+    const newDir = currentKey === col.key && currentDir === 'asc' ? 'desc' : 'asc'
     sortKey.value = col.key
     sortDirection.value = newDir
     emit('sort', { key: col.key, direction: newDir })
