@@ -1,0 +1,11 @@
+- type: tier-floor-override
+  change-id: add-db-scheduling-page
+  timestamp: '2026-06-27T03:51:55.961Z'
+  declared-tier: 2
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - migration
+  reason: >-
+    migration keyword matches docs/migration/ path prefix (modernization blueprint), not a DB schema
+    migration — no DDL, no data migration, no schema change

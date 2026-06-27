@@ -72,3 +72,4 @@
 | legacy-portal-admin-cleanup | 2026 | 2026-06-24 | specs/archive/2026/legacy-portal-admin-cleanup/ |
 | rh-remove-supplementary-filter | 2026 | 2026-06-25 | specs/archive/2026/rh-remove-supplementary-filter/ |
 | rh-primary-prefilter | 2026 | 2026-06-26 | specs/archive/2026/rh-primary-prefilter/ |
+| add-db-scheduling-page | 2026 | 2026-06-27 | specs/archive/2026/add-db-scheduling-page/ |
