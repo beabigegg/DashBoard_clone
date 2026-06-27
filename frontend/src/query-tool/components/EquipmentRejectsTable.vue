@@ -189,7 +189,7 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
               @click.exact="toggleSort('REJECT_TOTAL_QTY')"
               @keydown.enter.space.prevent="toggleSort('REJECT_TOTAL_QTY')"
             >
-              <span class="qt-th-inner">總報廢量 <component :is="sortIcon('REJECT_TOTAL_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECT_TOTAL_QTY' }" :size="13" /></span>
+              <span class="qt-th-inner">扣帳報廢量 <component :is="sortIcon('REJECT_TOTAL_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECT_TOTAL_QTY' }" :size="13" /></span>
               <button class="expand-toggle" type="button" :aria-label="showRejectBreakdown ? '收合報廢細項' : '展開報廢細項'" @click.stop="showRejectBreakdown = !showRejectBreakdown" @keydown.enter.space.prevent.stop="showRejectBreakdown = !showRejectBreakdown">{{ showRejectBreakdown ? '▾' : '▸' }}</button>
             </th>
             <template v-if="showRejectBreakdown">
@@ -199,7 +199,7 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
               <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('INPROCESS_QTY')" @click="toggleSort('INPROCESS_QTY')" @keydown.enter.space.prevent="toggleSort('INPROCESS_QTY')"><span class="qt-th-inner">INPROCESS <component :is="sortIcon('INPROCESS_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'INPROCESS_QTY' }" :size="13" /></span></th>
               <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('PROCESSED_QTY')" @click="toggleSort('PROCESSED_QTY')" @keydown.enter.space.prevent="toggleSort('PROCESSED_QTY')"><span class="qt-th-inner">PROCESSED <component :is="sortIcon('PROCESSED_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'PROCESSED_QTY' }" :size="13" /></span></th>
             </template>
-            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('DEFECT_QTY')" @click="toggleSort('DEFECT_QTY')" @keydown.enter.space.prevent="toggleSort('DEFECT_QTY')"><span class="qt-th-inner">不良品數 <component :is="sortIcon('DEFECT_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'DEFECT_QTY' }" :size="13" /></span></th>
+            <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('DEFECT_QTY')" @click="toggleSort('DEFECT_QTY')" @keydown.enter.space.prevent="toggleSort('DEFECT_QTY')"><span class="qt-th-inner">不扣帳報廢量 <component :is="sortIcon('DEFECT_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'DEFECT_QTY' }" :size="13" /></span></th>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('REJECTCOMMENT')" @click="toggleSort('REJECTCOMMENT')" @keydown.enter.space.prevent="toggleSort('REJECTCOMMENT')"><span class="qt-th-inner">備註 <component :is="sortIcon('REJECTCOMMENT')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECTCOMMENT' }" :size="13" /></span></th>
             <th class="sortable-th" tabindex="0" :aria-sort="ariaSortFor('EQUIPMENTNAME')" @click="toggleSort('EQUIPMENTNAME')" @keydown.enter.space.prevent="toggleSort('EQUIPMENTNAME')">
               <span class="qt-th-inner">報廢登錄設備 <span class="cross-station-note" title="此設備為報廢事件登錄的設備，可能與查詢設備不同（跨站報廢）">(可能不同於查詢設備)</span> <component :is="sortIcon('EQUIPMENTNAME')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'EQUIPMENTNAME' }" :size="13" /></span>

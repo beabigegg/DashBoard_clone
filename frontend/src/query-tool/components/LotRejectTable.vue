@@ -157,11 +157,13 @@ function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
             <th class="sortable-th" :aria-sort="ariaSortFor('REJECTCOMMENT')" @click="toggleSort('REJECTCOMMENT')">COMMENT <component :is="sortIcon('REJECTCOMMENT')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECTCOMMENT' }" :size="13" /></th>
             <th
               class="sortable-th"
+              tabindex="0"
               :aria-sort="ariaSortFor('REJECT_TOTAL_QTY')"
               @click.exact="toggleSort('REJECT_TOTAL_QTY')"
+              @keydown.enter.space.prevent="toggleSort('REJECT_TOTAL_QTY')"
             >
               扣帳報廢量 <component :is="sortIcon('REJECT_TOTAL_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECT_TOTAL_QTY' }" :size="13" />
-              <span class="expand-toggle" @click.stop="showRejectBreakdown = !showRejectBreakdown">{{ showRejectBreakdown ? '▾' : '▸' }}</span>
+              <button class="expand-toggle" type="button" :aria-label="showRejectBreakdown ? '收合報廢細項' : '展開報廢細項'" @click.stop="showRejectBreakdown = !showRejectBreakdown" @keydown.enter.space.prevent.stop="showRejectBreakdown = !showRejectBreakdown">{{ showRejectBreakdown ? '▾' : '▸' }}</button>
             </th>
             <template v-if="showRejectBreakdown">
               <th class="sortable-th" :aria-sort="ariaSortFor('REJECT_QTY')" @click="toggleSort('REJECT_QTY')">REJECT <component :is="sortIcon('REJECT_QTY')" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === 'REJECT_QTY' }" :size="13" /></th>
