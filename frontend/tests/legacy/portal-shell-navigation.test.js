@@ -221,17 +221,18 @@ test('test_manifest_nav_tree_non_admin_matches_baseline (AC-1)', () => {
   assert.ok(!drawerIds.includes('dev-tools'), 'dev-tools must be hidden for non-admin');
   assert.ok(!drawerIds.includes('test'), 'test drawer must not exist');
 
-  // Expected visible drawers for non-admin (reports, history-reports, query-tools, trace-tools, eap-analysis)
+  // Expected visible drawers for non-admin (reports, history-reports, query-tools, trace-tools, eap-analysis, production-assist)
   assert.ok(drawerIds.includes('reports'), 'reports drawer must be visible');
   assert.ok(drawerIds.includes('history-reports'), 'history-reports drawer must be visible');
   assert.ok(drawerIds.includes('query-tools'), 'query-tools drawer must be visible');
   assert.ok(drawerIds.includes('trace-tools'), 'trace-tools drawer must be visible');
   assert.ok(drawerIds.includes('eap-analysis'), 'eap-analysis drawer must be visible');
+  assert.ok(drawerIds.includes('production-assist'), 'production-assist drawer must be visible');
 
-  // Drawer order must be 1..5 (dev-tools excluded)
+  // Drawer order must be 1..5, 7 (dev-tools at 6 excluded for non-admin)
   const orders = state.drawers.map((d) => d.order);
   const sortedOrders = [...orders].sort((a, b) => a - b);
-  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5]);
+  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5, 7]);
 
   // Page counts per drawer (from current-behavior.md)
   const byId = Object.fromEntries(state.drawers.map((d) => [d.id, d]));
@@ -248,18 +249,19 @@ test('test_manifest_nav_tree_admin_matches_baseline (AC-1)', () => {
   const state = buildDynamicNavigationState(statusMap, { isAdmin: true });
 
   const drawerIds = state.drawers.map((d) => d.id);
-  // All 6 drawers should be visible for admin
+  // All 7 drawers should be visible for admin
   assert.ok(drawerIds.includes('reports'), 'reports must be visible for admin');
   assert.ok(drawerIds.includes('history-reports'), 'history-reports must be visible for admin');
   assert.ok(drawerIds.includes('query-tools'), 'query-tools must be visible for admin');
   assert.ok(drawerIds.includes('trace-tools'), 'trace-tools must be visible for admin');
   assert.ok(drawerIds.includes('dev-tools'), 'dev-tools must be visible for admin');
   assert.ok(drawerIds.includes('eap-analysis'), 'eap-analysis must be visible for admin');
+  assert.ok(drawerIds.includes('production-assist'), 'production-assist must be visible for admin');
 
-  // Drawer orders 1..6
+  // Drawer orders 1..7
   const orders = state.drawers.map((d) => d.order);
   const sortedOrders = [...orders].sort((a, b) => a - b);
-  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(sortedOrders, [1, 2, 3, 4, 5, 6, 7]);
 
   const byId = Object.fromEntries(state.drawers.map((d) => [d.id, d]));
   // dev-tools: /admin/pages (released), /admin/dashboard (dev — admin can see)
@@ -270,9 +272,9 @@ test('test_manifest_nav_tree_admin_matches_baseline (AC-1)', () => {
 });
 
 test('test_drawer_order_is_1_through_6 (AC-1)', () => {
-  // Verify manifest drawer orders are exactly 1..6, distinct
+  // Verify manifest drawer orders are exactly 1..7, distinct
   const orders = MANIFEST_DRAWERS.map((d) => d.order).sort((a, b) => a - b);
-  assert.deepEqual(orders, [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(orders, [1, 2, 3, 4, 5, 6, 7]);
 });
 
 test('test_trace_tools_page_order_is_distinct (AC-1)', () => {
