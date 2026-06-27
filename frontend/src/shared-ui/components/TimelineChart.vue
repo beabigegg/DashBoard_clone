@@ -406,85 +406,100 @@ function eventPath(type: string | undefined, x: number, y: number): string {
   const normalizedType = (normalizeText(type) as string).toLowerCase();
 
   if (normalizedType.includes('job') || normalizedType.includes('maint')) {
-    return `M ${x} ${y - 7} L ${x - 7} ${y + 5} L ${x + 7} ${y + 5} Z`;
+    // upward triangle — slightly larger
+    return `M ${x} ${y - 9} L ${x - 8} ${y + 6} L ${x + 8} ${y + 6} Z`;
   }
 
-  return `M ${x} ${y - 7} L ${x - 7} ${y} L ${x} ${y + 7} L ${x + 7} ${y} Z`;
+  // diamond — slightly larger
+  return `M ${x} ${y - 9} L ${x - 8} ${y} L ${x} ${y + 9} L ${x + 8} ${y} Z`;
 }
 </script>
 
 <template>
-  <div class="rounded-card border border-stroke-soft bg-white p-3">
-    <div class="mb-2 flex flex-wrap items-center gap-3 text-xs text-slate-600">
-      <span class="font-medium text-slate-700">Timeline</span>
-      <div v-for="item in legendItems" :key="item.key" class="flex items-center gap-1">
-        <span class="inline-block size-2 rounded-full" :style="{ backgroundColor: item.color }" />
+  <div class="tl-root">
+    <!-- Legend -->
+    <div class="tl-legend">
+      <div v-for="item in legendItems" :key="item.key" class="tl-legend-item">
+        <span
+          class="tl-legend-swatch"
+          :style="{ backgroundColor: item.color }"
+        />
         <span>{{ item.key }}</span>
       </div>
     </div>
 
     <div
       ref="containerRef"
-      class="relative rounded-card border border-stroke-soft bg-surface-muted/30"
+      class="tl-grid-wrap"
       @mouseleave="hideTooltip"
     >
-      <div class="grid" :style="{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }">
+      <div class="tl-grid" :style="{ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }">
         <!-- Track labels (sticky left) -->
-        <div class="sticky left-0 z-20 border-r border-stroke-soft bg-white">
-          <div
-            class="flex items-center border-b border-stroke-soft px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400"
-            :style="{ height: `${AXIS_HEIGHT}px` }"
-          >
-            Track
+        <div class="tl-labels">
+          <div class="tl-label-header" :style="{ height: `${AXIS_HEIGHT}px` }">
+            Station
           </div>
 
           <div
-            v-for="track in tracks"
+            v-for="(track, trackIndex) in tracks"
             :key="track.id || track.label"
-            class="flex flex-col justify-center border-b border-stroke-soft/70 px-3"
+            class="tl-label-row"
+            :class="{ 'tl-label-row--even': trackIndex % 2 === 0 }"
             :style="{ height: `${trackRowHeight}px` }"
           >
-            <span class="truncate text-xs font-medium text-slate-700">{{ track.label }}</span>
-            <!-- sublabels (array) takes priority over sublabel (string) -->
-            <template v-if="track.sublabels?.length">
-              <span
-                v-for="sub in track.sublabels"
-                :key="sub"
-                class="truncate text-[10px] leading-tight text-slate-400"
-              >{{ sub }}</span>
-            </template>
-            <span v-else-if="track.sublabel" class="truncate text-[10px] leading-tight text-slate-400">{{ track.sublabel }}</span>
+            <span
+              class="tl-label-stripe"
+              :style="{ backgroundColor: resolveColor(track.label) }"
+            />
+            <div class="tl-label-text">
+              <span class="tl-label-main">{{ track.label }}</span>
+              <template v-if="track.sublabels?.length">
+                <span v-for="sub in track.sublabels" :key="sub" class="tl-label-sub">{{ sub }}</span>
+              </template>
+              <span v-else-if="track.sublabel" class="tl-label-sub">{{ track.sublabel }}</span>
+            </div>
           </div>
         </div>
 
         <!-- Chart area (scrollable) -->
-        <div ref="scrollRef" class="overflow-x-auto">
+        <div ref="scrollRef" class="tl-scroll">
           <svg
             :width="chartWidth"
             :height="svgHeight"
             :viewBox="`0 0 ${chartWidth} ${svgHeight}`"
             class="block"
           >
-            <rect x="0" y="0" :width="chartWidth" :height="svgHeight" fill="var(--color-token-hffffff)" />
+            <defs>
+              <!-- Universal bar gloss overlay -->
+              <linearGradient id="tl-bar-gloss" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="white" stop-opacity="0.28"/>
+                <stop offset="50%" stop-color="white" stop-opacity="0.04"/>
+                <stop offset="100%" stop-color="black" stop-opacity="0.06"/>
+              </linearGradient>
+            </defs>
+
+            <rect x="0" y="0" :width="chartWidth" :height="svgHeight" fill="#ffffff" />
 
             <!-- Time axis -->
             <g>
-              <line x1="0" :x2="chartWidth" :y1="AXIS_HEIGHT - 1" :y2="AXIS_HEIGHT - 1" stroke="var(--color-token-hcbd5e1)" stroke-width="1" />
+              <rect x="0" y="0" :width="chartWidth" :height="AXIS_HEIGHT" fill="#f8fafc" />
+              <line x1="0" :x2="chartWidth" :y1="AXIS_HEIGHT - 1" :y2="AXIS_HEIGHT - 1" stroke="#cbd5e1" stroke-width="1" />
               <g v-for="tick in timelineTicks" :key="tick.timeMs">
                 <line
                   :x1="xByTimestamp(tick.timeMs)"
                   :x2="xByTimestamp(tick.timeMs)"
                   y1="0"
                   :y2="svgHeight"
-                  stroke="var(--color-token-he2e8f0)"
+                  stroke="#e2e8f0"
                   stroke-width="1"
-                  stroke-dasharray="2 3"
+                  stroke-dasharray="3 4"
                 />
                 <text
-                  :x="xByTimestamp(tick.timeMs) + 3"
-                  y="13"
-                  fill="var(--color-token-h475569)"
-                  font-size="10"
+                  :x="xByTimestamp(tick.timeMs) + 4"
+                  y="15"
+                  fill="#64748b"
+                  font-size="10.5"
+                  font-weight="500"
                   font-family="ui-monospace, monospace"
                 >
                   {{ tick.label }}
@@ -494,13 +509,22 @@ function eventPath(type: string | undefined, x: number, y: number): string {
 
             <!-- Track rows -->
             <g v-for="(track, trackIndex) in tracks" :key="track.id || track.label">
+              <!-- Alternating row bg -->
               <rect
                 x="0"
                 :y="rowTopByIndex(trackIndex)"
                 :width="chartWidth"
                 :height="trackRowHeight"
-                :fill="trackIndex % 2 === 0 ? 'var(--color-token-hf8fafc)' : 'var(--color-token-hf1f5f9)'"
-                opacity="0.45"
+                :fill="trackIndex % 2 === 0 ? '#f8fafc' : '#f1f5f9'"
+              />
+              <!-- Bottom row separator -->
+              <line
+                x1="0"
+                :x2="chartWidth"
+                :y1="rowTopByIndex(trackIndex) + trackRowHeight - 1"
+                :y2="rowTopByIndex(trackIndex) + trackRowHeight - 1"
+                stroke="#e2e8f0"
+                stroke-width="1"
               />
 
               <!-- Bars -->
@@ -509,18 +533,30 @@ function eventPath(type: string | undefined, x: number, y: number): string {
                   v-for="(bar, barIndex) in (layer.bars || [])"
                   :key="bar.id || `${trackIndex}-${layerIndex}-${barIndex}`"
                 >
-                  <rect
-                    v-if="normalizeBar(bar)"
-                    :x="xByTimestamp(normalizeBar(bar)!.startMs)"
-                    :y="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).y"
-                    :width="Math.max(4, xByTimestamp(normalizeBar(bar)!.endMs) - xByTimestamp(normalizeBar(bar)!.startMs))"
-                    :height="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).height"
-                    :fill="bar.color || resolveColor(bar.type)"
-                    :opacity="layer.opacity ?? (layerIndex === 0 ? 0.45 : 0.9)"
-                    rx="3"
-                    class="cursor-pointer"
-                    @mousemove="handleBarHover($event, bar, track.label)"
-                  />
+                  <template v-if="normalizeBar(bar)">
+                    <!-- Bar base color -->
+                    <rect
+                      :x="xByTimestamp(normalizeBar(bar)!.startMs)"
+                      :y="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).y"
+                      :width="Math.max(6, xByTimestamp(normalizeBar(bar)!.endMs) - xByTimestamp(normalizeBar(bar)!.startMs))"
+                      :height="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).height"
+                      :fill="bar.color || resolveColor(bar.type)"
+                      :opacity="layer.opacity ?? 0.92"
+                      rx="4"
+                      class="cursor-pointer"
+                      @mousemove="handleBarHover($event, bar, track.label)"
+                    />
+                    <!-- Gloss overlay -->
+                    <rect
+                      :x="xByTimestamp(normalizeBar(bar)!.startMs)"
+                      :y="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).y"
+                      :width="Math.max(6, xByTimestamp(normalizeBar(bar)!.endMs) - xByTimestamp(normalizeBar(bar)!.startMs))"
+                      :height="layerGeometry(trackIndex, layerIndex, (track.layers || []).length).height"
+                      fill="url(#tl-bar-gloss)"
+                      rx="4"
+                      style="pointer-events: none;"
+                    />
+                  </template>
                 </template>
               </g>
 
@@ -530,9 +566,11 @@ function eventPath(type: string | undefined, x: number, y: number): string {
                   v-if="normalizeEvent(eventItem) && normalizeText(eventItem.trackId) === normalizeText(track.id)"
                   :d="eventPath(eventItem.shape || eventItem.type, xByTimestamp(normalizeEvent(eventItem)!.timeMs), rowTopByIndex(trackIndex) + (trackRowHeight / 2))"
                   :fill="eventItem.color || resolveColor(eventItem.type)"
-                  stroke="var(--color-token-h0f172a)"
-                  stroke-width="0.5"
+                  stroke="white"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
                   class="cursor-pointer"
+                  filter="drop-shadow(0 1px 2px rgba(0,0,0,0.25))"
                   @mousemove="handleEventHover($event, eventItem, track.label)"
                 />
               </template>
@@ -547,11 +585,11 @@ function eventPath(type: string | undefined, x: number, y: number): string {
       <Transition name="tooltip-fade">
         <div
           v-if="tooltipRef.visible"
-          class="pointer-events-none fixed z-[9999] max-w-72 rounded-lg border border-slate-600/30 bg-slate-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-slate-100 shadow-xl backdrop-blur-sm"
+          class="tl-tooltip"
           :style="{ left: `${tooltipRef.x}px`, top: `${tooltipRef.y}px` }"
         >
-          <p class="font-semibold text-white">{{ tooltipRef.title }}</p>
-          <p v-for="line in tooltipRef.lines" :key="line" class="mt-0.5 text-slate-300">{{ line }}</p>
+          <p class="tl-tooltip-title">{{ tooltipRef.title }}</p>
+          <p v-for="line in tooltipRef.lines" :key="line" class="tl-tooltip-line">{{ line }}</p>
         </div>
       </Transition>
     </Teleport>
@@ -559,6 +597,140 @@ function eventPath(type: string | undefined, x: number, y: number): string {
 </template>
 
 <style scoped>
+/* Root */
+.tl-root {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+/* Legend */
+.tl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+}
+.tl-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #475569;
+  font-weight: 500;
+}
+.tl-legend-swatch {
+  display: inline-block;
+  width: 20px;
+  height: 10px;
+  border-radius: 3px;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+/* Grid wrapper */
+.tl-grid-wrap {
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tl-grid {
+  display: grid;
+}
+
+/* Labels column */
+.tl-labels {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  border-right: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+}
+.tl-label-header {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.tl-label-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tl-label-row--even {
+  background: #f8fafc;
+}
+.tl-label-stripe {
+  flex-shrink: 0;
+  width: 3px;
+  align-self: stretch;
+  opacity: 0.7;
+}
+.tl-label-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 10px;
+  overflow: hidden;
+  min-width: 0;
+}
+.tl-label-main {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-label-sub {
+  font-size: 10px;
+  line-height: 1.3;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Chart scroll area */
+.tl-scroll {
+  overflow-x: auto;
+}
+
+/* Tooltip */
+.tl-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: 280px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #1e293b;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.30);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+.tl-tooltip-title {
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.tl-tooltip-line {
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* Tooltip transitions */
 .tooltip-fade-enter-active { transition: opacity 0.12s ease-out; }
 .tooltip-fade-leave-active { transition: opacity 0.08s ease-in; }
 .tooltip-fade-enter-from,

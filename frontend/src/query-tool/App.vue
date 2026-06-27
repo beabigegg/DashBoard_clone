@@ -539,8 +539,6 @@ watch(
 
       <div class="card-body ui-card-body">
         <div class="query-tool-tab-desc">
-          <p class="query-tool-tab-desc-label">目前頁籤</p>
-          <h2 class="query-tool-tab-desc-title">{{ activeTabMeta.label }}</h2>
           <p class="query-tool-tab-desc-subtitle">{{ activeTabMeta.subtitle }}</p>
         </div>
 

@@ -1,1153 +1,965 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, triggerRef, watch } from 'vue';
-
-import VChart from 'vue-echarts';
-import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import { TreeChart } from 'echarts/charts';
-import { TooltipComponent, ToolboxComponent } from 'echarts/components';
-
+/**
+ * LineageTreeChart — SVG-based lineage tree (replaces ECharts TreeChart)
+ * Layout: d3-hierarchy tree()  |  Rendering: hand-crafted SVG cards
+ *
+ * Card design: left colour stripe + white/tinted body + drop shadow
+ * Pan/zoom: wheel to zoom, drag to pan (no external dependency)
+ */
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue';
+import { hierarchy, tree as d3Tree } from 'd3-hierarchy';
+import type { HierarchyPointNode } from 'd3-hierarchy';
 import ErrorBanner from '../../shared-ui/components/ErrorBanner.vue';
 import ExportButton from './ExportButton.vue';
-import LoadingOverlay from '../../shared-ui/components/LoadingOverlay.vue';
 import PaginationControl from '../../shared-ui/components/PaginationControl.vue';
 import { normalizeText } from '../utils/values';
 
-use([CanvasRenderer, TreeChart, TooltipComponent, ToolboxComponent]);
+// ─────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────
 
-const NODE_COLORS = {
-  wafer: 'rgb(37, 99, 235)',
-  gc: 'rgb(6, 182, 212)',
-  ga: 'rgb(16, 185, 129)',
-  gd: 'rgb(239, 68, 68)',
-  root: 'rgb(59, 130, 246)',
-  branch: 'rgb(16, 185, 129)',
-  leaf: 'rgb(245, 158, 11)',
-  serial: 'rgb(148, 163, 184)',
+const CARD_H       = 38;    // card height px
+const STRIPE_W     = 5;     // left colour stripe width
+const CARD_R       = 7;     // corner radius
+const CARD_MIN_W   = 110;
+const CARD_MAX_W   = 270;
+const TOGGLE_W     = 32;    // width of [-] / [+N] toggle pills
+const NODE_V_GAP   = 30;    // vertical gap between sibling cards
+const DEPTH_STEP   = 280;   // horizontal step per tree level
+const SERIAL_R     = 5;     // diamond (serial) half-size
+const BADGE_H      = 16;    // type badge height
+const PAD_L        = 10;    // left padding inside card body (after stripe)
+const PAD_R        = 10;    // right padding
+
+const NODE_COLORS: Record<string, string> = {
+  wafer:  '#2563eb',
+  gc:     '#06b6d4',
+  ga:     '#10b981',
+  gd:     '#ef4444',
+  root:   '#3b82f6',
+  branch: '#64748b',
+  leaf:   '#f59e0b',
+  serial: '#94a3b8',
+  toggle: '#a5b4fc',
 };
 
-const EDGE_STYLES = Object.freeze({
-  split_from: { color: 'rgb(203, 213, 225)', type: 'solid', width: 1.5 },
-  merge_source: { color: 'rgb(245, 158, 11)', type: 'dashed', width: 1.8 },
-  wafer_origin: { color: 'rgb(37, 99, 235)', type: 'dotted', width: 1.8 },
-  gd_rework_source: { color: 'rgb(239, 68, 68)', type: 'dashed', width: 1.8 },
-  default: { color: 'rgb(203, 213, 225)', type: 'solid', width: 1.5 },
-});
+const CARD_BG: Record<string, string> = {
+  wafer:  'rgba(37,99,235,0.06)',
+  gc:     'rgba(6,182,212,0.06)',
+  ga:     'rgba(16,185,129,0.06)',
+  gd:     'rgba(239,68,68,0.06)',
+  root:   'rgba(59,130,246,0.06)',
+  branch: '#f8fafc',
+  leaf:   'rgba(245,158,11,0.06)',
+};
 
-const EDGE_TAGS = Object.freeze({
-  split_from: { forward: '←拆', reverse: '→拆' },
-  merge_source: { forward: '←併', reverse: '→併' },
-  wafer_origin: { forward: '←晶', reverse: '→晶' },
+const SHADOW_COLOR: Record<string, string> = {
+  wafer:  'rgba(37,99,235,0.22)',
+  gc:     'rgba(6,182,212,0.22)',
+  ga:     'rgba(16,185,129,0.22)',
+  gd:     'rgba(239,68,68,0.22)',
+  root:   'rgba(59,130,246,0.22)',
+  branch: 'rgba(0,0,0,0.10)',
+  leaf:   'rgba(245,158,11,0.22)',
+  toggle: 'rgba(99,102,241,0.18)',
+};
+
+const EDGE_LINE: Record<string, { stroke: string; width: number; dash?: string }> = {
+  split_from:       { stroke: '#94a3b8', width: 1.5 },
+  merge_source:     { stroke: '#f59e0b', width: 1.8, dash: '6,4' },
+  wafer_origin:     { stroke: '#2563eb', width: 1.8, dash: '2,3' },
+  gd_rework_source: { stroke: '#ef4444', width: 1.8, dash: '6,4' },
+  default:          { stroke: '#94a3b8', width: 1.5 },
+};
+
+const EDGE_TAGS: Record<string, { forward: string; reverse: string }> = {
+  split_from:       { forward: '←拆', reverse: '→拆' },
+  merge_source:     { forward: '←併', reverse: '→併' },
+  wafer_origin:     { forward: '←晶', reverse: '→晶' },
   gd_rework_source: { forward: '←重', reverse: '→重' },
-});
+};
 
-const RELATION_TYPE_LABELS = Object.freeze({
-  split_from: '拆批',
-  merge_source: '併批',
-  wafer_origin: '晶圓來源',
-  gd_rework_source: '重工來源',
-});
+const EDGE_TAG_COLOR: Record<string, string> = {
+  split_from:       '#94a3b8',
+  merge_source:     '#d97706',
+  wafer_origin:     '#2563eb',
+  gd_rework_source: '#dc2626',
+};
 
-const LABEL_BASE_STYLE = Object.freeze({
-  backgroundColor: 'rgba(255,255,255,0.92)',
-  borderRadius: 3,
-  padding: [1, 4],
-});
+const RELATION_TYPE_LABELS: Record<string, string> = {
+  split_from: '拆批', merge_source: '併批', wafer_origin: '晶圓來源', gd_rework_source: '重工來源',
+};
 
-const TOGGLE_EXPAND_STYLE = Object.freeze({
-  symbol: 'roundRect',
-  symbolSize: [18, 14],
-  itemStyle: { color: 'rgb(224, 231, 255)', borderColor: 'rgb(129, 140, 248)', borderWidth: 1 },
-  label: {
-    show: true, position: 'inside', fontSize: 11, fontWeight: 'bold',
-    color: 'rgb(67, 56, 202)', backgroundColor: 'transparent', padding: 0,
-  },
-  lineStyle: { width: 0 },
-  emphasis: { itemStyle: { borderColor: 'rgb(79, 70, 229)', borderWidth: 2 } },
-});
+const TYPE_BADGE: Record<string, string> = { wafer: '晶', gc: 'GC', ga: 'GA', gd: 'GD' };
 
-const TOGGLE_COLLAPSE_STYLE = Object.freeze({
-  symbol: 'roundRect',
-  symbolSize: [18, 14],
-  itemStyle: { color: 'rgb(254, 243, 199)', borderColor: 'rgb(245, 158, 11)', borderWidth: 1 },
-  label: {
-    show: true, position: 'inside', fontSize: 11, fontWeight: 'bold',
-    color: 'rgb(146, 64, 14)', backgroundColor: 'transparent', padding: 0,
-  },
-  lineStyle: { width: 0 },
-  emphasis: { itemStyle: { borderColor: 'rgb(217, 119, 6)', borderWidth: 2 } },
-});
+// ─────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────
+
+interface NodeData {
+  id: string;
+  name: string;
+  type: string;
+  edgeType: string;
+  edgeReversed: boolean;
+  parentName: string;
+  relationTag: string;
+  cardW: number;
+  isToggle?: 'minus' | 'plus';
+  isSerial?: boolean;
+  children?: NodeData[];
+}
+
+type D3Point = HierarchyPointNode<NodeData>;
+
+interface LayoutNode {
+  data: NodeData;
+  svgX: number;
+  svgY: number;
+}
+
+interface LayoutLink {
+  source: LayoutNode;
+  target: LayoutNode;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Props & emits
+// ─────────────────────────────────────────────────────────────
 
 const props = defineProps({
-  treeRoots: {
-    type: Array,
-    default: () => [],
-  },
-  lineageMap: {
-    type: Object,
-    required: true,
-  },
-  nameMap: {
-    type: Object,
-    default: () => new Map(),
-  },
-  nodeMetaMap: {
-    type: Object,
-    default: () => new Map(),
-  },
-  edgeTypeMap: {
-    type: Object,
-    default: () => new Map(),
-  },
-  graphEdges: {
-    type: Array,
-    default: () => [],
-  },
-  leafSerials: {
-    type: Object,
-    default: () => new Map(),
-  },
-  notFound: {
-    type: Array,
-    default: () => [],
-  },
-  selectedContainerIds: {
-    type: Array,
-    default: () => [],
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  title: {
-    type: String,
-    default: '批次血緣樹',
-  },
-  description: {
-    type: String,
-    default: '生產流程追溯：晶批 → 切割 → 封裝 → 成品（點擊節點篩選，+/− 展開收合）',
-  },
-  emptyMessage: {
-    type: String,
-    default: '目前尚無 LOT 根節點，請先在上方解析。',
-  },
-  showSerialLegend: {
-    type: Boolean,
-    default: true,
-  },
-  isReverse: {
-    type: Boolean,
-    default: false,
-  },
+  treeRoots:            { type: Array,   default: () => [] },
+  lineageMap:           { type: Object,  required: true },
+  nameMap:              { type: Object,  default: () => new Map() },
+  nodeMetaMap:          { type: Object,  default: () => new Map() },
+  edgeTypeMap:          { type: Object,  default: () => new Map() },
+  graphEdges:           { type: Array,   default: () => [] },
+  leafSerials:          { type: Object,  default: () => new Map() },
+  notFound:             { type: Array,   default: () => [] },
+  selectedContainerIds: { type: Array,   default: () => [] },
+  loading:              { type: Boolean, default: false },
+  title:                { type: String,  default: '批次血緣樹' },
+  description:          { type: String,  default: '生產流程追溯：晶批 → 切割 → 封裝 → 成品' },
+  emptyMessage:         { type: String,  default: '目前尚無 LOT 根節點，請先在上方解析。' },
+  showSerialLegend:     { type: Boolean, default: true },
+  isReverse:            { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['select-nodes']);
-const chartRef = ref<{ getEchartsInstance?: () => unknown; chart?: unknown } | null>(null);
-const exportingTreeImage = ref(false);
-const exportingRelationCsv = ref(false);
-const exportErrorMessage = ref('');
-const relationPage = ref(1);
-const RELATION_PAGE_SIZE = 50;
 
-const selectedSet = computed(() => new Set(props.selectedContainerIds.map(normalizeText).filter(Boolean)));
+// ─────────────────────────────────────────────────────────────
+// Reactive state
+// ─────────────────────────────────────────────────────────────
 
-// Track which branch CIDs are collapsed (managed by us, not ECharts)
-const collapsedCids = shallowRef(new Set());
+const collapsedCids = shallowRef(new Set<string>());
 
-const rootsSet = computed(() => new Set(props.treeRoots.map(normalizeText).filter(Boolean)));
-
+const selectedSet = computed(() =>
+  new Set((props.selectedContainerIds as string[]).map(normalizeText).filter(Boolean))
+);
+const rootsSet = computed(() =>
+  new Set((props.treeRoots as string[]).map(normalizeText).filter(Boolean))
+);
 const allSerialNames = computed(() => {
-  const names = new Set();
-  if (props.leafSerials) {
-    for (const serials of props.leafSerials.values()) {
-      if (Array.isArray(serials)) {
-        serials.forEach((sn) => names.add(sn));
-      }
+  const s = new Set<string>();
+  const lm = props.leafSerials as Map<string, string[]>;
+  if (lm) for (const serials of lm.values()) if (Array.isArray(serials)) serials.forEach(sn => s.add(sn));
+  return s;
+});
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+function charPx(text: string): number {
+  let px = 0;
+  for (const ch of text) px += ch.codePointAt(0)! > 127 ? 13 : 7.5;
+  return px;
+}
+
+function calcCardW(displayLabel: string, hasBadge: boolean): number {
+  const badgePx = hasBadge ? charPx(TYPE_BADGE['ga'] || 'GA') + 14 : 0; // approximate badge
+  return Math.min(Math.max(charPx(displayLabel) + badgePx + STRIPE_W + PAD_L + PAD_R, CARD_MIN_W), CARD_MAX_W);
+}
+
+function lookupEdge(parentCid: string, childCid: string) {
+  const em = props.edgeTypeMap as Map<string, string>;
+  const p = normalizeText(parentCid), c = normalizeText(childCid);
+  if (!p || !c) return { edgeType: '', reversed: false };
+  const direct = normalizeText(em?.get?.(`${p}->${c}`));
+  if (direct) return { edgeType: direct, reversed: false };
+  const rev = normalizeText(em?.get?.(`${c}->${p}`));
+  if (rev) return { edgeType: rev, reversed: true };
+  return { edgeType: '', reversed: false };
+}
+
+function getRelTag(edgeType: string, reversed: boolean): string {
+  const spec = EDGE_TAGS[normalizeText(edgeType)];
+  if (!spec) return '';
+  return reversed ? spec.reverse : spec.forward;
+}
+
+function detectType(cid: string, childIds: string[], serials: string[]): string {
+  const meta = (props.nodeMetaMap as Map<string, { node_type?: string }>)?.get?.(cid);
+  const ex = normalizeText(meta?.node_type).toUpperCase();
+  if (ex === 'WAFER') return 'wafer';
+  if (ex === 'GC')    return 'gc';
+  if (ex === 'GA')    return 'ga';
+  if (ex === 'GD')    return 'gd';
+  if (rootsSet.value.has(cid)) return 'root';
+  return childIds.length === 0 ? 'leaf' : 'branch';
+}
+
+function nodeColor(type: string): string {
+  return NODE_COLORS[type] || NODE_COLORS.branch;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tree data builder (D3-compatible plain objects)
+// ─────────────────────────────────────────────────────────────
+
+function buildNode(cid: unknown, visited: Set<string>, parentCid = ''): NodeData | null {
+  const id = normalizeText(cid);
+  if (!id || visited.has(id)) return null;
+  visited.add(id);
+
+  const nm    = props.nameMap  as Map<string, string>;
+  const lm    = props.lineageMap as Map<string, { children?: string[] }>;
+  const slm   = props.leafSerials as Map<string, string[]>;
+
+  const name     = nm?.get?.(id) || id;
+  const serials  = slm?.get?.(id) || [];
+  const childIds = (lm?.get?.(id)?.children || []) as string[];
+  const type     = detectType(id, childIds, serials as string[]);
+
+  const { edgeType, reversed } = lookupEdge(parentCid, id);
+  const relTag     = getRelTag(edgeType, reversed);
+  const parentName = normalizeText(nm?.get?.(normalizeText(parentCid)) || parentCid);
+  const displayLabel = relTag ? `${relTag} ${name}` : name;
+  const badge      = TYPE_BADGE[type] || '';
+  const cardW      = calcCardW(displayLabel, !!badge);
+
+  // Serial-like leaf: node whose name matches a known serial number
+  const isSerialLike = type === 'leaf'
+    && (serials as string[]).length === 0
+    && allSerialNames.value.has(name);
+
+  if (isSerialLike) {
+    return { id, name, type: 'serial', edgeType, edgeReversed: reversed, parentName, relationTag: relTag, cardW: 0, isSerial: true, children: [] };
+  }
+
+  const isCollapsed = collapsedCids.value.has(id);
+  let children: NodeData[] = [];
+
+  if (isCollapsed && childIds.length > 0) {
+    children = [{
+      id: `__expand__${id}`, name: `+${childIds.length}`, type: 'toggle',
+      edgeType: '', edgeReversed: false, parentName: '', relationTag: '',
+      cardW: TOGGLE_W, isToggle: 'plus', children: [],
+    }];
+  } else {
+    const orderedIds = props.isReverse
+      ? [...childIds].sort((a, b) => {
+          const pri: Record<string, number> = { split_from: 0, merge_source: 1, gd_rework_source: 2, wafer_origin: 3 };
+          return (pri[normalizeText(lookupEdge(id, a).edgeType)] ?? 1) - (pri[normalizeText(lookupEdge(id, b).edgeType)] ?? 1);
+        })
+      : childIds as string[];
+
+    const built = orderedIds.map(c2 => buildNode(c2, visited, id)).filter((n): n is NodeData => n !== null);
+
+    // Serial leaf children (inline serial nodes)
+    if (built.length === 0 && (serials as string[]).length > 0) {
+      (serials as string[]).forEach((sn: string) => {
+        built.push({ id: `__sn__${id}__${sn}`, name: sn, type: 'serial', edgeType: '', edgeReversed: false, parentName: name, relationTag: '', cardW: 0, isSerial: true, children: [] });
+      });
+    }
+
+    // [-] collapse toggle at the BOTTOM of the children list
+    if (built.length > 0 && childIds.length > 0 && !rootsSet.value.has(id)) {
+      built.push({ id: `__collapse__${id}`, name: '−', type: 'toggle', edgeType: '', edgeReversed: false, parentName: '', relationTag: '', cardW: TOGGLE_W, isToggle: 'minus', children: [] });
+    }
+
+    children = built;
+  }
+
+  return { id, name, type, edgeType, edgeReversed: reversed, parentName, relationTag: relTag, cardW, children };
+}
+
+// ─────────────────────────────────────────────────────────────
+// D3 layout
+// ─────────────────────────────────────────────────────────────
+
+const treeData = computed((): NodeData | null => {
+  collapsedCids.value; selectedSet.value; // reactive deps
+  const roots = (props.treeRoots as string[]).map(r => buildNode(r, new Set())).filter((n): n is NodeData => n !== null);
+  if (roots.length === 0) return null;
+  return roots.length === 1
+    ? roots[0]
+    : { id: '__vroot__', name: '', type: 'virtual', edgeType: '', edgeReversed: false, parentName: '', relationTag: '', cardW: 0, children: roots };
+});
+
+const layout = computed<{ nodes: LayoutNode[]; links: LayoutLink[]; w: number; h: number } | null>(() => {
+  const root = treeData.value;
+  if (!root) return null;
+
+  const hier    = hierarchy<NodeData>(root, d => d.children);
+  const layoutFn = d3Tree<NodeData>().nodeSize([CARD_H + NODE_V_GAP, DEPTH_STEP]);
+  const laid    = layoutFn(hier);
+
+  // d3 tree: x = breadth (→ SVG Y for LR),  y = depth (→ SVG X for LR)
+  type D3N = { data: NodeData; x: number; y: number };
+  type D3L = { source: D3N; target: D3N };
+
+  const all   = (laid.descendants() as unknown as D3N[]).filter(n => n.data.type !== 'virtual');
+  const links = (laid.links() as unknown as D3L[]).filter(l => l.source.data.type !== 'virtual');
+
+  const toLayout = (n: D3N): LayoutNode => ({ data: n.data, svgX: n.y, svgY: n.x });
+
+  const nodes: LayoutNode[] = all.map(toLayout);
+  const layoutLinks: LayoutLink[] = links.map(l => ({ source: toLayout(l.source), target: toLayout(l.target) }));
+
+  // Compute bounding box & offset so content starts at (pad, pad)
+  const pad = 50;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const n of nodes) {
+    const hw = n.data.cardW / 2 || SERIAL_R;
+    minX = Math.min(minX, n.svgX - hw);
+    maxX = Math.max(maxX, n.svgX + hw);
+    minY = Math.min(minY, n.svgY - CARD_H / 2);
+    maxY = Math.max(maxY, n.svgY + CARD_H / 2);
+  }
+  const ox = -minX + pad, oy = -minY + pad;
+  nodes.forEach(n => { n.svgX += ox; n.svgY += oy; });
+  layoutLinks.forEach(l => {
+    l.source.svgX += ox; l.source.svgY += oy;
+    l.target.svgX += ox; l.target.svgY += oy;
+  });
+
+  return { nodes, links: layoutLinks, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
+});
+
+const hasData = computed(() => !!layout.value?.nodes.length);
+
+// ─────────────────────────────────────────────────────────────
+// Pan / Zoom
+// ─────────────────────────────────────────────────────────────
+
+const svgRef  = ref<SVGSVGElement | null>(null);
+const wrapRef = ref<HTMLDivElement | null>(null);
+const tx = ref(0), ty = ref(0), sc = ref(0.9);
+let drag: { cx: number; cy: number; tx0: number; ty0: number } | null = null;
+
+function onWheel(e: WheelEvent) {
+  e.preventDefault();
+  sc.value = Math.max(0.15, Math.min(4, sc.value * (e.deltaY < 0 ? 1.1 : 0.9)));
+}
+function onMD(e: MouseEvent) {
+  if (e.button !== 0) return;
+  drag = { cx: e.clientX, cy: e.clientY, tx0: tx.value, ty0: ty.value };
+}
+function onMM(e: MouseEvent) {
+  if (!drag) return;
+  tx.value = drag.tx0 + (e.clientX - drag.cx);
+  ty.value = drag.ty0 + (e.clientY - drag.cy);
+}
+function onMU() { drag = null; }
+
+function fitView() {
+  if (!layout.value || !wrapRef.value) return;
+  const { w, h } = layout.value;
+  const { clientWidth: cw, clientHeight: ch } = wrapRef.value;
+  const newSc = Math.min(0.95, cw / w, ch / h);
+  sc.value = newSc;
+  tx.value = (cw - w * newSc) / 2;
+  ty.value = (ch - h * newSc) / 2;
+}
+
+// New query: reset → full expand → collapseAll → fitView.
+// User interactions (expand/collapse single nodes) do NOT trigger fitView.
+watch(() => (props.treeRoots as string[]).join(','), async (newVal) => {
+  if (!newVal) return;
+  // Clear old collapsed state so treeData builds the complete tree
+  collapsedCids.value = new Set();
+  triggerRef(collapsedCids);
+  await nextTick();    // treeData recomputes fully expanded
+  collapseAll();       // mark every branch node as collapsed
+  await nextTick();    // layout recomputes in collapsed form
+  fitView();           // scale to fit the now-compact view
+}, { immediate: true });
+
+onMounted(() => {
+  window.addEventListener('mousemove', onMM);
+  window.addEventListener('mouseup',   onMU);
+});
+onUnmounted(() => {
+  window.removeEventListener('mousemove', onMM);
+  window.removeEventListener('mouseup',   onMU);
+});
+
+// ─────────────────────────────────────────────────────────────
+// SVG geometry
+// ─────────────────────────────────────────────────────────────
+
+/** Cubic bezier path: right-edge of source card → left-edge of target card */
+function edgePath(src: LayoutNode, tgt: LayoutNode): string {
+  const isSerial = tgt.data.isSerial;
+  const srcX = src.svgX + src.data.cardW / 2;
+  const tgtX = tgt.svgX - (isSerial ? SERIAL_R + 2 : tgt.data.cardW / 2);
+  const mx   = (srcX + tgtX) / 2;
+  return `M ${srcX} ${src.svgY} C ${mx} ${src.svgY}, ${mx} ${tgt.svgY}, ${tgtX} ${tgt.svgY}`;
+}
+
+function edgeLineStyle(tgt: LayoutNode) {
+  const s = EDGE_LINE[tgt.data.edgeType] || EDGE_LINE.default;
+  return { stroke: s.stroke, strokeWidth: s.width, strokeDasharray: s.dash || '' };
+}
+
+/** Card outer rect path (rounded rect with CARD_R) for shadow */
+function shadowAttrs(cw: number) {
+  return { x: -cw / 2, y: -CARD_H / 2, width: cw, height: CARD_H, rx: CARD_R };
+}
+
+/** Left stripe path — rounded only on the left side */
+function stripePath(cw: number): string {
+  const r = CARD_R, x0 = -cw / 2, x1 = x0 + STRIPE_W, h = CARD_H;
+  return `M ${x1} ${-h/2} L ${x0+r} ${-h/2} Q ${x0} ${-h/2} ${x0} ${-h/2+r}`
+       + ` L ${x0} ${h/2-r} Q ${x0} ${h/2} ${x0+r} ${h/2}`
+       + ` L ${x1} ${h/2} Z`;
+}
+
+/** Card body path — white/tinted, rounded only on the right side */
+function bodyPath(cw: number): string {
+  const r = CARD_R, x0 = -cw / 2 + STRIPE_W, x1 = cw / 2, h = CARD_H;
+  return `M ${x0} ${-h/2} L ${x1-r} ${-h/2} Q ${x1} ${-h/2} ${x1} ${-h/2+r}`
+       + ` L ${x1} ${h/2-r} Q ${x1} ${h/2} ${x1-r} ${h/2}`
+       + ` L ${x0} ${h/2} Z`;
+}
+
+// Badge for type-badged nodes: returns { text, x, w }
+function badgeInfo(type: string, cw: number) {
+  const label = TYPE_BADGE[type] || '';
+  if (!label) return null;
+  const bw = charPx(label) + 10;
+  const bx = -cw / 2 + STRIPE_W + PAD_L;
+  return { label, bx, bw, bh: BADGE_H, color: nodeColor(type) };
+}
+
+// Text X start (after stripe + optional badge)
+function textX(type: string, cw: number): number {
+  const badge = badgeInfo(type, cw);
+  if (badge) return badge.bx + badge.bw + 5;
+  return -cw / 2 + STRIPE_W + PAD_L;
+}
+
+// Diamond path for serial nodes
+function diamondPath(): string {
+  const r = SERIAL_R;
+  return `M 0 ${-r} L ${r} 0 L 0 ${r} L ${-r} 0 Z`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Node click
+// ─────────────────────────────────────────────────────────────
+
+function handleClick(node: LayoutNode) {
+  const { data } = node;
+  if (data.isToggle === 'minus') {
+    const pid = normalizeText(data.id.replace('__collapse__', ''));
+    if (pid) { const s = new Set(collapsedCids.value); s.add(pid); collapsedCids.value = s; triggerRef(collapsedCids); }
+    return;
+  }
+  if (data.isToggle === 'plus') {
+    const pid = normalizeText(data.id.replace('__expand__', ''));
+    if (pid) { const s = new Set(collapsedCids.value); s.delete(pid); collapsedCids.value = s; triggerRef(collapsedCids); }
+    return;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Expand / Collapse all
+// ─────────────────────────────────────────────────────────────
+
+function expandAll() { collapsedCids.value = new Set(); triggerRef(collapsedCids); }
+
+function collapseAll() {
+  const set = new Set<string>();
+  function walk(n: NodeData) {
+    for (const c of (n.children || [])) {
+      const e = (props.lineageMap as Map<string, { children?: string[] }>).get(c.id);
+      if ((e?.children?.length || 0) > 0) set.add(c.id);
+      walk(c);
     }
   }
-  return names;
-});
+  if (treeData.value) walk(treeData.value);
+  collapsedCids.value = set;
+  triggerRef(collapsedCids);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Relation rows table
+// ─────────────────────────────────────────────────────────────
+
+const RELATION_PAGE_SIZE = 50;
+const relationPage = ref(1);
 
 const relationRows = computed(() => {
   const rows: Array<Record<string, string>> = [];
   const seen = new Set<string>();
-  const source = Array.isArray(props.graphEdges) ? props.graphEdges : [];
-
-  source.forEach((edge: unknown) => {
-    if (!edge || typeof edge !== 'object') {
-      return;
-    }
+  const nm = props.nameMap as Map<string, string>;
+  ((props.graphEdges as unknown[]) || []).forEach((edge: unknown) => {
+    if (!edge || typeof edge !== 'object') return;
     const e = edge as Record<string, unknown>;
-    const fromCid = normalizeText(e.from_cid);
-    const toCid = normalizeText(e.to_cid);
-    const edgeType = normalizeText(e.edge_type);
-    if (!fromCid || !toCid || !edgeType) {
-      return;
-    }
-
-    const key = `${fromCid}->${toCid}:${edgeType}`;
-    if (seen.has(key)) {
-      return;
-    }
+    const fc = normalizeText(e.from_cid), tc = normalizeText(e.to_cid), et = normalizeText(e.edge_type);
+    if (!fc || !tc || !et) return;
+    const key = `${fc}->${tc}:${et}`;
+    if (seen.has(key)) return;
     seen.add(key);
-
-    rows.push({
-      key,
-      fromCid,
-      toCid,
-      fromName: normalizeText(props.nameMap?.get?.(fromCid) || fromCid),
-      toName: normalizeText(props.nameMap?.get?.(toCid) || toCid),
-      edgeType,
-      edgeLabel: (RELATION_TYPE_LABELS as Record<string, string>)[edgeType] || edgeType,
-    });
+    rows.push({ key, fromCid: fc, toCid: tc, fromName: nm?.get?.(fc) || fc, toName: nm?.get?.(tc) || tc, edgeType: et, edgeLabel: RELATION_TYPE_LABELS[et] || et });
   });
-
-  rows.sort((a, b) => (
-    a.edgeLabel.localeCompare(b.edgeLabel, 'zh-Hant')
-    || a.fromName.localeCompare(b.fromName, 'zh-Hant')
-    || a.toName.localeCompare(b.toName, 'zh-Hant')
-  ));
+  rows.sort((a, b) => a.edgeLabel.localeCompare(b.edgeLabel, 'zh-Hant') || a.fromName.localeCompare(b.fromName, 'zh-Hant'));
   return rows;
 });
 
-const pagedRelationRows = computed(() => relationRows.value.slice(
-  (relationPage.value - 1) * RELATION_PAGE_SIZE,
-  relationPage.value * RELATION_PAGE_SIZE,
-));
-
+const pagedRelationRows = computed(() => relationRows.value.slice((relationPage.value - 1) * RELATION_PAGE_SIZE, relationPage.value * RELATION_PAGE_SIZE));
 const relationTotalPages = computed(() => Math.max(1, Math.ceil(relationRows.value.length / RELATION_PAGE_SIZE)));
 
-function detectNodeType(cid: string, entry: { children?: string[] } | null, serials: unknown[]) {
-  const explicitType = normalizeText(props.nodeMetaMap?.get?.(cid)?.node_type).toUpperCase();
-  if (explicitType === 'WAFER') {
-    return 'wafer';
-  }
-  if (explicitType === 'GC') {
-    return 'gc';
-  }
-  if (explicitType === 'GA') {
-    return 'ga';
-  }
-  if (explicitType === 'GD') {
-    return 'gd';
-  }
+// ─────────────────────────────────────────────────────────────
+// Export
+// ─────────────────────────────────────────────────────────────
 
-  if (rootsSet.value.has(cid)) {
-    return 'root';
-  }
-  const children = entry?.children || [];
-  if (children.length === 0 && serials.length > 0) {
-    return 'leaf';
-  }
-  if (children.length === 0 && serials.length === 0) {
-    return 'leaf';
-  }
-  return 'branch';
-}
+const exportingPng = ref(false), exportingCsv = ref(false), exportError = ref('');
 
-function lookupEdgeMeta(parentCid: string, childCid: string) {
-  const parent = normalizeText(parentCid);
-  const child = normalizeText(childCid);
-  if (!parent || !child) {
-    return { edgeType: '', reversed: false };
-  }
-  const direct = normalizeText(props.edgeTypeMap?.get?.(`${parent}->${child}`));
-  if (direct) {
-    return { edgeType: direct, reversed: false };
-  }
-  const reverse = normalizeText(props.edgeTypeMap?.get?.(`${child}->${parent}`));
-  if (reverse) {
-    return { edgeType: reverse, reversed: true };
-  }
-  return { edgeType: '', reversed: false };
-}
-
-function relationTag(edgeType: string, reversed: boolean) {
-  const spec = (EDGE_TAGS as Record<string, { forward: string; reverse: string }>)[normalizeText(edgeType)];
-  if (!spec) {
-    return '';
-  }
-  return reversed ? spec.reverse : spec.forward;
-}
-
-function relationSentence({ edgeType, reversed, leftName, currentName }: { edgeType: string; reversed: boolean; leftName: string; currentName: string }) {
-  const left = normalizeText(leftName);
-  const current = normalizeText(currentName);
-  if (!edgeType || !left || !current) {
-    return '';
-  }
-
-  if (edgeType === 'split_from') {
-    return reversed
-      ? `${left} 拆自 ${current}`
-      : `${current} 拆自 ${left}`;
-  }
-  if (edgeType === 'merge_source') {
-    return reversed
-      ? `${left} 由 ${current} 併批而來`
-      : `${current} 由 ${left} 併批而來`;
-  }
-  if (edgeType === 'wafer_origin') {
-    return reversed
-      ? `${left} 對應 Wafer ${current}`
-      : `${current} 源自 Wafer ${left}`;
-  }
-  if (edgeType === 'gd_rework_source') {
-    return reversed
-      ? `${left} 由 ${current} 重工而來`
-      : `${current} 由 ${left} 重工而來`;
-  }
-
-  return reversed
-    ? `${left} 與 ${current}（${edgeType}）`
-    : `${current} 與 ${left}（${edgeType}）`;
-}
-
-type TreeNode = Record<string, unknown> & { children?: TreeNode[] };
-
-function buildNode(cid: unknown, visited: Set<string>, parentCid = ''): TreeNode | null {
-  const id = normalizeText(cid);
-  if (!id || visited.has(id)) {
-    return null;
-  }
-  visited.add(id);
-
-  const entry = props.lineageMap.get(id);
-  const name = props.nameMap?.get?.(id) || id;
-  const serials = props.leafSerials?.get?.(id) || [];
-  const childIds = entry?.children || [];
-  const nodeType = detectNodeType(id, entry, serials);
-
-  const isCollapsed = collapsedCids.value.has(id);
-
-  let children;
-  if (isCollapsed && childIds.length > 0) {
-    // Collapsed: show a single [+N] placeholder to expand
-    const totalDescendants = childIds.length;
-    children = [{
-      name: `+${totalDescendants}`,
-      value: { type: 'expand-toggle', parentCid: id },
-      ...TOGGLE_COLLAPSE_STYLE,
-      label: { ...TOGGLE_COLLAPSE_STYLE.label, formatter: () => `+${totalDescendants}` },
-      children: [],
-    }];
-  } else {
-    // In reverse mode, process split_from children first so the lineage chain
-    // (A00-001-01C → A00-001 → A01) is traversed before wafer_origin nodes.
-    // This ensures wafer_lot is "claimed" by the deepest ancestor (A01) via
-    // the global visited set, and won't duplicate at shallower levels.
-    const orderedChildIds = props.isReverse
-      ? [...(childIds as string[])].sort((a: string, b: string) => {
-          const ea = normalizeText(lookupEdgeMeta(id, a).edgeType);
-          const eb = normalizeText(lookupEdgeMeta(id, b).edgeType);
-          const priority: Record<string, number> = { split_from: 0, merge_source: 1, gd_rework_source: 2, wafer_origin: 3 };
-          return (priority[ea] ?? 1) - (priority[eb] ?? 1);
-        })
-      : childIds as string[];
-
-    children = orderedChildIds
-      .map((childId: string) => buildNode(childId, visited, id))
-      .filter((n): n is TreeNode => n !== null);
-
-    if (children.length === 0 && serials.length > 0) {
-      (serials as string[]).forEach((sn: string) => {
-        children.push({
-          name: sn,
-          value: { type: 'serial', cid: id },
-          itemStyle: {
-            color: NODE_COLORS.serial,
-            borderColor: NODE_COLORS.serial,
-          },
-          label: {
-            fontSize: 10,
-            color: 'rgb(100, 116, 139)',
-          },
-          symbol: 'diamond',
-          symbolSize: 6,
-        });
-      });
-    }
-
-    // Expanded branch: prepend a [−] toggle to allow collapsing
-    // Skip root nodes — use "全部收合" for root-level collapse
-    if (children.length > 0 && childIds.length > 0 && !rootsSet.value.has(id)) {
-      children.unshift({
-        name: '−',
-        value: { type: 'collapse-toggle', parentCid: id },
-        ...TOGGLE_EXPAND_STYLE,
-        label: { ...TOGGLE_EXPAND_STYLE.label, formatter: () => '−' },
-        children: [],
-      });
-    }
-  }
-
-  // Leaf node whose display name matches a known serial → render as serial style
-  const isSerialLike: boolean = nodeType === 'leaf'
-    && serials.length === 0
-    && children.length === 0
-    && allSerialNames.value.has(name);
-  const effectiveType: string = isSerialLike ? 'serial' : nodeType;
-  const color = (NODE_COLORS as Record<string, string>)[effectiveType] || NODE_COLORS.branch;
-  const incomingMeta = lookupEdgeMeta(parentCid, id);
-  const incomingEdgeType = incomingMeta.edgeType;
-  const incomingEdgeReversed = incomingMeta.reversed;
-  const incomingEdgeStyle = (EDGE_STYLES as Record<string, { color: string; type: string; width: number }>)[incomingEdgeType] || EDGE_STYLES.default;
-  const parentName = normalizeText(props.nameMap?.get?.(normalizeText(parentCid)) || parentCid);
-  const shortTag = relationTag(incomingEdgeType, incomingEdgeReversed);
-  const displayLabel = shortTag ? `${shortTag} ${name}` : name;
-  const isSelected = selectedSet.value.has(id);
-
-  const node: TreeNode = {
-    name,
-    value: {
-      cid: id,
-      type: effectiveType,
-      edgeType: incomingEdgeType || '',
-      edgeReversed: incomingEdgeReversed,
-      parentName,
-      relationTag: shortTag,
-    },
-    children,
-    itemStyle: {
-      color,
-      borderColor: isSelected ? 'rgb(15, 23, 42)' : color,
-      borderWidth: isSelected ? 2.5 : 1,
-    },
-    label: {
-      ...LABEL_BASE_STYLE,
-      position: children.length > 0 ? 'top' : 'right',
-      distance: children.length > 0 ? 8 : 6,
-      fontWeight: isSelected ? 'bold' : 'normal',
-      fontSize: isSerialLike ? 10 : 11,
-      color: isSelected ? 'rgb(15, 23, 42)' : (isSerialLike ? 'rgb(100, 116, 139)' : 'rgb(51, 65, 85)'),
-      formatter: () => displayLabel,
-    },
-    symbol: isSerialLike ? 'diamond' : (nodeType === 'root' ? 'roundRect' : 'circle'),
-    symbolSize: isSerialLike ? 6 : (nodeType === 'root' ? 14 : 10),
-    lineStyle: incomingEdgeStyle,
-  };
-
-  return node;
-}
-
-// Build each root into its own independent tree data.
-// Depends on collapsedCids so tree rebuilds when expand/collapse changes.
-const treesData = computed(() => {
-  // Access reactive deps so tree rebuilds on change
-  collapsedCids.value;
-  selectedSet.value;
-  if (props.treeRoots.length === 0) {
-    return [];
-  }
-
-  return props.treeRoots
-    .map((rootId) => buildNode(rootId, new Set()))
-    .filter((n): n is TreeNode => n !== null);
-});
-
-const hasData = computed(() => treesData.value.length > 0);
-
-function countLeaves(node: { children?: unknown[] }): number {
-  if (!node.children || node.children.length === 0) {
-    return 1;
-  }
-  return node.children.reduce((sum: number, child: unknown) => sum + countLeaves(child as { children?: unknown[] }), 0);
-}
-
-const chartHeight = computed(() => {
-  const totalLeaves = treesData.value.reduce((sum, tree) => sum + countLeaves(tree), 0);
-  const base = Math.max(300, Math.min(1200, totalLeaves * 36));
-  return `${base}px`;
-});
-
-function countGraphemes(text: unknown): number {
-  return Array.from(normalizeText(text)).length;
-}
-
-function walkTreeMetrics(node: Record<string, unknown>, depth: number, metrics: { maxDepth: number; maxLabelChars: number }) {
-  if (!node || typeof node !== 'object') {
-    return;
-  }
-
-  metrics.maxDepth = Math.max(metrics.maxDepth, depth);
-  const nodeVal = (node?.value as Record<string, unknown>) || {};
-  const relationTag = normalizeText(nodeVal?.relationTag);
-  const labelText = relationTag
-    ? `${relationTag} ${normalizeText(node.name)}`
-    : normalizeText(node.name);
-  metrics.maxLabelChars = Math.max(metrics.maxLabelChars, countGraphemes(labelText));
-
-  const children = Array.isArray(node.children) ? node.children : [];
-  children.forEach((child: unknown) => walkTreeMetrics(child as Record<string, unknown>, depth + 1, metrics));
-}
-
-const treeMetrics = computed(() => {
-  const metrics = {
-    maxDepth: 1,
-    maxLabelChars: 12,
-  };
-
-  treesData.value.forEach((tree) => walkTreeMetrics(tree, 1, metrics));
-  return metrics;
-});
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-const labelWidthPx = computed(() => clampNumber(
-  treeMetrics.value.maxLabelChars * 7 + 14,
-  120,
-  360,
-));
-
-const depthSpacingPx = computed(() => clampNumber(
-  88 + Math.round(treeMetrics.value.maxLabelChars * 1.4),
-  96,
-  132,
-));
-
-const rootLabelWidthPx = computed(() => {
-  const maxChars = (props.treeRoots as unknown[]).reduce<number>((max, rootCid) => {
-    const rootId = normalizeText(rootCid);
-    const rootName = normalizeText(props.nameMap?.get?.(rootId) || rootId);
-    return Math.max(max, countGraphemes(rootName));
-  }, 8);
-  return clampNumber(maxChars * 7 + 24, 72, 260);
-});
-
-const chartLayout = computed(() => {
-  const left = rootLabelWidthPx.value;
-  const right = labelWidthPx.value + 18;
-  const depthSpacing = depthSpacingPx.value;
-  const depthCount = Math.max(1, treeMetrics.value.maxDepth - 1);
-  const requiredWidth = left + right + (depthCount * depthSpacing) + 120;
-  const minWidth = clampNumber(requiredWidth, 760, 3000);
-  return { left, right, minWidth };
-});
-
-const chartMinWidth = computed(() => `${chartLayout.value.minWidth}px`);
-
-const TREE_SERIES_DEFAULTS = Object.freeze({
-  type: 'tree',
-  layout: 'orthogonal',
-  orient: 'LR',
-  expandAndCollapse: false,
-  roam: true,
-  symbol: 'circle',
-  symbolSize: 10,
-  label: {
-    show: true,
-    position: 'right',
-    distance: 6,
-    fontSize: 11,
-    color: 'rgb(51, 65, 85)',
-    overflow: 'break',
-    ...LABEL_BASE_STYLE,
-  },
-  lineStyle: {
-    width: 1.5,
-    color: 'rgb(203, 213, 225)',
-    curveness: 0.5,
-  },
-  emphasis: {
-    focus: 'ancestor',
-    itemStyle: { borderWidth: 2 },
-    label: { fontWeight: 'bold' },
-  },
-  animationDuration: 350,
-  animationDurationUpdate: 300,
-});
-
-const chartOption = computed(() => {
-  const trees = treesData.value;
-  if (trees.length === 0) {
-    return null;
-  }
-
-  const toolbox = {
-    show: true,
-    orient: 'vertical',
-    right: 8,
-    top: 8,
-    feature: {
-      restore: { title: '重置' },
-    },
-    iconStyle: {
-      borderColor: 'rgb(100, 116, 139)',
-    },
-    emphasis: {
-      iconStyle: {
-        borderColor: 'rgb(37, 99, 235)',
-      },
-    },
-  };
-
-  const tooltip = {
-    trigger: 'item',
-    triggerOn: 'mousemove',
-    // TODO: type echarts callback
-    formatter(params: Record<string, unknown>) {
-      const data = params?.data as Record<string, unknown> | undefined;
-      if (!data) {
-        return '';
-      }
-      const val = (data.value || {}) as Record<string, unknown>;
-      if (val.type === 'expand-toggle' || val.type === 'collapse-toggle') {
-        return val.type === 'expand-toggle' ? '點擊展開' : '點擊收合';
-      }
-      const lines = [`<b>${data.name}</b>`];
-      if (val.type === 'serial') {
-        lines.push('<span style="color:rgb(100, 116, 139)">成品序列號</span>');
-      } else if (val.type === 'wafer') {
-        lines.push('<span style="color:rgb(37, 99, 235)">Wafer LOT</span>');
-      } else if (val.type === 'gc') {
-        lines.push('<span style="color:rgb(6, 182, 212)">GC LOT</span>');
-      } else if (val.type === 'ga') {
-        lines.push('<span style="color:rgb(16, 185, 129)">GA LOT</span>');
-      } else if (val.type === 'gd') {
-        lines.push('<span style="color:rgb(239, 68, 68)">GD LOT（重工）</span>');
-      } else if (val.type === 'root') {
-        lines.push('<span style="color:rgb(59, 130, 246)">根節點（晶批）</span>');
-      } else if (val.type === 'leaf') {
-        lines.push('<span style="color:rgb(245, 158, 11)">末端節點</span>');
-      } else if (val.type === 'branch') {
-        lines.push('<span style="color:rgb(16, 185, 129)">中間節點</span>');
-      }
-      if (val.edgeType) {
-        const sentence = relationSentence({
-          edgeType: String(val.edgeType),
-          reversed: Boolean(val.edgeReversed),
-          leftName: String(val.parentName || ''),
-          currentName: String(data.name || ''),
-        });
-        if (sentence) {
-          lines.push(`<span style="color:rgb(15, 23, 42);font-size:11px">讀法: ${sentence}</span>`);
-        }
-        const directionTag = val.relationTag ? `（${val.relationTag}）` : '';
-        lines.push(`<span style="color:rgb(148, 163, 184);font-size:11px">關係型別: ${val.edgeType}${directionTag}</span>`);
-      }
-      if (val.cid && val.cid !== data.name) {
-        lines.push(`<span style="color:rgb(148, 163, 184);font-size:11px">CID: ${val.cid}</span>`);
-      }
-      return lines.join('<br/>');
-    },
-  };
-
-  // Single series for unified roam/zoom — use virtual root when multiple trees
-  const seriesData = trees.length === 1
-    ? [trees[0]]
-    : [{
-        name: '',
-        value: { type: 'virtual-root', cid: '' },
-        itemStyle: { opacity: 0 },
-        label: { show: false },
-        symbol: 'none',
-        symbolSize: 0,
-        lineStyle: { opacity: 0 },
-        children: trees,
-      }];
-
-  return {
-    tooltip,
-    toolbox,
-    series: [{
-      ...TREE_SERIES_DEFAULTS,
-      left: chartLayout.value.left,
-      right: chartLayout.value.right,
-      top: 20,
-      bottom: 20,
-      label: {
-        ...TREE_SERIES_DEFAULTS.label,
-        width: labelWidthPx.value,
-      },
-      data: seriesData,
-    }],
-  };
-});
-
-// TODO: type echarts callback
-function handleNodeClick(params: Record<string, unknown>) {
-  const data = params?.data as Record<string, unknown> | undefined;
-  if (!data?.value) return;
-
-  const nodeValue = data.value as Record<string, unknown>;
-  const nodeType = nodeValue.type;
-
-  // Toggle expand/collapse via our managed state
-  if (nodeType === 'collapse-toggle') {
-    const parentCid = String(nodeValue.parentCid || '');
-    if (parentCid) {
-      const next = new Set(collapsedCids.value);
-      next.add(parentCid);
-      collapsedCids.value = next;
-      triggerRef(collapsedCids);
-    }
-    return;
-  }
-  if (nodeType === 'expand-toggle') {
-    const parentCid = String(nodeValue.parentCid || '');
-    if (parentCid) {
-      const next = new Set(collapsedCids.value);
-      next.delete(parentCid);
-      collapsedCids.value = next;
-      triggerRef(collapsedCids);
-    }
-    return;
-  }
-
-}
-
-function buildExportFileName(ext = 'png') {
+function fileName(ext = 'png') {
   const now = new Date();
-  const ts = [
-    String(now.getFullYear()).padStart(4, '0'),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0'),
-  ].join('');
-  const rawBase = normalizeText(props.title) || 'lineage_tree';
-  const safeBase = rawBase
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .replace(/\s+/g, '_');
-  return `${safeBase}_${ts}.${ext}`;
+  const ts = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0'), String(now.getHours()).padStart(2,'0'), String(now.getMinutes()).padStart(2,'0'), String(now.getSeconds()).padStart(2,'0')].join('');
+  return `${(normalizeText(props.title) || 'lineage').replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_')}_${ts}.${ext}`;
 }
+function dl(url: string, name: string) { const a = document.createElement('a'); a.href=url; a.download=name; a.rel='noopener'; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
 
-function triggerDownloadByUrl(url: string, filename: string): void {
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.rel = 'noopener';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-interface EChartsInstance {
-  resize(): void;
-  setOption(option: unknown, opts?: unknown): void;
-  dispatchAction(payload: unknown): void;
-  getDataURL(opts?: unknown): string;
-}
-
-function getChartInstance(): EChartsInstance | null {
-  const chartComponent = chartRef.value;
-  if (!chartComponent) {
-    return null;
-  }
-  if (typeof chartComponent.getEchartsInstance === 'function') {
-    return (chartComponent.getEchartsInstance as () => EChartsInstance | null)();
-  }
-  return (chartComponent.chart as EChartsInstance) || null;
-}
-
-// Force ECharts tree to re-layout after SPA navigation or when data first
-// arrives. Without this, the chart can initialize with a zero-width container
-// (e.g. during route transition) and the tree node positions stay stuck at
-// the stale layout until a hard reload. resize() alone does not re-run the
-// tree layout, so we also re-apply the option with notMerge.
-async function forceRelayout() {
-  await nextTick();
-  const instance = getChartInstance();
-  if (!instance) return;
-  instance.resize();
-  instance.setOption(chartOption.value, { notMerge: true });
-}
-
-onMounted(() => {
-  if (hasData.value) {
-    void forceRelayout();
-  }
-});
-
-watch(hasData, (next) => {
-  if (next) {
-    void forceRelayout();
-  }
-});
-
-function escapeCsvField(value: unknown): string {
-  const text = normalizeText(value);
-  if (text === '') {
-    return '';
-  }
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-function buildCsvContent() {
-  const headers = ['來源批次', '來源CID', '目標批次', '目標CID', '關係', '關係代碼'];
-  const lines = [headers.join(',')];
-
-  relationRows.value.forEach((row) => {
-    lines.push([
-      escapeCsvField(row.fromName),
-      escapeCsvField(row.fromCid),
-      escapeCsvField(row.toName),
-      escapeCsvField(row.toCid),
-      escapeCsvField(row.edgeLabel),
-      escapeCsvField(row.edgeType),
-    ].join(','));
-  });
-
-  return `\uFEFF${lines.join('\r\n')}`;
-}
-
-function collectBranchCids(node: unknown, result: Set<string>): void {
-  if (!node || typeof node !== 'object') return;
-  const n = node as Record<string, unknown>;
-  const val = n.value as Record<string, unknown> | undefined;
-  const childIds = props.lineageMap.get(normalizeText(val?.cid))?.children;
-  if (childIds && childIds.length > 0) {
-    result.add(normalizeText(val?.cid));
-  }
-  if (Array.isArray(n.children)) {
-    n.children.forEach((child) => collectBranchCids(child, result));
-  }
-}
-
-function expandAll() {
-  collapsedCids.value = new Set();
-  triggerRef(collapsedCids);
-}
-
-function collapseAll() {
-  // Collapse all branches except root nodes (so roots stay visible)
-  const allBranches = new Set();
-  treesData.value.forEach((tree) => {
-    // Don't collapse the root itself, but collapse its branch children
-    const treeVal = (tree?.value as Record<string, unknown>) || {};
-    const rootCid = normalizeText(treeVal.cid);
-    const rootEntry = props.lineageMap.get(rootCid);
-    if (rootEntry?.children) {
-      rootEntry.children.forEach((childCid: unknown) => {
-        const childId = normalizeText(childCid);
-        const childEntry = props.lineageMap.get(childId);
-        if (childEntry?.children?.length > 0) {
-          allBranches.add(childId);
-        }
-      });
-    }
-  });
-  collapsedCids.value = allBranches;
-  triggerRef(collapsedCids);
-}
-
-function removeSelection(cid: unknown): void {
-  const current = new Set(selectedSet.value);
-  current.delete(normalizeText(cid));
-  emit('select-nodes', [...current]);
-}
-
-function resetView() {
-  const instance = getChartInstance();
-  if (!instance) return;
-  instance.dispatchAction({ type: 'restore' });
-}
-
-async function exportTreeAsPng() {
-  if (!hasData.value || exportingTreeImage.value) {
-    return;
-  }
-
-  exportingTreeImage.value = true;
-  exportErrorMessage.value = '';
-
+async function exportPng() {
+  if (!svgRef.value || exportingPng.value || !layout.value) return;
+  exportingPng.value = true; exportError.value = '';
   try {
-    await nextTick();
-    const instance = getChartInstance();
-    if (!instance || typeof instance.getDataURL !== 'function') {
-      throw new Error('無法取得樹圖實例');
-    }
-
-    const dataUrl = instance.getDataURL({
-      type: 'png',
-      pixelRatio: Math.min(2, window.devicePixelRatio || 1),
-      backgroundColor: 'rgb(255, 255, 255)',
-    });
-    triggerDownloadByUrl(dataUrl, buildExportFileName('png'));
-  } catch (error) {
-    exportErrorMessage.value = (error as Error)?.message || '樹圖匯出失敗';
-  } finally {
-    exportingTreeImage.value = false;
-  }
+    const { w, h } = layout.value;
+    const clone = svgRef.value.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute('width', String(Math.ceil(w)));
+    clone.setAttribute('height', String(Math.ceil(h)));
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const zg = clone.querySelector('.lt-zoom') as SVGGElement | null;
+    if (zg) zg.setAttribute('transform', 'translate(0,0) scale(1)');
+    const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = url; });
+    const cv = document.createElement('canvas');
+    const px = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.ceil(w)*px; cv.height = Math.ceil(h)*px;
+    const ctx = cv.getContext('2d')!;
+    ctx.scale(px, px); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    dl(cv.toDataURL('image/png'), fileName('png'));
+  } catch(e) { exportError.value = (e as Error)?.message || '匯出失敗'; }
+  finally { exportingPng.value = false; }
 }
 
-function exportRelationCsv() {
-  if (!hasData.value || exportingRelationCsv.value || relationRows.value.length === 0) {
-    return;
-  }
-
-  exportingRelationCsv.value = true;
-  exportErrorMessage.value = '';
-
+function exportCsv() {
+  if (!hasData.value || exportingCsv.value || !relationRows.value.length) return;
+  exportingCsv.value = true; exportError.value = '';
   try {
-    const csv = buildCsvContent();
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const href = URL.createObjectURL(blob);
-    triggerDownloadByUrl(href, buildExportFileName('csv'));
-    URL.revokeObjectURL(href);
-  } catch (error) {
-    exportErrorMessage.value = (error as Error)?.message || '關係 CSV 匯出失敗';
-  } finally {
-    exportingRelationCsv.value = false;
-  }
+    const esc = (v: unknown) => { const t = normalizeText(v); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g,'""')}"` : t; };
+    const lines = [['來源批次','來源CID','目標批次','目標CID','關係','關係代碼'].join(','),
+      ...relationRows.value.map(r => [esc(r.fromName),esc(r.fromCid),esc(r.toName),esc(r.toCid),esc(r.edgeLabel),esc(r.edgeType)].join(','))];
+    const url = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' }));
+    dl(url, fileName('csv')); URL.revokeObjectURL(url);
+  } catch(e) { exportError.value = (e as Error)?.message || 'CSV 匯出失敗'; }
+  finally { exportingCsv.value = false; }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Selection
+// ─────────────────────────────────────────────────────────────
+
+function removeSelection(cid: unknown) {
+  const s = new Set(selectedSet.value); s.delete(normalizeText(cid)); emit('select-nodes', [...s]);
 }
 </script>
 
 <template>
   <section class="card ui-card"><div class="card-body ui-card-body">
-    <div class="query-tool-section-header">
-      <div>
-        <h3 class="card-title ui-card-title">{{ title }}</h3>
-        <p class="query-tool-muted">{{ description }}</p>
-        <p class="query-tool-muted lineage-direction-note">
-          讀圖方向由左至右；節點前綴 <code>←拆/←併/←晶/←重</code> 代表本節點由左側來源而來，
-          <code>→拆/→併/→晶/→重</code> 代表左側節點由本節點而來。
-        </p>
-        <p class="query-tool-muted lineage-direction-note">
-          滾輪縮放 · 拖曳平移 · 點擊 <code>[−]</code> 收合 / <code>[+N]</code> 展開分支；節點篩選請回主頁面操作
-        </p>
-      </div>
 
-      <div class="flex items-center gap-3">
+    <!-- Header: toolbar + legend only, no title/description redundancy -->
+    <div class="lt-toolbar-row">
+      <div class="lt-toolbar">
         <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="expandAll">全部展開</button>
         <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="collapseAll">全部收合</button>
-        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="resetView">重置視圖</button>
-        <ExportButton
-          :disabled="!hasData || loading"
-          :loading="exportingTreeImage"
-          label="匯出樹圖 PNG"
-          @click="exportTreeAsPng"
-        />
-        <ExportButton
-          :disabled="!hasData || loading || relationRows.length === 0"
-          :loading="exportingRelationCsv"
-          label="匯出關係 CSV"
-          @click="exportRelationCsv"
-        />
-        <div class="flex items-center gap-2 text-[10px] text-slate-500">
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-sm" :style="{ background: NODE_COLORS.wafer }" />
-            Wafer
+        <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm" :disabled="!hasData || loading" @click="fitView">重置視圖</button>
+        <ExportButton :disabled="!hasData || loading" :loading="exportingPng" label="匯出 PNG" @click="exportPng" />
+        <ExportButton :disabled="!hasData || loading || !relationRows.length" :loading="exportingCsv" label="匯出關係 CSV" @click="exportCsv" />
+        <!-- Legend -->
+        <div class="lt-legend">
+          <span v-for="[k,label] in [['wafer','Wafer'],['gc','GC'],['ga','GA'],['gd','GD'],['leaf','其他LOT']]" :key="k" class="lt-legend-item">
+            <span class="lt-legend-dot" :style="{ background: NODE_COLORS[k] }" />
+            {{ label }}
           </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.gc }" />
-            GC
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.ga }" />
-            GA
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.gd }" />
-            GD
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rounded-full" :style="{ background: NODE_COLORS.leaf }" />
-            其他 LOT
-          </span>
-          <span v-if="showSerialLegend" class="inline-flex items-center gap-1">
-            <span class="inline-block size-2.5 rotate-45" :style="{ background: NODE_COLORS.serial, width: '8px', height: '8px' }" />
+          <span v-if="showSerialLegend" class="lt-legend-item">
+            <span class="lt-legend-diamond" :style="{ borderColor: NODE_COLORS.serial }" />
             序列號
           </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block h-0.5 w-3 bg-slate-300" />
-            split(拆批)
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block h-0.5 w-3 border-t-2 border-dashed border-amber-500" />
-            merge(併批)
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block h-0.5 w-3 border-t-2 border-dotted border-blue-600" />
-            wafer(晶圓來源)
-          </span>
-          <span class="inline-flex items-center gap-1">
-            <span class="inline-block h-0.5 w-3 border-t-2 border-dashed border-red-500" />
-            gd-rework(重工來源)
-          </span>
-        </div>
-      </div>
-    </div>
-    <ErrorBanner :message="exportErrorMessage" />
+          <span class="lt-legend-item"><span class="lt-legend-line" />split</span>
+          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dashed" style="border-color:#f59e0b" />merge</span>
+          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dotted" style="border-color:#2563eb" />wafer</span>
+          <span class="lt-legend-item"><span class="lt-legend-line lt-legend-line--dashed" style="border-color:#ef4444" />rework</span>
+        </div><!-- /lt-legend -->
+      </div><!-- /lt-toolbar -->
+    </div><!-- /lt-toolbar-row -->
 
-    <!-- Loading overlay -->
-    <div v-if="loading" class="placeholder lineage-loading-placeholder">
-      正在載入血緣資料…
-    </div>
+    <ErrorBanner :message="exportError" @dismiss="exportError = ''" />
 
-    <!-- Empty state -->
-    <div v-else-if="!hasData" class="placeholder">
-      {{ emptyMessage }}
-    </div>
+    <!-- States -->
+    <div v-if="loading"    class="placeholder lt-placeholder">正在載入血緣資料…</div>
+    <div v-else-if="!hasData" class="placeholder lt-placeholder">{{ emptyMessage }}</div>
 
-    <!-- ECharts Tree -->
-    <div v-else class="relative">
-      <LoadingOverlay v-if="exportingTreeImage" />
-      <VChart
-        ref="chartRef"
-        class="lineage-tree-chart"
-        :style="{ height: chartHeight, width: '100%' }"
-        :option="chartOption ?? undefined"
-        :autoresize="true"
-        @click="handleNodeClick"
-      />
-    </div>
+    <!-- SVG canvas -->
+    <div
+      v-else
+      ref="wrapRef"
+      class="lt-canvas-wrap"
+      @wheel.prevent="onWheel"
+      @mousedown="onMD"
+    >
+      <svg
+        ref="svgRef"
+        class="lt-svg"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <!-- ── Defs: shadow filters ── -->
+        <defs>
+          <filter v-for="type in ['wafer','gc','ga','gd','root','branch','leaf','toggle']"
+                  :key="type"
+                  :id="`lt-shd-${type}`"
+                  x="-30%" y="-40%" width="160%" height="180%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4"
+                          :flood-color="SHADOW_COLOR[type] || 'rgba(0,0,0,0.1)'"
+                          flood-opacity="1" />
+          </filter>
+          <filter id="lt-shd-selected" x="-30%" y="-40%" width="160%" height="180%">
+            <feDropShadow dx="0" dy="3" stdDeviation="7" flood-color="rgba(0,0,0,0.28)" flood-opacity="1" />
+          </filter>
+        </defs>
 
-    <details v-if="relationRows.length > 0" class="lineage-relation-details">
-      <summary class="lineage-relation-summary">
-        關係清單（{{ relationRows.length }}）
-      </summary>
-      <div class="query-tool-table-wrap short lineage-relation-table-wrap">
-        <table class="query-tool-table">
-          <thead>
-            <tr>
-              <th>來源批次</th>
-              <th>目標批次</th>
-              <th>關係</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in pagedRelationRows"
-              :key="row.key"
+        <!-- ── Zoom/pan group ── -->
+        <g class="lt-zoom" :transform="`translate(${tx},${ty}) scale(${sc})`">
+
+          <!-- ── Links (skip toggle nodes — they need no connector line) ── -->
+          <g class="lt-links">
+            <path
+              v-for="(link, i) in (layout?.links ?? []).filter(l => !l.target.data.isToggle)"
+              :key="i"
+              :d="edgePath(link.source, link.target)"
+              fill="none"
+              :stroke="edgeLineStyle(link.target).stroke"
+              :stroke-width="edgeLineStyle(link.target).strokeWidth"
+              :stroke-dasharray="edgeLineStyle(link.target).strokeDasharray || undefined"
+              stroke-linecap="round"
+            />
+          </g>
+
+          <!-- ── Nodes ── -->
+          <g class="lt-nodes">
+            <g
+              v-for="node in layout?.nodes ?? []"
+              :key="node.data.id"
+              :transform="`translate(${node.svgX},${node.svgY})`"
+              class="lt-node"
+              :class="{
+                'lt-node--toggle': node.data.isToggle,
+                'lt-node--serial': node.data.isSerial,
+                'lt-node--selected': selectedSet.has(node.data.id),
+              }"
+              @click="handleClick(node)"
             >
-              <td class="lineage-relation-cell mono">
-                {{ row.fromName }}
-              </td>
-              <td class="lineage-relation-cell mono">
-                {{ row.toName }}
-              </td>
-              <td class="lineage-relation-cell">
-                {{ row.edgeLabel }}
-              </td>
+              <!-- ─ Serial diamond ─ -->
+              <template v-if="node.data.isSerial">
+                <path :d="diamondPath()" :fill="NODE_COLORS.serial" opacity="0.9" />
+                <text
+                  :x="SERIAL_R + 5"
+                  y="0"
+                  dominant-baseline="middle"
+                  font-size="10"
+                  fill="#64748b"
+                  font-family="monospace"
+                >{{ node.data.name }}</text>
+              </template>
+
+              <!-- ─ Toggle pill ([-] or [+N]) ─ -->
+              <template v-else-if="node.data.isToggle">
+                <!-- Shadow -->
+                <rect v-bind="shadowAttrs(node.data.cardW)"
+                      :filter="`url(#lt-shd-toggle)`"
+                      fill="white" />
+                <!-- Pill body -->
+                <rect
+                  :x="-node.data.cardW/2" :y="-CARD_H/2"
+                  :width="node.data.cardW" :height="CARD_H"
+                  :rx="CARD_H/2"
+                  :fill="node.data.isToggle === 'minus' ? 'rgb(224,231,255)' : 'rgb(254,243,199)'"
+                  :stroke="node.data.isToggle === 'minus' ? 'rgb(129,140,248)' : 'rgb(245,158,11)'"
+                  stroke-width="1.5"
+                />
+                <text
+                  x="0" y="0"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  font-size="12"
+                  font-weight="700"
+                  :fill="node.data.isToggle === 'minus' ? 'rgb(67,56,202)' : 'rgb(146,64,14)'"
+                >{{ node.data.name }}</text>
+              </template>
+
+              <!-- ─ Content card ─ -->
+              <template v-else>
+                <!-- Shadow layer -->
+                <rect
+                  v-bind="shadowAttrs(node.data.cardW)"
+                  :filter="`url(#${selectedSet.has(node.data.id) ? 'lt-shd-selected' : 'lt-shd-' + node.data.type})`"
+                  fill="white"
+                />
+                <!-- Left colour stripe (rounded on left) -->
+                <path
+                  :d="stripePath(node.data.cardW)"
+                  :fill="nodeColor(node.data.type)"
+                />
+                <!-- Card body (tinted white, rounded on right) -->
+                <path
+                  :d="bodyPath(node.data.cardW)"
+                  :fill="selectedSet.has(node.data.id) ? (CARD_BG[node.data.type] || '#f8fafc') : (CARD_BG[node.data.type] || '#f8fafc')"
+                />
+                <!-- Selection border overlay -->
+                <rect
+                  v-if="selectedSet.has(node.data.id)"
+                  v-bind="shadowAttrs(node.data.cardW)"
+                  fill="none"
+                  :stroke="nodeColor(node.data.type)"
+                  stroke-width="2.5"
+                />
+
+                <!-- Type badge -->
+                <g v-if="badgeInfo(node.data.type, node.data.cardW)" :transform="`translate(0,0)`">
+                  <rect
+                    :x="badgeInfo(node.data.type, node.data.cardW)!.bx"
+                    :y="-BADGE_H/2"
+                    :width="badgeInfo(node.data.type, node.data.cardW)!.bw"
+                    :height="BADGE_H"
+                    :rx="3"
+                    :fill="nodeColor(node.data.type)"
+                  />
+                  <text
+                    :x="badgeInfo(node.data.type, node.data.cardW)!.bx + badgeInfo(node.data.type, node.data.cardW)!.bw / 2"
+                    y="0"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="9"
+                    font-weight="700"
+                    fill="white"
+                    font-family="system-ui, sans-serif"
+                  >{{ badgeInfo(node.data.type, node.data.cardW)!.label }}</text>
+                </g>
+
+                <!-- Node label text (relation tag + name) -->
+                <text
+                  :x="textX(node.data.type, node.data.cardW)"
+                  y="0"
+                  dominant-baseline="middle"
+                  font-size="11.5"
+                  font-family="system-ui, ui-sans-serif, sans-serif"
+                  :font-weight="selectedSet.has(node.data.id) ? '700' : '500'"
+                >
+                  <!-- Relation tag in muted colour -->
+                  <tspan
+                    v-if="node.data.relationTag"
+                    :fill="EDGE_TAG_COLOR[node.data.edgeType] || '#94a3b8'"
+                    font-size="10"
+                    font-weight="500"
+                  >{{ node.data.relationTag }} </tspan>
+                  <!-- Node name -->
+                  <tspan
+                    :fill="selectedSet.has(node.data.id) ? '#0f172a' : '#1e293b'"
+                    font-family="ui-monospace, monospace"
+                  >{{ node.data.name }}</tspan>
+                </text>
+              </template>
+            </g>
+          </g>
+
+        </g><!-- /lt-zoom -->
+      </svg>
+    </div>
+
+    <!-- Relation table -->
+    <details v-if="relationRows.length > 0" class="lt-relation-details">
+      <summary class="lt-relation-summary">關係清單（{{ relationRows.length }}）</summary>
+      <div class="query-tool-table-wrap short lt-relation-table-wrap">
+        <table class="query-tool-table">
+          <thead><tr><th>來源批次</th><th>目標批次</th><th>關係</th></tr></thead>
+          <tbody>
+            <tr v-for="row in pagedRelationRows" :key="row.key">
+              <td class="lt-rel-cell mono">{{ row.fromName }}</td>
+              <td class="lt-rel-cell mono">{{ row.toName }}</td>
+              <td class="lt-rel-cell">{{ row.edgeLabel }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <PaginationControl
-        v-if="relationTotalPages > 1"
-        v-model="relationPage"
-        :total-pages="relationTotalPages"
-        :info-text="`第 ${relationPage}/${relationTotalPages} 頁，共 ${relationRows.length} 筆`"
-      />
+      <PaginationControl v-if="relationTotalPages > 1" v-model="relationPage" :total-pages="relationTotalPages" :info-text="`第 ${relationPage}/${relationTotalPages} 頁，共 ${relationRows.length} 筆`" />
     </details>
 
-    <!-- Not found warning -->
-    <div v-if="notFound.length > 0" class="query-tool-success lineage-not-found">
-      未命中：{{ notFound.join(', ') }}
+    <!-- Not-found warning -->
+    <div v-if="notFound.length > 0" class="query-tool-success lt-not-found">
+      未命中：{{ (notFound as string[]).join(', ') }}
     </div>
 
-    <!-- Selection summary -->
-    <div v-if="selectedContainerIds.length > 0" class="query-tool-success lineage-selected-summary">
+    <!-- Selection chips -->
+    <div v-if="selectedContainerIds.length > 0" class="query-tool-success lt-selected-bar">
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="mr-1 text-xs font-medium lineage-selected-count">已選 {{ selectedContainerIds.length }} 個節點</span>
+        <span class="mr-1 text-xs font-medium" style="color:var(--brand-800)">已選 {{ selectedContainerIds.length }} 個節點</span>
         <span
-          v-for="cid in selectedContainerIds.slice(0, 8)"
-          :key="cid as PropertyKey"
-          class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white pl-2 pr-1 py-0.5 font-mono text-xs text-brand-800 shadow-sm"
+          v-for="cid in (selectedContainerIds as string[]).slice(0, 8)"
+          :key="cid"
+          class="lt-chip"
         >
-          {{ nameMap?.get?.(cid as string) || cid }}
-          <button
-            type="button"
-            class="lineage-chip-remove"
-            title="取消篩選"
-            @click="removeSelection(cid)"
-          >×</button>
+          {{ (props.nameMap as Map<string,string>)?.get?.(cid) || cid }}
+          <button type="button" class="lt-chip-x" @click="removeSelection(cid)">×</button>
         </span>
-        <span v-if="selectedContainerIds.length > 8" class="text-xs text-brand-600">+{{ selectedContainerIds.length - 8 }} 更多</span>
+        <span v-if="selectedContainerIds.length > 8" class="text-xs" style="color:var(--brand-600)">+{{ selectedContainerIds.length - 8 }} 更多</span>
       </div>
     </div>
+
   </div></section>
 </template>
 
 <style scoped>
-.lineage-tree-chart {
+/* Override ui-card-body default padding — keep this component compact */
+section.ui-card > .ui-card-body {
+  padding: 10px 16px;
+}
+
+/* Canvas wrapper — fixed viewport, pan/zoom inside */
+.lt-canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid theme('colors.stroke.soft');
+  border-radius: 10px;
+  background: #f9fafb;
+  cursor: grab;
+  height: 640px;
+}
+.lt-canvas-wrap:active { cursor: grabbing; }
+
+.lt-svg {
+  display: block;
   width: 100%;
-  min-height: 300px;
+  height: 100%;
+  user-select: none;
 }
 
-.lineage-direction-note {
-  font-size: 11px;
+/* Node cursor */
+.lt-node { cursor: pointer; transition: opacity 0.15s; }
+.lt-node:hover { opacity: 0.88; }
+.lt-node--toggle { cursor: pointer; }
+.lt-node--serial { cursor: default; }
+
+/* Compact toolbar row (no title block above it) */
+.lt-toolbar-row {
+  margin-bottom: 10px;
+}
+.lt-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p8');
 }
 
-.lineage-loading-placeholder {
-  padding: theme('spacing.token.p48') theme('spacing.token.p12');
+/* Legend */
+.lt-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: theme('colors.text.subtle');
 }
+.lt-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.lt-legend-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.lt-legend-diamond {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border: 1.5px solid;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+.lt-legend-line {
+  display: inline-block;
+  width: 18px; height: 0;
+  border-top: 1.5px solid #94a3b8;
+}
+.lt-legend-line--dashed { border-style: dashed; }
+.lt-legend-line--dotted { border-style: dotted; }
 
-.lineage-relation-details {
+/* Hint text */
+.lt-hint { font-size: 11px; }
+.lt-placeholder { padding: theme('spacing.token.p48') theme('spacing.token.p12'); text-align: center; }
+
+/* Relation table */
+.lt-relation-details {
   margin-top: theme('spacing.token.p12');
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: theme('colors.token.hf8fafc');
+  background: theme('colors.surface.muted');
   padding: theme('spacing.token.p8') theme('spacing.token.p12');
 }
+.lt-relation-summary { cursor: pointer; font-size: 12px; font-weight: 600; color: theme('colors.text.secondary'); }
+.lt-relation-table-wrap { margin-top: theme('spacing.token.p8'); max-height: 224px; }
+.lt-rel-cell { font-size: 11px; }
+.lt-rel-cell.mono { font-family: monospace; }
 
-.lineage-relation-summary {
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: theme('colors.token.h334155');
-}
-
-.lineage-relation-table-wrap {
-  margin-top: theme('spacing.token.p8');
-  max-height: 224px;
-}
-
-.lineage-relation-cell {
-  font-size: 11px;
-}
-
-.lineage-relation-cell.mono {
-  font-family: monospace;
-}
-
-.lineage-relation-note {
-  margin-top: theme('spacing.token.p4');
-  font-size: 11px;
-}
-
-.lineage-not-found {
+/* Warnings */
+.lt-not-found {
   border-color: theme('colors.token.hfde68a');
   background: theme('colors.token.hfefce8');
   color: theme('colors.token.h92400e');
+  margin-top: theme('spacing.token.p8');
 }
-
-.lineage-selected-summary {
+.lt-selected-bar {
   border-color: theme('colors.brand.100');
-  background: rgba(238, 242, 255, 0.6);
+  background: rgba(238,242,255,0.6);
   color: inherit;
+  margin-top: theme('spacing.token.p8');
 }
 
-.lineage-selected-count {
-  color: theme('colors.brand.800');
-}
-
-.lineage-chip-remove {
+/* Selection chips */
+.lt-chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: theme('colors.brand.500');
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  transition: all 0.15s ease;
+  gap: 2px;
+  border-radius: 9999px;
+  border: 1px solid theme('colors.brand.100');
+  background: white;
+  padding: 1px 4px 1px 8px;
+  font-family: monospace;
+  font-size: 11px;
+  color: theme('colors.brand.800');
 }
-
-.lineage-chip-remove:hover {
-  background: theme('colors.brand.100');
-  color: theme('colors.brand.700');
+.lt-chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  border: none; border-radius: 50%; background: transparent;
+  color: theme('colors.brand.500'); font-size: 13px; cursor: pointer; padding: 0;
+  transition: background 0.15s;
 }
+.lt-chip-x:hover { background: theme('colors.brand.100'); color: theme('colors.brand.700'); }
 </style>

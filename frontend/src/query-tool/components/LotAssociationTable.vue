@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
 
 import { useSortableTable } from '../../shared-composables/useSortableTable';
 import { formatCellValue } from '../utils/values';
@@ -65,9 +66,9 @@ const columns = computed(() => {
 const rowsRef = computed(() => props.rows as Record<string, unknown>[]);
 const { sortKey, sortDirection, sortedData, toggleSort } = useSortableTable(rowsRef);
 
-function sortLabel(key: string): string {
-  if (sortKey.value !== key) return '⇕';
-  return sortDirection.value === 'asc' ? '▲' : '▼';
+function sortIcon(key: string) {
+  if (sortKey.value !== key) return ArrowUpDown;
+  return sortDirection.value === 'asc' ? ArrowUp : ArrowDown;
 }
 
 function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
@@ -99,8 +100,10 @@ function resolveColumnLabel(column: string): string {
               :aria-sort="ariaSortFor(column)"
               @click="toggleSort(column)"
             >
-              {{ resolveColumnLabel(column) }}
-              <span class="sort-indicator">{{ sortLabel(column) }}</span>
+              <span class="qt-th-inner">
+                {{ resolveColumnLabel(column) }}
+                <component :is="sortIcon(column)" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === column }" :size="13" />
+              </span>
             </th>
           </tr>
         </thead>

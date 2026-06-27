@@ -351,25 +351,29 @@ const timeRange = computed(() => {
 </script>
 
 <template>
-  <div>
-    <div class="query-tool-section-header">
-      <h4 class="card-title ui-card-title">LOT 生產 Timeline</h4>
-      <div class="flex items-center gap-3 query-tool-muted">
-        <span v-if="timeRange">{{ formatDateTime(timeRange.start) }} — {{ formatDateTime(timeRange.end) }}</span>
-        <span>Hold / Material 事件已覆蓋標記</span>
-        <span v-if="materialMappingStats.total > 0">
+  <div class="lot-tl-wrap">
+    <!-- Meta row -->
+    <div class="lot-tl-meta">
+      <span v-if="timeRange" class="lot-tl-meta-range">
+        {{ formatDateTime(timeRange.start) }} — {{ formatDateTime(timeRange.end) }}
+      </span>
+      <div class="lot-tl-meta-badges">
+        <span class="lot-tl-badge lot-tl-badge--info">
+          <span class="lot-tl-badge-dot" style="background:#f59e0b;" />
+          Hold / Material 事件已覆蓋標記
+        </span>
+        <span
+          v-if="materialMappingStats.total > 0"
+          class="lot-tl-badge"
+          :class="materialMappingStats.unmapped > 0 ? 'lot-tl-badge--warn' : 'lot-tl-badge--ok'"
+        >
           扣料對應 {{ materialMappingStats.mapped }} / {{ materialMappingStats.total }}
-          <template v-if="materialMappingStats.unmapped > 0">
-            （未對應 {{ materialMappingStats.unmapped }}）
-          </template>
+          <template v-if="materialMappingStats.unmapped > 0">（未對應 {{ materialMappingStats.unmapped }}）</template>
         </span>
       </div>
     </div>
 
-    <div
-      v-if="isTruncated"
-      class="query-tool-warning"
-    >
+    <div v-if="isTruncated" class="query-tool-warning">
       ⚠️ Timeline 目前僅顯示前 {{ pagination?.per_page }} 筆資料（共 {{ pagination?.total }} 筆），部分 LOT 可能未顯示。請至下方歷程表格調大每頁筆數，或依站點篩選縮小範圍。
     </div>
 
@@ -384,7 +388,7 @@ const timeRange = computed(() => {
         :time-range="timeRange"
         :color-map="colorMap"
         :label-width="200"
-        :track-row-height="58"
+        :track-row-height="56"
         :min-chart-width="600"
       />
     </div>
@@ -392,6 +396,58 @@ const timeRange = computed(() => {
 </template>
 
 <style scoped>
+.lot-tl-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lot-tl-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.lot-tl-meta-range {
+  font-size: 11.5px;
+  font-family: ui-monospace, monospace;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.lot-tl-meta-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lot-tl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.lot-tl-badge--info { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+.lot-tl-badge--ok   { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+.lot-tl-badge--warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+
+.lot-tl-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .timeline-scroll-area {
   max-height: 520px;
   overflow-y: auto;

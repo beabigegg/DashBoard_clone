@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
 
 import { apiGet, ensureMesApiAvailable } from '../../core/api';
 import { useSortableTable } from '../../shared-composables/useSortableTable';
@@ -83,9 +84,9 @@ const sortedRows = computed(() => {
 const sortedRowsTyped = sortedRows as unknown as import('vue').ComputedRef<Record<string, unknown>[]>;
 const { sortKey, sortDirection, sortedData: displayRows, toggleSort } = useSortableTable(sortedRowsTyped);
 
-function sortLabel(key: string): string {
-  if (sortKey.value !== key) return '⇕';
-  return sortDirection.value === 'asc' ? '▲' : '▼';
+function sortIcon(key: string) {
+  if (sortKey.value !== key) return ArrowUpDown;
+  return sortDirection.value === 'asc' ? ArrowUp : ArrowDown;
 }
 
 function ariaSortFor(key: string): 'none' | 'ascending' | 'descending' {
@@ -188,8 +189,10 @@ async function loadTxn(jobId: unknown): Promise<void> {
                 :aria-sort="ariaSortFor(column)"
                 @click="toggleSort(column)"
               >
-                {{ column === 'CONTAINERNAMES' ? 'LOT ID' : column }}
-                <span class="sort-indicator">{{ sortLabel(column) }}</span>
+                <span class="qt-th-inner">
+                  {{ column === 'CONTAINERNAMES' ? 'LOT ID' : column }}
+                  <component :is="sortIcon(column)" class="qt-sort-icon" :class="{ 'qt-sort-icon--active': sortKey === column }" :size="13" />
+                </span>
               </th>
             </tr>
           </thead>

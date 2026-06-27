@@ -94,63 +94,52 @@
 /* ---- Tab 說明區塊 ---- */
 .theme-query-tool .query-tool-tab-desc {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: theme('colors.token.hf8fafc');
-  padding: theme('spacing.token.p12') theme('spacing.token.p16');
+  padding: 6px 14px;
   margin-bottom: theme('spacing.token.p14');
 }
 
-.theme-query-tool .query-tool-tab-desc-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.025em;
-}
-
-.theme-query-tool .query-tool-tab-desc-title {
-  margin-top: theme('spacing.token.p4');
-  font-size: 16px;
-  font-weight: 700;
-  color: theme('colors.token.h0f172a');
-}
-
 .theme-query-tool .query-tool-tab-desc-subtitle {
-  margin-top: theme('spacing.token.p4');
-  font-size: 14px;
+  font-size: 12.5px;
   color: theme('colors.token.h475569');
+  line-height: 1.5;
 }
 
 /* ---- Sub-tab 導航 (Detail / Equipment) ---- */
 .theme-query-tool .query-tool-sub-tab-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: theme('spacing.token.p8');
+  gap: 3px;
+  padding: 4px;
+  background: theme('colors.token.hf1f5f9');
+  border-radius: 10px;
   margin-bottom: theme('spacing.token.p12');
 }
 
 .theme-query-tool .query-tool-sub-tab {
-  padding: theme('spacing.token.p6') theme('spacing.token.p12');
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: theme('colors.token.hf1f5f9');
-  font-size: 12px;
-  font-weight: 600;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
   color: theme('colors.token.h475569');
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.13s, color 0.13s, box-shadow 0.13s;
+  line-height: 20px;
 }
 
 .theme-query-tool .query-tool-sub-tab:hover:not(.active) {
-  border-color: var(--border);
-  color: theme('colors.token.h1e293b');
+  background: rgba(255,255,255,0.65);
+  color: theme('colors.token.h334155');
 }
 
 .theme-query-tool .query-tool-sub-tab.active {
-  border-color: var(--primary);
-  background: theme('colors.brand.50');
+  background: #fff;
   color: theme('colors.brand.700');
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.12), 0 0 0 1px rgba(37,99,235,0.10);
 }
 
 /* ---- 表單控制元素 ---- */
@@ -412,16 +401,28 @@
   background: theme('colors.token.he2e8f0');
 }
 
-.theme-query-tool .sort-indicator {
-  margin-left: 4px;
-  font-size: 10px;
-  opacity: 0.45;
+/* qt-th-inner — flex row for label + sort icon */
+.theme-query-tool .qt-th-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.theme-query-tool th.sortable-th[aria-sort='ascending'] .sort-indicator,
-.theme-query-tool th.sortable-th[aria-sort='descending'] .sort-indicator {
+/* Sort icon (lucide, matches DataTable.vue style) */
+.theme-query-tool .qt-sort-icon {
+  flex-shrink: 0;
+  opacity: 0.32;
+  vertical-align: middle;
+}
+
+.theme-query-tool .qt-sort-icon--active {
   opacity: 1;
   color: var(--primary);
+}
+
+/* Inline icon for hardcoded-th cells (LotRejectTable) */
+.theme-query-tool .query-tool-table thead th.sortable-th > .qt-sort-icon {
+  margin-left: 3px;
 }
 
 /* ---- 表格高度變體 ---- */
@@ -511,23 +512,55 @@
 .theme-query-tool .lineage-node-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: theme('spacing.token.p8') theme('spacing.token.p14');
+  gap: 5px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border);
-  background: rgba(238, 242, 255, 0.45);
+  background: rgba(238, 242, 255, 0.35);
 }
 
 .theme-query-tool .lineage-node-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   border: 1px solid theme('colors.brand.100');
-  border-radius: 9999px;
-  background: theme('colors.token.hffffff');
-  padding: 2px 8px 2px 10px;
-  font-size: 11px;
-  font-family: monospace;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0 0 0 9px;
+  font-size: 11.5px;
+  font-family: ui-monospace, monospace;
+  font-weight: 500;
   color: theme('colors.brand.800');
+  box-shadow: 0 1px 2px rgba(37,99,235,0.07);
+  line-height: 26px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-query-tool .lineage-chip-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 26px;
+  border: none;
+  border-left: 1px solid theme('colors.brand.100');
+  border-radius: 0 6px 6px 0;
+  background: transparent;
+  color: theme('colors.brand.400');
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: 6px;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.theme-query-tool .lineage-chip-remove:hover {
+  background: theme('colors.brand.50');
+  color: theme('colors.brand.700');
 }
 
 .theme-query-tool .lineage-node-chip-more {

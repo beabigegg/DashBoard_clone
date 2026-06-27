@@ -153,6 +153,16 @@ const showTreeModal = ref(false);
 const openTreeBtn = ref<HTMLButtonElement | null>(null);
 const nodeSearchQuery = ref('');
 
+// Strip MES system prefixes like "參考編號：" that add no info over the CID itself
+function stripMesPrefix(raw: string): string {
+  return raw.replace(/^參考編號[：:]\s*/u, '').trim();
+}
+
+function nodeName(cid: string): string {
+  const raw = normalizeText((props.nameMap as Map<string, string>)?.get?.(normalizeText(cid)) || cid);
+  return stripMesPrefix(raw) || normalizeText(cid);
+}
+
 const allSelectableNodes = computed<Array<{ cid: string; name: string }>>(() => {
   const result: Array<{ cid: string; name: string }> = [];
   const lm = props.lineageMap as Map<string, { children?: string[] }>;
@@ -160,8 +170,7 @@ const allSelectableNodes = computed<Array<{ cid: string; name: string }>>(() => 
   lm.forEach((_entry, cid) => {
     const id = normalizeText(cid);
     if (!id) return;
-    const name = normalizeText((props.nameMap as Map<string, string>)?.get?.(id) || id);
-    result.push({ cid: id, name });
+    result.push({ cid: id, name: nodeName(id) });
   });
   result.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
   return result;
@@ -301,7 +310,7 @@ function handleModalKeydown(event: KeyboardEvent) {
           :key="cid"
           class="lineage-node-chip"
         >
-          {{ (nameMap as Map<string, string>)?.get?.(cid) || cid }}
+          {{ nodeName(cid) }}
           <button
             type="button"
             class="lineage-chip-remove"
