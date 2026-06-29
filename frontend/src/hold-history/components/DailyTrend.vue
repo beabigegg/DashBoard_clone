@@ -31,9 +31,9 @@ const hasData = computed(() => (props.days || []).length > 0);
 const chartOption = computed(() => {
   const days = props.days || [];
   const dates = days.map((item) => item.date ?? '');
-  const release = days.map((item) => Number(item.releaseQty || 0));
-  const newHold = days.map((item) => -Math.abs(Number(item.newHoldQty || 0)));
-  const futureHold = days.map((item) => -Math.abs(Number(item.futureHoldQty || 0)));
+  const release = days.map((item) => -Math.abs(Number(item.releaseQty || 0)));
+  const newHold = days.map((item) => Math.abs(Number(item.newHoldQty || 0)));
+  const futureHold = days.map((item) => Math.abs(Number(item.futureHoldQty || 0)));
   const stock = days.map((item) => Number(item.holdQty || 0));
 
   // Last day with any activity (release / new / future hold), not just carry-forward stock
@@ -123,7 +123,7 @@ const chartOption = computed(() => {
       {
         name: 'New Hold',
         type: 'bar',
-        stack: 'negative',
+        stack: 'positive',
         data: newHold,
         itemStyle: { color: 'rgb(220, 38, 38)' },
         barMaxWidth: 18,
@@ -142,7 +142,7 @@ const chartOption = computed(() => {
       {
         name: 'Future Hold',
         type: 'bar',
-        stack: 'negative',
+        stack: 'positive',
         data: futureHold,
         itemStyle: { color: 'rgb(249, 115, 22)' },
         barMaxWidth: 18,
