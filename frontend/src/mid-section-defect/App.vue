@@ -11,7 +11,6 @@ import TraceProgressBar from '../shared-composables/TraceProgressBar.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 
 // Components below are kept as plain SFCs (no lang="ts") per migration scope — Phase 3 in-progress
 // @ts-expect-error AnalysisSummary.vue not yet migrated to lang="ts"
@@ -51,6 +50,7 @@ interface AttributionRecord {
   WORKCENTER_GROUP?: string;
   RESOURCEFAMILYNAME?: string;
   MATERIAL_PART_NAME?: string;
+  MATERIAL_LOT_NAME?: string;
 }
 
 interface ChartItem {
@@ -147,7 +147,7 @@ function buildMaterialChartFromAttribution(records: AttributionRecord[]): ChartI
     const rec = sorted[i];
     if (i < CHART_TOP_N) {
       const rate = rec.INPUT_QTY > 0 ? Math.round((rec.DEFECT_QTY / rec.INPUT_QTY) * 1e6) / 1e4 : 0;
-      items.push({ name: rec.MATERIAL_KEY, input_qty: rec.INPUT_QTY, defect_qty: rec.DEFECT_QTY, defect_rate: rate, lot_count: rec.DETECTION_LOT_COUNT });
+      items.push({ name: rec.MATERIAL_LOT_NAME || rec.MATERIAL_KEY, input_qty: rec.INPUT_QTY, defect_qty: rec.DEFECT_QTY, defect_rate: rate, lot_count: rec.DETECTION_LOT_COUNT });
     } else {
       other.input_qty += rec.INPUT_QTY;
       other.defect_qty += rec.DEFECT_QTY;
@@ -394,12 +394,14 @@ const materialTypeOptions = computed(() => {
 });
 const filteredByMaterialData = computed(() => {
   const materials = analysisData.value?.materials_attribution;
-  const hasFilter = materialTypeFilter.value.length > 0;
-  if (!hasFilter || !Array.isArray(materials) || materials.length === 0) {
+  if (!Array.isArray(materials) || materials.length === 0) {
     return analysisData.value?.charts?.by_material ?? [];
   }
-  const filtered = materials.filter(rec => materialTypeFilter.value.includes(rec.MATERIAL_PART_NAME ?? ''));
-  return filtered.length > 0 ? buildMaterialChartFromAttribution(filtered) : [];
+  const hasFilter = materialTypeFilter.value.length > 0;
+  const base = hasFilter
+    ? materials.filter(rec => materialTypeFilter.value.includes(rec.MATERIAL_PART_NAME ?? ''))
+    : materials;
+  return base.length > 0 ? buildMaterialChartFromAttribution(base) : [];
 });
 
 const suspectMachineNames = computed(() => {
@@ -824,10 +826,6 @@ void initPage();
 
 <template>
   <div class="dashboard theme-mid-section-defect" data-testid="mid-defect-app">
-    <PageHeader
-      title="製程不良追溯分析"
-      :show-refresh="false"
-    />
     <FilterBar
       :filters="filters"
       :loading="loading.querying"
@@ -897,7 +895,7 @@ void initPage();
             <template v-if="!isForward">
               <div class="charts-row">
                 <div class="chart-with-panel">
-                  <ParetoChart title="依上游機台歸因" :data="filteredByMachineData" enable-click data-testid="pareto-chart" @bar-click="handleMachineBarClick">
+                  <ParetoChart title="依上游機台歸因" :data="filteredByMachineData" :show-cumulative="false" enable-click data-testid="pareto-chart" @bar-click="handleMachineBarClick">
                     <template #header-extra>
                       <div class="chart-inline-filters">
                         <MultiSelect
@@ -943,7 +941,7 @@ void initPage();
               </div>
               <div class="charts-row">
                 <ParetoChart title="依不良原因" :data="analysisData.charts?.by_loss_reason" />
-                <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" />
+                <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" :show-cumulative="false" />
               </div>
             </template>
             <template v-else>
@@ -953,7 +951,7 @@ void initPage();
               </div>
               <div class="charts-row">
                 <ParetoChart title="依下游機台" :data="analysisData.charts?.by_downstream_machine" />
-                <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" />
+                <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" :show-cumulative="false" />
               </div>
             </template>
             <div v-if="committedFilters.queryMode !== 'container'" class="charts-row charts-row-full">

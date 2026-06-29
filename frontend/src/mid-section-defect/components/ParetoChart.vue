@@ -26,6 +26,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  showCumulative: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(['bar-click']);
@@ -68,6 +72,8 @@ const chartOption = computed(() => {
   const cumulativePct = data.map((d) => d.cumulative_pct);
   const defectRate = data.map((d) => d.defect_rate);
 
+  const legendItems = props.showCumulative ? ['不良數', '不良率', '累計占比'] : ['不良數', '不良率'];
+
   return {
     animationDuration: 350,
     tooltip: {
@@ -86,18 +92,20 @@ const chartOption = computed(() => {
           const pct = total > 0 ? ((item.lot_count / total) * 100).toFixed(1) : '0.0';
           html += `關聯 LOT 數: ${item.lot_count} (${pct}%)<br/>`;
         }
-        html += `累計占比: ${(item.cumulative_pct || 0).toFixed(1)}%`;
+        if (props.showCumulative) {
+          html += `累計占比: ${(item.cumulative_pct || 0).toFixed(1)}%`;
+        }
         return html;
       },
     },
     legend: {
-      data: ['不良數', '不良率', '累計占比'],
+      data: legendItems,
       bottom: 0,
       textStyle: { fontSize: 11 },
     },
     grid: {
       top: 40,
-      right: 60,
+      right: props.showCumulative ? 60 : 40,
       bottom: 50,
       left: 50,
       containLabel: true,
@@ -145,7 +153,7 @@ const chartOption = computed(() => {
         lineStyle: { color: 'rgb(245, 158, 11)', width: 2 },
         itemStyle: { color: 'rgb(245, 158, 11)' },
       },
-      {
+      ...(props.showCumulative ? [{
         name: '累計占比',
         type: 'line',
         yAxisIndex: 1,
@@ -161,7 +169,7 @@ const chartOption = computed(() => {
           lineStyle: { color: 'rgb(148, 163, 184)', type: 'dotted', width: 1 },
           data: [{ yAxis: 80 }],
         },
-      },
+      }] : []),
     ],
   };
 });

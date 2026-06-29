@@ -8,6 +8,11 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.33.0] — 2026-06-29
+### Added
+- msd-type-package-filter: BQE-08 — `count_query.sql` row-unit must match paged SQL combined-CTE row-unit (entity × dimension JOIN pairs, not DISTINCT base entities); silent truncation risk when mismatched with ASC-sorted paged query.
+- msd-type-package-filter: MSD-05 — container-filter-options no-Oracle invariant; `GET /api/mid-section-defect/container-filter-options` reads from `container_filter_cache` only (24h TTL); cold cache returns empty arrays; symmetric with RHPF-06.
+
 ## [api 1.32.0] — 2026-06-29
 ### Added
 - msd-type-package-filter: New `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options for Type/Package FilterBar MultiSelects; reuses shared `container_filter_cache`; no Oracle at request time. `GET /api/mid-section-defect/analysis` gains optional `pj_types[]` and `packages[]` multi-value query params (post-query filter; AND-semantics; absent/empty = no restriction; both params added to result cache key). New schema `MsdContainerFilterOptionsResponse`. Additive; no existing endpoints or fields removed.

@@ -147,6 +147,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - BatchQueryEngine `ROW_NUMBER()` chunking is incompatible with cross-row reductions; classify at design time — see docs/adr/0003-downtime-rowcount-chunking-exclusion.md
 - Type B async: when inner fn can't accept `progress_callback`, use coarse bracket milestones 5→15→90→100 bracketing the call; avoid hash-mirroring unless per-chunk granularity is required — see docs/architecture/cache-spool-patterns.md
 - `*_USE_UNIFIED_JOB` flags must be set identically in gunicorn AND the RQ worker service environment; module-level constants freeze at boot so drift causes silent split-brain routing — see contracts/env/env-contract.md §Worker Feature-Flag Env-Var Parity
+- Coarse spool key (excludes fine-filter dims): inject fine-filter WHERE into DuckDB runtime views at `_register_runtime_views`, not at spool-write time; stage spools under finer keys (e.g., `trace_query_id`) should be saved pre-filtered — see docs/architecture/cache-spool-patterns.md
 
 **Service architecture** — see `docs/architecture/service-patterns.md` for full detail:
 - `downtime_analysis_service`: patch `load_downtime_events` at definition site (`downtime_analysis_cache`), not the service module — see docs/architecture/service-patterns.md

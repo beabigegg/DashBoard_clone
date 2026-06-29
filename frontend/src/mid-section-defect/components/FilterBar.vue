@@ -88,8 +88,8 @@ function updateFilters(patch) {
         </button>
       </div>
 
-      <div class="filter-row">
-        <!-- Shared: detection station (multi-select) -->
+      <div class="filter-grid">
+        <!-- Row 1: 偵測站 / 不良原因 -->
         <div class="filter-field">
           <label>偵測站</label>
           <MultiSelect
@@ -101,9 +101,40 @@ function updateFilters(patch) {
             @update:model-value="updateFilters({ station: $event })"
           />
         </div>
+        <div class="filter-field">
+          <label>不良原因</label>
+          <MultiSelect
+            :model-value="filters.lossReasons"
+            :options="availableLossReasons"
+            :disabled="loading"
+            placeholder="全部原因"
+            data-testid="loss-reason-select"
+            @update:model-value="updateFilters({ lossReasons: $event })"
+          />
+        </div>
 
-        <!-- Container mode: input type -->
-        <div v-if="queryMode === 'container'" class="filter-field">
+        <!-- Row 2: 日期範圍 or 輸入類型 / 方向 -->
+        <div v-if="queryMode === 'date_range'" class="filter-field filter-field--date">
+          <label>日期範圍</label>
+          <input
+            id="msd-start-date"
+            type="date"
+            :value="filters.startDate"
+            :disabled="loading"
+            data-testid="start-date"
+            @input="updateFilters({ startDate: $event.target.value })"
+          />
+          <span class="filter-date-sep">~</span>
+          <input
+            id="msd-end-date"
+            type="date"
+            :value="filters.endDate"
+            :disabled="loading"
+            data-testid="end-date"
+            @input="updateFilters({ endDate: $event.target.value })"
+          />
+        </div>
+        <div v-else class="filter-field">
           <label for="msd-container-type">輸入類型</label>
           <select
             id="msd-container-type"
@@ -120,8 +151,6 @@ function updateFilters(patch) {
             <option value="gd_lot_id">GD LOT ID</option>
           </select>
         </div>
-
-        <!-- Shared: direction -->
         <div class="filter-field">
           <label>方向</label>
           <div class="direction-toggle">
@@ -146,79 +175,42 @@ function updateFilters(patch) {
           </div>
         </div>
 
-        <!-- Date range mode: dates -->
-        <template v-if="queryMode === 'date_range'">
+        <!-- Row 3: Package / Type — hidden in container mode -->
+        <template v-if="queryMode !== 'container'">
           <div class="filter-field">
-            <label for="msd-start-date">開始</label>
-            <input
-              id="msd-start-date"
-              type="date"
-              :value="filters.startDate"
+            <label>Package</label>
+            <MultiSelect
+              :model-value="filters.packages"
+              :options="packageOptions"
               :disabled="loading"
-              data-testid="start-date"
-              @input="updateFilters({ startDate: $event.target.value })"
+              :loading="filterOptionsLoading"
+              placeholder="全部 Package"
+              data-testid="package-select"
+              @update:model-value="updateFilters({ packages: $event })"
+              @dropdown-close="emit('commit-container-filter')"
             />
           </div>
-
           <div class="filter-field">
-            <label for="msd-end-date">結束</label>
-            <input
-              id="msd-end-date"
-              type="date"
-              :value="filters.endDate"
+            <label>Type</label>
+            <MultiSelect
+              :model-value="filters.pjTypes"
+              :options="pjTypeOptions"
               :disabled="loading"
-              data-testid="end-date"
-              @input="updateFilters({ endDate: $event.target.value })"
+              :loading="filterOptionsLoading"
+              placeholder="全部 Type"
+              data-testid="pj-type-select"
+              @update:model-value="updateFilters({ pjTypes: $event })"
+              @dropdown-close="emit('commit-container-filter')"
             />
           </div>
         </template>
+      </div>
 
-        <!-- Shared: Type (PJ_TYPE) cross-filter -->
-        <div class="filter-field">
-          <label>型號</label>
-          <MultiSelect
-            :model-value="filters.pjTypes"
-            :options="pjTypeOptions"
-            :disabled="loading"
-            :loading="filterOptionsLoading"
-            placeholder="全部型號"
-            data-testid="pj-type-select"
-            @update:model-value="updateFilters({ pjTypes: $event })"
-            @dropdown-close="emit('commit-container-filter')"
-          />
-        </div>
-
-        <!-- Shared: Package (PRODUCTLINENAME) cross-filter -->
-        <div class="filter-field">
-          <label>封裝</label>
-          <MultiSelect
-            :model-value="filters.packages"
-            :options="packageOptions"
-            :disabled="loading"
-            :loading="filterOptionsLoading"
-            placeholder="全部封裝"
-            data-testid="package-select"
-            @update:model-value="updateFilters({ packages: $event })"
-            @dropdown-close="emit('commit-container-filter')"
-          />
-        </div>
-
-        <!-- Shared: loss reasons -->
-        <div class="filter-field">
-          <label>不良原因</label>
-          <MultiSelect
-            :model-value="filters.lossReasons"
-            :options="availableLossReasons"
-            :disabled="loading"
-            placeholder="全部原因"
-            data-testid="loss-reason-select"
-            @update:model-value="updateFilters({ lossReasons: $event })"
-          />
-        </div>
-
+      <!-- Query button -->
+      <div class="filter-actions">
         <button
           type="button"
-          class="ui-btn ui-btn--primary"
+          class="ui-btn ui-btn--primary msd-query-btn"
           :disabled="loading"
           data-testid="query-submit-btn"
           @click="$emit('query')"

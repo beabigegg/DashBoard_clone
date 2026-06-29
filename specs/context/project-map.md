@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 200
-visible-files: 1053
-omitted-dirs: 66
-truncated-dirs: 6
+visible-dirs: 204
+visible-files: 1111
+omitted-dirs: 67
+truncated-dirs: 7
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -62,6 +62,7 @@ DashBoard_vite/
 |   |   |-- 01cb19e636d04082
 |   |   |-- 0252574dd854487b
 |   |   |-- 02bca2c9d2f8566d
+|   |   |-- 039f8a28fa91d19f
 |   |   |-- 03d72be617fe07b9
 |   |   |-- 0478f49b48ee4a27
 |   |   |-- 04e26e6472111f2c
@@ -103,8 +104,7 @@ DashBoard_vite/
 |   |   |-- 1b488e9c0e7c5031
 |   |   |-- 1bfae4d4f286c3d1
 |   |   |-- 1c079de4646a8d8b
-|   |   |-- 1c2919ea2d0d7b6f
-|   |   \-- ... (333 more entries truncated; cap=50)
+|   |   \-- ... (344 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -422,6 +422,8 @@ DashBoard_vite/
 |   |   |-- mid-section-defect/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
 |   |   |   |-- App.vue
 |   |   |   |-- index.html
 |   |   |   |-- main.ts
@@ -717,19 +719,57 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260629_093714.log
-|   |   |-- error_20260629_093714.log
-|   |   |-- rq_downtime_worker_20260629_093714.log
-|   |   |-- rq_eap_alarm_worker_20260629_093714.log
-|   |   |-- rq_hold_hist_worker_20260629_093714.log
-|   |   |-- rq_msd_worker_20260629_093714.log
-|   |   |-- rq_prod_hist_worker_20260629_093714.log
-|   |   |-- rq_reject_worker_20260629_093714.log
-|   |   |-- rq_resource_worker_20260629_093714.log
-|   |   |-- rq_warmup_worker_20260629_093714.log
-|   |   |-- rq_worker_20260629_093714.log
-|   |   |-- rq_yield_alert_worker_20260629_093714.log
-|   |   \-- watchdog_20260629_093714.log
+|   |   |-- access_20260629_113757.log
+|   |   |-- access_20260629_114747.log
+|   |   |-- access_20260629_115628.log
+|   |   |-- access_20260629_123124.log
+|   |   |-- access_20260629_131606.log
+|   |   |-- error_20260629_113757.log
+|   |   |-- error_20260629_114747.log
+|   |   |-- error_20260629_115628.log
+|   |   |-- error_20260629_123124.log
+|   |   |-- error_20260629_131606.log
+|   |   |-- error_20260629_132330.log
+|   |   |-- rq_downtime_worker_20260629_113757.log
+|   |   |-- rq_downtime_worker_20260629_114747.log
+|   |   |-- rq_downtime_worker_20260629_115628.log
+|   |   |-- rq_downtime_worker_20260629_123124.log
+|   |   |-- rq_downtime_worker_20260629_131606.log
+|   |   |-- rq_downtime_worker_20260629_132330.log
+|   |   |-- rq_eap_alarm_worker_20260629_113757.log
+|   |   |-- rq_eap_alarm_worker_20260629_114747.log
+|   |   |-- rq_eap_alarm_worker_20260629_115628.log
+|   |   |-- rq_eap_alarm_worker_20260629_123124.log
+|   |   |-- rq_eap_alarm_worker_20260629_131606.log
+|   |   |-- rq_eap_alarm_worker_20260629_132330.log
+|   |   |-- rq_hold_hist_worker_20260629_113757.log
+|   |   |-- rq_hold_hist_worker_20260629_114747.log
+|   |   |-- rq_hold_hist_worker_20260629_115628.log
+|   |   |-- rq_hold_hist_worker_20260629_123124.log
+|   |   |-- rq_hold_hist_worker_20260629_131606.log
+|   |   |-- rq_hold_hist_worker_20260629_132330.log
+|   |   |-- rq_msd_worker_20260629_113757.log
+|   |   |-- rq_msd_worker_20260629_114747.log
+|   |   |-- rq_msd_worker_20260629_115628.log
+|   |   |-- rq_msd_worker_20260629_123124.log
+|   |   |-- rq_msd_worker_20260629_131606.log
+|   |   |-- rq_msd_worker_20260629_132330.log
+|   |   |-- rq_prod_hist_worker_20260629_113757.log
+|   |   |-- rq_prod_hist_worker_20260629_114747.log
+|   |   |-- rq_prod_hist_worker_20260629_115628.log
+|   |   |-- rq_prod_hist_worker_20260629_123124.log
+|   |   |-- rq_prod_hist_worker_20260629_131606.log
+|   |   |-- rq_prod_hist_worker_20260629_132330.log
+|   |   |-- rq_reject_worker_20260629_113757.log
+|   |   |-- rq_reject_worker_20260629_114747.log
+|   |   |-- rq_reject_worker_20260629_115628.log
+|   |   |-- rq_reject_worker_20260629_123124.log
+|   |   |-- rq_reject_worker_20260629_131606.log
+|   |   |-- rq_reject_worker_20260629_132330.log
+|   |   |-- rq_resource_worker_20260629_113757.log
+|   |   |-- rq_resource_worker_20260629_114747.log
+|   |   |-- rq_resource_worker_20260629_115628.log
+|   |   \-- ... (27 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1017,6 +1057,7 @@ DashBoard_vite/
 |   |   |   |-- get_analytics_yield_anomalies_drilldown.json
 |   |   |   |-- get_analytics_yield_anomalies.json
 |   |   |   |-- get_auth_me.json
+|   |   |   |-- get_db_scheduling_queue.json
 |   |   |   |-- get_downtime_analysis_equipment_detail.json
 |   |   |   |-- get_downtime_analysis_event_detail.json
 |   |   |   |-- get_downtime_analysis_export_equipment_detail.json
@@ -1044,10 +1085,9 @@ DashBoard_vite/
 |   |   |   |-- get_material_trace_job.json
 |   |   |   |-- get_mid_section_defect_analysis_detail.json
 |   |   |   |-- get_mid_section_defect_analysis.json
+|   |   |   |-- get_mid_section_defect_container_filter_options.json
 |   |   |   |-- get_mid_section_defect_export.json
-|   |   |   |-- get_mid_section_defect_loss_reasons.json
-|   |   |   |-- get_mid_section_defect_station_options.json
-|   |   |   \-- ... (125 more entries truncated; cap=50)
+|   |   |   \-- ... (127 more entries truncated; cap=50)
 |   |   |-- capture_samples.py
 |   |   |-- README.md
 |   |   |-- response-samples.example.json
@@ -1259,22 +1299,51 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- hold_dataset/
-|   |   |   \-- ec861224d052b0d9.parquet
+|   |   |-- msd_detect/
+|   |   |   |-- 1b2c27400d90c60e.parquet
+|   |   |   \-- 73e08c01f3544c04.parquet
+|   |   |-- msd-events/
+|   |   |   |-- msd-12fe6a2052a4a2dd_detection.parquet
+|   |   |   |-- msd-12fe6a2052a4a2dd_events.parquet
+|   |   |   |-- msd-12fe6a2052a4a2dd_lineage.parquet
+|   |   |   |-- msd-b5d2f3feee876f07_detection.parquet
+|   |   |   |-- msd-b5d2f3feee876f07_events.parquet
+|   |   |   |-- msd-b5d2f3feee876f07_lineage.parquet
+|   |   |   |-- msd-beb5cca615ac2331_events.parquet
+|   |   |   |-- msd-beb5cca615ac2331_lineage.parquet
+|   |   |   |-- msd-ff2fe66eda2d1a26_detection.parquet
+|   |   |   |-- msd-ff2fe66eda2d1a26_events.parquet
+|   |   |   \-- msd-ff2fe66eda2d1a26_lineage.parquet
+|   |   |-- production_history/
+|   |   |   \-- ph-05d194608de28a34.parquet
 |   |   |-- reject_dataset/
+|   |   |   |-- 01a58ef66a9ad017.parquet
 |   |   |   \-- c8451800751581f8.parquet
 |   |   |-- resource_dataset/
-|   |   |   \-- 045bc3844da19eb7.parquet
+|   |   |   |-- 045bc3844da19eb7.parquet
+|   |   |   |-- 58383bcb2be3dff8.parquet
+|   |   |   |-- 5ce2411ee1a6cec9.parquet
+|   |   |   \-- 7d2ee9025463aabc.parquet
 |   |   |-- resource_oee/
+|   |   |   |-- 43dc6676a902087d.parquet
+|   |   |   |-- 58383bcb2be3dff8.parquet
+|   |   |   |-- 5ce2411ee1a6cec9.parquet
 |   |   |   \-- f6603626127bbbc0.parquet
+|   |   |-- trace_lineage/
+|   |   |   |-- trace-lineage-mid-section-defect-5c7319ed8d93eeced8f250e0.parquet
+|   |   |   \-- trace-lineage-mid-section-defect-f6daec723ff0997e5d41c326.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- cd7220007fc5ae48.parquet
+|   |   |   |-- 6134fde4c72712e3.parquet
+|   |   |   |-- cd7220007fc5ae48.parquet
+|   |   |   \-- e0abeb7e48bee179.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
+|   |   |-- probe_103174.json
 |   |   |-- probe_103452.json
 |   |   |-- probe_10348.json
 |   |   |-- probe_1038537.json
 |   |   |-- probe_1038627.json
+|   |   |-- probe_104444.json
 |   |   |-- probe_1050995.json
 |   |   |-- probe_1051070.json
 |   |   |-- probe_1051128.json
@@ -1305,12 +1374,7 @@ DashBoard_vite/
 |   |   |-- probe_1052817.json
 |   |   |-- probe_1052864.json
 |   |   |-- probe_1052948.json
-|   |   |-- probe_1053022.json
-|   |   |-- probe_1055095.json
-|   |   |-- probe_1055122.json
-|   |   |-- probe_1056521.json
-|   |   |-- probe_1060804.json
-|   |   \-- ... (854 more entries truncated; cap=50)
+|   |   \-- ... (898 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json

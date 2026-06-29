@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.32.0
-last-changed: 2026-06-26
+schema-version: 1.33.0
+last-changed: 2026-06-29
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -236,6 +236,7 @@ breaking-change-policy: deprecate-2-minors
 | MSD-02 | Cache key | Analysis cache key 由 `_analysis_cache_key()` 生成（包含所有 filter params）；cache miss → 查詢 Oracle/DuckDB | route tests |
 | MSD-03 | Station options | `GET /api/mid-section-defect/station-options` 提供站點 filter 清單；`/loss-reasons` 提供 loss reason 清單 | route tests |
 | MSD-04 | CSV export | `GET /api/mid-section-defect/export` stream-download-exception；content-type: text/csv | e2e tests |
+| MSD-05 | container-filter-options no-Oracle invariant | `GET /api/mid-section-defect/container-filter-options` reads from `container_filter_cache` only (24h TTL); no Oracle query is issued at request time. A cold or fully-expired cache returns HTTP 200 with all four arrays empty; the client must tolerate empty lists. Analogous to RHPF-06 for reject-history. | `tests/e2e/test_mid_section_defect_e2e.py::TestMidSectionDefectE2E::test_container_filter_options_uses_cache_not_oracle` |
 
 ## Admin Rules
 
@@ -339,6 +340,7 @@ breaking-change-policy: deprecate-2-minors
 | BQE-05 | DB_SLOW_POOL_SIZE ceiling | `HOLD_ENGINE_PARALLEL`, `JOB_ENGINE_PARALLEL`, `MSD_ENGINE_PARALLEL` must not exceed `DB_SLOW_POOL_SIZE` (env-configurable; code default: dev=2, prod=5 per `settings.py`). A value above the ceiling silently saturates the slow pool and causes connection timeouts for other services. | env-validation tests |
 | BQE-06 | Count-vs-paged consistency under non-concurrent reads | The `SELECT COUNT(*)` and paged fetches are executed without intervening DDL or concurrent data changes. Under concurrent data inserts between count and a paged fetch, the engine may see more or fewer rows than the count — this is an accepted and documented limitation. The completeness guarantee (BQE-01) applies only to non-concurrent scenarios. | resilience tests |
 | BQE-07 | `downtime_analysis_service` raw-spool output | (Updated by `downtime-browser-duckdb`.) Flag ON: `query_downtime_dataset_raw()` uses one whole-dataset BQE chunk to write two raw namespaces (`downtime_analysis_base_events`, `downtime_analysis_job_bridge`); server does NOT run reductions. Flag OFF (legacy): `query_downtime_dataset()` continues to use `BatchQueryEngine → execute_plan → merge_chunks_to_spool` into the enriched `downtime_analysis_events` namespace. ADR-0003 permanent exclusion from `USE_ROW_COUNT_CHUNKING` applies to both paths. | `tests/test_downtime_analysis_service.py::TestRawSpoolWriter`; integration tests |
+| BQE-08 | count_query row-unit parity with paged SQL | `count_query.sql` for each BQE service must count the same logical row unit that `dataset_paged.sql` produces in its combined CTE. When the paged CTE expands base entities (e.g., CONTAINERID) into entity × dimension pairs via JOIN (e.g., CONTAINERID × LOSSREASONNAME), `count_query.sql` must count the expanded pair set — NOT `DISTINCT` base entities. Counting only base entities while the paged SQL yields N × k pairs causes `end_row = N` to silently truncate late-range rows sorted by primary key ASC, with no error signal. Pre-fix MSD `count_query.sql` counted `DISTINCT CONTAINERID`; paged SQL yielded `detection_deduped LEFT JOIN detection_rejects` pairs — any container appearing only in the latter portion of the date range was dropped. | `tests/test_mid_section_defect_service.py` (count-parity fixture); commit e76cde22 |
 
 
 ## BaseChunkedDuckDBJob Fan-out Rules

@@ -141,3 +141,16 @@ Required format: list "legacy path columns" and "unified path columns" as separa
 Pattern: `contracts/data/data-shape-contract.md §3.19` — `resource_oee` legacy includes `SHIFT_DATE`; unified `post_aggregate` drops it (GROUP BY EQUIPMENTID only, SHIFT_DATE absent from final parquet). Confirmed non-breaking because no consumer reads SHIFT_DATE from the OEE spool.
 
 Evidence: `resource-history-migration` CR-2 — blanket UNCHANGED claim was caught as internally contradictory by contract-reviewer; fix required documenting per-path column sets explicitly.
+
+
+## Coarse Spool Key — Fine-Filter Injection at DuckDB View Registration
+
+When a spool is keyed on a subset of filter dimensions (e.g., `station + date`, excluding `pj_types`/`packages`), the DuckDB runtime wrapping it must inject the remaining fine-filter conditions as WHERE clauses inside `_register_runtime_views`, not at spool-write time. Omitting the clause causes every downstream view (Pareto chart, daily trend, LOT detail, KPI) to operate on full-spool data regardless of the active filter — a silent correctness failure with no error signal.
+
+Filtering at spool-write time is the wrong fix: it forces a separate parquet per fine-filter combination and defeats coarse-key sharing. The coarse spool stays raw; fine-filter predicates are applied inside the DuckDB view registration layer.
+
+**However**, the detection stage spool stored under `trace_query_id` (a finer key) **should** be saved pre-filtered, because `trace_query_id` is already specific to the filtered seed set. Apply the filter via pandas before writing the stage file so `get_detail()` and cached `get_summary()` reads are also filtered without needing to re-supply the filter params.
+
+Pattern: `src/mes_dashboard/services/msd_duckdb_runtime.py::_register_runtime_views` — `WHERE TRIM(PJ_TYPE) IN (…)` added to `detection_raw` view; `src/mes_dashboard/services/trace_job_service.py::_build_job_msd_aggregation` — pandas filter before writing detection stage spool.
+
+Evidence: `msd-type-package-filter` archive.md §Production Reality Findings Bug 2; commits 4a56ebcd.
