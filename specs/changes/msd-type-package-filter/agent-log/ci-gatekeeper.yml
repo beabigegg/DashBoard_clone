@@ -1,0 +1,9 @@
+change-id: msd-type-package-filter
+agent: ci-gatekeeper
+status: done
+summary: "5 PR-required gates; 1 workflow step added (e2e-mid-section-defect Tier 1); no new workflow files or nightly gates"
+artifacts:
+  - { type: tiers-modified, pointer: "1" }
+  - { type: gate-promotions, pointer: "n/a (no existing gates promoted; e2e-mid-section-defect is new at Tier 1)" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, openapi-sync, contract-and-fast-tests, frontend-unit-tests, e2e-mid-section-defect" }

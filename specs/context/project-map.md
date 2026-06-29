@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 199
-visible-files: 1092
+visible-dirs: 200
+visible-files: 1053
 omitted-dirs: 66
-truncated-dirs: 7
+truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -83,12 +83,14 @@ DashBoard_vite/
 |   |   |-- 0eaea0baf0eb7dcf
 |   |   |-- 0ec66aabb29bda7c
 |   |   |-- 0f2d4ac438e36262
+|   |   |-- 0f3094f4c41337a3
 |   |   |-- 0f584482e7d3db29
 |   |   |-- 0fb4599ed66628f4
 |   |   |-- 0fe1e1a4cd35a9e8
 |   |   |-- 1131d28f548032e7
 |   |   |-- 11326b1300e7c559
 |   |   |-- 11d2c913de0cba90
+|   |   |-- 122fc4d943da0a54
 |   |   |-- 130930a01b21082f
 |   |   |-- 137aac6b65143dec
 |   |   |-- 1513f65c38d604ee
@@ -101,10 +103,8 @@ DashBoard_vite/
 |   |   |-- 1b488e9c0e7c5031
 |   |   |-- 1bfae4d4f286c3d1
 |   |   |-- 1c079de4646a8d8b
-|   |   |-- 1cc56ed5fc92eb40
-|   |   |-- 1fa576bc7d285941
-|   |   |-- 1fcb892092629696
-|   |   \-- ... (327 more entries truncated; cap=50)
+|   |   |-- 1c2919ea2d0d7b6f
+|   |   \-- ... (333 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -176,7 +176,8 @@ DashBoard_vite/
 |   |   |-- 0009-eap-alarm-cross-chunk-pairing-in-post-aggregate.md
 |   |   |-- 0010-downtime-duckdb-time-overlap-join.md
 |   |   |-- 0011-global-concurrency-semaphore-rq-oracle-bound.md
-|   |   \-- 0012-navigation-source-of-truth-code-manifest.md
+|   |   |-- 0012-navigation-source-of-truth-code-manifest.md
+|   |   \-- 0013-db-scheduling-reuse-wip-cache-no-dedicated-query.md
 |   |-- architecture/
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
@@ -340,6 +341,11 @@ DashBoard_vite/
 |   |   |   |-- unwrap-api-result.ts
 |   |   |   |-- wip-derive.ts
 |   |   |   \-- wip-navigation-state.ts
+|   |   |-- db-scheduling/
+|   |   |   |-- App.vue
+|   |   |   |-- index.html
+|   |   |   |-- main.js
+|   |   |   \-- style.css
 |   |   |-- downtime-analysis/
 |   |   |   |-- __tests__/
 |   |   |   |   \-- ... (max depth)
@@ -628,6 +634,7 @@ DashBoard_vite/
 |   |   |   |-- admin-pages.spec.ts
 |   |   |   |-- ai-query-panel.spec.ts
 |   |   |   |-- anomaly-overview.spec.ts
+|   |   |   |-- db-scheduling.spec.ts
 |   |   |   |-- downtime-analysis.spec.js
 |   |   |   |-- downtime-analysis.spec.ts
 |   |   |   |-- eap-alarm-filters.spec.ts
@@ -710,57 +717,19 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260626_075320.log
-|   |   |-- access_20260626_080717.log
-|   |   |-- access_20260626_081358.log
-|   |   |-- access_20260626_095025.log
-|   |   |-- access_20260626_101323.log
-|   |   |-- error_20260626_075320.log
-|   |   |-- error_20260626_080717.log
-|   |   |-- error_20260626_081358.log
-|   |   |-- error_20260626_095025.log
-|   |   |-- error_20260626_101323.log
-|   |   |-- rq_downtime_worker_20260626_075320.log
-|   |   |-- rq_downtime_worker_20260626_080717.log
-|   |   |-- rq_downtime_worker_20260626_081358.log
-|   |   |-- rq_downtime_worker_20260626_095025.log
-|   |   |-- rq_downtime_worker_20260626_101323.log
-|   |   |-- rq_eap_alarm_worker_20260626_075320.log
-|   |   |-- rq_eap_alarm_worker_20260626_080717.log
-|   |   |-- rq_eap_alarm_worker_20260626_081358.log
-|   |   |-- rq_eap_alarm_worker_20260626_095025.log
-|   |   |-- rq_eap_alarm_worker_20260626_101323.log
-|   |   |-- rq_hold_hist_worker_20260626_075320.log
-|   |   |-- rq_hold_hist_worker_20260626_080717.log
-|   |   |-- rq_hold_hist_worker_20260626_081358.log
-|   |   |-- rq_hold_hist_worker_20260626_095025.log
-|   |   |-- rq_hold_hist_worker_20260626_101323.log
-|   |   |-- rq_msd_worker_20260626_075320.log
-|   |   |-- rq_msd_worker_20260626_080717.log
-|   |   |-- rq_msd_worker_20260626_081358.log
-|   |   |-- rq_msd_worker_20260626_095025.log
-|   |   |-- rq_msd_worker_20260626_101323.log
-|   |   |-- rq_prod_hist_worker_20260626_075320.log
-|   |   |-- rq_prod_hist_worker_20260626_080717.log
-|   |   |-- rq_prod_hist_worker_20260626_081358.log
-|   |   |-- rq_prod_hist_worker_20260626_095025.log
-|   |   |-- rq_prod_hist_worker_20260626_101323.log
-|   |   |-- rq_reject_worker_20260626_075320.log
-|   |   |-- rq_reject_worker_20260626_080717.log
-|   |   |-- rq_reject_worker_20260626_081358.log
-|   |   |-- rq_reject_worker_20260626_095025.log
-|   |   |-- rq_reject_worker_20260626_101323.log
-|   |   |-- rq_resource_worker_20260626_075320.log
-|   |   |-- rq_resource_worker_20260626_080717.log
-|   |   |-- rq_resource_worker_20260626_081358.log
-|   |   |-- rq_resource_worker_20260626_095025.log
-|   |   |-- rq_resource_worker_20260626_101323.log
-|   |   |-- rq_warmup_worker_20260626_075320.log
-|   |   |-- rq_warmup_worker_20260626_080717.log
-|   |   |-- rq_warmup_worker_20260626_081358.log
-|   |   |-- rq_warmup_worker_20260626_095025.log
-|   |   |-- rq_warmup_worker_20260626_101323.log
-|   |   \-- ... (15 more entries truncated; cap=50)
+|   |   |-- access_20260629_093714.log
+|   |   |-- error_20260629_093714.log
+|   |   |-- rq_downtime_worker_20260629_093714.log
+|   |   |-- rq_eap_alarm_worker_20260629_093714.log
+|   |   |-- rq_hold_hist_worker_20260629_093714.log
+|   |   |-- rq_msd_worker_20260629_093714.log
+|   |   |-- rq_prod_hist_worker_20260629_093714.log
+|   |   |-- rq_reject_worker_20260629_093714.log
+|   |   |-- rq_resource_worker_20260629_093714.log
+|   |   |-- rq_warmup_worker_20260629_093714.log
+|   |   |-- rq_worker_20260629_093714.log
+|   |   |-- rq_yield_alert_worker_20260629_093714.log
+|   |   \-- watchdog_20260629_093714.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -886,6 +855,7 @@ DashBoard_vite/
 |       |   |-- ai_routes.py
 |       |   |-- analytics_routes.py
 |       |   |-- dashboard_routes.py
+|       |   |-- db_scheduling_routes.py
 |       |   |-- downtime_analysis_routes.py
 |       |   |-- eap_alarm_routes.py
 |       |   |-- health_routes.py
@@ -928,6 +898,7 @@ DashBoard_vite/
 |       |   |-- container_filter_cache.py
 |       |   |-- container_resolution_policy.py
 |       |   |-- dashboard_service.py
+|       |   |-- db_scheduling_service.py
 |       |   |-- downtime_analysis_cache.py
 |       |   |-- downtime_analysis_duckdb_cache.py
 |       |   |-- downtime_analysis_service.py
@@ -959,8 +930,7 @@ DashBoard_vite/
 |       |   |-- production_history_service.py
 |       |   |-- production_history_sql_runtime.py
 |       |   |-- qc_gate_service.py
-|       |   |-- query_tool_service.py
-|       |   \-- ... (28 more entries truncated; cap=50)
+|       |   \-- ... (29 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -1273,7 +1243,7 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   |-- test_cross_worker_result_sharing.py
-|   \-- ... (183 more entries truncated; cap=50)
+|   \-- ... (186 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
@@ -1289,27 +1259,20 @@ DashBoard_vite/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- production_history/
-|   |   |   |-- ph-44fbb9ba546af056.parquet
-|   |   |   |-- ph-c9556769513ff564.parquet
-|   |   |   |-- ph-cbbc695eb98229ef.parquet
-|   |   |   \-- ph-de1f5bf35a72e65b.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- ec861224d052b0d9.parquet
 |   |   |-- reject_dataset/
-|   |   |   |-- 390dce0f5e75d977.parquet
-|   |   |   |-- 5321f77b4d26be9b.parquet
-|   |   |   \-- 865f6dc4d44aaeff.parquet
+|   |   |   \-- c8451800751581f8.parquet
 |   |   |-- resource_dataset/
-|   |   |   \-- 788c06756949126a.parquet
+|   |   |   \-- 045bc3844da19eb7.parquet
 |   |   |-- resource_oee/
-|   |   |   \-- 5e0088f2541e4952.parquet
+|   |   |   \-- f6603626127bbbc0.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   |-- 128ebd7b216cda05.parquet
-|   |   |   |-- 254dca41e9f29aa4.parquet
-|   |   |   |-- 2826566ba4cae3a6.parquet
-|   |   |   |-- 8cae2436b5688133.parquet
-|   |   |   \-- 94ef9d0fd999f809.parquet
+|   |   |   \-- cd7220007fc5ae48.parquet
 |   |   |-- probe_100033.json
 |   |   |-- probe_101202.json
+|   |   |-- probe_103452.json
+|   |   |-- probe_10348.json
 |   |   |-- probe_1038537.json
 |   |   |-- probe_1038627.json
 |   |   |-- probe_1050995.json
@@ -1347,9 +1310,7 @@ DashBoard_vite/
 |   |   |-- probe_1055122.json
 |   |   |-- probe_1056521.json
 |   |   |-- probe_1060804.json
-|   |   |-- probe_1064516.json
-|   |   |-- probe_1066070.json
-|   |   \-- ... (794 more entries truncated; cap=50)
+|   |   \-- ... (854 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json

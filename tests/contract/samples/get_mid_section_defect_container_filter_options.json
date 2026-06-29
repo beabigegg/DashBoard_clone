@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "data": {
+    "pj_types": [],
+    "packages": [],
+    "bops": [],
+    "pj_functions": []
+  },
+  "meta": {
+    "timestamp": "2026-06-29T10:39:05.390623",
+    "app_version": "0.0.0",
+    "updated_at": null,
+    "schema_version": 2
+  }
+}

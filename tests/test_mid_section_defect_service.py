@@ -962,3 +962,237 @@ class TestMsdPartialFailure:
         assert result is not None
         assert "_meta" in result
         assert result["_meta"]["partial_failure"]["has_partial_failure"] is True
+
+
+# ─── pj_types / packages filter tests ────────────────────────────────────────
+
+def _make_detection_df_with_types():
+    """Seed DataFrame with PJ_TYPE and PRODUCTLINENAME columns."""
+    return pd.DataFrame([
+        {
+            'CONTAINERID': 'CID-001',
+            'CONTAINERNAME': 'LOT-001',
+            'TRACKINQTY': 100,
+            'REJECTQTY': 5,
+            'LOSSREASONNAME': 'R1',
+            'WORKFLOW': 'WF-A',
+            'PRODUCTLINENAME': 'PKG-A',
+            'PJ_TYPE': 'TYPE-A',
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
+            'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
+            'FINISHEDRUNCARD': 'FR-001',
+        },
+        {
+            'CONTAINERID': 'CID-002',
+            'CONTAINERNAME': 'LOT-002',
+            'TRACKINQTY': 120,
+            'REJECTQTY': 6,
+            'LOSSREASONNAME': 'R2',
+            'WORKFLOW': 'WF-B',
+            'PRODUCTLINENAME': 'PKG-B',
+            'PJ_TYPE': 'TYPE-B',
+            'DETECTION_EQUIPMENTNAME': 'EQ-02',
+            'TRACKINTIMESTAMP': '2025-01-11 10:00:00',
+            'FINISHEDRUNCARD': 'FR-002',
+        },
+    ])
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_filter_by_pj_type_reduces_rows(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """Passing pj_types=['TYPE-A'] should exclude TYPE-B rows from detection_df."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = query_analysis('2025-01-01', '2025-01-31', pj_types=['TYPE-A'])
+
+    assert result is not None
+    assert 'error' not in result
+    # Only TYPE-A container (CID-001/R1) should remain
+    available = result.get('available_loss_reasons', [])
+    assert 'R1' in available
+    assert 'R2' not in available
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_filter_by_package_reduces_rows(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """Passing packages=['PKG-B'] should exclude PKG-A rows from detection_df."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = query_analysis('2025-01-01', '2025-01-31', packages=['PKG-B'])
+
+    assert result is not None
+    assert 'error' not in result
+    available = result.get('available_loss_reasons', [])
+    assert 'R2' in available
+    assert 'R1' not in available
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_filter_pj_type_and_package_and_semantics(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """AND-semantics: both pj_types and packages applied; no co-occurrence → empty."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    # TYPE-A is in CID-001/PKG-A, TYPE-B in CID-002/PKG-B
+    # Asking for TYPE-A AND PKG-B → no rows match
+    result = query_analysis(
+        '2025-01-01', '2025-01-31',
+        pj_types=['TYPE-A'],
+        packages=['PKG-B'],
+    )
+
+    assert result is not None
+    assert 'error' not in result
+    assert result.get('available_loss_reasons', []) == []
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_no_pj_types_packages_output_unchanged(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """Empty pj_types=[] and packages=[] → no restriction; all rows returned (AC-5)."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = query_analysis('2025-01-01', '2025-01-31', pj_types=[], packages=[])
+
+    assert result is not None
+    assert 'error' not in result
+    available = result.get('available_loss_reasons', [])
+    assert 'R1' in available
+    assert 'R2' in available
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_unknown_pj_type_returns_empty_detection(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """Unknown pj_types value → empty df after filter; response shape unchanged; no 5xx."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = query_analysis('2025-01-01', '2025-01-31', pj_types=['NONEXISTENT'])
+
+    assert result is not None
+    assert 'error' not in result
+    assert result.get('available_loss_reasons', []) == []
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_empty_pj_types_list_no_filter(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """pj_types=None (absent) → same as no filter; both rows returned."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = query_analysis('2025-01-01', '2025-01-31')
+
+    assert result is not None
+    assert 'error' not in result
+    available = result.get('available_loss_reasons', [])
+    assert 'R1' in available
+    assert 'R2' in available
+
+
+@patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+@patch('mes_dashboard.services.mid_section_defect_service.cache_get', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_query_analysis_null_pj_type_column_no_crash(
+    mock_fetch,
+    _mock_ensure,
+    _mock_spool,
+    _mock_cache_get,
+    _mock_cache_set,
+):
+    """NULL PJ_TYPE values are excluded from isin match; no crash (AC-7 #8)."""
+    df_with_nulls = pd.DataFrame([
+        {
+            'CONTAINERID': 'CID-001',
+            'CONTAINERNAME': 'LOT-001',
+            'TRACKINQTY': 100,
+            'REJECTQTY': 5,
+            'LOSSREASONNAME': 'R1',
+            'WORKFLOW': 'WF-A',
+            'PRODUCTLINENAME': 'PKG-A',
+            'PJ_TYPE': None,  # NULL
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
+            'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
+            'FINISHEDRUNCARD': 'FR-001',
+        },
+        {
+            'CONTAINERID': 'CID-002',
+            'CONTAINERNAME': 'LOT-002',
+            'TRACKINQTY': 120,
+            'REJECTQTY': 6,
+            'LOSSREASONNAME': 'R2',
+            'WORKFLOW': 'WF-B',
+            'PRODUCTLINENAME': 'PKG-B',
+            'PJ_TYPE': 'TYPE-B',
+            'DETECTION_EQUIPMENTNAME': 'EQ-02',
+            'TRACKINTIMESTAMP': '2025-01-11 10:00:00',
+            'FINISHEDRUNCARD': 'FR-002',
+        },
+    ])
+    mock_fetch.return_value = (df_with_nulls, {})
+
+    # NULL row must be excluded; TYPE-B row should pass
+    result = query_analysis('2025-01-01', '2025-01-31', pj_types=['TYPE-B'])
+
+    assert result is not None
+    assert 'error' not in result
+    available = result.get('available_loss_reasons', [])
+    assert 'R2' in available
+    assert 'R1' not in available

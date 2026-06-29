@@ -1,0 +1,25 @@
+change-id: msd-type-package-filter
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test:legacy 2>&1 | tail -10
+    summary: specs/changes/msd-type-package-filter/test-runs/20260629-105217/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npm run test:legacy 2>&1 | tail -10
+    summary: specs/changes/msd-type-package-filter/test-runs/20260629-105224/summary.json
+  - phase: changed-area
+    status: passed
+    command: cd frontend && npm run test 2>&1 | tail -10
+    summary: specs/changes/msd-type-package-filter/test-runs/20260629-105229/summary.json
+  - phase: contract
+    status: passed
+    command: cdd-kit validate --contracts
+    summary: specs/changes/msd-type-package-filter/test-runs/20260629-103946/summary.json
+final-status: passed

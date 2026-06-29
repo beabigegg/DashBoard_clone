@@ -1,0 +1,55 @@
+change-id: msd-type-package-filter
+agent: backend-engineer
+status: done
+summary: "Implemented container-filter-options endpoint, pj_types/packages analysis filter, contract updates, and tests. All 66 tests pass (34 pre-existing + 32 new)."
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/mid_section_defect_routes.py (new container-filter-options route; _analysis_cache_key pj_types/packages; api_analysis extraction+forwarding)"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/mid_section_defect_service.py (resolve_analysis_trace_context pj_types/packages params + C-2 filter; query_analysis params + C-1 cache key)"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_filter_by_pj_type_reduces_rows"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_filter_by_package_reduces_rows"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_filter_pj_type_and_package_and_semantics"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_no_pj_types_packages_output_unchanged"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_unknown_pj_type_returns_empty_detection"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_empty_pj_types_list_no_filter"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py::test_query_analysis_null_pj_type_column_no_crash"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_analysis_forwards_pj_types_kwarg"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_analysis_forwards_packages_kwarg"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_analysis_absent_pj_types_forwards_unchanged"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_container_filter_options_returns_type_and_package_lists"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_container_filter_options_does_not_call_read_sql_df"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_container_filter_options_malformed_selected_returns_400"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_routes.py::test_analysis_route_malformed_pj_types_no_5xx"
+  - type: tests-added
+    pointer: "tests/e2e/test_mid_section_defect_e2e.py::TestMidSectionDefectE2E::test_container_filter_options_uses_cache_not_oracle"
+  - type: test-output
+    pointer: "66 passed in 1.46s (targeted + changed-area phases both exit 0)"
+  - type: contracts-touched
+    pointer: "contracts/api/api-contract.md (1.31.0→1.32.0; new endpoint row; analysis row updated; MsdContainerFilterOptionsResponse schema)"
+  - type: contracts-touched
+    pointer: "contracts/api/api-inventory.md (1.2.8→1.2.9; mid_section_defect_routes.py row)"
+  - type: contracts-touched
+    pointer: "contracts/data/data-shape-contract.md (1.27.0→1.28.0; §2.13 added)"
+  - type: contracts-touched
+    pointer: "contracts/CHANGELOG.md ([api 1.32.0] and [data 1.28.0] entries added)"
+  - type: contracts-touched
+    pointer: "contracts/api/openapi.json and contracts/openapi.json (regenerated via cdd-kit openapi export; 186 endpoints)"
+  - type: contracts-touched
+    pointer: "tests/contract/response-samples.json (GET /api/mid-section-defect/container-filter-options entry added)"
+  - type: contracts-touched
+    pointer: "tests/contract/samples/get_mid_section_defect_container_filter_options.json (new sample file)"

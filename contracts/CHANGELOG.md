@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.32.0] — 2026-06-29
+### Added
+- msd-type-package-filter: New `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options for Type/Package FilterBar MultiSelects; reuses shared `container_filter_cache`; no Oracle at request time. `GET /api/mid-section-defect/analysis` gains optional `pj_types[]` and `packages[]` multi-value query params (post-query filter; AND-semantics; absent/empty = no restriction; both params added to result cache key). New schema `MsdContainerFilterOptionsResponse`. Additive; no existing endpoints or fields removed.
+
 ## [api 1.31.0] — 2026-06-27
 ### Added
 - fix-ci-conformance: `GET /api/job/{job_id}/result` (auth required; ?prefix= query param; returns stored job result payload; 400/404). Endpoint existed in `job_routes.py` but was missing from the API contract.
@@ -15,6 +19,10 @@ a corresponding entry below.
 ## [api 1.30.0] — 2026-06-26
 ### Added
 - add-db-scheduling-page: `GET /api/db-scheduling/queue` (auth required; sync; read-only). Returns D/B-START lot recommended equipment list from `DWH.DW_MES_LOT_V` 5-min WIP cache. Response schema `DbSchedulingQueueResponse` (15 fields including 4 eqp* priority-column keys). One row per equipment per lot; matchSource closed enum `workflow | bop-fallback | none`. Additive; no existing endpoints changed.
+
+## [data 1.28.0] — 2026-06-29
+### Added
+- msd-type-package-filter: §2.13 (MSD Container-Filter-Options Response). Shape mirrors §2.7: data={pj_types,packages,bops,pj_functions}; meta={updated_at,schema_version} (D-CR-01). Same Redis key/24h TTL as §2.7 (shared container_filter_cache). Analysis response shape unchanged under pj_types[]/packages[] filtering. Additive; no existing schemas changed.
 
 ## [data 1.27.0] — 2026-06-26
 ### Added

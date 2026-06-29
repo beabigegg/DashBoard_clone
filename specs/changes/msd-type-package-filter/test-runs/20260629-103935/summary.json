@@ -1,0 +1,16 @@
+{
+  "change_id": "msd-type-package-filter",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/test_mid_section_defect_service.py tests/test_mid_section_defect_routes.py -v --tb=short --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/msd-type-package-filter/test-runs/20260629-103935/junit.xml' -q --maxfail=1 -ra",
+  "duration_ms": 2867,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/msd-type-package-filter/test-runs/20260629-103935/summary.json",
+    "stdout": "specs/changes/msd-type-package-filter/test-runs/20260629-103935/stdout.log",
+    "stderr": "specs/changes/msd-type-package-filter/test-runs/20260629-103935/stderr.log",
+    "junit": "specs/changes/msd-type-package-filter/test-runs/20260629-103935/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

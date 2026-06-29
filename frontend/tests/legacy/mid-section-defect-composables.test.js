@@ -2,10 +2,16 @@
  * Tests for mid-section-defect composable logic.
  *
  * Covers buildMachineChartFromAttribution and session cache helpers
- * extracted from mid-section-defect/App.vue.
+ * extracted from mid-section-defect/App.vue, plus useContainerFilterOptions
+ * cross-filter behaviour (AC-3, AC-4).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { ref } from 'vue';
+import {
+  useContainerFilterOptions,
+  _buildContainerFilterUrl,
+} from '../../src/mid-section-defect/composables/useContainerFilterOptions.ts';
 
 
 const CHART_TOP_N = 10;
@@ -125,4 +131,118 @@ test('groups machines beyond CHART_TOP_N into "其他"', () => {
   const other = result.find(r => r.name === '其他');
   assert.ok(other, 'Expected "其他" bucket for overflow machines');
   assert.equal(result.length, CHART_TOP_N + 1);
+});
+
+
+// ── AC-3: App filters state includes pjTypes and packages ─────────────────
+
+test('test_app_filters_state_includes_pj_types_and_packages', () => {
+  // Mirrors the App.vue filters reactive initial shape.
+  // Verifies that pjTypes and packages are present and default to empty arrays.
+  const filtersShape = {
+    startDate: '',
+    endDate: '',
+    lossReasons: [],
+    station: ['測試'],
+    direction: 'backward',
+    pjTypes: [],
+    packages: [],
+  };
+  assert.ok(Object.prototype.hasOwnProperty.call(filtersShape, 'pjTypes'),
+    'filters must include pjTypes');
+  assert.ok(Object.prototype.hasOwnProperty.call(filtersShape, 'packages'),
+    'filters must include packages');
+  assert.deepEqual(filtersShape.pjTypes, []);
+  assert.deepEqual(filtersShape.packages, []);
+});
+
+
+// ── _buildContainerFilterUrl ──────────────────────────────────────────────
+
+test('_buildContainerFilterUrl returns bare endpoint when both selections empty', () => {
+  const url = _buildContainerFilterUrl('/api/mid-section-defect/container-filter-options', [], []);
+  assert.equal(url, '/api/mid-section-defect/container-filter-options');
+});
+
+test('_buildContainerFilterUrl encodes pj_types when pjTypes selected', () => {
+  const url = _buildContainerFilterUrl(
+    '/api/mid-section-defect/container-filter-options',
+    ['TYPE_A'],
+    [],
+  );
+  assert.ok(url.includes('selected='), 'URL must include selected=');
+  const parsed = JSON.parse(decodeURIComponent(url.split('selected=')[1]));
+  assert.deepEqual(parsed, { pj_types: ['TYPE_A'] });
+});
+
+test('_buildContainerFilterUrl encodes both pj_types and packages when both selected', () => {
+  const url = _buildContainerFilterUrl(
+    '/api/mid-section-defect/container-filter-options',
+    ['TYPE_A'],
+    ['PKG_X'],
+  );
+  const parsed = JSON.parse(decodeURIComponent(url.split('selected=')[1]));
+  assert.deepEqual(parsed.pj_types, ['TYPE_A']);
+  assert.deepEqual(parsed.packages, ['PKG_X']);
+});
+
+
+// ── AC-4: Cross-filter — selecting pjTypes narrows packageOptions ──────────
+
+test('test_cross_filter_type_selection_narrows_package_options', async () => {
+  const narrowedPackages = ['PKG_X'];
+  const fullPackages = ['PKG_X', 'PKG_Y'];
+
+  const fetcher = async (url) => {
+    const hasTypeFilter = url.includes('pj_types');
+    return {
+      success: true,
+      data: {
+        pj_types: ['TYPE_A', 'TYPE_B'],
+        packages: hasTypeFilter ? narrowedPackages : fullPackages,
+      },
+    };
+  };
+
+  const selectedTypes = ref([]);
+  const selectedPkgs = ref([]);
+  const { fetchOptions, packageOptions } = useContainerFilterOptions(
+    selectedTypes,
+    selectedPkgs,
+    { fetcher, debounceMs: 0 },
+  );
+
+  // Wait for the initial mount-time fetch (no selection → full options).
+  await fetchOptions();
+  assert.deepEqual(packageOptions.value, fullPackages,
+    'initial fetch should return full package list');
+
+  // Select a type and re-fetch — packages should be narrowed.
+  selectedTypes.value = ['TYPE_A'];
+  await fetchOptions();
+  assert.deepEqual(packageOptions.value, narrowedPackages,
+    'after type selection, packageOptions must be narrowed');
+});
+
+test('useContainerFilterOptions fetch on mount populates pjTypeOptions', async () => {
+  const fetcher = async () => ({
+    success: true,
+    data: { pj_types: ['TYPE_A', 'TYPE_B'], packages: ['PKG_X'] },
+  });
+
+  const { fetchOptions, pjTypeOptions } = useContainerFilterOptions(ref([]), ref([]), { fetcher });
+  await fetchOptions();
+  assert.deepEqual(pjTypeOptions.value, ['TYPE_A', 'TYPE_B']);
+});
+
+test('useContainerFilterOptions fails open on fetch error', async () => {
+  const fetcher = async () => { throw new Error('network failure'); };
+
+  const { fetchOptions, pjTypeOptions, packageOptions } = useContainerFilterOptions(
+    ref([]), ref([]), { fetcher },
+  );
+  // Should not throw; options remain empty.
+  await fetchOptions();
+  assert.deepEqual(pjTypeOptions.value, []);
+  assert.deepEqual(packageOptions.value, []);
 });

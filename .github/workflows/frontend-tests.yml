@@ -74,6 +74,17 @@ jobs:
         run: npx playwright test tests/playwright/db-scheduling.spec.ts
         continue-on-error: true
 
+      - name: Run mid-section-defect e2e spec (msd-type-package-filter, Tier 1)
+        working-directory: frontend
+        # ci-gates.md gate: e2e-mid-section-defect (Tier 1, required)
+        # Covers: AC-3 MultiSelect render (Type + Package), AC-4 Type-narrows-Package
+        # (test-plan.md E2E rows: test_filter_bar_renders_type_multiselect,
+        #  test_filter_bar_renders_package_multiselect, test_type_selection_narrows_package_options)
+        # installBaseRoutes must mock **/api/mid-section-defect/container-filter-options** BEFORE
+        # specific overrides per LIFO page.route() rule (ci-workflow.md).
+        # npx playwright install --with-deps chromium already executed above.
+        run: npx playwright test tests/playwright/mid-section-defect.spec.ts
+
       - name: Verify test discovery
         working-directory: frontend
         run: |

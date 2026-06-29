@@ -320,3 +320,144 @@ def test_export_spool_miss_does_not_dispatch_job(mock_resolve_context, mock_runt
             '/api/mid-section-defect/export?start_date=2025-01-01&end_date=2025-01-31'
         )
         mock_dispatch.assert_not_called()
+
+
+# ─── pj_types / packages route forwarding tests ───────────────────────────────
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
+def test_analysis_forwards_pj_types_kwarg(mock_query_analysis):
+    """Route must forward pj_types[] as pj_types kwarg to query_analysis."""
+    mock_query_analysis.return_value = {
+        'kpi': {}, 'charts': {}, 'daily_trend': [],
+        'available_loss_reasons': [], 'genealogy_status': 'ready',
+        'detail': [],
+    }
+
+    client = _client()
+    client.get(
+        '/api/mid-section-defect/analysis'
+        '?start_date=2025-01-01&end_date=2025-01-31'
+        '&pj_types[]=TYPE-A&pj_types[]=TYPE-B'
+    )
+
+    assert mock_query_analysis.called
+    assert mock_query_analysis.call_args.kwargs['pj_types'] == ['TYPE-A', 'TYPE-B']
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
+def test_analysis_forwards_packages_kwarg(mock_query_analysis):
+    """Route must forward packages[] as packages kwarg to query_analysis."""
+    mock_query_analysis.return_value = {
+        'kpi': {}, 'charts': {}, 'daily_trend': [],
+        'available_loss_reasons': [], 'genealogy_status': 'ready',
+        'detail': [],
+    }
+
+    client = _client()
+    client.get(
+        '/api/mid-section-defect/analysis'
+        '?start_date=2025-01-01&end_date=2025-01-31'
+        '&packages[]=PKG-X&packages[]=PKG-Y'
+    )
+
+    assert mock_query_analysis.called
+    assert mock_query_analysis.call_args.kwargs['packages'] == ['PKG-X', 'PKG-Y']
+
+
+@patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis')
+def test_analysis_absent_pj_types_forwards_unchanged(mock_query_analysis):
+    """When pj_types[] is absent, route forwards empty list (AC-5 baseline unchanged)."""
+    mock_query_analysis.return_value = {
+        'kpi': {}, 'charts': {}, 'daily_trend': [],
+        'available_loss_reasons': [], 'genealogy_status': 'ready',
+        'detail': [],
+    }
+
+    client = _client()
+    client.get(
+        '/api/mid-section-defect/analysis?start_date=2025-01-01&end_date=2025-01-31'
+    )
+
+    assert mock_query_analysis.called
+    assert mock_query_analysis.call_args.kwargs['pj_types'] == []
+    assert mock_query_analysis.call_args.kwargs['packages'] == []
+
+
+# ─── container-filter-options route tests ─────────────────────────────────────
+
+@patch('mes_dashboard.services.container_filter_cache.get_filter_options')
+def test_container_filter_options_returns_type_and_package_lists(mock_get_filter_options):
+    """GET /container-filter-options returns data with pj_types and packages arrays."""
+    mock_get_filter_options.return_value = {
+        'pj_types': ['TYPE-A', 'TYPE-B'],
+        'packages': ['PKG-X', 'PKG-Y'],
+        'bops': ['BOP-1'],
+        'pj_functions': [],
+        'updated_at': '2025-01-01T00:00:00+00:00',
+        'schema_version': 2,
+    }
+
+    client = _client()
+    response = client.get('/api/mid-section-defect/container-filter-options')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['success'] is True
+    assert 'pj_types' in payload['data']
+    assert 'packages' in payload['data']
+    assert payload['data']['pj_types'] == ['TYPE-A', 'TYPE-B']
+    assert payload['data']['packages'] == ['PKG-X', 'PKG-Y']
+    assert 'updated_at' in payload.get('meta', {})
+
+
+@patch('mes_dashboard.services.container_filter_cache.get_filter_options')
+def test_container_filter_options_does_not_call_read_sql_df(mock_get_filter_options):
+    """Container-filter-options uses cache; read_sql_df is NOT called (AC-6)."""
+    mock_get_filter_options.return_value = {
+        'pj_types': [],
+        'packages': [],
+        'bops': [],
+        'pj_functions': [],
+        'updated_at': None,
+        'schema_version': 2,
+    }
+
+    with patch('mes_dashboard.core.database.read_sql_df') as mock_db:
+        client = _client()
+        client.get('/api/mid-section-defect/container-filter-options')
+        mock_db.assert_not_called()
+
+
+def test_container_filter_options_malformed_selected_returns_400():
+    """Malformed JSON in selected param → 400."""
+    client = _client()
+    response = client.get(
+        '/api/mid-section-defect/container-filter-options?selected=not-json'
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload['success'] is False
+
+
+@patch('mes_dashboard.services.container_filter_cache.get_filter_options')
+def test_analysis_route_malformed_pj_types_no_5xx(mock_get_filter_options):
+    """Malformed pj_types param (single value, not list form) → graceful no filter, no 5xx."""
+    mock_get_filter_options.return_value = {
+        'pj_types': [], 'packages': [], 'bops': [], 'pj_functions': [],
+        'updated_at': None, 'schema_version': 2,
+    }
+    with patch('mes_dashboard.routes.mid_section_defect_routes.query_analysis') as mock_qa:
+        mock_qa.return_value = {
+            'kpi': {}, 'charts': {}, 'daily_trend': [],
+            'available_loss_reasons': [], 'genealogy_status': 'ready',
+            'detail': [],
+        }
+        client = _client()
+        # Passing as single value (non-list form) — getlist returns it as single-element list
+        response = client.get(
+            '/api/mid-section-defect/analysis'
+            '?start_date=2025-01-01&end_date=2025-01-31&pj_types[]=single'
+        )
+        # Must not return 5xx
+        assert response.status_code < 500

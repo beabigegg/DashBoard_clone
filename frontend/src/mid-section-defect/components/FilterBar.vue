@@ -34,6 +34,18 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  pjTypeOptions: {
+    type: Array,
+    default: () => [],
+  },
+  packageOptions: {
+    type: Array,
+    default: () => [],
+  },
+  filterOptionsLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -159,6 +171,34 @@ function updateFilters(patch) {
             />
           </div>
         </template>
+
+        <!-- Shared: Type (PJ_TYPE) cross-filter -->
+        <div class="filter-field">
+          <label>型號</label>
+          <MultiSelect
+            :model-value="filters.pjTypes"
+            :options="pjTypeOptions"
+            :disabled="loading"
+            :loading="filterOptionsLoading"
+            placeholder="全部型號"
+            data-testid="pj-type-select"
+            @update:model-value="updateFilters({ pjTypes: $event })"
+          />
+        </div>
+
+        <!-- Shared: Package (PRODUCTLINENAME) cross-filter -->
+        <div class="filter-field">
+          <label>封裝</label>
+          <MultiSelect
+            :model-value="filters.packages"
+            :options="packageOptions"
+            :disabled="loading"
+            :loading="filterOptionsLoading"
+            placeholder="全部封裝"
+            data-testid="package-select"
+            @update:model-value="updateFilters({ packages: $event })"
+          />
+        </div>
 
         <!-- Shared: loss reasons -->
         <div class="filter-field">

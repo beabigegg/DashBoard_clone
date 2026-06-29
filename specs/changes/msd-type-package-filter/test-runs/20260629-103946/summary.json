@@ -1,0 +1,15 @@
+{
+  "change_id": "msd-type-package-filter",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts",
+  "duration_ms": 1777,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/msd-type-package-filter/test-runs/20260629-103946/summary.json",
+    "stdout": "specs/changes/msd-type-package-filter/test-runs/20260629-103946/stdout.log",
+    "stderr": "specs/changes/msd-type-package-filter/test-runs/20260629-103946/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

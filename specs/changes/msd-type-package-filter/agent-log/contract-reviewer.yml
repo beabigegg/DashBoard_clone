@@ -1,0 +1,22 @@
+change-id: msd-type-package-filter
+agent: contract-reviewer
+status: changes-required
+summary: "6 blocking contract gaps; no breaking changes; decided updated_at/schema_version in meta (mirrors §2.7)"
+artifacts:
+  - type: version-bumps
+    pointer: "api-contract 1.31.0→1.32.0; data-shape 1.27.0→1.28.0; api-inventory 1.2.8→1.2.9"
+  - type: blocking-items
+    pointer: "contracts/api/api-contract.md: new endpoint row + analysis row update + MsdContainerFilterOptionsResponse schema"
+  - type: blocking-items
+    pointer: "contracts/api/api-inventory.md: mid_section_defect_routes.py row update"
+  - type: blocking-items
+    pointer: "contracts/data/data-shape-contract.md: add §2.13 (updated_at/schema_version in meta, mirrors §2.7)"
+  - type: blocking-items
+    pointer: "contracts/CHANGELOG.md: add [api 1.32.0] and [data 1.28.0] entries"
+  - type: deferred
+    pointer: "openapi.json regen deferred to backend-engineer; sample capture deferred to post-implementation"
+  - type: breaking-changes
+    pointer: "none — all changes additive; sole consumer is frontend/src/mid-section-defect/"
+decisions:
+  - id: D-CR-01
+    decision: "updated_at and schema_version go in meta (not data), mirroring production-history §2.7; route handler extracts them from cache payload before calling success_response"

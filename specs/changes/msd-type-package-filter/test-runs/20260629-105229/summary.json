@@ -1,0 +1,15 @@
+{
+  "change_id": "msd-type-package-filter",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test 2>&1 | tail -10",
+  "duration_ms": 13136,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/msd-type-package-filter/test-runs/20260629-105229/summary.json",
+    "stdout": "specs/changes/msd-type-package-filter/test-runs/20260629-105229/stdout.log",
+    "stderr": "specs/changes/msd-type-package-filter/test-runs/20260629-105229/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

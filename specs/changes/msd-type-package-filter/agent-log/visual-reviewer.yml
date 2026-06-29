@@ -1,0 +1,11 @@
+change-id: msd-type-package-filter
+agent: visual-reviewer
+status: approved-with-notes
+summary: "CSS scope/layout pass; PageHeader accidentally removed — restored by main Claude immediately"
+artifacts:
+  - type: findings
+    pointer: "No new CSS file; theme-mid-section-defect scope intact; flex-wrap layout handles 2 extra controls"
+  - type: blocking-finding
+    pointer: "PageHeader title removed by frontend-engineer — restored (import + template) before gate"
+  - type: non-blocking
+    pointer: "No automated screenshot tooling; recommend manual spot-check before merge"

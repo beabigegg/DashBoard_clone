@@ -1,0 +1,8 @@
+change-id: msd-type-package-filter
+agent: implementation-planner
+status: done
+summary: "Execution packet written; flagged critical cache-collision (C-1) and exact filter insertion point (C-2) in resolve_analysis_trace_context"
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/msd-type-package-filter/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer" }
+  - { type: scope-summary, pointer: "9 required changes (IP-1..IP-9); 6 non-goals; new endpoint + analysis params + 2 FilterBar selects" }

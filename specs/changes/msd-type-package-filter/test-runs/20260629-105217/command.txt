@@ -1,0 +1,1 @@
+cd frontend && npm run test:legacy 2>&1 | tail -10

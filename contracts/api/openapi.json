@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.31.0"
+    "version": "1.32.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -3277,6 +3277,35 @@
           }
         ],
         "x-cdd-errors": "500"
+      }
+    },
+    "/api/mid-section-defect/container-filter-options": {
+      "get": {
+        "summary": "GET /api/mid-section-defect/container-filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: MsdContainerFilterOptionsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MsdContainerFilterOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/500"
       }
     },
     "/api/mid-section-defect/analysis": {
@@ -7098,6 +7127,56 @@
           "success",
           "equipment"
         ]
+      },
+      "MsdContainerFilterOptionsResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "pj_types",
+              "packages",
+              "bops",
+              "pj_functions"
+            ],
+            "properties": {
+              "pj_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "packages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "bops": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "pj_functions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
       }
     }
   }

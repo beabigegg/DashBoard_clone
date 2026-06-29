@@ -107,6 +107,17 @@ const MOCK_EMPTY_DETAIL_RESPONSE = {
   meta: { timestamp: new Date().toISOString(), app_version: 'test' },
 };
 
+const MOCK_CONTAINER_FILTER_OPTIONS = {
+  success: true,
+  data: {
+    pj_types: ['TYPE_A', 'TYPE_B'],
+    packages: ['PKG_X', 'PKG_Y'],
+    bops: [],
+    pj_functions: [],
+  },
+  meta: { timestamp: new Date().toISOString(), app_version: 'test', updated_at: new Date().toISOString(), schema_version: 1 },
+};
+
 const MOCK_PORTAL_NAV = {
   drawers: [
     {
@@ -183,6 +194,16 @@ async function installBaseRoutes(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ success: true, data: [] }),
+    }),
+  );
+
+  // Container filter options (registered before station/loss-reasons so test overrides
+  // registered later take priority per LIFO rule: ci-workflow.md §Playwright page.route LIFO)
+  await page.route('**/api/mid-section-defect/container-filter-options**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_CONTAINER_FILTER_OPTIONS),
     }),
   );
 
@@ -540,4 +561,91 @@ test('test_station_filter_loads_options', async ({ page }) => {
   const optionTexts = await page.locator('.multi-select-option').allTextContents();
   const hasTestStation = optionTexts.some((t) => t.includes('TEST') || t.includes('測試'));
   expect(hasTestStation).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// AC-3: Type and Package MultiSelect controls render in FilterBar
+// ---------------------------------------------------------------------------
+
+test('test_filter_bar_renders_type_multiselect', async ({ page }) => {
+  await installBaseRoutes(page);
+  await page.goto(PAGE_URL);
+  await page.waitForSelector('[data-testid="mid-defect-app"]', { timeout: 30_000 });
+
+  // Type (PJ_TYPE) MultiSelect must be visible in the FilterBar
+  const typeSelect = page.locator('[data-testid="pj-type-select"]');
+  await expect(typeSelect).toBeVisible();
+
+  // The trigger button must be present and enabled
+  const trigger = typeSelect.locator('.multi-select-trigger');
+  await expect(trigger).toBeVisible();
+});
+
+test('test_filter_bar_renders_package_multiselect', async ({ page }) => {
+  await installBaseRoutes(page);
+  await page.goto(PAGE_URL);
+  await page.waitForSelector('[data-testid="mid-defect-app"]', { timeout: 30_000 });
+
+  // Package (PRODUCTLINENAME) MultiSelect must be visible in the FilterBar
+  const packageSelect = page.locator('[data-testid="package-select"]');
+  await expect(packageSelect).toBeVisible();
+
+  // The trigger button must be present and enabled
+  const trigger = packageSelect.locator('.multi-select-trigger');
+  await expect(trigger).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// AC-4: Selecting a Type narrows the Package options
+// ---------------------------------------------------------------------------
+
+test('test_type_selection_narrows_package_options', async ({ page }) => {
+  // Register a smart mock that returns narrowed packages when pj_types is in the URL.
+  // This override is registered AFTER installBaseRoutes (LIFO: last-registered wins).
+  await page.route('**/api/mid-section-defect/container-filter-options**', (route) => {
+    const url = route.request().url();
+    const hasTypeFilter = url.includes('pj_types');
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          pj_types: ['TYPE_A', 'TYPE_B'],
+          packages: hasTypeFilter ? ['PKG_X'] : ['PKG_X', 'PKG_Y'],
+          bops: [],
+          pj_functions: [],
+        },
+        meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+      }),
+    });
+  });
+
+  await installBaseRoutes(page);
+  await page.goto(PAGE_URL);
+  await page.waitForSelector('[data-testid="pj-type-select"]', { timeout: 30_000 });
+
+  // Open the Type dropdown
+  await page.locator('[data-testid="pj-type-select"] .multi-select-trigger').click();
+  await page.waitForSelector('.multi-select-option', { timeout: 5_000 });
+
+  // Select TYPE_A (triggers debounced re-fetch with pj_types param)
+  await page.locator('.multi-select-option').filter({ hasText: 'TYPE_A' }).click();
+
+  // Close the Type dropdown via the close button; wait for the debounce + API re-fetch.
+  const [_] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().includes('container-filter-options') && r.url().includes('pj_types'),
+      { timeout: 5_000 },
+    ),
+    page.locator('[data-testid="multiselect-close"]').click(),
+  ]);
+
+  // Open the Package dropdown and verify options are narrowed to PKG_X only.
+  await page.locator('[data-testid="package-select"] .multi-select-trigger').click();
+  await page.waitForSelector('.multi-select-option', { timeout: 5_000 });
+
+  const packageOptionTexts = await page.locator('.multi-select-option').allTextContents();
+  expect(packageOptionTexts.some((t) => t.includes('PKG_X'))).toBe(true);
+  expect(packageOptionTexts.some((t) => t.includes('PKG_Y'))).toBe(false);
 });

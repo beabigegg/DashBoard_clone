@@ -171,5 +171,6 @@
   "POST /api/material-consumption/export": "samples/post_material_consumption_export.json",
   "GET /api/get_table_info": "samples/get_get_table_info.json",
   "POST /api/get_table_columns": "samples/post_get_table_columns.json",
-  "POST /api/query_table": "samples/post_query_table.json"
+  "POST /api/query_table": "samples/post_query_table.json",
+  "GET /api/mid-section-defect/container-filter-options": "samples/get_mid_section_defect_container_filter_options.json"
 }

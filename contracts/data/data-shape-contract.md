@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.27.0
-last-changed: 2026-06-26
+schema-version: 1.28.0
+last-changed: 2026-06-29
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -319,6 +319,40 @@ Internal in-process dict extended by ai-pipeline-upgrade. Keyed by `conversation
 {}
 ```
 `normalize_chart_data("qc_gate_status", raw)` returns `raw.get("stations", [])` when `raw` is a dict; otherwise passes through.
+
+
+### 2.13 MSD Container-Filter-Options Response（`GET /api/mid-section-defect/container-filter-options`）
+
+Response shape for cross-filter cached Type/Package options (HTTP 200):
+
+```json
+{
+  "success": true,
+  "data": {
+    "pj_types":     ["<string>"],
+    "packages":     ["<string>"],
+    "bops":         ["<string>"],
+    "pj_functions": ["<string>"]
+  },
+  "meta": {
+    "timestamp":      "<ISO 8601 local>",
+    "app_version":    "<string>",
+    "updated_at":     "<ISO 8601 UTC>",
+    "schema_version": 2
+  }
+}
+```
+
+Constraints:
+- All four `data` arrays are required and always present (may be `[]` when nothing co-occurs with the current `selected` set or cache is cold).
+- Each array contains distinct strings sorted ascending; duplicates MUST NOT appear.
+- `meta.updated_at` and `meta.schema_version` are in `meta`, NOT in `data` (mirrors §2.7 pattern — D-CR-01).
+- `meta.schema_version` is an integer; current value `2` (shared with §2.8 container_filter_cache payload).
+- `bops` and `pj_functions` are returned by this endpoint but are NOT consumed by the analysis filter (AC scope is Type/Package only).
+- Same Redis key and 24h TTL as §2.7 production-history filter-options (shared `container_filter_cache`).
+- `selected` query param is URL-encoded JSON; unknown keys are ignored; values not present in cache are silently dropped (fail-open picker).
+- 400 on malformed `selected` JSON; 500 on Oracle build error.
+- Added by change `msd-type-package-filter`.
 
 ### 2.4 Truncated Payload（memory pressure guard）
 
@@ -1461,6 +1495,10 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ---
 
 ## CHANGELOG
+## [data 1.28.0] — 2026-06-29
+### Added
+- msd-type-package-filter: §2.13 (MSD Container-Filter-Options Response — GET /api/mid-section-defect/container-filter-options). Shape mirrors §2.7 (production-history filter-options): data={pj_types, packages, bops, pj_functions} arrays; meta={updated_at, schema_version} (D-CR-01: not in data). Same Redis key and 24h TTL as §2.7 (shared container_filter_cache). bops/pj_functions returned but not consumed by analysis endpoint. Analysis response shape unchanged under pj_types[]/packages[] filtering. Additive; no existing schemas changed.
+
 ## [data 1.27.0] — 2026-06-26
 ### Added
 - add-db-scheduling-page: §3.22 DB Scheduling Queue Row — 15-column shape (11 lot/dispatch fields + 4 eqp* priority-column keys from running lot on candidate equipment: `eqpPackageLef`, `eqpPjType`, `eqpWaferLot`, `eqpUts`). One row per equipment per D/B-START lot; sort keys PACKAGE_LEF/PJ_TYPE/WAFERLOT/UTS (NULLS LAST); matchSource closed enum; sync-only; null BOP → zero rows. Additive; no existing schemas changed.

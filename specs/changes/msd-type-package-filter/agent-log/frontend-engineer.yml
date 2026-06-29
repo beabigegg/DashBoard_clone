@@ -1,0 +1,75 @@
+agent: frontend-engineer
+change-id: msd-type-package-filter
+date: 2026-06-29
+status: complete
+
+summary: |
+  Implemented IP-5 through IP-9 for the msd-type-package-filter change.
+  Added pjTypes/packages state to App.vue, created useContainerFilterOptions
+  composable, added two MultiSelect controls in FilterBar.vue, and extended
+  both the legacy unit tests and Playwright E2E tests.
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/composables/useContainerFilterOptions.ts:1-137 (new file)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/App.vue:1-4 (toRef import), 21-22 (composable import), 93-102 (CommittedFilters+pjTypes/packages), 109-127 (SessionCache.filters), 218-232 (filters reactive), 231-239 (committedFilters), 244-249 (useContainerFilterOptions wiring), 496-514 (buildFilterParams pj_types/packages), 541-553 (snapshotFilters), 792-807 (FilterBar props)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/components/FilterBar.vue:36-44 (pjTypeOptions/packageOptions props), 163-193 (two new MultiSelect controls)"
+  - type: files-changed
+    pointer: "frontend/tests/legacy/mid-section-defect-composables.test.js:1-12 (imports), 129-216 (new tests)"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/mid-section-defect.spec.ts:32-45 (MOCK_CONTAINER_FILTER_OPTIONS), 190-205 (installBaseRoutes mock), 546-643 (new E2E tests)"
+  - type: components-affected
+    pointer: "FilterBar (pj-type-select, package-select MultiSelect controls added)"
+  - type: screenshot-paths
+    pointer: "n/a (no visual regression screenshots captured in this run)"
+  - type: accessibility-audit
+    pointer: "All new MultiSelect controls use shared MultiSelect.vue with accessible trigger buttons and aria-label-equivalent via visible label text"
+
+test-evidence:
+  - phase: collect
+    command: "cd frontend && npm run test:legacy"
+    result: pass
+    run-id: "20260629-105217"
+  - phase: targeted
+    command: "cd frontend && npm run test:legacy"
+    result: pass
+    run-id: "20260629-105224"
+  - phase: changed-area
+    command: "cd frontend && npm run test"
+    result: "634 pass, 2 skipped, 0 fail"
+    run-id: "20260629-105229"
+  - phase: type-check
+    command: "cd frontend && npm run type-check"
+    result: pass
+  - phase: css-governance
+    command: "cd frontend && npm run css:check"
+    result: "0 errors, 307 warnings (all pre-existing)"
+
+implementation-notes: |
+  - IP-5: Added pjTypes/packages to filters reactive, CommittedFilters interface,
+    SessionCache.filters interface, committedFilters initial value, snapshotFilters(),
+    and buildFilterParams() (emits as pj_types/packages when non-empty).
+  - IP-6: FilterBar gains pjTypeOptions/packageOptions props; two MultiSelect controls
+    added with data-testid="pj-type-select" and data-testid="package-select", placed
+    after date range inputs and before loss-reasons MultiSelect.
+  - IP-7: New useContainerFilterOptions.ts composable: fetches on mount, debounced
+    200ms re-fetch on selection change via watch, stale-response in-flight token guard,
+    _lastCommitted snapshot-diff to avoid spurious re-fetches. Exports _buildContainerFilterUrl
+    for pure-function testability (mirrors _buildUrl in useFirstTierFilters.ts).
+  - IP-8: App.vue instantiates composable with toRef(filters,'pjTypes') and
+    toRef(filters,'packages'); passes pjTypeOptions/packageOptions to FilterBar.
+  - IP-9: Legacy tests (node:test): 3 new _buildContainerFilterUrl pure-function tests,
+    test_app_filters_state_includes_pj_types_and_packages, test_cross_filter_type_selection_narrows_package_options,
+    2 additional composable behavior tests. Playwright: MOCK_CONTAINER_FILTER_OPTIONS added,
+    installBaseRoutes updated (LIFO: container-filter-options registered before station/loss-reasons),
+    3 new E2E tests (type multiselect render, package multiselect render, cross-filter narrowing).
+
+risks-remaining: |
+  - Playwright E2E tests (test_type_selection_narrows_package_options) require
+    the Playwright browser environment and a running dev server — not executed
+    in this run (no GunicornHarness available). The mocked route interceptor logic
+    is correctly structured per LIFO rule.
+  - Backend changes (IP-1/IP-2) required for the container-filter-options endpoint
+    and analysis pj_types/packages params are owned by backend-engineer.

@@ -1,0 +1,12 @@
+change-id: msd-type-package-filter
+agent: test-strategist
+status: done
+summary: "20 AC-mapped tests across 5 families; 14 data-boundary cases; no existing tests deleted"
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/msd-type-package-filter/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_mid_section_defect_routes.py → src/mes_dashboard/routes/mid_section_defect_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/test_mid_section_defect_service.py → src/mes_dashboard/services/mid_section_defect_service.py" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/mid-section-defect-composables.test.js → frontend/src/mid-section-defect/App.vue + FilterBar.vue" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/mid-section-defect.spec.ts → frontend/src/mid-section-defect/FilterBar.vue" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), contract (Tier 1), integration (Tier 1), e2e (Tier 1), data-boundary (Tier 0)" }
+  - { type: mapping-completeness, pointer: "all 7 ACs covered; AC-6 covered via AC-1 integration test (no-Oracle assertion)" }

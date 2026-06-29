@@ -1,0 +1,13 @@
+change-id: msd-type-package-filter
+agent: ui-ux-reviewer
+status: changes-required
+summary: "B-1 resolved by architecture (trace_query_id encodes filtered container_ids); B-2 isLoading not wired; label fix recommended"
+artifacts:
+  - type: finding-resolved
+    pointer: "B-1 (detail/export filter gap): RESOLVED — filter applied before seed_container_ids derivation (service.py:192-195 before :202-210); trace_query_id encodes filtered set; no explicit pj_types/packages needed in detail/export"
+  - type: blocking-finding
+    pointer: "B-2: isLoading not destructured from useContainerFilterOptions in App.vue; Package/Type MultiSelect shows empty state during cross-filter re-fetch instead of loading spinner"
+  - type: recommended
+    pointer: "Label: FilterBar.vue:174 '型號類型' → '型號' (redundant suffix)"
+  - type: accessibility-findings
+    pointer: "Pre-existing: aria-expanded missing on trigger; label-for pairing absent — same pattern as existing controls, not a regression"

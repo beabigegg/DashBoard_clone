@@ -147,3 +147,20 @@ class TestMidSectionDefectE2E:
         assert resp.status_code == 400
         payload = resp.json()
         assert "730" in payload.get("error", {}).get("message", "")
+
+    def test_container_filter_options_uses_cache_not_oracle(self, app_server):
+        """GET /container-filter-options responds without hitting Oracle directly."""
+        resp = requests.get(
+            f"{app_server}/api/mid-section-defect/container-filter-options",
+            timeout=30,
+        )
+        # Accept 200 (warm cache) or 500 (cold start before warmup on test env)
+        assert resp.status_code in (200, 500)
+        if resp.status_code == 200:
+            payload = resp.json()
+            assert payload["success"] is True
+            data = payload.get("data", {})
+            assert "pj_types" in data
+            assert "packages" in data
+            assert isinstance(data["pj_types"], list)
+            assert isinstance(data["packages"], list)

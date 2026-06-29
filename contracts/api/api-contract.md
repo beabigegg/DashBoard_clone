@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.31.0
-last-changed: 2026-06-27
+schema-version: 1.32.0
+last-changed: 2026-06-29
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -174,7 +174,8 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/trace/job/{job_id}/result | required | — | GenericSuccessResponse | 404/410 | route tests |
 | GET | /api/trace/job/{job_id}/stream | required | — | GenericSuccessResponse | 404 | e2e tests |
 | GET | /api/mid-section-defect/station-options | required | — | GenericSuccessResponse | 500 | route tests |
-| GET | /api/mid-section-defect/analysis | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/mid-section-defect/container-filter-options | required | ?selected=<json> | MsdContainerFilterOptionsResponse | 400/500 | route tests |
+| GET | /api/mid-section-defect/analysis | required | query params; optional pj_types[], packages[] | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/mid-section-defect/analysis/detail | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/mid-section-defect/loss-reasons | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/mid-section-defect/export | required | query params | GenericSuccessResponse | 400/500 | e2e tests |
@@ -464,6 +465,8 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.32.0] — 2026-06-29 (msd-type-package-filter):** New `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options for Type/Package FilterBar MultiSelects; reuses shared `container_filter_cache`; no Oracle at request time; 400 on malformed `selected` JSON; 500 on Oracle build error; response schema `MsdContainerFilterOptionsResponse`. `GET /api/mid-section-defect/analysis` gains optional `pj_types[]` and `packages[]` multi-value query params (absent/empty = no restriction; AND-semantics when both present; post-query filter on detection_df BEFORE spool derivation). Both params added to analysis result cache key to prevent collision. Additive; no existing fields removed or renamed.
+- **[api 1.31.0] — 2026-06-27 (fix-ci-conformance):** `GET /api/job/{job_id}/result` (auth required; ?prefix= query param; returns stored job result payload; 400/404). Endpoint existed in `job_routes.py` but was missing from the API contract.
 - **[api 1.29.0] — 2026-06-25 (rh-remove-supplementary-filter):** `POST /api/reject-history/query` gains `reasons[]` optional string array (additive; absent/empty = no restriction). `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)` at `{{ BASE_WHERE }}` layer; sentinel `(未填寫)` distinct from container-level `(NA)`. `workcenter_groups[]` param removed; supplementary `{{ WHERE_CLAUSE }}` layer removed entirely. Sole consumer `frontend/src/reject-history/`; monorepo atomic cutover (same precedent as [api 1.27.0]).
 - **[api 1.28.0] — 2026-06-25 (rh-primary-prefilter):** `POST /api/reject-history/query` body gains three new optional fields: `pj_types[]`, `packages[]`, `pj_functions[]` (string arrays; absent or empty = no restriction). Injected into `{{ BASE_WHERE }}` of `reject_raw` CTE (Oracle-layer, before GROUP BY). SQL form: `NVL(TRIM(c.col), '(NA)') IN (...)` — NULL container values map to `(NA)` sentinel, not silently dropped. `PJ_BOP` explicitly excluded. Options from shared `container_filter_cache`. Both sync (200) and async/RQ (202) paths carry new fields identically. Additive; no existing fields removed or renamed.
 - **[api 1.27.0] — 2026-06-24 (nav-config-to-code):** Removed BREAKING: `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}` all return **404**. `name`/`drawer_id`/`order` removed from `GET /admin/api/pages` response body and `PUT /admin/api/pages` accepted body. Changed: `GET /api/portal/navigation` response drops `drawers`, adds `statuses` map; response schema renamed `GenericSuccessResponse` → `PortalNavigationResponse`. Added: `AdminPagesResponse` schema; `PUT /admin/api/pages/{route}` row. No deprecation window — monorepo atomic cutover.
@@ -1102,3 +1105,28 @@ Tier-B — status feed returned by `GET /api/portal/navigation` (no drawers; str
 | produceRegion | string | no |  | produce region (PJ_PRODUCEREGION) |
 | specName | string | no |  | spec name |
 | workflowName | string | no |  | workflow name |
+
+### MsdContainerFilterOptionsResponse
+
+Tier-B — cross-filter cached options returned by `GET /api/mid-section-defect/container-filter-options` (data-shape §2.13). Reuses `container_filter_cache`; no Oracle at request time. 400 on malformed `selected` JSON; 500 on Oracle build error.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data"],
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "required": ["pj_types", "packages", "bops", "pj_functions"],
+      "properties": {
+        "pj_types":     {"type": "array", "items": {"type": "string"}},
+        "packages":     {"type": "array", "items": {"type": "string"}},
+        "bops":         {"type": "array", "items": {"type": "string"}},
+        "pj_functions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "meta": {"type": "object"}
+  }
+}
+```

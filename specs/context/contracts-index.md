@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 68044adcd53f0bb54a8a3cc4ea51901bd11a6d05e95a9be73baf87bcfefa04b0
+inputs-digest: 17992589fe91d7edf6d1197d360931fe7165d45240af553061ba3f2f73ae439b
 ---
 
 # Contracts Index
@@ -35,8 +35,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.29.0
-- last-changed: 2026-06-25
+- schema-version: 1.31.0
+- last-changed: 2026-06-27
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
 
@@ -48,8 +48,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Inventory
 - owner: application-team
 - surface: api
-- schema-version: 1.2.7
-- last-changed: 2026-06-25
+- schema-version: 1.2.8
+- last-changed: 2026-06-26
 - summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 
 
@@ -72,8 +72,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.31.0
-- last-changed: 2026-06-25
+- schema-version: 1.32.0
+- last-changed: 2026-06-26
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
 
@@ -109,10 +109,10 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - type: css-inventory
 - directory: contracts/css
 - title: CSS Inventory (Governed Source List)
-- schema-version: 1.2.6
+- schema-version: 1.2.7
 - owner: application-team
 - surface: ui
-- last-changed: 2026-06-18
+- last-changed: 2026-06-26
 - summary: Governed inventory of authored CSS source files under frontend/src/.
 
 
@@ -135,8 +135,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.26.0
-- last-changed: 2026-06-25
+- schema-version: 1.27.0
+- last-changed: 2026-06-26
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
 

@@ -4,6 +4,7 @@
 Bidirectional traceability from any detection station to upstream/downstream.
 """
 
+import json
 import logging
 
 from flask import Blueprint, request, Response
@@ -73,6 +74,8 @@ def _analysis_cache_key(
     station,
     direction: str,
     loss_reasons,
+    pj_types=None,
+    packages=None,
 ) -> str:
     station_key = ','.join(sorted(station)) if isinstance(station, list) else str(station)
     return make_cache_key(
@@ -83,6 +86,8 @@ def _analysis_cache_key(
             "loss_reasons": sorted(loss_reasons) if loss_reasons else None,
             "station": station_key,
             "direction": direction,
+            "pj_types": sorted(pj_types) if pj_types else None,
+            "packages": sorted(packages) if packages else None,
         },
     )
 
@@ -106,6 +111,56 @@ def api_station_options():
     return success_response(query_station_options())
 
 
+@mid_section_defect_bp.route('/container-filter-options', methods=['GET'])
+def api_container_filter_options():
+    """API: Cross-filter cached options for Type/Package filter MultiSelects.
+
+    Query param ``selected`` is URL-encoded JSON of the form::
+
+        {"pj_types": [...], "packages": [...]}
+
+    Empty / omitted → returns the full distinct set for each field.
+    Unknown keys are silently ignored; values not present in the cache
+    are silently dropped (fail-open picker — data-shape §2.13).
+
+    Returns:
+        data: {pj_types, packages, bops, pj_functions} (all arrays)
+        meta: {updated_at, schema_version}
+    """
+    raw_selected = request.args.get("selected")
+    selected = None
+    if raw_selected:
+        try:
+            parsed = json.loads(raw_selected)
+        except (TypeError, ValueError):
+            return validation_error("selected 參數需為合法 JSON")
+        if not isinstance(parsed, dict):
+            return validation_error("selected 參數需為 JSON 物件")
+        selected = parsed
+
+    try:
+        from mes_dashboard.services.container_filter_cache import (
+            SCHEMA_VERSION,
+            get_filter_options,
+        )
+        opts = get_filter_options(selected)
+        return success_response(
+            {
+                "pj_types": opts.get("pj_types") or [],
+                "packages": opts.get("packages") or [],
+                "bops": opts.get("bops") or [],
+                "pj_functions": opts.get("pj_functions") or [],
+            },
+            meta={
+                "updated_at": opts.get("updated_at"),
+                "schema_version": opts.get("schema_version", SCHEMA_VERSION),
+            },
+        )
+    except Exception:
+        logger.exception("mid_section_defect container-filter-options failed")
+        return internal_error("篩選選項查詢失敗")
+
+
 @mid_section_defect_bp.route('/analysis', methods=['GET'])
 @_ANALYSIS_RATE_LIMIT
 def api_analysis():
@@ -123,6 +178,8 @@ def api_analysis():
         direction: 'backward' or 'forward' (default 'backward')
     """
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
+    pj_types = request.args.getlist("pj_types[]") or []
+    packages = request.args.getlist("packages[]") or []
 
     if not start_date or not end_date:
         return validation_error('必須提供 start_date 和 end_date 參數')
@@ -133,13 +190,20 @@ def api_analysis():
         station=station,
         direction=direction,
         loss_reasons=loss_reasons,
+        pj_types=pj_types,
+        packages=packages,
     )
     cached = cache_get(cache_key)
     if cached is not None:
         return success_response(_build_summary_payload(cached))
 
     from mes_dashboard.core.permissions import get_owner_token
-    result = query_analysis(start_date, end_date, loss_reasons, station, direction, owner=get_owner_token())
+    result = query_analysis(
+        start_date, end_date, loss_reasons, station, direction,
+        owner=get_owner_token(),
+        pj_types=pj_types,
+        packages=packages,
+    )
 
     if result is None:
         return internal_error('查詢失敗，請稍後再試')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, toRef } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api';
 import { unwrapApiResult } from '../core/unwrap-api-result';
@@ -20,6 +20,7 @@ import AnalysisSummary from './components/AnalysisSummary.vue';
 import DetailTable from './components/DetailTable.vue';
 // @ts-expect-error FilterBar.vue not yet migrated to lang="ts"
 import FilterBar from './components/FilterBar.vue';
+import { useContainerFilterOptions } from './composables/useContainerFilterOptions';
 // @ts-expect-error KpiCards.vue not yet migrated to lang="ts"
 import KpiCards from './components/KpiCards.vue';
 // @ts-expect-error ParetoChart.vue not yet migrated to lang="ts"
@@ -100,6 +101,8 @@ interface CommittedFilters {
   queryMode?: string;
   containerInputType?: string;
   containerValues?: string[];
+  pjTypes?: string[];
+  packages?: string[];
 }
 
 interface ResolutionInfo {
@@ -116,6 +119,8 @@ interface SessionCache {
     lossReasons: string[];
     station: string[];
     direction: string;
+    pjTypes: string[];
+    packages: string[];
   };
   analysisData: MsdAnalysisData;
   detailData: unknown[];
@@ -222,12 +227,16 @@ const filters = reactive<{
   lossReasons: string[];
   station: string[];
   direction: string;
+  pjTypes: string[];
+  packages: string[];
 }>({
   startDate: '',
   endDate: '',
   lossReasons: [],
   station: ['測試'],
   direction: 'backward',
+  pjTypes: [],
+  packages: [],
 });
 const committedFilters = ref<CommittedFilters>({
   startDate: '',
@@ -235,6 +244,8 @@ const committedFilters = ref<CommittedFilters>({
   lossReasons: [],
   station: ['測試'],
   direction: 'backward',
+  pjTypes: [],
+  packages: [],
 });
 
 const queryMode = ref<string>('date_range');
@@ -243,6 +254,14 @@ const containerInput = ref<string>('');
 const resolutionInfo = ref<ResolutionInfo | null>(null);
 
 const availableLossReasons = ref<string[]>([]);
+
+// Cross-filter options for Type (PJ_TYPE) and Package (PRODUCTLINENAME).
+// Fetched on mount and re-fetched (200 ms debounce) when either selection changes.
+const { pjTypeOptions, packageOptions, isLoading: filterOptionsLoading } = useContainerFilterOptions(
+  toRef(filters, 'pjTypes'),
+  toRef(filters, 'packages'),
+);
+
 const trace = useTraceProgress({ profile: 'mid_section_defect' });
 
 // Canonical trace_query_id from spool-hit or async job result.
@@ -503,6 +522,12 @@ function buildFilterParams(): Record<string, unknown> {
   if (snapshot.lossReasons.length) {
     params.loss_reasons = snapshot.lossReasons;
   }
+  if (snapshot.pjTypes?.length) {
+    params.pj_types = snapshot.pjTypes;
+  }
+  if (snapshot.packages?.length) {
+    params.packages = snapshot.packages;
+  }
   if (snapshot.queryMode === 'container') {
     params.mode = 'container';
     params.resolve_type = snapshot.containerInputType === 'lot' ? 'lot_id' : snapshot.containerInputType;
@@ -549,6 +574,8 @@ function snapshotFilters() {
     queryMode: queryMode.value,
     containerInputType: containerInputType.value,
     containerValues: parseContainerValues(),
+    pjTypes: [...filters.pjTypes],
+    packages: [...filters.packages],
   };
 }
 
@@ -794,7 +821,6 @@ void initPage();
       title="製程不良追溯分析"
       :show-refresh="false"
     />
-
     <FilterBar
       :filters="filters"
       :loading="loading.querying"
@@ -804,6 +830,9 @@ void initPage();
       :container-input-type="containerInputType"
       :container-input="containerInput"
       :resolution-info="resolutionInfo"
+      :pj-type-options="pjTypeOptions"
+      :package-options="packageOptions"
+      :filter-options-loading="filterOptionsLoading"
       @update-filters="handleUpdateFilters"
       @query="handleQuery"
       @update:query-mode="queryMode = $event"

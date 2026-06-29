@@ -1,0 +1,11 @@
+change-id: msd-type-package-filter
+agent: change-classifier
+status: done
+summary: "Tier 2 feature-add; 7 ACs; required contracts: API + data-shape; required agents: contract-reviewer, test-strategist, implementation-planner, backend-engineer, frontend-engineer, ui-ux-reviewer, visual-reviewer, qa-reviewer"
+artifacts:
+  - type: tier
+    pointer: "Tier 2 — medium risk, module-level impact"
+  - type: not-applicable
+    pointer: "tasks 1.3, 2.3, 2.5, 2.6, 3.5, 4.3, 4.4 skipped"
+  - type: acceptance-criteria
+    pointer: "specs/changes/msd-type-package-filter/change-classification.md#inferred-acceptance-criteria"

@@ -174,6 +174,8 @@ def resolve_analysis_trace_context(
     end_date: str,
     station: StationInput = '測試',
     direction: str = 'backward',
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Resolve canonical MSD trace context from compatibility query params."""
     error = _validate_params(start_date, end_date, station, direction)
@@ -183,6 +185,14 @@ def resolve_analysis_trace_context(
     detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
+
+    # C-2: apply PJ_TYPE / PRODUCTLINENAME filters BEFORE available_loss_reasons
+    # calculation and seed_container_ids derivation so the spool/trace_query_id
+    # reflects the narrowed set.  Empty list = no restriction (AC-5).
+    if pj_types and not detection_df.empty:
+        detection_df = detection_df[detection_df["PJ_TYPE"].isin(set(pj_types))]
+    if packages and not detection_df.empty:
+        detection_df = detection_df[detection_df["PRODUCTLINENAME"].isin(set(packages))]
 
     available_loss_reasons = sorted(
         detection_df.loc[detection_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
@@ -329,6 +339,8 @@ def query_analysis(
     station: StationInput = '測試',
     direction: str = 'backward',
     owner: str = '',
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Main entry point for defect traceability analysis.
 
@@ -338,6 +350,8 @@ def query_analysis(
         loss_reasons: Optional list of loss reasons to filter (None = all)
         station: Workcenter group name for detection station (default '測試')
         direction: 'backward' or 'forward'
+        pj_types: Optional list of PJ_TYPE values to restrict (None/[] = no restriction)
+        packages: Optional list of PRODUCTLINENAME values to restrict (None/[] = no restriction)
 
     Returns:
         Dict with kpi, charts, detail, available_loss_reasons, genealogy_status.
@@ -347,13 +361,15 @@ def query_analysis(
         end_date=end_date,
         station=station,
         direction=direction,
+        pj_types=pj_types,
+        packages=packages,
     )
     if context is None:
         return None
     if 'error' in context:
         return {'error': context['error']}
 
-    # Check full analysis cache
+    # Check full analysis cache — C-1: pj_types/packages must be in the key
     cache_key = make_cache_key(
         "mid_section_defect",
         filters={
@@ -362,6 +378,8 @@ def query_analysis(
             'loss_reasons': sorted(loss_reasons) if loss_reasons else None,
             'station': station,
             'direction': direction,
+            'pj_types': sorted(pj_types) if pj_types else None,
+            'packages': sorted(packages) if packages else None,
         },
     )
     cached = cache_get(cache_key)
