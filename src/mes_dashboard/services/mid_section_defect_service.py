@@ -189,10 +189,13 @@ def resolve_analysis_trace_context(
     # C-2: apply PJ_TYPE / PRODUCTLINENAME filters BEFORE available_loss_reasons
     # calculation and seed_container_ids derivation so the spool/trace_query_id
     # reflects the narrowed set.  Empty list = no restriction (AC-5).
+    # strip() required: station_detection.sql omits TRIM() on these CHAR columns,
+    # but container_filter_cache (which drives the dropdown) uses TRIM() — without
+    # strip() the isin() comparison fails on space-padded Oracle CHAR values.
     if pj_types and not detection_df.empty:
-        detection_df = detection_df[detection_df["PJ_TYPE"].isin(set(pj_types))]
+        detection_df = detection_df[detection_df["PJ_TYPE"].str.strip().isin(set(pj_types))]
     if packages and not detection_df.empty:
-        detection_df = detection_df[detection_df["PRODUCTLINENAME"].isin(set(packages))]
+        detection_df = detection_df[detection_df["PRODUCTLINENAME"].str.strip().isin(set(packages))]
 
     available_loss_reasons = sorted(
         detection_df.loc[detection_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
@@ -561,10 +564,11 @@ def resolve_trace_seed_lots(
 
     # Apply PJ_TYPE / PRODUCTLINENAME filters so the returned seed set reflects
     # the user's selection.  Empty list = no restriction (mirrors AC-5).
+    # strip() required: station_detection.sql omits TRIM() on Oracle CHAR columns.
     if pj_types and not detection_df.empty:
-        detection_df = detection_df[detection_df["PJ_TYPE"].isin(set(pj_types))]
+        detection_df = detection_df[detection_df["PJ_TYPE"].str.strip().isin(set(pj_types))]
     if packages and not detection_df.empty:
-        detection_df = detection_df[detection_df["PRODUCTLINENAME"].isin(set(packages))]
+        detection_df = detection_df[detection_df["PRODUCTLINENAME"].str.strip().isin(set(packages))]
 
     if detection_df.empty:
         result = {'seeds': [], 'seed_count': 0}

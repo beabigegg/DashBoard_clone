@@ -1255,3 +1255,30 @@ def test_resolve_trace_seed_lots_filter_all_excluded_returns_empty(mock_fetch):
     assert 'error' not in result
     assert result['seed_count'] == 0
     assert result['seeds'] == []
+
+
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_resolve_trace_seed_lots_filter_strips_char_padding(mock_fetch):
+    """Oracle CHAR columns may have trailing spaces; filter must still match."""
+    df = pd.DataFrame([
+        {
+            'CONTAINERID': 'CID-001',
+            'CONTAINERNAME': 'LOT-001',
+            'TRACKINQTY': 100,
+            'REJECTQTY': 5,
+            'LOSSREASONNAME': 'R1',
+            'WORKFLOW': 'WF-A',
+            'PRODUCTLINENAME': 'PKG-A   ',   # space-padded CHAR
+            'PJ_TYPE': 'TYPE-A  ',            # space-padded CHAR
+            'DETECTION_EQUIPMENTNAME': 'EQ-01',
+            'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
+            'FINISHEDRUNCARD': 'FR-001',
+        },
+    ])
+    mock_fetch.return_value = (df, {})
+
+    # Dropdown sends stripped value (from container_filter_cache)
+    result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', pj_types=['TYPE-A'])
+
+    assert result is not None
+    assert result['seed_count'] == 1, "strip() on CHAR column must allow match"
