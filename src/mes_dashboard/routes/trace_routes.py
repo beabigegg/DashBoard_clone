@@ -369,7 +369,11 @@ def _seed_resolve_mid_section_defect(
         return None, ("INVALID_PARAMS", "start_date/end_date (or date_range) is required", 400)
 
     station = [s.strip() for s in str(params.get("station") or "測試").split(',') if s.strip()] or ['測試']
-    result = resolve_trace_seed_lots(start_date, end_date, station=station)
+    raw_pj_types = params.get("pj_types") or []
+    raw_packages = params.get("packages") or []
+    pj_types = [str(v).strip() for v in raw_pj_types if str(v).strip()] if isinstance(raw_pj_types, list) else []
+    packages = [str(v).strip() for v in raw_packages if str(v).strip()] if isinstance(raw_packages, list) else []
+    result = resolve_trace_seed_lots(start_date, end_date, station=station, pj_types=pj_types, packages=packages)
     if result is None:
         return None, ("SEED_RESOLVE_FAILED", "seed resolve service unavailable", 503)
     if "error" in result:

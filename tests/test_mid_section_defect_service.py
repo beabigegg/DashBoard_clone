@@ -20,6 +20,7 @@ from mes_dashboard.services.mid_section_defect_service import (
     query_all_loss_reasons,
     query_station_options,
     resolve_msd_seeds_at_station,
+    resolve_trace_seed_lots,
 )
 
 
@@ -1196,3 +1197,61 @@ def test_query_analysis_null_pj_type_column_no_crash(
     available = result.get('available_loss_reasons', [])
     assert 'R2' in available
     assert 'R1' not in available
+
+
+# ---------------------------------------------------------------------------
+# resolve_trace_seed_lots: pj_types / packages filter (trace path)
+# ---------------------------------------------------------------------------
+
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_resolve_trace_seed_lots_filter_by_pj_type(mock_fetch):
+    """pj_types filter must exclude non-matching seeds from the trace seed set."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', pj_types=['TYPE-A'])
+
+    assert result is not None
+    assert 'error' not in result
+    cids = [s['container_id'] for s in result['seeds']]
+    assert 'CID-001' in cids
+    assert 'CID-002' not in cids
+    assert result['seed_count'] == 1
+
+
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_resolve_trace_seed_lots_filter_by_package(mock_fetch):
+    """packages filter must exclude non-matching seeds from the trace seed set."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', packages=['PKG-B'])
+
+    assert result is not None
+    assert 'error' not in result
+    cids = [s['container_id'] for s in result['seeds']]
+    assert 'CID-002' in cids
+    assert 'CID-001' not in cids
+    assert result['seed_count'] == 1
+
+
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_resolve_trace_seed_lots_no_filter_returns_all(mock_fetch):
+    """Empty pj_types/packages means no restriction — all seeds returned."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = resolve_trace_seed_lots('2025-01-01', '2025-01-31')
+
+    assert result is not None
+    assert result['seed_count'] == 2
+
+
+@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
+def test_resolve_trace_seed_lots_filter_all_excluded_returns_empty(mock_fetch):
+    """Filter that excludes all rows must return seed_count=0, not error."""
+    mock_fetch.return_value = (_make_detection_df_with_types(), {})
+
+    result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', pj_types=['NONEXISTENT'])
+
+    assert result is not None
+    assert 'error' not in result
+    assert result['seed_count'] == 0
+    assert result['seeds'] == []

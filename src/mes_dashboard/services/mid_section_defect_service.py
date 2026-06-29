@@ -542,6 +542,8 @@ def resolve_trace_seed_lots(
     start_date: str,
     end_date: str,
     station: StationInput = '測試',
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Resolve seed lots for staged mid-section trace API."""
     error = _validate_date_range(start_date, end_date)
@@ -553,6 +555,19 @@ def resolve_trace_seed_lots(
         return None
     if detection_df.empty:
         result: Dict[str, Any] = {'seeds': [], 'seed_count': 0}
+        if _msd_pf:
+            result['_meta'] = {'partial_failure': _msd_pf}
+        return result
+
+    # Apply PJ_TYPE / PRODUCTLINENAME filters so the returned seed set reflects
+    # the user's selection.  Empty list = no restriction (mirrors AC-5).
+    if pj_types and not detection_df.empty:
+        detection_df = detection_df[detection_df["PJ_TYPE"].isin(set(pj_types))]
+    if packages and not detection_df.empty:
+        detection_df = detection_df[detection_df["PRODUCTLINENAME"].isin(set(packages))]
+
+    if detection_df.empty:
+        result = {'seeds': [], 'seed_count': 0}
         if _msd_pf:
             result['_meta'] = {'partial_failure': _msd_pf}
         return result
