@@ -116,10 +116,14 @@ def _execute_msd_seed_resolve_job(
         return
 
     station = str(params.get("station") or "測試").strip()
+    raw_pj_types = params.get("pj_types") or []
+    raw_packages = params.get("packages") or []
+    pj_types = [str(v).strip() for v in raw_pj_types if str(v).strip()] if isinstance(raw_pj_types, list) else []
+    packages = [str(v).strip() for v in raw_packages if str(v).strip()] if isinstance(raw_packages, list) else []
 
     try:
         from mes_dashboard.services.mid_section_defect_service import resolve_trace_seed_lots
-        result = resolve_trace_seed_lots(start_date, end_date, station=station)
+        result = resolve_trace_seed_lots(start_date, end_date, station=station, pj_types=pj_types, packages=packages)
     except Exception as exc:
         logger.error("msd seed job failed job_id=%s: %s", job_id, exc, exc_info=True)
         complete_job(_JOB_PREFIX, job_id, error=str(exc))
