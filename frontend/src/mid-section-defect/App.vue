@@ -257,7 +257,12 @@ const availableLossReasons = ref<string[]>([]);
 
 // Cross-filter options for Type (PJ_TYPE) and Package (PRODUCTLINENAME).
 // Fetched on mount and re-fetched (200 ms debounce) when either selection changes.
-const { pjTypeOptions, packageOptions, isLoading: filterOptionsLoading } = useContainerFilterOptions(
+const {
+  pjTypeOptions,
+  packageOptions,
+  isLoading: filterOptionsLoading,
+  commit: commitContainerFilter,
+} = useContainerFilterOptions(
   toRef(filters, 'pjTypes'),
   toRef(filters, 'packages'),
 );
@@ -834,6 +839,7 @@ void initPage();
       :package-options="packageOptions"
       :filter-options-loading="filterOptionsLoading"
       @update-filters="handleUpdateFilters"
+      @commit-container-filter="commitContainerFilter"
       @query="handleQuery"
       @update:query-mode="queryMode = $event"
       @update:container-input-type="containerInputType = $event"

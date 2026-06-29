@@ -54,6 +54,7 @@ const emit = defineEmits([
   'update:queryMode',
   'update:containerInputType',
   'update:containerInput',
+  'commit-container-filter',
 ]);
 
 function updateFilters(patch) {
@@ -183,6 +184,7 @@ function updateFilters(patch) {
             placeholder="全部型號"
             data-testid="pj-type-select"
             @update:model-value="updateFilters({ pjTypes: $event })"
+            @dropdown-close="emit('commit-container-filter')"
           />
         </div>
 
@@ -197,6 +199,7 @@ function updateFilters(patch) {
             placeholder="全部封裝"
             data-testid="package-select"
             @update:model-value="updateFilters({ packages: $event })"
+            @dropdown-close="emit('commit-container-filter')"
           />
         </div>
 

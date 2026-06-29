@@ -3,15 +3,14 @@
  * filter dimensions.
  *
  * - Fetches narrowed option lists from GET /api/mid-section-defect/container-filter-options
- * - 200 ms debounced re-fetch on selection change (mirrors useFirstTierFilters AC-2 guard)
+ * - Re-fetch is triggered via commit() only when a dropdown closes (mirrors
+ *   useFirstTierFilters setSelection/commitSelection pattern).  The watch-based
+ *   approach fired on every single toggleOption click and prevented multi-select.
+ * - 200 ms debounced re-fetch inside commit()
  * - Stale-response guard via in-flight token
- * - Syncs _lastCommitted after each fetch (snapshot-diff pattern from frontend-patterns.md)
- *
- * Accepts external Ref<string[]> args so that App.vue drives the selection state
- * and this composable is purely responsible for keeping option lists fresh.
  */
 
-import { ref, watch, type Ref } from 'vue';
+import { ref, type Ref } from 'vue';
 import { apiGet } from '../../core/api';
 
 const DEFAULT_DEBOUNCE_MS = 200;
@@ -61,13 +60,6 @@ export function useContainerFilterOptions(
   const packageOptions = ref<string[]>([]);
   const isLoading = ref(false);
 
-  // Track last-fetched selection to avoid spurious re-fetches on reactive mutations
-  // that do not reflect a true user-initiated change (snapshot-diff pattern).
-  const _lastCommitted = {
-    pj_types: [] as string[],
-    packages: [] as string[],
-  };
-
   let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let _inFlightToken = 0;
 
@@ -86,9 +78,6 @@ export function useContainerFilterOptions(
         pjTypeOptions.value = Array.isArray(result.data.pj_types) ? result.data.pj_types : [];
         packageOptions.value = Array.isArray(result.data.packages) ? result.data.packages : [];
       }
-      // Sync _lastCommitted so the next watch tick does not trigger a spurious re-fetch.
-      _lastCommitted.pj_types = [...selectedPjTypes.value];
-      _lastCommitted.packages = [...selectedPackages.value];
     } catch {
       if (requestToken !== _inFlightToken) return;
       // Fail-open: leave existing options intact; no throw.
@@ -97,6 +86,7 @@ export function useContainerFilterOptions(
     }
   }
 
+  /** Schedule a debounced re-fetch.  Called from commit() on dropdown-close. */
   function _scheduleRefresh(): void {
     if (_debounceTimer !== null) {
       clearTimeout(_debounceTimer);
@@ -108,30 +98,19 @@ export function useContainerFilterOptions(
     }, debounceMs);
   }
 
-  // Watch selectedPjTypes → re-fetch (narrows packageOptions); no-op when unchanged.
-  watch(
-    selectedPjTypes,
-    (now) => {
-      const last = _lastCommitted.pj_types;
-      if (now.length === last.length && now.every((v, i) => v === last[i])) return;
-      _scheduleRefresh();
-    },
-    { deep: true },
-  );
+  /**
+   * Trigger a debounced cross-filter re-fetch.
+   *
+   * Call this from App.vue on the @dropdown-close event of the Type or Package
+   * MultiSelect — NOT on @update:model-value.  Calling on every modelValue change
+   * would fire after each individual click and prevent multi-select.
+   */
+  function commit(): void {
+    _scheduleRefresh();
+  }
 
-  // Watch selectedPackages → re-fetch (narrows pjTypeOptions); no-op when unchanged.
-  watch(
-    selectedPackages,
-    (now) => {
-      const last = _lastCommitted.packages;
-      if (now.length === last.length && now.every((v, i) => v === last[i])) return;
-      _scheduleRefresh();
-    },
-    { deep: true },
-  );
-
-  // Initial fetch on composable setup.
+  // Initial fetch on composable setup (no selection yet → returns full option sets).
   void fetchOptions();
 
-  return { pjTypeOptions, packageOptions, isLoading, fetchOptions };
+  return { pjTypeOptions, packageOptions, isLoading, fetchOptions, commit };
 }
