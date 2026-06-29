@@ -836,3 +836,198 @@ qc_gate_status:
   service: mes_dashboard.services.qc_gate_service.get_qc_gate_summary
   chart_type: table
   params: {}
+
+# ── Downtime Analysis ─────────────────────────────────────────────────────────
+
+downtime_summary:
+  description: 設備停機分析，顯示停機時數 KPI（UDT/SDT/EGT）、每日趨勢及前 N 停機原因排行
+  service: mes_dashboard.services.downtime_analysis_service.query_downtime_dataset
+  chart_type: kpi
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼列表，不填代表全廠
+    status_types:
+      type: list[string]
+      required: false
+      enum:
+        - UDT
+        - SDT
+        - EGT
+      description: 停機狀態類型篩選，UDT=非計畫停機、SDT=計畫停機、EGT=工程時間
+  drill_down:
+    - equipment_status_summary
+    - resource_history_summary
+
+# ── DB Scheduling ─────────────────────────────────────────────────────────────
+
+db_scheduling_queue:
+  description: 派工排程佇列，顯示目前等待派工的批次清單（不需傳入參數）
+  service: mes_dashboard.services.db_scheduling_service.get_db_scheduling_queue
+  chart_type: table
+  params: {}
+  drill_down:
+    - wip_summary
+
+# ── Hold Today Snapshot ───────────────────────────────────────────────────────
+
+hold_today_snapshot:
+  description: 當日 Hold 即時快照，顯示今天新增 Hold 的批次數量、原因分佈與清單
+  service: mes_dashboard.services.hold_today_snapshot_service.execute_today_snapshot
+  chart_type: kpi
+  params:
+    snapshot_mode:
+      type: string
+      required: false
+      enum:
+        - today
+        - current
+      default: today
+      description: today=今日新增 Hold、current=目前所有在 Hold 狀態的批次
+    hold_type:
+      type: string
+      required: false
+      enum:
+        - quality
+        - non-quality
+        - all
+      default: all
+      description: Hold 類型篩選
+  drill_down:
+    - hold_reason_pareto
+    - hold_lot_list
+
+# ── WIP Hold Details ──────────────────────────────────────────────────────────
+
+wip_hold_reason_summary:
+  description: 目前在製品依 Hold 原因彙總，顯示各原因的 Hold 批次數與數量
+  service: mes_dashboard.services.wip_service.get_wip_hold_summary
+  chart_type: table
+  params:
+    workcenter:
+      type: string
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別篩選
+    package:
+      type: string
+      required: false
+      description: 產品種類篩選
+    hold_type:
+      type: string
+      required: false
+      enum:
+        - quality
+        - non-quality
+      description: Hold 類型篩選
+  drill_down:
+    - hold_detail_lots
+    - wip_hold_summary
+
+hold_detail_lots:
+  description: Hold 批次明細清單，列出符合原因/站別/產品的 Hold 批次詳細資訊
+  service: mes_dashboard.services.wip_service.get_hold_detail_lots
+  chart_type: table
+  params:
+    reason:
+      type: string
+      required: false
+      description: Hold 原因篩選
+    hold_type:
+      type: string
+      required: false
+      enum:
+        - quality
+        - non-quality
+      description: Hold 類型篩選
+    workcenter:
+      type: string
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別篩選
+    package:
+      type: string
+      required: false
+      description: 產品種類篩選
+  drill_down:
+    - hold_reason_pareto
+    - lot_query
+
+# ── Resource History Detail ───────────────────────────────────────────────────
+
+resource_history_detail:
+  description: 設備稼動率逐台明細，依設備顯示各台機台在指定期間的 OU%、PRD/SBY/UDT/SDT/EGT 小時
+  service: mes_dashboard.services.resource_history_service.query_detail
+  chart_type: table
+  params:
+    start_date:
+      type: string
+      required: true
+      description: 開始日期 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 結束日期 YYYY-MM-DD
+    granularity:
+      type: string
+      required: false
+      default: day
+      enum:
+        - day
+        - week
+        - month
+      description: 時間粒度
+    workcenter_groups:
+      type: list[string]
+      required: false
+      enum: $WORKCENTER_GROUPS
+      description: 站別代碼清單（選填）
+    resource_ids:
+      type: list[string]
+      required: false
+      description: 設備 ID 列表，例如 ["WB001"]
+  drill_down:
+    - resource_history_summary
+    - equipment_status_summary
+
+# ── Material Consumption ──────────────────────────────────────────────────────
+
+material_consumption_summary:
+  description: 材料消耗摘要，顯示指定材料的消耗量 KPI、時間趨勢與產品類型分佈
+  service: mes_dashboard.services.material_consumption_service.get_summary
+  chart_type: kpi
+  params:
+    material_parts:
+      type: list[string]
+      required: true
+      description: 材料料號列表，例如 ["MAT-001"]，需指定要查詢的材料
+    start_date:
+      type: string
+      required: true
+      description: 查詢起始日期，格式 YYYY-MM-DD
+    end_date:
+      type: string
+      required: true
+      description: 查詢結束日期，格式 YYYY-MM-DD
+    granularity:
+      type: string
+      required: false
+      enum:
+        - day
+        - week
+        - month
+        - quarter
+      default: month
+      description: 時間粒度
+  drill_down:
+    - lot_materials

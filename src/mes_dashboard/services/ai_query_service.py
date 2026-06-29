@@ -50,20 +50,21 @@ _AI_API_URL = os.getenv("AI_API_URL", "https://ollama_pjapi.theaken.com")
 _AI_API_KEY = os.getenv("AI_API_KEY", "")
 _AI_MODEL = os.getenv("AI_MODEL", "gpt-oss:120b")
 _AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
-_AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "false").strip().lower() in {"1", "true", "yes"}
+_AI_VERIFY_TLS = os.getenv("AI_VERIFY_TLS", "true").strip().lower() in {"1", "true", "yes"}
 # No max_tokens cap — internal LLM with 16K context, no token cost.
 _AI_MODE = os.getenv("AI_MODE", "text2sql")  # "text2sql" | "function"
 
 # ---------------------------------------------------------------------------
-# HTTP session: verify CA chain but skip hostname check.
-# The endpoint hostname (ollama_pjapi.theaken.com) contains an underscore,
-# which OpenSSL 3.x refuses to match against *.theaken.com even though the
-# wildcard is technically valid. CA chain is Google-issued and fully trusted.
+# HTTP session with optional TLS bypass (AI_VERIFY_TLS=false).
+# Kept for endpoints whose hostname contains an underscore — OpenSSL 3.x
+# refuses to match underscore hostnames against wildcard certs even when the
+# CA chain is valid. The current endpoint (ollamapjapi.theaken.com) passes
+# standard TLS verification; set AI_VERIFY_TLS=false only as a last resort.
 # ---------------------------------------------------------------------------
 class _SkipHostnameAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False  # OpenSSL rejects underscore in wildcard match
+        ctx.check_hostname = False
         kwargs["ssl_context"] = ctx
         super().init_poolmanager(*args, **kwargs)
 
@@ -626,6 +627,81 @@ def normalize_chart_data(function_name: str, raw: Any) -> Any:
 
     if fn in ("production_history_query", "resource_history_summary"):
         # Pass through — service returns structured dict directly
+        return raw
+
+    # ── Downtime analysis ──────────────────────────────────────────────────
+    if fn == "downtime_summary":
+        if not isinstance(raw, dict):
+            return raw
+        s = raw.get("summary", {})
+        items = [
+            {"label": "停機總時數", "value": round(s.get("total_hours", 0), 1)},
+            {"label": "非計畫停機 UDT (h)", "value": round(s.get("udt_hours", 0), 1)},
+            {"label": "計畫停機 SDT (h)", "value": round(s.get("sdt_hours", 0), 1)},
+            {"label": "工程時間 EGT (h)", "value": round(s.get("egt_hours", 0), 1)},
+            {"label": "停機事件數", "value": s.get("event_count", 0)},
+            {"label": "平均每事件 (min)", "value": round(s.get("avg_event_min", 0), 1)},
+        ]
+        top = raw.get("top_reasons", [])[:5]
+        if top:
+            items.append({"label": "前5停機原因", "value": ", ".join(
+                f"{r.get('reason', '')}({round(r.get('hours', 0), 1)}h)" for r in top
+            )})
+        return items
+
+    # ── Hold today snapshot ────────────────────────────────────────────────
+    if fn == "hold_today_snapshot":
+        if not isinstance(raw, dict):
+            return raw
+        s = raw.get("summary", {})
+        items = [
+            {"label": "Hold 批次數", "value": s.get("total_lots", s.get("totalLots", 0))},
+            {"label": "Hold 數量", "value": s.get("total_qty", s.get("totalQty", 0))},
+            {"label": "品質 Hold", "value": s.get("quality_lots", s.get("qualityLots", 0))},
+            {"label": "非品質 Hold", "value": s.get("non_quality_lots", s.get("nonQualityLots", 0))},
+        ]
+        return items
+
+    # ── WIP hold details ───────────────────────────────────────────────────
+    if fn == "wip_hold_reason_summary":
+        items = raw.get("items", raw) if isinstance(raw, dict) else raw
+        if isinstance(items, list):
+            return items
+        return raw
+
+    if fn == "hold_detail_lots":
+        if isinstance(raw, dict):
+            return raw.get("lots", raw.get("items", []))
+        return raw
+
+    # ── Resource history detail ────────────────────────────────────────────
+    if fn == "resource_history_detail":
+        if isinstance(raw, dict):
+            return raw.get("data", [])
+        return raw
+
+    # ── Material consumption ───────────────────────────────────────────────
+    if fn == "material_consumption_summary":
+        if not isinstance(raw, dict):
+            return raw
+        kpi = raw.get("kpi", raw.get("summary", {}))
+        items = []
+        if isinstance(kpi, dict):
+            for label, key in [
+                ("消耗總量", "total_qty"),
+                ("平均消耗", "avg_qty"),
+                ("最大消耗", "max_qty"),
+            ]:
+                if key in kpi:
+                    items.append({"label": label, "value": kpi[key]})
+        if not items:
+            return raw
+        return items
+
+    # ── DB scheduling queue ────────────────────────────────────────────────
+    if fn == "db_scheduling_queue":
+        if isinstance(raw, dict):
+            return raw.get("items", raw.get("queue", []))
         return raw
 
     return raw
