@@ -87,13 +87,36 @@ class MsdDuckdbRuntime:
         conn,
         detection_spool_path: Optional[str] = None,
         loss_reasons: Optional[List[str]] = None,
+        pj_types: Optional[List[str]] = None,
+        packages: Optional[List[str]] = None,
     ) -> bool:
         self._resolve_paths()
         if not self._events_path or not detection_spool_path:
             return False
 
         conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
-        conn.execute(f"CREATE VIEW detection_raw AS SELECT * FROM read_parquet('{detection_spool_path}')")
+
+        pj_type_filter = ""
+        pkg_filter = ""
+        if pj_types:
+            quoted_pj = ", ".join(f"'{self._sql_quote(str(v).strip())}'" for v in pj_types if str(v).strip())
+            if quoted_pj:
+                pj_type_filter = f"AND TRIM(PJ_TYPE) IN ({quoted_pj})"
+        if packages:
+            quoted_pkg = ", ".join(f"'{self._sql_quote(str(v).strip())}'" for v in packages if str(v).strip())
+            if quoted_pkg:
+                pkg_filter = f"AND TRIM(PRODUCTLINENAME) IN ({quoted_pkg})"
+
+        if pj_type_filter or pkg_filter:
+            conn.execute(
+                f"""
+                CREATE VIEW detection_raw AS
+                SELECT * FROM read_parquet('{detection_spool_path}')
+                WHERE 1=1 {pj_type_filter} {pkg_filter}
+                """
+            )
+        else:
+            conn.execute(f"CREATE VIEW detection_raw AS SELECT * FROM read_parquet('{detection_spool_path}')")
 
         if loss_reasons:
             quoted = ", ".join(f"'{self._sql_quote(str(reason).strip())}'" for reason in loss_reasons if str(reason).strip())
@@ -546,6 +569,8 @@ class MsdDuckdbRuntime:
         loss_reasons: Optional[List[str]] = None,
         *,
         upstream_station_groups: Optional[List[str]] = None,
+        pj_types: Optional[List[str]] = None,
+        packages: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Compute summary KPIs and charts using detection spool + events/lineage spools.
 
@@ -558,6 +583,8 @@ class MsdDuckdbRuntime:
         Args:
             detection_spool_path: Absolute path to the ``msd_detect`` parquet
                 spool file that corresponds to this query's station / date range.
+            pj_types: Optional PJ_TYPE filter values (TRIM applied).
+            packages: Optional PRODUCTLINENAME filter values (TRIM applied).
 
         Returns:
             Aggregated dict compatible with ``build_trace_aggregation_from_events``
@@ -575,6 +602,8 @@ class MsdDuckdbRuntime:
                 conn,
                 detection_spool_path=detection_spool_path,
                 loss_reasons=loss_reasons,
+                pj_types=pj_types,
+                packages=packages,
             ):
                 conn.close()
                 return None

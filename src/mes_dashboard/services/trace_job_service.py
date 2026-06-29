@@ -1425,6 +1425,8 @@ def _build_job_msd_aggregation(
     normalized_loss_reasons = None
     direction = "backward"
     _station_order_fallback: int = 999
+    _pj_types: Optional[List[str]] = None
+    _packages: Optional[List[str]] = None
     if isinstance(params, dict):
         from mes_dashboard.services.mid_section_defect_service import parse_loss_reasons_param
         from mes_dashboard.services.mid_section_defect_service import _normalize_station
@@ -1435,6 +1437,14 @@ def _build_job_msd_aggregation(
         _raw_station = params.get("station") or "測試"
         _stations = _normalize_station(_raw_station)
         _station_order_fallback = min(get_group_order(s) for s in _stations)
+        _raw_pj = params.get("pj_types") or []
+        _raw_pkg = params.get("packages") or []
+        _pj_types = [str(v).strip() for v in _raw_pj if str(v).strip()] if isinstance(_raw_pj, list) else None
+        _packages = [str(v).strip() for v in _raw_pkg if str(v).strip()] if isinstance(_raw_pkg, list) else None
+        if not _pj_types:
+            _pj_types = None
+        if not _packages:
+            _packages = None
 
     if trace_query_id:
         try:
@@ -1478,15 +1488,19 @@ def _build_job_msd_aggregation(
                         str(detection_path),
                         loss_reasons=normalized_loss_reasons,
                         upstream_station_groups=_upstream_groups,
+                        pj_types=_pj_types,
+                        packages=_packages,
                     )
                     if summary is not None:
                         if domain_quality_meta:
                             summary["domain_quality_meta"] = domain_quality_meta
-                        # Copy detection spool as stage under msd-events namespace so
-                        # get_detail() can access it after the short msd_detect TTL expires.
+                        # Persist filtered detection rows as stage spool under msd-events
+                        # namespace so get_detail() can access them after the short
+                        # msd_detect TTL expires.  Apply pj_types/packages filter so
+                        # the stored stage matches the filtered query, not the full spool.
                         try:
-                            import shutil as _shutil
                             import tempfile as _tmpmod
+                            import pandas as _pd
                             from mes_dashboard.services.msd_duckdb_runtime import (
                                 SPOOL_NAMESPACE as _MSD_NS,
                                 _STAGE_DETECTION,
@@ -1494,23 +1508,25 @@ def _build_job_msd_aggregation(
                             from mes_dashboard.core.query_spool_store import (
                                 QUERY_SPOOL_DIR as _QUERY_SPOOL_DIR,
                                 register_stage_spool_file as _reg_stage,
-                                get_spool_metadata as _get_meta,
                             )
-                            _det_meta = _get_meta("msd_detect", detection_hash) or {}
-                            _det_row_count = int(_det_meta.get("row_count", 0))
+                            _det_df = _pd.read_parquet(str(detection_path))
+                            if _pj_types and not _det_df.empty and "PJ_TYPE" in _det_df.columns:
+                                _det_df = _det_df[_det_df["PJ_TYPE"].str.strip().isin(set(_pj_types))]
+                            if _packages and not _det_df.empty and "PRODUCTLINENAME" in _det_df.columns:
+                                _det_df = _det_df[_det_df["PRODUCTLINENAME"].str.strip().isin(set(_packages))]
                             _ns_dir = (_QUERY_SPOOL_DIR / _MSD_NS).resolve()
                             _ns_dir.mkdir(parents=True, exist_ok=True)
                             with _tmpmod.NamedTemporaryFile(suffix=".parquet", delete=False, dir=_ns_dir) as _tf:
                                 _det_copy = _AggPath(_tf.name)
-                            _shutil.copy2(detection_path, _det_copy)
-                            _reg_stage(_MSD_NS, trace_query_id, _STAGE_DETECTION, _det_copy, _det_row_count)
+                            _det_df.to_parquet(_det_copy, engine="pyarrow", index=False)
+                            _reg_stage(_MSD_NS, trace_query_id, _STAGE_DETECTION, _det_copy, len(_det_df))
                             logger.info(
                                 "_build_job_msd_aggregation: detection stage registered trace_query_id=%s rows=%d",
-                                trace_query_id, _det_row_count,
+                                trace_query_id, len(_det_df),
                             )
                         except Exception as _copy_exc:
                             logger.warning(
-                                "_build_job_msd_aggregation: detection stage copy failed: %s", _copy_exc
+                                "_build_job_msd_aggregation: detection stage save failed: %s", _copy_exc
                             )
                         return summary, None
         except Exception as _ddb_exc:
