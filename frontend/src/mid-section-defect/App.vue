@@ -680,7 +680,9 @@ async function loadAnalysis() {
       queryError.value = stageError;
     }
 
-    if (!stageError || trace.completed_stages.value.includes('events')) {
+    const seedResult = trace.stage_results.seed as unknown as { seed_count?: number } | null;
+    const hasSeedResults = (seedResult?.seed_count ?? 0) > 0;
+    if (hasSeedResults && (!stageError || trace.completed_stages.value.includes('events'))) {
       await loadDetail(1, createAbortSignal('msd-detail'));
       saveSession();
     }
