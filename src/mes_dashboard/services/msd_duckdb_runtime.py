@@ -1223,9 +1223,7 @@ class MsdDuckdbRuntime:
         Returns records compatible with the frontend's ``materialTypeOptions``
         and ``buildMaterialChartFromAttribution`` expectations.
         """
-        try:
-            rows = conn.execute(
-                """
+        _BASE_CTE = """
                 WITH defective_kpis AS (
                     SELECT CONTAINERID,
                            MAX(TRACKINQTY)  AS trackin_qty,
@@ -1237,6 +1235,7 @@ class MsdDuckdbRuntime:
                     SELECT
                         COALESCE(NULLIF(TRIM(e.MATERIALPARTNAME), ''), '(未知)') AS part_name,
                         COALESCE(TRIM(e.MATERIALLOTNAME), '')                    AS lot_name,
+                        {desc_expr}
                         COUNT(DISTINCT dk.CONTAINERID)                            AS lot_count,
                         SUM(dk.defect_qty)                                        AS defect_qty,
                         SUM(dk.trackin_qty)                                       AS input_qty
@@ -1246,31 +1245,47 @@ class MsdDuckdbRuntime:
                     WHERE e.MATERIALPARTNAME IS NOT NULL AND TRIM(e.MATERIALPARTNAME) != ''
                     GROUP BY part_name, lot_name
                 )
-                SELECT part_name, lot_name, lot_count, defect_qty, input_qty
+                SELECT part_name, lot_name, {desc_col} lot_count, defect_qty, input_qty
                 FROM mat_agg
                 ORDER BY defect_qty DESC
                 """
-            ).fetchall()
+        try:
+            # Prefer description column (available in parquet built after lot_materials.sql update).
+            sql = _BASE_CTE.format(
+                desc_expr="FIRST(COALESCE(NULLIF(TRIM(e.MATERIALDESCRIPTION), ''), '')) AS desc_name,",
+                desc_col="desc_name,",
+            )
+            rows = conn.execute(sql).fetchall()
+            desc_offset = 1  # desc_name is at index 2; lot_count at 3
+        except Exception:
+            # Older parquet files lack MATERIALDESCRIPTION — fall back without it.
+            try:
+                sql = _BASE_CTE.format(desc_expr="", desc_col="")
+                rows = conn.execute(sql).fetchall()
+                desc_offset = 0
+            except Exception as exc:
+                logger.debug("_compute_raw_materials_attribution failed: %s", exc)
+                return []
 
-            attribution = []
-            for r in rows:
-                part_name, lot_name = str(r[0]), str(r[1] or '')
-                lot_count, defect_qty, input_qty = int(r[2] or 0), int(r[3] or 0), int(r[4] or 0)
-                rate = round(defect_qty / input_qty * 100, 4) if input_qty else 0.0
-                display_name = f"{part_name} ({lot_name})" if lot_name else part_name
-                attribution.append({
-                    'MATERIAL_KEY': display_name,
-                    'MATERIAL_PART_NAME': part_name,
-                    'MATERIAL_LOT_NAME': lot_name,
-                    'DETECTION_LOT_COUNT': lot_count,
-                    'INPUT_QTY': input_qty,
-                    'DEFECT_QTY': defect_qty,
-                    'DEFECT_RATE': rate,
-                })
-            return attribution
-        except Exception as exc:
-            logger.debug("_compute_raw_materials_attribution failed: %s", exc)
-            return []
+        attribution = []
+        for r in rows:
+            part_name, lot_name = str(r[0]), str(r[1] or '')
+            desc = str(r[2] or '') if desc_offset else ''
+            base = 2 + desc_offset
+            lot_count, defect_qty, input_qty = int(r[base] or 0), int(r[base + 1] or 0), int(r[base + 2] or 0)
+            rate = round(defect_qty / input_qty * 100, 4) if input_qty else 0.0
+            display_name = f"{part_name} ({lot_name})" if lot_name else part_name
+            attribution.append({
+                'MATERIAL_KEY': display_name,
+                'MATERIAL_PART_NAME': part_name,
+                'MATERIAL_LOT_NAME': lot_name,
+                'MATERIAL_PART_DESC': desc,
+                'DETECTION_LOT_COUNT': lot_count,
+                'INPUT_QTY': input_qty,
+                'DEFECT_QTY': defect_qty,
+                'DEFECT_RATE': rate,
+            })
+        return attribution
 
     @staticmethod
     def _to_pareto_items(rows) -> List[Dict[str, Any]]:

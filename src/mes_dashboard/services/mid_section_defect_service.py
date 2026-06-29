@@ -2201,6 +2201,7 @@ def _normalize_materials_event_records(
             result[cid_value].append({
                 'MATERIALPARTNAME': part,
                 'MATERIALLOTNAME': _safe_str(event.get('MATERIALLOTNAME')),
+                'MATERIALDESCRIPTION': _safe_str(event.get('MATERIALDESCRIPTION')),
                 'QTYCONSUMED': _safe_int(event.get('QTYCONSUMED')),
                 'WORKCENTERNAME': _safe_str(event.get('WORKCENTERNAME')),
                 'EQUIPMENTNAME': _safe_str(event.get('EQUIPMENTNAME')),
@@ -2438,6 +2439,7 @@ def _attribute_materials(
     ``(MATERIALPARTNAME, MATERIALLOTNAME)``.
     """
     material_to_detection: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+    material_descriptions: Dict[Tuple[str, str], str] = {}
 
     for det_cid, data in detection_data.items():
         ancestor_set = ancestors.get(det_cid, set())
@@ -2451,6 +2453,10 @@ def _attribute_materials(
                     continue
                 material_key = (part, lot) if lot else (part, '')
                 material_to_detection[material_key].add(det_cid)
+                if material_key not in material_descriptions:
+                    desc = _safe_str(record.get('MATERIALDESCRIPTION') or record.get('material_description'))
+                    if desc:
+                        material_descriptions[material_key] = desc
 
     attribution = []
     for material_key, det_lot_set in material_to_detection.items():
@@ -2479,6 +2485,7 @@ def _attribute_materials(
             'MATERIAL_KEY': display_name,
             'MATERIAL_PART_NAME': part_name,
             'MATERIAL_LOT_NAME': lot_name,
+            'MATERIAL_PART_DESC': material_descriptions.get(material_key, ''),
             'DETECTION_LOT_COUNT': len(det_lot_set),
             'INPUT_QTY': total_trackinqty,
             'DEFECT_QTY': total_rejectqty,

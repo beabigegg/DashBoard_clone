@@ -130,7 +130,7 @@ const chartOption = computed(() => {
       {
         type: 'value',
         name: '%',
-        max: 100,
+        ...(props.showCumulative ? { max: 100 } : {}),
         nameTextStyle: { fontSize: 11 },
         axisLabel: { fontSize: 11, formatter: '{value}%' },
       },

@@ -51,6 +51,7 @@ interface AttributionRecord {
   RESOURCEFAMILYNAME?: string;
   MATERIAL_PART_NAME?: string;
   MATERIAL_LOT_NAME?: string;
+  MATERIAL_PART_DESC?: string;
 }
 
 interface ChartItem {
@@ -381,16 +382,17 @@ const materialTypeFilter = computed({
 const materialTypeOptions = computed(() => {
   const materials = analysisData.value?.materials_attribution;
   if (!Array.isArray(materials) || materials.length === 0) return [];
-  const seen = new Set();
-  const options = [];
+  const seen = new Set<string>();
+  const options: { value: string; label: string }[] = [];
   for (const rec of materials) {
     const part = rec.MATERIAL_PART_NAME;
     if (part && !seen.has(part)) {
       seen.add(part);
-      options.push(part);
+      const desc = rec.MATERIAL_PART_DESC;
+      options.push({ value: part, label: desc ? `${desc} (${part})` : part });
     }
   }
-  return options.sort((a, b) => a.localeCompare(b, 'zh-TW'));
+  return options.sort((a, b) => a.label.localeCompare(b.label, 'zh-TW'));
 });
 const filteredByMaterialData = computed(() => {
   const materials = analysisData.value?.materials_attribution;
