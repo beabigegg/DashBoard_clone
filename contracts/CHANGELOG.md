@@ -14,6 +14,10 @@ a corresponding entry below.
 ### Changed
 - msd-forward-cause-effect: §3.24.1 `by_detection_loss_reason` now also emits per-reason `input_qty` + `lot_count` (membership cohort) and `reject_rate = reject_qty / input_qty` (was ÷ whole-cohort total). Fixes the front-stage Pareto showing 投入數=0 / 關聯 LOT 數=0.
 
+## [business 1.36.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: MSD-11 (backward upstream attribution must not fan-out defect_qty — dedupe `(dimension, CONTAINERID)` before SUM over the lineage×events join; invariant: no single dimension exceeds the cohort total; fix shipped in 5e0ea59a).
+
 ## [business 1.35.0] — 2026-06-30
 ### Added
 - msd-forward-cause-effect: MSD-09 (front×downstream reason correlation matrix — cohort-membership double-count, row-normalized primary display), MSD-10 (detection input qty = `MAX(TRACKINQTY)` over upload session per PH-06, not last partial; applies to forward AND backward via shared `station_detection_by_ids.sql`).

@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.35.0
+schema-version: 1.36.0
 last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
@@ -242,6 +242,7 @@ breaking-change-policy: deprecate-2-minors
 | MSD-08 | Forward lineage attribution | `_attribute_forward_defects` re-keys descendant rejects to SEED_ID via lineage spool JOIN when `lineage_spool_df` is provided; split/merge/rename descendants are included. genealogy_status="error" → self-edge-only graceful degrade (never 5xx). get_summary(direction="forward") always via DuckDB; in-memory forward summary path retired. | `tests/test_mid_section_defect_service.py::test_attribute_forward_defects_lineage_rekeying_passes`, `tests/test_unified_spool_integration.py::TestMsdFullChain` |
 | MSD-09 | Front×downstream reason correlation matrix | `_build_front_downstream_reason_matrix` attributes each downstream reject (re-keyed to SEED_ID via lineage) to EVERY front-stage loss reason its seed carries — **cohort membership**, so a lot with multiple front reasons counts in multiple rows and Σcells may exceed the physical reject total. Rows/cols independently TOP_N=10 + "其他"; `row_pct` row-normalized to 100% (0.0 when row total=0) is the primary display. Empty → `{rows:[],cols:[],cells:[],row_pct:[]}`. | `tests/test_mid_section_defect_service.py::TestFrontDownstreamReasonMatrix` |
 | MSD-10 | Detection input qty = session original load | Detection `偵測投入` (TRACKINQTY emitted by `station_detection_by_ids.sql`) must be `MAX(TRACKINQTY) OVER (PARTITION BY CONTAINERID, TRACKINTIMESTAMP, EQUIPMENTID)` — the upload session's original load — NOT the last partial's remaining qty. Per PH-06 TRACKINQTY decrements across partials; picking rn=1 under-counts input and inflates downstream/defect rates past 100%. Applies to BOTH forward and backward (shared SQL/spool). | `tests/test_mid_section_defect_service.py::TestDetectionInputPartialAggregation` |
+| MSD-11 | Backward upstream attribution must not fan-out defect_qty | The DuckDB backward attribution charts (`by_machine`, `by_material`, raw machine/materials attribution, `by_wafer_root` fallback) JOIN `defective_kpis × lineage × events`; summing `dk.defect_qty`/`dk.trackin_qty` directly over that join counts each defect lot once per matching upstream EVENT row, so a single dimension can exceed the cohort total (observed: one machine 不良數 366 > 不良總數 252). Invariant: **no single attribution dimension may exceed the cohort total defect_qty**. Implementation must collapse the lineage×events fan-out to one row per `(dimension, CONTAINERID)` via `SELECT DISTINCT` BEFORE aggregating (then `COUNT(*)`/`SUM`); label-only columns (e.g. material description) are computed in a separate CTE so they never enter the dedup key. Mirrors the in-memory `_attribute_defects` (a SET per dimension), which never had the bug. | `tests/test_msd_duckdb_runtime.py::TestBackwardAttributionNoFanout` |
 
 ## Admin Rules
 
