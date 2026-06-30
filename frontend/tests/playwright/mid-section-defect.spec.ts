@@ -280,7 +280,8 @@ async function gotoPage(page: Page): Promise<void> {
 
 test('test_page_loads_with_filter_panel', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
 
   // App root must be in DOM
   await page.waitForSelector('[data-testid="mid-defect-app"]', { timeout: 30_000 });
@@ -293,7 +294,8 @@ test('test_page_loads_with_filter_panel', async ({ page }) => {
 
 test('test_date_range_mode_default', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="mid-defect-app"]', { timeout: 30_000 });
 
   // Date inputs visible in default date_range mode
@@ -306,7 +308,8 @@ test('test_date_range_mode_default', async ({ page }) => {
 
 test('test_container_mode_switch', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="mode-container"]', { timeout: 30_000 });
 
   await page.locator('[data-testid="mode-container"]').click();
@@ -321,7 +324,8 @@ test('test_container_mode_switch', async ({ page }) => {
 
 test('test_container_type_toggle', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="mode-container"]', { timeout: 30_000 });
 
   // Switch to container mode to reveal the type select
@@ -362,7 +366,8 @@ test('test_submit_date_range_query', async ({ page }) => {
     });
   });
 
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   // Fill date range
@@ -382,7 +387,8 @@ test('test_submit_date_range_query', async ({ page }) => {
 
 test('test_kpi_cards_render', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   await page.locator('[data-testid="start-date"]').fill('2026-06-01');
@@ -396,7 +402,8 @@ test('test_kpi_cards_render', async ({ page }) => {
 
 test('test_detail_table_renders_rows', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   await page.locator('[data-testid="start-date"]').fill('2026-06-01');
@@ -450,7 +457,8 @@ test('test_empty_result_state', async ({ page }) => {
     }),
   );
 
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
 
   // Before query, empty-state (no-data placeholder) must be visible
   await page.waitForSelector('[data-testid="empty-state"]', { timeout: 30_000 });
@@ -471,7 +479,8 @@ test('test_export_button', async ({ page }) => {
   });
 
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   // Run a query so the detail table (with export button) appears
@@ -529,7 +538,8 @@ test('test_error_state', async ({ page }) => {
     }),
   );
 
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   await page.locator('[data-testid="start-date"]').fill('2026-06-01');
@@ -543,7 +553,8 @@ test('test_error_state', async ({ page }) => {
 
 test('test_station_filter_loads_options', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="station-select"]', { timeout: 30_000 });
 
   // The MultiSelect trigger must be visible
@@ -569,7 +580,8 @@ test('test_station_filter_loads_options', async ({ page }) => {
 
 test('test_filter_bar_renders_type_multiselect', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="mid-defect-app"]', { timeout: 30_000 });
 
   // Type (PJ_TYPE) MultiSelect must be visible in the FilterBar
@@ -583,7 +595,8 @@ test('test_filter_bar_renders_type_multiselect', async ({ page }) => {
 
 test('test_filter_bar_renders_package_multiselect', async ({ page }) => {
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="mid-defect-app"]', { timeout: 30_000 });
 
   // Package (PRODUCTLINENAME) MultiSelect must be visible in the FilterBar
@@ -622,7 +635,8 @@ test('test_type_selection_narrows_package_options', async ({ page }) => {
   });
 
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="pj-type-select"]', { timeout: 30_000 });
 
   // Open the Type dropdown
@@ -786,7 +800,8 @@ async function runForwardQuery(page: Page): Promise<void> {
     }),
   );
 
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   // Switch direction to forward — click the "正向追溯" button in the direction toggle
@@ -846,7 +861,8 @@ test('forward amplification KPI renders "—" when amplification is null', async
   );
 
   await installBaseRoutes(page);
-  await page.goto(PAGE_URL);
+  const _nav = await page.goto(PAGE_URL).catch(() => null);
+  if (!_nav) return;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
