@@ -559,6 +559,12 @@ function buildDetailParams(): Record<string, unknown> {
   if (snapshot.lossReasons.length) {
     params.loss_reasons = snapshot.lossReasons.join(',');
   }
+  if (snapshot.pjTypes?.length) {
+    params['pj_types[]'] = snapshot.pjTypes;
+  }
+  if (snapshot.packages?.length) {
+    params['packages[]'] = snapshot.packages;
+  }
   // Pass canonical trace_query_id when available so backend serves from spool.
   if (currentTraceQueryId.value) {
     params.trace_query_id = currentTraceQueryId.value;
@@ -931,6 +937,8 @@ void initPage();
                         :model-value="materialTypeFilter"
                         :options="materialTypeOptions"
                         placeholder="全部原物料"
+                        wrap-options
+                        :dropdown-min-width="420"
                         @update:model-value="materialTypeFilter = $event"
                       />
                     </div>

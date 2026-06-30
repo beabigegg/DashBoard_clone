@@ -152,9 +152,12 @@ def _hash_payload(payload: Any) -> str:
 
 def _seed_cache_key(profile: str, params: Dict[str, Any]) -> str:
     if profile == PROFILE_MID_SECTION_DEFECT:
-        # loss_reasons does not affect seed resolution; exclude it so that
-        # changing the reason filter hits the cache instead of re-querying Oracle.
-        filtered = {k: v for k, v in params.items() if k != "loss_reasons"}
+        # loss_reasons / pj_types / packages do NOT affect seed resolution — they
+        # are population masks applied at DuckDB read time.  Exclude them so the
+        # seed set (and trace_query_id) depends only on station + date + direction,
+        # letting one staged trace serve every reason/Type/Package selection.
+        _EXCLUDED = {"loss_reasons", "pj_types", "packages"}
+        filtered = {k: v for k, v in params.items() if k not in _EXCLUDED}
         return f"trace:seed:{profile}:{_hash_payload(filtered)}"
     return f"trace:seed:{profile}:{_hash_payload(params)}"
 
@@ -583,6 +586,10 @@ def _build_msd_aggregation(
     raw_loss_reasons = params.get("loss_reasons")
     loss_reasons = parse_loss_reasons_param(raw_loss_reasons)
     direction = str(params.get("direction") or "backward").strip()
+    _raw_pj = params.get("pj_types") or []
+    _raw_pkg = params.get("packages") or []
+    _pj_mask = [str(v).strip() for v in _raw_pj if str(v).strip()] if isinstance(_raw_pj, list) else None
+    _pkg_mask = [str(v).strip() for v in _raw_pkg if str(v).strip()] if isinstance(_raw_pkg, list) else None
 
     # Task 5.2: try spool-backed DuckDB runtime first when a valid spool exists.
     # This avoids large in-memory pandas aggregation in the gunicorn worker.
@@ -602,6 +609,8 @@ def _build_msd_aggregation(
             _summary = _rt.get_summary(
                 direction=direction,
                 loss_reasons=loss_reasons,
+                pj_types=_pj_mask or None,
+                packages=_pkg_mask or None,
             )
             if _summary is not None:
                 logger.debug(
@@ -972,9 +981,15 @@ def events():
             from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
             _rt = MsdDuckdbRuntime(_tqid)
             if _rt.is_available():
+                _raw_pj = params_block.get("pj_types") or []
+                _raw_pkg = params_block.get("packages") or []
+                _pj = [str(v).strip() for v in _raw_pj if str(v).strip()] if isinstance(_raw_pj, list) else None
+                _pkg = [str(v).strip() for v in _raw_pkg if str(v).strip()] if isinstance(_raw_pkg, list) else None
                 _summary = _rt.get_summary(
                     direction=str(params_block.get("direction") or "backward").strip(),
                     loss_reasons=parse_loss_reasons_param(params_block.get("loss_reasons")),
+                    pj_types=_pj or None,
+                    packages=_pkg or None,
                 )
                 if _summary is not None:
                     logger.debug(

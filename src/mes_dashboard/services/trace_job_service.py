@@ -1456,6 +1456,8 @@ def _build_job_msd_aggregation(
                     direction=direction,
                     loss_reasons=normalized_loss_reasons,
                     station_order_fallback=_station_order_fallback,
+                    pj_types=_pj_types,
+                    packages=_packages,
                 )
                 if summary is not None:
                     if domain_quality_meta:
@@ -1494,10 +1496,12 @@ def _build_job_msd_aggregation(
                     if summary is not None:
                         if domain_quality_meta:
                             summary["domain_quality_meta"] = domain_quality_meta
-                        # Persist filtered detection rows as stage spool under msd-events
-                        # namespace so get_detail() can access them after the short
-                        # msd_detect TTL expires.  Apply pj_types/packages filter so
-                        # the stored stage matches the filtered query, not the full spool.
+                        # Persist the FULL detection rows as stage spool under
+                        # msd-events namespace so get_detail() can access them after
+                        # the short msd_detect TTL expires.  Do NOT pre-filter by
+                        # pj_types/packages: trace_query_id is package-independent, so
+                        # this stage must hold the full population; get_detail() applies
+                        # the Type/Package mask at read time.
                         try:
                             import tempfile as _tmpmod
                             import pandas as _pd
@@ -1510,10 +1514,6 @@ def _build_job_msd_aggregation(
                                 register_stage_spool_file as _reg_stage,
                             )
                             _det_df = _pd.read_parquet(str(detection_path))
-                            if _pj_types and not _det_df.empty and "PJ_TYPE" in _det_df.columns:
-                                _det_df = _det_df[_det_df["PJ_TYPE"].str.strip().isin(set(_pj_types))]
-                            if _packages and not _det_df.empty and "PRODUCTLINENAME" in _det_df.columns:
-                                _det_df = _det_df[_det_df["PRODUCTLINENAME"].str.strip().isin(set(_packages))]
                             _ns_dir = (_QUERY_SPOOL_DIR / _MSD_NS).resolve()
                             _ns_dir.mkdir(parents=True, exist_ok=True)
                             with _tmpmod.NamedTemporaryFile(suffix=".parquet", delete=False, dir=_ns_dir) as _tf:

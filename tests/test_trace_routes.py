@@ -508,6 +508,8 @@ def test_events_mid_section_defect_with_aggregation(mock_runtime_cls):
     mock_runtime.get_summary.assert_called_once_with(
         direction='backward',
         loss_reasons=['R1'],
+        pj_types=None,
+        packages=None,
     )
 
 

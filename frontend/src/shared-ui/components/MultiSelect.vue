@@ -16,6 +16,11 @@ interface Props {
   loading?: boolean;
   searchable?: boolean;
   selectAllScope?: 'visible' | 'all';
+  /** Allow long option labels to wrap instead of overflowing horizontally. */
+  wrapOptions?: boolean;
+  /** Minimum dropdown width (px). Dropdown grows beyond the trigger width up to
+   *  this value, clamped to stay inside the viewport. Useful for long labels. */
+  dropdownMinWidth?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,6 +31,8 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   searchable: true,
   selectAllScope: 'visible',
+  wrapOptions: false,
+  dropdownMinWidth: 0,
 });
 
 const emit = defineEmits<{
@@ -44,11 +51,17 @@ const dropdownStyle = ref<CSSProperties>({});
 function updateDropdownPosition() {
   if (!triggerRef.value) return;
   const rect = triggerRef.value.getBoundingClientRect();
+  // Grow up to dropdownMinWidth, but never wider than the viewport (with an
+  // 8px gutter). Shift left so the right edge stays on-screen when widened.
+  const gutter = 8;
+  const maxWidth = window.innerWidth - gutter * 2;
+  const width = Math.min(Math.max(rect.width, props.dropdownMinWidth), maxWidth);
+  const left = Math.max(gutter, Math.min(rect.left, window.innerWidth - width - gutter));
   dropdownStyle.value = {
     position: 'fixed',
     top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
+    left: `${left}px`,
+    width: `${width}px`,
     zIndex: '9999',
   };
 }
@@ -186,6 +199,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
         v-if="isOpen && !loading"
         ref="dropdownRef"
         class="multi-select-dropdown"
+        :class="{ 'multi-select-dropdown--wrap': wrapOptions }"
         :style="dropdownStyle"
         data-testid="multiselect-dropdown"
         @keydown.esc.stop="closeDropdown"
@@ -277,6 +291,27 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
 
 .multi-select-option:hover {
   background: theme('colors.token.hf8fafc');
+}
+
+/* Wrap variant: long unbreakable labels (e.g. material spec strings full of
+ * slashes) wrap onto multiple lines instead of forcing horizontal overflow.
+ * Checkbox stays pinned to the first line. */
+.multi-select-dropdown--wrap .multi-select-option {
+  align-items: flex-start;
+}
+
+.multi-select-dropdown--wrap .multi-select-option input[type='checkbox'] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.multi-select-dropdown--wrap .multi-select-option > span {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
 }
 
 .multi-select-option input[type='checkbox'] {

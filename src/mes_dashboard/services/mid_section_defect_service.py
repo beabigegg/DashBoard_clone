@@ -92,7 +92,10 @@ from mes_dashboard.config.constants import (
 
 FORWARD_PIPELINE_MAX_WORKERS = int(os.getenv('FORWARD_PIPELINE_MAX_WORKERS', '2'))
 MSD_COMPAT_QUEUE = os.getenv("MSD_WORKER_QUEUE", "msd-analysis")
-_MSD_ENGINE_PARALLEL = max(1, int(os.getenv("MSD_ENGINE_PARALLEL", "1")))
+_MSD_ENGINE_PARALLEL = max(1, int(os.getenv("MSD_ENGINE_PARALLEL", "3")))
+# Oracle IN-clause batch size for CONTAINERID-first Step B enrichment (Oracle hard
+# limit is 1000 elements per IN list).
+_MSD_IN_BATCH_SIZE = max(1, min(1000, int(os.getenv("MSD_IN_BATCH_SIZE", "1000"))))
 MSD_COMPAT_JOB_TIMEOUT_SECONDS = int(os.getenv("MSD_JOB_TIMEOUT_SECONDS", "1800"))
 MSD_COMPAT_JOB_TTL_SECONDS = int(os.getenv("MSD_JOB_TTL_SECONDS", "3600"))
 _MSD_COMPAT_JOB_PREFIX = "msd-compat"
@@ -186,16 +189,12 @@ def resolve_analysis_trace_context(
     if detection_df is None:
         return None
 
-    # C-2: apply PJ_TYPE / PRODUCTLINENAME filters BEFORE available_loss_reasons
-    # calculation and seed_container_ids derivation so the spool/trace_query_id
-    # reflects the narrowed set.  Empty list = no restriction (AC-5).
-    # strip() required: station_detection.sql omits TRIM() on these CHAR columns,
-    # but container_filter_cache (which drives the dropdown) uses TRIM() — without
-    # strip() the isin() comparison fails on space-padded Oracle CHAR values.
-    if pj_types and not detection_df.empty:
-        detection_df = detection_df[detection_df["PJ_TYPE"].str.strip().isin(set(pj_types))]
-    if packages and not detection_df.empty:
-        detection_df = detection_df[detection_df["PRODUCTLINENAME"].str.strip().isin(set(packages))]
+    # NOTE: PJ_TYPE / PRODUCTLINENAME are NOT applied here.  They are population
+    # masks applied at DuckDB read time (get_summary_with_detection / get_detail),
+    # so the seed set — and therefore trace_query_id — depends only on
+    # station + date + direction.  This lets one staged trace serve every
+    # Type/Package selection and prevents a stale-trace_query_id mismatch when the
+    # user switches Type/Package (see msd second-query fix).
 
     available_loss_reasons = sorted(
         detection_df.loc[detection_df['REJECTQTY'] > 0, 'LOSSREASONNAME']
@@ -242,6 +241,8 @@ def _load_analysis_from_spool(
     loss_reasons: Optional[List[str]] = None,
     *,
     station_order_fallback: int = 999,
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Build compatibility summary payload from MSD spool-backed runtime."""
     from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
@@ -251,7 +252,8 @@ def _load_analysis_from_spool(
         return None
 
     summary = rt.get_summary(direction=direction, loss_reasons=loss_reasons,
-                             station_order_fallback=station_order_fallback)
+                             station_order_fallback=station_order_fallback,
+                             pj_types=pj_types or None, packages=packages or None)
     if summary is None:
         return None
 
@@ -409,6 +411,8 @@ def query_analysis(
         direction=direction,
         loss_reasons=loss_reasons,
         station_order_fallback=min(get_group_order(s) for s in _normalize_station(station)),
+        pj_types=pj_types,
+        packages=packages,
     )
     if staged is not None:
         cache_set(cache_key, staged, ttl=CACHE_TTL_DETECTION)
@@ -562,19 +566,11 @@ def resolve_trace_seed_lots(
             result['_meta'] = {'partial_failure': _msd_pf}
         return result
 
-    # Apply PJ_TYPE / PRODUCTLINENAME filters so the returned seed set reflects
-    # the user's selection.  Empty list = no restriction (mirrors AC-5).
-    # strip() required: station_detection.sql omits TRIM() on Oracle CHAR columns.
-    if pj_types and not detection_df.empty:
-        detection_df = detection_df[detection_df["PJ_TYPE"].str.strip().isin(set(pj_types))]
-    if packages and not detection_df.empty:
-        detection_df = detection_df[detection_df["PRODUCTLINENAME"].str.strip().isin(set(packages))]
-
-    if detection_df.empty:
-        result = {'seeds': [], 'seed_count': 0}
-        if _msd_pf:
-            result['_meta'] = {'partial_failure': _msd_pf}
-        return result
+    # NOTE: PJ_TYPE / PRODUCTLINENAME are intentionally NOT applied to the seed
+    # set.  They are population masks applied at DuckDB read time, so seeds — and
+    # therefore trace_query_id — depend only on station + date + direction.  One
+    # staged trace then serves every Type/Package selection.  (pj_types/packages
+    # params are accepted for signature compatibility but no longer filter seeds.)
 
     seeds = []
     unique_rows = detection_df.drop_duplicates(subset=['CONTAINERID'])
@@ -1502,16 +1498,184 @@ def _build_multi_station_filter(
 # Query 1: Station Detection Data (parameterized)
 # ============================================================
 
+_DET_TIME_FILTER = (
+    "AND h.TRACKINTIMESTAMP >= TO_DATE(:start_date, 'YYYY-MM-DD') "
+    "AND h.TRACKINTIMESTAMP < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+)
+_REJ_TIME_FILTER = (
+    "AND r.TXNDATE >= TO_DATE(:start_date, 'YYYY-MM-DD') "
+    "AND r.TXNDATE < TO_DATE(:end_date, 'YYYY-MM-DD') + 1"
+)
+
+
+def _resolve_detection_cids(
+    start_date: str,
+    end_date: str,
+    station: StationInput = '測試',
+) -> Tuple[List[str], Dict[str, Any]]:
+    """Step A (CONTAINERID-first): resolve the DISTINCT CONTAINERID set that had a
+    detection-station track-in within [start_date, end_date].
+
+    Lightweight single-column scan; time-chunked for long ranges so it never
+    times out.  Dedup of the detection event itself is deferred to Step B, which
+    recomputes rn=1 over the full window — so chunking/unioning the CID set here
+    cannot change the final result.
+
+    Returns:
+        (sorted_unique_cids, partial_failure_meta)
+    """
+    _stations = _normalize_station(station)
+    wip_filter, wip_params = _build_multi_station_filter(_stations, 'h')
+    sql = SQLLoader.load_with_params(
+        "mid_section_defect/station_detection_cids",
+        STATION_FILTER=wip_filter,
+    )
+
+    from mes_dashboard.services.batch_query_engine import (
+        decompose_by_time_range,
+        should_decompose_by_time,
+    )
+
+    def _run(s: str, e: str) -> Optional[pd.DataFrame]:
+        return read_sql_df(sql, {'start_date': s, 'end_date': e, **wip_params})
+
+    cids: Set[str] = set()
+    failed = 0
+    failed_ranges: List[str] = []
+
+    if should_decompose_by_time(start_date, end_date):
+        chunks = decompose_by_time_range(start_date, end_date)
+
+        def _run_chunk(chunk: Dict[str, Any]) -> Optional[pd.DataFrame]:
+            try:
+                return _run(chunk['chunk_start'], chunk['chunk_end'])
+            except Exception as exc:
+                logger.error("Detection CID chunk failed (%s): %s", station, exc)
+                return None
+
+        if _MSD_ENGINE_PARALLEL <= 1 or len(chunks) <= 1:
+            results = [_run_chunk(c) for c in chunks]
+        else:
+            with ThreadPoolExecutor(max_workers=_MSD_ENGINE_PARALLEL) as executor:
+                results = list(executor.map(_run_chunk, chunks))
+        for chunk, r in zip(chunks, results):
+            if r is None:
+                failed += 1
+                failed_ranges.append(f"{chunk['chunk_start']}~{chunk['chunk_end']}")
+            elif not r.empty and 'CONTAINERID' in r.columns:
+                cids.update(_safe_str(c) for c in r['CONTAINERID'].tolist())
+        logger.info(
+            "Detection CIDs resolved (%s): %d chunks, %d failed, %d unique containers",
+            station, len(chunks), failed, len(cids),
+        )
+    else:
+        try:
+            r = _run(start_date, end_date)
+        except Exception as exc:
+            logger.error("Detection CID query failed (%s): %s", station, exc)
+            r = None
+        if r is None:
+            failed += 1
+            failed_ranges.append(f"{start_date}~{end_date}")
+        elif not r.empty and 'CONTAINERID' in r.columns:
+            cids.update(_safe_str(c) for c in r['CONTAINERID'].tolist())
+
+    cids.discard("")
+    partial = (
+        {
+            "has_partial_failure": True,
+            "failed_chunk_count": failed,
+            "failed_ranges": ", ".join(failed_ranges),
+        }
+        if failed else {}
+    )
+    return sorted(cids), partial
+
+
+def _fetch_detection_rows_for_cids(
+    container_ids: List[str],
+    station: StationInput = '測試',
+    *,
+    detection_time_filter: str = "",
+    reject_time_filter: str = "",
+    time_params: Optional[Dict[str, str]] = None,
+) -> Tuple[Optional[pd.DataFrame], Dict[str, Any]]:
+    """Step B (shared by both query modes): enrich a CONTAINERID set into full
+    detection rows via the unified ``station_detection_by_ids.sql``.
+
+    Batches the IN clause to <= ``_MSD_IN_BATCH_SIZE`` (Oracle 1000 limit) and runs
+    batches in parallel.  Because all dedup / GROUP BY are PARTITION BY CONTAINERID,
+    batching produces results identical to a single unbatched query.
+
+    For date-range mode, pass the time-filter fragments + ``time_params`` so rows
+    are bounded to the query window (preserves legacy date-range semantics).
+    For container mode, leave the time filters empty.
+
+    Returns:
+        (df, partial_failure_meta)
+    """
+    unique_cids = sorted({_safe_str(c) for c in (container_ids or []) if _safe_str(c)})
+    if not unique_cids:
+        return pd.DataFrame(), {}
+
+    _stations = _normalize_station(station)
+    wip_filter, wip_params = _build_multi_station_filter(_stations, 'h')
+    rej_filter, rej_params = _build_multi_station_filter(_stations, 'r')
+    base_params = {**wip_params, **rej_params, **(time_params or {})}
+
+    batches = [
+        unique_cids[i:i + _MSD_IN_BATCH_SIZE]
+        for i in range(0, len(unique_cids), _MSD_IN_BATCH_SIZE)
+    ]
+
+    def _run_batch(batch: List[str]) -> Optional[pd.DataFrame]:
+        quoted_ids = ", ".join(f"'{cid}'" for cid in batch)
+        sql = SQLLoader.load_with_params(
+            "mid_section_defect/station_detection_by_ids",
+            CONTAINER_IDS=quoted_ids,
+            STATION_FILTER=wip_filter,
+            STATION_FILTER_REJECTS=rej_filter,
+            DETECTION_TIME_FILTER=detection_time_filter,
+            REJECT_TIME_FILTER=reject_time_filter,
+        )
+        try:
+            return read_sql_df(sql, base_params)
+        except Exception as exc:
+            logger.error("Detection enrichment batch failed (%s): %s", station, exc)
+            return None
+
+    frames: List[pd.DataFrame] = []
+    failed = 0
+    if _MSD_ENGINE_PARALLEL <= 1 or len(batches) <= 1:
+        results = [_run_batch(b) for b in batches]
+    else:
+        with ThreadPoolExecutor(max_workers=_MSD_ENGINE_PARALLEL) as executor:
+            results = list(executor.map(_run_batch, batches))
+    for r in results:
+        if r is None:
+            failed += 1
+        elif not r.empty:
+            frames.append(r)
+
+    partial = {"has_partial_failure": True, "failed_chunk_count": failed} if failed else {}
+    if not frames:
+        return pd.DataFrame(), partial
+    df = pd.concat(frames, ignore_index=True)
+    return df, partial
+
+
 def _fetch_station_detection_data(
     start_date: str,
     end_date: str,
     station: StationInput = '測試',
 ) -> Tuple[Optional[pd.DataFrame], Dict[str, Any]]:
-    """Execute station_detection.sql and return raw DataFrame.
+    """Resolve date-range detection data via the CONTAINERID-first pipeline.
 
-    For date ranges exceeding BATCH_QUERY_TIME_THRESHOLD_DAYS (default 10),
-    the query is decomposed into monthly chunks via BatchQueryEngine to
-    prevent Oracle timeout on high-volume stations.
+    Step A (``station_detection_cids.sql``) resolves the CONTAINERID set for the
+    window; Step B (``station_detection_by_ids.sql``) enriches it with reject /
+    metadata / workflow, bounded to the same window so semantics match the legacy
+    single-SQL query.  Results are spooled (msd_detect namespace) for DuckDB /
+    trace reuse, keyed by the same hash as ``_make_detection_spool_query_id``.
     """
     stations = _normalize_station(station)
     station_key = _canon_station_key(stations)
@@ -1549,153 +1713,59 @@ def _fetch_station_detection_data(
 
     _msd_partial_failure: Dict[str, Any] = {}
     try:
-        wip_filter, wip_params = _build_multi_station_filter(stations, 'h')
-        rej_filter, rej_params = _build_multi_station_filter(stations, 'r')
-
-        sql = SQLLoader.load_with_params(
-            "mid_section_defect/station_detection",
-            STATION_FILTER=wip_filter,
-            STATION_FILTER_REJECTS=rej_filter,
-        )
-
-        from mes_dashboard.services.batch_query_engine import (
-            _USE_ROW_COUNT_CHUNKING,
-            decompose_by_row_count,
-            decompose_by_time_range,
-            execute_plan,
-            get_batch_progress,
-            merge_chunks_to_spool,
-            should_decompose_by_time,
-        )
+        from mes_dashboard.services.batch_query_engine import should_decompose_by_time
         from mes_dashboard.core.query_spool_store import (
-            QUERY_SPOOL_DIR,
             load_spooled_df,
-            register_spool_file,
             store_spooled_df,
         )
 
         _SPOOL_NS = "msd_detect"
         engine_hash = detection_spool_query_id
 
-        if should_decompose_by_time(start_date, end_date):
-            # --- Engine path for long date ranges → stream to spool ---
-            # Check spool cache before re-executing
-            df = load_spooled_df(_SPOOL_NS, engine_hash)
-            if df is not None:
-                logger.info("Detection spool hit (hash=%s)", engine_hash)
-            else:
-                if _USE_ROW_COUNT_CHUNKING:
-                    # --- Row-count chunking path (USE_ROW_COUNT_CHUNKING=true) ---
-                    count_sql = SQLLoader.load_with_params(
-                        "mid_section_defect/count_query",
-                        STATION_FILTER=wip_filter,
-                        STATION_FILTER_REJECTS=rej_filter,
-                    )
-                    _count_params = {
-                        'start_date': start_date,
-                        'end_date': end_date,
-                        **wip_params,
-                        **rej_params,
-                    }
-                    _count_df = read_sql_df(count_sql, _count_params)
-                    total_rows = int(_count_df.iloc[0].get("ROW_COUNT") or 0) if (
-                        _count_df is not None and not _count_df.empty
-                    ) else 0
-                    engine_chunks = decompose_by_row_count(total_rows)
-                    paged_sql = SQLLoader.load_with_params(
-                        "mid_section_defect/dataset_paged",
-                        STATION_FILTER=wip_filter,
-                        STATION_FILTER_REJECTS=rej_filter,
-                    )
-
-                    def _run_detection_chunk(chunk, max_rows_per_chunk=None):
-                        chunk_params = {
-                            'start_date': start_date,
-                            'end_date': end_date,
-                            'start_row': chunk['start_row'],
-                            'end_row': chunk['end_row'],
-                            **wip_params,
-                            **rej_params,
-                        }
-                        result = read_sql_df(paged_sql, chunk_params)
-                        return result if result is not None else pd.DataFrame()
-
-                    logger.info(
-                        "Engine (row-count) activated for detection (%s): total=%d chunks=%d",
-                        station, total_rows, len(engine_chunks),
-                    )
-                else:
-                    # --- Date-range chunking path (default, BQE-04) ---
-                    engine_chunks = decompose_by_time_range(start_date, end_date)
-
-                    def _run_detection_chunk(chunk, max_rows_per_chunk=None):
-                        chunk_params = {
-                            'start_date': chunk['chunk_start'],
-                            'end_date': chunk['chunk_end'],
-                            **wip_params,
-                            **rej_params,
-                        }
-                        result = read_sql_df(sql, chunk_params)
-                        return result if result is not None else pd.DataFrame()
-
-                    logger.info(
-                        "Engine activated for detection (%s): %d chunks",
-                        station, len(engine_chunks),
-                    )
-
-                execute_plan(
-                    engine_chunks, _run_detection_chunk,
-                    parallel=_MSD_ENGINE_PARALLEL,
-                    query_hash=engine_hash,
-                    cache_prefix="msd_detect",
-                    chunk_ttl=CACHE_TTL_DETECTION,
-                )
-                _msd_progress = get_batch_progress("msd_detect", engine_hash) or {}
-                if _msd_progress.get("has_partial_failure") in (True, "True", "true", "1", 1):
-                    _msd_partial_failure = {
-                        "has_partial_failure": True,
-                        "failed_chunk_count": _msd_progress.get("failed_chunk_count"),
-                        "failed_ranges": _msd_progress.get("failed_ranges"),
-                    }
-                    logger.warning(
-                        "msd_detect partial failure (engine_hash=%s): failed_ranges=%s",
-                        engine_hash, _msd_progress.get("failed_ranges"),
-                    )
-                spool_tmp_path, spool_row_count = merge_chunks_to_spool(
-                    "msd_detect", engine_hash, spool_dir=QUERY_SPOOL_DIR,
-                )
-                if spool_tmp_path is not None:
-                    register_spool_file(
-                        _SPOOL_NS, engine_hash, spool_tmp_path,
-                        spool_row_count, ttl_seconds=CACHE_TTL_DETECTION,
-                    )
-                df = load_spooled_df(_SPOOL_NS, engine_hash)
-                if df is None:
-                    df = pd.DataFrame()
+        # Spool hit short-circuit (shared by DuckDB / trace pipeline).
+        df = load_spooled_df(_SPOOL_NS, engine_hash)
+        if df is not None:
+            logger.info("Detection spool hit (hash=%s)", engine_hash)
         else:
-            # --- Direct path (short query) ---
-            bind_params = {
-                'start_date': start_date,
-                'end_date': end_date,
-                **wip_params,
-                **rej_params,
-            }
-            df = read_sql_df(sql, bind_params)
-            if df is None:
-                logger.error("Station detection query returned None (station=%s)", station)
-                return None
-            if not df.empty:
-                stored = store_spooled_df(
-                    _SPOOL_NS,
-                    engine_hash,
-                    df,
-                    ttl_seconds=CACHE_TTL_DETECTION,
+            # --- Step A: resolve CONTAINERID set (CONTAINERID-first entry) ---
+            cids, _stepA_pf = _resolve_detection_cids(start_date, end_date, station)
+            if _stepA_pf:
+                _msd_partial_failure = _stepA_pf
+
+            if not cids:
+                df = pd.DataFrame()
+            else:
+                # --- Step B: enrich, bounded to the full window (legacy semantics) ---
+                df, _stepB_pf = _fetch_detection_rows_for_cids(
+                    cids,
+                    station,
+                    detection_time_filter=_DET_TIME_FILTER,
+                    reject_time_filter=_REJ_TIME_FILTER,
+                    time_params={'start_date': start_date, 'end_date': end_date},
                 )
-                if not stored:
-                    logger.debug(
-                        "Detection direct-path spool store skipped/failed (hash=%s)",
-                        engine_hash,
+                if _stepB_pf:
+                    _msd_partial_failure = {
+                        **_msd_partial_failure,
+                        **_stepB_pf,
+                        "has_partial_failure": True,
+                    }
+                if df is not None and not df.empty:
+                    stored = store_spooled_df(
+                        _SPOOL_NS, engine_hash, df, ttl_seconds=CACHE_TTL_DETECTION,
                     )
+                    if not stored:
+                        logger.debug(
+                            "Detection spool store skipped/failed (hash=%s)", engine_hash,
+                        )
+            if df is None:
+                df = pd.DataFrame()
+            if _msd_partial_failure.get("has_partial_failure"):
+                logger.warning(
+                    "msd_detect partial failure (hash=%s): failed_chunk_count=%s failed_ranges=%s",
+                    engine_hash,
+                    _msd_partial_failure.get("failed_chunk_count"),
+                    _msd_partial_failure.get("failed_ranges"),
+                )
 
         logger.info(
             "Station detection (%s): %d rows, %d unique lots",
@@ -1703,19 +1773,12 @@ def _fetch_station_detection_data(
             len(df),
             df['CONTAINERID'].nunique() if not df.empty else 0,
         )
-        # Only cache records in Redis for direct path; engine path uses spool
+        # Mirror legacy behavior: cache full records in Redis only for short ranges;
+        # long ranges rely on the parquet spool to avoid oversized Redis payloads.
         if not should_decompose_by_time(start_date, end_date):
             cache_set(cache_key, df.to_dict('records'), ttl=CACHE_TTL_DETECTION)
         return df, _msd_partial_failure
     except Exception as exc:
-        from mes_dashboard.services.batch_query_engine import ChunkSchemaMismatch
-        if isinstance(exc, ChunkSchemaMismatch):
-            logger.error(
-                "Station detection aborted: chunk schema drift (station=%s, "
-                "chunk_index=%d, expected=%s, got=%s). Upstream SQL/view likely changed.",
-                station, exc.chunk_index, exc.expected, exc.got,
-            )
-            raise
         logger.error("Station detection query failed (station=%s): %s", station, exc, exc_info=True)
         return None, {}
 
@@ -1753,7 +1816,10 @@ def _fetch_detection_by_container_ids(
 ) -> Optional[pd.DataFrame]:
     """Fetch detection data for explicit container IDs (container query mode).
 
-    Uses station_detection_by_ids.sql with CONTAINERID IN clause.
+    Step B of the CONTAINERID-first pipeline with no time-window bound (container
+    mode has no date range).  Delegates to the shared, batched enrichment helper
+    (``station_detection_by_ids.sql``), so it correctly handles >1000 IDs and
+    uses the same ROW_NUMBER workflow dedup as date-range mode.
     """
     if not container_ids:
         return pd.DataFrame()
@@ -1773,20 +1839,7 @@ def _fetch_detection_by_container_ids(
         return None
 
     try:
-        wip_filter, wip_params = _build_multi_station_filter(_cid_stations, 'h')
-        rej_filter, rej_params = _build_multi_station_filter(_cid_stations, 'r')
-
-        # Build CONTAINERID IN clause with quoted values
-        quoted_ids = ", ".join(f"'{cid}'" for cid in container_ids)
-
-        sql = SQLLoader.load_with_params(
-            "mid_section_defect/station_detection_by_ids",
-            CONTAINER_IDS=quoted_ids,
-            STATION_FILTER=wip_filter,
-            STATION_FILTER_REJECTS=rej_filter,
-        )
-        bind_params = {**wip_params, **rej_params}
-        df = read_sql_df(sql, bind_params)
+        df, _pf = _fetch_detection_rows_for_cids(container_ids, station)
         if df is None:
             logger.error("Container detection query returned None (station=%s)", station)
             return None
@@ -2569,6 +2622,8 @@ def _attribute_forward_defects(
             'loss_reasons': {reason: qty},
         }}
     """
+    defect_set = set(defect_cids)
+
     station_agg: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
         'lots_reached': set(),
         'total_input': 0,
@@ -2577,8 +2632,10 @@ def _attribute_forward_defects(
         'loss_reasons': defaultdict(int),
     })
 
-    # Aggregate WIP records at downstream stations
+    # Aggregate WIP records at downstream stations — only for defect-filtered lots
     for cid in wip_by_cid:
+        if cid not in defect_set:
+            continue
         for record in wip_by_cid[cid]:
             wc_group = record.get('workcenter_group', '')
             if not wc_group:
@@ -2594,8 +2651,10 @@ def _attribute_forward_defects(
             agg['total_input'] += trackinqty
             agg['machines'][eq_name]['input'] += trackinqty
 
-    # Aggregate reject records at downstream stations
+    # Aggregate reject records at downstream stations — only for defect-filtered lots
     for cid in downstream_rejects:
+        if cid not in defect_set:
+            continue
         for record in downstream_rejects[cid]:
             wc_group = record.get('workcenter_group', '')
             if not wc_group:

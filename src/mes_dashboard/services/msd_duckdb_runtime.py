@@ -377,8 +377,15 @@ class MsdDuckdbRuntime:
         loss_reasons: Optional[List[str]] = None,
         *,
         station_order_fallback: int = 999,
+        pj_types: Optional[List[str]] = None,
+        packages: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Compute summary KPIs and charts from spool via DuckDB."""
+        """Compute summary KPIs and charts from spool via DuckDB.
+
+        pj_types / packages are applied as population masks at read time (the
+        trace_query_id / spool is package-independent), so the same spool serves
+        every Type/Package selection.
+        """
         self._resolve_paths()
         if direction == "backward":
             if not self._detection_path or not Path(self._detection_path).exists():
@@ -394,45 +401,18 @@ class MsdDuckdbRuntime:
                 self._detection_path,
                 loss_reasons=loss_reasons,
                 upstream_station_groups=upstream_groups,
+                pj_types=pj_types,
+                packages=packages,
             )
             if summary is not None:
                 return summary
             return None
 
-        if not self._events_path:
-            return None
-
-        try:
-            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
-
-            conn = create_heavy_query_connection()
-            conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
-
-            kpi = self._compute_kpi(conn)
-            charts = self._compute_charts(conn)
-            daily_trend = self._compute_daily_trend(conn)
-
-            if self._lineage_path and Path(self._lineage_path).exists():
-                conn.execute(
-                    f"CREATE VIEW lineage AS SELECT * FROM read_parquet('{self._lineage_path}')"
-                )
-                attribution = self._compute_attribution(conn)
-            else:
-                attribution = []
-
-            conn.close()
-            return {
-                "kpi": kpi,
-                "charts": charts,
-                "daily_trend": daily_trend,
-                "attribution": attribution,
-                "trace_query_id": self.trace_query_id,
-            }
-        except Exception as exc:
-            logger.warning("MsdDuckdbRuntime.get_summary failed (trace_query_id=%s): %s", self.trace_query_id, exc)
-            from mes_dashboard.core.heavy_query_telemetry import record_lifecycle_failure
-            record_lifecycle_failure("msd", reason="runtime_error")
-            return None
+        # Forward-direction KPI requires detection-station counts and defect_cids filtering
+        # that are not captured in the events spool alone.  Return None so the caller
+        # falls back to Oracle-based build_trace_aggregation_from_events which produces
+        # the correct forward KPI structure (detection_lot_count, downstream_stations_reached …).
+        return None
 
     def _compute_kpi(self, conn) -> Dict[str, Any]:
         """Compute total defect count, lot count, and defect rate from events view.
@@ -668,22 +648,30 @@ class MsdDuckdbRuntime:
     def _compute_kpi_from_detection(self, conn) -> Dict[str, Any]:
         """Compute KPI from detection spool (Oracle column names)."""
         try:
+            # Denominator (lot_count, total_input) comes from the POPULATION view
+            # (detection_raw = package/type masked, NOT loss_reason masked) so that
+            # filtering by loss reason never shrinks the denominator and inflates the
+            # rate.  Numerator (defect_qty, defective_lot_count) comes from the
+            # loss_reason-masked `detection` view.
             row = conn.execute(
                 """
-                WITH lot_summary AS (
-                    SELECT
-                        CONTAINERID,
-                        MAX(TRACKINQTY) AS lot_trackinqty,
-                        SUM(REJECTQTY)  AS lot_rejectqty
+                WITH pop AS (
+                    SELECT CONTAINERID, MAX(TRACKINQTY) AS lot_trackinqty
+                    FROM detection_raw
+                    GROUP BY CONTAINERID
+                ),
+                dfct AS (
+                    SELECT CONTAINERID, SUM(REJECTQTY) AS lot_rejectqty
                     FROM detection
                     GROUP BY CONTAINERID
                 )
                 SELECT
-                    COUNT(DISTINCT CONTAINERID)                                  AS lot_count,
-                    SUM(lot_trackinqty)                                          AS total_input,
-                    SUM(CASE WHEN lot_rejectqty > 0 THEN 1 ELSE 0 END)          AS defective_lot_count,
-                    SUM(lot_rejectqty)                                           AS total_defect_qty
-                FROM lot_summary
+                    COUNT(DISTINCT pop.CONTAINERID)                              AS lot_count,
+                    SUM(pop.lot_trackinqty)                                      AS total_input,
+                    SUM(CASE WHEN dfct.lot_rejectqty > 0 THEN 1 ELSE 0 END)      AS defective_lot_count,
+                    COALESCE(SUM(dfct.lot_rejectqty), 0)                         AS total_defect_qty
+                FROM pop
+                LEFT JOIN dfct ON dfct.CONTAINERID = pop.CONTAINERID
                 """
             ).fetchone()
             if row:
@@ -698,11 +686,12 @@ class MsdDuckdbRuntime:
                     else 0.0
                 )
 
-                # Top loss reason
+                # Top loss reason — from population so it reflects the true top
+                # reason regardless of the loss_reason filter selection.
                 top_row = conn.execute(
                     """
                     SELECT LOSSREASONNAME, SUM(REJECTQTY) AS total
-                    FROM detection
+                    FROM detection_raw
                     WHERE LOSSREASONNAME IS NOT NULL AND LOSSREASONNAME != ''
                     GROUP BY LOSSREASONNAME
                     ORDER BY total DESC
@@ -733,24 +722,35 @@ class MsdDuckdbRuntime:
     def _compute_daily_trend_from_detection(self, conn) -> List[Dict[str, Any]]:
         """Compute daily defect trend from detection spool."""
         try:
+            # Per-day rate: input (denominator) from population (detection_raw),
+            # defect (numerator) from loss_reason-masked detection.
             rows = conn.execute(
                 """
-                WITH lot_daily AS (
+                WITH pop_daily AS (
                     SELECT
                         CAST(TRACKINTIMESTAMP AS DATE) AS txn_day,
                         CONTAINERID,
-                        MAX(TRACKINQTY) AS input_qty,
-                        SUM(REJECTQTY)  AS defect_qty
+                        MAX(TRACKINQTY) AS input_qty
+                    FROM detection_raw
+                    GROUP BY CAST(TRACKINTIMESTAMP AS DATE), CONTAINERID
+                ),
+                dfct_daily AS (
+                    SELECT
+                        CAST(TRACKINTIMESTAMP AS DATE) AS txn_day,
+                        CONTAINERID,
+                        SUM(REJECTQTY) AS defect_qty
                     FROM detection
                     GROUP BY CAST(TRACKINTIMESTAMP AS DATE), CONTAINERID
                 )
                 SELECT
-                    txn_day,
-                    SUM(defect_qty) AS defect_qty,
-                    SUM(input_qty)  AS input_qty
-                FROM lot_daily
-                GROUP BY txn_day
-                ORDER BY txn_day
+                    p.txn_day,
+                    COALESCE(SUM(d.defect_qty), 0) AS defect_qty,
+                    SUM(p.input_qty)              AS input_qty
+                FROM pop_daily p
+                LEFT JOIN dfct_daily d
+                    ON d.txn_day = p.txn_day AND d.CONTAINERID = p.CONTAINERID
+                GROUP BY p.txn_day
+                ORDER BY p.txn_day
                 """
             ).fetchall()
             return [
@@ -1319,6 +1319,8 @@ class MsdDuckdbRuntime:
         order: str = "desc",
         direction: str = "backward",
         loss_reasons: Optional[List[str]] = None,
+        pj_types: Optional[List[str]] = None,
+        packages: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Return paginated detail rows from detection+lineage+events spool via DuckDB."""
         self._resolve_paths()
@@ -1353,6 +1355,8 @@ class MsdDuckdbRuntime:
                 conn,
                 detection_spool_path=self._detection_path,
                 loss_reasons=loss_reasons,
+                pj_types=pj_types,
+                packages=packages,
             ):
                 conn.close()
                 return None

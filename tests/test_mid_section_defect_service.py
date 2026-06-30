@@ -828,60 +828,71 @@ def test_export_csv_flattens_structured_fields(mock_query_analysis):
 # ============================================================
 
 class TestMsdEngineParallel:
-    """MSD_ENGINE_PARALLEL env var controls execute_plan parallel for MSD detection."""
+    """MSD_ENGINE_PARALLEL env var controls ThreadPoolExecutor max_workers for the
+    CONTAINERID-first detection pipeline (Step A time-chunks + Step B IN-batches)."""
 
-    def _make_detection_env(self, monkeypatch, *, engine_calls, progress=None):
-        import mes_dashboard.services.batch_query_engine as engine_mod
+    def _make_detection_env(self, monkeypatch, *, pool_calls):
         import mes_dashboard.services.mid_section_defect_service as msd_svc
         import mes_dashboard.core.query_spool_store as spool_mod
-        import mes_dashboard.sql as sql_mod
+        import pandas as pd
 
-        def fake_execute_plan(chunks, query_fn, **kwargs):
-            engine_calls.append(kwargs.get("parallel"))
-            return kwargs.get("query_hash", "fake_hash")
-
-        # Patch engine_mod (these are imported fresh inside the function)
-        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
-        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
-        monkeypatch.setattr(engine_mod, "get_batch_progress", lambda *a: progress or {})
-        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *a: True)
-        monkeypatch.setattr(engine_mod, "decompose_by_time_range", lambda *a, **kw: [
-            {"chunk_start": "2025-01-01", "chunk_end": "2025-01-31"},
-        ])
-        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: None)
-        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda *a: None)
-        monkeypatch.setattr(sql_mod.SQLLoader, "load_with_params", lambda *a, **kw: "SELECT 1")
-        monkeypatch.setattr(msd_svc, "read_sql_df", lambda *a, **kw: __import__('pandas').DataFrame())
-        # Bypass cache_get so it goes to Oracle path
+        # Spool miss → forces Step A / Step B Oracle path.
+        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda *a, **kw: None)
+        monkeypatch.setattr(spool_mod, "store_spooled_df", lambda *a, **kw: True)
         monkeypatch.setattr(msd_svc, "cache_get", lambda *a: None)
-        # Mock _build_station_filter to return simple values
+        monkeypatch.setattr(msd_svc, "cache_set", lambda *a, **kw: None)
         monkeypatch.setattr(msd_svc, "_build_station_filter", lambda station, alias: ("1=1", {}))
 
-    def test_default_parallel_is_1(self, monkeypatch):
-        """Without MSD_ENGINE_PARALLEL → execute_plan gets parallel=1."""
+        def fake_read_sql(sql, params=None, **kw):
+            if "SELECT DISTINCT" in sql.upper():
+                # Step A: CONTAINERID resolution
+                return pd.DataFrame({"CONTAINERID": ["C1", "C2"]})
+            # Step B: enrichment
+            return pd.DataFrame({
+                "CONTAINERID": ["C1", "C2"],
+                "WORKCENTERNAME": ["WC-A", "WC-B"],
+                "REJECTQTY": [0, 0],
+            })
+
+        monkeypatch.setattr(msd_svc, "read_sql_df", fake_read_sql)
+
+        # Capture ThreadPoolExecutor max_workers usage.
+        real_tpe = msd_svc.ThreadPoolExecutor
+
+        class _SpyTPE(real_tpe):
+            def __init__(self, *args, **kwargs):
+                pool_calls.append(kwargs.get("max_workers"))
+                super().__init__(*args, **kwargs)
+
+        monkeypatch.setattr(msd_svc, "ThreadPoolExecutor", _SpyTPE)
+
+    def test_default_parallel_serial(self, monkeypatch):
+        """MSD_ENGINE_PARALLEL=1 → serial path, ThreadPoolExecutor NOT used."""
         import mes_dashboard.services.mid_section_defect_service as msd_svc
 
-        engine_calls = []
+        pool_calls = []
         monkeypatch.setattr(msd_svc, "_MSD_ENGINE_PARALLEL", 1)
-        self._make_detection_env(monkeypatch, engine_calls=engine_calls)
+        self._make_detection_env(monkeypatch, pool_calls=pool_calls)
 
-        msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
+        df, _pf = msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
 
-        assert len(engine_calls) == 1
-        assert engine_calls[0] == 1
+        assert pool_calls == []  # serial — no executor created
+        assert df is not None and len(df) == 2
 
-    def test_parallel_2_passed_to_execute_plan(self, monkeypatch):
-        """MSD_ENGINE_PARALLEL=2 → execute_plan gets parallel=2."""
+    def test_parallel_2_uses_threadpool(self, monkeypatch):
+        """MSD_ENGINE_PARALLEL=2 with multiple time-chunks → ThreadPoolExecutor(max_workers=2)."""
         import mes_dashboard.services.mid_section_defect_service as msd_svc
 
-        engine_calls = []
+        pool_calls = []
         monkeypatch.setattr(msd_svc, "_MSD_ENGINE_PARALLEL", 2)
-        self._make_detection_env(monkeypatch, engine_calls=engine_calls)
+        self._make_detection_env(monkeypatch, pool_calls=pool_calls)
 
-        msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
+        # 12-month range → Step A decomposes into multiple chunks → parallel.
+        df, _pf = msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
 
-        assert len(engine_calls) == 1
-        assert engine_calls[0] == 2
+        assert pool_calls, "ThreadPoolExecutor should be created for parallel Step A"
+        assert all(mw == 2 for mw in pool_calls)
+        assert df is not None and len(df) == 2
 
 
 # ============================================================
@@ -892,34 +903,25 @@ class TestMsdPartialFailure:
     """MSD detection partial failure logs a warning and propagates to _meta."""
 
     def _setup_partial_failure_mocks(self, monkeypatch):
-        """Common mock setup for partial failure tests."""
+        """Common mock setup: Step A CID resolution raises for every time-chunk."""
         import mes_dashboard.services.mid_section_defect_service as msd_svc
-        import mes_dashboard.services.batch_query_engine as engine_mod
         import mes_dashboard.core.query_spool_store as spool_mod
-        import mes_dashboard.sql as sql_mod
-        import pandas as pd
 
-        monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: kw.get("query_hash", "fake"))
-        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: ("/tmp/f.parquet", 1))
-        monkeypatch.setattr(
-            engine_mod,
-            "get_batch_progress",
-            lambda *a: {"has_partial_failure": "True", "failed_ranges": "2025-01-01~2025-01-31"},
-        )
-        monkeypatch.setattr(engine_mod, "should_decompose_by_time", lambda *a: True)
-        monkeypatch.setattr(engine_mod, "decompose_by_time_range", lambda *a, **kw: [
-            {"chunk_start": "2025-01-01", "chunk_end": "2025-01-31"},
-        ])
-        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: None)
-        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda *a: None)
-        monkeypatch.setattr(sql_mod.SQLLoader, "load_with_params", lambda *a, **kw: "SELECT 1")
-        monkeypatch.setattr(msd_svc, "read_sql_df", lambda *a, **kw: pd.DataFrame())
+        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda *a, **kw: None)
+        monkeypatch.setattr(spool_mod, "store_spooled_df", lambda *a, **kw: True)
         monkeypatch.setattr(msd_svc, "cache_get", lambda *a: None)
+        monkeypatch.setattr(msd_svc, "cache_set", lambda *a, **kw: None)
         monkeypatch.setattr(msd_svc, "_build_station_filter", lambda station, alias: ("1=1", {}))
+        monkeypatch.setattr(msd_svc, "_MSD_ENGINE_PARALLEL", 1)
+
+        def fail_read_sql(sql, params=None, **kw):
+            raise RuntimeError("simulated chunk failure")
+
+        monkeypatch.setattr(msd_svc, "read_sql_df", fail_read_sql)
         return msd_svc
 
     def test_partial_failure_warning_logged(self, monkeypatch, caplog):
-        """Chunk partial failure → logger.warning is emitted."""
+        """Step A chunk failure → logger.warning is emitted."""
         import logging
         msd_svc = self._setup_partial_failure_mocks(monkeypatch)
 
@@ -929,13 +931,17 @@ class TestMsdPartialFailure:
         assert any("partial failure" in r.message.lower() for r in caplog.records)
 
     def test_partial_failure_returned_in_meta(self, monkeypatch):
-        """Chunk partial failure → returned tuple[1] contains partial failure info."""
+        """Step A chunk failures → returned tuple[1] flags partial failure with ranges."""
         msd_svc = self._setup_partial_failure_mocks(monkeypatch)
 
+        # 12-month range decomposes into multiple chunks; all read_sql_df calls raise.
         df, pf_meta = msd_svc._fetch_station_detection_data("2025-01-01", "2025-12-31", "TestStation")
 
         assert pf_meta.get("has_partial_failure") is True
-        assert pf_meta.get("failed_ranges") == "2025-01-01~2025-01-31"
+        assert pf_meta.get("failed_chunk_count", 0) >= 1
+        assert "~" in (pf_meta.get("failed_ranges") or "")
+        # No CIDs resolved → empty detection frame, but no crash.
+        assert df is not None and df.empty
 
     def test_partial_failure_propagated_to_query_analysis(self, monkeypatch):
         """partial_failure_meta from detection propagates to query_analysis() result _meta."""
@@ -1004,24 +1010,28 @@ def _make_detection_df_with_types():
 @patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_query_analysis_filter_by_pj_type_reduces_rows(
+def test_query_analysis_pj_type_does_not_reduce_available_reasons(
     mock_fetch,
     _mock_ensure,
-    _mock_spool,
+    mock_spool,
     _mock_cache_get,
     _mock_cache_set,
 ):
-    """Passing pj_types=['TYPE-A'] should exclude TYPE-B rows from detection_df."""
+    """pj_types is a read-time mask, NOT a seed filter: available_loss_reasons stays
+    population-based (full), and pj_types is forwarded to the mask layer."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
     result = query_analysis('2025-01-01', '2025-01-31', pj_types=['TYPE-A'])
 
     assert result is not None
     assert 'error' not in result
-    # Only TYPE-A container (CID-001/R1) should remain
+    # Population-based: both reasons remain regardless of pj_types
     available = result.get('available_loss_reasons', [])
     assert 'R1' in available
-    assert 'R2' not in available
+    assert 'R2' in available
+    # pj_types forwarded to the spool/mask layer
+    assert mock_spool.called
+    assert mock_spool.call_args.kwargs.get('pj_types') == ['TYPE-A']
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
@@ -1029,14 +1039,15 @@ def test_query_analysis_filter_by_pj_type_reduces_rows(
 @patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_query_analysis_filter_by_package_reduces_rows(
+def test_query_analysis_package_does_not_reduce_available_reasons(
     mock_fetch,
     _mock_ensure,
-    _mock_spool,
+    mock_spool,
     _mock_cache_get,
     _mock_cache_set,
 ):
-    """Passing packages=['PKG-B'] should exclude PKG-A rows from detection_df."""
+    """packages is a read-time mask, NOT a seed filter: available_loss_reasons stays
+    population-based, and packages is forwarded to the mask layer."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
     result = query_analysis('2025-01-01', '2025-01-31', packages=['PKG-B'])
@@ -1044,8 +1055,10 @@ def test_query_analysis_filter_by_package_reduces_rows(
     assert result is not None
     assert 'error' not in result
     available = result.get('available_loss_reasons', [])
+    assert 'R1' in available
     assert 'R2' in available
-    assert 'R1' not in available
+    assert mock_spool.called
+    assert mock_spool.call_args.kwargs.get('packages') == ['PKG-B']
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
@@ -1053,18 +1066,17 @@ def test_query_analysis_filter_by_package_reduces_rows(
 @patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_query_analysis_filter_pj_type_and_package_and_semantics(
+def test_query_analysis_pj_type_and_package_both_forwarded(
     mock_fetch,
     _mock_ensure,
-    _mock_spool,
+    mock_spool,
     _mock_cache_get,
     _mock_cache_set,
 ):
-    """AND-semantics: both pj_types and packages applied; no co-occurrence → empty."""
+    """Both pj_types and packages are forwarded to the read-time mask layer; seeds /
+    available_loss_reasons remain population-based (no seed-level AND-empty)."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
-    # TYPE-A is in CID-001/PKG-A, TYPE-B in CID-002/PKG-B
-    # Asking for TYPE-A AND PKG-B → no rows match
     result = query_analysis(
         '2025-01-01', '2025-01-31',
         pj_types=['TYPE-A'],
@@ -1073,7 +1085,11 @@ def test_query_analysis_filter_pj_type_and_package_and_semantics(
 
     assert result is not None
     assert 'error' not in result
-    assert result.get('available_loss_reasons', []) == []
+    # No seed-level AND-empty anymore: population reasons remain
+    available = result.get('available_loss_reasons', [])
+    assert 'R1' in available and 'R2' in available
+    assert mock_spool.call_args.kwargs.get('pj_types') == ['TYPE-A']
+    assert mock_spool.call_args.kwargs.get('packages') == ['PKG-B']
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
@@ -1105,21 +1121,25 @@ def test_query_analysis_no_pj_types_packages_output_unchanged(
 @patch('mes_dashboard.services.mid_section_defect_service._load_analysis_from_spool', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service.ensure_analysis_background_job', return_value=None)
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_query_analysis_unknown_pj_type_returns_empty_detection(
+def test_query_analysis_unknown_pj_type_does_not_empty_population(
     mock_fetch,
     _mock_ensure,
-    _mock_spool,
+    mock_spool,
     _mock_cache_get,
     _mock_cache_set,
 ):
-    """Unknown pj_types value → empty df after filter; response shape unchanged; no 5xx."""
+    """Unknown pj_types no longer empties the result at seed level; it is forwarded as
+    a mask (the DuckDB layer yields empty aggregates, not the seed resolver)."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
     result = query_analysis('2025-01-01', '2025-01-31', pj_types=['NONEXISTENT'])
 
     assert result is not None
     assert 'error' not in result
-    assert result.get('available_loss_reasons', []) == []
+    # Population reasons unchanged; mask forwarded
+    available = result.get('available_loss_reasons', [])
+    assert 'R1' in available and 'R2' in available
+    assert mock_spool.call_args.kwargs.get('pj_types') == ['NONEXISTENT']
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
@@ -1154,11 +1174,11 @@ def test_query_analysis_empty_pj_types_list_no_filter(
 def test_query_analysis_null_pj_type_column_no_crash(
     mock_fetch,
     _mock_ensure,
-    _mock_spool,
+    mock_spool,
     _mock_cache_get,
     _mock_cache_set,
 ):
-    """NULL PJ_TYPE values are excluded from isin match; no crash (AC-7 #8)."""
+    """NULL PJ_TYPE values in the population do not crash seed resolution (mask at read)."""
     df_with_nulls = pd.DataFrame([
         {
             'CONTAINERID': 'CID-001',
@@ -1189,23 +1209,27 @@ def test_query_analysis_null_pj_type_column_no_crash(
     ])
     mock_fetch.return_value = (df_with_nulls, {})
 
-    # NULL row must be excluded; TYPE-B row should pass
+    # NULL PJ_TYPE in the population must not crash; seeds stay package-independent.
     result = query_analysis('2025-01-01', '2025-01-31', pj_types=['TYPE-B'])
 
     assert result is not None
     assert 'error' not in result
     available = result.get('available_loss_reasons', [])
+    assert 'R1' in available  # population-based, includes the NULL-pj_type lot's reason
     assert 'R2' in available
-    assert 'R1' not in available
+    assert mock_spool.call_args.kwargs.get('pj_types') == ['TYPE-B']
 
 
 # ---------------------------------------------------------------------------
-# resolve_trace_seed_lots: pj_types / packages filter (trace path)
+# resolve_trace_seed_lots: pj_types / packages are NOT seed filters anymore.
+# They are population masks applied at DuckDB read time, so the seed set (and
+# therefore trace_query_id) is package-independent — one trace serves every
+# Type/Package selection.  See msd second-query fix.
 # ---------------------------------------------------------------------------
 
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_resolve_trace_seed_lots_filter_by_pj_type(mock_fetch):
-    """pj_types filter must exclude non-matching seeds from the trace seed set."""
+def test_resolve_trace_seed_lots_pj_type_does_not_filter_seeds(mock_fetch):
+    """pj_types must NOT shrink the seed set — seeds stay package-independent."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
     result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', pj_types=['TYPE-A'])
@@ -1214,13 +1238,13 @@ def test_resolve_trace_seed_lots_filter_by_pj_type(mock_fetch):
     assert 'error' not in result
     cids = [s['container_id'] for s in result['seeds']]
     assert 'CID-001' in cids
-    assert 'CID-002' not in cids
-    assert result['seed_count'] == 1
+    assert 'CID-002' in cids  # full population regardless of pj_types
+    assert result['seed_count'] == 2
 
 
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_resolve_trace_seed_lots_filter_by_package(mock_fetch):
-    """packages filter must exclude non-matching seeds from the trace seed set."""
+def test_resolve_trace_seed_lots_package_does_not_filter_seeds(mock_fetch):
+    """packages must NOT shrink the seed set — seeds stay package-independent."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
     result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', packages=['PKG-B'])
@@ -1228,9 +1252,9 @@ def test_resolve_trace_seed_lots_filter_by_package(mock_fetch):
     assert result is not None
     assert 'error' not in result
     cids = [s['container_id'] for s in result['seeds']]
-    assert 'CID-002' in cids
-    assert 'CID-001' not in cids
-    assert result['seed_count'] == 1
+    assert 'CID-001' in cids
+    assert 'CID-002' in cids  # full population regardless of packages
+    assert result['seed_count'] == 2
 
 
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
@@ -1245,40 +1269,12 @@ def test_resolve_trace_seed_lots_no_filter_returns_all(mock_fetch):
 
 
 @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_resolve_trace_seed_lots_filter_all_excluded_returns_empty(mock_fetch):
-    """Filter that excludes all rows must return seed_count=0, not error."""
+def test_resolve_trace_seed_lots_unknown_pj_type_still_returns_all_seeds(mock_fetch):
+    """An unknown pj_types value no longer empties the seed set (mask happens later)."""
     mock_fetch.return_value = (_make_detection_df_with_types(), {})
 
     result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', pj_types=['NONEXISTENT'])
 
     assert result is not None
     assert 'error' not in result
-    assert result['seed_count'] == 0
-    assert result['seeds'] == []
-
-
-@patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detection_data')
-def test_resolve_trace_seed_lots_filter_strips_char_padding(mock_fetch):
-    """Oracle CHAR columns may have trailing spaces; filter must still match."""
-    df = pd.DataFrame([
-        {
-            'CONTAINERID': 'CID-001',
-            'CONTAINERNAME': 'LOT-001',
-            'TRACKINQTY': 100,
-            'REJECTQTY': 5,
-            'LOSSREASONNAME': 'R1',
-            'WORKFLOW': 'WF-A',
-            'PRODUCTLINENAME': 'PKG-A   ',   # space-padded CHAR
-            'PJ_TYPE': 'TYPE-A  ',            # space-padded CHAR
-            'DETECTION_EQUIPMENTNAME': 'EQ-01',
-            'TRACKINTIMESTAMP': '2025-01-10 10:00:00',
-            'FINISHEDRUNCARD': 'FR-001',
-        },
-    ])
-    mock_fetch.return_value = (df, {})
-
-    # Dropdown sends stripped value (from container_filter_cache)
-    result = resolve_trace_seed_lots('2025-01-01', '2025-01-31', pj_types=['TYPE-A'])
-
-    assert result is not None
-    assert result['seed_count'] == 1, "strip() on CHAR column must allow match"
+    assert result['seed_count'] == 2  # seeds package-independent; mask applied at read time

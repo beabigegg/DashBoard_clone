@@ -10,78 +10,56 @@ from mes_dashboard.services import mid_section_defect_service as msd_svc
 
 
 class TestDetectionEngineDecomposition:
-    """Engine decomposition with spool-based merge."""
+    """CONTAINERID-first two-step pipeline (Step A time-chunked CIDs → Step B IN-batch enrich)."""
 
-    def test_long_range_triggers_engine_spool(self, monkeypatch, tmp_path):
-        """90-day range → engine decomposition → merge_chunks_to_spool → spool DataFrame."""
-        import mes_dashboard.services.batch_query_engine as engine_mod
+    def test_long_range_triggers_two_step_spool(self, monkeypatch):
+        """90-day range → Step A (time-chunked CIDs) → Step B (IN-batch enrich) → spool."""
         import mes_dashboard.core.query_spool_store as spool_mod
 
-        engine_calls = {"execute": 0, "merge_to_spool": 0, "register": 0}
+        calls = {"stepA": 0, "stepB": 0, "store": 0}
 
-        def fake_execute_plan(chunks, query_fn, **kwargs):
-            engine_calls["execute"] += 1
-            assert len(chunks) == 3  # 90 days / 31 = 3 chunks
-            assert kwargs.get("cache_prefix") == "msd_detect"
-            return kwargs.get("query_hash", "fake_hash")
+        def fake_read_sql(sql, params=None, **kwargs):
+            if "SELECT DISTINCT" in sql.upper():
+                calls["stepA"] += 1
+                return pd.DataFrame({"CONTAINERID": ["C1", "C2"]})
+            calls["stepB"] += 1
+            return pd.DataFrame({
+                "CONTAINERID": ["C1", "C2"],
+                "WORKCENTERNAME": ["TEST-WC-A", "TEST-WC-B"],
+                "REJECTQTY": [0, 0],
+            })
 
-        result_df = pd.DataFrame({
-            "CONTAINERID": ["C1", "C2"],
-            "WORKCENTERNAME": ["TEST-WC-A", "TEST-WC-B"],
-        })
-
-        spool_file = tmp_path / "test_spool.parquet"
-        result_df.to_parquet(spool_file, engine="pyarrow", index=False)
-
-        def fake_merge_chunks_to_spool(prefix, qhash, spool_dir, **kwargs):
-            engine_calls["merge_to_spool"] += 1
-            return (spool_file, 2)
-
-        def fake_register_spool_file(ns, qid, src, row_count, **kwargs):
-            engine_calls["register"] += 1
+        def fake_store_spooled_df(ns, qid, df, ttl_seconds=None):
+            calls["store"] += 1
             assert ns == "msd_detect"
-            assert row_count == 2
+            assert len(df) == 2
             return True
 
-        # load_spooled_df: first call (cache check) returns None, second returns df
-        load_calls = {"count": 0}
-
-        def fake_load_spooled_df(ns, qid):
-            load_calls["count"] += 1
-            if load_calls["count"] <= 1:
-                return None  # cache miss
-            return result_df
-
-        monkeypatch.setattr(engine_mod, "execute_plan", fake_execute_plan)
-        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", fake_merge_chunks_to_spool)
-        monkeypatch.setattr(spool_mod, "register_spool_file", fake_register_spool_file)
-        monkeypatch.setattr(spool_mod, "load_spooled_df", fake_load_spooled_df)
+        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda ns, qid: None)
+        monkeypatch.setattr(spool_mod, "store_spooled_df", fake_store_spooled_df)
         monkeypatch.setattr(
-            "mes_dashboard.services.mid_section_defect_service.cache_get",
-            lambda key: None,
+            "mes_dashboard.services.mid_section_defect_service.read_sql_df", fake_read_sql,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.mid_section_defect_service.cache_get", lambda key: None,
         )
         monkeypatch.setattr(
             "mes_dashboard.services.mid_section_defect_service.cache_set",
             lambda key, val, ttl=None: None,
         )
-        monkeypatch.setattr(
-            "mes_dashboard.services.mid_section_defect_service.SQLLoader",
-            type("FakeLoader", (), {
-                "load_with_params": staticmethod(lambda name, **kw: "SELECT 1 FROM dual"),
-            }),
-        )
 
-        df = msd_svc._fetch_station_detection_data(
+        df, _pf = msd_svc._fetch_station_detection_data(
             start_date="2025-01-01",
             end_date="2025-03-31",
             station="測試",
         )
 
-        assert engine_calls["execute"] == 1
-        assert engine_calls["merge_to_spool"] == 1
-        assert engine_calls["register"] == 1
+        assert calls["stepA"] >= 1   # time-chunked CID resolution ran
+        assert calls["stepB"] >= 1   # IN-batch enrichment ran
+        assert calls["store"] == 1   # long range spools the merged result
         assert df is not None
         assert len(df) == 2
+        assert "WORKCENTERNAME" in df.columns
 
     def test_spool_cache_hit_skips_engine(self, monkeypatch):
         """Spool cache hit → returns cached DataFrame without engine execution."""
@@ -196,39 +174,29 @@ class TestDetectionEngineDecomposition:
         assert df.iloc[0]["CONTAINERID"] == "C1"
         assert spool_calls == [("msd_detect", msd_svc._make_detection_spool_query_id("2025-06-01", "2025-06-05", "測試"), 1)]
 
-    def test_engine_path_returns_dataframe(self, monkeypatch, tmp_path):
-        """Engine path returns DataFrame (same interface as before migration)."""
-        import mes_dashboard.services.batch_query_engine as engine_mod
+    def test_two_step_path_returns_dataframe(self, monkeypatch):
+        """Two-step path returns the enriched DataFrame (Step B columns preserved)."""
         import mes_dashboard.core.query_spool_store as spool_mod
 
-        result_df = pd.DataFrame({
-            "CONTAINERID": ["C1"],
-            "WORKCENTERNAME": ["WC"],
-            "TOTAL_QTY": [100],
-        })
+        def fake_read_sql(sql, params=None, **kwargs):
+            if "SELECT DISTINCT" in sql.upper():
+                return pd.DataFrame({"CONTAINERID": ["C1"]})
+            return pd.DataFrame({
+                "CONTAINERID": ["C1"],
+                "WORKCENTERNAME": ["WC"],
+                "REJECTQTY": [100],
+            })
 
-        monkeypatch.setattr(engine_mod, "execute_plan", lambda *a, **kw: None)
-        monkeypatch.setattr(engine_mod, "merge_chunks_to_spool", lambda *a, **kw: (tmp_path / "x.parquet", 1))
-        monkeypatch.setattr(spool_mod, "register_spool_file", lambda *a, **kw: True)
-        # First load returns None (cache miss), second returns df
-        loads = {"n": 0}
-
-        def fake_load(ns, qid):
-            loads["n"] += 1
-            return None if loads["n"] <= 1 else result_df
-
-        monkeypatch.setattr(spool_mod, "load_spooled_df", fake_load)
+        monkeypatch.setattr(spool_mod, "load_spooled_df", lambda ns, qid: None)
+        monkeypatch.setattr(spool_mod, "store_spooled_df", lambda *a, **kw: True)
+        monkeypatch.setattr(
+            "mes_dashboard.services.mid_section_defect_service.read_sql_df", fake_read_sql,
+        )
         monkeypatch.setattr(
             "mes_dashboard.services.mid_section_defect_service.cache_get", lambda key: None,
         )
         monkeypatch.setattr(
             "mes_dashboard.services.mid_section_defect_service.cache_set", lambda key, val, ttl=None: None,
-        )
-        monkeypatch.setattr(
-            "mes_dashboard.services.mid_section_defect_service.SQLLoader",
-            type("FakeLoader", (), {
-                "load_with_params": staticmethod(lambda name, **kw: "SELECT 1 FROM dual"),
-            }),
         )
 
         df, _pf = msd_svc._fetch_station_detection_data(
@@ -239,4 +207,77 @@ class TestDetectionEngineDecomposition:
 
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 1
-        assert "TOTAL_QTY" in df.columns
+        assert "WORKCENTERNAME" in df.columns
+        assert int(df.iloc[0]["REJECTQTY"]) == 100
+
+
+class TestMaskSemantics:
+    """package/type as population masks; loss_reason masks numerator only (denominator
+    preserved) — the read-time DuckDB layer that replaced seed-level filtering."""
+
+    def _make_runtime(self, tmp_path):
+        """Build a runtime over a synthetic detection + minimal events spool.
+
+        Population (PJ_TYPE / PRODUCTLINENAME):
+          X: input 100, reason A=10   (TYPE-A / PKG-A)
+          Y: input 100, reason B=5    (TYPE-A / PKG-A)
+          Z: input 100, no defect     (TYPE-A / PKG-A)
+          W: input 100, reason B=5    (TYPE-B / PKG-B)
+        """
+        from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+        det = pd.DataFrame([
+            ("X", "LOT-X", "TYPE-A", "PKG-A", 100, "A", 10),
+            ("Y", "LOT-Y", "TYPE-A", "PKG-A", 100, "B", 5),
+            ("Z", "LOT-Z", "TYPE-A", "PKG-A", 100, None, 0),
+            ("W", "LOT-W", "TYPE-B", "PKG-B", 100, "B", 5),
+        ], columns=["CONTAINERID", "CONTAINERNAME", "PJ_TYPE", "PRODUCTLINENAME",
+                    "TRACKINQTY", "LOSSREASONNAME", "REJECTQTY"])
+        det["TRACKINTIMESTAMP"] = "2025-01-10 10:00:00"
+        det_path = tmp_path / "detection.parquet"
+        det.to_parquet(det_path, index=False)
+
+        events = pd.DataFrame([("X", "WC", 100)], columns=["CONTAINERID", "WORKCENTER_GROUP", "TRACKINQTY"])
+        ev_path = tmp_path / "events.parquet"
+        events.to_parquet(ev_path, index=False)
+
+        rt = MsdDuckdbRuntime("tqid-mask-test")
+        rt._events_path = str(ev_path)
+        rt._lineage_path = None
+        rt._detection_path = str(det_path)
+        rt._resolved = True
+        return rt, str(det_path)
+
+    def test_loss_reason_does_not_shrink_denominator(self, tmp_path):
+        """Filtering loss_reason=B keeps the full population in the denominator so the
+        rate is NOT inflated by dropping lots that only had other-reason defects."""
+        rt, det_path = self._make_runtime(tmp_path)
+        summary = rt.get_summary_with_detection(det_path, loss_reasons=["B"])
+        assert summary is not None
+        kpi = summary["kpi"]
+        # Denominator = full population (X+Y+Z+W) = 400, NOT 300 (X must stay in)
+        assert kpi["total_input"] == 400
+        assert kpi["lot_count"] == 4
+        # Numerator = only reason B defects = Y(5) + W(5) = 10
+        assert kpi["total_defect_qty"] == 10
+        assert abs(kpi["total_defect_rate"] - 2.5) < 0.001
+
+    def test_pj_type_mask_restricts_population(self, tmp_path):
+        """pj_types=['TYPE-A'] restricts both numerator AND denominator to TYPE-A lots."""
+        rt, det_path = self._make_runtime(tmp_path)
+        summary = rt.get_summary_with_detection(det_path, pj_types=["TYPE-A"])
+        assert summary is not None
+        kpi = summary["kpi"]
+        # Population = X,Y,Z (TYPE-A); W (TYPE-B) excluded
+        assert kpi["total_input"] == 300
+        assert kpi["lot_count"] == 3
+        assert kpi["total_defect_qty"] == 15  # X's A(10) + Y's B(5)
+
+    def test_pj_type_and_loss_reason_combined(self, tmp_path):
+        """pj_types=['TYPE-A'] (population) + loss_reasons=['B'] (numerator)."""
+        rt, det_path = self._make_runtime(tmp_path)
+        summary = rt.get_summary_with_detection(det_path, pj_types=["TYPE-A"], loss_reasons=["B"])
+        assert summary is not None
+        kpi = summary["kpi"]
+        assert kpi["total_input"] == 300        # TYPE-A population denominator
+        assert kpi["total_defect_qty"] == 5     # only Y's B within TYPE-A

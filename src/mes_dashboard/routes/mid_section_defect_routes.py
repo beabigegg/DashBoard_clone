@@ -230,6 +230,8 @@ def api_analysis_detail():
     # Task 5.3 / 6.5: resolve canonical trace_query_id first, then serve from spool.
     trace_query_id = request.args.get("trace_query_id", "").strip() or None
     start_date, end_date, loss_reasons, station, direction = _parse_common_params()
+    pj_types = request.args.getlist("pj_types[]") or []
+    packages = request.args.getlist("packages[]") or []
     if not trace_query_id:
         if not start_date or not end_date:
             return validation_error('必須提供 start_date 和 end_date 參數')
@@ -272,6 +274,8 @@ def api_analysis_detail():
                     order=order,
                     direction=direction,
                     loss_reasons=loss_reasons,
+                    pj_types=pj_types or None,
+                    packages=packages or None,
                 )
                 if detail is not None:
                     pagination = detail.get("pagination") or {}

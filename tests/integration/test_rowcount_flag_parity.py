@@ -214,32 +214,42 @@ class TestFlagFalseRegression:
             assert "chunk_start" in keys, f"Expected date-range chunks, got {keys}"
             assert "start_row" not in keys
 
-    def test_mid_section_defect_flag_false_uses_date_chunks(self, monkeypatch):
-        """mid_section_defect_service._fetch_station_detection_data must use date-range chunks."""
+    def test_mid_section_defect_flag_false_uses_two_step_pipeline(self, monkeypatch):
+        """MSD detection is CONTAINERID-first and flag-independent: it must NOT call
+        execute_plan, and must run Step A (station_detection_cids) + Step B
+        (station_detection_by_ids) regardless of _USE_ROW_COUNT_CHUNKING=false."""
         from mes_dashboard.services import mid_section_defect_service as msd
+        import pandas as pd
 
         monkeypatch.setattr(msd, "cache_get", MagicMock(return_value=None))
+        monkeypatch.setattr(msd, "cache_set", MagicMock(return_value=None))
 
+        seen = {"stepA": 0, "stepB": 0}
+
+        def fake_read_sql(sql, params=None, **kw):
+            if "SELECT DISTINCT" in sql.upper():
+                seen["stepA"] += 1
+                return pd.DataFrame({"CONTAINERID": ["C1"]})
+            seen["stepB"] += 1
+            return pd.DataFrame({"CONTAINERID": ["C1"], "REJECTQTY": [0]})
+
+        monkeypatch.setattr(msd, "read_sql_df", fake_read_sql)
         mock_ep = MagicMock(return_value=None)
-        mock_mc = MagicMock(return_value=(None, 0))
 
         with patch("mes_dashboard.services.batch_query_engine._USE_ROW_COUNT_CHUNKING", False), \
              patch("mes_dashboard.services.batch_query_engine.execute_plan", mock_ep), \
-             patch("mes_dashboard.services.batch_query_engine.merge_chunks_to_spool", mock_mc), \
              patch("mes_dashboard.services.batch_query_engine.BATCH_QUERY_TIME_THRESHOLD_DAYS", 0), \
-             patch("mes_dashboard.core.query_spool_store.load_spooled_df", MagicMock(return_value=None)):
+             patch("mes_dashboard.core.query_spool_store.load_spooled_df", MagicMock(return_value=None)), \
+             patch("mes_dashboard.core.query_spool_store.store_spooled_df", MagicMock(return_value=True)):
             msd._fetch_station_detection_data(
                 start_date="2024-01-01",
                 end_date="2024-12-31",
                 station="測試",
             )
 
-        mock_ep.assert_called_once()
-        key_sets = _chunk_key_sets(mock_ep)
-        assert len(key_sets) > 0
-        for keys in key_sets:
-            assert "chunk_start" in keys, f"Expected date-range chunks, got {keys}"
-            assert "start_row" not in keys
+        mock_ep.assert_not_called()
+        assert seen["stepA"] >= 1, "Step A (station_detection_cids) must run"
+        assert seen["stepB"] >= 1, "Step B (station_detection_by_ids) must run"
 
     def test_downtime_analysis_flag_false_uses_execute_plan(self, monkeypatch):
         """downtime_analysis_service must always call execute_plan (ADR-0003).
@@ -463,36 +473,41 @@ class TestFlagTrueParity:
             assert "start_row" in keys, f"Expected paged chunks, got {keys}"
             assert "chunk_start" not in keys
 
-    def test_mid_section_defect_flag_true_calls_paged_chunks(self, monkeypatch):
-        """mid_section_defect_service._fetch_station_detection_data must use paged chunks."""
+    def test_mid_section_defect_flag_true_still_uses_two_step_pipeline(self, monkeypatch):
+        """MSD detection ignores _USE_ROW_COUNT_CHUNKING=true: still Step A + Step B,
+        never execute_plan / dataset_paged (CONTAINERID-first opts out of row-count paging)."""
         from mes_dashboard.services import mid_section_defect_service as msd
+        import pandas as pd
 
         monkeypatch.setattr(msd, "cache_get", MagicMock(return_value=None))
-        monkeypatch.setattr(
-            msd, "read_sql_df",
-            MagicMock(return_value=_make_count_df(70000)),
-        )
+        monkeypatch.setattr(msd, "cache_set", MagicMock(return_value=None))
 
+        seen = {"stepA": 0, "stepB": 0}
+
+        def fake_read_sql(sql, params=None, **kw):
+            if "SELECT DISTINCT" in sql.upper():
+                seen["stepA"] += 1
+                return pd.DataFrame({"CONTAINERID": ["C1"]})
+            seen["stepB"] += 1
+            return pd.DataFrame({"CONTAINERID": ["C1"], "REJECTQTY": [0]})
+
+        monkeypatch.setattr(msd, "read_sql_df", fake_read_sql)
         mock_ep = MagicMock(return_value=None)
-        mock_mc = MagicMock(return_value=(None, 0))
 
         with patch("mes_dashboard.services.batch_query_engine._USE_ROW_COUNT_CHUNKING", True), \
              patch("mes_dashboard.services.batch_query_engine.execute_plan", mock_ep), \
-             patch("mes_dashboard.services.batch_query_engine.merge_chunks_to_spool", mock_mc), \
              patch("mes_dashboard.services.batch_query_engine.BATCH_QUERY_TIME_THRESHOLD_DAYS", 0), \
-             patch("mes_dashboard.core.query_spool_store.load_spooled_df", MagicMock(return_value=None)):
+             patch("mes_dashboard.core.query_spool_store.load_spooled_df", MagicMock(return_value=None)), \
+             patch("mes_dashboard.core.query_spool_store.store_spooled_df", MagicMock(return_value=True)):
             msd._fetch_station_detection_data(
                 start_date="2024-01-01",
                 end_date="2024-12-31",
                 station="測試",
             )
 
-        mock_ep.assert_called_once()
-        key_sets = _chunk_key_sets(mock_ep)
-        assert len(key_sets) > 0
-        for keys in key_sets:
-            assert "start_row" in keys, f"Expected paged chunks, got {keys}"
-            assert "chunk_start" not in keys
+        mock_ep.assert_not_called()
+        assert seen["stepA"] >= 1, "Step A (station_detection_cids) must run"
+        assert seen["stepB"] >= 1, "Step B (station_detection_by_ids) must run"
 
 
 # ===========================================================================
