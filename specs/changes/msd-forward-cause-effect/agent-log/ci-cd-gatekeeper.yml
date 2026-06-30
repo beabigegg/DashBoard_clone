@@ -1,0 +1,20 @@
+change-id: msd-forward-cause-effect
+agent: ci-cd-gatekeeper
+timestamp: "2026-06-30T00:00:00Z"
+status: complete
+artifacts:
+  - { type: tiers-modified, pointer: "1, 2, 3, 4, 5" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/openapi-sync.yml" }
+  - { type: required-status-checks, pointer: "unit-and-integration-tests, openapi-sync, contract-and-fast-tests, frontend-unit-tests" }
+next-action: none
+notes: >
+  openapi-sync.yml extended: added contracts/api/openapi.json to push+PR path
+  filters and added a second cdd-kit openapi export --check step for the mirror.
+  frontend-tests.yml unchanged — npx playwright install --with-deps chromium
+  and mid-section-defect.spec.ts run step already present; new Sankey/heatmap
+  assertions are picked up automatically.
+  stress/soak are NOT pre-merge (classification: not-pre-merge per project
+  test-layer governance); stress-soak-report.md is a required artifact but
+  produced via manual Tier 5 dispatch before the PR is approved, not as a
+  blocking CI gate.

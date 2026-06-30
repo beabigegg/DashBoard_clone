@@ -1,0 +1,15 @@
+{
+  "change_id": "msd-forward-cause-effect",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check && npm run css:check && npm run test 2>&1 | tail -10",
+  "duration_ms": 28078,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/msd-forward-cause-effect/test-runs/20260630-115433/summary.json",
+    "stdout": "specs/changes/msd-forward-cause-effect/test-runs/20260630-115433/stdout.log",
+    "stderr": "specs/changes/msd-forward-cause-effect/test-runs/20260630-115433/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.7
+schema-version: 1.2.8
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-06-26
+last-changed: 2026-06-30
 ---
 
 # CSS Inventory (Governed Source List)
@@ -67,7 +67,7 @@ last-changed: 2026-06-26
 | `frontend/src/job-query/style.css` | `theme-job-query` | job-query |
 | `frontend/src/material-consumption/style.css` | `theme-material-consumption` | material-consumption |
 | `frontend/src/material-trace/style.css` | `theme-material-trace` | material-trace |
-| `frontend/src/mid-section-defect/style.css` | `theme-mid-section-defect` | mid-section-defect |
+| `frontend/src/mid-section-defect/style.css` | `theme-mid-section-defect` | mid-section-defect | Sankey/Heatmap chart styles for forward cause-effect analysis; all rules scoped under `.theme-mid-section-defect` (css-contract Rule 4.2/4.3) |
 | `frontend/src/qc-gate/style.css` | `theme-qc-gate` | qc-gate |
 | `frontend/src/query-tool/style.css` | `theme-query-tool` | query-tool |
 | `frontend/src/reject-history/style.css` | `theme-reject-history` | reject-history — `.supplementary-panel/.supplementary-header/.supplementary-row/.supplementary-toolbar` removed (rh-remove-supplementary-filter); `.primary-prefilter-row` grid is `repeat(4, minmax(0, 1fr))` |
@@ -85,6 +85,10 @@ last-changed: 2026-06-26
 任何新增/刪除/重新命名/搬移 `frontend/src/**/*.css` 的 PR 必須在同一變更同步更新此清單。
 
 ## CHANGELOG
+
+## [css-inventory 1.2.8] — 2026-06-30
+### Changed
+- msd-forward-cause-effect: Updated `frontend/src/mid-section-defect/style.css` row note to document Sankey/Heatmap chart styles for forward cause-effect analysis; all rules must remain scoped under `.theme-mid-section-defect` (css-contract Rule 4.2/4.3).
 
 ## [css-inventory 1.2.7] — 2026-06-26
 ### Added

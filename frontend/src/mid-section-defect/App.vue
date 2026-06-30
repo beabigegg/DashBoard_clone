@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, toRef } from 'vue';
+import { computed, nextTick, reactive, ref, toRef } from 'vue';
 
 import { apiGet, ensureMesApiAvailable } from '../core/api';
 import { unwrapApiResult } from '../core/unwrap-api-result';
@@ -28,6 +28,10 @@ import ParetoChart from './components/ParetoChart.vue';
 import SuspectContextPanel from './components/SuspectContextPanel.vue';
 // @ts-expect-error TrendChart.vue not yet migrated to lang="ts"
 import TrendChart from './components/TrendChart.vue';
+// @ts-expect-error ForwardFlowChart.vue is a plain SFC (no lang="ts")
+import ForwardFlowChart from './components/ForwardFlowChart.vue';
+// @ts-expect-error ForwardHeatmap.vue is a plain SFC (no lang="ts")
+import ForwardHeatmap from './components/ForwardHeatmap.vue';
 
 ensureMesApiAvailable();
 
@@ -75,6 +79,31 @@ interface ChartsByKey {
   by_downstream_machine?: ChartItem[];
 }
 
+interface ByDetectionLossReasonItem {
+  loss_reason: string;
+  reject_qty: number;
+  reject_rate: number;
+}
+
+interface LossReasonCrosstabCell {
+  loss_reason: string;
+  workcenter_group: string;
+  reject_qty: number;
+  reject_rate: number;
+}
+
+interface LossReasonWorkcenterCrosstab {
+  loss_reasons: string[];
+  workcenter_groups: string[];
+  cells: LossReasonCrosstabCell[];
+}
+
+interface DownstreamTrendItem {
+  date: string;
+  reject_qty: number;
+  reject_rate: number;
+}
+
 interface MsdAnalysisData {
   kpi: Record<string, unknown>;
   charts: ChartsByKey;
@@ -84,6 +113,11 @@ interface MsdAnalysisData {
   genealogy_status: string;
   detail_total_count: number;
   total_ancestor_count?: number;
+  // Forward-only aggregation fields
+  by_detection_loss_reason?: ByDetectionLossReasonItem[];
+  loss_reason_workcenter_crosstab?: LossReasonWorkcenterCrosstab;
+  downstream_trend?: DownstreamTrendItem[];
+  amplification?: number | null;
 }
 
 interface DetailPagination {
@@ -412,6 +446,87 @@ const suspectMachineNames = computed(() => {
   return data.filter((d) => d.name && d.name !== '其他').map((d) => d.name);
 });
 
+// ---------------------------------------------------------------------------
+// Forward direction: Sankey/Heatmap cross-filter state + hero chart toggle
+// ---------------------------------------------------------------------------
+
+/** Active hero view in forward mode: 'sankey' or 'heatmap' */
+const forwardHeroView = ref<'sankey' | 'heatmap'>('sankey');
+
+/** Template ref for the Sankey toggle button — used to return focus after clearForwardSelection (WAI-ARIA) */
+const sankeyToggleBtnRef = ref<HTMLButtonElement | null>(null);
+
+interface ForwardSelection {
+  frontReason: string | null;
+  downstreamGroup: string | null;
+}
+
+const forwardSelection = ref<ForwardSelection>({ frontReason: null, downstreamGroup: null });
+
+function handleSankeyNodeClick(payload: ForwardSelection) {
+  // Toggle: clicking the same node again clears it
+  const cur = forwardSelection.value;
+  if (payload.frontReason && cur.frontReason === payload.frontReason) {
+    forwardSelection.value = { frontReason: null, downstreamGroup: null };
+    return;
+  }
+  if (payload.downstreamGroup && cur.downstreamGroup === payload.downstreamGroup) {
+    forwardSelection.value = { frontReason: null, downstreamGroup: null };
+    return;
+  }
+  forwardSelection.value = payload;
+}
+
+function clearForwardSelection() {
+  forwardSelection.value = { frontReason: null, downstreamGroup: null };
+  // Return keyboard focus to the hero toggle (WAI-ARIA focus-return rule — CLAUDE.md)
+  void nextTick(() => sankeyToggleBtnRef.value?.focus());
+}
+
+/**
+ * Cross-filter: given by_detection_loss_reason data, filter by frontReason when active.
+ * Re-slice is client-side from the server payload (Top-N already applied server-side).
+ */
+const filteredByDetectionLossReason = computed((): ByDetectionLossReasonItem[] => {
+  const items = analysisData.value?.by_detection_loss_reason;
+  if (!Array.isArray(items)) return [];
+  const sel = forwardSelection.value;
+  if (!sel.frontReason) return items;
+  return items.filter((item) => item.loss_reason === sel.frontReason);
+});
+
+/**
+ * Convert by_detection_loss_reason items to ChartItem[] for ParetoChart.
+ * reject_rate is 0..1 from the backend; multiply by 100 for display %.
+ */
+const byDetectionLossReasonChartData = computed((): ChartItem[] => {
+  const items = filteredByDetectionLossReason.value;
+  if (!items.length) return [];
+  const totalQty = items.reduce((s, d) => s + d.reject_qty, 0);
+  let cumsum = 0;
+  return items.map((item) => {
+    cumsum += item.reject_qty;
+    return {
+      name: item.loss_reason,
+      input_qty: 0,
+      defect_qty: item.reject_qty,
+      defect_rate: Math.round((item.reject_rate || 0) * 10000) / 100, // 0..1 → %
+      lot_count: 0,
+      cumulative_pct: totalQty > 0 ? Math.round((cumsum / totalQty) * 1e4) / 100 : 0,
+    };
+  });
+});
+
+function handleForwardLossReasonBarClick({ name }: { name: string; dataIndex: number }) {
+  if (!name || name === '其他') return;
+  const cur = forwardSelection.value;
+  if (cur.frontReason === name) {
+    forwardSelection.value = { frontReason: null, downstreamGroup: null };
+  } else {
+    forwardSelection.value = { frontReason: name, downstreamGroup: null };
+  }
+}
+
 const isForward = computed(() => committedFilters.value.direction === 'forward');
 const committedStation = computed(() => {
   const stations = committedFilters.value.station;
@@ -649,6 +764,7 @@ async function loadAnalysis() {
   updateUpstreamField('station', []);
   updateUpstreamField('spec', []);
   updateMaterialField('materialType', []);
+  forwardSelection.value = { frontReason: null, downstreamGroup: null };
   trace.abort();
   trace.reset();
   loading.querying = true;
@@ -955,13 +1071,93 @@ void initPage();
               </div>
             </template>
             <template v-else>
+              <!-- Forward hero: Sankey / Heatmap toggle -->
+              <div class="charts-row-full forward-hero-section" data-testid="forward-hero">
+                <div class="chart-card forward-hero-card">
+                  <div class="forward-hero-toggle">
+                    <button
+                      ref="sankeyToggleBtnRef"
+                      type="button"
+                      class="hero-toggle-btn"
+                      :class="{ active: forwardHeroView === 'sankey' }"
+                      :aria-pressed="forwardHeroView === 'sankey'"
+                      data-testid="toggle-sankey"
+                      aria-label="切換為 Sankey 流向圖"
+                      @click="forwardHeroView = 'sankey'"
+                    >
+                      Sankey 流向
+                    </button>
+                    <button
+                      type="button"
+                      class="hero-toggle-btn"
+                      :class="{ active: forwardHeroView === 'heatmap' }"
+                      :aria-pressed="forwardHeroView === 'heatmap'"
+                      data-testid="toggle-heatmap"
+                      aria-label="切換為熱圖"
+                      @click="forwardHeroView = 'heatmap'"
+                    >
+                      熱圖
+                    </button>
+                  </div>
+                  <ForwardFlowChart
+                    v-if="forwardHeroView === 'sankey'"
+                    :crosstab="analysisData.loss_reason_workcenter_crosstab"
+                    :selection="forwardSelection"
+                    data-testid="forward-flow-chart"
+                    @node-click="handleSankeyNodeClick"
+                    @clear-selection="clearForwardSelection"
+                  />
+                  <ForwardHeatmap
+                    v-else
+                    :crosstab="analysisData.loss_reason_workcenter_crosstab"
+                    :selection="forwardSelection"
+                    data-testid="forward-heatmap"
+                    @cell-click="handleSankeyNodeClick"
+                    @clear-selection="clearForwardSelection"
+                  />
+                </div>
+              </div>
+              <!-- Forward supporting charts -->
               <div class="charts-row">
-                <ParetoChart title="依下游站點" :data="analysisData.charts?.by_downstream_station" />
-                <ParetoChart title="依下游報廢原因" :data="analysisData.charts?.by_downstream_loss_reason" />
+                <ParetoChart
+                  title="前段不良原因分布"
+                  :data="byDetectionLossReasonChartData"
+                  :show-cumulative="true"
+                  enable-click
+                  data-testid="forward-loss-reason-pareto"
+                  @bar-click="handleForwardLossReasonBarClick"
+                />
+                <ParetoChart
+                  title="依下游站點"
+                  :data="analysisData.charts?.by_downstream_station"
+                />
               </div>
               <div class="charts-row">
+                <ParetoChart title="依下游報廢原因" :data="analysisData.charts?.by_downstream_loss_reason" />
                 <ParetoChart title="依下游機台" :data="analysisData.charts?.by_downstream_machine" />
+              </div>
+              <div class="charts-row">
                 <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" :show-cumulative="false" />
+              </div>
+              <!-- Clear forward cross-filter affordance (global, shown when any selection active) -->
+              <div
+                v-if="forwardSelection.frontReason || forwardSelection.downstreamGroup"
+                class="forward-selection-banner"
+                data-testid="forward-selection-banner"
+              >
+                <span>
+                  篩選中：
+                  <strong v-if="forwardSelection.frontReason">前段原因「{{ forwardSelection.frontReason }}」</strong>
+                  <strong v-if="forwardSelection.downstreamGroup">下游站點「{{ forwardSelection.downstreamGroup }}」</strong>
+                </span>
+                <button
+                  type="button"
+                  class="clear-selection-link"
+                  data-testid="forward-clear-selection"
+                  @click="clearForwardSelection"
+                >
+                  清除選取
+                </button>
               </div>
             </template>
             <div v-if="committedFilters.queryMode !== 'container'" class="charts-row charts-row-full">

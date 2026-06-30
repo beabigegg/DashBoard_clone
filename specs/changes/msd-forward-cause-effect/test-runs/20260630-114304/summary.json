@@ -1,0 +1,15 @@
+{
+  "change_id": "msd-forward-cause-effect",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts && cdd-kit validate --versions",
+  "duration_ms": 1920,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/msd-forward-cause-effect/test-runs/20260630-114304/summary.json",
+    "stdout": "specs/changes/msd-forward-cause-effect/test-runs/20260630-114304/stdout.log",
+    "stderr": "specs/changes/msd-forward-cause-effect/test-runs/20260630-114304/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

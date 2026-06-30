@@ -1,0 +1,14 @@
+change-id: msd-forward-cause-effect
+agent: contract-reviewer
+status: changes-required
+summary: >
+  Specified additive contract deltas across 7 files (api-contract, api-inventory,
+  data-shape §3.23 lineage spool + §3.24 aggregation payloads, business MSD-06/07/08,
+  css-contract, css-inventory, CHANGELOG). All API-surface additive; in-memory forward
+  retirement is implementation-internal. Deltas are read-only output — applied by
+  backend-engineer with the code in the same PR, then openapi regen (both files) +
+  response-sample capture + validate.
+artifacts:
+  - { type: contract-deltas, pointer: "specs/changes/msd-forward-cause-effect/agent-log/contract-reviewer-deltas.md" }
+  - { type: version-bumps, pointer: "api 1.33.0, api-inventory 1.3.0, data 1.29.0, business 1.34.0, css 1.11.0, css-inventory 1.2.8" }
+next-action: backend-engineer applies deltas + mechanical follow-up steps

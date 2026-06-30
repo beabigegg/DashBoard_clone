@@ -6,6 +6,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 from mes_dashboard.services.mid_section_defect_service import (
     _attribute_materials,
@@ -1278,3 +1279,357 @@ def test_resolve_trace_seed_lots_unknown_pj_type_still_returns_all_seeds(mock_fe
     assert result is not None
     assert 'error' not in result
     assert result['seed_count'] == 2  # seeds package-independent; mask applied at read time
+
+
+# ===========================================================================
+# AC-4: Forward attribution lineage re-keying (TDD)
+# ===========================================================================
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="AC-4 permanent regression guard: _attribute_forward_defects WITHOUT "
+           "lineage_spool_df still drops split descendants (per-CONTAINERID behavior). "
+           "This is intentional — callers MUST pass lineage_spool_df to get re-keying. "
+           "Tripwire: if this xfail unexpectedly passes, the no-lineage code path was "
+           "changed in a way that may break the known fallback contract.",
+)
+def test_attribute_forward_defects_drops_split_descendant_FAILING():
+    """AC-4 TDD tripwire: per-CONTAINERID attribution drops split-descendant rejects.
+
+    Scenario: LOT-A is detected as defect at the front station (order=4, 成型).
+    LOT-A splits into LOT-A-1 downstream at 測試 (order=11).
+    LOT-A-1 has a downstream reject, but it is NOT in defect_cids (only LOT-A is).
+
+    Without lineage_spool_df: `cid not in defect_set` filters out LOT-A-1 → drop.
+    With lineage_spool_df: see test_attribute_forward_defects_lineage_rekeying_passes.
+    """
+    from mes_dashboard.services.mid_section_defect_service import _attribute_forward_defects
+
+    detection_data = {
+        'LOT-A': {
+            'trackinqty': 100,
+            'rejectqty_by_reason': {'BondWire': 5},
+            'workflow': 'WF1',
+            'productlinename': 'PKG-1',
+            'pj_type': 'GA',
+            'detection_equipmentname': 'MOLD-01',
+            'detection_station_order': 4,
+        },
+    }
+    defect_cids = ['LOT-A']  # only seed is a defect CID
+    wip_by_cid = {
+        'LOT-A-1': [  # split descendant — reaches downstream station
+            {'workcenter_group': '測試', 'equipment_name': 'TEST-01', 'trackinqty': 80},
+        ],
+    }
+    downstream_rejects = {
+        'LOT-A-1': [  # split descendant has downstream reject
+            {
+                'workcenter_group': '測試',
+                'lossreasonname': 'OpenCircuit',
+                'equipment_name': 'TEST-01',
+                'reject_total_qty': 8,
+            },
+        ],
+    }
+    station_order = 4  # 成型
+
+    # Without lineage re-keying, LOT-A-1 is dropped (not in defect_set → empty result)
+    result = _attribute_forward_defects(
+        detection_data, defect_cids, wip_by_cid, downstream_rejects, station_order,
+    )
+
+    # The test expects to find 測試 station aggregation with LOT-A-1's reject
+    # (this will FAIL with current code because LOT-A-1 is not in defect_set)
+    assert '測試' in result, (
+        "Split descendant LOT-A-1 must contribute its downstream reject to 測試 "
+        "after lineage re-keying. Current per-CONTAINERID filtering drops it."
+    )
+    assert result['測試']['total_reject'] == 8
+
+
+def test_attribute_forward_defects_lineage_rekeying_passes():
+    """AC-4 regression: after lineage re-keying fix, split descendants are attributed.
+
+    Uses the lineage_spool_df argument to map LOT-A-1 → SEED_ID=LOT-A.
+    """
+    from mes_dashboard.services.mid_section_defect_service import _attribute_forward_defects
+    import pandas as pd
+
+    detection_data = {
+        'LOT-A': {
+            'trackinqty': 100,
+            'rejectqty_by_reason': {'BondWire': 5},
+            'workflow': 'WF1',
+            'productlinename': 'PKG-1',
+            'pj_type': 'GA',
+            'detection_equipmentname': 'MOLD-01',
+            'detection_station_order': 4,
+        },
+    }
+    defect_cids = ['LOT-A']
+    wip_by_cid = {
+        'LOT-A-1': [
+            {'workcenter_group': '測試', 'equipment_name': 'TEST-01', 'trackinqty': 80},
+        ],
+    }
+    downstream_rejects = {
+        'LOT-A-1': [
+            {
+                'workcenter_group': '測試',
+                'lossreasonname': 'OpenCircuit',
+                'equipment_name': 'TEST-01',
+                'reject_total_qty': 8,
+            },
+        ],
+    }
+    station_order = 4
+
+    # Lineage spool: LOT-A-1 → SEED_ID=LOT-A (self-edge LOT-A → LOT-A also present)
+    lineage_spool_df = pd.DataFrame([
+        {'SEED_ID': 'LOT-A', 'DESCENDANT_ID': 'LOT-A'},
+        {'SEED_ID': 'LOT-A', 'DESCENDANT_ID': 'LOT-A-1'},
+    ])
+
+    result = _attribute_forward_defects(
+        detection_data, defect_cids, wip_by_cid, downstream_rejects, station_order,
+        lineage_spool_df=lineage_spool_df,
+    )
+
+    assert '測試' in result, "Lineage re-keying must include LOT-A-1's downstream reject"
+    assert result['測試']['total_reject'] == 8
+    assert result['測試']['lots_reached'] >= 1
+
+
+# ===========================================================================
+# AC-1: by_detection_loss_reason aggregation
+# ===========================================================================
+
+def test_by_detection_loss_reason_aggregation():
+    """AC-1: _build_by_detection_loss_reason returns per-reason reject_qty and reject_rate."""
+    from mes_dashboard.services.mid_section_defect_service import _build_by_detection_loss_reason
+
+    detection_data = {
+        'LOT-A': {
+            'trackinqty': 200,
+            'rejectqty_by_reason': {'BondWire': 10, 'OpenCircuit': 5},
+        },
+        'LOT-B': {
+            'trackinqty': 100,
+            'rejectqty_by_reason': {'BondWire': 3},
+        },
+    }
+
+    result = _build_by_detection_loss_reason(detection_data)
+
+    assert isinstance(result, list)
+    reasons = {r['loss_reason']: r for r in result}
+    assert 'BondWire' in reasons
+    assert reasons['BondWire']['reject_qty'] == 13  # 10 + 3
+    assert 'OpenCircuit' in reasons
+    assert reasons['OpenCircuit']['reject_qty'] == 5
+    # reject_rate = reject_qty / total_trackinqty (unique lot sum)
+    total_input = 300  # 200 + 100
+    assert abs(reasons['BondWire']['reject_rate'] - 13 / total_input) < 1e-6
+    assert abs(reasons['OpenCircuit']['reject_rate'] - 5 / total_input) < 1e-6
+
+
+def test_by_detection_loss_reason_top_n_truncation():
+    """AC-1: reasons beyond TOP_N are collapsed into '其他'."""
+    from mes_dashboard.services.mid_section_defect_service import (
+        _build_by_detection_loss_reason, TOP_N,
+    )
+
+    # Create TOP_N + 2 distinct reasons
+    reasons = {f"Reason-{i:02d}": i + 1 for i in range(TOP_N + 2)}
+    detection_data = {
+        'LOT-X': {
+            'trackinqty': 1000,
+            'rejectqty_by_reason': reasons,
+        },
+    }
+
+    result = _build_by_detection_loss_reason(detection_data)
+
+    named = [r for r in result if r['loss_reason'] != '其他']
+    other = [r for r in result if r['loss_reason'] == '其他']
+    assert len(named) == TOP_N
+    assert len(other) == 1
+    # '其他' must aggregate the bottom 2 reasons
+    assert other[0]['reject_qty'] == (1 + 2)  # smallest two
+
+
+# ===========================================================================
+# AC-2: loss_reason × workcenter_group cross-tab
+# ===========================================================================
+
+def test_loss_reason_workcenter_crosstab_builder():
+    """AC-2: crosstab has loss_reasons[], workcenter_groups[], and cells[]."""
+    from mes_dashboard.services.mid_section_defect_service import _build_loss_reason_workcenter_crosstab
+
+    detection_data = {
+        'LOT-A': {'trackinqty': 100, 'rejectqty_by_reason': {'BondWire': 10}},
+    }
+    forward_attr = {
+        '測試': {
+            'total_input': 100,
+            'total_reject': 8,
+            'loss_reasons': {'BondWire': 8},
+            'lots_reached': 1,
+            'machines': {},
+            'reject_rate': 8.0,
+        },
+    }
+
+    result = _build_loss_reason_workcenter_crosstab(detection_data, forward_attr)
+
+    assert 'loss_reasons' in result
+    assert 'workcenter_groups' in result
+    assert 'cells' in result
+    assert 'BondWire' in result['loss_reasons']
+    assert '測試' in result['workcenter_groups']
+    # One non-zero cell
+    cells_dict = {
+        (c['loss_reason'], c['workcenter_group']): c for c in result['cells']
+    }
+    assert ('BondWire', '測試') in cells_dict
+    cell = cells_dict[('BondWire', '測試')]
+    assert cell['reject_qty'] == 8
+
+
+def test_crosstab_top_n_folds_remainder_to_other():
+    """AC-2: axes beyond TOP_N on each dimension are collapsed to '其他'."""
+    from mes_dashboard.services.mid_section_defect_service import (
+        _build_loss_reason_workcenter_crosstab, TOP_N,
+    )
+
+    # Create TOP_N + 2 detection reasons and TOP_N + 1 downstream stations
+    n_reasons = TOP_N + 2
+    n_stations = TOP_N + 1
+    detection_data = {
+        f'LOT-{i}': {
+            'trackinqty': 100,
+            'rejectqty_by_reason': {f'Reason-{i:02d}': 5},
+        }
+        for i in range(n_reasons)
+    }
+    forward_attr = {
+        f'Station-{j:02d}': {
+            'total_input': 100,
+            'total_reject': 2,
+            'loss_reasons': {f'Reason-{j % n_reasons:02d}': 2},
+            'lots_reached': 1,
+            'machines': {},
+            'reject_rate': 2.0,
+        }
+        for j in range(n_stations)
+    }
+
+    result = _build_loss_reason_workcenter_crosstab(detection_data, forward_attr)
+
+    named_reasons = [r for r in result['loss_reasons'] if r != '其他']
+    named_stations = [s for s in result['workcenter_groups'] if s != '其他']
+    assert len(named_reasons) == TOP_N
+    assert len(named_stations) == TOP_N
+
+
+# ===========================================================================
+# AC-3: downstream_trend (no control cohort)
+# ===========================================================================
+
+def test_downstream_reject_trend_no_control_cohort():
+    """AC-3: downstream trend has date/reject_qty/reject_rate but no cohort baseline."""
+    from mes_dashboard.services.mid_section_defect_service import _build_downstream_trend
+
+    downstream_rejects = {
+        'LOT-A': [
+            {
+                'workcenter_group': '測試',
+                'lossreasonname': 'OpenCircuit',
+                'reject_total_qty': 3,
+                'txndate': '2025-03-01',
+            },
+        ],
+        'LOT-B': [
+            {
+                'workcenter_group': '測試',
+                'lossreasonname': 'BondWire',
+                'reject_total_qty': 5,
+                'txndate': '2025-03-02',
+            },
+        ],
+    }
+    wip_by_cid = {
+        'LOT-A': [{'workcenter_group': '測試', 'trackinqty': 100}],
+        'LOT-B': [{'workcenter_group': '測試', 'trackinqty': 200}],
+    }
+    defect_cids = ['LOT-A', 'LOT-B']
+    station_order = 4  # 成型
+
+    result = _build_downstream_trend(defect_cids, wip_by_cid, downstream_rejects, station_order)
+
+    assert isinstance(result, list)
+    assert len(result) >= 1
+    for item in result:
+        assert 'date' in item
+        assert 'reject_qty' in item
+        assert 'reject_rate' in item
+        # AC-3: no cohort/baseline fields
+        assert 'baseline_reject_rate' not in item
+        assert 'control_reject_rate' not in item
+
+
+# ===========================================================================
+# AC-7: Amplification KPI divide-by-zero semantics
+# ===========================================================================
+
+def test_amplification_kpi_detection_rate_zero_emits_null():
+    """AC-7: when detection_reject_rate=0, amplification is None."""
+    from mes_dashboard.services.mid_section_defect_service import _compute_amplification_kpi
+
+    result = _compute_amplification_kpi(
+        detection_total_reject=0,
+        detection_total_input=200,
+        downstream_total_reject=5,
+        downstream_total_input=200,
+    )
+    assert result is None
+
+
+def test_amplification_kpi_downstream_rate_zero_emits_zero_float():
+    """AC-7: when downstream=0 and detection>0, amplification is 0.0 (real zero)."""
+    from mes_dashboard.services.mid_section_defect_service import _compute_amplification_kpi
+
+    result = _compute_amplification_kpi(
+        detection_total_reject=10,
+        detection_total_input=100,
+        downstream_total_reject=0,
+        downstream_total_input=200,
+    )
+    assert result == 0.0
+    assert isinstance(result, float)
+
+
+def test_amplification_kpi_both_rates_nonzero_correct_ratio():
+    """AC-7: amplification = downstream_rate / detection_rate."""
+    from mes_dashboard.services.mid_section_defect_service import _compute_amplification_kpi
+
+    # detection_rate = 10/100 = 0.10; downstream_rate = 20/200 = 0.10 → ratio = 1.0
+    result = _compute_amplification_kpi(
+        detection_total_reject=10,
+        detection_total_input=100,
+        downstream_total_reject=20,
+        downstream_total_input=200,
+    )
+    assert result is not None
+    assert abs(result - 1.0) < 1e-6
+
+    # detection_rate = 5/100 = 0.05; downstream_rate = 20/200 = 0.10 → ratio = 2.0
+    result2 = _compute_amplification_kpi(
+        detection_total_reject=5,
+        detection_total_input=100,
+        downstream_total_reject=20,
+        downstream_total_input=200,
+    )
+    assert result2 is not None
+    assert abs(result2 - 2.0) < 1e-6

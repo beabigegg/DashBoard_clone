@@ -1,0 +1,41 @@
+agent: backend-engineer
+change-id: msd-forward-cause-effect
+status: done
+artifacts:
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/mid_section_defect_service.py — _write_msd_forward_lineage_spool (BFS, self-edge, dedup), _compute_amplification_kpi, _build_by_detection_loss_reason, _build_loss_reason_workcenter_crosstab, _build_downstream_trend; _attribute_forward_defects gains lineage_spool_df re-keying; 3x forward branch in build_trace_aggregation added new fields; _build_forward_detail_table adds DETECTION_LOSS_REASON"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/msd_duckdb_runtime.py — _get_forward_summary replaces return None; charts + daily_trend + kpi (lot_count/defect_qty/defect_rate) computed from DuckDB events; WORKCENTERNAME not WORKCENTER_GROUP; removed stale det_reject_rate variable"
+  - type: files-changed
+    pointer: "src/mes_dashboard/services/trace_job_service.py — _TRACE_QUERY_ID_SCHEMA_VERSION 1→2; calls _write_msd_forward_lineage_spool in execute_trace_events_job"
+  - type: files-changed
+    pointer: "src/mes_dashboard/routes/mid_section_defect_routes.py — _build_summary_payload surfaces by_detection_loss_reason/loss_reason_workcenter_crosstab/downstream_trend/amplification for forward"
+  - type: files-changed
+    pointer: "contracts/api/api-contract.md:1.33.0 — MsdForwardAnalysisResponse + MsdForwardDetailResponse schemas; DbSchedulingQueueResponse corrected from Tier-A table to Tier-B json-schema with data:[] wrapper"
+  - type: files-changed
+    pointer: "contracts/api/api-inventory.md:1.3.0, contracts/data/data-shape-contract.md:1.29.0 (§3.23+§3.24), contracts/business/business-rules.md:1.34.0 (MSD-06/07/08), contracts/css/css-contract.md:1.11.0, contracts/css/css-inventory.md:1.2.8, contracts/CHANGELOG.md"
+  - type: files-changed
+    pointer: "contracts/openapi.json + contracts/api/openapi.json — both re-exported after schema changes"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_service.py — test_attribute_forward_defects_drops_split_descendant_FAILING (xfail strict=True tripwire), test_attribute_forward_defects_lineage_rekeying_passes, test_by_detection_loss_reason_aggregation, test_by_detection_loss_reason_top_n_truncation, test_loss_reason_workcenter_crosstab_builder, test_crosstab_top_n_folds_remainder_to_other, test_downstream_reject_trend_no_control_cohort, test_amplification_kpi_detection_rate_zero_emits_null, test_amplification_kpi_downstream_rate_zero_emits_zero_float, test_amplification_kpi_both_rates_nonzero_correct_ratio"
+  - type: tests-added
+    pointer: "tests/test_mid_section_defect_engine.py::TestForwardLineageSpoolSelfEdge — 3 tests for BFS/self-edge/dedup"
+  - type: tests-added
+    pointer: "tests/test_unified_spool_integration.py — xfail markers removed from TestMsdFullChain.test_summary_from_spool + test_full_chain_summary_detail_export_consistency; test_forward_get_summary_duckdb_path_end_to_end added"
+  - type: tests-added
+    pointer: "tests/integration/test_material_trace_rq_async.py::TestForwardLineageSpoolRoundtrip.test_forward_lineage_spool_write_read_roundtrip (integration, requires --run-integration)"
+  - type: test-output
+    pointer: "129 passed, 1 xfailed (targeted: test_mid_section_defect_service + engine + unified_spool + msd_duckdb_parity); contract: cdd-kit validate --contracts PASS; cdd-kit validate --versions PASS"
+  - type: contracts-touched
+    pointer: "contracts/api/api-contract.md#MsdForwardAnalysisResponse, contracts/api/api-contract.md#MsdForwardDetailResponse, contracts/api/api-contract.md#DbSchedulingQueueResponse (schema fix), contracts/data/data-shape-contract.md#§3.23-§3.24, contracts/business/business-rules.md#MSD-06/07/08, contracts/css/css-contract.md#1.11.0, contracts/css/css-inventory.md#1.2.8"
+notes:
+  - "IP-1: _write_msd_forward_lineage_spool implemented with BFS, self-edge guarantee, no-duplicate invariant"
+  - "IP-2: _TRACE_QUERY_ID_SCHEMA_VERSION bumped 1→2 in trace_job_service.py"
+  - "IP-3: execute_trace_events_job wires _write_msd_forward_lineage_spool in try/except before detection spool"
+  - "IP-4: _attribute_forward_defects re-keying via lineage_spool_df; _is_defect_cid inner function"
+  - "IP-5: TDD tests written first; test_attribute_forward_defects_drops_split_descendant_FAILING confirmed failing before fix, then marked xfail(strict=True) as permanent tripwire"
+  - "IP-6: get_summary(direction=forward) → _get_forward_summary; detects missing events (return None), degrades gracefully on missing lineage/detection; returns lot_count/defect_qty/defect_rate + forward-specific keys"
+  - "IP-6 fix: column name WORKCENTERNAME (not WORKCENTER_GROUP) in events spool; defect_rate key added after parity test revealed gap"
+  - "IP-7: 3 forward branch return dicts updated in mid_section_defect_service (date_range, container_mode, _build_msd_analysis_date_range); _build_summary_payload in routes exposes new fields; _build_forward_detail_table adds DETECTION_LOSS_REASON via primary-loss-reason per lot"
+  - "IP-8: all 6 contract version bumps applied; DbSchedulingQueueResponse schema corrected (Tier-A→Tier-B) to fix pre-existing sample mismatch; samples updated; cdd-kit validate --contracts 0 errors"
+  - "pre-existing failures: test_runtime_hardening + test_yield_alert_job_service (confirmed pre-existing by git stash check, unrelated to this change)"

@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.28.0
-last-changed: 2026-06-29
+schema-version: 1.29.0
+last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1564,3 +1564,60 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 
 ## [data 1.8.0]
 - material-part-consumption (2026-05-20): Added §3.9 with summary spool schema (8 columns: txn_date, material_part, pj_type, primary_category, total_consumed, total_required, lot_count, workorder_count) and detail spool schema (mirrors forward_by_lot.sql columns + pj_type). New spool namespaces only; no existing schemas changed.
+
+
+### §3.23 MSD Forward Lineage Stage Spool
+
+**namespace**: `msd-events`  **path pattern**: `tmp/query_spool/msd-events/<trace_query_id>_lineage.parquet`
+
+| column | type | nullable | notes |
+|---|---|---|---|
+| SEED_ID | VARCHAR | N | Detection defect-lot CONTAINERID; BFS root of children_map |
+| DESCENDANT_ID | VARCHAR | N | Every descendant including self |
+
+**Invariants:**
+- Self-edge `(SEED_ID, SEED_ID)` always emitted (even when children_map is empty — "degraded-lineage" path).
+- No duplicate `(SEED_ID, DESCENDANT_ID)` rows (seen-set deduplication during BFS traversal).
+- SEED_ID is denormalized at write time (spool write), NOT computed at query time via JOIN.
+- `get_summary(direction="forward")` MUST NOT return None when events spool exists, even if lineage spool is absent — degrades to self-edge-only logic.
+
+**Schema change policy:**  
+`_STAGE_FORWARD_LINEAGE` version bump required (`_TRACE_QUERY_ID_SCHEMA_VERSION += 1`) + `rm -f tmp/query_spool/msd-events/*_lineage.parquet` on both deploy and rollback runbook.
+
+**Registration**: `register_stage_spool_file(trace_query_id, _STAGE_FORWARD_LINEAGE, path)` via `query_spool_store`.
+
+### §3.24 Forward Cause-Effect Aggregation Payloads
+
+These payloads are computed in `mid_section_defect_service.py` and returned by `GET /api/mid-section-defect/analysis?direction=forward`.
+
+#### §3.24.1 by_detection_loss_reason
+
+Array of `{loss_reason: str, reject_qty: int, reject_rate: float[0..1]}` sorted descending by `reject_qty`. TOP_N=10; rows beyond TOP_N are folded into a synthetic `"其他"` row. `reject_rate = reject_qty / total_trackinqty` (detection cohort).
+
+#### §3.24.2 loss_reason_workcenter_crosstab
+
+Sparse cross-tab:
+```
+{
+  loss_reasons: string[],        # TOP_N detection loss reasons (ascending by crosstab order)
+  workcenter_groups: string[],   # downstream stations seen in forward attribution
+  cells: [{loss_reason, workcenter_group, reject_qty: int, reject_rate: float}]
+}
+```
+Zero-count cells omitted (sparse). `reject_rate` = workcenter-specific reject_qty / total_trackinqty for that loss_reason cohort.
+
+#### §3.24.3 downstream_trend
+
+Array of `{date: "YYYY-MM-DD", reject_qty: int, reject_rate: float}` sorted ascending by date. Covers downstream reject events over the same date-range query window. `reject_rate = downstream_reject_qty / detection_input_qty` (normalized to detection cohort size so rates are comparable across dates).
+
+#### §3.24.4 amplification
+
+`float | null` — downstream_reject_rate ÷ detection_reject_rate over the SAME SEED_ID flagged cohort.
+
+| condition | value | display |
+|---|---|---|
+| detection_reject_rate = 0 | null | "—" |
+| downstream = 0 AND detection > 0 | 0.0 | "0.0x" |
+| both > 0 | downstream_rate / detection_rate | "Nx" |
+
+Within-cohort ratio, NOT flagged-vs-clean lift.

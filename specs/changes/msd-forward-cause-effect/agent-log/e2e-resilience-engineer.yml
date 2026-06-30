@@ -1,0 +1,68 @@
+agent: e2e-resilience-engineer
+change-id: msd-forward-cause-effect
+date: 2026-06-30
+status: complete
+
+summary: |
+  Added 22 new tests across two files (20 Python + 8 Playwright resilience scenarios).
+  20 Python tests run headlessly (--run-e2e gate) and PASS locally.
+  8 new Playwright specs collected clean (27 total in spec file); browser execution
+  requires a live dev server and is documented below.
+
+executed-vs-design-only:
+  executed:
+    - All 20 Python tests in TestForwardDuckDBSummaryFallback, TestForwardAsyncGating,
+      TestForwardDataBoundary — run via conda run -n mes-dashboard pytest --run-e2e;
+      result: 20 passed, 0 failed.
+  design-only (need live server + chromium):
+    - 8 new Playwright resilience specs in mid-section-defect.spec.ts
+      (forward 503, seed-resolve 500, null-amp spool-degrade, empty-loss-reason,
+       slow-network 4s, malformed JSON, null-detection-loss-reason, empty-crosstab);
+      all 27 tests in the file list cleanly via `npx playwright test --list`.
+
+run-commands:
+  python-resilience: |
+    conda run -n mes-dashboard pytest \
+      tests/e2e/test_mid_section_defect_e2e.py::TestForwardDuckDBSummaryFallback \
+      tests/e2e/test_mid_section_defect_e2e.py::TestForwardAsyncGating \
+      tests/e2e/test_mid_section_defect_e2e.py::TestForwardDataBoundary \
+      --run-e2e -v
+  playwright: |
+    cd frontend
+    npx playwright test tests/playwright/mid-section-defect.spec.ts \
+      --project=chromium
+    # Requires: E2E_BASE_URL pointing to a running dev/staging server
+    # CI: covered by frontend-tests.yml "Run mid-section-defect e2e spec" step
+
+artifacts:
+  - type: test-files
+    pointer: "tests/e2e/test_mid_section_defect_e2e.py:183-826"
+  - type: test-files
+    pointer: "frontend/tests/playwright/mid-section-defect.spec.ts:906-1295"
+  - type: scenarios-covered
+    pointer: >
+      forward-spool-miss-fallback, rq-worker-failure-mid-orchestration,
+      duckdb-summary-no-lineage-degrade, duckdb-summary-empty-events,
+      duckdb-summary-missing-events-path, duckdb-summary-with-lineage,
+      async-503-retry-after, async-mock-enqueue-non-503,
+      amplification-zero-detection-input-null, amplification-zero-detection-reject-null,
+      amplification-downstream-zero-returns-float, amplification-both-nonzero-ratio,
+      top-n-exactly-10-no-other, top-n-11-folds-to-other, top-n-empty-list,
+      top-n-zero-qty-omitted, forward-lineage-self-edge-only-empty-children-map,
+      forward-lineage-self-edge-capture, forward-lineage-with-descendants-bfs,
+      forward-lineage-diamond-no-duplicate-rows, events-missing-reject-col-no-crash,
+      playwright-503-error-banner, playwright-seed-500-error-banner,
+      playwright-null-amp-dash-not-crash, playwright-empty-loss-reason-no-crash,
+      playwright-slow-network-4s, playwright-malformed-json-error-banner,
+      playwright-null-detection-loss-reason, playwright-empty-crosstab-heatmap
+  - type: mutation-checks
+    pointer: "none (mutation testing not in tier-1 scope for this change)"
+  - type: trace-artifacts
+    pointer: "n/a (Playwright browser tests require live server; not run in this session)"
+
+notes:
+  - "Spool writer tests patch at mes_dashboard.core.query_spool_store (not service module) because QUERY_SPOOL_DIR and register_stage_spool_file are imported inside the function body."
+  - "Playwright LIFO rule applied: installBaseRoutes registered first, specific overrides registered last in each test."
+  - "pageRendered guards check '製程不良' text content, not bodyText.length (CLAUDE.md CI pattern)."
+  - "page.goto().catch(()=>{}) + early-return guard applied to all new Playwright tests."
+  - "TestForwardAsyncGating::test_trace_events_async_available_with_mock_enqueue_returns_202 uses mocked is_async_available=True + enqueue fn per CLAUDE.md CI pattern."

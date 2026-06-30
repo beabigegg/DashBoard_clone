@@ -1,0 +1,14 @@
+change-id: msd-forward-cause-effect
+agent: contract-reviewer
+verdict: approved-after-fixes
+summary: >
+  Re-review of applied contracts. All schemas (MsdForwardAnalysisResponse,
+  MsdForwardDetailResponse), §3.23/§3.24 data-shape, MSD-06/07/08 business rules,
+  CHANGELOG entries (6), both openapi.json in sync, response samples — all correctly
+  applied and additive (backward unchanged). Fixed: css-inventory + api-inventory
+  stale last-changed dates (→2026-06-30); capture_samples.py gained direction=forward
+  variant so live regen no longer overwrites the forward samples with backward data.
+  Decision-table rows left in MSD-07/08 prose (low-severity, semantics covered).
+artifacts:
+  - { type: fixes-applied, pointer: "css-inventory.md + api-inventory.md last-changed; tests/contract/capture_samples.py direction=forward" }
+  - { type: validators, pointer: "validate --versions, --contracts, openapi --check all expected PASS" }

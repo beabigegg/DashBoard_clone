@@ -1,0 +1,49 @@
+agent: stress-soak-engineer
+change-id: msd-forward-cause-effect
+run-date: 2026-06-30
+status: complete
+
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_mid_section_defect_stress.py" }
+  - { type: runner-config-path, pointer: "tests/integration/test_material_trace_rq_async.py::TestMsdForwardSpoolSoak" }
+  - { type: runner, pointer: "pytest (no external k6/Locust needed — pure Python in-process spool/DuckDB load)" }
+  - type: pass-criteria-cited
+    pointer: >
+      stress: zero parquet write errors / collisions across 20 concurrent traces;
+      zero cross-trace SEED_ID contamination; mean per-file write latency < 2s;
+      DuckDB forward summary p95 < 5s across 12 concurrent readers; zero DuckDB errors;
+      20 concurrent cache lookups complete < 3s.
+      soak: zero orphan parquets after 200 write+delete cycles; RSS growth < 15%
+      head-to-tail quartile; fd delta <= 10; DuckDB error rate <= 2%.
+  - { type: artifacts-location, pointer: "tests/stress/test_mid_section_defect_stress.py (4 new test classes); tests/integration/test_material_trace_rq_async.py::TestMsdForwardSpoolSoak" }
+
+smoke-run-results:
+  - test: TestSpoolConcurrentForwardWrites::test_spool_concurrent_forward_writes_no_collision
+    status: PASSED
+    detail: "n=20, elapsed=0.03s, errors=0"
+  - test: TestDuckdbForwardSummaryUnderLoad::test_duckdb_forward_summary_under_load
+    status: PASSED
+    detail: "n=12, elapsed=0.08s, p95=0.080s, errors=0"
+  - test: TestCacheReuseUnderConcurrentSameStation::test_concurrent_cache_hits_return_same_trace_id
+    status: PASSED
+    detail: "n=20, elapsed=0.002s, errors=0"
+  - test: TestForwardSpoolWriteReadConcurrent::test_concurrent_writer_reader_no_partial_read
+    status: PASSED
+    detail: "no cross-trace contamination, no file corruption"
+  - test: TestMsdForwardSpoolSoak::test_forward_spool_repeated_cycles_no_leak
+    status: PASSED
+    detail: "cycles=200, elapsed=3.73s, fd_delta=0, final_spool_count=0, rss_growth~0.1%"
+
+scope-decision: >
+  Oracle fetch scope is NOT enlarged (change-classification.md 3b dropped).
+  All load profiles operate on the spool-path only (parquet write/read + DuckDB
+  in-process GROUP BY).  No HTTP server required for the forward-lineage tests.
+  The legacy HTTP stress tests (TestMsdQueryStress, TestMsdStationOptionsStress)
+  require a live server and remain gated behind STRESS_TEST_URL.
+
+notes: >
+  Stress tests are @pytest.mark.stress, gated behind --run-stress (Tier-5 manual
+  workflow_dispatch). Soak test is @pytest.mark.soak + @pytest.mark.integration_real,
+  gated behind --run-integration-real (Tier-4 weekly schedule 0 18 * * 0).
+  Neither runs pre-merge. stress-soak-report.md written as required by
+  change-classification.md (stress-soak-report.md = yes, concurrency-critical surface).

@@ -1,0 +1,12 @@
+change-id: msd-forward-cause-effect
+agent: visual-reviewer
+verdict: approved-with-notes
+summary: >
+  No blocking CSS-contract violations. css:check 0 errors, build + type-check clean.
+  All new CSS scoped under .theme-mid-section-defect; ECharts colors as named
+  constants; no Teleport tooltip. 2 non-blocking advisories: tablet 7-card KPI grid
+  orphan (3+3+1), redundant charts-row-full class on hero div. Full bundle in
+  visual-review-report.md.
+artifacts:
+  - { type: report, pointer: "specs/changes/msd-forward-cause-effect/visual-review-report.md" }
+  - { type: advisory, pointer: "tablet KPI orphan; charts-row-full no-op class; detail column 130px truncation" }

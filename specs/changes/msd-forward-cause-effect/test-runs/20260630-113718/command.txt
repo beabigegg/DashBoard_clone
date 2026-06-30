@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/test_mid_section_defect_service.py tests/test_mid_section_defect_engine.py tests/test_unified_spool_integration.py tests/test_msd_duckdb_parity.py -q --tb=short

@@ -1,0 +1,10 @@
+agent: implementation-planner
+change-id: msd-forward-cause-effect
+status: done
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/msd-forward-cause-effect/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-1..IP-8), frontend-engineer (IP-9), stress-soak-engineer + e2e-resilience-engineer + test-strategist (IP-10)" }
+  - { type: scope-summary, pointer: "8 in scope, 7 explicit non-goals; ordered TDD/mergeable sequence IP-1..IP-10" }
+notes:
+  - "Line anchors re-confirmed against code-map 2026-06-30 + live grep: _attribute_forward_defects 2639-2722, lineage writer 1133-1203, msd_duckdb_runtime get_summary forward return None at :415, _TRACE_QUERY_ID_SCHEMA_VERSION at trace_job_service.py:1713 (this is the parquet _SCHEMA_VERSION to bump)."
+  - "design.md present and filled (Architecture Review = yes); proceeded with planning."

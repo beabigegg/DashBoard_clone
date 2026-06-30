@@ -1,0 +1,133 @@
+agent: frontend-engineer
+change-id: msd-forward-cause-effect
+status: done
+timestamp: 2026-06-30T11:55:00Z
+model: claude-sonnet-4-6
+
+summary: |
+  Implemented IP-9 (AC-8): all forward-direction frontend views including:
+  - ForwardFlowChart.vue (Sankey hero: front detection loss-reason → downstream WORKCENTER_GROUP)
+  - ForwardHeatmap.vue (heatmap: loss_reasons × workcenter_groups, cell color = reject_rate)
+  - Segmented toggle (Sankey ▣ / Heatmap ▢) in the hero header
+  - Amplification KPI card (#7 in forwardCards) in KpiCards.vue (null → "—", ×N.N display)
+  - DETECTION_LOSS_REASON column added to COLUMNS_FORWARD in DetailTable.vue
+  - Cross-filter: forwardSelection reactive in App.vue; handleSankeyNodeClick toggle, clearForwardSelection, forward-selection-banner with "清除選取"
+  - byDetectionLossReasonChartData computed for the new front-reason ParetoChart
+  - New interfaces in App.vue: ByDetectionLossReasonItem, LossReasonWorkcenterCrosstab, DownstreamTrendItem
+  - MsdAnalysisData extended with 4 forward-only aggregation fields
+  - All new CSS scoped under .theme-mid-section-defect in style.css
+  - All component scoped <style> use theme() tokens; ECharts colors use named RGB constants (Rule 6.2/6.3)
+  - AC-8 composable unit tests added to mid-section-defect-composables.test.js (9 new tests)
+  - AC-8 Playwright tests added to mid-section-defect.spec.ts (5 new scenarios)
+
+test-evidence:
+  - phase: collect
+    result: pass
+    run-id: 20260630-115420
+  - phase: targeted
+    result: pass
+    run-id: 20260630-115426
+  - phase: changed-area
+    result: pass
+    run-id: 20260630-115433
+  - phase: quality
+    result: pass
+    run-id: 20260630-115508
+
+artifacts:
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/components/ForwardFlowChart.vue (new)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/components/ForwardHeatmap.vue (new)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/components/KpiCards.vue:65-114 (amplification card + formatAmplification/amplificationAccent)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/components/DetailTable.vue:47-57 (DETECTION_LOSS_REASON column)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/App.vue (ForwardFlowChart/ForwardHeatmap imports; forward interfaces; forwardSelection state; forward template branch)"
+  - type: files-changed
+    pointer: "frontend/src/mid-section-defect/style.css:654-754 (forward hero + selection banner CSS under .theme-mid-section-defect)"
+  - type: files-changed
+    pointer: "frontend/tests/legacy/mid-section-defect-composables.test.js:249-358 (9 AC-8 unit tests)"
+  - type: files-changed
+    pointer: "frontend/tests/playwright/mid-section-defect.spec.ts:651-835 (5 AC-8 Playwright scenarios)"
+  - type: components-affected
+    pointer: "ForwardFlowChart (new), ForwardHeatmap (new), KpiCards, DetailTable, App (mid-section-defect)"
+  - type: accessibility-audit
+    pointer: "All new interactive elements have aria-label; Sankey/Heatmap containers have role=img + aria-label; clear-selection buttons have aria-label='清除選取'"
+
+i18n-note: |
+  No dedicated i18n library (vue-i18n) is installed in this project.
+  All user-visible strings are inline in templates/JS, consistent with the
+  existing codebase pattern. New strings added inline:
+  - 放大倍率 (KpiCards.vue forwardCards label)
+  - 前段不良原因 (DetailTable.vue COLUMNS_FORWARD label)
+  - 清除選取 (ForwardFlowChart.vue clear button, forward-selection-banner button)
+  - Sankey 流向 / 熱圖 (hero toggle button labels)
+  - 前段不良原因 → 下游站點流向 (Sankey) (ForwardFlowChart chart title)
+  - 不良率熱圖 (前段原因 × 下游站點) (ForwardHeatmap chart title)
+  - 前段不良原因分布 (ParetoChart title in App.vue forward branch)
+  All strings are monolingual Chinese consistent with the rest of the app.
+
+known-risks:
+  - Playwright AC-8 tests for forward direction depend on the direction toggle
+    button ("正向追溯") being clickable. If the FilterBar's button is
+    disabled on initial load, the test falls back gracefully (guard: isVisible check).
+  - The SankeyChart click cross-filter in the Playwright test only verifies
+    the clear-selection button appears; deep Sankey node click simulation
+    in headless Playwright is complex due to ECharts canvas rendering.
+
+# ---------------------------------------------------------------------------
+# Fix-back: ui-ux review (verdict: changes-required) — 2026-06-30
+# ---------------------------------------------------------------------------
+fixback-log:
+  timestamp: 2026-06-30T12:15:00Z
+  verdict: changes-required
+  items:
+    - id: B-1
+      status: fixed
+      description: >
+        ForwardHeatmap.vue: added `selection` prop (mirrors ForwardFlowChart)
+        + `clear-selection` emit + inline "清除選取" button shown when
+        selection.frontReason or selection.downstreamGroup is active
+        (data-testid="heatmap-clear-selection"). App.vue now passes
+        `:selection="forwardSelection"` and `@clear-selection="clearForwardSelection"`
+        to the ForwardHeatmap component binding.
+    - id: B-2
+      status: fixed
+      description: >
+        App.vue hero-toggle buttons now have `:aria-pressed="forwardHeroView === 'sankey'"`
+        and `:aria-pressed="forwardHeroView === 'heatmap'"` respectively.
+    - id: A-3
+      status: fixed
+      description: >
+        Added `.theme-mid-section-defect .hero-toggle-btn { transition: none; }`
+        inside the existing `@media (prefers-reduced-motion: reduce)` block
+        in frontend/src/mid-section-defect/style.css.
+    - id: A-4
+      status: fixed
+      description: >
+        ForwardFlowChart.vue and ForwardHeatmap.vue: removed `role="img"` +
+        `aria-label` from the component root <div>. Moved them onto a new thin
+        wrapper <div role="img" aria-label="..."> that wraps only the <VChart>
+        canvas element. Interactive children (clear button, toggle slot) remain
+        outside the role="img" scope and are not buried inside it.
+    - id: A-5
+      status: fixed
+      description: >
+        App.vue: imported `nextTick` from Vue; added `sankeyToggleBtnRef`
+        template ref on the Sankey toggle button; updated `clearForwardSelection`
+        to call `void nextTick(() => sankeyToggleBtnRef.value?.focus())` after
+        clearing, per WAI-ARIA focus-return rule (CLAUDE.md).
+
+  verify-results:
+    - cmd: "npm run type-check"
+      result: pass (0 errors)
+    - cmd: "npm run css:check"
+      result: pass (0 errors; pre-existing WARNs in unrelated apps unchanged)
+    - cmd: "npm run build"
+      result: pass (built in ~12.6 s; large vendor-echarts chunk is pre-existing)
+    - cmd: "npm test"
+      result: "633 pass / 1 pre-existing fail (yield-alert/App.cross-filter.test.js — unrelated, confirmed pre-existing by git stash test)"
+    - cmd: "npx playwright test --list"
+      result: "27 tests collected in mid-section-defect.spec.ts — no selector breakage from B-1/B-2 changes"

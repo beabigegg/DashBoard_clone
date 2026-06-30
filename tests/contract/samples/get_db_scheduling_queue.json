@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "data": [
+    {
+      "lotId": "GA26062246-A00-017",
+      "workflowName": "ECA10-FLOW",
+      "packageLef": "DFN2510-10L",
+      "pjType": "PJE5UFN10A",
+      "waferLot": "MSASM",
+      "uts": "2026/07/12",
+      "qty": 800,
+      "bop": "ECA10",
+      "eqpPackageLef": "DFN2510-10L",
+      "eqpPjType": "PJE5UFN10A",
+      "eqpWaferLot": "MSASM",
+      "eqpUts": "2026/07/12",
+      "targetSpec": "ECA10-SPEC",
+      "equipment": "GDBA-0122",
+      "matchSource": "workflow"
+    }
+  ],
+  "meta": {
+    "timestamp": "2026-06-30T00:00:00.000000",
+    "app_version": "unknown"
+  }
+}

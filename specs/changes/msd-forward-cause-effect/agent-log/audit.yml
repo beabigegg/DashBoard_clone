@@ -1,0 +1,19 @@
+- type: tier-floor-override
+  change-id: msd-forward-cause-effect
+  timestamp: '2026-06-30T04:22:48.043Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - cache
+    - concurrency
+    - query
+  reason: >-
+    Deliberate tier-1 acceptance of the concurrency-critical surface. The new forward lineage stage
+    spool reuses the existing msd-events namespace and the same atomic file-write path already live
+    for the backward lineage spool and detection stage spool (Phase 1/2, commit e2931e1b); it
+    introduces NO enlarged Oracle fetch scope (3b control-cohort dropped). Incremental concurrency
+    risk over the already-shipped spool pattern is bounded and covered by a dedicated 4-class
+    concurrency stress suite + 200-cycle soak (0 collisions, 0 cross-trace bleed, fd_delta=0, RSS
+    ~0.1%) per the mandated stress-soak-report.md, plus e2e resilience (spool-miss/Oracle fallback,
+    RQ-failure, self-edge degrade). Signed off by qa-reviewer + spec-architect (design.md).

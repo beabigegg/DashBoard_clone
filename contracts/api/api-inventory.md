@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.2.9
-last-changed: 2026-06-29
+schema-version: 1.3.0
+last-changed: 2026-06-30
 ---
 
 # API Inventory
@@ -33,7 +33,7 @@ last-changed: 2026-06-29
 | `job_query_routes.py` | All JSON API endpoints |
 | `qc_gate_routes.py` | All JSON API endpoints |
 | `trace_routes.py` | All JSON API endpoints — `GET /api/trace/lineage/job/<job_id>` / `/result`；`POST /api/trace/lineage` 非同步 capable → 202；MSD events → `{spool_hit, trace_query_id, aggregation}`；`trace_query_id` 為 stable hash-based canonical query id |
-| `mid_section_defect_routes.py` | All JSON API endpoints — **compatibility adapter**：`GET /api/mid-section-defect/analysis` accepts optional `pj_types[]` and `packages[]` multi-value params (post-query filter on detection_df; AND-semantics; absent/empty = no restriction); `/analysis/detail` / `/export` accept optional `trace_query_id`. **New**: `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options (4-tuple in-memory filter over `container_filter_cache`); 400 on malformed `selected` JSON; 500 on Oracle build error; payload `{data: {pj_types, packages, bops, pj_functions}, meta: {updated_at, schema_version: 2}}` (msd-type-package-filter). |
+| `mid_section_defect_routes.py` | All JSON API endpoints — **compatibility adapter**：`GET /api/mid-section-defect/analysis` accepts optional `pj_types[]` and `packages[]` multi-value params (post-query filter on detection_df; AND-semantics; absent/empty = no restriction); `/analysis/detail` / `/export` accept optional `trace_query_id`. **New**: `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options; 400 on malformed `selected` JSON; 500 on Oracle build error (msd-type-package-filter). **Forward fields (msd-forward-cause-effect)**: `direction=forward` adds `by_detection_loss_reason[]`, `loss_reason_workcenter_crosstab`, `downstream_trend[]`, `amplification` to `/analysis` response; `/analysis/detail` rows gain `DETECTION_LOSS_REASON`. |
 | `query_tool_routes.py` | All JSON API endpoints；`GET /api/query-tool/lot-history` 和 `POST /api/query-tool/equipment-period`（`query_type=lots`）每筆 row 新增 `PRODUCTLINENAME: string \| null`（add-package-detail-tables，additive）；`POST /api/query-tool/equipment-period`（`query_type=rejects`）`PRODUCTLINENAME` 已存在（equipment_lot_rejects.sql line 52） |
 | `material_trace_routes.py` | JSON endpoints（CSV export 除外）— `POST /api/material-trace/query` spool 優先；miss → 202；RQ 不可用 → 503+Retry-After；`GET /api/material-trace/job/<job_id>`；`POST /api/material-trace/export` 需 `query_hash`，409 `QUERY_NOT_READY` if not ready |
 | `db_scheduling_routes.py` | `GET /api/db-scheduling/queue` — read-only recommendation endpoint; queries `DWH.DW_MES_LOT_V` (5-min WIP cache); sync only (~689 lots); returns recommended DB equipment per D/B-START lot; WORKFLOWNAME-match primary path + BOP-fallback (DB-01..DB-05); matchSource enum: workflow/bop-fallback/none. Auth required. `GET /api/db-scheduling/equipment-detail?equipment=<id>` — on-demand machine status + running-lot detail from realtime-equipment-cache + WIP cache; 400 if equipment param missing. Auth required. |

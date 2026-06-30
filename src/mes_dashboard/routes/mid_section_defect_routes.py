@@ -93,7 +93,7 @@ def _analysis_cache_key(
 
 
 def _build_summary_payload(result: dict) -> dict:
-    return {
+    payload = {
         'kpi': result.get('kpi'),
         'charts': result.get('charts'),
         'daily_trend': result.get('daily_trend'),
@@ -103,6 +103,17 @@ def _build_summary_payload(result: dict) -> dict:
         'attribution': result.get('attribution', []),
         'trace_query_id': result.get('trace_query_id'),
     }
+    # Forward direction: include new aggregation fields (AC-1/AC-2/AC-3/AC-7)
+    if 'by_detection_loss_reason' in result:
+        payload['by_detection_loss_reason'] = result['by_detection_loss_reason']
+    if 'loss_reason_workcenter_crosstab' in result:
+        payload['loss_reason_workcenter_crosstab'] = result['loss_reason_workcenter_crosstab']
+    if 'downstream_trend' in result:
+        payload['downstream_trend'] = result['downstream_trend']
+    if 'amplification' in result or result.get('kpi', {}).get('detection_lot_count') is not None:
+        # Always include amplification key for forward (None = "—", 0.0 = real zero)
+        payload['amplification'] = result.get('amplification')
+    return payload
 
 
 @mid_section_defect_bp.route('/station-options', methods=['GET'])

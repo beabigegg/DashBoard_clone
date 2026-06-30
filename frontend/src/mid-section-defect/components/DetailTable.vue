@@ -47,6 +47,7 @@ const COLUMNS_BACKWARD = [
 const COLUMNS_FORWARD = [
   { key: 'CONTAINERNAME', label: 'LOT ID', width: '140px' },
   { key: 'DETECTION_EQUIPMENTNAME', label: '偵測設備', width: '120px' },
+  { key: 'DETECTION_LOSS_REASON', label: '前段不良原因', width: '130px' },
   { key: 'TRACKINQTY', label: '偵測投入', width: '80px', numeric: true },
   { key: 'DEFECT_QTY', label: '偵測不良', width: '80px', numeric: true },
   { key: 'DOWNSTREAM_STATIONS_REACHED', label: '下游到達站數', width: '100px', numeric: true },

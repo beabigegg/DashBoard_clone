@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.32.0
-last-changed: 2026-06-29
+schema-version: 1.33.0
+last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -175,8 +175,8 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/trace/job/{job_id}/stream | required | — | GenericSuccessResponse | 404 | e2e tests |
 | GET | /api/mid-section-defect/station-options | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/mid-section-defect/container-filter-options | required | ?selected=<json> | MsdContainerFilterOptionsResponse | 400/500 | route tests |
-| GET | /api/mid-section-defect/analysis | required | query params; optional pj_types[], packages[] | GenericSuccessResponse | 400/500 | route tests |
-| GET | /api/mid-section-defect/analysis/detail | required | query params | GenericSuccessResponse | 400/500 | route tests |
+| GET | /api/mid-section-defect/analysis | required | query params; optional pj_types[], packages[], direction=forward adds by_detection_loss_reason/crosstab/trend/amplification | MsdForwardAnalysisResponse | 400/500 | route tests |
+| GET | /api/mid-section-defect/analysis/detail | required | query params; direction=forward rows gain detection_loss_reason | MsdForwardDetailResponse | 400/500 | route tests |
 | GET | /api/mid-section-defect/loss-reasons | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/mid-section-defect/export | required | query params | GenericSuccessResponse | 400/500 | e2e tests |
 | GET | /api/analytics/anomaly-summary | required | — | AnomalySummaryResponse | 503 | route tests |
@@ -1056,24 +1056,43 @@ Tier-B — status feed returned by `GET /api/portal/navigation` (no drawers; str
 ```
 
 ### DbSchedulingQueueResponse
-| field | type | required | format | notes |
-|---|---|---|---|---|
-| success | boolean | yes |  |  |
-| lotId | string | yes |  |  |
-| workflowName | string | yes |  |  |
-| packageLef | string | no |  |  |
-| pjType | string | no |  |  |
-| waferLot | string | no |  |  |
-| uts | string | no |  | date string YYYY/MM/DD |
-| qty | integer | yes |  |  |
-| bop | string | no |  |  |
-| eqpPackageLef | string | no |  | running lot Package LEF on equipment (priority-column key, primary) |
-| eqpPjType | string | no |  | running lot PJ Type on equipment (priority-column key, secondary) |
-| eqpWaferLot | string | no |  | running lot Wafer Lot on equipment (priority-column key, tertiary) |
-| eqpUts | string | no |  | running lot UTS on equipment (priority-column key, quaternary) |
-| targetSpec | string | yes |  | DB process SPEC name |
-| equipment | string | yes |  | single equipment ID; one row per equipment |
-| matchSource | string | yes |  | enum: workflow / bop-fallback / none |
+
+Tier-B — response for `GET /api/db-scheduling/queue`. Array of lot-equipment recommendation rows, each representing one equipment option for a D/B-START lot. One lot can have multiple rows (one per equipment).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data"],
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lotId", "workflowName", "qty", "targetSpec", "equipment", "matchSource"],
+        "properties": {
+          "lotId": {"type": "string"},
+          "workflowName": {"type": "string"},
+          "packageLef": {"type": "string"},
+          "pjType": {"type": "string"},
+          "waferLot": {"type": "string"},
+          "uts": {"type": "string", "description": "date string YYYY/MM/DD"},
+          "qty": {"type": "integer"},
+          "bop": {"type": "string"},
+          "eqpPackageLef": {"type": "string", "description": "running lot Package LEF on equipment (priority-column key, primary)"},
+          "eqpPjType": {"type": "string", "description": "running lot PJ Type on equipment (priority-column key, secondary)"},
+          "eqpWaferLot": {"type": "string", "description": "running lot Wafer Lot on equipment (priority-column key, tertiary)"},
+          "eqpUts": {"type": "string", "description": "running lot UTS on equipment (priority-column key, quaternary)"},
+          "targetSpec": {"type": "string", "description": "DB process SPEC name"},
+          "equipment": {"type": "string", "description": "single equipment ID; one row per equipment"},
+          "matchSource": {"type": "string", "enum": ["workflow", "bop-fallback", "none"]}
+        }
+      }
+    },
+    "meta": {"type": "object"}
+  }
+}
+```
 
 ### EquipmentDetailResponse
 | field | type | required | format | notes |
@@ -1124,6 +1143,126 @@ Tier-B — cross-filter cached options returned by `GET /api/mid-section-defect/
         "packages":     {"type": "array", "items": {"type": "string"}},
         "bops":         {"type": "array", "items": {"type": "string"}},
         "pj_functions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "meta": {"type": "object"}
+  }
+}
+```
+
+
+### MsdForwardAnalysisResponse
+
+Tier-B — response for `GET /api/mid-section-defect/analysis?direction=forward`. Extends the generic analysis response with forward cause-effect aggregation fields.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data"],
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "required": ["kpi", "charts", "daily_trend", "available_loss_reasons", "genealogy_status"],
+      "properties": {
+        "kpi": {"type": "object"},
+        "charts": {"type": "object"},
+        "daily_trend": {"type": "array"},
+        "available_loss_reasons": {"type": "array", "items": {"type": "string"}},
+        "genealogy_status": {"type": "string"},
+        "trace_query_id": {"type": ["string", "null"]},
+        "detail_total_count": {"type": "integer"},
+        "by_detection_loss_reason": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["loss_reason", "reject_qty", "reject_rate"],
+            "properties": {
+              "loss_reason": {"type": "string"},
+              "reject_qty": {"type": "integer"},
+              "reject_rate": {"type": "number", "minimum": 0, "maximum": 1}
+            }
+          }
+        },
+        "loss_reason_workcenter_crosstab": {
+          "type": "object",
+          "properties": {
+            "loss_reasons": {"type": "array", "items": {"type": "string"}},
+            "workcenter_groups": {"type": "array", "items": {"type": "string"}},
+            "cells": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["loss_reason", "workcenter_group", "reject_qty", "reject_rate"],
+                "properties": {
+                  "loss_reason": {"type": "string"},
+                  "workcenter_group": {"type": "string"},
+                  "reject_qty": {"type": "integer"},
+                  "reject_rate": {"type": "number", "minimum": 0}
+                }
+              }
+            }
+          }
+        },
+        "downstream_trend": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["date", "reject_qty", "reject_rate"],
+            "properties": {
+              "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+              "reject_qty": {"type": "integer"},
+              "reject_rate": {"type": "number", "minimum": 0}
+            }
+          }
+        },
+        "amplification": {
+          "type": ["number", "null"],
+          "description": "downstream_reject_rate / detection_reject_rate. null when detection_rate=0 (display dash); 0.0 when downstream=0 and detection>0."
+        }
+      }
+    },
+    "meta": {"type": "object"}
+  }
+}
+```
+
+### MsdForwardDetailResponse
+
+Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=forward`. Detail rows gain `detection_loss_reason` (primary detection loss reason for the lot; null if no rejects).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data"],
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "required": ["detail", "pagination"],
+      "properties": {
+        "detail": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "CONTAINERNAME": {"type": "string"},
+              "PJ_TYPE": {"type": "string"},
+              "PRODUCTLINENAME": {"type": "string"},
+              "WORKFLOW": {"type": "string"},
+              "DETECTION_EQUIPMENTNAME": {"type": "string"},
+              "INPUT_QTY": {"type": "integer"},
+              "DEFECT_QTY": {"type": "integer"},
+              "DOWNSTREAM_STATIONS": {"type": "integer"},
+              "DOWNSTREAM_REJECTS": {"type": "integer"},
+              "DOWNSTREAM_REJECT_RATE": {"type": "number"},
+              "WORST_DOWNSTREAM": {"type": "string"},
+              "DETECTION_LOSS_REASON": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "pagination": {"type": "object"},
+        "trace_query_id": {"type": ["string", "null"]}
       }
     },
     "meta": {"type": "object"}

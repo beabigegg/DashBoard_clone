@@ -1,0 +1,14 @@
+change-id: msd-forward-cause-effect
+agent: ui-ux-reviewer
+verdict: changes-required
+summary: >
+  2 blocking, fixed in same-PR frontend fix-back: B-1 heatmap cross-filter has no
+  proximate "清除選取" affordance (banner sits below supporting charts); B-2 hero
+  toggle buttons lack aria-pressed. Advisories A-3 (prefers-reduced-motion for
+  hero-toggle-btn), A-4 (role=img contains interactive children), A-5 (nextTick
+  focus return on clear) folded into the fix. Note: project has NO i18n runtime
+  (hardcoded zh-TW throughout) so the all-locale-sync rule does not apply.
+artifacts:
+  - { type: blocking, pointer: "B-1 heatmap clear affordance; B-2 aria-pressed on hero toggle" }
+  - { type: advisory, pointer: "A-3 reduced-motion; A-4 role=img; A-5 focus-return; A-1 banner copy vs detail not re-fetched; A-6 no forward methodology panel" }
+next-action: frontend fix-back (B-1, B-2, A-3, A-4, A-5)

@@ -69,12 +69,6 @@ class TestMsdFullChain:
         assert tqid1 == tqid2
         assert isinstance(tqid1, str) and len(tqid1) > 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Phase 3: get_summary(direction='forward') is intentionally disabled "
-               "(returns None → Oracle/in-memory fallback) until the forward DuckDB "
-               "summary path is implemented. Tripwire: remove when Phase 3 lands.",
-    )
     def test_summary_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
@@ -121,12 +115,6 @@ class TestMsdFullChain:
         # 1 header + 3 data rows
         assert len(lines) == 4
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Phase 3: asserts get_summary(direction='forward') KPI from the events "
-               "spool, which is disabled until the forward DuckDB summary path is "
-               "implemented. Tripwire: remove when Phase 3 lands.",
-    )
     def test_full_chain_summary_detail_export_consistency(self, msd_spool):
         """Summary, detail, and export should all reflect the same dataset."""
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
@@ -516,3 +504,61 @@ class TestGuardRetirementOrdering:
         """EVENT_FETCHER_MAX_TOTAL_ROWS — needed until callers fully spool-safe."""
         from mes_dashboard.services.event_fetcher import EVENT_FETCHER_MAX_TOTAL_ROWS
         assert EVENT_FETCHER_MAX_TOTAL_ROWS > 0
+
+
+# ===========================================================================
+# AC-5: Forward get_summary DuckDB path end-to-end
+# ===========================================================================
+
+def test_forward_get_summary_duckdb_path_end_to_end(tmp_path):
+    """AC-5: get_summary(direction='forward') produces a non-None result via DuckDB.
+
+    Verifies the DuckDB forward summary path with a minimal events spool +
+    detection spool (no Oracle, no Redis).
+    """
+    import pandas as pd
+    from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+    events_df = pd.DataFrame(
+        [
+            ("SEED-001", "測試", 100, 5, "2025-04-01", None, None, "測試", None),
+            ("SEED-002", "成型", 200, 0, "2025-04-01", None, None, "成型", None),
+        ],
+        columns=[
+            "CONTAINERID", "WORKCENTERNAME",
+            "TRACKINQTY", "REJECT_TOTAL_QTY", "TXNDATE",
+            "EQUIPMENTID", "EQUIPMENTNAME", "WORKCENTER_GROUP", "TRACKINTIMESTAMP",
+        ],
+    )
+    detection_df = pd.DataFrame(
+        [
+            ("SEED-001", "SEED-001-001", "GA", "PKG1", "WF1", "EQP1", 100, "BondWire", 5),
+        ],
+        columns=[
+            "CONTAINERID", "CONTAINERNAME", "PJ_TYPE", "PRODUCTLINENAME",
+            "WORKFLOW", "DETECTION_EQUIPMENTNAME", "TRACKINQTY", "LOSSREASONNAME", "REJECTQTY",
+        ],
+    )
+
+    events_path = tmp_path / "events.parquet"
+    detection_path = tmp_path / "detection.parquet"
+    events_df.to_parquet(events_path, index=False)
+    detection_df.to_parquet(detection_path, index=False)
+
+    rt = MsdDuckdbRuntime("tqid-ac5-end-to-end")
+    rt._events_path = str(events_path)
+    rt._detection_path = str(detection_path)
+    rt._forward_lineage_path = None
+    rt._lineage_path = None
+    rt._resolved = True
+
+    summary = rt.get_summary(direction="forward")
+
+    assert summary is not None, "get_summary(forward) must not return None when events spool exists"
+    assert "kpi" in summary
+    assert "daily_trend" in summary
+    assert "genealogy_status" in summary
+    # KPI should reflect detection data
+    kpi = summary["kpi"]
+    assert "detection_lot_count" in kpi or "lot_count" in kpi
+    assert "downstream_total_reject" in kpi or "defect_qty" in kpi

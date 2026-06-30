@@ -976,6 +976,36 @@ def execute_trace_events_job(
                         job_id, _lin_exc,
                     )
 
+                # Write forward lineage spool (SEED_ID, DESCENDANT_ID) for DuckDB
+                # forward attribution re-keying (AC-4) and forward summary (AC-5/AC-6).
+                # Children_map is available from the lineage payload for forward queries.
+                if _direction != "backward":
+                    try:
+                        _fwd_children_map = (
+                            _lineage_payload.get("children_map") or {}
+                            if isinstance(_lineage_payload, dict) else {}
+                        )
+                        from mes_dashboard.services.mid_section_defect_service import (
+                            _write_msd_forward_lineage_spool,
+                        )
+                        _write_msd_forward_lineage_spool(
+                            trace_query_id,
+                            _seed_container_ids,
+                            _fwd_children_map,
+                        )
+                        logger.info(
+                            "trace job MSD forward lineage spool written job_id=%s "
+                            "seed_count=%d children_map_size=%d",
+                            job_id,
+                            len(_seed_container_ids),
+                            len(_fwd_children_map),
+                        )
+                    except Exception as _fwd_lin_exc:
+                        logger.warning(
+                            "trace job MSD forward lineage spool write failed job_id=%s: %s",
+                            job_id, _fwd_lin_exc,
+                        )
+
                 # Write detection spool for container mode so DuckDB attribution works.
                 # Date-range mode gets detection from _fetch_station_detection_data (called
                 # inside _build_trace_aggregation_container_mode via compat job); container
@@ -1710,7 +1740,7 @@ def make_general_trace_events_query_id(
 #
 # The trace_query_id is derived from the primary query parameters (not a
 # random UUID) so that the same query always maps to the same spool key.
-_TRACE_QUERY_ID_SCHEMA_VERSION = 1
+_TRACE_QUERY_ID_SCHEMA_VERSION = 2  # bumped: SEED_ID column added to forward lineage spool
 
 
 def make_trace_query_id(

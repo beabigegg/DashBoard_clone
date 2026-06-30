@@ -12,11 +12,13 @@ on:
     paths:
       - 'contracts/api/api-contract.md'
       - 'contracts/openapi.json'
+      - 'contracts/api/openapi.json'
       - '.github/workflows/openapi-sync.yml'
   pull_request:
     paths:
       - 'contracts/api/api-contract.md'
       - 'contracts/openapi.json'
+      - 'contracts/api/openapi.json'
       - '.github/workflows/openapi-sync.yml'
   workflow_dispatch:
 
@@ -36,3 +38,9 @@ jobs:
 
       - name: Verify OpenAPI export is in sync with the API contract
         run: cdd-kit openapi export --check --out contracts/openapi.json
+
+      # msd-forward-cause-effect: CLAUDE.md requires BOTH mirrors to be in sync
+      # after any endpoint-table, schema, or schema-version edit.
+      # Fix on drift: cdd-kit openapi export --out contracts/api/openapi.json
+      - name: Verify contracts/api/openapi.json mirror is in sync
+        run: cdd-kit openapi export --check --out contracts/api/openapi.json

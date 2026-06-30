@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.10.0
-last-changed: 2026-06-18
+schema-version: 1.11.0
+last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -148,6 +148,10 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.11.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect (2026-06-30): Sankey/Heatmap chart CSS scoped under `.theme-mid-section-defect` (Rule 4.2/4.3). Teleport tooltip wrap required (Rule 4.4) if using `<Teleport to="body">`. ECharts colors defined as named constants (Rule 6.x / 2.4 color-token exempt). `@click` on `<VChart>` not imperative `.on()` (frontend-patterns). LoadingOverlay 三層 applied for chart loading states. All chart CSS must remain scoped; no unscoped top-level rules (css:check enforced).
 
 ## [css 1.10.0] — 2026-06-25
 ### Changed

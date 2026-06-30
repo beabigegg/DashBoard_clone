@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.32.0"
+    "version": "1.33.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -3313,11 +3313,11 @@
         "summary": "GET /api/mid-section-defect/analysis",
         "responses": {
           "200": {
-            "description": "Contract response: GenericSuccessResponse",
+            "description": "Contract response: MsdForwardAnalysisResponse",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                  "$ref": "#/components/schemas/MsdForwardAnalysisResponse"
                 }
               }
             }
@@ -3342,11 +3342,11 @@
         "summary": "GET /api/mid-section-defect/analysis/detail",
         "responses": {
           "200": {
-            "description": "Contract response: GenericSuccessResponse",
+            "description": "Contract response: MsdForwardDetailResponse",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                  "$ref": "#/components/schemas/MsdForwardDetailResponse"
                 }
               }
             }
@@ -6944,73 +6944,91 @@
       },
       "DbSchedulingQueueResponse": {
         "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
         "properties": {
           "success": {
             "type": "boolean"
           },
-          "lotId": {
-            "type": "string"
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "lotId",
+                "workflowName",
+                "qty",
+                "targetSpec",
+                "equipment",
+                "matchSource"
+              ],
+              "properties": {
+                "lotId": {
+                  "type": "string"
+                },
+                "workflowName": {
+                  "type": "string"
+                },
+                "packageLef": {
+                  "type": "string"
+                },
+                "pjType": {
+                  "type": "string"
+                },
+                "waferLot": {
+                  "type": "string"
+                },
+                "uts": {
+                  "type": "string",
+                  "description": "date string YYYY/MM/DD"
+                },
+                "qty": {
+                  "type": "integer"
+                },
+                "bop": {
+                  "type": "string"
+                },
+                "eqpPackageLef": {
+                  "type": "string",
+                  "description": "running lot Package LEF on equipment (priority-column key, primary)"
+                },
+                "eqpPjType": {
+                  "type": "string",
+                  "description": "running lot PJ Type on equipment (priority-column key, secondary)"
+                },
+                "eqpWaferLot": {
+                  "type": "string",
+                  "description": "running lot Wafer Lot on equipment (priority-column key, tertiary)"
+                },
+                "eqpUts": {
+                  "type": "string",
+                  "description": "running lot UTS on equipment (priority-column key, quaternary)"
+                },
+                "targetSpec": {
+                  "type": "string",
+                  "description": "DB process SPEC name"
+                },
+                "equipment": {
+                  "type": "string",
+                  "description": "single equipment ID; one row per equipment"
+                },
+                "matchSource": {
+                  "type": "string",
+                  "enum": [
+                    "workflow",
+                    "bop-fallback",
+                    "none"
+                  ]
+                }
+              }
+            }
           },
-          "workflowName": {
-            "type": "string"
-          },
-          "packageLef": {
-            "type": "string"
-          },
-          "pjType": {
-            "type": "string"
-          },
-          "waferLot": {
-            "type": "string"
-          },
-          "uts": {
-            "type": "string",
-            "description": "date string YYYY/MM/DD"
-          },
-          "qty": {
-            "type": "integer"
-          },
-          "bop": {
-            "type": "string"
-          },
-          "eqpPackageLef": {
-            "type": "string",
-            "description": "running lot Package LEF on equipment (priority-column key, primary)"
-          },
-          "eqpPjType": {
-            "type": "string",
-            "description": "running lot PJ Type on equipment (priority-column key, secondary)"
-          },
-          "eqpWaferLot": {
-            "type": "string",
-            "description": "running lot Wafer Lot on equipment (priority-column key, tertiary)"
-          },
-          "eqpUts": {
-            "type": "string",
-            "description": "running lot UTS on equipment (priority-column key, quaternary)"
-          },
-          "targetSpec": {
-            "type": "string",
-            "description": "DB process SPEC name"
-          },
-          "equipment": {
-            "type": "string",
-            "description": "single equipment ID; one row per equipment"
-          },
-          "matchSource": {
-            "type": "string",
-            "description": "enum: workflow / bop-fallback / none"
+          "meta": {
+            "type": "object"
           }
-        },
-        "required": [
-          "success",
-          "lotId",
-          "workflowName",
-          "qty",
-          "targetSpec",
-          "equipment",
-          "matchSource"
-        ]
+        }
       },
       "EquipmentDetailResponse": {
         "type": "object",
@@ -7170,6 +7188,239 @@
                 "items": {
                   "type": "string"
                 }
+              }
+            }
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "MsdForwardAnalysisResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "kpi",
+              "charts",
+              "daily_trend",
+              "available_loss_reasons",
+              "genealogy_status"
+            ],
+            "properties": {
+              "kpi": {
+                "type": "object"
+              },
+              "charts": {
+                "type": "object"
+              },
+              "daily_trend": {
+                "type": "array"
+              },
+              "available_loss_reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "genealogy_status": {
+                "type": "string"
+              },
+              "trace_query_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "detail_total_count": {
+                "type": "integer"
+              },
+              "by_detection_loss_reason": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "loss_reason",
+                    "reject_qty",
+                    "reject_rate"
+                  ],
+                  "properties": {
+                    "loss_reason": {
+                      "type": "string"
+                    },
+                    "reject_qty": {
+                      "type": "integer"
+                    },
+                    "reject_rate": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  }
+                }
+              },
+              "loss_reason_workcenter_crosstab": {
+                "type": "object",
+                "properties": {
+                  "loss_reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "workcenter_groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cells": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "loss_reason",
+                        "workcenter_group",
+                        "reject_qty",
+                        "reject_rate"
+                      ],
+                      "properties": {
+                        "loss_reason": {
+                          "type": "string"
+                        },
+                        "workcenter_group": {
+                          "type": "string"
+                        },
+                        "reject_qty": {
+                          "type": "integer"
+                        },
+                        "reject_rate": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "downstream_trend": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "date",
+                    "reject_qty",
+                    "reject_rate"
+                  ],
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "reject_qty": {
+                      "type": "integer"
+                    },
+                    "reject_rate": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                }
+              },
+              "amplification": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "downstream_reject_rate / detection_reject_rate. null when detection_rate=0 (display dash); 0.0 when downstream=0 and detection>0."
+              }
+            }
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "MsdForwardDetailResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "detail",
+              "pagination"
+            ],
+            "properties": {
+              "detail": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "CONTAINERNAME": {
+                      "type": "string"
+                    },
+                    "PJ_TYPE": {
+                      "type": "string"
+                    },
+                    "PRODUCTLINENAME": {
+                      "type": "string"
+                    },
+                    "WORKFLOW": {
+                      "type": "string"
+                    },
+                    "DETECTION_EQUIPMENTNAME": {
+                      "type": "string"
+                    },
+                    "INPUT_QTY": {
+                      "type": "integer"
+                    },
+                    "DEFECT_QTY": {
+                      "type": "integer"
+                    },
+                    "DOWNSTREAM_STATIONS": {
+                      "type": "integer"
+                    },
+                    "DOWNSTREAM_REJECTS": {
+                      "type": "integer"
+                    },
+                    "DOWNSTREAM_REJECT_RATE": {
+                      "type": "number"
+                    },
+                    "WORST_DOWNSTREAM": {
+                      "type": "string"
+                    },
+                    "DETECTION_LOSS_REASON": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "pagination": {
+                "type": "object"
+              },
+              "trace_query_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           },

@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0014-msd-forward-lineage-seed-anchor.md" }
+  - { type: affected-areas, pointer: "msd-forward attribution, msd-events lineage spool, msd_duckdb_runtime get_summary(forward), mid-section-defect frontend" }
+  - { type: decision-summary, pointer: "SEED_ID anchored on detection defect-lot, denormalized at spool-write time; DuckDB-forward cutover retires in-memory path" }
+  - { type: risks-noted, pointer: "0 high, 4 medium (empty children_map degrade, job-registry test sync, code-map drift, amplification denominator filter parity)" }

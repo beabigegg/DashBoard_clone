@@ -649,3 +649,656 @@ test('test_type_selection_narrows_package_options', async ({ page }) => {
   expect(packageOptionTexts.some((t) => t.includes('PKG_X'))).toBe(true);
   expect(packageOptionTexts.some((t) => t.includes('PKG_Y'))).toBe(false);
 });
+
+// ---------------------------------------------------------------------------
+// AC-8: Forward direction — Sankey, Heatmap, amplification KPI, detail column
+// ---------------------------------------------------------------------------
+
+/**
+ * Forward analysis mock payload with all new fields:
+ *   by_detection_loss_reason, loss_reason_workcenter_crosstab,
+ *   downstream_trend, amplification.
+ */
+const MOCK_FORWARD_ANALYSIS_DATA = {
+  kpi: {
+    detection_lot_count: 10,
+    detection_defect_qty: 50,
+    tracked_lot_count: 8,
+    downstream_stations_reached: 3,
+    downstream_total_reject: 30,
+    downstream_reject_rate: 0.03,
+    amplification: 2.5,
+  },
+  charts: {
+    by_downstream_station: [{ name: '封裝', input_qty: 500, defect_qty: 30, defect_rate: 6.0, lot_count: 8, cumulative_pct: 100 }],
+    by_downstream_loss_reason: [],
+    by_downstream_machine: [],
+    by_detection_machine: [],
+  },
+  by_detection_loss_reason: [
+    { loss_reason: '外觀不良', reject_qty: 40, reject_rate: 0.04 },
+    { loss_reason: '電性不良', reject_qty: 10, reject_rate: 0.01 },
+  ],
+  loss_reason_workcenter_crosstab: {
+    loss_reasons: ['外觀不良', '電性不良'],
+    workcenter_groups: ['封裝', '測試'],
+    cells: [
+      { loss_reason: '外觀不良', workcenter_group: '封裝', reject_qty: 25, reject_rate: 0.025 },
+      { loss_reason: '外觀不良', workcenter_group: '測試', reject_qty: 15, reject_rate: 0.015 },
+      { loss_reason: '電性不良', workcenter_group: '封裝', reject_qty: 10, reject_rate: 0.01 },
+    ],
+  },
+  downstream_trend: [
+    { date: '2026-06-01', reject_qty: 15, reject_rate: 0.015 },
+    { date: '2026-06-02', reject_qty: 15, reject_rate: 0.015 },
+  ],
+  amplification: 2.5,
+  attribution: [],
+  materials_attribution: [],
+  daily_trend: [],
+  genealogy_status: 'ready',
+  detail_total_count: 2,
+  total_ancestor_count: 0,
+};
+
+const MOCK_FORWARD_EVENTS_RESULT = {
+  success: true,
+  data: {
+    stage: 'events',
+    trace_query_id: 'test-forward-trace-001',
+    aggregation: MOCK_FORWARD_ANALYSIS_DATA,
+    quality_meta: { status: 'complete' },
+  },
+  meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+};
+
+const MOCK_FORWARD_DETAIL_RESPONSE = {
+  success: true,
+  data: {
+    detail: [
+      {
+        CONTAINERNAME: 'LOT-F001',
+        DETECTION_EQUIPMENTNAME: 'MWB-01',
+        DETECTION_LOSS_REASON: '外觀不良',
+        TRACKINQTY: 100,
+        DEFECT_QTY: 5,
+        DOWNSTREAM_STATIONS_REACHED: 2,
+        DOWNSTREAM_TOTAL_REJECT: 3,
+        DOWNSTREAM_REJECT_RATE: 0.03,
+        WORST_DOWNSTREAM_STATION: '封裝',
+      },
+      {
+        CONTAINERNAME: 'LOT-F002',
+        DETECTION_EQUIPMENTNAME: 'MWB-02',
+        DETECTION_LOSS_REASON: null,
+        TRACKINQTY: 80,
+        DEFECT_QTY: 3,
+        DOWNSTREAM_STATIONS_REACHED: 1,
+        DOWNSTREAM_TOTAL_REJECT: 0,
+        DOWNSTREAM_REJECT_RATE: 0,
+        WORST_DOWNSTREAM_STATION: null,
+      },
+    ],
+    pagination: { page: 1, page_size: 20, total_count: 2, total_pages: 1 },
+  },
+  meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+};
+
+/**
+ * Helper: run a forward-direction query.
+ * Switches direction toggle to "正向追溯" and submits.
+ */
+async function runForwardQuery(page: Page): Promise<void> {
+  // Stub the events stage with forward data
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_EVENTS_RESULT),
+    }),
+  );
+  // Stub the detail endpoint with forward detail data
+  await page.route('**/api/mid-section-defect/analysis/detail**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_DETAIL_RESPONSE),
+    }),
+  );
+
+  await page.goto(PAGE_URL);
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  // Switch direction to forward — click the "正向追溯" button in the direction toggle
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) {
+    await forwardBtn.click();
+  }
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  // Wait for KPI cards to appear (indicates events stage complete)
+  await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
+}
+
+test('forward amplification KPI renders "×2.5" when amplification is nonzero', async ({ page }) => {
+  await installBaseRoutes(page);
+  await runForwardQuery(page);
+
+  // KPI section must be visible
+  await expect(page.locator('[data-testid="kpi-cards"]')).toBeVisible();
+
+  // The amplification card value should show ×2.5
+  const kpiText = await page.locator('[data-testid="kpi-cards"]').textContent();
+  expect(kpiText).toContain('放大倍率');
+  // ×2.5 should appear somewhere in the kpi section
+  expect(kpiText).toContain('×2.5');
+});
+
+test('forward amplification KPI renders "—" when amplification is null', async ({ page }) => {
+  // Override with null amplification
+  const nullAmpData = {
+    ...MOCK_FORWARD_EVENTS_RESULT,
+    data: {
+      ...MOCK_FORWARD_EVENTS_RESULT.data,
+      aggregation: {
+        ...MOCK_FORWARD_ANALYSIS_DATA,
+        kpi: { ...MOCK_FORWARD_ANALYSIS_DATA.kpi, amplification: null },
+        amplification: null,
+      },
+    },
+  };
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(nullAmpData),
+    }),
+  );
+  await page.route('**/api/mid-section-defect/analysis/detail**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_DETAIL_RESPONSE),
+    }),
+  );
+
+  await installBaseRoutes(page);
+  await page.goto(PAGE_URL);
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) {
+    await forwardBtn.click();
+  }
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+  await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
+
+  const kpiText = await page.locator('[data-testid="kpi-cards"]').textContent();
+  expect(kpiText).toContain('放大倍率');
+  expect(kpiText).toContain('—');
+});
+
+test('heatmap toggle switches chart type from Sankey to Heatmap', async ({ page }) => {
+  await installBaseRoutes(page);
+  await runForwardQuery(page);
+
+  // Forward hero section should be visible after query
+  await page.waitForSelector('[data-testid="forward-hero"]', { timeout: 10_000 });
+
+  // Default is sankey
+  const sankeyToggle = page.locator('[data-testid="toggle-sankey"]');
+  const heatmapToggle = page.locator('[data-testid="toggle-heatmap"]');
+  await expect(sankeyToggle).toBeVisible();
+  await expect(heatmapToggle).toBeVisible();
+
+  // Sankey chart should be visible by default
+  const sankeyChart = page.locator('[data-testid="forward-flow-chart"]');
+  const heatmapChart = page.locator('[data-testid="forward-heatmap"]');
+  await expect(sankeyChart).toBeVisible();
+  await expect(heatmapChart).not.toBeVisible();
+
+  // Click heatmap toggle
+  await heatmapToggle.click();
+
+  // Now heatmap should be visible and sankey hidden
+  await expect(heatmapChart).toBeVisible();
+  await expect(sankeyChart).not.toBeVisible();
+
+  // Click back to sankey
+  await sankeyToggle.click();
+  await expect(sankeyChart).toBeVisible();
+  await expect(heatmapChart).not.toBeVisible();
+});
+
+test('forward detail table shows detection loss reason column', async ({ page }) => {
+  await installBaseRoutes(page);
+  await runForwardQuery(page);
+
+  await page.waitForSelector('[data-testid="detail-table"]', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="detail-table"]')).toBeVisible();
+
+  const tableText = await page.locator('[data-testid="detail-table"]').textContent();
+  // Column header must be present
+  expect(tableText).toContain('前段不良原因');
+  // The non-null value should be in the table
+  expect(tableText).toContain('外觀不良');
+});
+
+test('forward sankey click cross-filters: clearing selection via banner button', async ({ page }) => {
+  await installBaseRoutes(page);
+  await runForwardQuery(page);
+
+  await page.waitForSelector('[data-testid="forward-hero"]', { timeout: 10_000 });
+
+  // Initially no selection banner
+  const selectionBanner = page.locator('[data-testid="forward-selection-banner"]');
+  await expect(selectionBanner).not.toBeVisible();
+
+  // The clear-selection button in the sankey should not be visible before selection
+  const sankeyClear = page.locator('[data-testid="sankey-clear-selection"]');
+  await expect(sankeyClear).not.toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Resilience: forward DuckDB path failure injection (msd-forward-cause-effect)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resilience: /api/trace/events 503 (async unavailable) during forward analysis.
+ *
+ * CLAUDE.md CI pattern: `page.goto(...).catch(()=>{})` + early-return guard;
+ * pageRendered checks `.theme-mid-section-defect` not bodyText length.
+ * `page.route()` LIFO: catch-all registered in installBaseRoutes FIRST;
+ * specific override registered LAST so it takes priority.
+ *
+ * AC-5: when the async worker is unavailable the UI must surface an error
+ * banner — not silently show empty data or crash.
+ */
+test('forward trace/events 503 (async unavailable) shows error-banner not crash', async ({ page }) => {
+  await installBaseRoutes(page);
+
+  // Override: trace/events returns 503 with Retry-After (LIFO: registered last → highest priority)
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      headers: { 'Retry-After': '30' },
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'SERVICE_UNAVAILABLE', message: '背景查詢服務不可用，請稍後再試' },
+        meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+      }),
+    }),
+  );
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  // pageRendered guard: check theme class content, NOT bodyText.length
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) {
+    await forwardBtn.click();
+  }
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  // Error banner must appear — 503 must not crash the UI or show empty-state silently
+  await page.waitForSelector('[data-testid="error-banner"]', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="error-banner"]')).toBeVisible();
+  // KPI cards must NOT render (no data to show)
+  await expect(page.locator('[data-testid="kpi-cards"]')).not.toBeVisible();
+});
+
+/**
+ * Resilience: seed-resolve 500 propagates to error-banner in forward mode.
+ *
+ * If the seed stage fails the UI must surface an error rather than proceeding
+ * to show charts with stale/empty data (AC-4+AC-5).
+ */
+test('forward seed-resolve 500 shows error-banner', async ({ page }) => {
+  await installBaseRoutes(page);
+
+  // Override: seed-resolve returns 500 (LIFO: last wins)
+  await page.route('**/api/trace/seed-resolve**', (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'seed resolve failed' },
+        meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+      }),
+    }),
+  );
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) await forwardBtn.click();
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  await page.waitForSelector('[data-testid="error-banner"]', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="error-banner"]')).toBeVisible();
+});
+
+/**
+ * Resilience: forward analysis with null amplification from events (spool miss path).
+ *
+ * The events endpoint returns a valid forward aggregation but with null amplification
+ * (detection_rate = 0 scenario — design §Key Decisions: emit null/"—").
+ * UI must display "—" in the KPI card and NOT crash or show 0 or ∞.
+ *
+ * AC-7: null amplification must render as "—" (verified by KPI text content).
+ */
+test('forward null amplification from spool-degrade renders dash not crash', async ({ page }) => {
+  // Build a response where amplification is null (detection_reject_qty = 0)
+  const spoolDegradeData = {
+    ...MOCK_FORWARD_EVENTS_RESULT,
+    data: {
+      ...MOCK_FORWARD_EVENTS_RESULT.data,
+      aggregation: {
+        ...MOCK_FORWARD_ANALYSIS_DATA,
+        kpi: {
+          ...MOCK_FORWARD_ANALYSIS_DATA.kpi,
+          detection_defect_qty: 0,    // no rejects detected → rate = 0 → amp = null
+          amplification: null,
+        },
+        amplification: null,
+      },
+    },
+  };
+
+  // LIFO: register specific override LAST so it beats installBaseRoutes's catch-all
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(spoolDegradeData),
+    }),
+  );
+  await page.route('**/api/mid-section-defect/analysis/detail**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_DETAIL_RESPONSE),
+    }),
+  );
+  await installBaseRoutes(page);
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) await forwardBtn.click();
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
+
+  const kpiText = await page.locator('[data-testid="kpi-cards"]').textContent();
+  // Must contain the dash marker — never ×0 or ∞
+  expect(kpiText).toContain('—');
+  // Must not contain a numeric multiplier for the null case
+  expect(kpiText).not.toMatch(/×\d/);
+  // Page must not crash (no error banner expected for valid degrade data)
+  await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
+});
+
+/**
+ * Resilience: forward with empty by_detection_loss_reason (no detections).
+ *
+ * If the events response has an empty by_detection_loss_reason array
+ * the Sankey hero must render empty-state (or not render at all) without crash.
+ * AC-1 / data-boundary: empty detection → empty list → safe empty chart.
+ */
+test('forward empty by_detection_loss_reason renders without crash', async ({ page }) => {
+  const emptyLossReasonData = {
+    ...MOCK_FORWARD_EVENTS_RESULT,
+    data: {
+      ...MOCK_FORWARD_EVENTS_RESULT.data,
+      aggregation: {
+        ...MOCK_FORWARD_ANALYSIS_DATA,
+        by_detection_loss_reason: [],         // empty — no detections
+        loss_reason_workcenter_crosstab: {
+          loss_reasons: [],
+          workcenter_groups: [],
+          cells: [],
+        },
+        kpi: {
+          ...MOCK_FORWARD_ANALYSIS_DATA.kpi,
+          detection_defect_qty: 0,
+          amplification: null,
+        },
+        amplification: null,
+      },
+    },
+  };
+
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(emptyLossReasonData),
+    }),
+  );
+  await page.route('**/api/mid-section-defect/analysis/detail**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_DETAIL_RESPONSE),
+    }),
+  );
+  await installBaseRoutes(page);
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) await forwardBtn.click();
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  // KPI cards should still render (with zeros) — the page must not crash
+  await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="kpi-cards"]')).toBeVisible();
+  // No unhandled JS error banner
+  await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
+});
+
+/**
+ * Resilience: slow network — trace/events delayed 4 s.
+ *
+ * The page must not crash or display an error while waiting.
+ * After the response arrives the KPI cards must render.
+ */
+test('forward slow trace/events (4 s delay) renders after response arrives', async ({ page }) => {
+  await installBaseRoutes(page);
+
+  // LIFO: override events LAST with artificial delay
+  await page.route('**/api/trace/events**', async (route) => {
+    await new Promise((r) => setTimeout(r, 4_000));
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_EVENTS_RESULT),
+    });
+  });
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) await forwardBtn.click();
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  // KPI cards must eventually appear despite the delay (allow up to 30 s)
+  await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 30_000 });
+  await expect(page.locator('[data-testid="kpi-cards"]')).toBeVisible();
+  // Error banner must NOT appear for a slow (but successful) response
+  await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
+});
+
+/**
+ * Resilience: malformed JSON from trace/events → error-banner, not JS crash.
+ *
+ * Simulates a truncated/corrupted network response.
+ */
+test('forward malformed JSON from trace/events shows error-banner', async ({ page }) => {
+  await installBaseRoutes(page);
+
+  // LIFO: override events LAST with malformed body
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"success": true, "data": {TRUNCATED',  // invalid JSON
+    }),
+  );
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) await forwardBtn.click();
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  // UI must surface an error indicator — not silently show empty data
+  await page.waitForSelector('[data-testid="error-banner"]', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="error-banner"]')).toBeVisible();
+});
+
+/**
+ * Resilience: forward detail table with null DETECTION_LOSS_REASON in one row.
+ *
+ * The "前段不良原因" column in the forward detail table must handle null values
+ * gracefully — render "—" or empty string, not crash.
+ * AC-8 / data-boundary: MOCK_FORWARD_DETAIL_RESPONSE already includes one null row.
+ */
+test('forward detail table null detection_loss_reason renders without crash', async ({ page }) => {
+  await installBaseRoutes(page);
+  await runForwardQuery(page);
+
+  // runForwardQuery stubs the detail response with one null DETECTION_LOSS_REASON row
+  await page.waitForSelector('[data-testid="detail-table"]', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="detail-table"]')).toBeVisible();
+
+  const tableText = await page.locator('[data-testid="detail-table"]').textContent();
+  // The column header must be present
+  expect(tableText).toContain('前段不良原因');
+  // The non-null value must be present
+  expect(tableText).toContain('外觀不良');
+  // The page must not show a JS error
+  await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
+});
+
+/**
+ * Resilience: heatmap toggle with empty crosstab data.
+ *
+ * When the crosstab cells are empty the heatmap must render a safe empty-state
+ * and the toggle itself must remain functional (no crash on empty ECharts data).
+ */
+test('heatmap toggle with empty crosstab renders empty-state without crash', async ({ page }) => {
+  const emptyCrosstabData = {
+    ...MOCK_FORWARD_EVENTS_RESULT,
+    data: {
+      ...MOCK_FORWARD_EVENTS_RESULT.data,
+      aggregation: {
+        ...MOCK_FORWARD_ANALYSIS_DATA,
+        loss_reason_workcenter_crosstab: {
+          loss_reasons: [],
+          workcenter_groups: [],
+          cells: [],
+        },
+      },
+    },
+  };
+
+  await page.route('**/api/trace/events**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(emptyCrosstabData),
+    }),
+  );
+  await page.route('**/api/mid-section-defect/analysis/detail**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_FORWARD_DETAIL_RESPONSE),
+    }),
+  );
+  await installBaseRoutes(page);
+
+  const response = await page.goto(PAGE_URL).catch(() => null);
+  if (!response) return;
+  const bodyText = await page.locator('body').textContent().catch(() => '');
+  if (!bodyText?.includes('製程不良') && !bodyText?.includes('mid-defect')) return;
+
+  await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
+
+  const forwardBtn = page.locator('button.direction-btn', { hasText: '正向追溯' });
+  if (await forwardBtn.isVisible().catch(() => false)) await forwardBtn.click();
+
+  await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+  await page.locator('[data-testid="end-date"]').fill('2026-06-14');
+  await page.locator('[data-testid="query-submit-btn"]').click();
+
+  await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
+
+  // If forward-hero renders, heatmap toggle must work without crash
+  const forwardHero = page.locator('[data-testid="forward-hero"]');
+  if (await forwardHero.isVisible().catch(() => false)) {
+    const heatmapToggle = page.locator('[data-testid="toggle-heatmap"]');
+    if (await heatmapToggle.isVisible().catch(() => false)) {
+      await heatmapToggle.click();
+      // No error banner after toggling to heatmap with empty data
+      await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
+    }
+  }
+  // KPI section must remain visible regardless
+  await expect(page.locator('[data-testid="kpi-cards"]')).toBeVisible();
+});

@@ -8,6 +8,30 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [css-inventory 1.2.8] — 2026-06-30
+### Changed
+- msd-forward-cause-effect: Updated `mid-section-defect/style.css` row note documenting Sankey/Heatmap styles for forward cause-effect; all scoped under `.theme-mid-section-defect`.
+
+## [css 1.11.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: Sankey/Heatmap chart CSS scoped under `.theme-mid-section-defect` (Rule 4.2/4.3); Teleport tooltip wrap (Rule 4.4); ECharts colors as named constants; `@click` on `<VChart>`; LoadingOverlay 三層 for chart loading.
+
+## [business 1.34.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: MSD-06 (Forward Top-N=10 + "其他" per axis independently), MSD-07 (amplification semantics: null when detection_rate=0, 0.0 when downstream=0&detection>0, ratio otherwise; within-cohort NOT lift), MSD-08 (forward lineage attribution via lineage spool JOIN; get_summary(forward) always DuckDB; graceful degrade on genealogy_status=error).
+
+## [data 1.29.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: §3.23 MSD Forward Lineage Stage Spool (parquet `tmp/query_spool/msd-events/<trace_query_id>_lineage.parquet`, columns SEED_ID/DESCENDANT_ID, self-edge always, no dupes, SEED_ID denormalized at write time). §3.24 Aggregation payloads (by_detection_loss_reason TOP_N=10, sparse crosstab, downstream_trend, amplification denominator rule).
+
+## [api-inventory 1.3.0] — 2026-06-30
+### Changed
+- msd-forward-cause-effect: `mid_section_defect_routes.py` row updated — `direction=forward` adds `by_detection_loss_reason[]`, `loss_reason_workcenter_crosstab`, `downstream_trend[]`, `amplification` to `/analysis`; `/analysis/detail` rows gain `DETECTION_LOSS_REASON`.
+
+## [api 1.33.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: `GET /api/mid-section-defect/analysis?direction=forward` gains `by_detection_loss_reason[]`, `loss_reason_workcenter_crosstab`, `downstream_trend[]`, `amplification` fields; schema `MsdForwardAnalysisResponse`. `GET /api/mid-section-defect/analysis/detail?direction=forward` detail rows gain `DETECTION_LOSS_REASON: string | null`; schema `MsdForwardDetailResponse`. Both additive; backward direction response unchanged.
+
 ## [business 1.33.0] — 2026-06-29
 ### Added
 - msd-type-package-filter: BQE-08 — `count_query.sql` row-unit must match paged SQL combined-CTE row-unit (entity × dimension JOIN pairs, not DISTINCT base entities); silent truncation risk when mismatched with ASC-sorted paged query.

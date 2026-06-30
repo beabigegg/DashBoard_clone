@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.33.0
-last-changed: 2026-06-29
+schema-version: 1.34.0
+last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -237,6 +237,9 @@ breaking-change-policy: deprecate-2-minors
 | MSD-03 | Station options | `GET /api/mid-section-defect/station-options` 提供站點 filter 清單；`/loss-reasons` 提供 loss reason 清單 | route tests |
 | MSD-04 | CSV export | `GET /api/mid-section-defect/export` stream-download-exception；content-type: text/csv | e2e tests |
 | MSD-05 | container-filter-options no-Oracle invariant | `GET /api/mid-section-defect/container-filter-options` reads from `container_filter_cache` only (24h TTL); no Oracle query is issued at request time. A cold or fully-expired cache returns HTTP 200 with all four arrays empty; the client must tolerate empty lists. Analogous to RHPF-06 for reject-history. | `tests/e2e/test_mid_section_defect_e2e.py::TestMidSectionDefectE2E::test_container_filter_options_uses_cache_not_oracle` |
+| MSD-06 | Forward Top-N truncation | `by_detection_loss_reason` and the crosstab loss_reason axis are independently truncated to TOP_N=10; rows beyond TOP_N are folded into a synthetic "其他" row. The downstream-workcenter axis is also TOP_N=10 independently. Sankey drops self-zero links. TOP_N is a constant, not a query param. | `tests/test_mid_section_defect_service.py::test_by_detection_loss_reason_top_n_truncation`, `test_crosstab_top_n_folds_remainder_to_other` |
+| MSD-07 | Amplification KPI semantics | amplification = downstream_reject_rate ÷ detection_reject_rate over the SAME SEED_ID flagged cohort; within-cohort ratio, NOT flagged-vs-clean lift. **Decision table:** detection_rate=0 → null (display "—", never ∞ or sentinel); downstream=0 & detection>0 → 0.0; both>0 → downstream_rate/detection_rate. | `tests/test_mid_section_defect_service.py::test_amplification_kpi_*` |
+| MSD-08 | Forward lineage attribution | `_attribute_forward_defects` re-keys descendant rejects to SEED_ID via lineage spool JOIN when `lineage_spool_df` is provided; split/merge/rename descendants are included. genealogy_status="error" → self-edge-only graceful degrade (never 5xx). get_summary(direction="forward") always via DuckDB; in-memory forward summary path retired. | `tests/test_mid_section_defect_service.py::test_attribute_forward_defects_lineage_rekeying_passes`, `tests/test_unified_spool_integration.py::TestMsdFullChain` |
 
 ## Admin Rules
 

@@ -1,0 +1,15 @@
+{
+  "change_id": "msd-forward-cause-effect",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/test_mid_section_defect_service.py tests/test_mid_section_defect_engine.py tests/test_unified_spool_integration.py tests/test_msd_duckdb_parity.py tests/contract/ -q --tb=short",
+  "duration_ms": 125141,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/msd-forward-cause-effect/test-runs/20260630-113727/summary.json",
+    "stdout": "specs/changes/msd-forward-cause-effect/test-runs/20260630-113727/stdout.log",
+    "stderr": "specs/changes/msd-forward-cause-effect/test-runs/20260630-113727/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

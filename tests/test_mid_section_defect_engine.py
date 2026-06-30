@@ -315,3 +315,104 @@ class TestApplyPopulationMask:
                           columns=["CONTAINERID", "PJ_TYPE", "PRODUCTLINENAME"])
         out = msd_svc._apply_population_mask(df, pj_types=["TYPE-A"])
         assert set(out["CONTAINERID"]) == {"X"}
+
+
+# ===========================================================================
+# AC-4: Forward lineage spool self-edge
+# ===========================================================================
+
+class TestForwardLineageSpoolSelfEdge:
+    """_write_msd_forward_lineage_spool must always emit a (SEED_ID, SEED_ID) self-edge."""
+
+    def test_forward_lineage_spool_self_edge_included(self, tmp_path, monkeypatch):
+        """Self-edge (seed, seed) is always present — even with no children (AC-4)."""
+        import pandas as pd
+        from pathlib import Path
+        import mes_dashboard.core.query_spool_store as spool_mod
+
+        written_path: dict = {}
+
+        def fake_register(ns, qid, stage, file_path, row_count=None):
+            written_path["path"] = file_path
+            return True
+
+        monkeypatch.setattr(spool_mod, "QUERY_SPOOL_DIR", tmp_path)
+        monkeypatch.setattr(spool_mod, "register_stage_spool_file", fake_register)
+
+        msd_svc._write_msd_forward_lineage_spool(
+            trace_query_id="test-self-edge",
+            seed_container_ids=["SEED-001"],
+            children_map={},  # no children → self-edge only
+        )
+
+        assert "path" in written_path
+        df = pd.read_parquet(written_path["path"])
+        assert "SEED_ID" in df.columns
+        assert "DESCENDANT_ID" in df.columns
+        self_edges = df[(df["SEED_ID"] == "SEED-001") & (df["DESCENDANT_ID"] == "SEED-001")]
+        assert len(self_edges) == 1, "Self-edge (SEED_ID, SEED_ID) must always be emitted"
+
+    def test_forward_lineage_spool_includes_children(self, tmp_path, monkeypatch):
+        """Children from children_map are included as (SEED_ID, DESCENDANT_ID) rows."""
+        import pandas as pd
+        import mes_dashboard.core.query_spool_store as spool_mod
+
+        written_path: dict = {}
+
+        def fake_register(ns, qid, stage, file_path, row_count=None):
+            written_path["path"] = file_path
+            return True
+
+        monkeypatch.setattr(spool_mod, "QUERY_SPOOL_DIR", tmp_path)
+        monkeypatch.setattr(spool_mod, "register_stage_spool_file", fake_register)
+
+        children_map = {
+            "SEED-001": ["CHILD-001", "CHILD-002"],
+            "CHILD-001": ["GRANDCHILD-001"],
+        }
+
+        msd_svc._write_msd_forward_lineage_spool(
+            trace_query_id="test-children",
+            seed_container_ids=["SEED-001"],
+            children_map=children_map,
+        )
+
+        df = pd.read_parquet(written_path["path"])
+        descendants = set(df["DESCENDANT_ID"].tolist())
+        assert "SEED-001" in descendants, "Self-edge descendant"
+        assert "CHILD-001" in descendants, "Direct child"
+        assert "CHILD-002" in descendants, "Direct child"
+        assert "GRANDCHILD-001" in descendants, "Grandchild via BFS"
+        # All rows have same SEED_ID
+        assert all(df["SEED_ID"] == "SEED-001")
+
+    def test_forward_lineage_spool_no_duplicates(self, tmp_path, monkeypatch):
+        """No duplicate (SEED_ID, DESCENDANT_ID) rows."""
+        import pandas as pd
+        import mes_dashboard.core.query_spool_store as spool_mod
+
+        written_path: dict = {}
+
+        def fake_register(ns, qid, stage, file_path, row_count=None):
+            written_path["path"] = file_path
+            return True
+
+        monkeypatch.setattr(spool_mod, "QUERY_SPOOL_DIR", tmp_path)
+        monkeypatch.setattr(spool_mod, "register_stage_spool_file", fake_register)
+
+        # Diamond: SEED → A → C, SEED → B → C (C would appear twice without dedup)
+        children_map = {
+            "SEED-001": ["CHILD-A", "CHILD-B"],
+            "CHILD-A": ["GRANDCHILD-C"],
+            "CHILD-B": ["GRANDCHILD-C"],
+        }
+
+        msd_svc._write_msd_forward_lineage_spool(
+            trace_query_id="test-dedup",
+            seed_container_ids=["SEED-001"],
+            children_map=children_map,
+        )
+
+        df = pd.read_parquet(written_path["path"])
+        pairs = list(zip(df["SEED_ID"], df["DESCENDANT_ID"]))
+        assert len(pairs) == len(set(pairs)), "No duplicate (SEED_ID, DESCENDANT_ID) rows"

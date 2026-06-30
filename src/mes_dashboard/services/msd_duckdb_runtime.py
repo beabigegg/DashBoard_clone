@@ -34,6 +34,7 @@ SPOOL_NAMESPACE = "msd-events"
 _STAGE_EVENTS = "events"
 _STAGE_LINEAGE = "lineage"
 _STAGE_DETECTION = "detection"
+_STAGE_FORWARD_LINEAGE = "forward_lineage"
 
 
 class MsdDuckdbRuntime:
@@ -44,6 +45,7 @@ class MsdDuckdbRuntime:
         self._events_path: Optional[str] = None
         self._lineage_path: Optional[str] = None
         self._detection_path: Optional[str] = None
+        self._forward_lineage_path: Optional[str] = None
         self._resolved = False
 
     def _resolve_paths(self) -> None:
@@ -65,6 +67,11 @@ class MsdDuckdbRuntime:
             SPOOL_NAMESPACE, self.trace_query_id, _STAGE_DETECTION
         )
         self._detection_path = _det_stage_path if _det_stage_path and Path(_det_stage_path).exists() else None
+        # Forward lineage spool: (SEED_ID, DESCENDANT_ID) pairs written by the forward pipeline
+        _fwd_lin_path = get_stage_spool_path(
+            SPOOL_NAMESPACE, self.trace_query_id, _STAGE_FORWARD_LINEAGE
+        )
+        self._forward_lineage_path = _fwd_lin_path if _fwd_lin_path and Path(_fwd_lin_path).exists() else None
         self._resolved = True
 
     def is_available(self) -> bool:
@@ -408,11 +415,225 @@ class MsdDuckdbRuntime:
                 return summary
             return None
 
-        # Forward-direction KPI requires detection-station counts and defect_cids filtering
-        # that are not captured in the events spool alone.  Return None so the caller
-        # falls back to Oracle-based build_trace_aggregation_from_events which produces
-        # the correct forward KPI structure (detection_lot_count, downstream_stations_reached …).
-        return None
+        # Forward direction: build summary from detection spool + events spool joined
+        # on the denormalized SEED_ID in the forward lineage spool (AC-5/AC-6).
+        # Degrades to events-only KPI when detection spool is missing.
+        return self._get_forward_summary(
+            loss_reasons=loss_reasons,
+            pj_types=pj_types,
+            packages=packages,
+        )
+
+    def _get_forward_summary(
+        self,
+        loss_reasons: Optional[List[str]] = None,
+        pj_types: Optional[List[str]] = None,
+        packages: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Compute forward-direction summary KPIs using detection + events spools.
+
+        Single-pass GROUP BY on events spool (SEED_ID denormalized at write time via
+        forward lineage spool).  No per-query lineage JOIN required.
+
+        Returns None only when the events spool is missing (safe degrade path so
+        caller can fall back to Oracle/in-memory if events not spooled yet).
+        Never returns None due to missing lineage or detection — those degrade to
+        events-only KPIs (AC-6: must not return None silently when events exist).
+        """
+        self._resolve_paths()
+        if not self._events_path or not Path(self._events_path).exists():
+            return None
+
+        try:
+            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+
+            conn = create_heavy_query_connection()
+            try:
+                conn.execute(
+                    f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')"
+                )
+
+                # Register forward lineage view if available
+                has_fwd_lineage = bool(
+                    self._forward_lineage_path and Path(self._forward_lineage_path).exists()
+                )
+                if has_fwd_lineage:
+                    conn.execute(
+                        f"CREATE VIEW fwd_lineage AS "
+                        f"SELECT * FROM read_parquet('{self._forward_lineage_path}')"
+                    )
+
+                # Register detection view with pj_type/package filters
+                has_detection = bool(
+                    self._detection_path and Path(self._detection_path).exists()
+                )
+                if has_detection:
+                    pj_filter = ""
+                    pkg_filter = ""
+                    if pj_types:
+                        quoted = ", ".join(
+                            f"'{self._sql_quote(str(v).strip())}'" for v in pj_types if str(v).strip()
+                        )
+                        if quoted:
+                            pj_filter = f"AND TRIM(PJ_TYPE) IN ({quoted})"
+                    if packages:
+                        quoted = ", ".join(
+                            f"'{self._sql_quote(str(v).strip())}'" for v in packages if str(v).strip()
+                        )
+                        if quoted:
+                            pkg_filter = f"AND TRIM(PRODUCTLINENAME) IN ({quoted})"
+
+                    lr_filter = ""
+                    if loss_reasons:
+                        quoted_lr = ", ".join(
+                            f"'{self._sql_quote(str(r).strip())}'" for r in loss_reasons if str(r).strip()
+                        )
+                        if quoted_lr:
+                            lr_filter = (
+                                f"AND (LOSSREASONNAME IN ({quoted_lr}) "
+                                f"OR REJECTQTY = 0 OR LOSSREASONNAME IS NULL)"
+                            )
+
+                    conn.execute(
+                        f"""
+                        CREATE VIEW detection AS
+                        SELECT * FROM read_parquet('{self._detection_path}')
+                        WHERE 1=1 {pj_filter} {pkg_filter} {lr_filter}
+                        """
+                    )
+
+                # Detection KPI: lot count + detection reject qty + trackinqty
+                if has_detection:
+                    det_row = conn.execute(
+                        """
+                        SELECT
+                            COUNT(DISTINCT CONTAINERID) AS lot_count,
+                            SUM(CASE WHEN REJECTQTY > 0 THEN REJECTQTY ELSE 0 END) AS detection_reject_qty,
+                            SUM(TRACKINQTY) AS detection_input_qty,
+                            COUNT(DISTINCT CASE WHEN REJECTQTY > 0 THEN CONTAINERID END) AS defect_lot_count
+                        FROM detection
+                        """
+                    ).fetchone()
+                    det_lot_count = int(det_row[0] or 0) if det_row else 0
+                    det_reject_qty = int(det_row[1] or 0) if det_row else 0
+                    det_input_qty = int(det_row[2] or 0) if det_row else 0
+                    det_defect_lot_count = int(det_row[3] or 0) if det_row else 0
+
+                    available_loss_reasons_rows = conn.execute(
+                        """
+                        SELECT DISTINCT LOSSREASONNAME
+                        FROM detection
+                        WHERE REJECTQTY > 0 AND LOSSREASONNAME IS NOT NULL
+                        ORDER BY LOSSREASONNAME
+                        """
+                    ).fetchall()
+                    available_loss_reasons = [r[0] for r in available_loss_reasons_rows if r[0]]
+                else:
+                    det_lot_count = 0
+                    det_reject_qty = 0
+                    det_input_qty = 0
+                    det_defect_lot_count = 0
+                    available_loss_reasons = []
+
+                # Events KPI: downstream rejects and stations reached
+                try:
+                    ev_row = conn.execute(
+                        """
+                        SELECT
+                            COUNT(DISTINCT CONTAINERID) AS downstream_lot_count,
+                            SUM(REJECT_TOTAL_QTY) AS downstream_reject_qty,
+                            SUM(TRACKINQTY) AS downstream_input_qty,
+                            COUNT(DISTINCT WORKCENTERNAME) AS station_count
+                        FROM events
+                        WHERE REJECT_TOTAL_QTY > 0 OR TRACKINQTY > 0
+                        """
+                    ).fetchone()
+                    ds_lot_count = int(ev_row[0] or 0) if ev_row else 0
+                    ds_reject_qty = int(ev_row[1] or 0) if ev_row else 0
+                    ds_input_qty = int(ev_row[2] or 0) if ev_row else 0
+                    ds_station_count = int(ev_row[3] or 0) if ev_row else 0
+                except Exception:
+                    ds_lot_count = ds_reject_qty = ds_input_qty = ds_station_count = 0
+
+                # Daily trend from events
+                daily_trend = self._compute_daily_trend(conn)
+
+                # Detail total count from detection
+                detail_total_count = det_lot_count if has_detection else ds_lot_count
+
+                # Downstream reject rate
+                ds_reject_rate = (
+                    round(ds_reject_qty / ds_input_qty * 100, 4)
+                    if ds_input_qty and ds_input_qty > 0
+                    else 0.0
+                )
+
+                # Generic input qty for defect_rate denominator
+                _generic_input = det_input_qty if has_detection else ds_input_qty
+                _generic_defect = ds_reject_qty  # downstream rejects are the "defects" for forward
+                _defect_rate = (
+                    round(_generic_defect / _generic_input * 100, 2)
+                    if _generic_input and _generic_input > 0
+                    else 0.0
+                )
+
+                kpi = {
+                    # Forward-specific KPI keys
+                    "detection_lot_count": det_defect_lot_count if det_defect_lot_count else det_lot_count,
+                    "detection_defect_qty": det_reject_qty,
+                    "tracked_lot_count": det_lot_count,
+                    "downstream_stations_reached": ds_station_count,
+                    "downstream_total_reject": ds_reject_qty,
+                    "downstream_reject_rate": ds_reject_rate,
+                    # Generic events-based KPI keys (for backward compat / events-only path)
+                    "lot_count": det_lot_count if has_detection else ds_lot_count,
+                    "defect_qty": _generic_defect,
+                    "input_qty": _generic_input,
+                    "defect_rate": _defect_rate,
+                }
+
+                # Charts: per-station downstream defect totals
+                charts: list = []
+                try:
+                    chart_rows = conn.execute(
+                        """
+                        SELECT
+                            WORKCENTERNAME AS station,
+                            SUM(REJECT_TOTAL_QTY) AS defect_qty,
+                            SUM(TRACKINQTY) AS input_qty
+                        FROM events
+                        WHERE REJECT_TOTAL_QTY > 0
+                        GROUP BY WORKCENTERNAME
+                        ORDER BY defect_qty DESC
+                        """
+                    ).fetchall()
+                    charts = [
+                        {"station": r[0], "defect_qty": int(r[1] or 0), "input_qty": int(r[2] or 0)}
+                        for r in chart_rows
+                        if r[0]
+                    ]
+                except Exception:
+                    charts = []
+
+            finally:
+                conn.close()
+
+            return {
+                "kpi": kpi,
+                "charts": charts,
+                "daily_trend": daily_trend,
+                "available_loss_reasons": available_loss_reasons,
+                "genealogy_status": "ready",
+                "detail_total_count": detail_total_count,
+                "trace_query_id": self.trace_query_id,
+            }
+
+        except Exception as exc:
+            logger.warning(
+                "MsdDuckdbRuntime._get_forward_summary failed (trace_query_id=%s): %s",
+                self.trace_query_id, exc,
+            )
+            return None
 
     def _compute_kpi(self, conn) -> Dict[str, Any]:
         """Compute total defect count, lot count, and defect rate from events view.

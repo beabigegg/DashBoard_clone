@@ -1,0 +1,24 @@
+agent: test-strategist
+change-id: msd-forward-cause-effect
+run-date: 2026-06-30
+status: complete
+
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/msd-forward-cause-effect/test-plan.md" }
+  - type: tdd-pairs
+    pointer: >
+      tests/test_mid_section_defect_service.py → src/mes_dashboard/services/mid_section_defect_service.py;
+      tests/test_mid_section_defect_engine.py → src/mes_dashboard/services/msd_duckdb_runtime.py;
+      tests/test_unified_spool_integration.py (xfail-flip) → src/mes_dashboard/services/msd_duckdb_runtime.py;
+      tests/integration/test_material_trace_rq_async.py → src/mes_dashboard/services/trace_job_service.py;
+      frontend/tests/playwright/mid-section-defect.spec.ts → frontend/src/mid-section-defect/
+  - { type: coverage-tiers, pointer: "unit, data-boundary, contract, integration, e2e/playwright, visual, resilience, stress, soak" }
+  - { type: mapping-completeness, pointer: "all 8 ACs mapped; AC-6 xfail-flip explicitly tracked in Test Update Contract table; AC-4 TDD failing-first test named" }
+
+notes: >
+  Two xfail(strict=True) markers in tests/test_unified_spool_integration.py::TestMsdChain
+  (test_summary_from_spool, test_full_chain_summary_detail_export_consistency) are live tripwires.
+  Their removal is AC-6 and is recorded in the Test Update Contract table — not a waiver.
+  AC-4 TDD: the FAILING test must be committed before the lineage re-keying fix lands so CI
+  confirms the pre-fix drop bug. Stress/soak scoped to spool concurrency + DuckDB forward summary only;
+  enlarged-fetch is out of scope per classification.

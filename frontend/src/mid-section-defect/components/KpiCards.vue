@@ -99,6 +99,13 @@ const forwardCards = computed(() => [
     unit: '%',
     accent: 'success',
   },
+  {
+    label: '放大倍率',
+    value: formatAmplification(props.kpi.amplification),
+    unit: '',
+    accent: amplificationAccent(props.kpi.amplification),
+    dataTestid: 'kpi-amplification',
+  },
 ]);
 
 const cards = computed(() => (
@@ -114,6 +121,21 @@ function formatRate(v) {
   if (v == null) return '0.00';
   return Number(v).toFixed(2);
 }
+
+/** Amplification: null → "—"; 0.0 is a real value → "×0.0"; else "×N.N" */
+function formatAmplification(v) {
+  if (v === null || v === undefined) return '—';
+  return `×${Number(v).toFixed(1)}`;
+}
+
+/** danger accent when amplification > 1; warning when = 1; neutral otherwise (null or 0) */
+function amplificationAccent(v) {
+  if (v === null || v === undefined) return 'neutral';
+  const n = Number(v);
+  if (n > 1) return 'danger';
+  if (n === 1) return 'warning';
+  return 'neutral';
+}
 </script>
 
 <template>
@@ -125,6 +147,7 @@ function formatRate(v) {
         :label="card.label"
         :value="card.value"
         :accent="card.accent"
+        v-bind="card.dataTestid ? { 'data-testid': card.dataTestid } : {}"
       >
         <template v-if="card.unit" #sub>{{ card.unit }}</template>
       </SummaryCard>

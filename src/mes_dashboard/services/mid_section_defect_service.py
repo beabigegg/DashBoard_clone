@@ -741,8 +741,10 @@ def build_trace_aggregation_from_events(
             materials_quality_meta=materials_quality_meta,
             downstream_quality_meta=downstream_quality_meta,
         )
+        # AC-1/AC-2/AC-3/AC-7: new forward aggregation fields
+        _fwd_kpi = _build_forward_kpi(detection_data, forward_attr)
         _fwd: Dict[str, Any] = {
-            'kpi': _build_forward_kpi(detection_data, forward_attr),
+            'kpi': _fwd_kpi,
             'charts': _build_forward_charts(forward_attr, detection_data),
             'daily_trend': _build_daily_trend(filtered_df, normalized_loss_reasons),
             'available_loss_reasons': available_loss_reasons,
@@ -750,6 +752,20 @@ def build_trace_aggregation_from_events(
             'detail_total_count': len(detail),
             'attribution': [],
             'quality_meta': quality_meta,
+            # New forward aggregation fields (AC-1/AC-2/AC-3/AC-7)
+            'by_detection_loss_reason': _build_by_detection_loss_reason(detection_data),
+            'loss_reason_workcenter_crosstab': _build_loss_reason_workcenter_crosstab(
+                detection_data, forward_attr,
+            ),
+            'downstream_trend': _build_downstream_trend(
+                defect_cids, wip_by_cid, downstream_rejects, station_order,
+            ),
+            'amplification': _compute_amplification_kpi(
+                detection_total_reject=_fwd_kpi.get('detection_defect_qty', 0),
+                detection_total_input=sum(d.get('trackinqty', 0) for d in detection_data.values()),
+                downstream_total_reject=_fwd_kpi.get('downstream_total_reject', 0),
+                downstream_total_input=sum(a.get('total_input', 0) for a in forward_attr.values()),
+            ),
         }
         if _msd_pf:
             _fwd['_meta'] = {'partial_failure': _msd_pf}
@@ -921,8 +937,9 @@ def _build_trace_aggregation_container_mode(
             materials_quality_meta=materials_quality_meta,
             downstream_quality_meta=downstream_quality_meta,
         )
+        _cm_fwd_kpi = _build_forward_kpi(detection_data, forward_attr)
         return {
-            'kpi': _build_forward_kpi(detection_data, forward_attr),
+            'kpi': _cm_fwd_kpi,
             'charts': _build_forward_charts(forward_attr, detection_data),
             'daily_trend': [],
             'available_loss_reasons': available_loss_reasons,
@@ -930,6 +947,20 @@ def _build_trace_aggregation_container_mode(
             'detail_total_count': len(detail),
             'attribution': [],
             'quality_meta': quality_meta,
+            # New forward aggregation fields (AC-1/AC-2/AC-3/AC-7)
+            'by_detection_loss_reason': _build_by_detection_loss_reason(detection_data),
+            'loss_reason_workcenter_crosstab': _build_loss_reason_workcenter_crosstab(
+                detection_data, forward_attr,
+            ),
+            'downstream_trend': _build_downstream_trend(
+                defect_cids, wip_by_cid, downstream_rejects, station_order,
+            ),
+            'amplification': _compute_amplification_kpi(
+                detection_total_reject=_cm_fwd_kpi.get('detection_defect_qty', 0),
+                detection_total_input=sum(d.get('trackinqty', 0) for d in detection_data.values()),
+                downstream_total_reject=_cm_fwd_kpi.get('downstream_total_reject', 0),
+                downstream_total_input=sum(a.get('total_input', 0) for a in forward_attr.values()),
+            ),
         }
 
     # Backward direction
@@ -1232,6 +1263,288 @@ def _write_msd_detection_stage_spool(
     )
     if not ok and tmp_path.exists():
         tmp_path.unlink(missing_ok=True)
+
+
+_STAGE_FORWARD_LINEAGE = "forward_lineage"
+
+
+def _write_msd_forward_lineage_spool(
+    trace_query_id: str,
+    seed_container_ids: List[str],
+    children_map: Dict[str, Any],
+) -> None:
+    """Persist forward lineage stage spool: (SEED_ID, DESCENDANT_ID) pairs.
+
+    SEED_ID = detection defect-lot (BFS root of children_map).
+    Self-edge (SEED_ID, SEED_ID) always emitted so the seed's own station events
+    are included in the DuckDB forward summary GROUP BY.
+
+    Degrades to self-edges-only when children_map is empty / genealogy_status='error'.
+    No duplicate (SEED_ID, DESCENDANT_ID) rows.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from mes_dashboard.core.query_spool_store import QUERY_SPOOL_DIR, register_stage_spool_file
+    from mes_dashboard.services.msd_duckdb_runtime import SPOOL_NAMESPACE
+
+    rows: List[Dict[str, str]] = []
+    seen: set = set()
+
+    def _add_row(seed_id: str, descendant_id: str) -> None:
+        key = (seed_id, descendant_id)
+        if key not in seen:
+            seen.add(key)
+            rows.append({"SEED_ID": seed_id, "DESCENDANT_ID": descendant_id})
+
+    for seed_id in seed_container_ids:
+        safe_seed = _safe_str(seed_id)
+        if not safe_seed:
+            continue
+        # Always emit self-edge
+        _add_row(safe_seed, safe_seed)
+        # BFS over children_map from this seed
+        queue = [safe_seed]
+        while queue:
+            current = queue.pop(0)
+            children = children_map.get(current)
+            if not isinstance(children, (list, set, tuple)):
+                continue
+            for child in children:
+                safe_child = _safe_str(child)
+                if not safe_child:
+                    continue
+                _add_row(safe_seed, safe_child)
+                queue.append(safe_child)
+
+    if not rows:
+        return
+
+    df = pd.DataFrame(rows)
+    ns_dir = (QUERY_SPOOL_DIR / SPOOL_NAMESPACE).resolve()
+    ns_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False, dir=ns_dir) as tmp:
+        tmp_path = Path(tmp.name)
+    df.to_parquet(tmp_path, engine="pyarrow", index=False)
+
+    ok = register_stage_spool_file(
+        SPOOL_NAMESPACE,
+        trace_query_id,
+        _STAGE_FORWARD_LINEAGE,
+        tmp_path,
+        row_count=len(df),
+    )
+    if not ok and tmp_path.exists():
+        tmp_path.unlink(missing_ok=True)
+
+
+def _compute_amplification_kpi(
+    detection_total_reject: int,
+    detection_total_input: int,
+    downstream_total_reject: int,
+    downstream_total_input: int,
+) -> Optional[float]:
+    """Compute forward amplification KPI.
+
+    amplification = downstream_reject_rate / detection_reject_rate
+
+    Business rules (MSD-07):
+      - detection_rate = 0 → None (undefined; display "—")
+      - downstream = 0 and detection > 0 → 0.0 (real zero, effect fully absorbed)
+      - both nonzero → ratio (within-cohort ratio, NOT flagged-vs-clean lift)
+    """
+    detection_rate = (
+        detection_total_reject / detection_total_input
+        if detection_total_input and detection_total_input > 0
+        else 0.0
+    )
+    if detection_rate == 0:
+        return None
+
+    downstream_rate = (
+        downstream_total_reject / downstream_total_input
+        if downstream_total_input and downstream_total_input > 0
+        else 0.0
+    )
+    return round(downstream_rate / detection_rate, 6)
+
+
+def _build_by_detection_loss_reason(
+    detection_data: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """AC-1: aggregate detection defects by LOSSREASONNAME with Top-N truncation.
+
+    Returns:
+        List of {loss_reason, reject_qty, reject_rate} dicts sorted by reject_qty desc.
+        Reasons beyond TOP_N folded into '其他'.
+    """
+    total_input = sum(d.get('trackinqty', 0) for d in detection_data.values())
+    reason_qty: Dict[str, int] = defaultdict(int)
+    for data in detection_data.values():
+        for reason, qty in (data.get('rejectqty_by_reason') or {}).items():
+            reason_qty[reason] += qty
+
+    sorted_reasons = sorted(reason_qty.items(), key=lambda x: x[1], reverse=True)
+    items: List[Dict[str, Any]] = []
+    other_qty = 0
+    for i, (reason, qty) in enumerate(sorted_reasons):
+        if i < TOP_N:
+            items.append({
+                'loss_reason': reason,
+                'reject_qty': qty,
+                'reject_rate': round(qty / total_input, 6) if total_input else 0.0,
+            })
+        else:
+            other_qty += qty
+
+    if other_qty > 0:
+        items.append({
+            'loss_reason': '其他',
+            'reject_qty': other_qty,
+            'reject_rate': round(other_qty / total_input, 6) if total_input else 0.0,
+        })
+    return items
+
+
+def _build_loss_reason_workcenter_crosstab(
+    detection_data: Dict[str, Dict[str, Any]],
+    forward_attr: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    """AC-2: sparse detection-reason × downstream-workcenter cross-tab with Top-N.
+
+    Returns:
+        {
+          'loss_reasons': [str, ...],      # top-N detection reasons (+ '其他' if needed)
+          'workcenter_groups': [str, ...], # top-N downstream stations (+ '其他' if needed)
+          'cells': [{loss_reason, workcenter_group, reject_qty, reject_rate}, ...],
+          # sparse: zero-count cells omitted
+        }
+    """
+    # Rank detection reasons by total reject qty
+    reason_qty: Dict[str, int] = defaultdict(int)
+    for data in detection_data.values():
+        for reason, qty in (data.get('rejectqty_by_reason') or {}).items():
+            reason_qty[reason] += qty
+
+    sorted_reasons = sorted(reason_qty.items(), key=lambda x: x[1], reverse=True)
+    top_reasons = [r for r, _ in sorted_reasons[:TOP_N]]
+    has_other_reason = len(sorted_reasons) > TOP_N
+    if has_other_reason:
+        top_reasons_set = set(top_reasons)
+    else:
+        top_reasons_set = set(top_reasons)
+
+    # Rank downstream stations by total reject qty
+    station_qty: Dict[str, int] = {
+        wc: agg.get('total_reject', 0) for wc, agg in forward_attr.items()
+    }
+    sorted_stations = sorted(station_qty.items(), key=lambda x: x[1], reverse=True)
+    top_stations = [s for s, _ in sorted_stations[:TOP_N]]
+    has_other_station = len(sorted_stations) > TOP_N
+
+    axis_reasons = top_reasons + (['其他'] if has_other_reason else [])
+    axis_stations = top_stations + (['其他'] if has_other_station else [])
+
+    # Build sparse cell matrix: reason × station
+    cell_agg: Dict[tuple, int] = defaultdict(int)
+    total_input_per_station: Dict[str, int] = {
+        wc: agg.get('total_input', 0) for wc, agg in forward_attr.items()
+    }
+
+    for wc, agg in forward_attr.items():
+        station_key = wc if wc in set(top_stations) else ('其他' if has_other_station else None)
+        if station_key is None:
+            continue
+        for reason, qty in (agg.get('loss_reasons') or {}).items():
+            reason_key = reason if reason in top_reasons_set else ('其他' if has_other_reason else None)
+            if reason_key is None:
+                continue
+            cell_agg[(reason_key, station_key)] += qty
+
+    # Aggregate total_input for '其他' station bucket
+    other_station_input = sum(
+        agg.get('total_input', 0) for wc, agg in forward_attr.items()
+        if wc not in set(top_stations)
+    )
+    station_input_for_rate: Dict[str, int] = {wc: total_input_per_station.get(wc, 0) for wc in top_stations}
+    if has_other_station:
+        station_input_for_rate['其他'] = other_station_input
+
+    cells = []
+    for (reason_key, station_key), qty in cell_agg.items():
+        if qty == 0:
+            continue
+        total_in = station_input_for_rate.get(station_key, 0)
+        cells.append({
+            'loss_reason': reason_key,
+            'workcenter_group': station_key,
+            'reject_qty': qty,
+            'reject_rate': round(qty / total_in, 6) if total_in else 0.0,
+        })
+
+    return {
+        'loss_reasons': axis_reasons,
+        'workcenter_groups': axis_stations,
+        'cells': cells,
+    }
+
+
+def _build_downstream_trend(
+    defect_cids: List[str],
+    wip_by_cid: Dict[str, List[Dict[str, Any]]],
+    downstream_rejects: Dict[str, List[Dict[str, Any]]],
+    station_order: int,
+) -> List[Dict[str, Any]]:
+    """AC-3: downstream reject trend by date.
+
+    No control-cohort / lift baseline (explicitly out of scope, MSD-06).
+    Returns [{date, reject_qty, reject_rate}, ...] sorted by date ascending.
+    """
+    defect_set = set(defect_cids)
+
+    # Aggregate daily downstream input (WIP reached downstream stations)
+    daily_input: Dict[str, int] = defaultdict(int)
+    for cid, records in wip_by_cid.items():
+        if cid not in defect_set:
+            continue
+        for rec in records:
+            wc = rec.get('workcenter_group', '')
+            if wc and get_group_order(wc) <= station_order:
+                continue
+            # WIP records lack TXNDATE; use TRACKINTIMESTAMP date part if available
+            date_raw = rec.get('txndate') or rec.get('trackintimestamp') or rec.get('txn_date')
+            if date_raw:
+                date_str = str(date_raw)[:10]
+                qty = rec.get('trackinqty', 0)
+                daily_input[date_str] += qty if isinstance(qty, int) else 0
+
+    # Aggregate daily downstream rejects
+    daily_reject: Dict[str, int] = defaultdict(int)
+    for cid, records in downstream_rejects.items():
+        if cid not in defect_set:
+            continue
+        for rec in records:
+            wc = rec.get('workcenter_group', '')
+            if wc and get_group_order(wc) <= station_order:
+                continue
+            date_raw = rec.get('txndate') or rec.get('txn_date')
+            if date_raw:
+                date_str = str(date_raw)[:10]
+                qty = rec.get('reject_total_qty', 0)
+                daily_reject[date_str] += qty if isinstance(qty, int) else 0
+
+    all_dates = sorted(set(list(daily_input.keys()) + list(daily_reject.keys())))
+    result = []
+    for date in all_dates:
+        rej = daily_reject.get(date, 0)
+        inp = daily_input.get(date, 0)
+        rate = round(rej / inp, 6) if inp else 0.0
+        result.append({
+            'date': date,
+            'reject_qty': rej,
+            'reject_rate': rate,
+        })
+    return result
 
 
 def _execute_msd_compat_job(
@@ -2076,8 +2389,9 @@ def _run_forward_pipeline(
     )
 
     # Stage 8: Build result
+    _s8_fwd_kpi = _build_forward_kpi(detection_data, forward_attr)
     _fwd: Dict[str, Any] = {
-        'kpi': _build_forward_kpi(detection_data, forward_attr),
+        'kpi': _s8_fwd_kpi,
         'available_loss_reasons': available_loss_reasons,
         'charts': _build_forward_charts(forward_attr, detection_data),
         'daily_trend': _build_daily_trend(filtered_df, loss_reasons),
@@ -2085,6 +2399,20 @@ def _run_forward_pipeline(
             filtered_df, defect_cids, wip_by_cid, downstream_rejects, station_order,
         ),
         'genealogy_status': genealogy_status,
+        # New forward aggregation fields (AC-1/AC-2/AC-3/AC-7)
+        'by_detection_loss_reason': _build_by_detection_loss_reason(detection_data),
+        'loss_reason_workcenter_crosstab': _build_loss_reason_workcenter_crosstab(
+            detection_data, forward_attr,
+        ),
+        'downstream_trend': _build_downstream_trend(
+            defect_cids, wip_by_cid, downstream_rejects, station_order,
+        ),
+        'amplification': _compute_amplification_kpi(
+            detection_total_reject=_s8_fwd_kpi.get('detection_defect_qty', 0),
+            detection_total_input=sum(d.get('trackinqty', 0) for d in detection_data.values()),
+            downstream_total_reject=_s8_fwd_kpi.get('downstream_total_reject', 0),
+            downstream_total_input=sum(a.get('total_input', 0) for a in forward_attr.values()),
+        ),
     }
     if _msd_pf:
         _fwd['_meta'] = {'partial_failure': _msd_pf}
@@ -2642,10 +2970,19 @@ def _attribute_forward_defects(
     wip_by_cid: Dict[str, List[Dict[str, Any]]],
     downstream_rejects: Dict[str, List[Dict[str, Any]]],
     station_order: int,
+    lineage_spool_df: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Attribute forward: for each downstream station, compute reject rate.
 
     Only stations with order > detection station_order are included.
+
+    When ``lineage_spool_df`` is provided (columns SEED_ID, DESCENDANT_ID), every
+    descendant CID is re-keyed to its SEED_ID (detection defect-lot) before
+    aggregation.  This fixes the per-CONTAINERID attribution hole where
+    split/merge/rename descendants were silently dropped (AC-4 / MSD-08).
+
+    When ``lineage_spool_df`` is None, falls back to original per-CONTAINERID
+    filtering (``cid in defect_set``) for backward-compat during migration.
 
     Returns:
         {workcenter_group: {
@@ -2657,6 +2994,23 @@ def _attribute_forward_defects(
     """
     defect_set = set(defect_cids)
 
+    # Build descendant→SEED_ID map from lineage spool if available (AC-4 fix)
+    descendant_to_seed: Dict[str, str] = {}
+    if lineage_spool_df is not None and not lineage_spool_df.empty:
+        for row in lineage_spool_df.to_dict(orient="records"):
+            seed = _safe_str(row.get("SEED_ID"))
+            desc = _safe_str(row.get("DESCENDANT_ID"))
+            if seed and desc and seed in defect_set:
+                descendant_to_seed[desc] = seed
+
+    def _is_defect_cid(cid: str) -> bool:
+        """Return True if cid is (or re-keys to) a defect CID."""
+        if cid in defect_set:
+            return True
+        if descendant_to_seed:
+            return cid in descendant_to_seed
+        return False
+
     station_agg: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
         'lots_reached': set(),
         'total_input': 0,
@@ -2665,10 +3019,11 @@ def _attribute_forward_defects(
         'loss_reasons': defaultdict(int),
     })
 
-    # Aggregate WIP records at downstream stations — only for defect-filtered lots
+    # Aggregate WIP records at downstream stations — lineage re-keyed
     for cid in wip_by_cid:
-        if cid not in defect_set:
+        if not _is_defect_cid(cid):
             continue
+        seed_key = descendant_to_seed.get(cid, cid)
         for record in wip_by_cid[cid]:
             wc_group = record.get('workcenter_group', '')
             if not wc_group:
@@ -2680,13 +3035,13 @@ def _attribute_forward_defects(
             trackinqty = record.get('trackinqty', 0)
 
             agg = station_agg[wc_group]
-            agg['lots_reached'].add(cid)
+            agg['lots_reached'].add(seed_key)
             agg['total_input'] += trackinqty
             agg['machines'][eq_name]['input'] += trackinqty
 
-    # Aggregate reject records at downstream stations — only for defect-filtered lots
+    # Aggregate reject records at downstream stations — lineage re-keyed
     for cid in downstream_rejects:
-        if cid not in defect_set:
+        if not _is_defect_cid(cid):
             continue
         for record in downstream_rejects[cid]:
             wc_group = record.get('workcenter_group', '')
@@ -3247,18 +3602,30 @@ def _build_forward_detail_table(
         [c for c in lot_cols if c in df.columns]
     ].copy()
 
-    # Aggregate defects per LOT at detection station
+    # Aggregate defects per LOT at detection station + primary detection loss reason (AC-8)
     defect_rows = df[(df['REJECTQTY'] > 0) & (df['CONTAINERID'].isin(defect_cids))]
     lot_defect_qty: Dict[str, int] = defaultdict(int)
+    lot_reason_qty: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for _, row in defect_rows.iterrows():
         cid = row['CONTAINERID']
-        lot_defect_qty[cid] += _safe_int(row.get('REJECTQTY'))
+        qty = _safe_int(row.get('REJECTQTY'))
+        lot_defect_qty[cid] += qty
+        reason = _safe_str(row.get('LOSSREASONNAME')) or None
+        if reason:
+            lot_reason_qty[cid][reason] += qty
 
     result = []
     for _, row in lots.iterrows():
         cid = row['CONTAINERID']
         input_qty = _safe_int(row.get('TRACKINQTY'))
         det_defect = lot_defect_qty.get(cid, 0)
+
+        # Primary detection loss reason = highest-qty reason for this lot (null if no rejects)
+        reasons_for_lot = lot_reason_qty.get(cid, {})
+        detection_loss_reason: Optional[str] = (
+            max(reasons_for_lot, key=reasons_for_lot.get)
+            if reasons_for_lot else None
+        )
 
         ds_stations = set()
         ds_total_reject = 0
@@ -3295,6 +3662,7 @@ def _build_forward_detail_table(
             'DOWNSTREAM_REJECTS': ds_total_reject,
             'DOWNSTREAM_REJECT_RATE': ds_rate,
             'WORST_DOWNSTREAM': worst,
+            'DETECTION_LOSS_REASON': detection_loss_reason,  # AC-8: detail column
         })
 
     return result

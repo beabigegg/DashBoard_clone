@@ -246,3 +246,116 @@ test('useContainerFilterOptions fails open on fetch error', async () => {
   assert.deepEqual(pjTypeOptions.value, []);
   assert.deepEqual(packageOptions.value, []);
 });
+
+
+// ── AC-8: Forward cross-filter composable logic ───────────────────────────
+
+/**
+ * Mirrors byDetectionLossReasonChartData computed from App.vue.
+ * Converts by_detection_loss_reason items to ParetoChart-compatible ChartItem[].
+ */
+function buildLossReasonChartData(items, selectedReason = null) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const filtered = selectedReason
+    ? items.filter((item) => item.loss_reason === selectedReason)
+    : items;
+  const totalQty = filtered.reduce((s, d) => s + d.reject_qty, 0);
+  let cumsum = 0;
+  return filtered.map((item) => {
+    cumsum += item.reject_qty;
+    return {
+      name: item.loss_reason,
+      input_qty: 0,
+      defect_qty: item.reject_qty,
+      defect_rate: Math.round((item.reject_rate || 0) * 10000) / 100,
+      lot_count: 0,
+      cumulative_pct: totalQty > 0 ? Math.round((cumsum / totalQty) * 1e4) / 100 : 0,
+    };
+  });
+}
+
+/**
+ * Mirrors formatAmplification from KpiCards.vue.
+ */
+function formatAmplification(v) {
+  if (v === null || v === undefined) return '—';
+  return `×${Number(v).toFixed(1)}`;
+}
+
+test('AC-8: buildLossReasonChartData returns empty for empty input', () => {
+  assert.deepEqual(buildLossReasonChartData([]), []);
+});
+
+test('AC-8: buildLossReasonChartData converts reject_rate 0..1 to percentage', () => {
+  const items = [{ loss_reason: '外觀不良', reject_qty: 10, reject_rate: 0.05 }];
+  const result = buildLossReasonChartData(items);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].name, '外觀不良');
+  assert.equal(result[0].defect_qty, 10);
+  assert.equal(result[0].defect_rate, 5); // 0.05 * 100 = 5%
+  assert.equal(result[0].cumulative_pct, 100);
+});
+
+test('AC-8: buildLossReasonChartData cross-filters by selected front reason', () => {
+  const items = [
+    { loss_reason: '外觀不良', reject_qty: 20, reject_rate: 0.1 },
+    { loss_reason: '電性不良', reject_qty: 5, reject_rate: 0.02 },
+  ];
+  const result = buildLossReasonChartData(items, '外觀不良');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].name, '外觀不良');
+});
+
+test('AC-8: buildLossReasonChartData returns all items when no selection', () => {
+  const items = [
+    { loss_reason: '外觀不良', reject_qty: 20, reject_rate: 0.1 },
+    { loss_reason: '電性不良', reject_qty: 5, reject_rate: 0.02 },
+  ];
+  const result = buildLossReasonChartData(items, null);
+  assert.equal(result.length, 2);
+});
+
+test('AC-8: formatAmplification returns "—" when null', () => {
+  assert.equal(formatAmplification(null), '—');
+  assert.equal(formatAmplification(undefined), '—');
+});
+
+test('AC-8: formatAmplification returns "×0.0" for 0.0 (real zero)', () => {
+  assert.equal(formatAmplification(0.0), '×0.0');
+});
+
+test('AC-8: formatAmplification formats 1-decimal string for nonzero value', () => {
+  assert.equal(formatAmplification(2.3456), '×2.3');
+  assert.equal(formatAmplification(1), '×1.0');
+});
+
+test('AC-8: forward selection toggle: setting same frontReason again would clear it (logic mirror)', () => {
+  // Mirror the toggle logic in handleSankeyNodeClick
+  function handleSankeyNodeClick(cur, payload) {
+    if (payload.frontReason && cur.frontReason === payload.frontReason) {
+      return { frontReason: null, downstreamGroup: null };
+    }
+    if (payload.downstreamGroup && cur.downstreamGroup === payload.downstreamGroup) {
+      return { frontReason: null, downstreamGroup: null };
+    }
+    return { ...payload };
+  }
+
+  // First click sets selection
+  let sel = handleSankeyNodeClick({ frontReason: null, downstreamGroup: null }, { frontReason: '外觀不良', downstreamGroup: null });
+  assert.equal(sel.frontReason, '外觀不良');
+
+  // Second click on same node clears
+  sel = handleSankeyNodeClick(sel, { frontReason: '外觀不良', downstreamGroup: null });
+  assert.equal(sel.frontReason, null);
+});
+
+test('AC-8: buildLossReasonChartData cumulative_pct sums to 100 for multiple items', () => {
+  const items = [
+    { loss_reason: '外觀不良', reject_qty: 60, reject_rate: 0.06 },
+    { loss_reason: '電性不良', reject_qty: 40, reject_rate: 0.04 },
+  ];
+  const result = buildLossReasonChartData(items);
+  assert.equal(result.length, 2);
+  assert.equal(result[result.length - 1].cumulative_pct, 100);
+});
