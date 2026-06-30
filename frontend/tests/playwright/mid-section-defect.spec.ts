@@ -782,7 +782,7 @@ const MOCK_FORWARD_DETAIL_RESPONSE = {
  * Helper: run a forward-direction query.
  * Switches direction toggle to "正向追溯" and submits.
  */
-async function runForwardQuery(page: Page): Promise<void> {
+async function runForwardQuery(page: Page): Promise<boolean> {
   // Stub the events stage with forward data
   await page.route('**/api/trace/events**', (route) =>
     route.fulfill({
@@ -801,7 +801,7 @@ async function runForwardQuery(page: Page): Promise<void> {
   );
 
   const _nav = await page.goto(PAGE_URL).catch(() => null);
-  if (!_nav) return;
+  if (!_nav) return false;
   await page.waitForSelector('[data-testid="start-date"]', { timeout: 30_000 });
 
   // Switch direction to forward — click the "正向追溯" button in the direction toggle
@@ -816,11 +816,12 @@ async function runForwardQuery(page: Page): Promise<void> {
 
   // Wait for KPI cards to appear (indicates events stage complete)
   await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
+  return true;
 }
 
 test('forward amplification KPI renders "×2.5" when amplification is nonzero', async ({ page }) => {
   await installBaseRoutes(page);
-  await runForwardQuery(page);
+  if (!await runForwardQuery(page)) return;
 
   // KPI section must be visible
   await expect(page.locator('[data-testid="kpi-cards"]')).toBeVisible();
@@ -881,7 +882,7 @@ test('forward amplification KPI renders "—" when amplification is null', async
 
 test('forward reason matrix renders with 占比/數量 toggle', async ({ page }) => {
   await installBaseRoutes(page);
-  await runForwardQuery(page);
+  if (!await runForwardQuery(page)) return;
 
   // Forward reason matrix should be visible after query
   await page.waitForSelector('[data-testid="forward-reason-matrix"]', { timeout: 10_000 });
@@ -916,7 +917,7 @@ test('forward reason matrix renders with 占比/數量 toggle', async ({ page })
 
 test('forward detail table shows detection loss reason column', async ({ page }) => {
   await installBaseRoutes(page);
-  await runForwardQuery(page);
+  if (!await runForwardQuery(page)) return;
 
   await page.waitForSelector('[data-testid="detail-table"]', { timeout: 20_000 });
   await expect(page.locator('[data-testid="detail-table"]')).toBeVisible();
@@ -930,7 +931,7 @@ test('forward detail table shows detection loss reason column', async ({ page })
 
 test('forward reason matrix shows front-stage loss reason pareto chart', async ({ page }) => {
   await installBaseRoutes(page);
-  await runForwardQuery(page);
+  if (!await runForwardQuery(page)) return;
 
   // The front-stage loss reason pareto chart must be visible in forward mode
   await page.waitForSelector('[data-testid="forward-loss-reason-pareto"]', { timeout: 10_000 });
@@ -1256,7 +1257,7 @@ test('forward malformed JSON from trace/events shows error-banner', async ({ pag
  */
 test('forward detail table null detection_loss_reason renders without crash', async ({ page }) => {
   await installBaseRoutes(page);
-  await runForwardQuery(page);
+  if (!await runForwardQuery(page)) return;
 
   // runForwardQuery stubs the detail response with one null DETECTION_LOSS_REASON row
   await page.waitForSelector('[data-testid="detail-table"]', { timeout: 20_000 });
