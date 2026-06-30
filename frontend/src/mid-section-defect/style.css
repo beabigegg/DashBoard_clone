@@ -25,6 +25,13 @@
   padding: theme('spacing.4') theme('spacing.5');
 }
 
+/* LOT 明細: let the wide table use (nearly) the full card width — trim the
+   horizontal padding that otherwise leaves a visible gap on both sides. */
+.theme-mid-section-defect .detail-table-card .section-inner {
+  padding-left: theme('spacing.2');
+  padding-right: theme('spacing.2');
+}
+
 .theme-mid-section-defect .section-title {
   margin: 0 0 theme('spacing.3');
   font-size: 16px;
@@ -372,6 +379,11 @@
   grid-template-columns: 1fr;
 }
 
+/* Separate the forward cause-effect matrix (hero) from the supporting charts below */
+.theme-mid-section-defect .forward-matrix-row {
+  margin-bottom: theme('spacing.6');
+}
+
 .theme-mid-section-defect .chart-with-panel {
   position: relative;
 }
@@ -656,24 +668,8 @@
   }
 }
 
-/* ====== Forward Cause-Effect: Sankey / Heatmap hero ====== */
 
-.theme-mid-section-defect .forward-hero-section {
-  margin-bottom: theme('spacing.4');
-}
-
-.theme-mid-section-defect .forward-hero-card {
-  background: var(--msd-card-bg);
-  border-radius: 12px;
-  box-shadow: var(--msd-shadow);
-  padding: theme('spacing.4') theme('spacing.5');
-}
-
-.theme-mid-section-defect .forward-hero-toggle {
-  display: flex;
-  gap: theme('spacing.2');
-  margin-bottom: theme('spacing.3');
-}
+/* ====== Forward Cause-Effect: mode toggle (reused by ForwardReasonMatrix) ====== */
 
 .theme-mid-section-defect .hero-toggle-btn {
   font-size: 12px;
@@ -698,51 +694,3 @@
   color: theme('colors.surface.card');
 }
 
-/* ====== Forward cross-filter banner ====== */
-
-.theme-mid-section-defect .forward-selection-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: theme('spacing.3');
-  background: theme('colors.brand.50', rgba(99,102,241,0.07));
-  border: 1px solid theme('colors.brand.200', rgba(99,102,241,0.2));
-  border-radius: 8px;
-  padding: theme('spacing.2') theme('spacing.4');
-  font-size: 13px;
-  color: theme('colors.text.primary');
-  margin-bottom: theme('spacing.3');
-}
-
-.theme-mid-section-defect .clear-selection-link {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--msd-primary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  padding: 0;
-  text-decoration: underline;
-}
-
-.theme-mid-section-defect .clear-selection-link:hover {
-  color: var(--msd-primary-dark);
-}
-
-/* clear-selection-btn used inside ForwardFlowChart scoped; mirror here for override-by-parent */
-.theme-mid-section-defect .clear-selection-btn {
-  font-size: 11px;
-  font-weight: 600;
-  padding: theme('spacing.token.p1') theme('spacing.token.p6');
-  border: 1px solid var(--msd-border);
-  border-radius: 4px;
-  background: var(--msd-card-bg);
-  color: theme('colors.text.subtle');
-  cursor: pointer;
-}
-
-.theme-mid-section-defect .clear-selection-btn:hover {
-  border-color: var(--msd-primary);
-  color: var(--msd-primary);
-}

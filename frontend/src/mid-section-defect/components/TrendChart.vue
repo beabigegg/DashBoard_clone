@@ -32,6 +32,19 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'cross' },
+      formatter: (params) => {
+        const arr = Array.isArray(params) ? params : [params];
+        if (!arr.length) return '';
+        let html = `${arr[0].axisValue}<br/>`;
+        for (const p of arr) {
+          const v = p.value ?? 0;
+          const text = p.seriesName === '不良率'
+            ? `${Number(v).toFixed(4)}%`
+            : Number(v).toLocaleString();
+          html += `${p.marker}${p.seriesName}: ${text}<br/>`;
+        }
+        return html;
+      },
     },
     legend: {
       data: ['投入數', '不良數', '不良率'],

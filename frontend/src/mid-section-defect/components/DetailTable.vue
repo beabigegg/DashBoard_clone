@@ -45,15 +45,14 @@ const COLUMNS_BACKWARD = [
 ];
 
 const COLUMNS_FORWARD = [
-  { key: 'CONTAINERNAME', label: 'LOT ID', width: '140px' },
-  { key: 'DETECTION_EQUIPMENTNAME', label: '偵測設備', width: '120px' },
-  { key: 'DETECTION_LOSS_REASON', label: '前段不良原因', width: '130px' },
-  { key: 'TRACKINQTY', label: '偵測投入', width: '80px', numeric: true },
-  { key: 'DEFECT_QTY', label: '偵測不良', width: '80px', numeric: true },
-  { key: 'DOWNSTREAM_STATIONS_REACHED', label: '下游到達站數', width: '100px', numeric: true },
-  { key: 'DOWNSTREAM_TOTAL_REJECT', label: '下游不良總數', width: '100px', numeric: true },
-  { key: 'DOWNSTREAM_REJECT_RATE', label: '下游不良率(%)', width: '110px', numeric: true },
-  { key: 'WORST_DOWNSTREAM_STATION', label: '最差下游站', width: '120px' },
+  { key: 'CONTAINERNAME', label: 'LOT ID' },
+  { key: 'DETECTION_EQUIPMENTNAME', label: '偵測設備' },
+  { key: 'DETECTION_LOSS_REASON', label: '前段不良原因' },
+  { key: 'TRACKINQTY', label: '偵測投入', numeric: true },
+  { key: 'DEFECT_QTY', label: '偵測不良', numeric: true },
+  { key: 'DOWNSTREAM_STATIONS_REACHED', label: '下游到達站數', numeric: true },
+  { key: 'DOWNSTREAM_TOTAL_REJECT', label: '下游不良總數', numeric: true },
+  { key: 'DOWNSTREAM_REJECT_RATE', label: '下游不良率(%)', numeric: true },
 ];
 
 const activeColumns = computed(() => (
@@ -116,7 +115,7 @@ function getSuspectHits(row) {
 </script>
 
 <template>
-  <section class="section-card" data-testid="detail-table">
+  <section class="section-card detail-table-card" data-testid="detail-table">
     <div class="section-inner">
       <div class="detail-header">
         <h3 class="section-title">LOT 明細</h3>

@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.34.0
+schema-version: 1.35.0
 last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
@@ -240,6 +240,8 @@ breaking-change-policy: deprecate-2-minors
 | MSD-06 | Forward Top-N truncation | `by_detection_loss_reason` and the crosstab loss_reason axis are independently truncated to TOP_N=10; rows beyond TOP_N are folded into a synthetic "其他" row. The downstream-workcenter axis is also TOP_N=10 independently. Sankey drops self-zero links. TOP_N is a constant, not a query param. | `tests/test_mid_section_defect_service.py::test_by_detection_loss_reason_top_n_truncation`, `test_crosstab_top_n_folds_remainder_to_other` |
 | MSD-07 | Amplification KPI semantics | amplification = downstream_reject_rate ÷ detection_reject_rate over the SAME SEED_ID flagged cohort; within-cohort ratio, NOT flagged-vs-clean lift. **Decision table:** detection_rate=0 → null (display "—", never ∞ or sentinel); downstream=0 & detection>0 → 0.0; both>0 → downstream_rate/detection_rate. | `tests/test_mid_section_defect_service.py::test_amplification_kpi_*` |
 | MSD-08 | Forward lineage attribution | `_attribute_forward_defects` re-keys descendant rejects to SEED_ID via lineage spool JOIN when `lineage_spool_df` is provided; split/merge/rename descendants are included. genealogy_status="error" → self-edge-only graceful degrade (never 5xx). get_summary(direction="forward") always via DuckDB; in-memory forward summary path retired. | `tests/test_mid_section_defect_service.py::test_attribute_forward_defects_lineage_rekeying_passes`, `tests/test_unified_spool_integration.py::TestMsdFullChain` |
+| MSD-09 | Front×downstream reason correlation matrix | `_build_front_downstream_reason_matrix` attributes each downstream reject (re-keyed to SEED_ID via lineage) to EVERY front-stage loss reason its seed carries — **cohort membership**, so a lot with multiple front reasons counts in multiple rows and Σcells may exceed the physical reject total. Rows/cols independently TOP_N=10 + "其他"; `row_pct` row-normalized to 100% (0.0 when row total=0) is the primary display. Empty → `{rows:[],cols:[],cells:[],row_pct:[]}`. | `tests/test_mid_section_defect_service.py::TestFrontDownstreamReasonMatrix` |
+| MSD-10 | Detection input qty = session original load | Detection `偵測投入` (TRACKINQTY emitted by `station_detection_by_ids.sql`) must be `MAX(TRACKINQTY) OVER (PARTITION BY CONTAINERID, TRACKINTIMESTAMP, EQUIPMENTID)` — the upload session's original load — NOT the last partial's remaining qty. Per PH-06 TRACKINQTY decrements across partials; picking rn=1 under-counts input and inflates downstream/defect rates past 100%. Applies to BOTH forward and backward (shared SQL/spool). | `tests/test_mid_section_defect_service.py::TestDetectionInputPartialAggregation` |
 
 ## Admin Rules
 

@@ -679,6 +679,26 @@ const MOCK_FORWARD_ANALYSIS_DATA = {
     { loss_reason: '外觀不良', reject_qty: 40, reject_rate: 0.04 },
     { loss_reason: '電性不良', reject_qty: 10, reject_rate: 0.01 },
   ],
+  by_front_downstream_reason_matrix: {
+    rows: [
+      { name: '043_NSOP', total: 28140 },
+      { name: '044_NSOL', total: 15920 },
+    ],
+    cols: [
+      { name: 'OPEN',  total: 18000 },
+      { name: '短路',  total: 7000 },
+      { name: '撞料',  total: 4000 },
+      { name: '其他',  total: 5000 },
+    ],
+    cells: [
+      [17447, 3377,  2533,  4783],
+      [8756,  2866,  1274,  3024],
+    ],
+    row_pct: [
+      [62, 12,  9, 17],
+      [55, 18,  8, 19],
+    ],
+  },
   loss_reason_workcenter_crosstab: {
     loss_reasons: ['外觀不良', '電性不良'],
     workcenter_groups: ['封裝', '測試'],
@@ -843,36 +863,39 @@ test('forward amplification KPI renders "—" when amplification is null', async
   expect(kpiText).toContain('—');
 });
 
-test('heatmap toggle switches chart type from Sankey to Heatmap', async ({ page }) => {
+test('forward reason matrix renders with 占比/數量 toggle', async ({ page }) => {
   await installBaseRoutes(page);
   await runForwardQuery(page);
 
-  // Forward hero section should be visible after query
-  await page.waitForSelector('[data-testid="forward-hero"]', { timeout: 10_000 });
+  // Forward reason matrix should be visible after query
+  await page.waitForSelector('[data-testid="forward-reason-matrix"]', { timeout: 10_000 });
+  await expect(page.locator('[data-testid="forward-reason-matrix"]')).toBeVisible();
 
-  // Default is sankey
-  const sankeyToggle = page.locator('[data-testid="toggle-sankey"]');
-  const heatmapToggle = page.locator('[data-testid="toggle-heatmap"]');
-  await expect(sankeyToggle).toBeVisible();
-  await expect(heatmapToggle).toBeVisible();
+  // Matrix table should render with row and column data
+  const matrixTable = page.locator('[data-testid="matrix-table"]');
+  await expect(matrixTable).toBeVisible();
 
-  // Sankey chart should be visible by default
-  const sankeyChart = page.locator('[data-testid="forward-flow-chart"]');
-  const heatmapChart = page.locator('[data-testid="forward-heatmap"]');
-  await expect(sankeyChart).toBeVisible();
-  await expect(heatmapChart).not.toBeVisible();
+  // Default is 占比 mode — percentage values should appear
+  const tableText = await matrixTable.textContent();
+  expect(tableText).toContain('043_NSOP');
+  expect(tableText).toContain('OPEN');
+  expect(tableText).toContain('%');
 
-  // Click heatmap toggle
-  await heatmapToggle.click();
+  // Toggle to 數量 mode
+  const qtyBtn = page.locator('[data-testid="matrix-mode-qty"]');
+  await expect(qtyBtn).toBeVisible();
+  await qtyBtn.click();
 
-  // Now heatmap should be visible and sankey hidden
-  await expect(heatmapChart).toBeVisible();
-  await expect(sankeyChart).not.toBeVisible();
+  // Now numbers without % should appear (localeString integers)
+  const tableTextQty = await matrixTable.textContent();
+  // Should now show integer counts
+  expect(tableTextQty).toContain('043_NSOP');
 
-  // Click back to sankey
-  await sankeyToggle.click();
-  await expect(sankeyChart).toBeVisible();
-  await expect(heatmapChart).not.toBeVisible();
+  // Toggle back to 占比
+  const pctBtn = page.locator('[data-testid="matrix-mode-pct"]');
+  await pctBtn.click();
+  const tableTextPct = await matrixTable.textContent();
+  expect(tableTextPct).toContain('%');
 });
 
 test('forward detail table shows detection loss reason column', async ({ page }) => {
@@ -889,19 +912,16 @@ test('forward detail table shows detection loss reason column', async ({ page })
   expect(tableText).toContain('外觀不良');
 });
 
-test('forward sankey click cross-filters: clearing selection via banner button', async ({ page }) => {
+test('forward reason matrix shows front-stage loss reason pareto chart', async ({ page }) => {
   await installBaseRoutes(page);
   await runForwardQuery(page);
 
-  await page.waitForSelector('[data-testid="forward-hero"]', { timeout: 10_000 });
+  // The front-stage loss reason pareto chart must be visible in forward mode
+  await page.waitForSelector('[data-testid="forward-loss-reason-pareto"]', { timeout: 10_000 });
+  await expect(page.locator('[data-testid="forward-loss-reason-pareto"]')).toBeVisible();
 
-  // Initially no selection banner
-  const selectionBanner = page.locator('[data-testid="forward-selection-banner"]');
-  await expect(selectionBanner).not.toBeVisible();
-
-  // The clear-selection button in the sankey should not be visible before selection
-  const sankeyClear = page.locator('[data-testid="sankey-clear-selection"]');
-  await expect(sankeyClear).not.toBeVisible();
+  // The forward-reason-matrix must also render alongside it
+  await expect(page.locator('[data-testid="forward-reason-matrix"]')).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -1236,22 +1256,23 @@ test('forward detail table null detection_loss_reason renders without crash', as
 });
 
 /**
- * Resilience: heatmap toggle with empty crosstab data.
+ * Resilience: forward reason matrix with empty by_front_downstream_reason_matrix.
  *
- * When the crosstab cells are empty the heatmap must render a safe empty-state
- * and the toggle itself must remain functional (no crash on empty ECharts data).
+ * When the matrix payload is empty the matrix component must render a safe
+ * empty-state ("暫無資料") without crash.
  */
-test('heatmap toggle with empty crosstab renders empty-state without crash', async ({ page }) => {
-  const emptyCrosstabData = {
+test('forward reason matrix with empty payload renders empty-state without crash', async ({ page }) => {
+  const emptyMatrixData = {
     ...MOCK_FORWARD_EVENTS_RESULT,
     data: {
       ...MOCK_FORWARD_EVENTS_RESULT.data,
       aggregation: {
         ...MOCK_FORWARD_ANALYSIS_DATA,
-        loss_reason_workcenter_crosstab: {
-          loss_reasons: [],
-          workcenter_groups: [],
+        by_front_downstream_reason_matrix: {
+          rows: [],
+          cols: [],
           cells: [],
+          row_pct: [],
         },
       },
     },
@@ -1261,7 +1282,7 @@ test('heatmap toggle with empty crosstab renders empty-state without crash', asy
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(emptyCrosstabData),
+      body: JSON.stringify(emptyMatrixData),
     }),
   );
   await page.route('**/api/mid-section-defect/analysis/detail**', (route) =>
@@ -1289,15 +1310,14 @@ test('heatmap toggle with empty crosstab renders empty-state without crash', asy
 
   await page.waitForSelector('[data-testid="kpi-cards"]', { timeout: 20_000 });
 
-  // If forward-hero renders, heatmap toggle must work without crash
-  const forwardHero = page.locator('[data-testid="forward-hero"]');
-  if (await forwardHero.isVisible().catch(() => false)) {
-    const heatmapToggle = page.locator('[data-testid="toggle-heatmap"]');
-    if (await heatmapToggle.isVisible().catch(() => false)) {
-      await heatmapToggle.click();
-      // No error banner after toggling to heatmap with empty data
-      await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
-    }
+  // Matrix component must render (with empty-state) without crash
+  const matrixEl = page.locator('[data-testid="forward-reason-matrix"]');
+  if (await matrixEl.isVisible().catch(() => false)) {
+    // Empty-state indicator must appear when no data
+    const emptyState = page.locator('[data-testid="matrix-empty"]');
+    await expect(emptyState).toBeVisible();
+    // No error banner
+    await expect(page.locator('[data-testid="error-banner"]')).not.toBeVisible();
   }
   // KPI section must remain visible regardless
   await expect(page.locator('[data-testid="kpi-cards"]')).toBeVisible();

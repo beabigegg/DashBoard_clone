@@ -456,6 +456,7 @@ class MsdDuckdbRuntime:
             from mes_dashboard.services.mid_section_defect_service import (
                 _apply_population_mask,
                 _attribute_forward_defects,
+                _build_front_downstream_reason_matrix,
                 _build_by_detection_loss_reason,
                 _build_daily_trend,
                 _build_detection_lookup,
@@ -567,13 +568,30 @@ class MsdDuckdbRuntime:
                 except Exception as _exc:
                     logger.debug("Failed to load forward_lineage spool: %s", _exc)
 
+            # ---- Detection station order (robust) -------------------------------
+            # station_order_fallback from the caller is min(get_group_order(label));
+            # that maps RAW workcenter labels (e.g. '焊_WB_料') to 999 because
+            # get_group_order only knows GROUP names. _build_detection_lookup already
+            # stores the correct per-lot order via get_workcenter_group(WORKCENTERNAME),
+            # so derive the detection station order from the data and only fall back to
+            # the caller value when detection_data carries nothing usable. Without this,
+            # every downstream group (order < 999) is wrongly filtered out and forward
+            # attribution / matrix / trend come back empty.
+            _det_orders = [
+                d.get("detection_station_order")
+                for d in detection_data.values()
+                if isinstance(d.get("detection_station_order"), int)
+                and d.get("detection_station_order") < 999
+            ]
+            station_order = min(_det_orders) if _det_orders else station_order_fallback
+
             # ---- Forward attribution --------------------------------------------
             forward_attr = _attribute_forward_defects(
                 detection_data,
                 defect_cids,
                 wip_by_cid,
                 downstream_rejects,
-                station_order_fallback,
+                station_order,
                 lineage_spool_df=lineage_spool_df,
             )
 
@@ -603,7 +621,14 @@ class MsdDuckdbRuntime:
                     detection_data, forward_attr
                 ),
                 "downstream_trend": _build_downstream_trend(
-                    defect_cids, wip_by_cid, downstream_rejects, station_order_fallback
+                    defect_cids, wip_by_cid, downstream_rejects, station_order
+                ),
+                "by_front_downstream_reason_matrix": _build_front_downstream_reason_matrix(
+                    detection_data,
+                    defect_cids,
+                    downstream_rejects,
+                    station_order,
+                    lineage_spool_df=lineage_spool_df,
                 ),
                 "amplification": _compute_amplification_kpi(
                     detection_total_reject=detection_total_reject,
@@ -1606,9 +1631,26 @@ class MsdDuckdbRuntime:
                                     'reject_total_qty': int(qty) if qty == qty else 0,
                                 })
 
+            # Robust detection station order: the caller's station_order_fallback
+            # can be 999 (min(get_group_order(label)) collapses raw WB labels to
+            # 999), which would filter out every downstream group and zero the
+            # whole downstream impact. Derive it from the detection workcenter via
+            # get_workcenter_group (same fix as _get_forward_summary). Without this
+            # the CSV export (which passes the default 999) returns empty downstream.
+            from mes_dashboard.services.mid_section_defect_service import (
+                get_workcenter_group as _gwg,
+            )
+            _orders = []
+            if 'WORKCENTERNAME' in detection_df.columns:
+                for _wc in detection_df['WORKCENTERNAME'].dropna().unique():
+                    _o = _gwg(str(_wc))[1]
+                    if isinstance(_o, int) and _o < 999:
+                        _orders.append(_o)
+            station_order = min(_orders) if _orders else station_order_fallback
+
             rows = _build_forward_detail_table(
                 detection_df, defect_cids, wip_by_cid, downstream_rejects,
-                station_order_fallback,
+                station_order,
             )
 
             # Sort
@@ -1970,95 +2012,73 @@ class MsdDuckdbRuntime:
         direction: str = "backward",
         loss_reasons: Optional[List[str]] = None,
     ) -> Generator[bytes, None, None]:
-        """Stream CSV rows from events spool via DuckDB in chunks."""
+        """Stream the LOT 明細 as CSV, identical to the on-screen detail table.
+
+        Both directions page through ``get_detail`` (forward → ``_get_forward_detail``,
+        backward → detection/lineage detail) and emit the columns in
+        CSV_COLUMNS_FORWARD / CSV_COLUMNS_BACKWARD, whose keys match the detail
+        rows. (The previous forward path dumped the raw events spool, which is why
+        the forward CSV did not match the table.)
+        """
         self._resolve_paths()
-        if direction == "backward" and self._detection_path and Path(self._detection_path).exists():
-            import csv
-            import io
+        import csv
+        import io
 
-            from mes_dashboard.services.mid_section_defect_service import CSV_COLUMNS_BACKWARD
+        from mes_dashboard.services.mid_section_defect_service import (
+            CSV_COLUMNS_BACKWARD,
+            CSV_COLUMNS_FORWARD,
+        )
+
+        is_forward = direction == "forward"
+        columns = CSV_COLUMNS_FORWARD if is_forward else CSV_COLUMNS_BACKWARD
+        # forward detail needs the events spool; backward needs the detection spool
+        required = self._events_path if is_forward else self._detection_path
+        if not required or not Path(required).exists():
+            return
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([label for _, label in columns])
+        yield buf.getvalue().encode("utf-8-sig")
+
+        page = 1
+        per_page = max(1, min(chunk_size, 2000))
+        while True:
+            detail = self.get_detail(
+                page=page,
+                per_page=per_page,
+                sort_by="defect_rate",
+                order="desc",
+                direction=direction,
+                loss_reasons=loss_reasons,
+            )
+            if not detail:
+                break
+            items = detail.get("items") or []
+            if not items:
+                break
 
             buf = io.StringIO()
             writer = csv.writer(buf)
-            writer.writerow([label for _, label in CSV_COLUMNS_BACKWARD])
-            yield buf.getvalue().encode("utf-8-sig")
+            for row in items:
+                csv_row = []
+                for col, _ in columns:
+                    value = row.get(col, "")
+                    if col == "UPSTREAM_MACHINES" and isinstance(value, list):
+                        value = ", ".join(
+                            f"{item.get('station', '')}/{item.get('machine', '')}"
+                            for item in value
+                        )
+                    elif col == "UPSTREAM_MATERIALS" and isinstance(value, list):
+                        value = ", ".join(
+                            f"{item.get('part', '')}/{item.get('lot', '')}"
+                            for item in value
+                        )
+                    csv_row.append(value)
+                writer.writerow(csv_row)
+            yield buf.getvalue().encode("utf-8")
 
-            page = 1
-            per_page = max(1, min(chunk_size, 2000))
-            while True:
-                detail = self.get_detail(
-                    page=page,
-                    per_page=per_page,
-                    sort_by="defect_rate",
-                    order="desc",
-                    direction=direction,
-                    loss_reasons=loss_reasons,
-                )
-                if not detail:
-                    break
-                items = detail.get("items") or []
-                if not items:
-                    break
-
-                buf = io.StringIO()
-                writer = csv.writer(buf)
-                for row in items:
-                    csv_row = []
-                    for col, _ in CSV_COLUMNS_BACKWARD:
-                        value = row.get(col, "")
-                        if col == "UPSTREAM_MACHINES" and isinstance(value, list):
-                            value = ", ".join(
-                                f"{item.get('station', '')}/{item.get('machine', '')}"
-                                for item in value
-                            )
-                        elif col == "UPSTREAM_MATERIALS" and isinstance(value, list):
-                            value = ", ".join(
-                                f"{item.get('part', '')}/{item.get('lot', '')}"
-                                for item in value
-                            )
-                        csv_row.append(value)
-                    writer.writerow(csv_row)
-                yield buf.getvalue().encode("utf-8")
-
-                pagination = detail.get("pagination") or {}
-                if page >= int(pagination.get("total_pages") or page):
-                    break
-                page += 1
-            return
-
-        if not self._events_path:
-            return
-
-        try:
-            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
-            import io
-            import csv
-
-            conn = create_heavy_query_connection()
-            conn.execute(f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')")
-
-            # Get column names
-            cols_result = conn.execute("DESCRIBE events").fetchall()
-            columns = [r[0] for r in cols_result]
-
-            buf = io.StringIO()
-            writer = csv.writer(buf)
-            writer.writerow(columns)
-            yield buf.getvalue().encode("utf-8-sig")
-
-            offset = 0
-            while True:
-                rows = conn.execute(
-                    f"SELECT * FROM events LIMIT {chunk_size} OFFSET {offset}"
-                ).fetchall()
-                if not rows:
-                    break
-                buf = io.StringIO()
-                writer = csv.writer(buf)
-                writer.writerows(rows)
-                yield buf.getvalue().encode("utf-8")
-                offset += chunk_size
-
-            conn.close()
-        except Exception as exc:
-            logger.warning("MsdDuckdbRuntime.export_csv failed: %s", exc)
+            pagination = detail.get("pagination") or {}
+            if page >= int(pagination.get("total_pages") or page):
+                break
+            page += 1

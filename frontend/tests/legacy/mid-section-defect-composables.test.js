@@ -329,25 +329,12 @@ test('AC-8: formatAmplification formats 1-decimal string for nonzero value', () 
   assert.equal(formatAmplification(1), '×1.0');
 });
 
-test('AC-8: forward selection toggle: setting same frontReason again would clear it (logic mirror)', () => {
-  // Mirror the toggle logic in handleSankeyNodeClick
-  function handleSankeyNodeClick(cur, payload) {
-    if (payload.frontReason && cur.frontReason === payload.frontReason) {
-      return { frontReason: null, downstreamGroup: null };
-    }
-    if (payload.downstreamGroup && cur.downstreamGroup === payload.downstreamGroup) {
-      return { frontReason: null, downstreamGroup: null };
-    }
-    return { ...payload };
-  }
-
-  // First click sets selection
-  let sel = handleSankeyNodeClick({ frontReason: null, downstreamGroup: null }, { frontReason: '外觀不良', downstreamGroup: null });
-  assert.equal(sel.frontReason, '外觀不良');
-
-  // Second click on same node clears
-  sel = handleSankeyNodeClick(sel, { frontReason: '外觀不良', downstreamGroup: null });
-  assert.equal(sel.frontReason, null);
+test('AC-8: ForwardReasonMatrix empty-state: buildLossReasonChartData handles empty by_detection_loss_reason', () => {
+  // Verify the chart-data builder returns empty for both null and empty inputs,
+  // which is the path taken when by_detection_loss_reason is missing/empty.
+  assert.deepEqual(buildLossReasonChartData(null), []);
+  assert.deepEqual(buildLossReasonChartData(undefined), []);
+  assert.deepEqual(buildLossReasonChartData([]), []);
 });
 
 test('AC-8: buildLossReasonChartData cumulative_pct sums to 100 for multiple items', () => {

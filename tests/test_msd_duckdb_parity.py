@@ -360,33 +360,52 @@ class TestDetailParity:
 class TestExportCsvParity:
     def test_export_yields_bytes(self, spool_paths):
         events_path, lineage_path, det_path = spool_paths
-        rt = _runtime_with_paths("test-export-001", events_path, lineage_path)
-        chunks = list(rt.export_csv(chunk_size=2))
+        rt = _runtime_with_paths("test-export-001", events_path, lineage_path,
+                                 detection_path=det_path, forward_lineage_path=lineage_path)
+        chunks = list(rt.export_csv(chunk_size=2, direction="forward"))
         assert len(chunks) > 0
         for chunk in chunks:
             assert isinstance(chunk, bytes)
 
-    def test_export_has_header_row(self, spool_paths):
+    def test_export_forward_header_is_detail_columns_not_raw_events(self, spool_paths):
+        """Regression: forward CSV must be the per-lot LOT 明細 (CSV_COLUMNS_FORWARD),
+        NOT a raw dump of the events spool (the old bug)."""
         events_path, lineage_path, det_path = spool_paths
-        rt = _runtime_with_paths("test-export-002", events_path, lineage_path)
-        chunks = list(rt.export_csv(chunk_size=100))
+        rt = _runtime_with_paths("test-export-002", events_path, lineage_path,
+                                 detection_path=det_path, forward_lineage_path=lineage_path)
+        from mes_dashboard.services.mid_section_defect_service import CSV_COLUMNS_FORWARD
+        chunks = list(rt.export_csv(chunk_size=100, direction="forward"))
         full_csv = b"".join(chunks).decode("utf-8-sig", errors="replace")
         lines = [l for l in full_csv.splitlines() if l.strip()]
-        assert len(lines) > 0
-        header = lines[0]
-        # Header must include column names from events parquet
-        assert "CONTAINERID" in header or "WORKCENTER_GROUP" in header
+        assert lines, "export must yield at least the header row"
+        assert lines[0] == ",".join(label for _, label in CSV_COLUMNS_FORWARD)
+        # raw events columns must NOT leak into the export
+        assert "CONTAINERID" not in lines[0]
+        assert "WORKCENTER_GROUP" not in lines[0]
 
-    def test_export_row_count_matches_events(self, spool_paths):
+    def test_export_backward_header_is_backward_columns(self, spool_paths):
         events_path, lineage_path, det_path = spool_paths
-        rt = _runtime_with_paths("test-export-003", events_path, lineage_path)
-        chunks = list(rt.export_csv(chunk_size=100))
-        # First chunk is the header (utf-8-sig), rest is data
+        rt = _runtime_with_paths("test-export-003b", events_path, lineage_path,
+                                 detection_path=det_path)
+        from mes_dashboard.services.mid_section_defect_service import CSV_COLUMNS_BACKWARD
+        chunks = list(rt.export_csv(chunk_size=100, direction="backward"))
         full_csv = b"".join(chunks).decode("utf-8-sig", errors="replace")
         lines = [l for l in full_csv.splitlines() if l.strip()]
-        # 1 header + N data rows
-        data_rows = len(lines) - 1
-        assert data_rows == len(SAMPLE_EVENTS)
+        assert lines[0] == ",".join(label for _, label in CSV_COLUMNS_BACKWARD)
+
+    def test_export_row_count_matches_detail(self, spool_paths):
+        """The CSV row count must equal the detail table total (same data source),
+        proving export <-> table parity in BOTH directions."""
+        events_path, lineage_path, det_path = spool_paths
+        for direction in ("forward", "backward"):
+            rt = _runtime_with_paths(f"test-export-{direction}", events_path, lineage_path,
+                                     detection_path=det_path, forward_lineage_path=lineage_path)
+            detail = rt.get_detail(page=1, per_page=100000, direction=direction)
+            expected = (detail or {}).get("pagination", {}).get("total", 0)
+            chunks = list(rt.export_csv(chunk_size=100, direction=direction))
+            full_csv = b"".join(chunks).decode("utf-8-sig", errors="replace")
+            lines = [l for l in full_csv.splitlines() if l.strip()]
+            assert len(lines) - 1 == expected, f"{direction}: export rows must match detail total"
 
 
 # ---------------------------------------------------------------------------

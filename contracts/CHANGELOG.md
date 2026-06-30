@@ -8,6 +8,16 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.30.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: §3.24.5 `by_front_downstream_reason_matrix` — 前段報廢原因 × 下游報廢原因 關聯矩陣 (cohort-membership attribution via lineage; rows/cols TOP_N=10 + "其他"; `cells` raw qty + `row_pct` row-normalized; empty → all-empty arrays). Additive on `direction=forward`.
+### Changed
+- msd-forward-cause-effect: §3.24.1 `by_detection_loss_reason` now also emits per-reason `input_qty` + `lot_count` (membership cohort) and `reject_rate = reject_qty / input_qty` (was ÷ whole-cohort total). Fixes the front-stage Pareto showing 投入數=0 / 關聯 LOT 數=0.
+
+## [business 1.35.0] — 2026-06-30
+### Added
+- msd-forward-cause-effect: MSD-09 (front×downstream reason correlation matrix — cohort-membership double-count, row-normalized primary display), MSD-10 (detection input qty = `MAX(TRACKINQTY)` over upload session per PH-06, not last partial; applies to forward AND backward via shared `station_detection_by_ids.sql`).
+
 ## [css-inventory 1.2.8] — 2026-06-30
 ### Changed
 - msd-forward-cause-effect: Updated `mid-section-defect/style.css` row note documenting Sankey/Heatmap styles for forward cause-effect; all scoped under `.theme-mid-section-defect`.

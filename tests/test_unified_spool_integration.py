@@ -106,18 +106,25 @@ class TestMsdFullChain:
     def test_export_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
+        from mes_dashboard.services.mid_section_defect_service import CSV_COLUMNS_FORWARD
+
         events_path, lineage_path, detection_path = msd_spool
         rt = MsdDuckdbRuntime("tqid-chain-test")
         rt._events_path = events_path
         rt._lineage_path = lineage_path
+        rt._detection_path = detection_path
+        rt._forward_lineage_path = lineage_path
         rt._resolved = True
 
-        chunks = list(rt.export_csv(chunk_size=10))
+        # forward export = per-lot LOT 明細 (matches the detail table), NOT raw events
+        detail = rt.get_detail(page=1, per_page=10000, direction="forward")
+        expected = (detail or {}).get("pagination", {}).get("total", 0)
+        chunks = list(rt.export_csv(chunk_size=10, direction="forward"))
         assert len(chunks) > 0
         full_csv = b"".join(chunks).decode("utf-8-sig", errors="replace")
         lines = [l for l in full_csv.splitlines() if l.strip()]
-        # 1 header + 3 data rows
-        assert len(lines) == 4
+        assert lines[0] == ",".join(label for _, label in CSV_COLUMNS_FORWARD)
+        assert len(lines) - 1 == expected
 
     def test_full_chain_summary_detail_export_consistency(self, msd_spool):
         """Summary, detail, and export should all reflect the same dataset."""
@@ -700,6 +707,21 @@ def test_forward_summary_phase3_complete_payload(tmp_path):
     assert "downstream_trend" in summary, "downstream_trend must be in summary"
     assert isinstance(summary["downstream_trend"], list)
 
+    # MSD-09: front×downstream reason correlation matrix
+    assert "by_front_downstream_reason_matrix" in summary, (
+        "by_front_downstream_reason_matrix must be in forward summary"
+    )
+    matrix = summary["by_front_downstream_reason_matrix"]
+    assert isinstance(matrix, dict)
+    for k in ("rows", "cols", "cells", "row_pct"):
+        assert k in matrix, f"matrix must have {k} key"
+        assert isinstance(matrix[k], list)
+    # cells grid shape matches rows × cols
+    assert len(matrix["cells"]) == len(matrix["rows"])
+    assert len(matrix["row_pct"]) == len(matrix["rows"])
+    if matrix["rows"]:
+        assert all(len(r) == len(matrix["cols"]) for r in matrix["cells"])
+
     assert "amplification" in summary, "amplification must be in summary"
     # detection_defect_qty > 0, so amplification must be a number (not None)
     assert summary["amplification"] is not None, (
@@ -716,3 +738,52 @@ def test_forward_summary_phase3_complete_payload(tmp_path):
             f"daily_trend input_qty is unreasonably large ({max_input}); "
             "must be detection-based, not sum of all events rows"
         )
+
+
+# Regression: forward summary must derive the detection station order from the
+# detection workcenter, NOT from station_order_fallback (which callers compute via
+# get_group_order(label) and which collapses to 999 for raw WB labels like
+# '焊_WB_料'). At 999 every downstream group (order < 999) is filtered out and the
+# matrix / downstream attribution come back empty.
+def test_forward_summary_derives_station_order_when_fallback_is_999(tmp_path):
+    import pandas as pd
+    from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+    # Detection at WB: WORKCENTERNAME '焊_WB_料' -> get_workcenter_group order 2.
+    detection_df = pd.DataFrame(
+        [("SEED-001", "SEED-001-001", "GA", "PKG1", "WF1", "EQP1", 100,
+          "焊_WB_料", "043_NSOP", 8)],
+        columns=["CONTAINERID", "CONTAINERNAME", "PJ_TYPE", "PRODUCTLINENAME",
+                 "WORKFLOW", "DETECTION_EQUIPMENTNAME", "TRACKINQTY",
+                 "WORKCENTERNAME", "LOSSREASONNAME", "REJECTQTY"],
+    )
+    detection_df["TRACKINTIMESTAMP"] = "2026-06-23"
+    # Downstream reject at 測試 (order 11 > 2)
+    events_df = pd.DataFrame(
+        [("SEED-001", "測試", 100, None, None, "EQP-DS-1", "043_NSOP", "2026-06-24"),
+         ("SEED-001", "測試", None, 15, "2026-06-24", "EQP-DS-1", "274_OPEN", None)],
+        columns=["CONTAINERID", "WORKCENTER_GROUP", "TRACKINQTY", "REJECT_TOTAL_QTY",
+                 "TXNDATE", "EQUIPMENTNAME", "LOSSREASONNAME", "TRACKINTIMESTAMP"],
+    )
+    det_path = tmp_path / "detection.parquet"
+    ev_path = tmp_path / "events.parquet"
+    detection_df.to_parquet(det_path, index=False)
+    events_df.to_parquet(ev_path, index=False)
+
+    rt = MsdDuckdbRuntime("tqid-station-order-derive")
+    rt._detection_path = str(det_path)
+    rt._events_path = str(ev_path)
+    rt._forward_lineage_path = None
+    rt._lineage_path = None
+    rt._resolved = True
+
+    # Caller passes the buggy default 999 — derivation must rescue it.
+    summary = rt.get_summary(direction="forward", station_order_fallback=999)
+    assert summary is not None
+
+    matrix = summary["by_front_downstream_reason_matrix"]
+    assert matrix["rows"], "matrix must be non-empty (station_order derived from WB workcenter, not 999)"
+    assert any("043_NSOP" in r["name"] for r in matrix["rows"])
+    assert any("274_OPEN" in c["name"] for c in matrix["cols"])
+    # downstream attribution must also be populated (not filtered out by order=999)
+    assert summary["charts"]["by_downstream_station"], "downstream station chart must be non-empty"

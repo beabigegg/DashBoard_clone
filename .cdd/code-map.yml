@@ -1,6 +1,6 @@
-# generated: 2026-06-30T06:32:47Z by cdd-kit 3.6.0
-# files: 966, src-lines: 298331, map-lines: 21400, compression: 13.9x
-# sources-digest: 3a3c31fdaf8796623540f9107e0ae8332a47c9a2cf9cf42b91bdd792acc07b46
+# generated: 2026-06-30T10:01:06Z by cdd-kit 3.6.0
+# files: 967, src-lines: 300182, map-lines: 21468, compression: 14.0x
+# sources-digest: 2c728eb1d40b4da652f2935a49e54ceadad857ec2728d068376e842f43bae68d
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -957,11 +957,11 @@ frontend/src/downtime-analysis/types.ts:  # 143 lines
   types:
     - { name: MatchSource, lines: 76-76 }
 
-frontend/src/eap-alarm/App.vue:  # 379 lines
+frontend/src/eap-alarm/App.vue:  # 396 lines
 
 frontend/src/eap-alarm/DetailTable.vue:  # 142 lines
 
-frontend/src/eap-alarm/FilterBar.vue:  # 172 lines
+frontend/src/eap-alarm/FilterBar.vue:  # 281 lines
 
 frontend/src/eap-alarm/FineFilterBar.vue:  # 73 lines
 
@@ -971,11 +971,12 @@ frontend/src/eap-alarm/SummaryCards.vue:  # 44 lines
 
 frontend/src/eap-alarm/TrendChart.vue:  # 128 lines
 
-frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 139 lines
+frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 224 lines
   imports:
-    - { module: vue, items: [reactive, ref], line: 8 }
+    - { module: vue, items: [reactive, ref, onMounted], line: 9 }
+    - { module: '../../core/api', items: [apiGet], line: 10 }
   functions:
-    - { name: useEapAlarmFilter, lines: 10-139 }
+    - { name: useEapAlarmFilter, lines: 12-224 }
 
 frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 251 lines
   imports:
@@ -1242,7 +1243,7 @@ frontend/src/material-trace/main.ts:  # 7 lines
     - { module: '../wip-shared/styles.css', items: [], line: 4 }
     - { module: './style.css', items: [], line: 5 }
 
-frontend/src/mid-section-defect/App.vue:  # 1185 lines
+frontend/src/mid-section-defect/App.vue:  # 1076 lines
 
 frontend/src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
   imports:
@@ -1255,7 +1256,7 @@ frontend/src/mid-section-defect/components/AnalysisSummary.vue:  # 176 lines
     - { name: formatNumber, lines: 52-55 }
     - { name: formatInputType, lines: 57-59 }
 
-frontend/src/mid-section-defect/components/DetailTable.vue:  # 178 lines
+frontend/src/mid-section-defect/components/DetailTable.vue:  # 177 lines
   imports:
     - { module: vue, items: [computed], line: 2 }
     - { module: '../../shared-ui/components/DataTable.vue', items: ['default:DataTable'], line: 4 }
@@ -1264,9 +1265,9 @@ frontend/src/mid-section-defect/components/DetailTable.vue:  # 178 lines
     - { name: COLUMNS_BACKWARD, line: 32 }
     - { name: COLUMNS_FORWARD, line: 47 }
   functions:
-    - { name: handlePageChange, lines: 80-87 }
-    - { name: formatCell, lines: 89-94 }
-    - { name: getSuspectHits, lines: 96-115 }
+    - { name: handlePageChange, lines: 79-86 }
+    - { name: formatCell, lines: 88-93 }
+    - { name: getSuspectHits, lines: 95-114 }
 
 frontend/src/mid-section-defect/components/FilterBar.vue:  # 251 lines
   imports:
@@ -1274,33 +1275,9 @@ frontend/src/mid-section-defect/components/FilterBar.vue:  # 251 lines
   functions:
     - { name: updateFilters, lines: 60-65 }
 
-frontend/src/mid-section-defect/components/ForwardFlowChart.vue:  # 203 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 3 }
-    - { module: echarts/core, items: [use], line: 4 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 5 }
-    - { module: echarts/charts, items: [SankeyChart], line: 6 }
-    - { module: echarts/components, items: [TooltipComponent], line: 7 }
-  constants:
-    - { name: SANKEY_SOURCE_COLOR, line: 12 }
-    - { name: SANKEY_TARGET_COLOR, line: 13 }
-    - { name: SANKEY_LINK_COLOR, line: 14 }
-  functions:
-    - { name: handleChartClick, lines: 127-136 }
+frontend/src/mid-section-defect/components/ForwardReasonMatrix.vue:  # 344 lines
 
-frontend/src/mid-section-defect/components/ForwardHeatmap.vue:  # 189 lines
-  imports:
-    - { module: vue, items: [computed], line: 2 }
-    - { module: vue-echarts, items: ['default:VChart'], line: 3 }
-    - { module: echarts/core, items: [use], line: 4 }
-    - { module: echarts/renderers, items: [CanvasRenderer], line: 5 }
-    - { module: echarts/charts, items: [HeatmapChart], line: 6 }
-    - { module: echarts/components, items: [GridComponent, TooltipComponent, VisualMapComponent], line: 7 }
-  functions:
-    - { name: handleChartClick, lines: 113-122 }
-
-frontend/src/mid-section-defect/components/KpiCards.vue:  # 156 lines
+frontend/src/mid-section-defect/components/KpiCards.vue:  # 157 lines
   imports:
     - { module: vue, items: [computed], line: 2 }
     - { module: '../../shared-ui/components/SummaryCard.vue', items: ['default:SummaryCard'], line: 4 }
@@ -1308,8 +1285,8 @@ frontend/src/mid-section-defect/components/KpiCards.vue:  # 156 lines
   functions:
     - { name: formatNumber, lines: 115-118 }
     - { name: formatRate, lines: 120-123 }
-    - { name: formatAmplification, lines: 126-129 }
-    - { name: amplificationAccent, lines: 132-138 }
+    - { name: formatAmplification, lines: 127-130 }
+    - { name: amplificationAccent, lines: 133-139 }
 
 frontend/src/mid-section-defect/components/ParetoChart.vue:  # 225 lines
   imports:
@@ -1333,7 +1310,7 @@ frontend/src/mid-section-defect/components/SuspectContextPanel.vue:  # 215 lines
     - { name: formatDate, lines: 49-52 }
     - { name: formatNumber, lines: 54-57 }
 
-frontend/src/mid-section-defect/components/TrendChart.vue:  # 111 lines
+frontend/src/mid-section-defect/components/TrendChart.vue:  # 124 lines
   imports:
     - { module: vue, items: [computed], line: 2 }
     - { module: vue-echarts, items: ['default:VChart'], line: 3 }
@@ -2252,7 +2229,7 @@ frontend/src/shared-ui/components/SkeletonLoader.vue:  # 153 lines
 
 frontend/src/shared-ui/components/StatusBadge.vue:  # 57 lines
 
-frontend/src/shared-ui/components/SummaryCard.vue:  # 273 lines
+frontend/src/shared-ui/components/SummaryCard.vue:  # 276 lines
 
 frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
@@ -2362,7 +2339,7 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 1198 lines
+frontend/src/yield-alert-center/App.vue:  # 1202 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
@@ -2479,6 +2456,14 @@ frontend/tests/components/FilterPanel.test.js:  # 215 lines
     - { module: vitest, items: [describe, it, expect, vi], line: 20 }
     - { module: '@vue/test-utils', items: [shallowMount], line: 21 }
     - { module: '../../src/wip-overview/components/FilterPanel.vue', items: ['default:FilterPanel'], line: 22 }
+
+frontend/tests/components/ForwardReasonMatrix.test.js:  # 200 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 13 }
+    - { module: '@vue/test-utils', items: [mount], line: 14 }
+    - { module: '../../src/mid-section-defect/components/ForwardReasonMatrix.vue', items: ['default:ForwardReasonMatrix'], line: 15 }
+  constants:
+    - { name: SAMPLE_MATRIX, line: 17 }
 
 frontend/tests/components/HoldMatrix.test.js:  # 125 lines
   imports:
@@ -2607,7 +2592,7 @@ frontend/tests/legacy/material-trace-composables.test.js:  # 110 lines
     - { name: isOverLimit, lines: 65-68 }
     - { name: queryModeForApi, lines: 95-98 }
 
-frontend/tests/legacy/mid-section-defect-composables.test.js:  # 361 lines
+frontend/tests/legacy/mid-section-defect-composables.test.js:  # 348 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 8 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 9 }
@@ -3003,29 +2988,30 @@ frontend/tests/playwright/downtime-analysis.spec.ts:  # 937 lines
     - { name: async waitForErrorBanner, lines: 231-248 }
     - { name: async waitForEmptyState, lines: 250-267 }
 
-frontend/tests/playwright/eap-alarm-filters.spec.ts:  # 667 lines
+frontend/tests/playwright/eap-alarm-filters.spec.ts:  # 907 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 19 }
     - { module: './_auth.js', items: [navigateViaSidebar], line: 20 }
   constants:
-    - { name: MOCK_QUERY_ID, line: 24 }
-    - { name: MOCK_SPOOL_202, line: 26 }
-    - { name: MOCK_SPOOL_STATUS_FINISHED, line: 37 }
-    - { name: MOCK_RESOURCE_OPTIONS, line: 49 }
-    - { name: MOCK_FILTER_OPTIONS, line: 61 }
-    - { name: MOCK_SUMMARY, line: 70 }
-    - { name: MOCK_SUMMARY_EMPTY, line: 81 }
-    - { name: MOCK_PARETO, line: 92 }
-    - { name: MOCK_TREND, line: 104 }
-    - { name: MOCK_DETAIL, line: 116 }
-    - { name: MOCK_DETAIL_PAGINATED, line: 150 }
+    - { name: MOCK_PRODUCT_FILTER_OPTIONS, line: 24 }
+    - { name: MOCK_QUERY_ID, line: 37 }
+    - { name: MOCK_SPOOL_202, line: 39 }
+    - { name: MOCK_SPOOL_STATUS_FINISHED, line: 50 }
+    - { name: MOCK_RESOURCE_OPTIONS, line: 62 }
+    - { name: MOCK_FILTER_OPTIONS, line: 74 }
+    - { name: MOCK_SUMMARY, line: 83 }
+    - { name: MOCK_SUMMARY_EMPTY, line: 94 }
+    - { name: MOCK_PARETO, line: 105 }
+    - { name: MOCK_TREND, line: 117 }
+    - { name: MOCK_DETAIL, line: 129 }
+    - { name: MOCK_DETAIL_PAGINATED, line: 163 }
   functions:
-    - { name: async setupEapMocks, lines: 184-304 }
-    - { name: async navigateToEapAlarm, lines: 307-320 }
-    - { name: async submitCoarseFilter, lines: 326-347 }
-    - { name: async waitForFineFilter, lines: 352-356 }
+    - { name: async setupEapMocks, lines: 197-326 }
+    - { name: async navigateToEapAlarm, lines: 329-342 }
+    - { name: async submitCoarseFilter, lines: 349-381 }
+    - { name: async waitForFineFilter, lines: 386-390 }
   interfaces:
-    - { name: MockOptions, lines: 172-178 }  # local
+    - { name: MockOptions, lines: 185-191 }  # local
 
 frontend/tests/playwright/eap-alarm.spec.js:  # 388 lines
   imports:
@@ -3187,7 +3173,7 @@ frontend/tests/playwright/material-trace.spec.ts:  # 742 lines
     - { name: async pageRendered, lines: 230-234 }
     - { name: async fillAndSubmit, lines: 240-250 }
 
-frontend/tests/playwright/mid-section-defect.spec.ts:  # 1304 lines
+frontend/tests/playwright/mid-section-defect.spec.ts:  # 1324 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page, Request], line: 19 }
   constants:
@@ -3204,12 +3190,12 @@ frontend/tests/playwright/mid-section-defect.spec.ts:  # 1304 lines
     - { name: MOCK_LINEAGE_RESULT, line: 151 }
     - { name: MOCK_EVENTS_RESULT, line: 157 }
     - { name: MOCK_FORWARD_ANALYSIS_DATA, line: 662 }
-    - { name: MOCK_FORWARD_EVENTS_RESULT, line: 704 }
-    - { name: MOCK_FORWARD_DETAIL_RESPONSE, line: 715 }
+    - { name: MOCK_FORWARD_EVENTS_RESULT, line: 724 }
+    - { name: MOCK_FORWARD_DETAIL_RESPONSE, line: 735 }
   functions:
     - { name: async installBaseRoutes, lines: 172-258 }
     - { name: async gotoPage, lines: 265-275 }
-    - { name: async runForwardQuery, lines: 751-784 }
+    - { name: async runForwardQuery, lines: 771-804 }
 
 frontend/tests/playwright/portal-shell-login.spec.ts:  # 211 lines
   imports:
@@ -3609,10 +3595,10 @@ frontend/tests/shared-composables/useRequestGuard.test.js:  # 155 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
     - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
 
-frontend/tests/unit/eap-alarm-filter.test.js:  # 142 lines
+frontend/tests/unit/eap-alarm-filter.test.js:  # 300 lines
   imports:
-    - { module: vitest, items: [describe, it, expect, beforeEach], line: 11 }
-    - { module: '../../src/eap-alarm/composables/useEapAlarmFilter.js', items: [useEapAlarmFilter], line: 12 }
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 13 }
+    - { module: '../../src/eap-alarm/composables/useEapAlarmFilter.js', items: [useEapAlarmFilter], line: 33 }
 
 frontend/tests/unwrap-api-result.test.js:  # 88 lines
   imports:
@@ -6542,7 +6528,7 @@ src/mes_dashboard/services/downtime_query_job_service.py:  # 138 lines
   functions:
     - { name: execute_downtime_query_job, lines: 58-124 }
 
-src/mes_dashboard/services/eap_alarm_cache.py:  # 101 lines
+src/mes_dashboard/services/eap_alarm_cache.py:  # 114 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6553,11 +6539,11 @@ src/mes_dashboard/services/eap_alarm_cache.py:  # 101 lines
     - { name: EAP_ALARM_SPOOL_DIR, line: 25 }
     - { name: EAP_ALARM_SPOOL_TTL, line: 28 }
   functions:
-    - { name: make_eap_alarm_spool_key, lines: 34-60 }
-    - { name: decode_alarm_category, lines: 80-91 }
-    - { name: get_eap_alarm_spool_path, lines: 96-101 }
+    - { name: make_eap_alarm_spool_key, lines: 34-73 }
+    - { name: decode_alarm_category, lines: 93-104 }
+    - { name: get_eap_alarm_spool_path, lines: 109-114 }
 
-src/mes_dashboard/services/eap_alarm_service.py:  # 410 lines
+src/mes_dashboard/services/eap_alarm_service.py:  # 456 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: json, items: [], line: 23 }
@@ -6566,16 +6552,16 @@ src/mes_dashboard/services/eap_alarm_service.py:  # 410 lines
     - { module: typing, items: [Any, Dict, List, Optional], line: 26 }
     - { module: mes_dashboard.services.eap_alarm_cache, items: [decode_alarm_category], line: 28 }
   functions:
-    - { name: validate_eap_alarm_params, lines: 37-48 }
-    - { name: _get_duckdb_conn, lines: 53-55 }
-    - { name: _escape_like, lines: 58-59 }
-    - { name: _escape_sql, lines: 62-63 }
-    - { name: _build_filter_where, lines: 66-94 }
-    - { name: get_filter_options, lines: 99-139 }
-    - { name: get_summary, lines: 144-184 }
-    - { name: get_pareto, lines: 189-233 }
-    - { name: get_trend, lines: 238-314 }
-    - { name: get_detail, lines: 319-410 }
+    - { name: validate_eap_alarm_params, lines: 44-94 }
+    - { name: _get_duckdb_conn, lines: 99-101 }
+    - { name: _escape_like, lines: 104-105 }
+    - { name: _escape_sql, lines: 108-109 }
+    - { name: _build_filter_where, lines: 112-140 }
+    - { name: get_filter_options, lines: 145-185 }
+    - { name: get_summary, lines: 190-230 }
+    - { name: get_pareto, lines: 235-279 }
+    - { name: get_trend, lines: 284-360 }
+    - { name: get_detail, lines: 365-456 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -7086,7 +7072,7 @@ src/mes_dashboard/services/material_trace_service.py:  # 1015 lines
     - { name: rq_material_trace_job, lines: 919-945 }
     - { name: execute_material_trace_unified_job, lines: 964-1007 }
 
-src/mes_dashboard/services/mid_section_defect_service.py:  # 3668 lines
+src/mes_dashboard/services/mid_section_defect_service.py:  # 3829 lines
   imports:
     - { module: csv, items: [], line: 35 }
     - { module: io, items: [], line: 36 }
@@ -7116,79 +7102,80 @@ src/mes_dashboard/services/mid_section_defect_service.py:  # 3668 lines
     - { name: TOP_N, line: 104 }
     - { name: DIMENSION_MAP, line: 108 }
     - { name: FORWARD_DIMENSION_MAP, line: 115 }
-    - { name: CSV_COLUMNS_BACKWARD, line: 123 }
-    - { name: CSV_COLUMNS_FORWARD, line: 142 }
-    - { name: VALID_DIRECTIONS, line: 157 }
+    - { name: CSV_COLUMNS_BACKWARD, line: 126 }
+    - { name: CSV_COLUMNS_FORWARD, line: 143 }
+    - { name: VALID_DIRECTIONS, line: 155 }
   functions:
     - { name: _normalize_station, lines: 74-80 }
     - { name: _canon_station_key, lines: 83-85 }
-    - { name: _make_detection_spool_query_id, lines: 160-172 }
-    - { name: resolve_analysis_trace_context, lines: 175-234 }
-    - { name: _load_analysis_from_spool, lines: 237-270 }
-    - { name: _empty_pending_result, lines: 273-282 }
-    - { name: _compat_job_id, lines: 285-286 }
-    - { name: ensure_analysis_background_job, lines: 289-333 }
-    - { name: query_analysis, lines: 340-438 }
-    - { name: parse_loss_reasons_param, lines: 441-474 }
-    - { name: resolve_msd_seeds_at_station, lines: 486-545 }
-    - { name: resolve_trace_seed_lots, lines: 548-595 }
-    - { name: _apply_population_mask, lines: 598-622 }
-    - { name: build_trace_aggregation_from_events, lines: 625-826 }
-    - { name: _build_trace_aggregation_container_mode, lines: 829-1015 }
-    - { name: query_analysis_detail, lines: 1018-1057 }
-    - { name: query_all_loss_reasons, lines: 1060-1075 }
-    - { name: export_csv, lines: 1078-1124 }
-    - { name: query_station_options, lines: 1127-1139 }
-    - { name: _collect_forward_tracked_cids, lines: 1142-1161 }
-    - { name: _write_msd_lineage_stage_spool, lines: 1164-1234 }
-    - { name: _write_msd_detection_stage_spool, lines: 1237-1265 }
-    - { name: _write_msd_forward_lineage_spool, lines: 1271-1338 }
-    - { name: _compute_amplification_kpi, lines: 1341-1369 }
-    - { name: _build_by_detection_loss_reason, lines: 1372-1406 }
-    - { name: _build_loss_reason_workcenter_crosstab, lines: 1409-1489 }
-    - { name: _build_downstream_trend, lines: 1492-1547 }
-    - { name: _execute_msd_compat_job, lines: 1550-1673 }
-    - { name: _safe_str, lines: 1680-1688 }
-    - { name: _safe_float, lines: 1691-1700 }
-    - { name: _safe_int, lines: 1703-1704 }
-    - { name: _empty_result, lines: 1707-1733 }
-    - { name: _validate_date_range, lines: 1740-1753 }
-    - { name: _validate_station, lines: 1756-1762 }
-    - { name: _validate_params, lines: 1765-1776 }
-    - { name: _build_station_filter, lines: 1783-1824 }
-    - { name: _build_multi_station_filter, lines: 1827-1840 }
-    - { name: _resolve_detection_cids, lines: 1857-1938 }
-    - { name: _fetch_detection_rows_for_cids, lines: 1941-2010 }
-    - { name: _fetch_station_detection_data, lines: 2013-2129 }
-    - { name: _build_expanded_detection_cids, lines: 2132-2156 }
-    - { name: _fetch_detection_by_container_ids, lines: 2159-2203 }
-    - { name: _run_backward_pipeline, lines: 2210-2292 }
-    - { name: _run_forward_pipeline, lines: 2299-2419 }
-    - { name: _resolve_full_genealogy, lines: 2426-2434 }
-    - { name: _log_genealogy_summary, lines: 2437-2448 }
-    - { name: _fetch_upstream_history, lines: 2455-2481 }
-    - { name: _fetch_downstream_rejects, lines: 2488-2527 }
-    - { name: _normalize_lineage_ancestors, lines: 2530-2567 }
-    - { name: _normalize_upstream_event_records, lines: 2570-2595 }
-    - { name: _normalize_materials_event_records, lines: 2598-2623 }
-    - { name: _normalize_downstream_event_records, lines: 2626-2650 }
-    - { name: _build_trace_quality_meta, lines: 2653-2675 }
-    - { name: _build_detection_lookup, lines: 2682-2727 }
-    - { name: _attribute_defects, lines: 2734-2841 }
-    - { name: _attribute_materials, lines: 2844-2910 }
-    - { name: _attribute_wafer_roots, lines: 2913-2960 }
-    - { name: _attribute_forward_defects, lines: 2967-3077 }
-    - { name: _build_kpi, lines: 3084-3129 }
-    - { name: _build_forward_kpi, lines: 3132-3158 }
-    - { name: _build_chart_data, lines: 3165-3222 }
-    - { name: _build_loss_reason_chart, lines: 3225-3260 }
-    - { name: _build_all_charts, lines: 3263-3311 }
-    - { name: _build_forward_charts, lines: 3314-3422 }
-    - { name: _build_daily_trend, lines: 3429-3476 }
-    - { name: _build_detail_table, lines: 3483-3583 }
-    - { name: _build_forward_detail_table, lines: 3586-3668 }
+    - { name: _make_detection_spool_query_id, lines: 158-170 }
+    - { name: resolve_analysis_trace_context, lines: 173-232 }
+    - { name: _load_analysis_from_spool, lines: 235-268 }
+    - { name: _empty_pending_result, lines: 271-280 }
+    - { name: _compat_job_id, lines: 283-284 }
+    - { name: ensure_analysis_background_job, lines: 287-331 }
+    - { name: query_analysis, lines: 338-436 }
+    - { name: parse_loss_reasons_param, lines: 439-472 }
+    - { name: resolve_msd_seeds_at_station, lines: 484-543 }
+    - { name: resolve_trace_seed_lots, lines: 546-593 }
+    - { name: _apply_population_mask, lines: 596-620 }
+    - { name: build_trace_aggregation_from_events, lines: 623-827 }
+    - { name: _build_trace_aggregation_container_mode, lines: 830-1019 }
+    - { name: query_analysis_detail, lines: 1022-1061 }
+    - { name: query_all_loss_reasons, lines: 1064-1079 }
+    - { name: export_csv, lines: 1082-1128 }
+    - { name: query_station_options, lines: 1131-1143 }
+    - { name: _collect_forward_tracked_cids, lines: 1146-1165 }
+    - { name: _write_msd_lineage_stage_spool, lines: 1168-1238 }
+    - { name: _write_msd_detection_stage_spool, lines: 1241-1269 }
+    - { name: _write_msd_forward_lineage_spool, lines: 1275-1342 }
+    - { name: _compute_amplification_kpi, lines: 1345-1373 }
+    - { name: _build_by_detection_loss_reason, lines: 1376-1434 }
+    - { name: _build_loss_reason_workcenter_crosstab, lines: 1437-1517 }
+    - { name: _build_downstream_trend, lines: 1520-1575 }
+    - { name: _execute_msd_compat_job, lines: 1578-1701 }
+    - { name: _safe_str, lines: 1708-1716 }
+    - { name: _safe_float, lines: 1719-1728 }
+    - { name: _safe_int, lines: 1731-1732 }
+    - { name: _empty_result, lines: 1735-1761 }
+    - { name: _validate_date_range, lines: 1768-1781 }
+    - { name: _validate_station, lines: 1784-1790 }
+    - { name: _validate_params, lines: 1793-1804 }
+    - { name: _build_station_filter, lines: 1811-1852 }
+    - { name: _build_multi_station_filter, lines: 1855-1868 }
+    - { name: _resolve_detection_cids, lines: 1885-1966 }
+    - { name: _fetch_detection_rows_for_cids, lines: 1969-2038 }
+    - { name: _fetch_station_detection_data, lines: 2041-2157 }
+    - { name: _build_expanded_detection_cids, lines: 2160-2184 }
+    - { name: _fetch_detection_by_container_ids, lines: 2187-2231 }
+    - { name: _run_backward_pipeline, lines: 2238-2320 }
+    - { name: _run_forward_pipeline, lines: 2327-2450 }
+    - { name: _resolve_full_genealogy, lines: 2457-2465 }
+    - { name: _log_genealogy_summary, lines: 2468-2479 }
+    - { name: _fetch_upstream_history, lines: 2486-2512 }
+    - { name: _fetch_downstream_rejects, lines: 2519-2558 }
+    - { name: _normalize_lineage_ancestors, lines: 2561-2598 }
+    - { name: _normalize_upstream_event_records, lines: 2601-2626 }
+    - { name: _normalize_materials_event_records, lines: 2629-2654 }
+    - { name: _normalize_downstream_event_records, lines: 2657-2681 }
+    - { name: _build_trace_quality_meta, lines: 2684-2706 }
+    - { name: _build_detection_lookup, lines: 2713-2758 }
+    - { name: _attribute_defects, lines: 2765-2872 }
+    - { name: _attribute_materials, lines: 2875-2941 }
+    - { name: _attribute_wafer_roots, lines: 2944-2991 }
+    - { name: _attribute_forward_defects, lines: 2998-3108 }
+    - { name: _build_front_downstream_reason_matrix, lines: 3111-3238 }
+    - { name: _build_kpi, lines: 3245-3290 }
+    - { name: _build_forward_kpi, lines: 3293-3319 }
+    - { name: _build_chart_data, lines: 3326-3383 }
+    - { name: _build_loss_reason_chart, lines: 3386-3421 }
+    - { name: _build_all_charts, lines: 3424-3472 }
+    - { name: _build_forward_charts, lines: 3475-3583 }
+    - { name: _build_daily_trend, lines: 3590-3637 }
+    - { name: _build_detail_table, lines: 3644-3744 }
+    - { name: _build_forward_detail_table, lines: 3747-3829 }
 
-src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2064 lines
+src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2084 lines
   imports:
     - { module: __future__, items: [annotations], line: 25 }
     - { module: logging, items: [], line: 27 }
@@ -7198,7 +7185,7 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2064 lines
     - { name: SPOOL_NAMESPACE, line: 33 }
   classes:
     - name: MsdDuckdbRuntime
-      lines: 40-2064
+      lines: 40-2084
       methods:
         - { name: __init__, lines: 43-49 }
         - { name: _resolve_paths, lines: 51-75 }
@@ -7212,31 +7199,31 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2064 lines
         - { name: _build_backward_payload_from_spool, lines: 238-351 }
         - { name: _sort_detail_rows, lines: 354-375 }
         - { name: get_summary, lines: 381-426 }
-        - { name: _get_forward_summary, lines: 428-622 }
-        - { name: _compute_kpi, lines: 624-656 }
-        - { name: _compute_charts, lines: 658-684 }
-        - { name: _compute_daily_trend, lines: 686-719 }
-        - { name: _compute_attribution, lines: 721-747 }
-        - { name: get_summary_with_detection, lines: 753-853 }
-        - { name: _compute_kpi_from_detection, lines: 855-927 }
-        - { name: _compute_daily_trend_from_detection, lines: 929-974 }
-        - { name: _compute_attribution_from_detection, lines: 976-1007 }
-        - { name: _compute_affected_machine_count, lines: 1009-1027 }
-        - { name: _compute_detection_machine_chart, lines: 1029-1063 }
-        - { name: _compute_wafer_root_chart, lines: 1065-1144 }
-        - { name: _compute_machine_chart, lines: 1146-1188 }
-        - { name: _compute_material_chart, lines: 1190-1223 }
-        - { name: _compute_loss_reason_chart, lines: 1225-1271 }
-        - { name: _compute_available_loss_reasons, lines: 1273-1288 }
-        - { name: _compute_detail_total_count, lines: 1290-1312 }
-        - { name: _compute_workflow_chart, lines: 1314-1347 }
-        - { name: _compute_raw_machine_attribution, lines: 1349-1425 }
-        - { name: _compute_raw_materials_attribution, lines: 1427-1495 }
-        - { name: _to_pareto_items, lines: 1498-1515 }
-        - { name: _get_forward_detail, lines: 1521-1653 }
-        - { name: get_detail, lines: 1655-1918 }
-        - { name: get_all_detail, lines: 1920-1961 }
-        - { name: export_csv, lines: 1967-2064 }
+        - { name: _get_forward_summary, lines: 428-647 }
+        - { name: _compute_kpi, lines: 649-681 }
+        - { name: _compute_charts, lines: 683-709 }
+        - { name: _compute_daily_trend, lines: 711-744 }
+        - { name: _compute_attribution, lines: 746-772 }
+        - { name: get_summary_with_detection, lines: 778-878 }
+        - { name: _compute_kpi_from_detection, lines: 880-952 }
+        - { name: _compute_daily_trend_from_detection, lines: 954-999 }
+        - { name: _compute_attribution_from_detection, lines: 1001-1032 }
+        - { name: _compute_affected_machine_count, lines: 1034-1052 }
+        - { name: _compute_detection_machine_chart, lines: 1054-1088 }
+        - { name: _compute_wafer_root_chart, lines: 1090-1169 }
+        - { name: _compute_machine_chart, lines: 1171-1213 }
+        - { name: _compute_material_chart, lines: 1215-1248 }
+        - { name: _compute_loss_reason_chart, lines: 1250-1296 }
+        - { name: _compute_available_loss_reasons, lines: 1298-1313 }
+        - { name: _compute_detail_total_count, lines: 1315-1337 }
+        - { name: _compute_workflow_chart, lines: 1339-1372 }
+        - { name: _compute_raw_machine_attribution, lines: 1374-1450 }
+        - { name: _compute_raw_materials_attribution, lines: 1452-1520 }
+        - { name: _to_pareto_items, lines: 1523-1540 }
+        - { name: _get_forward_detail, lines: 1546-1695 }
+        - { name: get_detail, lines: 1697-1960 }
+        - { name: get_all_detail, lines: 1962-2003 }
+        - { name: export_csv, lines: 2009-2084 }
 
 src/mes_dashboard/services/msd_lineage_job_service.py:  # 348 lines
   imports:
@@ -8701,7 +8688,7 @@ src/mes_dashboard/workers/downtime_worker.py:  # 747 lines
     - { name: _build_in_filter, lines: 140-164 }
     - { name: execute_downtime_unified_job, lines: 700-732 }
 
-src/mes_dashboard/workers/eap_alarm_worker.py:  # 533 lines
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 651 lines
   imports:
     - { module: __future__, items: [annotations], line: 23 }
     - { module: hashlib, items: [], line: 25 }
@@ -8711,24 +8698,26 @@ src/mes_dashboard/workers/eap_alarm_worker.py:  # 533 lines
     - { module: pathlib, items: [Path], line: 29 }
     - { module: typing, items: [Any, Dict, List], line: 30 }
     - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 32 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 524 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 642 }
   constants:
     - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 36 }
     - { name: EAP_ALARM_WORKER_QUEUE, line: 39 }
     - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 40 }
   classes:
     - name: EapAlarmJob
-      lines: 290-485
+      lines: 373-591
       methods:
-        - { name: __init__, lines: 303-313 }
-        - { name: pre_query, lines: 315-361 }
-        - { name: build_chunk_sql, lines: 363-374 }
-        - { name: post_aggregate, lines: 376-480 }
-        - { name: progress_report, lines: 482-485 }
+        - { name: __init__, lines: 386-398 }
+        - { name: pre_query, lines: 400-461 }
+        - { name: build_chunk_sql, lines: 463-480 }
+        - { name: post_aggregate, lines: 482-586 }
+        - { name: progress_report, lines: 588-591 }
   functions:
-    - { name: _build_equipment_filter, lines: 148-163 }
-    - { name: run_eap_alarm_query_job, lines: 166-287 }
-    - { name: execute_eap_alarm_unified_job, lines: 488-520 }
+    - { name: _build_lot_ids_filter, lines: 148-158 }
+    - { name: _build_product_dims_exists, lines: 161-198 }
+    - { name: _build_equipment_filter, lines: 201-216 }
+    - { name: run_eap_alarm_query_job, lines: 219-370 }
+    - { name: execute_eap_alarm_unified_job, lines: 594-638 }
 
 src/mes_dashboard/workers/production_history_worker.py:  # 242 lines
   imports:
@@ -10394,7 +10383,27 @@ tests/integration/test_downtime_rq_async.py:  # 1254 lines
     - { name: _reset_registry, lines: 36-39 }
     - { name: _reload_job_service, lines: 42-46 }
 
-tests/integration/test_eap_alarm_data_boundary.py:  # 254 lines
+tests/integration/test_eap_alarm_coarse_filter.py:  # 205 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: uuid, items: [], line: 15 }
+    - { module: typing, items: [Any, Dict], line: 16 }
+    - { module: pytest, items: [], line: 18 }
+  classes:
+    - name: TestEapAlarmWorkerFnNewDims
+      lines: 36-205
+      methods:
+        - { name: _base_monkeypatch, lines: 39-54 }
+        - { name: test_lot_ids_in_clause_present_in_sql, lines: 56-74 }
+        - { name: test_exists_clause_present_in_sql_for_pj_types, lines: 76-93 }
+        - { name: test_exists_clause_present_in_sql_for_product_lines, lines: 95-112 }
+        - { name: test_exists_clause_present_in_sql_for_pj_bops, lines: 114-131 }
+        - { name: test_multiple_dims_produce_multiple_exists_clauses, lines: 133-155 }
+        - { name: test_route_forwards_lot_ids_per_kwarg, lines: 157-205 }
+  functions:
+    - { name: _make_app, lines: 27-29 }
+
+tests/integration/test_eap_alarm_data_boundary.py:  # 333 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: json, items: [], line: 18 }
@@ -10403,20 +10412,25 @@ tests/integration/test_eap_alarm_data_boundary.py:  # 254 lines
     - { module: pyarrow.parquet, items: [], line: 22 }
     - { module: pytest, items: [], line: 23 }
   functions:
-    - { name: _write_parquet, lines: 41-74 }
-    - { name: _base_row, lines: 77-91 }
-    - { name: test_unknown_alarm_category_code_fallback, lines: 96-108 }
-    - { name: test_null_detail_params, lines: 113-121 }
-    - { name: test_null_lot_id, lines: 126-134 }
-    - { name: test_empty_alarm_text_rows, lines: 139-151 }
-    - { name: test_null_alarm_text_excluded_from_filter_options, lines: 154-164 }
-    - { name: test_large_alarm_text, lines: 169-181 }
-    - { name: test_zero_row_spool, lines: 186-211 }
-    - { name: test_detail_params_json_object, lines: 216-225 }
-    - { name: test_summary_top_equipment, lines: 230-242 }
-    - { name: test_per_page_capped_at_200, lines: 247-254 }
+    - { name: _write_parquet, lines: 43-81 }
+    - { name: _base_row, lines: 84-99 }
+    - { name: test_unknown_alarm_category_code_fallback, lines: 104-116 }
+    - { name: test_null_detail_params, lines: 121-129 }
+    - { name: test_null_lot_id, lines: 134-142 }
+    - { name: test_empty_alarm_text_rows, lines: 147-159 }
+    - { name: test_null_alarm_text_excluded_from_filter_options, lines: 162-172 }
+    - { name: test_large_alarm_text, lines: 177-189 }
+    - { name: test_zero_row_spool, lines: 194-219 }
+    - { name: test_detail_params_json_object, lines: 224-233 }
+    - { name: test_summary_affected_equipment_count, lines: 238-249 }
+    - { name: test_per_page_capped_at_200, lines: 254-261 }
+    - { name: test_lot_ids_whitespace_stripped, lines: 266-279 }
+    - { name: test_lot_ids_deduped_before_oracle, lines: 282-302 }
+    - { name: test_lot_ids_max200_cap_exceeded, lines: 305-310 }
+    - { name: test_char_padded_containername_matches, lines: 313-325 }
+    - { name: test_empty_product_dims_no_exists_clause, lines: 328-333 }
 
-tests/integration/test_eap_alarm_resilience.py:  # 174 lines
+tests/integration/test_eap_alarm_resilience.py:  # 264 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: uuid, items: [], line: 14 }
@@ -10427,9 +10441,12 @@ tests/integration/test_eap_alarm_resilience.py:  # 174 lines
     - { name: test_oracle_failure_during_spool, lines: 29-63 }
     - { name: test_redis_failure_returns_503, lines: 68-97 }
     - { name: test_spool_miss_fine_filter_returns_410, lines: 109-124 }  # @pytest.mark.parametrize('endpoint', ['/api/eap-alarm/filter-options?query_id=exp...
-    - { name: test_inflight_abort, lines: 129-174 }
+    - { name: test_oracle_error_during_exists_semijoin, lines: 129-163 }
+    - { name: test_container_filter_cache_miss_returns_empty_arrays, lines: 168-193 }
+    - { name: test_all_filters_empty_returns_400, lines: 198-214 }
+    - { name: test_inflight_abort, lines: 219-264 }
 
-tests/integration/test_eap_alarm_rq_async.py:  # 447 lines
+tests/integration/test_eap_alarm_rq_async.py:  # 469 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: importlib, items: [], line: 17 }
@@ -10450,23 +10467,25 @@ tests/integration/test_eap_alarm_rq_async.py:  # 447 lines
         - { name: test_post_spool_invalid_eqp_type_returns_400, lines: 133-146 }
         - { name: test_post_spool_empty_eqp_types_returns_400, lines: 148-161 }
     - name: TestEapAlarmWorkerFn
-      lines: 168-338
+      lines: 168-352
       methods:
-        - { name: _build_mock_df, lines: 171-183 }
-        - { name: test_worker_fn_writes_parquet_with_correct_columns, lines: 185-244 }
-        - { name: test_worker_fn_decodes_alarm_category, lines: 246-273 }
-        - { name: test_worker_fn_progress_milestones, lines: 275-311 }
-        - { name: test_worker_fn_oracle_sql_contains_last_update_time_predicate, lines: 313-338 }
+        - { name: _build_mock_df, lines: 171-182 }
+        - { name: _empty_detail_df, lines: 184-187 }
+        - { name: _sql_router, lines: 189-200 }
+        - { name: test_worker_fn_writes_parquet_with_correct_columns, lines: 202-260 }
+        - { name: test_worker_fn_decodes_alarm_category, lines: 262-291 }
+        - { name: test_worker_fn_progress_milestones, lines: 293-325 }
+        - { name: test_worker_fn_oracle_sql_contains_last_update_time_predicate, lines: 327-352 }
     - name: TestEapAlarmSpoolCacheHit
-      lines: 345-371
+      lines: 359-385
       methods:
-        - { name: test_spool_cache_hit_returns_200, lines: 348-371 }
+        - { name: test_spool_cache_hit_returns_200, lines: 362-385 }
   functions:
     - { name: _reset_registry, lines: 35-38 }
     - { name: _reload_eap_alarm_worker, lines: 41-45 }
     - { name: _make_app, lines: 48-50 }
-    - { name: test_spool_miss_returns_410, lines: 378-391 }
-    - { name: test_detail_no_extra_oracle_query, lines: 398-447 }
+    - { name: test_spool_miss_returns_410, lines: 392-405 }
+    - { name: test_detail_no_extra_oracle_query, lines: 412-464 }
 
 tests/integration/test_fixtures_smoke.py:  # 44 lines
   imports:
@@ -14751,56 +14770,93 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
 
-tests/test_eap_alarm_service.py:  # 217 lines
+tests/test_eap_alarm_service.py:  # 446 lines
   imports:
-    - { module: __future__, items: [annotations], line: 12 }
-    - { module: hashlib, items: [], line: 14 }
-    - { module: pytest, items: [], line: 16 }
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: hashlib, items: [], line: 17 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 18 }
+    - { module: pytest, items: [], line: 20 }
   classes:
     - name: TestSpoolKeyComposition
-      lines: 21-71
+      lines: 25-116
       methods:
-        - { name: test_key_format, lines: 24-28 }
-        - { name: test_hash_is_8_chars, lines: 30-37 }
-        - { name: test_sorted_machines_gives_same_key, lines: 39-44 }
-        - { name: test_different_machines_give_different_key, lines: 46-50 }
-        - { name: test_hash_matches_sha256_of_sorted_join, lines: 52-59 }
-        - { name: test_different_dates_give_different_key, lines: 61-65 }
-        - { name: test_schema_version_in_key, lines: 67-71 }
+        - { name: test_key_format, lines: 28-32 }
+        - { name: test_hash_is_8_chars, lines: 34-41 }
+        - { name: test_sorted_eqp_types_gives_same_key, lines: 43-48 }
+        - { name: test_different_eqp_types_give_different_key, lines: 50-54 }
+        - { name: test_different_dates_give_different_key, lines: 56-60 }
+        - { name: test_schema_version_in_key, lines: 62-66 }
+        - { name: test_same_full_params_give_same_key, lines: 68-79 }
+        - { name: test_lot_ids_dim_produces_different_key, lines: 81-87 }
+        - { name: test_pj_types_dim_produces_different_key, lines: 89-94 }
+        - { name: test_product_lines_dim_produces_different_key, lines: 96-101 }
+        - { name: test_pj_bops_dim_produces_different_key, lines: 103-108 }
+        - { name: test_empty_dims_do_not_collide_across_axes, lines: 110-116 }
     - name: TestMissingDateRangeRaisesValueError
-      lines: 76-107
+      lines: 121-152
       methods:
-        - { name: test_missing_date_from_spool_key, lines: 79-82 }
-        - { name: test_missing_date_to_spool_key, lines: 84-87 }
-        - { name: test_empty_date_from_spool_key, lines: 89-92 }
-        - { name: test_missing_date_from_validate, lines: 94-97 }
-        - { name: test_missing_date_to_validate, lines: 99-102 }
-        - { name: test_both_dates_missing_validate, lines: 104-107 }
+        - { name: test_missing_date_from_spool_key, lines: 124-127 }
+        - { name: test_missing_date_to_spool_key, lines: 129-132 }
+        - { name: test_empty_date_from_spool_key, lines: 134-137 }
+        - { name: test_missing_date_from_validate, lines: 139-142 }
+        - { name: test_missing_date_to_validate, lines: 144-147 }
+        - { name: test_both_dates_missing_validate, lines: 149-152 }
     - name: TestMachinesValidation
-      lines: 112-136
+      lines: 157-183
       methods:
-        - { name: test_single_valid_machine_no_error, lines: 115-117 }
-        - { name: test_multiple_valid_machines_no_error, lines: 119-121 }
-        - { name: test_empty_list_raises_value_error, lines: 123-126 }
-        - { name: test_none_raises_value_error, lines: 128-131 }
-        - { name: test_empty_string_in_list_raises_value_error, lines: 133-136 }
+        - { name: test_single_valid_eqp_type_no_error, lines: 160-162 }
+        - { name: test_multiple_valid_eqp_types_no_error, lines: 164-166 }
+        - { name: test_empty_list_raises_value_error, lines: 168-172 }
+        - { name: test_none_raises_value_error, lines: 174-178 }
+        - { name: test_empty_string_in_list_raises_value_error, lines: 180-183 }
     - name: TestAlarmCategoryDecode
-      lines: 141-198
+      lines: 188-245
       methods:
-        - { name: test_all_nine_known_codes, lines: 156-162 }
-        - { name: test_unknown_code_99_returns_unknown, lines: 164-166 }
-        - { name: test_unknown_code_255_returns_unknown, lines: 168-170 }
-        - { name: test_none_returns_unknown, lines: 172-174 }
-        - { name: test_string_code_coerced, lines: 176-179 }
-        - { name: test_string_unknown_code_returns_unknown, lines: 181-183 }
-        - { name: test_float_code_coerced, lines: 185-188 }
-        - { name: test_negative_code_returns_unknown, lines: 190-192 }
-        - { name: test_service_decode_matches_cache_decode, lines: 194-198 }
+        - { name: test_all_nine_known_codes, lines: 203-209 }
+        - { name: test_unknown_code_99_returns_unknown, lines: 211-213 }
+        - { name: test_unknown_code_255_returns_unknown, lines: 215-217 }
+        - { name: test_none_returns_unknown, lines: 219-221 }
+        - { name: test_string_code_coerced, lines: 223-226 }
+        - { name: test_string_unknown_code_returns_unknown, lines: 228-230 }
+        - { name: test_float_code_coerced, lines: 232-235 }
+        - { name: test_negative_code_returns_unknown, lines: 237-239 }
+        - { name: test_service_decode_matches_cache_decode, lines: 241-245 }
     - name: TestSchemaVersionIsPinned
-      lines: 203-217
+      lines: 250-264
       methods:
-        - { name: test_schema_version_is_integer, lines: 206-210 }
-        - { name: test_schema_version_equals_two, lines: 212-217 }
+        - { name: test_schema_version_is_integer, lines: 253-257 }
+        - { name: test_schema_version_equals_three, lines: 259-264 }
+    - name: TestAtLeastOneFilterRequired
+      lines: 269-321
+      methods:
+        - { name: test_all_empty_raises, lines: 272-275 }
+        - { name: test_all_none_raises, lines: 277-284 }
+        - { name: test_eqp_types_only_ok, lines: 286-289 }
+        - { name: test_lot_ids_only_ok, lines: 291-293 }
+        - { name: test_pj_types_only_ok, lines: 295-297 }
+        - { name: test_product_lines_only_ok, lines: 299-301 }
+        - { name: test_pj_bops_only_ok, lines: 303-305 }
+        - { name: test_mixed_ok, lines: 307-312 }
+        - { name: test_whitespace_only_lot_ids_treated_as_empty, lines: 314-321 }
+    - name: TestLotIdNormalization
+      lines: 326-380
+      methods:
+        - { name: test_whitespace_stripped_in_key, lines: 329-334 }
+        - { name: test_whitespace_only_strings_dropped, lines: 336-343 }
+        - { name: test_duplicates_deduped_by_validation_before_key, lines: 345-358 }
+        - { name: test_max_200_cap_exactly_200_ok, lines: 361-366 }
+        - { name: test_max_200_cap_exceeded_201_raises, lines: 368-373 }
+        - { name: test_char_padding_stripped_at_key_build, lines: 375-380 }
+    - name: TestProductDimsFilter
+      lines: 385-446
+      methods:
+        - { name: test_no_dims_returns_empty, lines: 388-392 }
+        - { name: test_pj_types_generates_exists_clause, lines: 394-406 }
+        - { name: test_product_lines_generates_exists_clause, lines: 408-413 }
+        - { name: test_pj_bops_generates_exists_clause, lines: 415-420 }
+        - { name: test_multiple_dims_and_semantics, lines: 422-431 }
+        - { name: test_absent_dim_produces_no_clause, lines: 433-440 }
+        - { name: test_whitespace_stripped_from_values, lines: 442-446 }
 
 tests/test_eap_alarm_unified_job.py:  # 211 lines
   imports:
@@ -16725,7 +16781,7 @@ tests/test_mid_section_defect_routes.py:  # 463 lines
     - { name: test_container_filter_options_malformed_selected_returns_400, lines: 431-440 }
     - { name: test_analysis_route_malformed_pj_types_no_5xx, lines: 444-463 }  # @patch('mes_dashboard.services.container_filter_cache.get_filter_options')
 
-tests/test_mid_section_defect_service.py:  # 1672 lines
+tests/test_mid_section_defect_service.py:  # 1771 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
@@ -16734,24 +16790,34 @@ tests/test_mid_section_defect_service.py:  # 1672 lines
     - { module: mes_dashboard.services.mid_section_defect_service, items: [_attribute_materials, _attribute_wafer_roots, _build_detail_table, _execute_msd_compat_job, _normalize_upstream_event_records, build_trace_aggregation_from_events, export_csv, query_analysis, query_analysis_detail, query_all_loss_reasons, query_station_options, resolve_msd_seeds_at_station, resolve_trace_seed_lots], line: 11 }
   classes:
     - name: TestMsdEngineParallel
-      lines: 831-896
+      lines: 834-899
       methods:
-        - { name: _make_detection_env, lines: 835-868 }
-        - { name: test_default_parallel_serial, lines: 870-881 }
-        - { name: test_parallel_2_uses_threadpool, lines: 883-896 }
+        - { name: _make_detection_env, lines: 838-871 }
+        - { name: test_default_parallel_serial, lines: 873-884 }
+        - { name: test_parallel_2_uses_threadpool, lines: 886-899 }
     - name: TestMsdPartialFailure
-      lines: 903-972
+      lines: 906-975
       methods:
-        - { name: _setup_partial_failure_mocks, lines: 906-922 }
-        - { name: test_partial_failure_warning_logged, lines: 924-932 }
-        - { name: test_partial_failure_returned_in_meta, lines: 934-945 }
-        - { name: test_partial_failure_propagated_to_query_analysis, lines: 947-972 }
+        - { name: _setup_partial_failure_mocks, lines: 909-925 }
+        - { name: test_partial_failure_warning_logged, lines: 927-935 }
+        - { name: test_partial_failure_returned_in_meta, lines: 937-948 }
+        - { name: test_partial_failure_propagated_to_query_analysis, lines: 950-975 }
     - name: TestDetectionInputPartialAggregation
-      lines: 1638-1672
+      lines: 1647-1681
       methods:
-        - { name: _render, lines: 1649-1659 }
-        - { name: test_detection_input_uses_session_scoped_max_window, lines: 1661-1665 }
-        - { name: test_detection_output_column_is_corrected_value, lines: 1667-1672 }
+        - { name: _render, lines: 1658-1668 }
+        - { name: test_detection_input_uses_session_scoped_max_window, lines: 1670-1674 }
+        - { name: test_detection_output_column_is_corrected_value, lines: 1676-1681 }
+    - name: TestFrontDownstreamReasonMatrix
+      lines: 1684-1771
+      methods:
+        - { name: _matrix, lines: 1687-1691 }
+        - { name: test_basic_single_front_reason, lines: 1693-1705 }
+        - { name: test_multi_front_reason_is_membership_double_counted, lines: 1707-1722 }
+        - { name: test_station_order_filters_non_downstream, lines: 1724-1736 }
+        - { name: test_lineage_rekeys_descendant_to_seed, lines: 1738-1752 }
+        - { name: test_row_pct_normalization, lines: 1754-1766 }
+        - { name: test_empty_inputs_return_empty_shape, lines: 1768-1771 }
   functions:
     - { name: test_query_analysis_invalid_date_format_returns_error, lines: 28-32 }
     - { name: test_query_analysis_start_after_end_returns_error, lines: 35-39 }
@@ -16785,29 +16851,29 @@ tests/test_mid_section_defect_service.py:  # 1672 lines
     - { name: test_build_detail_table_wafer_root, lines: 718-736 }
     - { name: test_build_detail_table_multiple_defect_reasons_expand_rows, lines: 739-762 }
     - { name: test_build_detail_table_deduplicates_machines, lines: 765-785 }
-    - { name: test_export_csv_flattens_structured_fields, lines: 789-824 }  # @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
-    - { name: _make_detection_df_with_types, lines: 977-1006 }
-    - { name: test_query_analysis_pj_type_does_not_reduce_available_reasons, lines: 1014-1035 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_query_analysis_package_does_not_reduce_available_reasons, lines: 1043-1062 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_query_analysis_pj_type_and_package_both_forwarded, lines: 1070-1093 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_query_analysis_no_pj_types_packages_output_unchanged, lines: 1101-1117 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_query_analysis_unknown_pj_type_does_not_empty_population, lines: 1125-1143 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_query_analysis_empty_pj_types_list_no_filter, lines: 1151-1167 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_query_analysis_null_pj_type_column_no_crash, lines: 1175-1221 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
-    - { name: test_resolve_trace_seed_lots_pj_type_does_not_filter_seeds, lines: 1232-1243 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
-    - { name: test_resolve_trace_seed_lots_package_does_not_filter_seeds, lines: 1247-1258 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
-    - { name: test_resolve_trace_seed_lots_no_filter_returns_all, lines: 1262-1269 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
-    - { name: test_resolve_trace_seed_lots_unknown_pj_type_still_returns_all_seeds, lines: 1273-1281 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
-    - { name: test_attribute_forward_defects_drops_split_descendant_FAILING, lines: 1296-1348 }  # @pytest.mark.xfail(strict=True, reason='AC-4 permanent regression guard: _attribu...
-    - { name: test_attribute_forward_defects_lineage_rekeying_passes, lines: 1351-1401 }
-    - { name: test_by_detection_loss_reason_aggregation, lines: 1408-1434 }
-    - { name: test_by_detection_loss_reason_top_n_truncation, lines: 1437-1459 }
-    - { name: test_loss_reason_workcenter_crosstab_builder, lines: 1466-1497 }
-    - { name: test_crosstab_top_n_folds_remainder_to_other, lines: 1500-1533 }
-    - { name: test_downstream_reject_trend_no_control_cohort, lines: 1540-1579 }
-    - { name: test_amplification_kpi_detection_rate_zero_emits_null, lines: 1586-1596 }
-    - { name: test_amplification_kpi_downstream_rate_zero_emits_zero_float, lines: 1599-1610 }
-    - { name: test_amplification_kpi_both_rates_nonzero_correct_ratio, lines: 1613-1635 }
+    - { name: test_export_csv_matches_backward_detail_columns, lines: 789-827 }  # @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
+    - { name: _make_detection_df_with_types, lines: 980-1009 }
+    - { name: test_query_analysis_pj_type_does_not_reduce_available_reasons, lines: 1017-1038 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_query_analysis_package_does_not_reduce_available_reasons, lines: 1046-1065 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_query_analysis_pj_type_and_package_both_forwarded, lines: 1073-1096 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_query_analysis_no_pj_types_packages_output_unchanged, lines: 1104-1120 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_query_analysis_unknown_pj_type_does_not_empty_population, lines: 1128-1146 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_query_analysis_empty_pj_types_list_no_filter, lines: 1154-1170 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_query_analysis_null_pj_type_column_no_crash, lines: 1178-1224 }  # @patch('mes_dashboard.services.mid_section_defect_service.cache_set')
+    - { name: test_resolve_trace_seed_lots_pj_type_does_not_filter_seeds, lines: 1235-1246 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
+    - { name: test_resolve_trace_seed_lots_package_does_not_filter_seeds, lines: 1250-1261 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
+    - { name: test_resolve_trace_seed_lots_no_filter_returns_all, lines: 1265-1272 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
+    - { name: test_resolve_trace_seed_lots_unknown_pj_type_still_returns_all_seeds, lines: 1276-1284 }  # @patch('mes_dashboard.services.mid_section_defect_service._fetch_station_detectio...
+    - { name: test_attribute_forward_defects_drops_split_descendant_FAILING, lines: 1299-1351 }  # @pytest.mark.xfail(strict=True, reason='AC-4 permanent regression guard: _attribu...
+    - { name: test_attribute_forward_defects_lineage_rekeying_passes, lines: 1354-1404 }
+    - { name: test_by_detection_loss_reason_aggregation, lines: 1411-1443 }
+    - { name: test_by_detection_loss_reason_top_n_truncation, lines: 1446-1468 }
+    - { name: test_loss_reason_workcenter_crosstab_builder, lines: 1475-1506 }
+    - { name: test_crosstab_top_n_folds_remainder_to_other, lines: 1509-1542 }
+    - { name: test_downstream_reject_trend_no_control_cohort, lines: 1549-1588 }
+    - { name: test_amplification_kpi_detection_rate_zero_emits_null, lines: 1595-1605 }
+    - { name: test_amplification_kpi_downstream_rate_zero_emits_zero_float, lines: 1608-1619 }
+    - { name: test_amplification_kpi_both_rates_nonzero_correct_ratio, lines: 1622-1644 }
 
 tests/test_modernization_policy_hardening.py:  # 189 lines
   imports:
@@ -16835,7 +16901,7 @@ tests/test_modernization_policy_hardening.py:  # 189 lines
     - { name: test_scope_matrix_loader_returns_defensive_copy, lines: 11-25 }
     - { name: test_scope_matrix_cache_refresh_requires_explicit_clear, lines: 28-45 }
 
-tests/test_msd_duckdb_parity.py:  # 471 lines
+tests/test_msd_duckdb_parity.py:  # 490 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: pathlib, items: [], line: 19 }
@@ -16876,24 +16942,25 @@ tests/test_msd_duckdb_parity.py:  # 471 lines
         - { name: test_detail_returns_pagination_shape, lines: 333-342 }
         - { name: test_detail_pagination_page_slicing, lines: 344-353 }
     - name: TestExportCsvParity
-      lines: 360-389
+      lines: 360-408
       methods:
-        - { name: test_export_yields_bytes, lines: 361-367 }
-        - { name: test_export_has_header_row, lines: 369-378 }
-        - { name: test_export_row_count_matches_events, lines: 380-389 }
+        - { name: test_export_yields_bytes, lines: 361-368 }
+        - { name: test_export_forward_header_is_detail_columns_not_raw_events, lines: 370-384 }
+        - { name: test_export_backward_header_is_backward_columns, lines: 386-394 }
+        - { name: test_export_row_count_matches_detail, lines: 396-408 }
     - name: TestIsAvailableParity
-      lines: 396-428
+      lines: 415-447
       methods:
-        - { name: test_is_available_returns_true_when_paths_set, lines: 397-405 }
-        - { name: test_is_available_returns_false_when_no_path, lines: 407-419 }
-        - { name: test_summary_returns_none_when_events_missing, lines: 421-428 }
+        - { name: test_is_available_returns_true_when_paths_set, lines: 416-424 }
+        - { name: test_is_available_returns_false_when_no_path, lines: 426-438 }
+        - { name: test_summary_returns_none_when_events_missing, lines: 440-447 }
     - name: TestBackwardSummary
-      lines: 435-471
+      lines: 454-490
       methods:
-        - { name: test_backward_summary_returns_all_chart_keys, lines: 436-443 }
-        - { name: test_backward_summary_has_attribution_keys, lines: 445-451 }
-        - { name: test_backward_wafer_root_uses_seed_root_name, lines: 453-461 }
-        - { name: test_backward_kpi_has_required_keys, lines: 463-471 }
+        - { name: test_backward_summary_returns_all_chart_keys, lines: 455-462 }
+        - { name: test_backward_summary_has_attribution_keys, lines: 464-470 }
+        - { name: test_backward_wafer_root_uses_seed_root_name, lines: 472-480 }
+        - { name: test_backward_kpi_has_required_keys, lines: 482-490 }
   functions:
     - { name: _make_events_parquet, lines: 85-92 }
     - { name: _make_fwd_detection_parquet, lines: 95-105 }
@@ -20471,7 +20538,7 @@ tests/test_trace_spool_integration.py:  # 558 lines
     - { name: msd_lineage_full_parquet, lines: 129-141 }  # @pytest.fixture()
     - { name: test_msd_container_mode_worker_writes_real_stage_spools_consumable_by_duckdb, lines: 443-558 }
 
-tests/test_unified_spool_integration.py:  # 718 lines
+tests/test_unified_spool_integration.py:  # 789 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: pathlib, items: [], line: 11 }
@@ -20480,69 +20547,70 @@ tests/test_unified_spool_integration.py:  # 718 lines
     - { module: pytest, items: [], line: 15 }
   classes:
     - name: TestMsdFullChain
-      lines: 22-142
+      lines: 22-149
       methods:
         - { name: msd_spool, lines: 26-62 }
         - { name: test_trace_query_id_is_deterministic, lines: 64-70 }
         - { name: test_summary_from_spool, lines: 72-88 }
         - { name: test_detail_from_spool, lines: 90-104 }
-        - { name: test_export_from_spool, lines: 106-120 }
-        - { name: test_full_chain_summary_detail_export_consistency, lines: 122-142 }
+        - { name: test_export_from_spool, lines: 106-127 }
+        - { name: test_full_chain_summary_detail_export_consistency, lines: 129-149 }
     - name: TestForwardDetailFromSpool
-      lines: 145-216
+      lines: 152-223
       methods:
-        - { name: fwd_spool, lines: 149-176 }
-        - { name: _runtime, lines: 178-186 }
-        - { name: test_forward_detail_not_empty_and_attributes_downstream, lines: 188-199 }
-        - { name: test_forward_detail_pj_type_mask_restricts_population, lines: 201-206 }
-        - { name: test_forward_detail_missing_spool_returns_empty, lines: 208-216 }
+        - { name: fwd_spool, lines: 156-183 }
+        - { name: _runtime, lines: 185-193 }
+        - { name: test_forward_detail_not_empty_and_attributes_downstream, lines: 195-206 }
+        - { name: test_forward_detail_pj_type_mask_restricts_population, lines: 208-213 }
+        - { name: test_forward_detail_missing_spool_returns_empty, lines: 215-223 }
     - name: TestWarmupSchedulerLeader
-      lines: 223-272
+      lines: 230-279
       methods:
-        - { name: _reset_scheduler, lines: 227-232 }
-        - { name: test_concurrent_workers_only_one_enqueues, lines: 234-259 }
-        - { name: test_lock_released_after_enqueue, lines: 261-272 }
+        - { name: _reset_scheduler, lines: 234-239 }
+        - { name: test_concurrent_workers_only_one_enqueues, lines: 241-266 }
+        - { name: test_lock_released_after_enqueue, lines: 268-279 }
     - name: TestWarmupSpoolHitRouteResponse
-      lines: 279-309
+      lines: 286-316
       methods:
-        - { name: test_reject_dataset_has_ensure_dataset_loaded, lines: 282-285 }
-        - { name: test_yield_alert_dataset_has_ensure_dataset_loaded, lines: 287-289 }
-        - { name: test_hold_dataset_has_ensure_dataset_loaded, lines: 291-293 }
-        - { name: test_resource_dataset_has_ensure_dataset_loaded, lines: 295-297 }
-        - { name: test_warmup_jobs_cover_expected_reports, lines: 299-309 }
+        - { name: test_reject_dataset_has_ensure_dataset_loaded, lines: 289-292 }
+        - { name: test_yield_alert_dataset_has_ensure_dataset_loaded, lines: 294-296 }
+        - { name: test_hold_dataset_has_ensure_dataset_loaded, lines: 298-300 }
+        - { name: test_resource_dataset_has_ensure_dataset_loaded, lines: 302-304 }
+        - { name: test_warmup_jobs_cover_expected_reports, lines: 306-316 }
     - name: TestRouteContractUnchanged
-      lines: 316-333
+      lines: 323-340
       methods:
-        - { name: test_resource_history_blueprint_exists, lines: 319-322 }
-        - { name: test_resource_dataset_cache_canonical_base_dataset, lines: 324-327 }
-        - { name: test_production_history_service_has_spool_identity, lines: 329-333 }
+        - { name: test_resource_history_blueprint_exists, lines: 326-329 }
+        - { name: test_resource_dataset_cache_canonical_base_dataset, lines: 331-334 }
+        - { name: test_production_history_service_has_spool_identity, lines: 336-340 }
     - name: TestProductionHistoryWarmupExclusion
-      lines: 340-363
+      lines: 347-370
       methods:
-        - { name: test_warmup_jobs_do_not_contain_production, lines: 343-352 }
-        - { name: test_scheduler_module_documents_exclusion, lines: 354-358 }
-        - { name: test_warmup_job_count_is_exactly_six, lines: 360-363 }
+        - { name: test_warmup_jobs_do_not_contain_production, lines: 350-359 }
+        - { name: test_scheduler_module_documents_exclusion, lines: 361-365 }
+        - { name: test_warmup_job_count_is_exactly_six, lines: 367-370 }
     - name: TestMaterialTraceAsyncPipeline
-      lines: 370-457
+      lines: 377-464
       methods:
-        - { name: test_execute_to_spool_idempotent, lines: 373-382 }
-        - { name: test_duckdb_runtime_pagination, lines: 384-413 }
-        - { name: test_duckdb_runtime_export_csv, lines: 415-438 }
-        - { name: test_rq_material_trace_job_function_exists, lines: 440-443 }
-        - { name: test_route_imports_spool_functions, lines: 445-448 }
-        - { name: test_canonical_query_hash_differs_by_mode, lines: 450-457 }
+        - { name: test_execute_to_spool_idempotent, lines: 380-389 }
+        - { name: test_duckdb_runtime_pagination, lines: 391-420 }
+        - { name: test_duckdb_runtime_export_csv, lines: 422-445 }
+        - { name: test_rq_material_trace_job_function_exists, lines: 447-450 }
+        - { name: test_route_imports_spool_functions, lines: 452-455 }
+        - { name: test_canonical_query_hash_differs_by_mode, lines: 457-464 }
     - name: TestGuardRetirementOrdering
-      lines: 464-510
+      lines: 471-517
       methods:
-        - { name: test_trace_events_legacy_guards_removed, lines: 472-477 }
-        - { name: test_lineage_max_seed_count_removed, lines: 479-484 }
-        - { name: test_lineage_rss_reject_removed, lines: 486-491 }
-        - { name: test_reject_query_rss_guard_removed, lines: 493-497 }
-        - { name: test_material_trace_row_guards_removed, lines: 499-505 }
-        - { name: test_event_fetcher_max_total_rows_present, lines: 507-510 }
+        - { name: test_trace_events_legacy_guards_removed, lines: 479-484 }
+        - { name: test_lineage_max_seed_count_removed, lines: 486-491 }
+        - { name: test_lineage_rss_reject_removed, lines: 493-498 }
+        - { name: test_reject_query_rss_guard_removed, lines: 500-504 }
+        - { name: test_material_trace_row_guards_removed, lines: 506-512 }
+        - { name: test_event_fetcher_max_total_rows_present, lines: 514-517 }
   functions:
-    - { name: test_forward_get_summary_duckdb_path_end_to_end, lines: 517-568 }
-    - { name: test_forward_summary_phase3_complete_payload, lines: 575-718 }
+    - { name: test_forward_get_summary_duckdb_path_end_to_end, lines: 524-575 }
+    - { name: test_forward_summary_phase3_complete_payload, lines: 582-740 }
+    - { name: test_forward_summary_derives_station_order_when_fallback_is_999, lines: 748-789 }
 
 tests/test_user_auth_routes.py:  # 222 lines
   imports:

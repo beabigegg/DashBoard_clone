@@ -786,8 +786,12 @@ def test_build_detail_table_deduplicates_machines():
 
 
 @patch('mes_dashboard.services.mid_section_defect_service.query_analysis')
-def test_export_csv_flattens_structured_fields(mock_query_analysis):
-    """CSV export should flatten UPSTREAM_MACHINES and UPSTREAM_MATERIALS to strings."""
+def test_export_csv_matches_backward_detail_columns(mock_query_analysis):
+    """Backward CSV columns must match the on-screen detail table (CSV_COLUMNS_BACKWARD):
+    the structured upstream-machine/material/wafer columns were dropped so the export
+    no longer diverges from the LOT 明細."""
+    from mes_dashboard.services.mid_section_defect_service import CSV_COLUMNS_BACKWARD
+
     mock_query_analysis.return_value = {
         'detail': [
             {
@@ -795,7 +799,6 @@ def test_export_csv_flattens_structured_fields(mock_query_analysis):
                 'PJ_TYPE': 'T',
                 'PRODUCTLINENAME': 'P',
                 'WORKFLOW': 'W',
-                'FINISHEDRUNCARD': 'FR',
                 'DETECTION_EQUIPMENTNAME': 'D',
                 'INPUT_QTY': 100,
                 'LOSS_REASON': 'R1',
@@ -803,25 +806,25 @@ def test_export_csv_flattens_structured_fields(mock_query_analysis):
                 'DEFECT_RATE': 5.0,
                 'ANCESTOR_COUNT': 1,
                 'UPSTREAM_MACHINE_COUNT': 2,
-                'UPSTREAM_MACHINES': [
-                    {'station': '中段', 'machine': 'WIRE-01'},
-                    {'station': '後段', 'machine': 'DIE-02'},
-                ],
-                'UPSTREAM_MATERIALS': [
-                    {'part': 'PART-A', 'lot': 'ML-1'},
-                ],
+                # structured fields may still be present on the row but must NOT be exported
+                'UPSTREAM_MACHINES': [{'station': '中段', 'machine': 'WIRE-01'}],
+                'UPSTREAM_MATERIALS': [{'part': 'PART-A', 'lot': 'ML-1'}],
                 'WAFER_ROOT': 'ROOT-001',
             },
         ],
     }
 
     lines = list(export_csv('2025-01-01', '2025-01-31', direction='backward'))
-
-    # First line is BOM, second is header, third is data
+    # BOM+header, data
     assert len(lines) == 3
+    header = lines[1]
+    assert header.strip() == ",".join(label for _, label in CSV_COLUMNS_BACKWARD)
+    # dropped columns must not appear
+    for gone in ('上游機台', '上游原物料', '源頭批次', '完工流水碼'):
+        assert gone not in header
     data_line = lines[2]
-    assert '中段/WIRE-01, 後段/DIE-02' in data_line
-    assert 'PART-A/ML-1' in data_line
+    assert 'LOT-1' in data_line and 'R1' in data_line
+    assert 'WIRE-01' not in data_line and 'ROOT-001' not in data_line
 
 
 # ============================================================
@@ -1428,10 +1431,16 @@ def test_by_detection_loss_reason_aggregation():
     assert reasons['BondWire']['reject_qty'] == 13  # 10 + 3
     assert 'OpenCircuit' in reasons
     assert reasons['OpenCircuit']['reject_qty'] == 5
-    # reject_rate = reject_qty / total_trackinqty (unique lot sum)
-    total_input = 300  # 200 + 100
-    assert abs(reasons['BondWire']['reject_rate'] - 13 / total_input) < 1e-6
-    assert abs(reasons['OpenCircuit']['reject_rate'] - 5 / total_input) < 1e-6
+    # input_qty / lot_count are per-reason membership cohorts:
+    # BondWire is on LOT-A(200) + LOT-B(100) -> input 300, 2 lots
+    # OpenCircuit is only on LOT-A(200) -> input 200, 1 lot
+    assert reasons['BondWire']['input_qty'] == 300
+    assert reasons['BondWire']['lot_count'] == 2
+    assert reasons['OpenCircuit']['input_qty'] == 200
+    assert reasons['OpenCircuit']['lot_count'] == 1
+    # reject_rate = reject_qty / per-reason input_qty (NOT whole-cohort total)
+    assert abs(reasons['BondWire']['reject_rate'] - 13 / 300) < 1e-6
+    assert abs(reasons['OpenCircuit']['reject_rate'] - 5 / 200) < 1e-6
 
 
 def test_by_detection_loss_reason_top_n_truncation():
@@ -1670,3 +1679,93 @@ class TestDetectionInputPartialAggregation:
         # never the raw last-partial t.TRACKINQTY
         assert "T.ORIG_TRACKINQTY AS TRACKINQTY" in sql
         assert "\n    T.TRACKINQTY,\n" not in self._render()
+
+
+class TestFrontDownstreamReasonMatrix:
+    """MSD-09: 前段報廢原因 × 下游報廢原因 關聯矩陣 (cohort-membership semantics)."""
+
+    def _matrix(self, **kw):
+        from mes_dashboard.services.mid_section_defect_service import (
+            _build_front_downstream_reason_matrix,
+        )
+        return _build_front_downstream_reason_matrix(**kw)
+
+    def test_basic_single_front_reason(self):
+        m = self._matrix(
+            detection_data={'S1': {'rejectqty_by_reason': {'NSOP': 10}}},
+            defect_cids=['S1'],
+            downstream_rejects={'S1': [
+                {'workcenter_group': '測試', 'lossreasonname': 'OPEN', 'reject_total_qty': 100},
+            ]},
+            station_order=4,
+        )
+        assert m['rows'] == [{'name': 'NSOP', 'total': 100}]
+        assert m['cols'] == [{'name': 'OPEN', 'total': 100}]
+        assert m['cells'] == [[100]]
+        assert m['row_pct'] == [[100.0]]
+
+    def test_multi_front_reason_is_membership_double_counted(self):
+        # A lot scrapped for BOTH NSOP and NSOL contributes its downstream
+        # rejects to BOTH rows — sum of cells (200) exceeds physical reject (100).
+        m = self._matrix(
+            detection_data={'S1': {'rejectqty_by_reason': {'NSOP': 10, 'NSOL': 5}}},
+            defect_cids=['S1'],
+            downstream_rejects={'S1': [
+                {'workcenter_group': '測試', 'lossreasonname': 'OPEN', 'reject_total_qty': 100},
+            ]},
+            station_order=4,
+        )
+        totals = {r['name']: r['total'] for r in m['rows']}
+        assert totals == {'NSOP': 100, 'NSOL': 100}
+        assert sum(sum(row) for row in m['cells']) == 200
+        # each row is 100% OPEN
+        assert all(pct == [100.0] for pct in m['row_pct'])
+
+    def test_station_order_filters_non_downstream(self):
+        # 成型 order(4) == station_order(4) -> excluded; 測試 order(11) -> kept
+        m = self._matrix(
+            detection_data={'S1': {'rejectqty_by_reason': {'NSOP': 10}}},
+            defect_cids=['S1'],
+            downstream_rejects={'S1': [
+                {'workcenter_group': '成型', 'lossreasonname': 'X', 'reject_total_qty': 999},
+                {'workcenter_group': '測試', 'lossreasonname': 'OPEN', 'reject_total_qty': 100},
+            ]},
+            station_order=4,
+        )
+        assert m['cols'] == [{'name': 'OPEN', 'total': 100}]
+        assert m['cells'] == [[100]]
+
+    def test_lineage_rekeys_descendant_to_seed(self):
+        import pandas as pd
+        det = {'SEED': {'rejectqty_by_reason': {'NSOP': 10}}}
+        ds = {'DESC': [
+            {'workcenter_group': '測試', 'lossreasonname': 'OPEN', 'reject_total_qty': 50},
+        ]}
+        lineage = pd.DataFrame([{'SEED_ID': 'SEED', 'DESCENDANT_ID': 'DESC'}])
+        m = self._matrix(detection_data=det, defect_cids=['SEED'],
+                         downstream_rejects=ds, station_order=4,
+                         lineage_spool_df=lineage)
+        assert m['rows'] == [{'name': 'NSOP', 'total': 50}]
+        # without lineage, DESC is not a defect cid -> empty
+        m2 = self._matrix(detection_data=det, defect_cids=['SEED'],
+                          downstream_rejects=ds, station_order=4)
+        assert m2 == {'rows': [], 'cols': [], 'cells': [], 'row_pct': []}
+
+    def test_row_pct_normalization(self):
+        m = self._matrix(
+            detection_data={'S1': {'rejectqty_by_reason': {'NSOP': 10}}},
+            defect_cids=['S1'],
+            downstream_rejects={'S1': [
+                {'workcenter_group': '測試', 'lossreasonname': 'OPEN', 'reject_total_qty': 75},
+                {'workcenter_group': '測試', 'lossreasonname': '短路', 'reject_total_qty': 25},
+            ]},
+            station_order=4,
+        )
+        cols = [c['name'] for c in m['cols']]
+        pct = dict(zip(cols, m['row_pct'][0]))
+        assert pct == {'OPEN': 75.0, '短路': 25.0}
+
+    def test_empty_inputs_return_empty_shape(self):
+        assert self._matrix(detection_data={}, defect_cids=[],
+                            downstream_rejects={}, station_order=4) == {
+            'rows': [], 'cols': [], 'cells': [], 'row_pct': []}

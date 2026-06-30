@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.29.0
+schema-version: 1.30.0
 last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1592,7 +1592,7 @@ These payloads are computed in `mid_section_defect_service.py` and returned by `
 
 #### §3.24.1 by_detection_loss_reason
 
-Array of `{loss_reason: str, reject_qty: int, reject_rate: float[0..1]}` sorted descending by `reject_qty`. TOP_N=10; rows beyond TOP_N are folded into a synthetic `"其他"` row. `reject_rate = reject_qty / total_trackinqty` (detection cohort).
+Array of `{loss_reason: str, reject_qty: int, input_qty: int, lot_count: int, reject_rate: float[0..1]}` sorted descending by `reject_qty`. TOP_N=10; rows beyond TOP_N are folded into a synthetic `"其他"` row. Per reason, `input_qty` = Σ trackinqty over the lots carrying that reason and `lot_count` = number of such lots (**membership cohort** — a lot with multiple front reasons counts toward each, so Σ input_qty across reasons can exceed the detection-cohort total). `reject_rate = reject_qty / input_qty` (defect rate among lots that had that reason, NOT ÷ whole-cohort total). The `"其他"` row's `input_qty`/`lot_count` are over the UNION of folded reasons' lots (no double-count).
 
 #### §3.24.2 loss_reason_workcenter_crosstab
 
@@ -1621,3 +1621,18 @@ Array of `{date: "YYYY-MM-DD", reject_qty: int, reject_rate: float}` sorted asce
 | both > 0 | downstream_rate / detection_rate | "Nx" |
 
 Within-cohort ratio, NOT flagged-vs-clean lift.
+
+#### §3.24.5 by_front_downstream_reason_matrix
+
+前段報廢原因 × 下游報廢原因 關聯矩陣. Built by `_build_front_downstream_reason_matrix`. For every downstream reject (re-keyed to its detection SEED via the forward lineage spool), the downstream `LOSSREASONNAME` is attributed to EACH front-stage loss reason the seed lot was scrapped for (**cohort-membership** semantics — a lot scrapped for both NSOP and NSOL contributes its descendants' downstream rejects to BOTH rows, so the sum of cells can exceed the physical downstream reject total).
+
+```
+{
+  rows: [{name: str, total: int}, ...],   # front-stage loss reasons, TOP_N=10 + synthetic "其他", desc by total
+  cols: [{name: str, total: int}, ...],   # downstream loss reasons, TOP_N=10 + synthetic "其他", desc by total
+  cells:   int[][],     # rows.length × cols.length, raw downstream reject qty
+  row_pct: float[][],   # same shape, each row normalized to 100% across its columns (0.0 when row total = 0)
+}
+```
+
+Empty result (no defect seeds / no downstream rejects) → `{rows: [], cols: [], cells: [], row_pct: []}`. Additive field on `direction=forward`; absent on `direction=backward`. `row_pct` is the primary display (frontend heat-table shades by row %) so cohort-overlap double-counting does not distort within-row reading.

@@ -120,37 +120,35 @@ FORWARD_DIMENSION_MAP = {
 }
 
 # CSV export column config (backward)
+# keys/labels MUST match the backward detail rows + DetailTable.vue COLUMNS_BACKWARD
+# so the export matches the on-screen LOT 明細 (嫌疑命中 is a UI-derived cell, not
+# a backend field, so it is omitted from the CSV).
 CSV_COLUMNS_BACKWARD = [
     ('CONTAINERNAME', 'LOT ID'),
     ('PJ_TYPE', 'TYPE'),
     ('PRODUCTLINENAME', 'PACKAGE'),
     ('WORKFLOW', 'WORKFLOW'),
-    ('FINISHEDRUNCARD', '完工流水碼'),
     ('DETECTION_EQUIPMENTNAME', '偵測設備'),
     ('INPUT_QTY', '投入數'),
-    ('LOSS_REASON', '不良原因'),
+    ('LOSS_REASON', '報廢原因'),
     ('DEFECT_QTY', '不良數'),
     ('DEFECT_RATE', '不良率(%)'),
     ('ANCESTOR_COUNT', '上游LOT數'),
     ('UPSTREAM_MACHINE_COUNT', '上游台數'),
-    ('UPSTREAM_MACHINES', '上游機台'),
-    ('UPSTREAM_MATERIALS', '上游原物料'),
-    ('WAFER_ROOT', '源頭批次'),
 ]
 
-# CSV export column config (forward)
+# CSV export column config (forward) — keys MUST match the forward detail rows
+# (_get_forward_detail remapped keys / DetailTable.vue COLUMNS_FORWARD) so the
+# export matches the on-screen LOT 明細 exactly.
 CSV_COLUMNS_FORWARD = [
     ('CONTAINERNAME', 'LOT ID'),
-    ('PJ_TYPE', 'TYPE'),
-    ('PRODUCTLINENAME', 'PACKAGE'),
-    ('WORKFLOW', 'WORKFLOW'),
     ('DETECTION_EQUIPMENTNAME', '偵測設備'),
-    ('INPUT_QTY', '偵測投入'),
+    ('DETECTION_LOSS_REASON', '前段不良原因'),
+    ('TRACKINQTY', '偵測投入'),
     ('DEFECT_QTY', '偵測不良'),
-    ('DOWNSTREAM_STATIONS', '下游到達站數'),
-    ('DOWNSTREAM_REJECTS', '下游不良總數'),
+    ('DOWNSTREAM_STATIONS_REACHED', '下游到達站數'),
+    ('DOWNSTREAM_TOTAL_REJECT', '下游不良總數'),
     ('DOWNSTREAM_REJECT_RATE', '下游不良率(%)'),
-    ('WORST_DOWNSTREAM', '最差下游站'),
 ]
 
 # Valid direction values
@@ -760,6 +758,9 @@ def build_trace_aggregation_from_events(
             'downstream_trend': _build_downstream_trend(
                 defect_cids, wip_by_cid, downstream_rejects, station_order,
             ),
+            'by_front_downstream_reason_matrix': _build_front_downstream_reason_matrix(
+                detection_data, defect_cids, downstream_rejects, station_order,
+            ),
             'amplification': _compute_amplification_kpi(
                 detection_total_reject=_fwd_kpi.get('detection_defect_qty', 0),
                 detection_total_input=sum(d.get('trackinqty', 0) for d in detection_data.values()),
@@ -954,6 +955,9 @@ def _build_trace_aggregation_container_mode(
             ),
             'downstream_trend': _build_downstream_trend(
                 defect_cids, wip_by_cid, downstream_rejects, station_order,
+            ),
+            'by_front_downstream_reason_matrix': _build_front_downstream_reason_matrix(
+                detection_data, defect_cids, downstream_rejects, station_order,
             ),
             'amplification': _compute_amplification_kpi(
                 detection_total_reject=_cm_fwd_kpi.get('detection_defect_qty', 0),
@@ -1374,34 +1378,58 @@ def _build_by_detection_loss_reason(
 ) -> List[Dict[str, Any]]:
     """AC-1: aggregate detection defects by LOSSREASONNAME with Top-N truncation.
 
+    Per reason we report the membership cohort: `input_qty` is the sum of
+    trackinqty over the lots that carry that reason and `lot_count` is the number
+    of such lots (a lot with multiple front reasons counts toward each), and
+    `reject_rate = reject_qty / input_qty` — the defect rate among the lots that
+    actually had that reason, which is more meaningful than dividing by the whole
+    detection cohort.
+
     Returns:
-        List of {loss_reason, reject_qty, reject_rate} dicts sorted by reject_qty desc.
-        Reasons beyond TOP_N folded into '其他'.
+        List of {loss_reason, reject_qty, input_qty, lot_count, reject_rate}
+        dicts sorted by reject_qty desc. Reasons beyond TOP_N folded into '其他'.
     """
-    total_input = sum(d.get('trackinqty', 0) for d in detection_data.values())
     reason_qty: Dict[str, int] = defaultdict(int)
-    for data in detection_data.values():
+    reason_input: Dict[str, int] = defaultdict(int)
+    reason_lots: Dict[str, set] = defaultdict(set)
+    for cid, data in detection_data.items():
+        trackinqty = _safe_int(data.get('trackinqty', 0))
         for reason, qty in (data.get('rejectqty_by_reason') or {}).items():
+            if not reason or _safe_int(qty) <= 0:
+                continue
             reason_qty[reason] += qty
+            reason_input[reason] += trackinqty
+            reason_lots[reason].add(cid)
 
     sorted_reasons = sorted(reason_qty.items(), key=lambda x: x[1], reverse=True)
     items: List[Dict[str, Any]] = []
     other_qty = 0
+    other_lots: set = set()
     for i, (reason, qty) in enumerate(sorted_reasons):
         if i < TOP_N:
+            inp = reason_input[reason]
             items.append({
                 'loss_reason': reason,
                 'reject_qty': qty,
-                'reject_rate': round(qty / total_input, 6) if total_input else 0.0,
+                'input_qty': inp,
+                'lot_count': len(reason_lots[reason]),
+                'reject_rate': round(qty / inp, 6) if inp else 0.0,
             })
         else:
             other_qty += qty
+            other_lots |= reason_lots[reason]
 
     if other_qty > 0:
+        # '其他' input/lot_count over the UNION of folded reasons' lots (no double-count)
+        other_input = sum(
+            _safe_int(detection_data[cid].get('trackinqty', 0)) for cid in other_lots
+        )
         items.append({
             'loss_reason': '其他',
             'reject_qty': other_qty,
-            'reject_rate': round(other_qty / total_input, 6) if total_input else 0.0,
+            'input_qty': other_input,
+            'lot_count': len(other_lots),
+            'reject_rate': round(other_qty / other_input, 6) if other_input else 0.0,
         })
     return items
 
@@ -2407,6 +2435,9 @@ def _run_forward_pipeline(
         'downstream_trend': _build_downstream_trend(
             defect_cids, wip_by_cid, downstream_rejects, station_order,
         ),
+        'by_front_downstream_reason_matrix': _build_front_downstream_reason_matrix(
+            detection_data, defect_cids, downstream_rejects, station_order,
+        ),
         'amplification': _compute_amplification_kpi(
             detection_total_reject=_s8_fwd_kpi.get('detection_defect_qty', 0),
             detection_total_input=sum(d.get('trackinqty', 0) for d in detection_data.values()),
@@ -3075,6 +3106,136 @@ def _attribute_forward_defects(
         }
 
     return result
+
+
+def _build_front_downstream_reason_matrix(
+    detection_data: Dict[str, Dict[str, Any]],
+    defect_cids: List[str],
+    downstream_rejects: Dict[str, List[Dict[str, Any]]],
+    station_order: int,
+    lineage_spool_df: Optional[pd.DataFrame] = None,
+    top_n_rows: int = TOP_N,
+    top_n_cols: int = TOP_N,
+) -> Dict[str, Any]:
+    """前段報廢原因 × 下游報廢原因 關聯矩陣 (MSD-09).
+
+    For every downstream reject (re-keyed to its detection SEED via the forward
+    lineage spool), attribute the downstream LOSSREASONNAME to EACH front-stage
+    loss reason the seed lot was scrapped for. This is *cohort membership*
+    semantics: a lot scrapped at the front for both NSOP and NSOL contributes its
+    descendants' downstream rejects to BOTH rows, so rows may overlap and the sum
+    of cells can exceed the physical downstream reject total. Row-normalized
+    percentages (``row_pct``) let the user read each front reason's downstream
+    composition (e.g. "NSOP 那列是否被 OPEN 主導") independent of the overlap.
+
+    Returns:
+        {
+          'rows': [{'name': front_reason, 'total': int}, ...],   # Top-N + '其他'
+          'cols': [{'name': downstream_reason, 'total': int}, ...],  # Top-N + '其他'
+          'cells': [[qty, ...], ...],     # len(rows) x len(cols), raw qty
+          'row_pct': [[pct, ...], ...],   # same shape, row-normalized %
+        }
+    """
+    defect_set = set(defect_cids)
+
+    # descendant -> SEED_ID (defect seeds only); mirrors _attribute_forward_defects
+    descendant_to_seed: Dict[str, str] = {}
+    if lineage_spool_df is not None and not lineage_spool_df.empty:
+        for row in lineage_spool_df.to_dict(orient="records"):
+            seed = _safe_str(row.get("SEED_ID"))
+            desc = _safe_str(row.get("DESCENDANT_ID"))
+            if seed and desc and seed in defect_set:
+                descendant_to_seed[desc] = seed
+
+    def _is_defect_cid(cid: str) -> bool:
+        if cid in defect_set:
+            return True
+        return bool(descendant_to_seed) and cid in descendant_to_seed
+
+    # Pre-compute each defect seed's front-stage loss reasons (qty > 0)
+    seed_front_reasons: Dict[str, List[str]] = {}
+    for cid in defect_set:
+        data = detection_data.get(cid)
+        if not data:
+            continue
+        reasons = [
+            r for r, q in data.get('rejectqty_by_reason', {}).items()
+            if r and _safe_int(q) > 0
+        ]
+        if reasons:
+            seed_front_reasons[cid] = reasons
+
+    # matrix[front_reason][downstream_reason] = qty
+    matrix: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for cid in downstream_rejects:
+        if not _is_defect_cid(cid):
+            continue
+        seed_key = descendant_to_seed.get(cid, cid)
+        front_reasons = seed_front_reasons.get(seed_key)
+        if not front_reasons:
+            continue
+        for record in downstream_rejects[cid]:
+            wc_group = record.get('workcenter_group', '')
+            if not wc_group or get_group_order(wc_group) <= station_order:
+                continue
+            ds_reason = record.get('lossreasonname') or '(未填寫)'
+            qty = _safe_int(record.get('reject_total_qty', 0))
+            if qty <= 0:
+                continue
+            for fr in front_reasons:
+                matrix[fr][ds_reason] += qty
+
+    if not matrix:
+        return {'rows': [], 'cols': [], 'cells': [], 'row_pct': []}
+
+    # Row order: front reasons by total desc (Top-N + '其他')
+    row_totals = {fr: sum(cols.values()) for fr, cols in matrix.items()}
+    ordered_rows = sorted(row_totals, key=lambda r: row_totals[r], reverse=True)
+    # Col order: downstream reasons by global total desc (Top-N + '其他')
+    col_totals: Dict[str, int] = defaultdict(int)
+    for cols in matrix.values():
+        for c, q in cols.items():
+            col_totals[c] += q
+    ordered_cols = sorted(col_totals, key=lambda c: col_totals[c], reverse=True)
+
+    row_keys = ordered_rows[:top_n_rows]
+    row_other = ordered_rows[top_n_rows:]
+    col_keys = ordered_cols[:top_n_cols]
+    col_other = set(ordered_cols[top_n_cols:])
+
+    def _row_vector(fr_list: List[str]) -> List[int]:
+        vec = [
+            sum(matrix.get(fr, {}).get(col_name, 0) for fr in fr_list)
+            for col_name in col_keys
+        ]
+        if col_other:
+            vec.append(sum(
+                q for fr in fr_list
+                for c, q in matrix.get(fr, {}).items() if c in col_other
+            ))
+        return vec
+
+    cells: List[List[int]] = [_row_vector([fr]) for fr in row_keys]
+    if row_other:
+        cells.append(_row_vector(row_other))
+
+    display_rows = list(row_keys) + (['其他'] if row_other else [])
+    display_cols = list(col_keys) + (['其他'] if col_other else [])
+
+    rows_out = [
+        {'name': name, 'total': sum(cells[i])}
+        for i, name in enumerate(display_rows)
+    ]
+    cols_out = [
+        {'name': name, 'total': sum(cells[i][j] for i in range(len(cells)))}
+        for j, name in enumerate(display_cols)
+    ]
+    row_pct: List[List[float]] = []
+    for vec in cells:
+        tot = sum(vec)
+        row_pct.append([round(v / tot * 100, 2) if tot else 0.0 for v in vec])
+
+    return {'rows': rows_out, 'cols': cols_out, 'cells': cells, 'row_pct': row_pct}
 
 
 # ============================================================

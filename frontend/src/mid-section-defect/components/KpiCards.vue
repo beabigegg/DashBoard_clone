@@ -122,10 +122,11 @@ function formatRate(v) {
   return Number(v).toFixed(2);
 }
 
-/** Amplification: null → "—"; 0.0 is a real value → "×0.0"; else "×N.N" */
+/** Amplification: null → "—"; 0.0 is a real value → "×0.00"; else "×N.NN".
+ * 2 decimals so sub-1 ratios (downstream rate < detection rate) read honestly. */
 function formatAmplification(v) {
   if (v === null || v === undefined) return '—';
-  return `×${Number(v).toFixed(1)}`;
+  return `×${Number(v).toFixed(2)}`;
 }
 
 /** danger accent when amplification > 1; warning when = 1; neutral otherwise (null or 0) */
