@@ -34,47 +34,58 @@
 /* ====== Mode Tabs ====== */
 .theme-mid-section-defect .mode-tab-row {
   display: flex;
-  gap: 0;
-  border: 1px solid var(--msd-border);
-  border-radius: 6px;
-  overflow: hidden;
+  gap: 4px;
+  flex-wrap: wrap;
   width: fit-content;
   margin-bottom: theme('spacing.3');
 }
 
 .theme-mid-section-defect .mode-tab {
+  border: 1px solid var(--msd-border);
+  border-radius: 6px;
   padding: theme('spacing.token.p7') theme('spacing.4');
-  border: none;
-  background: theme('colors.surface.muted');
+  background: theme('colors.surface.card');
+  color: theme('colors.text.subtle');
   font-size: 13px;
   font-weight: 600;
-  color: theme('colors.text.subtle');
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-mid-section-defect .mode-tab:hover:not(.active):not(:disabled) {
+  border-color: var(--msd-primary);
+  color: var(--msd-primary);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .theme-mid-section-defect .mode-tab.active {
   background: var(--msd-primary);
+  border-color: var(--msd-primary);
   color: theme('colors.surface.card');
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.15), 0 0 0 0 rgba(99,102,241,0.4);
-  animation: msd-tab-glow 2.5s ease-in-out infinite;
+  font-weight: 600;
+  animation: msd-pill-glow 2.4s ease-in-out infinite;
 }
 
-.theme-mid-section-defect .mode-tab:not(:last-child) {
-  border-right: 1px solid var(--msd-border);
+.theme-mid-section-defect .mode-tab.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.28) 50%, transparent 65%);
+  background-size: 200% auto;
+  animation: msd-pill-shimmer 2.8s linear infinite;
+  pointer-events: none;
 }
 
-.theme-mid-section-defect .mode-tab:hover:not(.active) {
-  background: theme('colors.stroke.soft');
+@keyframes msd-pill-glow {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(99,102,241,0.2), 0 0 14px 2px rgba(99,102,241,0.4); }
+  50%       { box-shadow: 0 0 12px 3px rgba(99,102,241,0.4), 0 0 24px 4px rgba(99,102,241,0.2); }
 }
 
-.theme-mid-section-defect .mode-tab:active {
-  transform: scale(0.96);
-}
-
-@keyframes msd-tab-glow {
-  0%, 100% { box-shadow: inset 0 1px 2px rgba(0,0,0,0.15), 0 0 6px rgba(99,102,241,0.35); }
-  50%       { box-shadow: inset 0 1px 2px rgba(0,0,0,0.15), 0 0 14px rgba(99,102,241,0.55); }
+@keyframes msd-pill-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
 }
 
 /* ====== Container Input ====== */
@@ -182,43 +193,44 @@
 /* ====== Direction Toggle ====== */
 .theme-mid-section-defect .direction-toggle {
   display: inline-flex;
-  border: 1px solid var(--msd-border);
-  border-radius: 6px;
-  overflow: hidden;
+  gap: 4px;
 }
 
 .theme-mid-section-defect .direction-btn {
-  border: none;
+  border: 1px solid var(--msd-border);
+  border-radius: 6px;
   background: theme('colors.surface.card');
   color: theme('colors.text.subtle');
   font-size: 13px;
   padding: theme('spacing.2') theme('spacing.token.p14');
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
 
-.theme-mid-section-defect .direction-btn + .direction-btn {
-  border-left: 1px solid var(--msd-border);
+.theme-mid-section-defect .direction-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--msd-primary);
+  color: var(--msd-primary);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .theme-mid-section-defect .direction-btn.active {
   background: var(--msd-primary);
+  border-color: var(--msd-primary);
   color: theme('colors.surface.card');
-  animation: msd-dir-glow 2.5s ease-in-out infinite;
+  animation: msd-pill-glow 2.4s ease-in-out infinite;
 }
 
-@keyframes msd-dir-glow {
-  0%, 100% { box-shadow: inset 0 1px 2px rgba(0,0,0,0.12), 0 0 5px rgba(99,102,241,0.3); }
-  50%       { box-shadow: inset 0 1px 2px rgba(0,0,0,0.12), 0 0 12px rgba(99,102,241,0.5); }
-}
-
-.theme-mid-section-defect .direction-btn:hover:not(:disabled):not(.active) {
-  background: theme('colors.surface.hover');
-}
-
-.theme-mid-section-defect .direction-btn:active:not(:disabled) {
-  transform: scale(0.95);
+.theme-mid-section-defect .direction-btn.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.28) 50%, transparent 65%);
+  background-size: 200% auto;
+  animation: msd-pill-shimmer 2.8s linear infinite;
+  pointer-events: none;
 }
 
 .theme-mid-section-defect .direction-btn:disabled {
@@ -230,34 +242,22 @@
 .theme-mid-section-defect .msd-query-btn {
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.2s ease;
-}
-
-.theme-mid-section-defect .msd-query-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-  transform: skewX(-20deg);
-  transition: left 0s;
+  transition: box-shadow 0.2s ease, transform 0.1s;
 }
 
 .theme-mid-section-defect .msd-query-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99,102,241,0.45);
+  box-shadow: 0 0 12px 2px rgba(99, 102, 241, 0.2);
 }
 
-.theme-mid-section-defect .msd-query-btn:hover:not(:disabled)::before {
-  left: 160%;
-  transition: left 0.5s ease;
-}
-
-.theme-mid-section-defect .msd-query-btn:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(99,102,241,0.3);
+.theme-mid-section-defect .msd-query-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.22) 50%, transparent 70%);
+  background-size: 200% auto;
+  animation: msd-pill-shimmer 3s linear infinite;
+  pointer-events: none;
 }
 
 /* ====== MultiSelect ====== */
@@ -645,7 +645,9 @@
     animation: none;
   }
 
-  .theme-mid-section-defect .msd-query-btn::before {
-    display: none;
+  .theme-mid-section-defect .mode-tab.active::after,
+  .theme-mid-section-defect .direction-btn.active::after,
+  .theme-mid-section-defect .msd-query-btn::after {
+    animation: none;
   }
 }

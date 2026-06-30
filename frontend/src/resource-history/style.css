@@ -45,67 +45,54 @@
 .theme-resource-history .granularity-btns {
   display: inline-flex;
   gap: 4px;
-  padding: theme('spacing.token.p4');
-  border-radius: 10px;
-  border: 1px solid var(--resource-border);
-  background: theme('colors.surface.muted');
 }
 
 .theme-resource-history .granularity-btn {
-  position: relative;
-  overflow: hidden;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
+  border: 1px solid var(--resource-border);
+  border-radius: 6px;
+  background: theme('colors.token.hffffff');
   color: theme('colors.token.h475569');
   font-size: 12px;
   font-weight: 600;
   padding: theme('spacing.token.p6') theme('spacing.token.p14');
   cursor: pointer;
-  transition: background 0.2s var(--motion-ease), color 0.2s var(--motion-ease), box-shadow 0.2s var(--motion-ease);
-}
-
-/* Shimmer sweep on hover */
-.theme-resource-history .granularity-btn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -80%;
-  width: 55%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
-  transform: skewX(-20deg);
-  pointer-events: none;
+  transition: all 0.2s var(--motion-ease);
+  position: relative;
+  overflow: hidden;
 }
 
 .theme-resource-history .granularity-btn:hover:not(:disabled) {
-  background: theme('colors.brand.50');
-  color: theme('colors.token.h3730a3');
+  border-color: theme('colors.brand.500');
+  color: theme('colors.brand.600');
+  background: rgba(37, 99, 235, 0.06);
 }
 
-.theme-resource-history .granularity-btn:hover:not(:disabled)::after {
-  animation: rh-gran-shimmer 0.5s ease forwards;
-}
-
-@keyframes rh-gran-shimmer {
-  from { left: -80%; }
-  to   { left: 130%; }
-}
-
-/* Active: continuous pulsing glow */
 .theme-resource-history .granularity-btn.active {
-  background: theme('colors.token.hdbeafe');
-  color: theme('colors.brand.800');
-  animation: rh-gran-glow 2s ease-in-out infinite;
+  background: theme('colors.brand.500');
+  border-color: theme('colors.brand.500');
+  color: theme('colors.token.hffffff');
+  font-weight: 700;
+  animation: rh-gran-glow 2.4s ease-in-out infinite;
+}
+
+.theme-resource-history .granularity-btn.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.28) 50%, transparent 65%);
+  background-size: 200% auto;
+  animation: rh-pill-shimmer 2.8s linear infinite;
+  pointer-events: none;
 }
 
 @keyframes rh-gran-glow {
-  0%, 100% {
-    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9), 0 0 0 0 rgba(59, 130, 246, 0.45);
-  }
-  50% {
-    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.5), 0 0 0 6px rgba(59, 130, 246, 0);
-  }
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(37, 99, 235, 0.2), 0 0 14px 2px rgba(37, 99, 235, 0.45); }
+  50%       { box-shadow: 0 0 12px 3px rgba(37, 99, 235, 0.45), 0 0 24px 4px rgba(37, 99, 235, 0.2); }
+}
+
+@keyframes rh-pill-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
 }
 
 .theme-resource-history .granularity-btn:focus-visible {
@@ -116,6 +103,28 @@
 .theme-resource-history .granularity-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ── 查詢 / 清除 buttons shimmer ── */
+.theme-resource-history .filter-row .ui-btn--primary:not(:disabled) {
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s var(--motion-ease), transform 0.1s;
+}
+
+.theme-resource-history .filter-row .ui-btn--primary:not(:disabled):hover {
+  box-shadow: 0 0 12px 2px rgba(37, 99, 235, 0.2);
+  transform: translateY(-1px);
+}
+
+.theme-resource-history .filter-row .ui-btn--primary:not(:disabled)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.22) 50%, transparent 70%);
+  background-size: 200% auto;
+  animation: rh-pill-shimmer 3s linear infinite;
+  pointer-events: none;
 }
 
 .theme-resource-history .checkbox-row {
@@ -320,9 +329,9 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-resource-history .granularity-btn.active {
     animation: none;
-    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
   }
-  .theme-resource-history .granularity-btn::after { display: none; }
+  .theme-resource-history .granularity-btn.active::after { animation: none; display: none; }
   .theme-resource-history .checkbox-pill:has(input:checked) {
     animation: none;
     box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9);
@@ -332,6 +341,7 @@
     animation: none;
   }
   .theme-resource-history .rh-query-btn::after { display: none; }
+  .theme-resource-history .filter-row .ui-btn--primary:not(:disabled)::after { animation: none; display: none; }
   .theme-resource-history .rh-bar-shimmer::after { animation: none; }
 }
 
