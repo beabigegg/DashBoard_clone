@@ -1145,15 +1145,24 @@ class MsdDuckdbRuntime:
                     FROM lineage l
                     WHERE l.ANCESTOR_ID NOT IN (SELECT DESCENDANT_ID FROM all_descendants)
                 ),
-                root_agg AS (
-                    SELECT
+                root_pairs AS (
+                    -- dedupe lineage fan-out to one row per (root, descendant lot)
+                    SELECT DISTINCT
                         COALESCE(NULLIF(TRIM(r.root_name), ''), r.root_id, '(未知)') AS name,
-                        COUNT(DISTINCT l.DESCENDANT_ID)                               AS lot_count,
-                        SUM(dk.defect_qty)                                            AS defect_qty,
-                        SUM(dk.trackin_qty)                                           AS input_qty
+                        l.DESCENDANT_ID,
+                        dk.defect_qty,
+                        dk.trackin_qty
                     FROM roots r
                     JOIN lineage l  ON l.ANCESTOR_ID = r.root_id
                     JOIN defective_kpis dk ON dk.CONTAINERID = l.DESCENDANT_ID
+                ),
+                root_agg AS (
+                    SELECT
+                        name,
+                        COUNT(*)         AS lot_count,
+                        SUM(defect_qty)  AS defect_qty,
+                        SUM(trackin_qty) AS input_qty
+                    FROM root_pairs
                     GROUP BY name
                 )
                 SELECT name, lot_count, defect_qty, input_qty
@@ -1188,17 +1197,29 @@ class MsdDuckdbRuntime:
                     FROM detection WHERE REJECTQTY > 0
                     GROUP BY CONTAINERID
                 ),
-                machine_agg AS (
-                    SELECT
+                machine_pairs AS (
+                    -- Collapse the lineage×events fan-out to one row per
+                    -- (machine, defect lot) BEFORE summing; otherwise a lot's
+                    -- defect_qty is counted once per matching upstream event row
+                    -- (a single machine could then exceed the cohort total).
+                    SELECT DISTINCT
                         COALESCE(NULLIF(TRIM(e.EQUIPMENTNAME), ''), '(未知)') AS name,
-                        COUNT(DISTINCT dk.CONTAINERID)                         AS lot_count,
-                        SUM(dk.defect_qty)                                     AS defect_qty,
-                        SUM(dk.trackin_qty)                                    AS input_qty
+                        dk.CONTAINERID,
+                        dk.defect_qty,
+                        dk.trackin_qty
                     FROM defective_kpis dk
                     JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
                     JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
                     WHERE e.EQUIPMENTNAME IS NOT NULL AND TRIM(e.EQUIPMENTNAME) != ''
                     {upstream_filter}
+                ),
+                machine_agg AS (
+                    SELECT
+                        name,
+                        COUNT(*)         AS lot_count,
+                        SUM(defect_qty)  AS defect_qty,
+                        SUM(trackin_qty) AS input_qty
+                    FROM machine_pairs
                     GROUP BY name
                 )
                 SELECT name, lot_count, defect_qty, input_qty
@@ -1224,16 +1245,25 @@ class MsdDuckdbRuntime:
                     FROM detection WHERE REJECTQTY > 0
                     GROUP BY CONTAINERID
                 ),
-                mat_agg AS (
-                    SELECT
+                mat_pairs AS (
+                    -- dedupe lineage×events fan-out to one row per (material, lot)
+                    SELECT DISTINCT
                         COALESCE(NULLIF(TRIM(e.MATERIALPARTNAME), ''), '(未知)') AS name,
-                        COUNT(DISTINCT dk.CONTAINERID)                            AS lot_count,
-                        SUM(dk.defect_qty)                                        AS defect_qty,
-                        SUM(dk.trackin_qty)                                       AS input_qty
+                        dk.CONTAINERID,
+                        dk.defect_qty,
+                        dk.trackin_qty
                     FROM defective_kpis dk
                     JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
                     JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
                     WHERE e.MATERIALPARTNAME IS NOT NULL AND TRIM(e.MATERIALPARTNAME) != ''
+                ),
+                mat_agg AS (
+                    SELECT
+                        name,
+                        COUNT(*)         AS lot_count,
+                        SUM(defect_qty)  AS defect_qty,
+                        SUM(trackin_qty) AS input_qty
+                    FROM mat_pairs
                     GROUP BY name
                 )
                 SELECT name, lot_count, defect_qty, input_qty
@@ -1393,19 +1423,28 @@ class MsdDuckdbRuntime:
                     FROM detection WHERE REJECTQTY > 0
                     GROUP BY CONTAINERID
                 ),
-                machine_agg AS (
-                    SELECT
+                machine_pairs AS (
+                    -- dedupe lineage×events fan-out to one row per (machine, lot)
+                    SELECT DISTINCT
                         COALESCE(NULLIF(TRIM(e.WORKCENTER_GROUP), ''), '(未知)') AS wc_group,
                         COALESCE(NULLIF(TRIM(e.EQUIPMENTNAME), ''), '(未知)')    AS eq_name,
                         COALESCE(TRIM(e.EQUIPMENTID), '')                        AS eq_id,
-                        COUNT(DISTINCT dk.CONTAINERID)                           AS lot_count,
-                        SUM(dk.defect_qty)                                       AS defect_qty,
-                        SUM(dk.trackin_qty)                                      AS input_qty
+                        dk.CONTAINERID,
+                        dk.defect_qty,
+                        dk.trackin_qty
                     FROM defective_kpis dk
                     JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
                     JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
                     WHERE e.EQUIPMENTNAME IS NOT NULL AND TRIM(e.EQUIPMENTNAME) != ''
                     {upstream_filter}
+                ),
+                machine_agg AS (
+                    SELECT
+                        wc_group, eq_name, eq_id,
+                        COUNT(*)         AS lot_count,
+                        SUM(defect_qty)  AS defect_qty,
+                        SUM(trackin_qty) AS input_qty
+                    FROM machine_pairs
                     GROUP BY wc_group, eq_name, eq_id
                 )
                 SELECT wc_group, eq_name, eq_id, lot_count, defect_qty, input_qty
@@ -1455,6 +1494,10 @@ class MsdDuckdbRuntime:
         Returns records compatible with the frontend's ``materialTypeOptions``
         and ``buildMaterialChartFromAttribution`` expectations.
         """
+        # NOTE: dedupe the lineage×events fan-out to one row per (material, lot)
+        # BEFORE summing (mat_pairs), otherwise a lot's defect_qty is counted once
+        # per matching upstream event row. The MATERIALDESCRIPTION label is computed
+        # in a SEPARATE CTE (mat_desc) so it never participates in the dedup key.
         _BASE_CTE = """
                 WITH defective_kpis AS (
                     SELECT CONTAINERID,
@@ -1463,36 +1506,57 @@ class MsdDuckdbRuntime:
                     FROM detection WHERE REJECTQTY > 0
                     GROUP BY CONTAINERID
                 ),
-                mat_agg AS (
-                    SELECT
+                mat_pairs AS (
+                    SELECT DISTINCT
                         COALESCE(NULLIF(TRIM(e.MATERIALPARTNAME), ''), '(未知)') AS part_name,
                         COALESCE(TRIM(e.MATERIALLOTNAME), '')                    AS lot_name,
-                        {desc_expr}
-                        COUNT(DISTINCT dk.CONTAINERID)                            AS lot_count,
-                        SUM(dk.defect_qty)                                        AS defect_qty,
-                        SUM(dk.trackin_qty)                                       AS input_qty
+                        dk.CONTAINERID,
+                        dk.defect_qty,
+                        dk.trackin_qty
                     FROM defective_kpis dk
                     JOIN lineage l ON l.DESCENDANT_ID = dk.CONTAINERID
                     JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
                     WHERE e.MATERIALPARTNAME IS NOT NULL AND TRIM(e.MATERIALPARTNAME) != ''
+                ),
+                {desc_cte}
+                mat_agg AS (
+                    SELECT
+                        part_name, lot_name,
+                        COUNT(*)         AS lot_count,
+                        SUM(defect_qty)  AS defect_qty,
+                        SUM(trackin_qty) AS input_qty
+                    FROM mat_pairs
                     GROUP BY part_name, lot_name
                 )
-                SELECT part_name, lot_name, {desc_col} lot_count, defect_qty, input_qty
+                SELECT mat_agg.part_name, mat_agg.lot_name, {desc_col}
+                       mat_agg.lot_count, mat_agg.defect_qty, mat_agg.input_qty
                 FROM mat_agg
-                ORDER BY defect_qty DESC
+                {desc_join}
+                ORDER BY mat_agg.defect_qty DESC
                 """
+        _DESC_CTE = """mat_desc AS (
+                    SELECT
+                        COALESCE(NULLIF(TRIM(e.MATERIALPARTNAME), ''), '(未知)') AS part_name,
+                        COALESCE(TRIM(e.MATERIALLOTNAME), '')                    AS lot_name,
+                        FIRST(COALESCE(NULLIF(TRIM(e.MATERIALDESCRIPTION), ''), '')) AS desc_name
+                    FROM events e
+                    WHERE e.MATERIALPARTNAME IS NOT NULL AND TRIM(e.MATERIALPARTNAME) != ''
+                    GROUP BY part_name, lot_name
+                ),"""
         try:
             # Prefer description column (available in parquet built after lot_materials.sql update).
             sql = _BASE_CTE.format(
-                desc_expr="FIRST(COALESCE(NULLIF(TRIM(e.MATERIALDESCRIPTION), ''), '')) AS desc_name,",
-                desc_col="desc_name,",
+                desc_cte=_DESC_CTE,
+                desc_col="COALESCE(md.desc_name, '') AS desc_name,",
+                desc_join="LEFT JOIN mat_desc md"
+                          " ON md.part_name = mat_agg.part_name AND md.lot_name = mat_agg.lot_name",
             )
             rows = conn.execute(sql).fetchall()
             desc_offset = 1  # desc_name is at index 2; lot_count at 3
         except Exception:
             # Older parquet files lack MATERIALDESCRIPTION — fall back without it.
             try:
-                sql = _BASE_CTE.format(desc_expr="", desc_col="")
+                sql = _BASE_CTE.format(desc_cte="", desc_col="", desc_join="")
                 rows = conn.execute(sql).fetchall()
                 desc_offset = 0
             except Exception as exc:
