@@ -645,6 +645,8 @@ def _build_msd_aggregation(
         start_date,
         end_date,
         loss_reasons=loss_reasons,
+        pj_types=_pj_mask or None,
+        packages=_pkg_mask or None,
         seed_container_ids=seed_container_ids,
         lineage_ancestors=lineage_ancestors,
         lineage_roots=lineage_roots,

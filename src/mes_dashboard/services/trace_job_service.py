@@ -1032,6 +1032,44 @@ def execute_trace_events_job(
             if agg_error is not None:
                 raise RuntimeError(agg_error)
 
+            # Date-range FORWARD: the forward aggregation uses the in-memory path
+            # (get_summary(forward) returns None) and never reaches the backward D4
+            # detection-stage write inside _build_job_msd_aggregation.  Now that the
+            # aggregation has run (and _fetch_station_detection_data has populated the
+            # msd_detect spool), register that detection spool as a trace-scoped stage
+            # spool so /analysis/detail (forward) can rebuild per-lot downstream impact
+            # by trace_query_id.  (Backward writes its own in the D4 path.)
+            if _msd_mode != "container" and _direction != "backward" and _msd_detection_hash:
+                try:
+                    from pathlib import Path as _FwdP
+                    import pandas as _fwd_pd
+                    from mes_dashboard.core.query_spool_store import (
+                        get_spool_file_path as _fwd_gsfp,
+                        get_stage_spool_path as _fwd_gssp,
+                    )
+                    from mes_dashboard.services.msd_duckdb_runtime import (
+                        SPOOL_NAMESPACE as _FWD_NS,
+                        _STAGE_DETECTION as _FWD_SD,
+                    )
+                    from mes_dashboard.services.mid_section_defect_service import (
+                        _write_msd_detection_stage_spool,
+                    )
+                    if not _fwd_gssp(_FWD_NS, trace_query_id, _FWD_SD):
+                        _fwd_src = _fwd_gsfp("msd_detect", _msd_detection_hash)
+                        if _fwd_src and _FwdP(_fwd_src).exists():
+                            _write_msd_detection_stage_spool(
+                                trace_query_id, _fwd_pd.read_parquet(str(_fwd_src))
+                            )
+                            logger.info(
+                                "trace job MSD forward detection stage spool written job_id=%s",
+                                job_id,
+                            )
+                except Exception as _fwd_det_exc:
+                    logger.warning(
+                        "trace job MSD forward detection stage spool failed job_id=%s: %s",
+                        job_id, _fwd_det_exc,
+                    )
+
         else:
             # Non-MSD path: original in-memory fetch (unchanged)
             with ThreadPoolExecutor(
@@ -1578,6 +1616,8 @@ def _build_job_msd_aggregation(
         start_date,
         end_date,
         loss_reasons=normalized_loss_reasons,
+        pj_types=_pj_types,
+        packages=_packages,
         seed_container_ids=seed_container_ids,
         lineage_ancestors=lineage_ancestors,
         lineage_roots=lineage_roots,

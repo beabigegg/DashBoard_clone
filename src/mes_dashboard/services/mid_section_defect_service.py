@@ -595,11 +595,40 @@ def resolve_trace_seed_lots(
     return result
 
 
+def _apply_population_mask(
+    df: pd.DataFrame,
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """Restrict the detection population by PJ_TYPE / PRODUCTLINENAME.
+
+    These are lot-population masks — they shrink BOTH numerator and denominator,
+    mirroring the backward DuckDB ``detection_raw`` view
+    (``TRIM(PJ_TYPE) IN (...)`` / ``TRIM(PRODUCTLINENAME) IN (...)``).  The
+    trace_query_id / spool is package-independent, so the same staged spool serves
+    every Type/Package selection via this read-time mask.
+    """
+    if df is None or df.empty:
+        return df
+    masked = df
+    if pj_types and 'PJ_TYPE' in masked.columns:
+        wanted = {str(v).strip() for v in pj_types if str(v).strip()}
+        if wanted:
+            masked = masked[masked['PJ_TYPE'].fillna('').astype(str).str.strip().isin(wanted)]
+    if packages and 'PRODUCTLINENAME' in masked.columns:
+        wanted = {str(v).strip() for v in packages if str(v).strip()}
+        if wanted:
+            masked = masked[masked['PRODUCTLINENAME'].fillna('').astype(str).str.strip().isin(wanted)]
+    return masked
+
+
 def build_trace_aggregation_from_events(
     start_date: Optional[str],
     end_date: Optional[str],
     *,
     loss_reasons: Optional[List[str]] = None,
+    pj_types: Optional[List[str]] = None,
+    packages: Optional[List[str]] = None,
     seed_container_ids: Optional[List[str]] = None,
     lineage_ancestors: Optional[Dict[str, Any]] = None,
     lineage_roots: Optional[Dict[str, str]] = None,
@@ -640,6 +669,10 @@ def build_trace_aggregation_from_events(
     detection_df, _msd_pf = _fetch_station_detection_data(start_date, end_date, station)
     if detection_df is None:
         return None
+    # Population mask: pj_types/packages restrict the lot population (numerator AND
+    # denominator) before available_loss_reasons / KPI are computed, matching the
+    # backward DuckDB detection_raw mask semantics.
+    detection_df = _apply_population_mask(detection_df, pj_types, packages)
     if detection_df.empty:
         empty_result = _empty_result(direction)
         quality_meta = _build_trace_quality_meta(

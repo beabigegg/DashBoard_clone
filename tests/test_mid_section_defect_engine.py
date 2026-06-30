@@ -281,3 +281,37 @@ class TestMaskSemantics:
         kpi = summary["kpi"]
         assert kpi["total_input"] == 300        # TYPE-A population denominator
         assert kpi["total_defect_qty"] == 5     # only Y's B within TYPE-A
+
+
+class TestApplyPopulationMask:
+    """Phase 1: _apply_population_mask is the in-memory (forward + backward-fallback)
+    equivalent of the DuckDB detection_raw pj_type/package population mask."""
+
+    def _df(self):
+        return pd.DataFrame([
+            ("X", "TYPE-A", "PKG-A"),
+            ("Y", "TYPE-A", "PKG-B"),
+            ("W", "TYPE-B", "PKG-B"),
+        ], columns=["CONTAINERID", "PJ_TYPE", "PRODUCTLINENAME"])
+
+    def test_pj_type_mask(self):
+        out = msd_svc._apply_population_mask(self._df(), pj_types=["TYPE-A"])
+        assert set(out["CONTAINERID"]) == {"X", "Y"}
+
+    def test_package_mask(self):
+        out = msd_svc._apply_population_mask(self._df(), packages=["PKG-B"])
+        assert set(out["CONTAINERID"]) == {"Y", "W"}
+
+    def test_combined_mask_is_intersection(self):
+        out = msd_svc._apply_population_mask(self._df(), pj_types=["TYPE-A"], packages=["PKG-B"])
+        assert set(out["CONTAINERID"]) == {"Y"}
+
+    def test_none_masks_are_noop(self):
+        out = msd_svc._apply_population_mask(self._df())
+        assert len(out) == 3
+
+    def test_mask_trims_whitespace(self):
+        df = pd.DataFrame([("X", " TYPE-A ", "PKG-A")],
+                          columns=["CONTAINERID", "PJ_TYPE", "PRODUCTLINENAME"])
+        out = msd_svc._apply_population_mask(df, pj_types=["TYPE-A"])
+        assert set(out["CONTAINERID"]) == {"X"}

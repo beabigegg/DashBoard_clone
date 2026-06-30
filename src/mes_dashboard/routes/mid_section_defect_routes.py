@@ -265,6 +265,15 @@ def api_analysis_detail():
             per_page = max(1, min(request.args.get("page_size", 200, type=int), 500))
             sort_by = request.args.get("sort_by", "defect_rate")
             order = request.args.get("order", "desc")
+            # Forward detail needs the detection station's group order to filter
+            # which downstream stations count (group_order > station_order).
+            _station_order_fallback = 999
+            if direction != "backward":
+                from mes_dashboard.services.mid_section_defect_service import _normalize_station
+                from mes_dashboard.config.workcenter_groups import get_group_order
+                _stations = _normalize_station(station)
+                if _stations:
+                    _station_order_fallback = min(get_group_order(s) for s in _stations)
             rt = MsdDuckdbRuntime(trace_query_id)
             if rt.is_available():
                 detail = rt.get_detail(
@@ -276,6 +285,7 @@ def api_analysis_detail():
                     loss_reasons=loss_reasons,
                     pj_types=pj_types or None,
                     packages=packages or None,
+                    station_order_fallback=_station_order_fallback,
                 )
                 if detail is not None:
                     pagination = detail.get("pagination") or {}

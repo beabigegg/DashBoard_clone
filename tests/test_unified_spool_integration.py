@@ -69,6 +69,12 @@ class TestMsdFullChain:
         assert tqid1 == tqid2
         assert isinstance(tqid1, str) and len(tqid1) > 0
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Phase 3: get_summary(direction='forward') is intentionally disabled "
+               "(returns None → Oracle/in-memory fallback) until the forward DuckDB "
+               "summary path is implemented. Tripwire: remove when Phase 3 lands.",
+    )
     def test_summary_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
 
@@ -115,6 +121,12 @@ class TestMsdFullChain:
         # 1 header + 3 data rows
         assert len(lines) == 4
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Phase 3: asserts get_summary(direction='forward') KPI from the events "
+               "spool, which is disabled until the forward DuckDB summary path is "
+               "implemented. Tripwire: remove when Phase 3 lands.",
+    )
     def test_full_chain_summary_detail_export_consistency(self, msd_spool):
         """Summary, detail, and export should all reflect the same dataset."""
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
@@ -136,6 +148,80 @@ class TestMsdFullChain:
         assert detail["pagination"]["total"] == csv_data_rows == 3
         # KPI defect sum matches
         assert summary["kpi"]["defect_qty"] == 18
+
+
+class TestForwardDetailFromSpool:
+    """Phase 2: forward per-lot detail is rebuilt from detection + events spool."""
+
+    @pytest.fixture()
+    def fwd_spool(self, tmp_path: pathlib.Path):
+        # Two detection defect lots at an upstream station (order 4 = 成型).
+        detection_df = pd.DataFrame(
+            [
+                ("LOT-A", "LOT-A-001", "TYPE-A", "PKG-1", "WF1", "EQP1", 200, "YieldLimit", 10),
+                ("LOT-B", "LOT-B-001", "TYPE-B", "PKG-2", "WF2", "EQP2", 100, "YieldLimit", 3),
+            ],
+            columns=[
+                "CONTAINERID", "CONTAINERNAME", "PJ_TYPE", "PRODUCTLINENAME",
+                "WORKFLOW", "DETECTION_EQUIPMENTNAME", "TRACKINQTY",
+                "LOSSREASONNAME", "REJECTQTY",
+            ],
+        )
+        # Merged events spool: wip-reached rows (TRACKINQTY) + downstream reject
+        # rows (REJECT_TOTAL_QTY) at 測試 (order 11, downstream of 成型).
+        events_df = pd.DataFrame(
+            [
+                ("LOT-A", "測試", 200, None),   # wip reached
+                ("LOT-A", "測試", None, 8),     # downstream reject
+                ("LOT-B", "測試", 100, None),   # wip reached, no downstream reject
+            ],
+            columns=["CONTAINERID", "WORKCENTER_GROUP", "TRACKINQTY", "REJECT_TOTAL_QTY"],
+        )
+        det_path = tmp_path / "detection.parquet"
+        ev_path = tmp_path / "events.parquet"
+        detection_df.to_parquet(det_path, index=False)
+        events_df.to_parquet(ev_path, index=False)
+        return str(det_path), str(ev_path)
+
+    def _runtime(self, fwd_spool):
+        from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+        det_path, ev_path = fwd_spool
+        rt = MsdDuckdbRuntime("tqid-fwd-detail")
+        rt._detection_path = det_path
+        rt._events_path = ev_path
+        rt._lineage_path = None
+        rt._resolved = True
+        return rt
+
+    def test_forward_detail_not_empty_and_attributes_downstream(self, fwd_spool):
+        rt = self._runtime(fwd_spool)
+        detail = rt.get_detail(direction="forward", page=1, per_page=50,
+                               station_order_fallback=4)
+        assert detail is not None
+        items = {r["CONTAINERNAME"]: r for r in detail["items"]}
+        assert detail["pagination"]["total"] == 2  # both defect lots present
+        # Keys aligned to frontend COLUMNS_FORWARD contract (DetailTable.vue)
+        assert items["LOT-A-001"]["DOWNSTREAM_TOTAL_REJECT"] == 8
+        assert items["LOT-A-001"]["DOWNSTREAM_STATIONS_REACHED"] >= 1
+        assert items["LOT-A-001"]["TRACKINQTY"] == 200
+        assert items["LOT-B-001"]["DOWNSTREAM_TOTAL_REJECT"] == 0
+
+    def test_forward_detail_pj_type_mask_restricts_population(self, fwd_spool):
+        rt = self._runtime(fwd_spool)
+        detail = rt.get_detail(direction="forward", page=1, per_page=50,
+                               station_order_fallback=4, pj_types=["TYPE-A"])
+        names = {r["CONTAINERNAME"] for r in detail["items"]}
+        assert names == {"LOT-A-001"}  # TYPE-B lot masked out of population
+
+    def test_forward_detail_missing_spool_returns_empty(self):
+        from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+        rt = MsdDuckdbRuntime("tqid-fwd-none")
+        rt._detection_path = None
+        rt._events_path = None
+        rt._resolved = True
+        detail = rt.get_detail(direction="forward")
+        assert detail["items"] == []
+        assert detail["pagination"]["total"] == 0
 
 
 # ===========================================================================

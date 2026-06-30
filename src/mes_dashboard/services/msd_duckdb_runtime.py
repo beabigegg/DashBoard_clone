@@ -1311,6 +1311,140 @@ class MsdDuckdbRuntime:
     # Detail (paginated)
     # ------------------------------------------------------------------
 
+    def _get_forward_detail(
+        self,
+        *,
+        page: int,
+        per_page: int,
+        sort_by: str,
+        order: str,
+        loss_reasons: Optional[List[str]],
+        pj_types: Optional[List[str]],
+        packages: Optional[List[str]],
+        station_order_fallback: int,
+    ) -> Optional[Dict[str, Any]]:
+        """Rebuild forward per-lot detail (downstream impact) from the spools.
+
+        Reuses the in-memory ``_build_forward_detail_table`` builder, sourcing the
+        detection lots from the detection spool and the downstream wip/reject
+        records reconstructed from the merged events spool.  pj_types/packages are
+        population masks and loss_reasons a numerator soft-mask, applied here at
+        read time so the package-independent trace serves every selection.
+        """
+        empty = {
+            "items": [],
+            "pagination": {"page": page, "per_page": per_page, "total": 0, "total_pages": 0},
+            "trace_query_id": self.trace_query_id,
+        }
+        if not self._detection_path or not Path(self._detection_path).exists():
+            return empty
+        if not self._events_path or not Path(self._events_path).exists():
+            return empty
+        try:
+            import pandas as pd
+            from mes_dashboard.services.mid_section_defect_service import (
+                _apply_population_mask,
+                _build_forward_detail_table,
+                parse_loss_reasons_param,
+            )
+
+            detection_df = pd.read_parquet(self._detection_path)
+            if detection_df is None or detection_df.empty:
+                return empty
+            # Population mask (pj_types/packages) — both numerator and denominator.
+            detection_df = _apply_population_mask(detection_df, pj_types, packages)
+            if detection_df.empty:
+                return empty
+            # loss_reason numerator soft-mask (keep no-defect rows so the lot stays
+            # in the population), mirroring build_trace_aggregation_from_events.
+            normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
+            if normalized_loss_reasons and 'LOSSREASONNAME' in detection_df.columns:
+                detection_df = detection_df[
+                    detection_df['LOSSREASONNAME'].isin(normalized_loss_reasons)
+                    | (detection_df['REJECTQTY'] == 0)
+                    | (detection_df['LOSSREASONNAME'].isna())
+                ].copy()
+
+            defect_cids = detection_df.loc[
+                detection_df['REJECTQTY'] > 0, 'CONTAINERID'
+            ].astype(str).unique().tolist()
+
+            # Reconstruct downstream wip (reached) and reject records from the merged
+            # events spool: wip rows carry TRACKINQTY, reject rows carry REJECT_TOTAL_QTY.
+            wip_by_cid: Dict[str, List[Dict[str, Any]]] = {}
+            downstream_rejects: Dict[str, List[Dict[str, Any]]] = {}
+            events_df = pd.read_parquet(self._events_path)
+            if events_df is not None and not events_df.empty and 'CONTAINERID' in events_df.columns:
+                ev = events_df
+                ev_cid = ev['CONTAINERID'].astype(str)
+                wcg_col = 'WORKCENTER_GROUP' if 'WORKCENTER_GROUP' in ev.columns else None
+                if wcg_col:
+                    if 'TRACKINQTY' in ev.columns:
+                        wip_rows = ev[pd.to_numeric(ev['TRACKINQTY'], errors='coerce').fillna(0) > 0]
+                        for cid, grp, qty in zip(
+                            ev_cid[wip_rows.index], wip_rows[wcg_col], wip_rows['TRACKINQTY']
+                        ):
+                            g = str(grp).strip()
+                            if g:
+                                wip_by_cid.setdefault(cid, []).append({'workcenter_group': g})
+                    if 'REJECT_TOTAL_QTY' in ev.columns:
+                        rej_rows = ev[pd.to_numeric(ev['REJECT_TOTAL_QTY'], errors='coerce').fillna(0) > 0]
+                        for cid, grp, qty in zip(
+                            ev_cid[rej_rows.index], rej_rows[wcg_col], rej_rows['REJECT_TOTAL_QTY']
+                        ):
+                            g = str(grp).strip()
+                            if g:
+                                downstream_rejects.setdefault(cid, []).append({
+                                    'workcenter_group': g,
+                                    'reject_total_qty': int(qty) if qty == qty else 0,
+                                })
+
+            rows = _build_forward_detail_table(
+                detection_df, defect_cids, wip_by_cid, downstream_rejects,
+                station_order_fallback,
+            )
+
+            # Sort
+            _sort_map = {
+                "defect_rate": "DOWNSTREAM_REJECT_RATE",
+                "defect_qty": "DOWNSTREAM_REJECTS",
+                "input_qty": "INPUT_QTY",
+            }
+            sort_key = _sort_map.get(str(sort_by).lower(), "DOWNSTREAM_REJECT_RATE")
+            reverse = str(order).lower() != "asc"
+            rows.sort(key=lambda r: r.get(sort_key, 0) or 0, reverse=reverse)
+
+            # Align builder keys to the frontend COLUMNS_FORWARD contract
+            # (DetailTable.vue): TRACKINQTY / DOWNSTREAM_STATIONS_REACHED /
+            # DOWNSTREAM_TOTAL_REJECT / WORST_DOWNSTREAM_STATION.
+            _keymap = {
+                "INPUT_QTY": "TRACKINQTY",
+                "DOWNSTREAM_STATIONS": "DOWNSTREAM_STATIONS_REACHED",
+                "DOWNSTREAM_REJECTS": "DOWNSTREAM_TOTAL_REJECT",
+                "WORST_DOWNSTREAM": "WORST_DOWNSTREAM_STATION",
+            }
+            total = len(rows)
+            offset = max(0, (page - 1) * per_page)
+            items = [
+                {_keymap.get(k, k): v for k, v in row.items()}
+                for row in rows[offset:offset + per_page]
+            ]
+            total_pages = (total + per_page - 1) // per_page if per_page else 0
+            return {
+                "items": items,
+                "pagination": {
+                    "page": page, "per_page": per_page,
+                    "total": total, "total_pages": total_pages,
+                },
+                "trace_query_id": self.trace_query_id,
+            }
+        except Exception as exc:
+            logger.warning(
+                "MsdDuckdbRuntime._get_forward_detail failed (trace_query_id=%s): %s",
+                self.trace_query_id, exc,
+            )
+            return empty
+
     def get_detail(
         self,
         page: int = 1,
@@ -1321,17 +1455,24 @@ class MsdDuckdbRuntime:
         loss_reasons: Optional[List[str]] = None,
         pj_types: Optional[List[str]] = None,
         packages: Optional[List[str]] = None,
+        station_order_fallback: int = 999,
     ) -> Optional[Dict[str, Any]]:
         """Return paginated detail rows from detection+lineage+events spool via DuckDB."""
         self._resolve_paths()
         if direction != "backward":
-            # Forward-direction per-lot detail is not yet implemented via DuckDB spool.
-            # Return an empty result so the route returns 200 instead of 410.
-            return {
-                "items": [],
-                "pagination": {"page": page, "per_page": per_page, "total": 0, "total_pages": 0},
-                "trace_query_id": self.trace_query_id,
-            }
+            # Forward-direction per-lot detail: rebuild downstream impact from the
+            # detection + events spool (mask-aware at read time).  See
+            # _get_forward_detail.
+            return self._get_forward_detail(
+                page=page,
+                per_page=per_page,
+                sort_by=sort_by,
+                order=order,
+                loss_reasons=loss_reasons,
+                pj_types=pj_types,
+                packages=packages,
+                station_order_fallback=station_order_fallback,
+            )
         if not self._events_path:
             return None
         # Detection spool is required for proper detail (CONTAINERNAME, DEFECT_QTY, etc.)
