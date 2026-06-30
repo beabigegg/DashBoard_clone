@@ -37,6 +37,7 @@ from typing import Iterator
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from mes_dashboard.core.global_concurrency import heavy_query_slot
 from mes_dashboard.core.oracle_arrow_reader import OracleArrowReader
 
 logger = logging.getLogger("mes_dashboard.base_chunked_duckdb_job")
@@ -204,12 +205,22 @@ class BaseChunkedDuckDBJob(ABC):
 
             chunks = list(self._chunks)  # snapshot after pre_query
 
-            # Step 2 — Decide reduction path
-            if self.requires_cross_chunk_reduction:
-                job_duckdb_path = self._make_job_duckdb_path()
-                self._fan_out_reduction(chunks, job_duckdb_path)
-            else:
-                self._fan_out_append(chunks)
+            # Step 2 — Oracle fan-out, bracketed by the cross-job heavy-query slot.
+            # Unified jobs (EAP_ALARM/DOWNTIME/MATERIAL_TRACE/... USE_UNIFIED_JOB=on)
+            # run their primary Oracle fetch here; without this slot they bypass
+            # HEAVY_QUERY_MAX_CONCURRENT entirely (ADR-0011, rq-semaphore-wiring).
+            # Only the Oracle fetch is bracketed — post_aggregate is DuckDB-local
+            # (D1: Oracle-phase only). Slot is unconditional: run() executes only on
+            # the unified (flag-on) path, so there is no flag-off parity concern, and
+            # the legacy per-domain acquires live on the mutually-exclusive flag-off
+            # path (no double-count). heavy_query_slot fails open when Redis is down.
+            _slot_owner = f"{self.namespace}:{self.job_id}"
+            with heavy_query_slot(_slot_owner):
+                if self.requires_cross_chunk_reduction:
+                    job_duckdb_path = self._make_job_duckdb_path()
+                    self._fan_out_reduction(chunks, job_duckdb_path)
+                else:
+                    self._fan_out_append(chunks)
 
             # Step 3 — bracket 15 (all chunks fetched)
             self.progress_report(15)

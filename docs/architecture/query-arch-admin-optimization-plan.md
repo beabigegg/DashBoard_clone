@@ -34,7 +34,7 @@
 
 | # | 缺口 | 現況 | 風險 | 對應 Phase |
 |---|---|---|---|---|
-| A1 | **併發閘門未全接** | `acquire_heavy_query_slot()` 未在所有 `execute_*_job` worker 接上（CLAUDE.md 第 163 行點名 query-tool/hold/resource/reject）。各 agent 對「reject 是否已接」說法不一，**需逐一核對程式碼**。 | 🔴 高 — 無法限制同時打 Oracle 的重查詢數，高峰壓垮連線池 | Phase A-1 |
+| A1 | **併發閘門未全接** | ✅ **已於 Phase A-1 處理。** 經逐一核對：CLAUDE.md 點名的 query-tool/hold/resource/reject 在 `rq-semaphore-wiring` 早已接好（reject 為 cache 層內部 acquire）；該註記已過時。**真正的缺口**是統一 job 核心 `BaseChunkedDuckDBJob.run()` 從未 acquire slot，導致 `*_USE_UNIFIED_JOB=on`（eap_alarm/downtime/material_trace 預設 on）的 always-async 重查詢在 production 裸奔。本計劃的 A-1 PR 已在 base `run()` 的 Oracle fan-out 段中央接線（一次補 6 個 job）+ material_trace override 補一處。 | 🔴 高（已關閉） | Phase A-1 ✅ |
 | A2 | **`classify_query_cost` 覆蓋不足** | 僅 4/28 route 走統一成本分類；`CostPolicy` 只定義 `eap_alarm/trace/msd`，其餘吃預設。 | 🟠 中 — 「何種查詢轉非同步」無單一可調政策 | Phase A-2 |
 | A3 | **參數解析無 facade** | 每個 route 自刻 `_get_*_args` / `_parse_multi_param` / 日期驗證 / 分頁 sanitize。 | 🟡 中 — 加一個共用過濾欄位要改 N 處 | Phase A-3 |
 | A4 | **快取 schema 版本嵌 key 不一致** | `reject_dataset` 的 `_CACHE_SCHEMA_VERSION` **未嵌入 query_id**；升版後舊 parquet 不會孤立，有讀到舊欄位的風險。`resource/yield/hold` 已正確嵌入。 | 🟡 中 — 升版資料正確性 | Phase A-4 |
@@ -146,7 +146,7 @@ COUNT(*) WHERE logout_time IS NULL AND last_active >= now - 30min
 
 ## 6. 待核實項目（實作前必須先確認，避免依誤報行動）
 
-1. **A-1 前置**：逐一開啟 `reject_query_job_service` / `resource_query_job_service` / `hold_*` / `production_history_worker` / `eap_alarm_worker` / `downtime_query_job_service` / `yield_alert_job_service`，確認 `acquire_heavy_query_slot` 的**真實接線狀態**（兩個調查 agent 對 reject 說法相左）。
+1. ~~**A-1 前置**：逐一核對 `acquire_heavy_query_slot` 真實接線狀態。~~ ✅ **已完成**：legacy 路徑（query-tool/hold/resource/reject/production/wip）全已接；真缺口在統一核心 `BaseChunkedDuckDBJob.run()`，A-1 PR 已補。**仍待辦**：在具備 Redis + Oracle 的環境跑真實負載，驗證 `peak_concurrent ≤ HEAVY_QUERY_MAX_CONCURRENT`（mock 結構證明不足以放行 production），並補正式 CDD change + stress-soak-report。
 2. **A-2 前置**：確認目前哪些 domain 已實際走 `classify_query_cost`（agent 報 4/28，需點數驗證）。
 3. **B-1 前置**：確認 Redis 在所有部署環境（gunicorn + RQ worker）皆可用且 `REDIS_ENABLED` 一致；確認多 worker 部署實況（worker 數）。
 4. **F-1 前置**：列出所有「多視圖且無 staleness guard」的 app（hold-overview、wip-overview、downtime-analysis 等）作為推廣對象清單。

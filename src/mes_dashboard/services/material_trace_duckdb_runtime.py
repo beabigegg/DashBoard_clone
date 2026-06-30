@@ -469,27 +469,36 @@ class MaterialTraceJob:
 
             reader = OracleArrowReader()
 
-            # Fetch all chunks and write per-chunk parquets (streaming, no concat)
-            for chunk_idx, chunk_params in enumerate(self._chunks):
-                sql, params = self.build_chunk_sql(chunk_params)
-                batch_idx = 0
-                for batch in reader.chunk_iter(sql, params):
-                    # Reproduce Decimal→float coercion (legacy L302) for dtype parity
-                    import pyarrow as pa
-                    coerced_arrays = []
-                    coerced_names = []
-                    for i, field in enumerate(batch.schema):
-                        col = batch.column(i)
-                        # Arrow decimal128 → float64 (matches legacy Decimal→float cast)
-                        if pa.types.is_decimal(field.type):
-                            col = col.cast(pa.float64())
-                        coerced_arrays.append(col)
-                        coerced_names.append(field.name)
-                    coerced_batch = pa.RecordBatch.from_arrays(coerced_arrays, names=coerced_names)
+            # Bracket the Oracle fetch with the cross-job heavy-query slot (ADR-0011).
+            # MaterialTraceJob overrides run() so it cannot inherit the base class's
+            # slot wiring — it must acquire here itself. Only the Oracle fetch loop is
+            # bracketed; post_aggregate is DuckDB-local. material_trace is always-async
+            # with no legacy per-domain acquire, so this is its only concurrency gate.
+            # heavy_query_slot fails open when Redis is down.
+            from mes_dashboard.core.global_concurrency import heavy_query_slot
+            _slot_owner = f"{self.namespace}:{self.job_id}"
+            with heavy_query_slot(_slot_owner):
+                # Fetch all chunks and write per-chunk parquets (streaming, no concat)
+                for chunk_idx, chunk_params in enumerate(self._chunks):
+                    sql, params = self.build_chunk_sql(chunk_params)
+                    batch_idx = 0
+                    for batch in reader.chunk_iter(sql, params):
+                        # Reproduce Decimal→float coercion (legacy L302) for dtype parity
+                        import pyarrow as pa
+                        coerced_arrays = []
+                        coerced_names = []
+                        for i, field in enumerate(batch.schema):
+                            col = batch.column(i)
+                            # Arrow decimal128 → float64 (matches legacy Decimal→float cast)
+                            if pa.types.is_decimal(field.type):
+                                col = col.cast(pa.float64())
+                            coerced_arrays.append(col)
+                            coerced_names.append(field.name)
+                        coerced_batch = pa.RecordBatch.from_arrays(coerced_arrays, names=coerced_names)
 
-                    chunk_path = chunk_dir_path / f"chunk-{chunk_idx:04d}-{batch_idx:04d}.parquet"
-                    pq.write_table(pa.Table.from_batches([coerced_batch]), chunk_path)
-                    batch_idx += 1
+                        chunk_path = chunk_dir_path / f"chunk-{chunk_idx:04d}-{batch_idx:04d}.parquet"
+                        pq.write_table(pa.Table.from_batches([coerced_batch]), chunk_path)
+                        batch_idx += 1
 
             return self.post_aggregate(chunk_dir_path)
 
