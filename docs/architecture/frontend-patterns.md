@@ -49,6 +49,8 @@ Pattern: `frontend/src/production-history/composables/useFirstTierFilters.ts`
 
 Evidence: `fix-prod-history-multiselect-filter` — `_pruneSelection` interaction with `commitSelection` diff.
 
+**Convergence:** 10 apps drive filters through `shared-composables/useFilterOrchestrator.ts`; the rest are bespoke. The categorisation of which bespoke apps to migrate, the migration recipe, and the batched rollout are in `docs/architecture/filter-convergence-plan.md` (Phase F-2). Note: snapshot-diff apps (production-history, eap-alarm) cannot migrate until the orchestrator gains per-field committed-snapshot support — keep them bespoke until then.
+
 ## Multi-View Staleness Counters (fetchAllViews fan-out)
 
 **Use a per-endpoint staleness dict, not a shared counter, in composables that fan out to multiple endpoints.**
