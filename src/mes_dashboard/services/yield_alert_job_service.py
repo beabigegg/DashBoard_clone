@@ -111,10 +111,11 @@ def execute_yield_alert_job(
 
     start_date = str(params.get("start_date", "")).strip()
     end_date = str(params.get("end_date", "")).strip()
+    process_type = str(params.get("process_type", "GA%")).strip() or "GA%"
 
     logger.info(
-        "yield_alert job started job_id=%s start_date=%s end_date=%s",
-        job_id, start_date, end_date,
+        "yield_alert job started job_id=%s start_date=%s end_date=%s process_type=%s",
+        job_id, start_date, end_date, process_type,
     )
     update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing", pct=0)
 
@@ -125,6 +126,7 @@ def execute_yield_alert_job(
                 "cache_schema_version": _CACHE_SCHEMA_VERSION,
                 "start_date": start_date,
                 "end_date": end_date,
+                "process_type": process_type,
             }
         )
 
@@ -139,7 +141,7 @@ def execute_yield_alert_job(
 
         update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle", pct=30)
 
-        execute_primary_query(start_date=start_date, end_date=end_date)
+        execute_primary_query(start_date=start_date, end_date=end_date, process_type=process_type)
 
         update_job_progress(_JOB_PREFIX, job_id, status="running", progress="complete", pct=100, stage="complete")
         complete_job(_JOB_PREFIX, job_id, query_id=query_id)

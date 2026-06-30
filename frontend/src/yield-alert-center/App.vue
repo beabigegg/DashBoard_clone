@@ -783,10 +783,10 @@ watch(granularity, (newVal, oldVal) => {
   }
 });
 
-// ── Process type: when changed, clear state and trigger a new primary query ──────
+// ── Process type: when changed, clear stale state (GA%/GC% have different products/lines)
+// User must click "執行日期查詢" to fetch new data after switching.
 watch(selectedProcessType, (_newVal, oldVal) => {
   if (!oldVal) return; // skip initial mount
-  // Clear existing spool cache and secondary filters (GA%/GC% have different products/lines)
   queryId.value = '';
   hasQueried.value = false;
   filters.workcenterGroups = [];
@@ -804,10 +804,6 @@ watch(selectedProcessType, (_newVal, oldVal) => {
   stationSummary.value = [];
   packageSummary.value = [];
   alerts.value = [];
-  // Trigger new primary query if dates are set
-  if (filters.start_date && filters.end_date) {
-    void runQuery(1);
-  }
 });
 
 // ── Cross-filter: dimension filter changes narrow other dropdowns' options ────
@@ -911,7 +907,6 @@ onUnmounted(() => {
           <button class="ui-btn ui-btn--primary" :disabled="!canSubmit" @click="runQuery(1)" data-testid="query-submit-btn">
             {{ loading ? '查詢中...' : isDateStageDirty ? '執行日期查詢' : '重新查詢日期範圍' }}
           </button>
-          <button class="ui-btn ui-btn--ghost" :disabled="loading" @click="resetFilters" data-testid="clear-btn">清除條件</button>
         </div>
       </div>
     </section>
