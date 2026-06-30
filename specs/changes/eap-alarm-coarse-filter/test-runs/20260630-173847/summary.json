@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/test_eap_alarm_service.py -v",
+  "duration_ms": 3247,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173847/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173847/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173847/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

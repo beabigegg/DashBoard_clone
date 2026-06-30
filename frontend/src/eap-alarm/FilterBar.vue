@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 
 interface ResourceOption {
@@ -18,6 +18,17 @@ interface CoarseFilter {
   date_from: string;
   date_to: string;
   machines: string[];
+  lot_ids: string[];
+  pj_types: string[];
+  product_lines: string[];
+  pj_bops: string[];
+}
+
+interface ProductFilterOptions {
+  pj_types: string[];
+  product_lines: string[];
+  pj_bops: string[];
+  updated_at: string | null;
 }
 
 interface LoadingState {
@@ -28,13 +39,27 @@ interface LoadingState {
 const props = defineProps<{
   filters: CoarseFilter;
   resourceOptions: ResourceOptions;
+  productFilterOptions: ProductFilterOptions;
   loading: LoadingState;
+  productOptionsLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'submit'): void;
   (e: 'clear'): void;
+  (e: 'update:filters', value: CoarseFilter): void;
 }>();
+
+// ── LOT ID textarea local state ───────────────────────────────────────────────
+const lotIdRaw = ref('');
+
+function onLotIdBlur() {
+  const parsedIds = lotIdRaw.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  emit('update:filters', { ...props.filters, lot_ids: parsedIds });
+}
 
 // ── Cascade state (local; determines the machine options pool) ───────────────
 const cascade = reactive({
@@ -57,30 +82,55 @@ const machineOptions = computed(() =>
 
 function updateFamilies(v: string[]) {
   cascade.families = v;
-  props.filters.machines = [];
+  emit('update:filters', { ...props.filters, machines: [] });
 }
 function updateMachines(v: string[]) {
-  props.filters.machines = v;
+  emit('update:filters', { ...props.filters, machines: v });
 }
 
-// Submit: if no machines explicitly selected, use all filtered
+// Submit: parse LOT IDs from textarea (in case blur didn't fire), then emit
 function handleSubmit() {
-  if (props.filters.machines.length === 0) {
-    props.filters.machines = [...machineOptions.value];
-  }
+  // Sync lot_ids from textarea before submit
+  const parsedIds = lotIdRaw.value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  emit('update:filters', { ...props.filters, lot_ids: parsedIds });
+  // Use nextTick-like approach: emit submit after filter update propagates
+  // (parent's Object.assign is synchronous so emit order is sufficient)
   emit('submit');
 }
 
 function handleClear() {
   cascade.families = [];
-  props.filters.machines = [];
+  lotIdRaw.value = '';
+  emit('update:filters', {
+    ...props.filters,
+    machines: [],
+    lot_ids: [],
+    pj_types: [],
+    product_lines: [],
+    pj_bops: [],
+  });
   emit('clear');
 }
+
+// ── hasLotIds: checks textarea raw value OR already-parsed lot_ids ──────────
+const hasLotIds = computed(() =>
+  props.filters.lot_ids?.length > 0 || lotIdRaw.value.trim().length > 0
+);
 
 const canSubmit = computed(() =>
   !props.loading.querying &&
   !!props.filters.date_from &&
-  !!props.filters.date_to
+  !!props.filters.date_to &&
+  (
+    (props.filters.machines?.length ?? 0) > 0 ||
+    hasLotIds.value ||
+    (props.filters.pj_types?.length ?? 0) > 0 ||
+    (props.filters.product_lines?.length ?? 0) > 0 ||
+    (props.filters.pj_bops?.length ?? 0) > 0
+  )
 );
 </script>
 
@@ -141,6 +191,63 @@ const canSubmit = computed(() =>
         />
       </div>
 
+      <!-- LOT ID textarea (one per line) -->
+      <div class="filter-group filter-group-wide">
+        <label class="filter-label" for="eap-lot-id">LOT ID</label>
+        <textarea
+          id="eap-lot-id"
+          v-model="lotIdRaw"
+          class="filter-input filter-textarea"
+          :disabled="loading.querying"
+          placeholder="每行一個 LOT ID / One LOT ID per line"
+          rows="3"
+          data-testid="lot-id-textarea"
+          @blur="onLotIdBlur"
+        />
+      </div>
+
+      <!-- PJ 類型 (TYPE) -->
+      <div class="filter-group">
+        <label class="filter-label">PJ 類型 / PJ Type</label>
+        <MultiSelect
+          :model-value="filters.pj_types"
+          :options="productFilterOptions.pj_types"
+          :disabled="loading.querying || productOptionsLoading"
+          :placeholder="productOptionsLoading ? '載入中...' : '全部 PJ 類型'"
+          searchable
+          data-testid="pj-type-select"
+          @update:model-value="(v: string[]) => emit('update:filters', { ...filters, pj_types: v })"
+        />
+      </div>
+
+      <!-- Package (product_lines) -->
+      <div class="filter-group">
+        <label class="filter-label">Package / 封裝</label>
+        <MultiSelect
+          :model-value="filters.product_lines"
+          :options="productFilterOptions.product_lines"
+          :disabled="loading.querying || productOptionsLoading"
+          :placeholder="productOptionsLoading ? '載入中...' : '全部 Package'"
+          searchable
+          data-testid="product-line-select"
+          @update:model-value="(v: string[]) => emit('update:filters', { ...filters, product_lines: v })"
+        />
+      </div>
+
+      <!-- BOP (pj_bops) -->
+      <div class="filter-group">
+        <label class="filter-label">BOP 製程 / BOP</label>
+        <MultiSelect
+          :model-value="filters.pj_bops"
+          :options="productFilterOptions.pj_bops"
+          :disabled="loading.querying || productOptionsLoading"
+          :placeholder="productOptionsLoading ? '載入中...' : '全部 BOP'"
+          searchable
+          data-testid="pj-bop-select"
+          @update:model-value="(v: string[]) => emit('update:filters', { ...filters, pj_bops: v })"
+        />
+      </div>
+
       <!-- Toolbar -->
       <div class="filter-toolbar filter-group-full">
         <div class="filter-actions">
@@ -149,6 +256,7 @@ const canSubmit = computed(() =>
             class="ui-btn ui-btn--primary"
             data-testid="coarse-submit-btn"
             :disabled="!canSubmit"
+            :title="!canSubmit ? '請選擇至少一項：機台、LOT ID 或產品條件' : ''"
             @click="handleSubmit"
           >
             <template v-if="loading.querying">查詢中...</template>
@@ -164,7 +272,8 @@ const canSubmit = computed(() =>
           </button>
         </div>
         <div class="filter-hint">
-          日期為必填。可選型號或機台縮小查詢範圍；不選機台則查詢全部篩選結果。
+          日期為必填。機台、LOT ID、PJ 類型 / Package / BOP 至少填入一項。
+          / Date required. At least one of: machines, LOT ID, or product dims.
         </div>
       </div>
     </div>

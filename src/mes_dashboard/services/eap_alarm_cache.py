@@ -19,7 +19,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # ── EA-06: schema version — bump on any parquet column add/remove/rename ──────
-_SCHEMA_VERSION: int = 2
+_SCHEMA_VERSION: int = 3
 
 # ── Environment configuration ─────────────────────────────────────────────────
 EAP_ALARM_SPOOL_DIR: str = os.getenv(
@@ -34,18 +34,24 @@ EAP_ALARM_SPOOL_TTL: int = max(
 def make_eap_alarm_spool_key(
     date_from: Optional[str],
     date_to: Optional[str],
-    machines: list[str],
+    eqp_types: list[str],
+    lot_ids: tuple[str, ...] | list[str] = (),
+    pj_types: tuple[str, ...] | list[str] = (),
+    product_lines: tuple[str, ...] | list[str] = (),
+    pj_bops: tuple[str, ...] | list[str] = (),
 ) -> str:
     """Build the deterministic spool key for a coarse EAP ALARM query (EA-01).
 
-    Format: ``eap_alarm_{date_from}_{date_to}_{sorted_machines_hash8}_v{schema_version}``
+    Format: ``eap_alarm_{date_from}_{date_to}_{coarse_dims_hash8}_v{schema_version}``
 
     Uses underscores (not colons) so the key passes query_spool_store's
     _VALID_ID_RE = r"^[A-Za-z0-9._-]{4,128}$" and can be used directly as
     a Redis metadata key and parquet filename without secondary sanitization.
 
-    The hash covers the sorted, comma-joined machine list so that any
-    permutation of the same machine set maps to the same key.
+    The hash covers all 5 coarse dims sorted with fixed per-dim separators:
+      eqp_types | lot_ids (whitespace-stripped) | pj_types | product_lines | pj_bops
+    Each dim is independently delimited so empty lists cannot collide across dims
+    (EA-01 canonical repr, D-1).
 
     Raises:
         ValueError: if date_from or date_to is missing (EA-03 guard).
@@ -53,11 +59,18 @@ def make_eap_alarm_spool_key(
     if not date_from or not date_to:
         raise ValueError("LAST_UPDATE_TIME filter required (date_from and date_to must be provided)")
 
-    sorted_machines = sorted(machines)
-    machines_string = ",".join(sorted_machines)
-    machines_hash = hashlib.sha256(machines_string.encode("utf-8")).hexdigest()[:8]
+    # Canonicalize each dim: sorted, stripped, distinct per-dim separator prevents
+    # cross-dim hash collisions when some dims are empty.
+    eqp_part = "eqp:" + ",".join(sorted(eqp_types))
+    lot_part = "lot:" + ",".join(sorted(str(v).strip() for v in lot_ids if str(v).strip()))
+    pjt_part = "pjt:" + ",".join(sorted(str(v).strip() for v in pj_types if str(v).strip()))
+    pln_part = "pln:" + ",".join(sorted(str(v).strip() for v in product_lines if str(v).strip()))
+    bop_part = "bop:" + ",".join(sorted(str(v).strip() for v in pj_bops if str(v).strip()))
 
-    return f"eap_alarm_{date_from}_{date_to}_{machines_hash}_v{_SCHEMA_VERSION}"
+    canonical = "|".join([eqp_part, lot_part, pjt_part, pln_part, bop_part])
+    dims_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:8]
+
+    return f"eap_alarm_{date_from}_{date_to}_{dims_hash}_v{_SCHEMA_VERSION}"
 
 
 # ── Spool file path helpers ───────────────────────────────────────────────────

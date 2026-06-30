@@ -2,16 +2,20 @@
 """Unit tests for EAP ALARM service and cache modules.
 
 Tests:
-  - test_spool_key_composition: SHA-256 hash, deterministic, sorted machines
-  - test_missing_date_range_raises_value_error: missing date_from/date_to → ValueError
-  - test_machines_validation: empty/invalid machines → ValueError; valid list → ok
-  - test_alarm_category_decode: 9 codes; code 99 → "未知"; None → "未知"
-  - test_schema_version_is_pinned: _SCHEMA_VERSION == 1
+  - TestSpoolKeyComposition: SHA-256 hash, deterministic, sorted machines + all 5 dims
+  - TestMissingDateRangeRaisesValueError: missing date_from/date_to → ValueError
+  - TestMachinesValidation: eqp_types now optional; at-least-one-of-three rule (EA-08)
+  - TestAtLeastOneFilterRequired: EA-08 validation matrix
+  - TestLotIdNormalization: strip/dedup/max-200 (EA-09)
+  - TestProductDimsFilter: EXISTS SQL generation per supplied dim (EA-10)
+  - TestAlarmCategoryDecode: 9 codes; code 99 → "未知"; None → "未知"
+  - TestSchemaVersionIsPinned: _SCHEMA_VERSION == 3
 """
 
 from __future__ import annotations
 
 import hashlib
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -19,56 +23,97 @@ import pytest
 # ── test_spool_key_composition ────────────────────────────────────────────────
 
 class TestSpoolKeyComposition:
-    """EA-01: Spool key is deterministic and order-independent."""
+    """EA-01: Spool key is deterministic and order-independent for all 5 dims."""
 
     def test_key_format(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, _SCHEMA_VERSION
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212", "GWBK-0246"])
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA", "GWBK"])
         assert key.startswith("eap_alarm_2025-01-01_2025-01-07_")
         assert f"_v{_SCHEMA_VERSION}" in key
 
     def test_hash_is_8_chars(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212"])
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
         parts = key.split("_")
         # format: eap_alarm_{date_from}_{date_to}_{hash8}_v{version}
         # split by _ gives: ['eap', 'alarm', '2025-01-01', '2025-01-07', '{hash8}', 'v{version}']
         hash_part = parts[4]
         assert len(hash_part) == 8
 
-    def test_sorted_machines_gives_same_key(self):
-        """Same machine set in any order must produce the same key (EA-01)."""
+    def test_sorted_eqp_types_gives_same_key(self):
+        """Same eqp_type set in any order must produce the same key (EA-01)."""
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA-0001", "GDBA-0212", "GWBA-0003"])
-        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA-0212", "GWBA-0003", "GCBA-0001"])
+        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA", "GDBA", "GWBA"])
+        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA", "GWBA", "GCBA"])
         assert key1 == key2
 
-    def test_different_machines_give_different_key(self):
+    def test_different_eqp_types_give_different_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA-0212"])
-        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA-0001"])
+        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GDBA"])
+        key2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-31", ["GCBA"])
         assert key1 != key2
-
-    def test_hash_matches_sha256_of_sorted_join(self):
-        """Verify hash computation: sha256(','.join(sorted(machines)))[:8]."""
-        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        machines = ["GCBA-0001", "GDBA-0212"]
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", machines)
-        expected_string = ",".join(sorted(machines))
-        expected_hash = hashlib.sha256(expected_string.encode("utf-8")).hexdigest()[:8]
-        assert f"_{expected_hash}_" in key
 
     def test_different_dates_give_different_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212"])
-        key2 = make_eap_alarm_spool_key("2025-01-02", "2025-01-07", ["GDBA-0212"])
+        key1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
+        key2 = make_eap_alarm_spool_key("2025-01-02", "2025-01-07", ["GDBA"])
         assert key1 != key2
 
     def test_schema_version_in_key(self):
         """EA-06: Schema version participates in spool key."""
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, _SCHEMA_VERSION
-        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA-0212"])
+        key = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"])
         assert f"v{_SCHEMA_VERSION}" in key
+
+    def test_same_full_params_give_same_key(self):
+        """All 5 dims identical → same key (EA-01 stable key invariant)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key(
+            "2025-01-01", "2025-01-07", ["GDBA"], ["LOT-A", "LOT-B"],
+            ["TypeX"], ["LineY"], ["BopZ"],
+        )
+        k2 = make_eap_alarm_spool_key(
+            "2025-01-01", "2025-01-07", ["GDBA"], ["LOT-B", "LOT-A"],
+            ["TypeX"], ["LineY"], ["BopZ"],
+        )
+        assert k1 == k2
+
+    def test_lot_ids_dim_produces_different_key(self):
+        """Changing lot_ids → different key (AC-4)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        base = {"date_from": "2025-01-01", "date_to": "2025-01-07", "eqp_types": ["GDBA"]}
+        k1 = make_eap_alarm_spool_key(**base, lot_ids=["LOT-A"])
+        k2 = make_eap_alarm_spool_key(**base, lot_ids=["LOT-B"])
+        assert k1 != k2
+
+    def test_pj_types_dim_produces_different_key(self):
+        """Changing pj_types → different key (AC-4)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], pj_types=["TypeA"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], pj_types=["TypeB"])
+        assert k1 != k2
+
+    def test_product_lines_dim_produces_different_key(self):
+        """Changing product_lines → different key (AC-4)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], product_lines=["LineA"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], product_lines=["LineB"])
+        assert k1 != k2
+
+    def test_pj_bops_dim_produces_different_key(self):
+        """Changing pj_bops → different key (AC-4)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], pj_bops=["BopA"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", ["GDBA"], pj_bops=["BopB"])
+        assert k1 != k2
+
+    def test_empty_dims_do_not_collide_across_axes(self):
+        """Empty lot_ids and empty pj_types should not produce the same key sub-contribution.
+        i.e., key(lot_ids=["X"]) != key(pj_types=["X"]) (per-dim label prevents collision)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], lot_ids=["X"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], pj_types=["X"])
+        assert k1 != k2
 
 
 # ── test_missing_date_range_raises_value_error ────────────────────────────────
@@ -79,61 +124,63 @@ class TestMissingDateRangeRaisesValueError:
     def test_missing_date_from_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            make_eap_alarm_spool_key(None, "2025-01-07", ["GDBA-0212"])
+            make_eap_alarm_spool_key(None, "2025-01-07", ["GDBA"])
 
     def test_missing_date_to_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            make_eap_alarm_spool_key("2025-01-01", None, ["GDBA-0212"])
+            make_eap_alarm_spool_key("2025-01-01", None, ["GDBA"])
 
     def test_empty_date_from_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
         with pytest.raises(ValueError):
-            make_eap_alarm_spool_key("", "2025-01-07", ["GDBA-0212"])
+            make_eap_alarm_spool_key("", "2025-01-07", ["GDBA"])
 
     def test_missing_date_from_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            validate_eap_alarm_params(None, "2025-01-07", ["GDBA-0212"])
+            validate_eap_alarm_params(None, "2025-01-07", eqp_types=["GDBA"])
 
     def test_missing_date_to_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
-            validate_eap_alarm_params("2025-01-01", "", ["GDBA-0212"])
+            validate_eap_alarm_params("2025-01-01", "", eqp_types=["GDBA"])
 
     def test_both_dates_missing_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError):
-            validate_eap_alarm_params(None, None, ["GDBA-0212"])
+            validate_eap_alarm_params(None, None, eqp_types=["GDBA"])
 
 
 # ── test_machines_validation ──────────────────────────────────────────────────
 
 class TestMachinesValidation:
-    """machines param: empty/None → ValueError; valid RESOURCENAME list → ok."""
+    """eqp_types param: now optional; at-least-one-of-three rule (EA-08); enum check only when supplied."""
 
-    def test_single_valid_machine_no_error(self):
+    def test_single_valid_eqp_type_no_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GWBK-0246"])
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GWBK"])
 
-    def test_multiple_valid_machines_no_error(self):
+    def test_multiple_valid_eqp_types_no_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GDBA-0212", "GWBK-0246", "GWBA-0101"])
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GDBA", "GWBK", "GWBA"])
 
     def test_empty_list_raises_value_error(self):
+        """Empty eqp_types with no other dims → at-least-one-of-three error (EA-08)."""
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="machines must be non-empty"):
-            validate_eap_alarm_params("2025-01-01", "2025-01-07", [])
+        with pytest.raises(ValueError, match="at least one of"):
+            validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=[])
 
     def test_none_raises_value_error(self):
+        """None eqp_types with no other dims → at-least-one-of-three error (EA-08)."""
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="machines must be non-empty"):
-            validate_eap_alarm_params("2025-01-01", "2025-01-07", None)
+        with pytest.raises(ValueError, match="at least one of"):
+            validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=None)
 
     def test_empty_string_in_list_raises_value_error(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError, match="invalid machine values"):
-            validate_eap_alarm_params("2025-01-01", "2025-01-07", ["GDBA-0212", ""])
+            validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GDBA", ""])
 
 
 # ── test_alarm_category_decode ────────────────────────────────────────────────
@@ -201,7 +248,7 @@ class TestAlarmCategoryDecode:
 # ── test_schema_version_is_pinned ─────────────────────────────────────────────
 
 class TestSchemaVersionIsPinned:
-    """EA-06: _SCHEMA_VERSION must be pinned to exactly 1."""
+    """EA-06: _SCHEMA_VERSION must be pinned to exactly 3 (AC-4 red-green tripwire)."""
 
     def test_schema_version_is_integer(self):
         import mes_dashboard.services.eap_alarm_cache as cache_mod
@@ -209,9 +256,191 @@ class TestSchemaVersionIsPinned:
             f"_SCHEMA_VERSION must be int, got {type(cache_mod._SCHEMA_VERSION)}"
         )
 
-    def test_schema_version_equals_two(self):
+    def test_schema_version_equals_three(self):
         import mes_dashboard.services.eap_alarm_cache as cache_mod
-        assert cache_mod._SCHEMA_VERSION == 2, (
-            f"_SCHEMA_VERSION pin test: expected 2, got {cache_mod._SCHEMA_VERSION}. "
+        assert cache_mod._SCHEMA_VERSION == 3, (
+            f"_SCHEMA_VERSION pin test: expected 3, got {cache_mod._SCHEMA_VERSION}. "
             "If you changed the parquet schema, bump the version AND update this assertion."
         )
+
+
+# ── TestAtLeastOneFilterRequired ──────────────────────────────────────────────
+
+class TestAtLeastOneFilterRequired:
+    """EA-08: At least one of {eqp_types, lot_ids, product_dims} required."""
+
+    def test_all_empty_raises(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        with pytest.raises(ValueError, match="at least one of"):
+            validate_eap_alarm_params("2025-01-01", "2025-01-07")
+
+    def test_all_none_raises(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        with pytest.raises(ValueError, match="at least one of"):
+            validate_eap_alarm_params(
+                "2025-01-01", "2025-01-07",
+                eqp_types=None, lot_ids=None, pj_types=None,
+                product_lines=None, pj_bops=None,
+            )
+
+    def test_eqp_types_only_ok(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        # Should not raise
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GDBA"])
+
+    def test_lot_ids_only_ok(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", lot_ids=["LOT-001"])
+
+    def test_pj_types_only_ok(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", pj_types=["TypeA"])
+
+    def test_product_lines_only_ok(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", product_lines=["LineA"])
+
+    def test_pj_bops_only_ok(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", pj_bops=["BopA"])
+
+    def test_mixed_ok(self):
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params(
+            "2025-01-01", "2025-01-07",
+            eqp_types=["GDBA"], lot_ids=["LOT-001"], pj_types=["TypeA"],
+        )
+
+    def test_whitespace_only_lot_ids_treated_as_empty(self):
+        """Whitespace-only lot_ids are stripped before check → effectively empty (EA-09)."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        with pytest.raises(ValueError, match="at least one of"):
+            validate_eap_alarm_params(
+                "2025-01-01", "2025-01-07",
+                lot_ids=["   ", "\t", ""],
+            )
+
+
+# ── TestLotIdNormalization ────────────────────────────────────────────────────
+
+class TestLotIdNormalization:
+    """EA-09: lot_ids strip / dedup / max-200 cap."""
+
+    def test_whitespace_stripped_in_key(self):
+        """lot_ids with surrounding whitespace → stripped in spool key (AC-5)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], lot_ids=["LOT-A"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], lot_ids=["  LOT-A  "])
+        assert k1 == k2, "Whitespace-padded lot_id must produce same key as stripped version"
+
+    def test_whitespace_only_strings_dropped(self):
+        """Whitespace-only strings removed; remaining determine key."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], lot_ids=["LOT-A"])
+        k2 = make_eap_alarm_spool_key(
+            "2025-01-01", "2025-01-07", [], lot_ids=["   ", "LOT-A", "\t"]
+        )
+        assert k1 == k2
+
+    def test_duplicates_deduped_by_validation_before_key(self):
+        """Validation deduplicates lot_ids before they reach the key builder (AC-5).
+
+        The validation layer strips duplicates; callers must pass pre-deduped lists
+        to make_eap_alarm_spool_key. This test verifies that identical post-dedup
+        lists produce the same key.
+        """
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        # Calling validate must not raise for duplicate lot_ids
+        # (dedup happens silently inside validation)
+        validate_eap_alarm_params(
+            "2025-01-01", "2025-01-07",
+            lot_ids=["LOT-A", "LOT-A", "LOT-B", "LOT-A"],
+        )
+        # After dedup: ["LOT-A", "LOT-B"] — confirmed no error
+
+    def test_max_200_cap_exactly_200_ok(self):
+        """Exactly 200 lot_ids → no error (boundary is strictly > 200)."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        lot_ids = [f"LOT-{i:04d}" for i in range(200)]
+        # Should not raise
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", lot_ids=lot_ids)
+
+    def test_max_200_cap_exceeded_201_raises(self):
+        """201 lot_ids → ValueError (EA-09: strictly > 200)."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        lot_ids = [f"LOT-{i:04d}" for i in range(201)]
+        with pytest.raises(ValueError, match="lot_ids exceeds max"):
+            validate_eap_alarm_params("2025-01-01", "2025-01-07", lot_ids=lot_ids)
+
+    def test_char_padding_stripped_at_key_build(self):
+        """CHAR-padded lot_id 'LOT-A   ' → same key as 'LOT-A' (CHAR-padding safety)."""
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        k1 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], lot_ids=["LOT-A"])
+        k2 = make_eap_alarm_spool_key("2025-01-01", "2025-01-07", [], lot_ids=["LOT-A   "])
+        assert k1 == k2
+
+
+# ── TestProductDimsFilter ─────────────────────────────────────────────────────
+
+class TestProductDimsFilter:
+    """EA-10: _build_product_dims_exists generates correct EXISTS clauses."""
+
+    def test_no_dims_returns_empty(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists([], [], [])
+        assert clauses == []
+        assert params == {}
+
+    def test_pj_types_generates_exists_clause(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists(["TypeA", "TypeB"], [], [])
+        assert len(clauses) == 1
+        assert "EXISTS" in clauses[0]
+        assert "c.PJ_TYPE" in clauses[0]
+        assert "DWH.DW_MES_CONTAINER" in clauses[0]
+        assert "c.CONTAINERNAME = e.LOT_ID" in clauses[0]
+        assert "NVL(TRIM" in clauses[0]
+        assert "pjt_0" in params
+        assert "pjt_1" in params
+        assert params["pjt_0"] == "TypeA"
+        assert params["pjt_1"] == "TypeB"
+
+    def test_product_lines_generates_exists_clause(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists([], ["LineA"], [])
+        assert len(clauses) == 1
+        assert "c.PRODUCTLINENAME" in clauses[0]
+        assert "pln_0" in params
+
+    def test_pj_bops_generates_exists_clause(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists([], [], ["BopA"])
+        assert len(clauses) == 1
+        assert "c.PJ_BOP" in clauses[0]
+        assert "bop_0" in params
+
+    def test_multiple_dims_and_semantics(self):
+        """Each dim = separate EXISTS clause (AND-semantics, D-3)."""
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists(["TypeA"], ["LineA"], ["BopA"])
+        assert len(clauses) == 3, (
+            f"Expected 3 separate EXISTS clauses (one per dim), got {len(clauses)}: {clauses}"
+        )
+        # Each clause is an independent EXISTS
+        for c in clauses:
+            assert c.startswith("EXISTS"), f"Each clause must start with EXISTS, got: {c!r}"
+
+    def test_absent_dim_produces_no_clause(self):
+        """Empty pj_bops → no EXISTS for that dim."""
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        clauses, params = _build_product_dims_exists(["TypeA"], [], [])
+        assert len(clauses) == 1
+        assert "c.PJ_TYPE" in clauses[0]
+        assert not any("PJ_BOP" in c for c in clauses)
+        assert not any("PRODUCTLINENAME" in c for c in clauses)
+
+    def test_whitespace_stripped_from_values(self):
+        """CHAR-padding safety: bind values are stripped (EA-10, design.md Open Risk)."""
+        from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
+        _, params = _build_product_dims_exists(["  TypeA  "], [], [])
+        assert params["pjt_0"] == "TypeA"

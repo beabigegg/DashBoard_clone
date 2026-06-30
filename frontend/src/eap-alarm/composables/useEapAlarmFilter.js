@@ -1,19 +1,35 @@
 /**
  * useEapAlarmFilter.js
  *
- * Manages coarse filter state (date range + eqp_types) and fine filter state
- * (alarm_text, alarm_category, eqp_id). Re-syncs _lastCommitted from selection
- * after every fetchFilterOptions call (frontend-patterns.md snapshot-diff rule).
+ * Manages coarse filter state (date range + eqp_types + lot_ids + product_dims)
+ * and fine filter state (alarm_text, alarm_category, eqp_id). Re-syncs
+ * _lastCommitted from selection after every fetchFilterOptions call
+ * (frontend-patterns.md snapshot-diff rule).
  */
-import { reactive, ref } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
+import { apiGet } from '../../core/api';
 
 export function useEapAlarmFilter() {
   // ── Coarse filter (triggers spool) ──────────────────────────────────────────
   const coarseFilter = reactive({
     date_from: '',
     date_to: '',
-    machines: [], // RESOURCENAME list; populated at submit time from resource filter
+    machines: [],    // RESOURCENAME list; populated at submit time from resource filter
+    lot_ids: [],     // LOT_ID IN (...) filter; text input parsed by newline
+    pj_types: [],    // product dim: PJ type
+    product_lines: [], // product dim: package / product line
+    pj_bops: [],     // product dim: BOP
   });
+
+  // ── Product filter options (from /api/eap-alarm/product-filter-options) ─────
+  const productFilterOptions = ref({
+    pj_types: [],
+    product_lines: [],
+    pj_bops: [],
+    updated_at: null,
+  });
+
+  const productOptionsLoading = ref(false);
 
   // ── Fine filter (DuckDB only, no Oracle re-query) ──────────────────────────
   const fineFilter = reactive({
@@ -105,6 +121,71 @@ export function useEapAlarmFilter() {
     return params;
   }
 
+  /**
+   * Build POST body params for the coarse spool request.
+   * Omits empty arrays so the backend does not receive spurious empty dims.
+   * machines maps to the "machines" key (backward-compat with existing API).
+   */
+  function buildCoarseParams() {
+    const params = {
+      date_from: coarseFilter.date_from,
+      date_to: coarseFilter.date_to,
+    };
+    if (coarseFilter.machines.length > 0) {
+      params.machines = coarseFilter.machines;
+    }
+    if (coarseFilter.lot_ids.length > 0) {
+      params.lot_ids = coarseFilter.lot_ids;
+    }
+    if (coarseFilter.pj_types.length > 0) {
+      params.pj_types = coarseFilter.pj_types;
+    }
+    if (coarseFilter.product_lines.length > 0) {
+      params.product_lines = coarseFilter.product_lines;
+    }
+    if (coarseFilter.pj_bops.length > 0) {
+      params.pj_bops = coarseFilter.pj_bops;
+    }
+    return params;
+  }
+
+  /**
+   * Parse a raw textarea string (one LOT ID per line) into a clean array.
+   * Splits on newline, trims each entry, and drops empty strings.
+   */
+  function parseLotIdText(raw) {
+    return raw
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  /**
+   * Load product-filter-options from the backend on mount.
+   * Cold-cache empty arrays are safe — just leaves MultiSelects empty.
+   */
+  async function loadProductFilterOptions() {
+    productOptionsLoading.value = true;
+    try {
+      const result = await apiGet('/api/eap-alarm/product-filter-options', { timeout: 30000 });
+      const data = result?.data ?? {};
+      productFilterOptions.value = {
+        pj_types: Array.isArray(data.pj_types) ? data.pj_types : [],
+        product_lines: Array.isArray(data.product_lines) ? data.product_lines : [],
+        pj_bops: Array.isArray(data.pj_bops) ? data.pj_bops : [],
+        updated_at: data.updated_at ?? null,
+      };
+    } catch {
+      // non-fatal: cold cache — leave options as empty arrays
+    } finally {
+      productOptionsLoading.value = false;
+    }
+  }
+
+  onMounted(() => {
+    loadProductFilterOptions();
+  });
+
   function setDefaultDateRange() {
     const today = new Date();
     const end = new Date(today);
@@ -125,6 +206,8 @@ export function useEapAlarmFilter() {
     coarseFilter,
     fineFilter,
     filterOptions,
+    productFilterOptions,
+    productOptionsLoading,
     queryId,
     spoolReady,
     setQueryId,
@@ -134,6 +217,8 @@ export function useEapAlarmFilter() {
     hasFineFilterChanged,
     commitFineFilter,
     buildFineFilterParams,
+    buildCoarseParams,
+    parseLotIdText,
     setDefaultDateRange,
   };
 }

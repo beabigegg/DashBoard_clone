@@ -56,6 +56,15 @@
   box-shadow: 0 0 0 2px theme('colors.brand.100');
 }
 
+.theme-eap-alarm .filter-textarea {
+  height: auto;
+  resize: vertical;
+  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .theme-eap-alarm .filter-toolbar {
   display: flex;
   align-items: flex-end;

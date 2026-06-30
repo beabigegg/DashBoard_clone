@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/test_eap_alarm_service.py tests/integration/test_eap_alarm_data_boundary.py tests/integration/test_eap_alarm_resilience.py tests/integration/test_eap_alarm_rq_async.py --collect-only -q

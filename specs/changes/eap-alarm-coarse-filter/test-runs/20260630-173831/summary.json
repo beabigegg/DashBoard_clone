@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard pytest tests/integration/test_eap_alarm_data_boundary.py tests/integration/test_eap_alarm_resilience.py tests/integration/test_eap_alarm_rq_async.py -v --run-integration --run-integration-real",
+  "duration_ms": 5468,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173831/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173831/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173831/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

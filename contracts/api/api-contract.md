@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.33.0
+schema-version: 1.34.0
 last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
@@ -243,7 +243,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/get_table_info | required | — | GenericSuccessResponse | 500 | route tests |
 | POST | /api/get_table_columns | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/query_table | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/eap-alarm/spool | required | JSON body {date_from, date_to, eqp_types[]} | EapAlarmSpoolJobAccepted | 202/400/500 | route tests |
+| POST | /api/eap-alarm/spool | required | JSON body {date_from, date_to, eqp_types[] (opt), lot_ids[] (opt, max 200), pj_types[] (opt), product_lines[] (opt), pj_bops[] (opt); at-least-one-of-three: eqp_types/lot_ids/product_dims} | EapAlarmSpoolJobAccepted | 202/400/500 | route tests |
 | GET | /api/eap-alarm/spool/status | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/filter-options | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/summary | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
@@ -254,6 +254,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
 | GET | /api/job/{job_id}/result | required | ?prefix= | GenericSuccessResponse | 400/404 | route tests |
+| GET | /api/eap-alarm/product-filter-options | required | - | EapAlarmProductFilterOptionsResponse | 500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -465,6 +466,8 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.34.0] — 2026-06-30 (eap-alarm-coarse-filter):** `POST /api/eap-alarm/spool` gains `lot_ids[]`, `pj_types[]`, `product_lines[]`, `pj_bops[]` (all optional); `eqp_types[]` now optional; at-least-one-of-three validation (EA-08). New `GET /api/eap-alarm/product-filter-options` — reads `container_filter_cache`, maps `packages→product_lines` and `bops→pj_bops`; cold-cache = empty arrays (not 500). Spool key hash extended to all 5 dims; `_SCHEMA_VERSION` 2→3. New schema `EapAlarmProductFilterOptionsResponse`. Additive for clients that always supply `eqp_types`.
+- **[api 1.33.0] — 2026-06-30 (msd-forward-cause-effect):** `GET /api/mid-section-defect/analysis?direction=forward` gains `by_detection_loss_reason[]`, `loss_reason_workcenter_crosstab`, `downstream_trend[]`, `amplification`; schema `MsdForwardAnalysisResponse`. Detail gains `DETECTION_LOSS_REASON`; schema `MsdForwardDetailResponse`. Additive.
 - **[api 1.32.0] — 2026-06-29 (msd-type-package-filter):** New `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options for Type/Package FilterBar MultiSelects; reuses shared `container_filter_cache`; no Oracle at request time; 400 on malformed `selected` JSON; 500 on Oracle build error; response schema `MsdContainerFilterOptionsResponse`. `GET /api/mid-section-defect/analysis` gains optional `pj_types[]` and `packages[]` multi-value query params (absent/empty = no restriction; AND-semantics when both present; post-query filter on detection_df BEFORE spool derivation). Both params added to analysis result cache key to prevent collision. Additive; no existing fields removed or renamed.
 - **[api 1.31.0] — 2026-06-27 (fix-ci-conformance):** `GET /api/job/{job_id}/result` (auth required; ?prefix= query param; returns stored job result payload; 400/404). Endpoint existed in `job_routes.py` but was missing from the API contract.
 - **[api 1.29.0] — 2026-06-25 (rh-remove-supplementary-filter):** `POST /api/reject-history/query` gains `reasons[]` optional string array (additive; absent/empty = no restriction). `NVL(TRIM(r.LOSSREASONNAME), '(未填寫)') IN (...)` at `{{ BASE_WHERE }}` layer; sentinel `(未填寫)` distinct from container-level `(NA)`. `workcenter_groups[]` param removed; supplementary `{{ WHERE_CLAUSE }}` layer removed entirely. Sole consumer `frontend/src/reject-history/`; monorepo atomic cutover (same precedent as [api 1.27.0]).
@@ -1269,3 +1272,11 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
   }
 }
 ```
+
+### EapAlarmProductFilterOptionsResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| pj_types | string[] | yes | List of PJ_TYPE values from container_filter_cache |  |
+| product_lines | string[] | yes | List of PRODUCTLINENAME values (mapped from packages in cache) |  |
+| pj_bops | string[] | yes | List of PJ_BOP values (mapped from bops in cache) |  |
+| updated_at | string | no | ISO-8601 cache refresh timestamp; null if cache never populated |  |

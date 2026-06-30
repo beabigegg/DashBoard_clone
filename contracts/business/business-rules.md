@@ -3,7 +3,7 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.36.0
+schema-version: 1.37.0
 last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
@@ -359,13 +359,16 @@ breaking-change-policy: deprecate-2-minors
 
 | rule id | name | current behavior | tests |
 |---|---|---|---|
-| EA-01 | Spool-key composition | EAP ALARM spool key is `eap_alarm:{date_from}:{date_to}:{sorted_eqp_types_hash}` where `sorted_eqp_types_hash = sha256(sorted(','.join(sorted(eqp_types))))[:8]`. Same coarse-filter (same date range + same EQP type set) reuses existing parquet; no Oracle re-query. | unit tests |
+| EA-01 | Spool-key composition | EAP ALARM spool key is `eap_alarm:{date_from}:{date_to}:{coarse_dims_hash}` where `coarse_dims_hash = sha256(<canonical_repr>)[:8]`. Canonical repr covers all five coarse dims sorted: eqp_types, lot_ids (whitespace-stripped), pj_types, product_lines, pj_bops. Same full coarse-filter reuses existing parquet. `_SCHEMA_VERSION = 3` participates in the key; v2 parquet is auto-invalidated on first key-miss. | unit tests |
 | EA-02 | Fine-filter derivation from DuckDB only | After spool is built, all fine-filter options (alarm_text distinct list, alarm_category decoded list, equipment_id distinct list) are derived from the DuckDB spool. Any change in fine-filter selection triggers DuckDB recompute only — never a new Oracle query. | resilience tests |
 | EA-03 | LAST_UPDATE_TIME mandatory index filter | Every Oracle query against `DWH.EAP_EVENT` MUST include `LAST_UPDATE_TIME BETWEEN :date_from AND :date_to` predicate (index-driven). Full-table scans are forbidden. Missing or unbounded LAST_UPDATE_TIME → 400 `VALIDATION_ERROR`. | unit + integration tests |
 | EA-04 | DETAIL data from spool only | EAP_EVENT_DETAIL parameters are JOIN-loaded into the parquet spool at query time. Detail row expansion in the UI reads from the spool. No additional Oracle query is issued. | integration tests |
 | EA-05 | AlarmCategory decode table | AlarmCategory integer code is decoded to a display label using the fixed table below. Unknown code → `"未知"` fallback (never crashes). Decode applied at spool-load time; parquet stores decoded label alongside raw code. | unit tests |
 | EA-06 | Spool schema version | `eap_alarm_cache.py` contains integer `_SCHEMA_VERSION` that participates in the spool cache key. Bumping orphans stale parquets by key. Schema-breaking rollback requires `rm -f tmp/query_spool/eap_alarm/*.parquet`. Column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. | constant-pin test |
-| EA-07 | EQP type allowlist | `eqp_types` values are validated against the closed enum: `{GDBA, GCBA, GWBA, GWBK, GPRA, GTMH, GWMT, GDSD, GWAC, GPTA}`. Value outside this set → 400 `VALIDATION_ERROR`. Empty list → 400 `VALIDATION_ERROR`. | route tests |
+| EA-07 | EQP type allowlist | When `eqp_types` is supplied, values must match the closed enum: `{GDBA, GCBA, GWBA, GWBK, GPRA, GTMH, GWMT, GDSD, GWAC, GPTA}`. Value outside this set → 400 `VALIDATION_ERROR`. Empty list (when supplied) treated as "not supplied". | route tests |
+| EA-08 | Coarse-filter at-least-one rule | A spool request is accepted only when at least one of {eqp_types (non-empty after enum validation), lot_ids (non-empty after whitespace-strip), product_dims (any of pj_types/product_lines/pj_bops non-empty)} is provided. All three absent or empty → 400 `VALIDATION_ERROR`. Whitespace-only lot_id strings are silently stripped before this check. | route tests |
+| EA-09 | lot_ids Oracle injection | `lot_ids` values are applied as `EAP_EVENT.LOT_ID IN (:lot_0, :lot_1, ...)`. Whitespace stripped at both key-build and Oracle bind time. Duplicates de-duplicated before binding. Max 200 lot_ids per request; exceeding this → 400 VALIDATION_ERROR. | unit + integration tests |
+| EA-10 | product_dims EXISTS semi-join | When any of pj_types/product_lines/pj_bops is supplied, the Oracle query applies a separate EXISTS sub-select for each supplied dim: `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.<col>),'(NA)') IN (...))`. EXISTS prevents row explosion. Multiple dims supplied = AND-semantics (independent EXISTS per dim). Index DW_C_CONTAINERNAME is relied upon. Absent/empty individual dims are omitted. | integration tests (no-row-explosion fixture) |
 | EA-ALCD | SECS/GEM ALCD sign convention | Oracle `DWH.EAP_EVENT.ALCD < 0` = SET event; `ALCD >= 0` = CLEAR event. Worker filters `ALCD < 0` for SET rows and joins CLEAR via `RESOURCEID + ALARMID + timestamp window`. Full-table scans without EA-03's `LAST_UPDATE_TIME` index predicate are forbidden. | unit + integration tests |
 | EA-ASYNC | EAP ALARM unified job routing | `eap_alarm` is an always-async domain (`JobTypeConfig.always_async=True`). When `EAP_ALARM_USE_UNIFIED_JOB=on`, route enqueues via `enqueue_query_job("eap-alarm", ..., sync_fallback_allowed=False)`. Queue unavailable → HTTP 503 (ASYNC-06; never silent sync fallback). Queue available → HTTP 202. When flag is `off` (default), the legacy `run_eap_alarm_query_job` path is used unchanged (AC-8 zero-regression). ADR-0009: SET/CLEAR pairing deferred to `post_aggregate` (cross-seam safe). | `tests/test_async_query_job_service.py`, `tests/integration/test_eap_alarm_rq_async.py` |
 
@@ -450,6 +453,10 @@ The 焊接_DB workcenter group contains the following 12 DB process SPECs (autho
 ## [business 1.24.0] — 2026-06-19
 ### Added
 - production-reject-history-migration: ASYNC-07 (unified-job dispatch rule — `<DOMAIN>_USE_UNIFIED_JOB=on` routes to `enqueue_query_job` with `always_async=False` and `sync_fallback_allowed=True`; flag-off uses legacy path verbatim; independent per-domain flags). ASYNC-08 (OOM guard shift — unified job path uses DuckDB COPY/on-disk spill; legacy flag=off path retains existing guards unchanged; ast-absence test confirms no `len(df)/memory_usage`-IF-raise patterns in new worker modules or legacy files). Six new Decision Table rows for production_history and reject unified/legacy/unavailable paths. EA-ASYNC rule supplemented with P2 context (production_history + reject). Additive; no existing rules changed.
+
+## [business 1.37.0] — 2026-06-30
+### Added
+- eap-alarm-coarse-filter: EA-08 (at-least-one-of-three coarse-filter validation), EA-09 (lot_ids Oracle IN injection — strip/dedup/max-200), EA-10 (product_dims EXISTS semi-join — no row explosion, AND-semantics, DW_C_CONTAINERNAME index). EA-01 updated (spool-key hash extended to all 5 dims). EA-07 updated (eqp_types validation applies only when supplied; empty no longer unconditional 400). Additive; no existing rules removed.
 
 ## [business 1.23.0] — 2026-06-18
 ### Added

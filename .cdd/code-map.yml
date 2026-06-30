@@ -1,6 +1,6 @@
-# generated: 2026-06-30T10:01:06Z by cdd-kit 3.6.0
-# files: 967, src-lines: 300182, map-lines: 21468, compression: 14.0x
-# sources-digest: 2c728eb1d40b4da652f2935a49e54ceadad857ec2728d068376e842f43bae68d
+# generated: 2026-06-30T10:52:37Z by cdd-kit 3.6.0
+# files: 967, src-lines: 300375, map-lines: 21477, compression: 14.0x
+# sources-digest: 65608543caecaab08d2d5d82b687e678cb85d63d1f8f730c2718cc9f4fd5eb28
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -5395,7 +5395,7 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 610 lines
     - { name: api_export_event_detail, lines: 566-591 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
     - { name: _get_resource_lookup_safe, lines: 599-610 }
 
-src/mes_dashboard/routes/eap_alarm_routes.py:  # 399 lines
+src/mes_dashboard/routes/eap_alarm_routes.py:  # 465 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
     - { module: logging, items: [], line: 20 }
@@ -5410,13 +5410,14 @@ src/mes_dashboard/routes/eap_alarm_routes.py:  # 399 lines
     - { name: _get_spool_path, lines: 85-99 }
     - { name: _require_query_id, lines: 102-107 }
     - { name: _require_spool, lines: 110-115 }
-    - { name: api_eap_alarm_spool, lines: 121-239 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
-    - { name: api_eap_alarm_spool_status, lines: 245-267 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
-    - { name: api_eap_alarm_filter_options, lines: 273-291 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
-    - { name: api_eap_alarm_summary, lines: 297-315 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
-    - { name: api_eap_alarm_pareto, lines: 321-339 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
-    - { name: api_eap_alarm_trend, lines: 345-366 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
-    - { name: api_eap_alarm_detail, lines: 372-399 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
+    - { name: api_eap_alarm_spool, lines: 121-279 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
+    - { name: api_eap_alarm_spool_status, lines: 285-307 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
+    - { name: api_eap_alarm_filter_options, lines: 313-331 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
+    - { name: api_eap_alarm_summary, lines: 337-355 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
+    - { name: api_eap_alarm_pareto, lines: 361-379 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
+    - { name: api_eap_alarm_trend, lines: 385-406 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
+    - { name: api_eap_alarm_product_filter_options, lines: 412-432 }  # @eap_alarm_bp.route('/api/eap-alarm/product-filter-options', methods=['GET'])
+    - { name: api_eap_alarm_detail, lines: 438-465 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -7175,7 +7176,7 @@ src/mes_dashboard/services/mid_section_defect_service.py:  # 3829 lines
     - { name: _build_detail_table, lines: 3644-3744 }
     - { name: _build_forward_detail_table, lines: 3747-3829 }
 
-src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2084 lines
+src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2148 lines
   imports:
     - { module: __future__, items: [annotations], line: 25 }
     - { module: logging, items: [], line: 27 }
@@ -7185,7 +7186,7 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2084 lines
     - { name: SPOOL_NAMESPACE, line: 33 }
   classes:
     - name: MsdDuckdbRuntime
-      lines: 40-2084
+      lines: 40-2148
       methods:
         - { name: __init__, lines: 43-49 }
         - { name: _resolve_paths, lines: 51-75 }
@@ -7210,20 +7211,20 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2084 lines
         - { name: _compute_attribution_from_detection, lines: 1001-1032 }
         - { name: _compute_affected_machine_count, lines: 1034-1052 }
         - { name: _compute_detection_machine_chart, lines: 1054-1088 }
-        - { name: _compute_wafer_root_chart, lines: 1090-1169 }
-        - { name: _compute_machine_chart, lines: 1171-1213 }
-        - { name: _compute_material_chart, lines: 1215-1248 }
-        - { name: _compute_loss_reason_chart, lines: 1250-1296 }
-        - { name: _compute_available_loss_reasons, lines: 1298-1313 }
-        - { name: _compute_detail_total_count, lines: 1315-1337 }
-        - { name: _compute_workflow_chart, lines: 1339-1372 }
-        - { name: _compute_raw_machine_attribution, lines: 1374-1450 }
-        - { name: _compute_raw_materials_attribution, lines: 1452-1520 }
-        - { name: _to_pareto_items, lines: 1523-1540 }
-        - { name: _get_forward_detail, lines: 1546-1695 }
-        - { name: get_detail, lines: 1697-1960 }
-        - { name: get_all_detail, lines: 1962-2003 }
-        - { name: export_csv, lines: 2009-2084 }
+        - { name: _compute_wafer_root_chart, lines: 1090-1178 }
+        - { name: _compute_machine_chart, lines: 1180-1234 }
+        - { name: _compute_material_chart, lines: 1236-1278 }
+        - { name: _compute_loss_reason_chart, lines: 1280-1326 }
+        - { name: _compute_available_loss_reasons, lines: 1328-1343 }
+        - { name: _compute_detail_total_count, lines: 1345-1367 }
+        - { name: _compute_workflow_chart, lines: 1369-1402 }
+        - { name: _compute_raw_machine_attribution, lines: 1404-1489 }
+        - { name: _compute_raw_materials_attribution, lines: 1491-1584 }
+        - { name: _to_pareto_items, lines: 1587-1604 }
+        - { name: _get_forward_detail, lines: 1610-1759 }
+        - { name: get_detail, lines: 1761-2024 }
+        - { name: get_all_detail, lines: 2026-2067 }
+        - { name: export_csv, lines: 2073-2148 }
 
 src/mes_dashboard/services/msd_lineage_job_service.py:  # 348 lines
   imports:
@@ -16972,7 +16973,7 @@ tests/test_msd_duckdb_parity.py:  # 490 lines
     - { name: backward_spool_paths, lines: 164-170 }  # @pytest.fixture()
     - { name: _runtime_with_paths, lines: 177-191 }
 
-tests/test_msd_duckdb_runtime.py:  # 75 lines
+tests/test_msd_duckdb_runtime.py:  # 138 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: sys, items: [], line: 16 }
@@ -16994,6 +16995,14 @@ tests/test_msd_duckdb_runtime.py:  # 75 lines
       lines: 69-75
       methods:
         - { name: test_new_instance_is_not_resolved, lines: 70-75 }
+    - name: TestBackwardAttributionNoFanout
+      lines: 78-138
+      methods:
+        - { name: _conn, lines: 85-107 }
+        - { name: test_machine_chart_counts_defect_once, lines: 109-117 }
+        - { name: test_material_chart_counts_defect_once, lines: 119-124 }
+        - { name: test_raw_machine_attribution_counts_defect_once, lines: 126-131 }
+        - { name: test_raw_materials_attribution_counts_defect_once, lines: 133-138 }
 
 tests/test_msd_lineage_job_service.py:  # 210 lines
   imports:

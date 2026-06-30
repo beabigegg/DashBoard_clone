@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd /home/egg/Project/DashBoard_vite/frontend && npm run type-check",
+  "duration_ms": 9011,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-175648/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-175648/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-175648/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -8,6 +8,24 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.34.0] — 2026-06-30
+### Added
+- eap-alarm-coarse-filter: `GET /api/eap-alarm/product-filter-options` — new endpoint; `EapAlarmProductFilterOptionsResponse` schema.
+### Changed
+- eap-alarm-coarse-filter: `POST /api/eap-alarm/spool` gains `lot_ids[]`, `pj_types[]`, `product_lines[]`, `pj_bops[]` (optional); `eqp_types[]` now optional (at-least-one-of-three rule). `_SCHEMA_VERSION` 2→3.
+
+## [api-inventory 1.4.0] — 2026-06-30
+### Changed
+- eap-alarm-coarse-filter: `eap_alarm_routes.py` row updated; new product-filter-options endpoint documented.
+
+## [data 1.31.0] — 2026-06-30
+### Changed
+- eap-alarm-coarse-filter: §3.17 EAP ALARM spool key extended to 5 dims; Oracle EXISTS semi-join mapping table; product-filter-options payload shape; cold-cache invariant.
+
+## [business 1.37.0] — 2026-06-30
+### Added
+- eap-alarm-coarse-filter: EA-08, EA-09, EA-10. EA-01, EA-07 updated.
+
 ## [data 1.30.0] — 2026-06-30
 ### Added
 - msd-forward-cause-effect: §3.24.5 `by_front_downstream_reason_matrix` — 前段報廢原因 × 下游報廢原因 關聯矩陣 (cohort-membership attribution via lineage; rows/cols TOP_N=10 + "其他"; `cells` raw qty + `row_pct` row-normalized; empty → all-empty arrays). Additive on `direction=forward`.

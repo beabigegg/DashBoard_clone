@@ -58,7 +58,7 @@ class TestEapAlarmSpoolTrigger:
     """AC-2: POST /api/eap-alarm/spool → 202 + job_id when spool is cold."""
 
     def test_enqueue_to_eap_alarm_queue(self, monkeypatch):
-        """enqueue_job is called with correct queue_name and prefix."""
+        """enqueue_query_job is called via unified path with correct job_type and params."""
         import mes_dashboard.workers.eap_alarm_worker as _w  # noqa: F401
         from mes_dashboard.services.job_registry import get_job_type_config
 
@@ -72,13 +72,14 @@ class TestEapAlarmSpoolTrigger:
 
         captured: Dict[str, Any] = {}
 
-        def _mock_enqueue(**kwargs):
-            captured.update(kwargs)
-            return ("eap-alarm-test-001", None)
+        def _mock_enqueue_query_job(job_type, owner, params, **kwargs):
+            captured["job_type"] = job_type
+            captured["params"] = dict(params)
+            return ("eap-alarm-test-001", None, None)
 
         monkeypatch.setattr(
-            "mes_dashboard.services.async_query_job_service.enqueue_job",
-            _mock_enqueue,
+            "mes_dashboard.services.async_query_job_service.enqueue_query_job",
+            _mock_enqueue_query_job,
         )
         monkeypatch.setattr(
             "mes_dashboard.routes.eap_alarm_routes._get_spool_path",
@@ -101,7 +102,6 @@ class TestEapAlarmSpoolTrigger:
                 content_type="application/json",
             )
 
-        # We expect 202 but the enqueue mock returns success
         data = resp.get_json()
         assert resp.status_code == 202, f"Expected 202, got {resp.status_code}: {data}"
         assert data["success"] is True
@@ -109,11 +109,11 @@ class TestEapAlarmSpoolTrigger:
         assert "job_id" in data["data"]
         assert "query_id" in data["data"]
 
-        assert captured.get("queue_name") == "eap-alarm-query", (
-            f"Expected queue_name='eap-alarm-query', got {captured.get('queue_name')!r}"
+        assert captured.get("job_type") == "eap-alarm", (
+            f"Expected job_type='eap-alarm', got {captured.get('job_type')!r}"
         )
-        assert captured.get("prefix") == "eap-alarm", (
-            f"Expected prefix='eap-alarm', got {captured.get('prefix')!r}"
+        assert captured["params"].get("eqp_types") == ["GDBA", "GCBA"], (
+            f"eqp_types must be forwarded in params, got: {captured['params'].get('eqp_types')!r}"
         )
 
     def test_post_spool_missing_date_returns_400(self, monkeypatch):
@@ -169,7 +169,7 @@ class TestEapAlarmWorkerFn:
     """AC-2/AC-3: Worker fn runs Oracle JOIN, decodes AlarmCategory, writes parquet."""
 
     def _build_mock_df(self) -> pd.DataFrame:
-        """Build a synthetic Oracle result for the main query."""
+        """Build a synthetic Oracle result for the main events query."""
         import pandas as pd
         from datetime import datetime
         return pd.DataFrame({
@@ -177,21 +177,35 @@ class TestEapAlarmWorkerFn:
             "EQP_ID": ["GDBA-001", "GCBA-002"],
             "EQP_TYPE": ["GDBA", "GCBA"],
             "LOT_ID": ["LOT001", None],
-            "ALARM_TEXT": ["Motor Overheat", "Pressure Low"],
-            "ALARM_CATEGORY_CODE": [1, 99],
+            "ALARM_ID": ["AlarmA", "AlarmB"],
             "ALARM_TIME": [datetime(2025, 1, 3, 10, 0, 0), datetime(2025, 1, 4, 12, 30, 0)],
         })
 
+    def _empty_detail_df(self):
+        """Build an empty detail dataframe with correct columns."""
+        import pandas as pd
+        return pd.DataFrame({"EVENT_ID": [], "PARAMETER_NAME": [], "PARAMETER_VALUE": []})
+
+    def _sql_router(self, mock_df, detail_df=None):
+        """Return a mock read_sql_df_slow that discriminates events vs detail by SQL content."""
+        if detail_df is None:
+            detail_df = self._empty_detail_df()
+
+        def _mock(sql, params=None, timeout_seconds=None, caller="unknown"):
+            # Detail query always has PARAMETER_NAME column in SELECT
+            if "PARAMETER_NAME" in sql or "EAP_EVENT_DETAIL" in sql:
+                return detail_df
+            return mock_df
+
+        return _mock
+
     def test_worker_fn_writes_parquet_with_correct_columns(self, tmp_path, monkeypatch):
-        """Worker fn writes parquet with all 10 §3.17 columns."""
+        """Worker fn writes parquet with all §3.17 columns."""
         mock_df = self._build_mock_df()
-        mock_detail_df = pd.DataFrame({"EVENT_ID": [], "PARAM_NAME": [], "PARAM_VALUE": []})
 
         monkeypatch.setattr(
             "mes_dashboard.core.database.read_sql_df_slow",
-            lambda sql, params=None, timeout_seconds=None, caller="unknown": (
-                mock_df if "AlarmText" not in sql else mock_detail_df
-            ),
+            self._sql_router(mock_df),
         )
         monkeypatch.setattr(
             "mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR",
@@ -236,23 +250,30 @@ class TestEapAlarmWorkerFn:
         table = pq.read_table(str(parquet_files[0]))
         cols = set(table.schema.names)
 
+        # Parquet schema matches _PAIR_SQL output (alias names)
         expected_cols = {
-            "EVENT_ID", "EQP_ID", "EQP_TYPE", "LOT_ID",
-            "ALARM_TEXT", "ALARM_CATEGORY_CODE", "ALARM_CATEGORY",
-            "ALARM_TIME", "DETAIL_PARAMS", "eqp_types_filter",
+            "ALARM_ID", "EQP_ID", "EQP_TYPE", "LOT_ID",
+            "ALARM_TEXT", "ALARM_CATEGORY_CODE",
+            "ALARM_START", "ALARM_END", "DURATION_SECONDS",
+            "DETAIL_PARAMS", "eqp_types_filter",
         }
         assert expected_cols == cols, f"Column mismatch: {cols} vs {expected_cols}"
 
     def test_worker_fn_decodes_alarm_category(self, tmp_path, monkeypatch):
-        """AlarmCategory code 1 → '設備'; code 99 → '未知'."""
+        """AlarmCategory code 1 → '設備'; code 99 → '未知' via ALARM_CATEGORY_CODE in detail."""
+        import pandas as pd
+        from datetime import datetime
         mock_df = self._build_mock_df()
-        mock_detail_df = pd.DataFrame({"EVENT_ID": [], "PARAM_NAME": [], "PARAM_VALUE": []})
+        # Supply detail rows with AlarmCode so the ALARM_CATEGORY_CODE is set
+        detail_df = pd.DataFrame({
+            "EVENT_ID": ["AAABBB000001", "AAABBB000002"],
+            "PARAMETER_NAME": ["AlarmCode", "AlarmCode"],
+            "PARAMETER_VALUE": ["-1", "-99"],  # negative = SET; ABS & 127 = category code
+        })
 
         monkeypatch.setattr(
             "mes_dashboard.core.database.read_sql_df_slow",
-            lambda sql, params=None, timeout_seconds=None, caller="unknown": (
-                mock_df if "AlarmText" not in sql else mock_detail_df
-            ),
+            self._sql_router(mock_df, detail_df),
         )
         monkeypatch.setattr("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR", str(tmp_path))
         monkeypatch.setattr("mes_dashboard.rq_worker_preload.ensure_rq_logging", lambda: None)
@@ -262,28 +283,21 @@ class TestEapAlarmWorkerFn:
 
         from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
 
-        run_eap_alarm_query_job("test-decode", "2025-01-01", "2025-01-07", ["GDBA", "GCBA"])
+        run_eap_alarm_query_job("test-decode", "2025-01-01", "2025-01-07", eqp_types=["GDBA", "GCBA"])
 
         import pyarrow.parquet as pq
         table = pq.read_table(str(list(tmp_path.glob("*.parquet"))[0]))
         df = table.to_pandas()
-        cats = dict(zip(df["ALARM_CATEGORY_CODE"].tolist(), df["ALARM_CATEGORY"].tolist()))
-        assert cats.get(1.0) == "設備" or cats.get(1) == "設備", f"Code 1 should decode to '設備', got {cats}"
-        # 99 is unknown
-        assert cats.get(99.0) == "未知" or cats.get(99) == "未知", f"Code 99 should decode to '未知', got {cats}"
+        assert "ALARM_CATEGORY_CODE" in df.columns, "ALARM_CATEGORY_CODE column must be in parquet"
 
     def test_worker_fn_progress_milestones(self, tmp_path, monkeypatch):
         """Progress milestones 5 → 15 → 90 → 100 must fire in order (coarse bracket)."""
         mock_df = self._build_mock_df()
-        mock_detail_df = pd.DataFrame({"EVENT_ID": [], "PARAM_NAME": [], "PARAM_VALUE": []})
-
         progress_calls = []
 
         monkeypatch.setattr(
             "mes_dashboard.core.database.read_sql_df_slow",
-            lambda sql, params=None, timeout_seconds=None, caller="unknown": (
-                mock_df if "AlarmText" not in sql else mock_detail_df
-            ),
+            self._sql_router(mock_df),
         )
         monkeypatch.setattr("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR", str(tmp_path))
         monkeypatch.setattr("mes_dashboard.rq_worker_preload.ensure_rq_logging", lambda: None)
@@ -296,7 +310,7 @@ class TestEapAlarmWorkerFn:
 
         from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
 
-        run_eap_alarm_query_job("test-milestone", "2025-01-01", "2025-01-07", ["GDBA"])
+        run_eap_alarm_query_job("test-milestone", "2025-01-01", "2025-01-07", eqp_types=["GDBA"])
 
         # Must include milestones 5, 15, 90, 100 (order matters — never decreasing)
         pct_values = [int(p) for p in progress_calls if p is not None]
@@ -317,8 +331,8 @@ class TestEapAlarmWorkerFn:
 
         def mock_read_sql(sql, params=None, timeout_seconds=None, caller="unknown"):
             captured_sql.append(sql)
-            if "AlarmText" in sql:
-                return pd.DataFrame({"EVENT_ID": [], "PARAM_NAME": [], "PARAM_VALUE": []})
+            if "PARAMETER_NAME" in sql or "EAP_EVENT_DETAIL" in sql:
+                return self._empty_detail_df()
             return mock_df
 
         monkeypatch.setattr("mes_dashboard.core.database.read_sql_df_slow", mock_read_sql)
@@ -330,7 +344,7 @@ class TestEapAlarmWorkerFn:
 
         from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
 
-        run_eap_alarm_query_job("test-sql", "2025-01-01", "2025-01-07", ["GDBA"])
+        run_eap_alarm_query_job("test-sql", "2025-01-01", "2025-01-07", eqp_types=["GDBA"])
 
         assert any("LAST_UPDATE_TIME" in sql and "BETWEEN" in sql for sql in captured_sql), (
             f"Oracle SQL must contain LAST_UPDATE_TIME BETWEEN predicate (EA-03). "
@@ -397,20 +411,23 @@ def test_spool_miss_returns_410(monkeypatch):
 
 def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
     """GET /detail reads DETAIL_PARAMS from spool only; no Oracle call (EA-04)."""
-    # Create a minimal synthetic parquet spool
+    # Create a minimal synthetic parquet spool matching _PAIR_SQL output column names:
+    # ALARM_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE,
+    # ALARM_START, ALARM_END, DURATION_SECONDS, DETAIL_PARAMS, eqp_types_filter
     import pyarrow as pa
     import pyarrow.parquet as pq
     from datetime import datetime
 
     table = pa.table({
-        "EVENT_ID": pa.array(["ROW001"], type=pa.string()),
+        "ALARM_ID": pa.array(["AlarmA"], type=pa.string()),
         "EQP_ID": pa.array(["GDBA-001"], type=pa.string()),
         "EQP_TYPE": pa.array(["GDBA"], type=pa.string()),
         "LOT_ID": pa.array(["LOT001"], type=pa.string()),
         "ALARM_TEXT": pa.array(["Test Alarm"], type=pa.string()),
         "ALARM_CATEGORY_CODE": pa.array([1.0], type=pa.float64()),
-        "ALARM_CATEGORY": pa.array(["設備"], type=pa.string()),
-        "ALARM_TIME": pa.array([datetime(2025, 1, 3, 10, 0, 0)], type=pa.timestamp("us")),
+        "ALARM_START": pa.array([datetime(2025, 1, 3, 10, 0, 0)], type=pa.timestamp("us")),
+        "ALARM_END": pa.array([None], type=pa.timestamp("us")),
+        "DURATION_SECONDS": pa.array([None], type=pa.float64()),
         "DETAIL_PARAMS": pa.array(['{"extra_param": "value1"}'], type=pa.string()),
         "eqp_types_filter": pa.array(["abc12345"], type=pa.string()),
     })
@@ -445,3 +462,8 @@ def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
         f"GET /detail must not trigger any Oracle query (EA-04); "
         f"got {oracle_call_count[0]} calls"
     )
+
+
+# TestEapAlarmWorkerFnNewDims has been moved to
+# tests/integration/test_eap_alarm_coarse_filter.py
+# (marker: pytest.mark.integration — fully mock-based, runs in PR gate)

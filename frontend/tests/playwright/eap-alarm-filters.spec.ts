@@ -19,6 +19,19 @@
 import { test, expect } from '@playwright/test';
 import { navigateViaSidebar } from './_auth.js';
 
+// ── Mock payloads (product-filter-options) ────────────────────────────────────
+
+const MOCK_PRODUCT_FILTER_OPTIONS = {
+  success: true,
+  data: {
+    pj_types: ['TYPE-A', 'TYPE-B'],
+    product_lines: ['PKG-X', 'PKG-Y'],
+    pj_bops: ['BOP-1', 'BOP-2'],
+    updated_at: '2026-06-30T00:00:00Z',
+  },
+  meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+};
+
 // ── Mock payloads ─────────────────────────────────────────────────────────────
 
 const MOCK_QUERY_ID = 'mock-eap-query-001';
@@ -203,6 +216,15 @@ async function setupEapMocks(
     })
   );
 
+  // ── Product filter options (for TYPE/PACKAGE/BOP MultiSelects) ────────────
+  await page.route('**/api/eap-alarm/product-filter-options**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_PRODUCT_FILTER_OPTIONS),
+    })
+  );
+
   // ── Spool status polling ───────────────────────────────────────────────────
   await page.route('**/api/eap-alarm/spool/status**', (route) =>
     route.fulfill({
@@ -320,7 +342,8 @@ async function navigateToEapAlarm(page: import('@playwright/test').Page): Promis
 }
 
 /**
- * Fill coarse filter dates and submit.
+ * Fill coarse filter dates, enter a default LOT ID (to satisfy the
+ * at-least-one-of-three rule), and submit.
  * Returns false if the submit button is not found.
  */
 async function submitCoarseFilter(
@@ -338,6 +361,17 @@ async function submitCoarseFilter(
 
   const currentTo = await endInput.inputValue();
   if (!currentTo) await endInput.fill(dateTo);
+
+  // canSubmit requires at-least-one-of-three; provide a default LOT ID
+  // so the button becomes enabled even when no machine is selected.
+  const textarea = page.locator('[data-testid="lot-id-textarea"]');
+  if ((await textarea.count()) > 0) {
+    const currentLotId = await textarea.inputValue();
+    if (!currentLotId) {
+      await textarea.fill('DEFAULT-LOT-001');
+      await textarea.blur(); // trigger onLotIdBlur → update:filters
+    }
+  }
 
   const submitBtn = page.locator('[data-testid="coarse-submit-btn"]');
   if ((await submitBtn.count()) === 0) return false;
@@ -446,7 +480,8 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
     const body = spoolRequests[0].postData() ?? '';
     expect(body).toContain('2026-06-12');
     expect(body).toContain('2026-06-18');
-    expect(body).toContain('machines');
+    // machines is now optional (at-least-one-of-three rule); body may omit it
+    // Date fields are the only guaranteed fields
   });
 
   // 4. Fine filter panel appears after spool completes
@@ -663,5 +698,210 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
     // Page 1 of 3: next enabled, prev disabled
     await expect(pageNext).toBeEnabled({ timeout: 5_000 });
     await expect(pagePrev).toBeDisabled({ timeout: 5_000 });
+  });
+
+  // ── AC-6: New coarse filter controls ──────────────────────────────────────
+
+  // 12. LOT_ID textarea is visible in the filter panel
+  test('test_lot_id_textarea_visible', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    const textarea = page.locator('[data-testid="lot-id-textarea"]');
+    await expect(textarea).toBeVisible({ timeout: 15_000 });
+    await expect(textarea).toHaveAttribute('placeholder', /LOT ID/i);
+  });
+
+  // 13. TYPE/PACKAGE/BOP MultiSelects are visible in the filter panel
+  test('test_product_multiselects_visible', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    // Wait a moment for the product-filter-options fetch to complete
+    await page.waitForTimeout(500);
+
+    const pjTypeSelect = page.locator('[data-testid="pj-type-select"]');
+    const productLineSelect = page.locator('[data-testid="product-line-select"]');
+    const pjBopSelect = page.locator('[data-testid="pj-bop-select"]');
+
+    await expect(pjTypeSelect).toBeVisible({ timeout: 10_000 });
+    await expect(productLineSelect).toBeVisible({ timeout: 10_000 });
+    await expect(pjBopSelect).toBeVisible({ timeout: 10_000 });
+  });
+
+  // 14. LOT_ID-only submission succeeds (machines is optional — AC-6 machines-optional)
+  test('test_lot_id_only_submission_accepted', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    const spoolRequests: import('@playwright/test').Request[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/api/eap-alarm/spool') && !req.url().includes('status')) {
+        spoolRequests.push(req);
+      }
+    });
+
+    // Fill dates, enter LOT IDs, but do NOT select any machine
+    const startDate = page.locator('[data-testid="start-date"]');
+    const endDate = page.locator('[data-testid="end-date"]');
+    await startDate.fill('2026-06-12');
+    await endDate.fill('2026-06-18');
+
+    const textarea = page.locator('[data-testid="lot-id-textarea"]');
+    if ((await textarea.count()) === 0) {
+      test.skip(true, 'LOT ID textarea not found');
+      return;
+    }
+    await textarea.fill('LOT-001\nLOT-002');
+    await textarea.blur(); // trigger onLotIdBlur to parse lot_ids
+
+    const submitBtn = page.locator('[data-testid="coarse-submit-btn"]');
+    await submitBtn.click();
+
+    // Should NOT show validation error
+    await page.waitForTimeout(800);
+    const errorBanner = page.locator('[data-testid="error-banner"]');
+    const errorText = await errorBanner.textContent().catch(() => '');
+    expect(errorText).not.toContain('請選擇至少');
+
+    // Spool request should have been fired (machines-optional)
+    expect(spoolRequests.length, 'Spool request should fire with lot_ids only').toBeGreaterThan(0);
+    const body = spoolRequests[0].postData() ?? '';
+    expect(body).toContain('LOT-001');
+    expect(body).not.toContain('"machines"');
+  });
+
+  // 15. All-filters-empty submit shows inline validation error (AC-3 front-end guard)
+  test('test_all_filters_empty_shows_validation_error', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    // Fill dates but leave machines/LOT ID/product dims all empty
+    const startDate = page.locator('[data-testid="start-date"]');
+    const endDate = page.locator('[data-testid="end-date"]');
+    await startDate.fill('2026-06-12');
+    await endDate.fill('2026-06-18');
+
+    const submitBtn = page.locator('[data-testid="coarse-submit-btn"]');
+    await submitBtn.click();
+
+    // Should show at-least-one-of-three validation error
+    await page.waitForFunction(
+      () => {
+        const body = document.body.textContent || '';
+        return body.includes('請選擇至少') || body.includes('Please select at least one');
+      },
+      { timeout: 5_000, polling: 300 }
+    );
+
+    const bodyText = await page.locator('body').textContent() ?? '';
+    const hasError =
+      bodyText.includes('請選擇至少') || bodyText.includes('Please select at least one');
+    expect(hasError, 'Expected validation error for all-empty coarse filter').toBe(true);
+  });
+
+  // 16. LOT_ID textarea content is included in spool body when submitted
+  test('test_lot_id_forwarded_in_spool_body', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    const spoolRequests: import('@playwright/test').Request[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/api/eap-alarm/spool') && !req.url().includes('status')) {
+        spoolRequests.push(req);
+      }
+    });
+
+    const startDate = page.locator('[data-testid="start-date"]');
+    const endDate = page.locator('[data-testid="end-date"]');
+    await startDate.fill('2026-06-12');
+    await endDate.fill('2026-06-18');
+
+    const textarea = page.locator('[data-testid="lot-id-textarea"]');
+    if ((await textarea.count()) === 0) {
+      test.skip(true, 'LOT ID textarea not found');
+      return;
+    }
+    await textarea.fill('MYLOTICA\nMYLOTICB');
+    await textarea.blur();
+
+    const submitBtn = page.locator('[data-testid="coarse-submit-btn"]');
+    await submitBtn.click();
+
+    await page.waitForTimeout(1_000);
+
+    if (spoolRequests.length === 0) {
+      test.skip(true, 'No spool request fired — environment not ready');
+      return;
+    }
+
+    const body = spoolRequests[0].postData() ?? '';
+    expect(body).toContain('MYLOTICA');
+    expect(body).toContain('MYLOTICB');
+  });
+
+  // 17. LOT_ID via Tab→Enter keyboard flow: lot_ids must reach spool body (BLOCKING FIX 3 coverage)
+  test('test_lot_id_tab_then_enter_forwards_lot_ids', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    const spoolRequests: import('@playwright/test').Request[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/api/eap-alarm/spool') && !req.url().includes('status')) {
+        spoolRequests.push(req);
+      }
+    });
+
+    // Fill dates
+    const startDate = page.locator('[data-testid="start-date"]');
+    const endDate = page.locator('[data-testid="end-date"]');
+    await startDate.fill('2026-06-12');
+    await endDate.fill('2026-06-18');
+
+    // Type LOT IDs into textarea
+    const textarea = page.locator('[data-testid="lot-id-textarea"]');
+    if ((await textarea.count()) === 0) {
+      test.skip(true, 'LOT ID textarea not found');
+      return;
+    }
+    await textarea.focus();
+    await textarea.fill('TAB-LOT-001\nTAB-LOT-002');
+
+    // Press Tab to move focus to the next element (triggers blur → onLotIdBlur → update:filters)
+    await page.keyboard.press('Tab');
+
+    // Navigate focus to the submit button and activate with Enter (keyboard flow)
+    const submitBtn = page.locator('[data-testid="coarse-submit-btn"]');
+    await submitBtn.focus();
+    await page.keyboard.press('Enter');
+
+    await page.waitForTimeout(1_000);
+
+    if (spoolRequests.length === 0) {
+      test.skip(true, 'No spool request fired — environment not ready');
+      return;
+    }
+
+    const body = spoolRequests[0].postData() ?? '';
+    expect(body).toContain('TAB-LOT-001');
+    expect(body).toContain('TAB-LOT-002');
   });
 });

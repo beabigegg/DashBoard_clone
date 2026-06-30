@@ -1,0 +1,21 @@
+agent: ui-ux-reviewer
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-06-30"
+status: changes-required
+summary: >
+  3 BLOCKING issues found. (1) FilterBar.vue directly mutates props.filters — violates Vue 3
+  one-way data flow; must use emit/defineModel. (2) canSubmit ignores at-least-one-of-three rule
+  — submit button enabled even when validation will reject. (3) Keyboard blur/submit ordering
+  needs Playwright assertion after fix 1. Advisory: cold-cache loading indicator, label bilingual
+  inconsistency (PJ類型/PJ Type vs Package/BOP English-only), hint text contrast, clear-button
+  scope ambiguity, empty-state testid collision.
+artifacts:
+  - { type: blocking-findings, pointer: "FilterBar.vue line 55 (prop mutation in onLotIdBlur), lines 97-101 (handleClear prop mutation)" }
+  - { type: blocking-findings, pointer: "FilterBar.vue canSubmit computed (lines 105-109) missing at-least-one-of-three check" }
+  - { type: blocking-findings, pointer: "Keyboard submit path: Playwright assertion required after prop mutation fix" }
+  - { type: advisory-findings, pointer: "productOptionsLoading flag missing; cold-cache MultiSelects indistinguishable from no-data" }
+  - { type: advisory-findings, pointer: "Label inconsistency: PJ 類型/PJ Type bilingual vs Package/BOP English-only" }
+notes: >
+  i18n audit PASS — no vue-i18n system, inline bilingual pattern is consistent within app.
+  Advisory items (loading state, label consistency, hint contrast, testid collision) addressable
+  in same PR as blocking fixes.

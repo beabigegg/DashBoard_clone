@@ -57,7 +57,7 @@ FROM DWH.EAP_EVENT e
 WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
                               AND TO_DATE(:date_to,   'YYYY-MM-DD') + 1
   AND {equipment_filter}
-  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'
+  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'{extra_filters}
 """
 
 _DETAIL_SQL_TEMPLATE = """\
@@ -69,7 +69,7 @@ JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
 WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
                               AND TO_DATE(:date_to,   'YYYY-MM-DD') + 1
   AND {equipment_filter}
-  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'
+  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'{extra_filters}
 """
 
 # ── DuckDB pairing query ───────────────────────────────────────────────────────
@@ -145,6 +145,59 @@ ORDER BY ALARM_START DESC
 """
 
 
+def _build_lot_ids_filter(lot_ids: List[str]) -> tuple[str, Dict[str, Any]]:
+    """Build ``LOT_ID IN (:lot_0, ...)`` clause + bind params for the given lot_ids list.
+
+    lot_ids must already be stripped/deduped by the caller (validation layer).
+    Returns ("", {}) when lot_ids is empty so callers can skip the clause.
+    """
+    if not lot_ids:
+        return "", {}
+    placeholders = ", ".join(f":lot_{i}" for i in range(len(lot_ids)))
+    params = {f"lot_{i}": v for i, v in enumerate(lot_ids)}
+    return f"e.LOT_ID IN ({placeholders})", params
+
+
+def _build_product_dims_exists(
+    pj_types: List[str],
+    product_lines: List[str],
+    pj_bops: List[str],
+) -> tuple[List[str], Dict[str, Any]]:
+    """Build per-dim EXISTS clauses + bind params (EA-10, D-3).
+
+    Each supplied dim produces one separate EXISTS semi-join clause (AND-semantics).
+    TRIM applied to both column value (NVL) and bind values (CHAR-padding safety).
+    Absent/empty dims produce no clause.
+
+    Returns:
+        (clauses: list[str], params: dict) — each clause is a standalone EXISTS(...)
+        ready to be AND-joined into the WHERE predicate.
+    """
+    clauses: List[str] = []
+    params: Dict[str, Any] = {}
+
+    dim_map = [
+        ("pjt", "c.PJ_TYPE", pj_types),
+        ("pln", "c.PRODUCTLINENAME", product_lines),
+        ("bop", "c.PJ_BOP", pj_bops),
+    ]
+    for prefix, col, values in dim_map:
+        stripped = [str(v).strip() for v in values if str(v).strip()]
+        if not stripped:
+            continue
+        ph = ", ".join(f":{prefix}_{i}" for i in range(len(stripped)))
+        clause = (
+            f"EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c"
+            f" WHERE c.CONTAINERNAME = e.LOT_ID"
+            f" AND NVL(TRIM({col}), '(NA)') IN ({ph}))"
+        )
+        clauses.append(clause)
+        for i, v in enumerate(stripped):
+            params[f"{prefix}_{i}"] = v
+
+    return clauses, params
+
+
 def _build_equipment_filter(machines: List[str]) -> tuple[str, Dict[str, Any]]:
     _ORACLE_IN_LIMIT = 999
     eqp_params: Dict[str, Any] = {}
@@ -167,7 +220,11 @@ def run_eap_alarm_query_job(
     job_id: str,
     date_from: str,
     date_to: str,
-    machines: List[str],
+    eqp_types: List[str] = (),
+    lot_ids: List[str] = (),
+    pj_types: List[str] = (),
+    product_lines: List[str] = (),
+    pj_bops: List[str] = (),
 ) -> None:
     """RQ worker: Oracle fetch → DuckDB in-memory pairing → parquet write."""
     import hashlib
@@ -187,23 +244,46 @@ def run_eap_alarm_query_job(
     update_job_progress(_JOB_PREFIX, job_id, status="started", progress="initializing", pct="5")
 
     try:
-        spool_key = make_eap_alarm_spool_key(date_from, date_to, machines)
+        spool_key = make_eap_alarm_spool_key(
+            date_from, date_to,
+            list(eqp_types), list(lot_ids), list(pj_types), list(product_lines), list(pj_bops),
+        )
         spool_path = get_eap_alarm_spool_path(spool_key)
         os.makedirs(os.path.dirname(spool_path), exist_ok=True)
 
-        machines_hash = hashlib.sha256(
-            ",".join(sorted(machines)).encode("utf-8")
-        ).hexdigest()[:8]
+        machines_hash = hashlib.sha256(spool_key.encode("utf-8")).hexdigest()[:8]
 
-        equipment_filter, eqp_params = _build_equipment_filter(machines)
-        base_params: Dict[str, Any] = {"date_from": date_from, "date_to": date_to, **eqp_params}
+        equipment_filter, eqp_params = _build_equipment_filter(list(eqp_types))
+
+        # Build extra filter clauses for lot_ids and product_dims (EA-09, EA-10)
+        lot_clause, lot_params = _build_lot_ids_filter(list(lot_ids))
+        exists_clauses, exists_params = _build_product_dims_exists(
+            list(pj_types), list(product_lines), list(pj_bops)
+        )
+        extra_filter_parts = []
+        if lot_clause:
+            extra_filter_parts.append(f"\n  AND {lot_clause}")
+        for ec in exists_clauses:
+            extra_filter_parts.append(f"\n  AND {ec}")
+        extra_filters = "".join(extra_filter_parts)
+
+        base_params: Dict[str, Any] = {
+            "date_from": date_from,
+            "date_to": date_to,
+            **eqp_params,
+            **lot_params,
+            **exists_params,
+        }
 
         update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle", pct="15")
 
         from mes_dashboard.core.database import read_sql_df_slow
 
         events_df = read_sql_df_slow(
-            _EAP_EVENT_SQL_TEMPLATE.format(equipment_filter=equipment_filter),
+            _EAP_EVENT_SQL_TEMPLATE.format(
+                equipment_filter=equipment_filter,
+                extra_filters=extra_filters,
+            ),
             params=base_params,
             timeout_seconds=EAP_ALARM_JOB_TIMEOUT_SECONDS,
             caller="eap_alarm_worker",
@@ -214,7 +294,10 @@ def run_eap_alarm_query_job(
 
         try:
             detail_df = read_sql_df_slow(
-                _DETAIL_SQL_TEMPLATE.format(equipment_filter=equipment_filter),
+                _DETAIL_SQL_TEMPLATE.format(
+                    equipment_filter=equipment_filter,
+                    extra_filters=extra_filters,
+                ),
                 params=base_params,
                 timeout_seconds=EAP_ALARM_JOB_TIMEOUT_SECONDS,
                 caller="eap_alarm_worker_detail",
@@ -308,7 +391,9 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         self._machines_hash: str = ""
         self._equipment_filter: str = ""
         self._eqp_params: dict = {}
-        self._machines: List[str] = []
+        self._extra_filters: str = ""
+        self._extra_params: dict = {}
+        self._eqp_types: List[str] = []
         self._date_from: str = ""
         self._date_to: str = ""
 
@@ -316,21 +401,35 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         """Parse params, compute spool key, build daily chunk pairs."""
         date_from = str(self.params.get("date_from", "")).strip()
         date_to = str(self.params.get("date_to", "")).strip()
-        machines = list(self.params.get("machines", []))
+        eqp_types = list(self.params.get("eqp_types", []))
+        lot_ids = list(self.params.get("lot_ids", []))
+        pj_types = list(self.params.get("pj_types", []))
+        product_lines = list(self.params.get("product_lines", []))
+        pj_bops = list(self.params.get("pj_bops", []))
 
         self._date_from = date_from
         self._date_to = date_to
-        self._machines = machines
+        self._eqp_types = eqp_types
 
-        self._machines_hash = hashlib.sha256(
-            ",".join(sorted(machines)).encode("utf-8")
-        ).hexdigest()[:8]
+        self._equipment_filter, self._eqp_params = _build_equipment_filter(eqp_types)
 
-        self._equipment_filter, self._eqp_params = _build_equipment_filter(machines)
+        # Build extra filter clauses for lot_ids and product_dims (EA-09, EA-10)
+        lot_clause, lot_params = _build_lot_ids_filter(lot_ids)
+        exists_clauses, exists_params = _build_product_dims_exists(pj_types, product_lines, pj_bops)
+        extra_filter_parts = []
+        if lot_clause:
+            extra_filter_parts.append(f"\n  AND {lot_clause}")
+        for ec in exists_clauses:
+            extra_filter_parts.append(f"\n  AND {ec}")
+        self._extra_filters = "".join(extra_filter_parts)
+        self._extra_params = {**lot_params, **exists_params}
 
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key, get_eap_alarm_spool_path
-        self._spool_key = make_eap_alarm_spool_key(date_from, date_to, machines)
+        self._spool_key = make_eap_alarm_spool_key(
+            date_from, date_to, eqp_types, lot_ids, pj_types, product_lines, pj_bops
+        )
         self._spool_path = get_eap_alarm_spool_path(self._spool_key)
+        self._machines_hash = hashlib.sha256(self._spool_key.encode("utf-8")).hexdigest()[:8]
 
         # Build daily chunk pairs: one "events" chunk + one "detail" chunk per day
         start = datetime.strptime(date_from, "%Y-%m-%d")
@@ -344,6 +443,7 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
                 "date_from": day_str,
                 "date_to": next_day_str,
                 **self._eqp_params,
+                **self._extra_params,
             }
             chunks.append({
                 "kind": "events",
@@ -364,12 +464,18 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         """Return (sql, binds) for the given chunk kind."""
         if chunk_params["kind"] == "events":
             return (
-                _EAP_EVENT_SQL_TEMPLATE.format(equipment_filter=self._equipment_filter),
+                _EAP_EVENT_SQL_TEMPLATE.format(
+                    equipment_filter=self._equipment_filter,
+                    extra_filters=self._extra_filters,
+                ),
                 chunk_params["base_params"],
             )
         else:
             return (
-                _DETAIL_SQL_TEMPLATE.format(equipment_filter=self._equipment_filter),
+                _DETAIL_SQL_TEMPLATE.format(
+                    equipment_filter=self._equipment_filter,
+                    extra_filters=self._extra_filters,
+                ),
                 chunk_params["base_params"],
             )
 
@@ -489,7 +595,11 @@ def execute_eap_alarm_unified_job(
     job_id: str,
     date_from: str,
     date_to: str,
-    machines: list,
+    eqp_types: list = (),
+    lot_ids: list = (),
+    pj_types: list = (),
+    product_lines: list = (),
+    pj_bops: list = (),
 ) -> None:
     """RQ entry point for EapAlarmJob (EAP_ALARM_USE_UNIFIED_JOB=on path).
 
@@ -504,7 +614,15 @@ def execute_eap_alarm_unified_job(
     try:
         job = EapAlarmJob(
             job_id=job_id,
-            params={"date_from": date_from, "date_to": date_to, "machines": machines},
+            params={
+                "date_from": date_from,
+                "date_to": date_to,
+                "eqp_types": list(eqp_types),
+                "lot_ids": list(lot_ids),
+                "pj_types": list(pj_types),
+                "product_lines": list(product_lines),
+                "pj_bops": list(pj_bops),
+            },
         )
         spool_path = job.run()
         complete_job("eap-alarm", job_id, query_id=job._spool_key)

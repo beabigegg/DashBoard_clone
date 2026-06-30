@@ -124,6 +124,96 @@ def test_spool_miss_fine_filter_returns_410(endpoint, monkeypatch):
     assert data["success"] is False
 
 
+# ── Oracle error during EXISTS semi-join ─────────────────────────────────────
+
+def test_oracle_error_during_exists_semijoin(tmp_path, monkeypatch):
+    """Oracle error on worker job with EXISTS semi-join → complete_job called with error (AC-7)."""
+    error_calls = []
+
+    def mock_read_sql_slow(*args, **kwargs):
+        raise Exception("ORA-00942: table or view does not exist")
+
+    monkeypatch.setattr("mes_dashboard.core.database.read_sql_df_slow", mock_read_sql_slow)
+    monkeypatch.setattr("mes_dashboard.rq_worker_preload.ensure_rq_logging", lambda: None)
+    monkeypatch.setattr(
+        "mes_dashboard.services.async_query_job_service.update_job_progress",
+        lambda *a, **kw: None,
+    )
+    monkeypatch.setattr(
+        "mes_dashboard.services.async_query_job_service.complete_job",
+        lambda prefix, job_id, **kw: error_calls.append(kw),
+    )
+    monkeypatch.setattr("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR", str(tmp_path))
+
+    from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
+
+    with pytest.raises(Exception, match="ORA-00942"):
+        run_eap_alarm_query_job(
+            job_id="test-exists-fail",
+            date_from="2025-01-01",
+            date_to="2025-01-07",
+            pj_types=["TypeA"],
+            product_lines=["LineB"],
+            pj_bops=["BopC"],
+        )
+
+    assert len(error_calls) >= 1, "complete_job must be called on EXISTS Oracle failure"
+    assert any("error" in kw and kw["error"] for kw in error_calls), (
+        f"complete_job must be called with error kwarg. Got: {error_calls}"
+    )
+
+
+# ── container_filter_cache miss returns empty arrays ─────────────────────────
+
+def test_container_filter_cache_miss_returns_empty_arrays(monkeypatch):
+    """GET /api/eap-alarm/product-filter-options with cold cache → empty arrays + null updated_at (AC-7, D-2)."""
+    def mock_get_filter_options(selected=None):
+        return {}  # empty / cold cache
+
+    monkeypatch.setattr(
+        "mes_dashboard.services.container_filter_cache.get_filter_options",
+        mock_get_filter_options,
+    )
+
+    app = _make_app()
+    with app.test_client() as client:
+        resp = client.get("/api/eap-alarm/product-filter-options")
+
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.get_json()}"
+    data = resp.get_json()
+    assert data["success"] is True
+    payload = data["data"]
+    assert payload["pj_types"] == [], f"Cold cache pj_types must be [], got {payload['pj_types']!r}"
+    assert payload["product_lines"] == [], (
+        f"Cold cache product_lines must be [], got {payload['product_lines']!r}"
+    )
+    assert payload["pj_bops"] == [], f"Cold cache pj_bops must be [], got {payload['pj_bops']!r}"
+    assert payload["updated_at"] is None, (
+        f"Cold cache updated_at must be null, got {payload['updated_at']!r}"
+    )
+
+
+# ── All filters empty → 400 ───────────────────────────────────────────────────
+
+def test_all_filters_empty_returns_400(monkeypatch):
+    """POST /api/eap-alarm/spool with no filter dims → 400 VALIDATION_ERROR (AC-3, EA-08)."""
+    app = _make_app()
+    with app.test_client() as client:
+        resp = client.post(
+            "/api/eap-alarm/spool",
+            json={
+                "date_from": "2025-01-01",
+                "date_to": "2025-01-07",
+                # no eqp_types, lot_ids, pj_types, product_lines, pj_bops
+            },
+            content_type="application/json",
+        )
+
+    assert resp.status_code == 400, f"Expected 400, got {resp.status_code}: {resp.get_json()}"
+    data = resp.get_json()
+    assert data["success"] is False
+
+
 # ── In-flight job: client abandons polling (page unload simulation) ───────────
 
 def test_inflight_abort(monkeypatch):

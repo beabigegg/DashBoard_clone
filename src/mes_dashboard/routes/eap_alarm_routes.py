@@ -136,22 +136,54 @@ def api_eap_alarm_spool():
 
     date_from = str(body.get("date_from") or "").strip()
     date_to = str(body.get("date_to") or "").strip()
-    machines_raw = body.get("machines", [])
-    if not isinstance(machines_raw, list):
-        machines_raw = [machines_raw] if machines_raw else []
-    machines = [str(m).strip() for m in machines_raw if str(m).strip()]
 
-    # Validate params (EA-03)
+    # Parse eqp_types (formerly 'machines'; accept both keys for backward compat)
+    eqp_types_raw = body.get("eqp_types") or body.get("machines") or []
+    if not isinstance(eqp_types_raw, list):
+        eqp_types_raw = [eqp_types_raw] if eqp_types_raw else []
+    eqp_types = [str(m).strip() for m in eqp_types_raw if str(m).strip()]
+
+    # Parse new coarse dims
+    lot_ids_raw = body.get("lot_ids") or []
+    if not isinstance(lot_ids_raw, list):
+        lot_ids_raw = [lot_ids_raw] if lot_ids_raw else []
+    lot_ids = [str(v).strip() for v in lot_ids_raw if str(v).strip()]
+
+    pj_types_raw = body.get("pj_types") or []
+    if not isinstance(pj_types_raw, list):
+        pj_types_raw = [pj_types_raw] if pj_types_raw else []
+    pj_types = [str(v).strip() for v in pj_types_raw if str(v).strip()]
+
+    product_lines_raw = body.get("product_lines") or []
+    if not isinstance(product_lines_raw, list):
+        product_lines_raw = [product_lines_raw] if product_lines_raw else []
+    product_lines = [str(v).strip() for v in product_lines_raw if str(v).strip()]
+
+    pj_bops_raw = body.get("pj_bops") or []
+    if not isinstance(pj_bops_raw, list):
+        pj_bops_raw = [pj_bops_raw] if pj_bops_raw else []
+    pj_bops = [str(v).strip() for v in pj_bops_raw if str(v).strip()]
+
+    # Validate params (EA-03, EA-07, EA-08, EA-09)
     try:
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        validate_eap_alarm_params(date_from, date_to, machines)
+        validate_eap_alarm_params(
+            date_from, date_to,
+            eqp_types=eqp_types,
+            lot_ids=lot_ids,
+            pj_types=pj_types,
+            product_lines=product_lines,
+            pj_bops=pj_bops,
+        )
     except ValueError as exc:
         return validation_error(str(exc))
 
     # Build spool key to check for cache hit
     try:
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        spool_key = make_eap_alarm_spool_key(date_from, date_to, machines)
+        spool_key = make_eap_alarm_spool_key(
+            date_from, date_to, eqp_types, lot_ids, pj_types, product_lines, pj_bops
+        )
     except ValueError as exc:
         return validation_error(str(exc))
 
@@ -182,7 +214,11 @@ def api_eap_alarm_spool():
                     "job_id": job_id,
                     "date_from": date_from,
                     "date_to": date_to,
-                    "machines": machines,
+                    "eqp_types": eqp_types,
+                    "lot_ids": lot_ids,
+                    "pj_types": pj_types,
+                    "product_lines": product_lines,
+                    "pj_bops": pj_bops,
                 },
                 sync_fallback_allowed=False,
                 job_id=job_id,
@@ -204,7 +240,11 @@ def api_eap_alarm_spool():
                     "job_id": job_id,
                     "date_from": date_from,
                     "date_to": date_to,
-                    "machines": machines,
+                    "eqp_types": eqp_types,
+                    "lot_ids": lot_ids,
+                    "pj_types": pj_types,
+                    "product_lines": product_lines,
+                    "pj_bops": pj_bops,
                 },
                 prefix=_JOB_PREFIX,
                 job_timeout=EAP_ALARM_JOB_TIMEOUT_SECONDS,
@@ -364,6 +404,32 @@ def api_eap_alarm_trend():
     except Exception as exc:
         logger.error("eap_alarm_routes: trend failed query_id=%s: %s", query_id, exc)
         return internal_error("Trend 查詢失敗")
+
+
+# ── GET /api/eap-alarm/product-filter-options ────────────────────────────────
+
+@eap_alarm_bp.route("/api/eap-alarm/product-filter-options", methods=["GET"])
+def api_eap_alarm_product_filter_options():
+    """Return EAP alarm product-dim filter options (EA-10, D-2, §3.17).
+
+    Wraps container_filter_cache (shared with production-history).
+    Cold-cache path: returns empty arrays + updated_at=null — never 500.
+    Key mapping: cache ``packages`` → response ``product_lines``;
+                 cache ``bops``    → response ``pj_bops``.
+    """
+    try:
+        from mes_dashboard.services.container_filter_cache import get_filter_options
+        data = get_filter_options({})
+    except Exception as exc:
+        logger.warning("eap_alarm_routes: container_filter_cache failed, returning empty: %s", exc)
+        data = {}
+
+    return success_response({
+        "pj_types":      data.get("pj_types") or [],
+        "product_lines": data.get("packages") or [],   # packages → product_lines (PRODUCTLINENAME)
+        "pj_bops":       data.get("bops") or [],        # bops → pj_bops (PJ_BOP)
+        "updated_at":    data.get("updated_at"),
+    })
 
 
 # ── GET /api/eap-alarm/detail ─────────────────────────────────────────────────

@@ -44,6 +44,8 @@ const {
   coarseFilter,
   fineFilter,
   filterOptions,
+  productFilterOptions,
+  productOptionsLoading,
   queryId,
   spoolReady,
   setQueryId,
@@ -51,6 +53,7 @@ const {
   resetFilterOptions,
   applyFilterOptions,
   buildFineFilterParams,
+  buildCoarseParams,
   setDefaultDateRange,
 } = useEapAlarmFilter();
 
@@ -124,7 +127,18 @@ function validateCoarseFilter(): string {
   if (!coarseFilter.date_from) return '請填入開始日期';
   if (!coarseFilter.date_to) return '請填入結束日期';
   if (coarseFilter.date_from > coarseFilter.date_to) return '開始日期不能晚於結束日期';
-  if (coarseFilter.machines.length === 0) return '請至少選擇一台機台（或先透過型號篩選再查詢）';
+  // At-least-one-of-three: machines, lot_ids, or any product dim (EA-08)
+  const hasProductDim =
+    coarseFilter.pj_types.length > 0 ||
+    coarseFilter.product_lines.length > 0 ||
+    coarseFilter.pj_bops.length > 0;
+  if (
+    coarseFilter.machines.length === 0 &&
+    coarseFilter.lot_ids.length === 0 &&
+    !hasProductDim
+  ) {
+    return '請選擇至少一個篩選條件 / Please select at least one filter';
+  }
   return '';
 }
 
@@ -148,11 +162,7 @@ async function handleSubmit(): Promise<void> {
   resetViews();
 
   try {
-    const body = {
-      date_from: coarseFilter.date_from,
-      date_to: coarseFilter.date_to,
-      machines: coarseFilter.machines,
-    };
+    const body = buildCoarseParams();
 
     const resp = await apiPost('/api/eap-alarm/spool', body, { timeout: 60000 });
     const respObj = resp as Record<string, unknown>;
@@ -229,6 +239,10 @@ async function _loadAfterSpool(qId: string): Promise<void> {
 function handleClear(): void {
   cancelAsyncJob();
   coarseFilter.machines = [];
+  coarseFilter.lot_ids = [];
+  coarseFilter.pj_types = [];
+  coarseFilter.product_lines = [];
+  coarseFilter.pj_bops = [];
   errorMessage.value = '';
   queryLoading.value = false;
   queryId.value = '';
@@ -308,7 +322,10 @@ async function handleParetoClick(alarmText: string): Promise<void> {
         <FilterBar
           :filters="coarseFilter"
           :resource-options="resourceOptions"
+          :product-filter-options="productFilterOptions"
+          :product-options-loading="productOptionsLoading"
           :loading="{ querying: queryLoading }"
+          @update:filters="(val) => Object.assign(coarseFilter, val)"
           @submit="handleSubmit"
           @clear="handleClear"
         />

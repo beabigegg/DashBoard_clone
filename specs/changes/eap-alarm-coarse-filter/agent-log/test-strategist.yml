@@ -1,0 +1,18 @@
+agent: test-strategist
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-06-30"
+status: complete
+summary: >
+  Mapped all 7 ACs to test families across 6 test files. Updated 2 existing tests
+  (schema_version pin, machines-required error) to reflect contract changes. Identified
+  TestSchemaVersionIsPinned as the required red-green tripwire before implementation.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/eap-alarm-coarse-filter/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_eap_alarm_service.py → src/mes_dashboard/services/eap_alarm_cache.py" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_eap_alarm_data_boundary.py → src/mes_dashboard/services/eap_alarm_service.py" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_eap_alarm_resilience.py → src/mes_dashboard/routes/eap_alarm_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_eap_alarm_rq_async.py → src/mes_dashboard/workers/eap_alarm_worker.py" }
+  - { type: tdd-pairs, pointer: "frontend/tests/unit/eap-alarm-filter.test.js → frontend/src/eap-alarm/composables/useEapAlarmFilter.js" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/eap-alarm-filters.spec.ts → frontend/src/eap-alarm/FilterBar.vue" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), data-boundary (Tier 1), resilience (Tier 1), integration (Tier 1), e2e (Tier 1)" }
+  - { type: mapping-completeness, pointer: "all 7 ACs covered; 3 existing tests flagged for update in Test Update Contract" }

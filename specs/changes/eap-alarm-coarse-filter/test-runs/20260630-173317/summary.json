@@ -1,0 +1,19 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "changed-area",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "conda run -n mes-dashboard pytest tests/integration/test_eap_alarm_data_boundary.py tests/integration/test_eap_alarm_resilience.py tests/integration/test_eap_alarm_rq_async.py -v --run-integration --run-integration-real",
+  "duration_ms": 5405,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests/integration/test_eap_alarm_data_boundary.py::test_unknown_alarm_category_code_fallback",
+    "message": "_duckdb.BinderException: Binder Error: Referenced column \"ALARM_ID\" not found in FROM clause!"
+  },
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173317/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173317/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260630-173317/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

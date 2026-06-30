@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.30.0
+schema-version: 1.31.0
 last-changed: 2026-06-30
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1091,7 +1091,23 @@ Added by change `yield-alert-spool-refactor`. Spool namespace: `tmp/query_spool/
 
 ### §3.17 EAP ALARM Spool Schema
 
-Added by change `eap-alarm-analysis`. Spool namespace: `tmp/query_spool/eap_alarm/`. Governed by `_SCHEMA_VERSION` in `eap_alarm_cache.py`. All shapes wrapped in standard `success_response` envelope (§1.1).
+Added by change `eap-alarm-analysis`. Updated by `eap-alarm-coarse-filter` (schema_version 2→3). Spool namespace: `tmp/query_spool/eap_alarm/`. Governed by `_SCHEMA_VERSION` in `eap_alarm_cache.py`. All shapes wrapped in standard `success_response` envelope (§1.1).
+
+#### Spool key dimensions (schema_version 3)
+
+`make_eap_alarm_spool_key()` canonical repr covers **all five** coarse dims (sorted): `eqp_types`, `lot_ids` (whitespace-stripped), `pj_types`, `product_lines`, `pj_bops`. Identical full parameter sets produce identical keys; any dimension change produces a different key. `_SCHEMA_VERSION = 3` participates in the key — all v2 spool parquet is auto-invalidated on first key-miss after deploy.
+
+#### Oracle coarse-filter mapping
+
+| filter dim | Oracle predicate | source column | join |
+|---|---|---|---|
+| `eqp_types` | `EQP_TYPE IN (...)` | EAP_EVENT.EQP_TYPE | direct |
+| `lot_ids` | `LOT_ID IN (...)` | EAP_EVENT.LOT_ID | direct |
+| `pj_types` | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PJ_TYPE),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join — no row explosion |
+| `product_lines` | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PRODUCTLINENAME),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join — no row explosion |
+| `pj_bops` | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PJ_BOP),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join — no row explosion |
+
+Index relied upon: `DW_C_CONTAINERNAME` on `DWH.DW_MES_CONTAINER.CONTAINERNAME`. When multiple product_dims are supplied together, each produces a separate EXISTS clause (AND-semantics). Empty/whitespace `lot_ids` entries are stripped before key-build and Oracle bind.
 
 #### Parquet column schema
 
@@ -1106,9 +1122,24 @@ Added by change `eap-alarm-analysis`. Spool namespace: `tmp/query_spool/eap_alar
 | ALARM_CATEGORY | VARCHAR | no | Decoded label per EA-05 decode table; unknown code → "未知" |
 | ALARM_TIME | TIMESTAMP | no | LAST_UPDATE_TIME from EAP_EVENT |
 | DETAIL_PARAMS | VARCHAR | yes | JSON string of remaining EAP_EVENT_DETAIL params (excluding AlarmText, AlarmCategory, AlarmCode used as columns); NULL if no extra params |
-| eqp_types_filter | VARCHAR | no | Coarse-filter hash for partition reuse validation |
+| eqp_types_filter | VARCHAR | no | Coarse-filter hash covering all 5 dims (eqp_types, lot_ids, pj_types, product_lines, pj_bops); for partition reuse validation |
 
-**Breaking-change surface:** column add/remove/rename to `eap_alarm` parquet orphans existing files. `rm -f tmp/query_spool/eap_alarm/*.parquet` required on both deploy and rollback. Bump `_SCHEMA_VERSION` in the same commit.
+**Breaking-change surface:** column add/remove/rename to `eap_alarm` parquet orphans existing files. `rm -f tmp/query_spool/eap_alarm/*.parquet` required on both deploy and rollback. Bump `_SCHEMA_VERSION` in the same commit. The schema_version 2→3 bump in this change auto-invalidates all v2 spool files; no manual `rm` needed on first deploy.
+
+#### Product-filter-options payload shape
+
+`GET /api/eap-alarm/product-filter-options` — served from `container_filter_cache` (shared with production-history and other pages). No Oracle at request time. Cold cache returns empty arrays (mirrors §2.7 fail-open behavior).
+
+```json
+{
+  "pj_types":      ["string", "..."],
+  "product_lines": ["string", "..."],
+  "pj_bops":       ["string", "..."],
+  "updated_at":    "ISO-8601 string | null"
+}
+```
+
+Cold-cache invariant: when `container_filter_cache` is unpopulated, all three arrays are `[]` and `updated_at` is `null`. A cache build failure must not crash the options endpoint — return last-good cache or empty arrays.
 
 #### Response shapes (DuckDB-derived; all fine-filter aware)
 
@@ -1536,6 +1567,10 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ## [data 1.21.0] — 2026-06-19
 ### Added
 - resource-history-migration: §3.19 (spool-schema-UNCHANGED assertion for `resource_dataset` and `resource_oee` namespaces). Explicit non-goal: P3 migration does not change spool parquet schemas. No parquet cleanup required on deploy/rollback. Standard breaking-change policy (schema-version bump + cleanup) applies to any future column change. Additive; no existing schemas changed.
+
+## [data 1.31.0] — 2026-06-30
+### Changed
+- eap-alarm-coarse-filter: §3.17 updated — schema_version 2→3; added spool-key dimensions table (all 5 coarse dims); Oracle coarse-filter mapping table (EXISTS semi-join semantics, DW_C_CONTAINERNAME index); updated eqp_types_filter column notes; product-filter-options payload shape `{pj_types, product_lines, pj_bops, updated_at}` with cold-cache empty-arrays invariant. Additive; no existing parquet columns removed.
 
 ## [data 1.20.0] — 2026-06-19
 ### Added

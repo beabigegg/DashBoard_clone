@@ -34,18 +34,64 @@ _DETAIL_PER_PAGE_MAX = 200
 
 # ── Validation ────────────────────────────────────────────────────────────────
 
+_LOT_IDS_MAX = 200
+
+_VALID_EQP_TYPES = frozenset({
+    "GDBA", "GCBA", "GWBA", "GWBK", "GPRA", "GTMH", "GWMT", "GDSD", "GWAC", "GPTA",
+})
+
+
 def validate_eap_alarm_params(
     date_from: Optional[str],
     date_to: Optional[str],
-    machines: Optional[list],
+    eqp_types: Optional[list] = None,
+    lot_ids: Optional[list] = None,
+    pj_types: Optional[list] = None,
+    product_lines: Optional[list] = None,
+    pj_bops: Optional[list] = None,
 ) -> None:
+    """Validate EAP ALARM coarse filter params (EA-03, EA-07, EA-08, EA-09).
+
+    Raises:
+        ValueError: on missing dates, invalid eqp_type enum value (EA-07 only when supplied),
+                    all-empty filter axes (EA-08), or lot_ids overflow (EA-09).
+    """
     if not date_from or not date_to:
         raise ValueError("LAST_UPDATE_TIME filter required (date_from and date_to must be provided)")
-    if not machines:
-        raise ValueError("machines must be non-empty")
-    invalid = [m for m in machines if not isinstance(m, str) or not m.strip()]
-    if invalid:
-        raise ValueError(f"invalid machine values: {invalid!r}")
+
+    # Normalize eqp_types — enum check only when supplied
+    cleaned_eqp = []
+    if eqp_types:
+        invalid = [m for m in eqp_types if not isinstance(m, str) or not m.strip()]
+        if invalid:
+            raise ValueError(f"invalid machine values: {invalid!r}")
+        cleaned_eqp = [m for m in eqp_types if m.strip()]
+        invalid_enum = [m for m in cleaned_eqp if m not in _VALID_EQP_TYPES]
+        if invalid_enum:
+            raise ValueError(f"invalid eqp_type values (EA-07): {invalid_enum!r}")
+
+    # Normalize lot_ids — strip whitespace, drop empties, dedup
+    cleaned_lots: list[str] = []
+    if lot_ids:
+        seen: set[str] = set()
+        for raw in lot_ids:
+            v = str(raw).strip() if raw is not None else ""
+            if v and v not in seen:
+                seen.add(v)
+                cleaned_lots.append(v)
+    if len(cleaned_lots) > _LOT_IDS_MAX:
+        raise ValueError(
+            f"lot_ids exceeds max {_LOT_IDS_MAX} entries (EA-09): got {len(cleaned_lots)}"
+        )
+
+    # Check product_dims presence (any of pj_types / product_lines / pj_bops non-empty)
+    has_product_dims = bool(pj_types) or bool(product_lines) or bool(pj_bops)
+
+    # EA-08: at least one of {eqp_types, lot_ids, product_dims} required
+    if not cleaned_eqp and not cleaned_lots and not has_product_dims:
+        raise ValueError(
+            "at least one of {eqp_types, lot_ids, product_dims} must be provided (EA-08)"
+        )
 
 
 # ── DuckDB helpers ────────────────────────────────────────────────────────────

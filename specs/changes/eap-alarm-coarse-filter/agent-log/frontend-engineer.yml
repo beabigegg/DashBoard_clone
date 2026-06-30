@@ -1,0 +1,61 @@
+change-id: eap-alarm-coarse-filter
+agent: frontend-engineer
+timestamp: "2026-06-30T17:58:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/composables/useEapAlarmFilter.js" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/FilterBar.vue" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/App.vue" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/style.css" }
+  - { type: files-changed, pointer: "frontend/tests/unit/eap-alarm-filter.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/eap-alarm-filters.spec.ts" }
+  - { type: components-affected, pointer: "FilterBar (IP-8: LOT_ID textarea + TYPE/PACKAGE/BOP MultiSelects; BLOCKING FIX 1 + BLOCKING FIX 2)" }
+  - { type: components-affected, pointer: "useEapAlarmFilter (IP-7: coarseFilter + productFilterOptions + productOptionsLoading + buildCoarseParams)" }
+  - { type: components-affected, pointer: "App.vue (IP-8: @update:filters wiring + productOptionsLoading prop pass-through)" }
+  - { type: screenshot-paths, pointer: "n/a (no visual capture in this run)" }
+  - { type: accessibility-audit, pointer: "all new inputs have associated <label>; submit button has :title for disabled-reason; MultiSelects show loading placeholder" }
+next-action: none
+notes: |
+  Run 2 — ui-ux-reviewer BLOCKING FIX pass (2026-06-30):
+
+  BLOCKING FIX 1 (prop mutation eliminated):
+    - FilterBar.vue: removed all direct `props.filters.X = ...` writes.
+    - Added `emit('update:filters', { ...props.filters, <key>: value })` in:
+        onLotIdBlur(), updateFamilies(), updateMachines(), handleSubmit(), handleClear().
+    - Inline @update:model-value handlers for pj_types / product_lines / pj_bops
+      now emit via `emit('update:filters', { ...filters, dim: v })` instead of direct `filters.dim = v`.
+    - App.vue: wires `@update:filters="(val) => Object.assign(coarseFilter, val)"` on <FilterBar>.
+
+  BLOCKING FIX 2 (canSubmit at-least-one-of-three):
+    - Added `hasLotIds` computed: checks lot_ids?.length > 0 OR lotIdRaw.value.trim().length > 0
+      (covers the case where user typed but blur hasn't fired yet).
+    - canSubmit now gates on: !loading.querying && date_from && date_to &&
+      (machines.length > 0 || hasLotIds || pj_types.length > 0 || product_lines.length > 0 || pj_bops.length > 0).
+    - Submit button gets :title="'請選擇至少一項：機台、LOT ID 或產品條件'" when !canSubmit.
+
+  ADVISORY (productOptionsLoading flag):
+    - useEapAlarmFilter.js: added `productOptionsLoading = ref(false)`;
+      loadProductFilterOptions() now sets it true before fetch and false in finally block.
+    - FilterBar.vue: accepts `productOptionsLoading?: boolean` prop;
+      TYPE/PACKAGE/BOP MultiSelects are :disabled when productOptionsLoading is true,
+      and show :placeholder="'載入中...'" during load.
+    - App.vue: passes `:product-options-loading="productOptionsLoading"`.
+
+  ADVISORY (BOP/Package label bilingual):
+    - "BOP" → "BOP 製程 / BOP"; "Package" → "Package / 封裝".
+
+  BLOCKING FIX 3 (Playwright LOT_ID Tab→Enter test):
+    - Added test 17: `test_lot_id_tab_then_enter_forwards_lot_ids`
+      types LOT IDs, presses Tab (triggers blur→update:filters), focuses submit button,
+      presses Enter, asserts spool request body contains the LOT ID values.
+    - Updated submitCoarseFilter() helper: fills a default LOT ID when textarea is empty
+      to satisfy the new canSubmit at-least-one-of-three requirement for existing tests.
+
+  Tests:
+    - 34 unit tests pass (34 eap-alarm; +1 new productOptionsLoading ref test).
+    - css:check: 0 errors, 307 warnings (all pre-existing).
+    - type-check: 0 errors.
+    - cdd-kit test run: collect/targeted/changed-area all green.
+
+  Pre-existing failure noted (not introduced here):
+    tests/yield-alert/App.cross-filter.test.js::test_process_type_selector_propagates_to_all_views.
