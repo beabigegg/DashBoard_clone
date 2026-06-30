@@ -1,27 +1,17 @@
 {
-  "success": true,
   "data": {
-    "detail": [
-      {
-        "CONTAINERNAME": "LOT-A",
-        "PJ_TYPE": "TypeA",
-        "PRODUCTLINENAME": "LineA",
-        "WORKFLOW": "FlowA",
-        "DETECTION_EQUIPMENTNAME": "EQ01",
-        "INPUT_QTY": 100,
-        "DEFECT_QTY": 9,
-        "DOWNSTREAM_STATIONS": 1,
-        "DOWNSTREAM_REJECTS": 3,
-        "DOWNSTREAM_REJECT_RATE": 0.03,
-        "WORST_DOWNSTREAM": "測試",
-        "DETECTION_LOSS_REASON": "Scratch"
-      }
-    ],
-    "pagination": {"page": 1, "per_page": 50, "total": 1},
-    "trace_query_id": "test-uuid-001"
+    "detail": [],
+    "pagination": {
+      "page": 1,
+      "page_size": 200,
+      "total_count": 0,
+      "total_pages": 1
+    },
+    "trace_query_id": "msd-5be6b8e8830bc009"
   },
   "meta": {
-    "timestamp": "2026-06-30T00:00:00.000000",
-    "app_version": "unknown"
-  }
+    "app_version": "unknown",
+    "timestamp": "2026-06-30T19:48:30.397491"
+  },
+  "success": true
 }

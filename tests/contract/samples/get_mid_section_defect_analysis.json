@@ -1,39 +1,30 @@
 {
-  "success": true,
   "data": {
-    "kpi": {
-      "detection_lot_count": 2,
-      "detection_defect_qty": 18,
-      "detection_input_qty": 200,
-      "downstream_lot_count": 3,
-      "downstream_total_reject": 5,
-      "downstream_total_input": 150
+    "amplification": null,
+    "attribution": [],
+    "available_loss_reasons": [],
+    "charts": {
+      "by_detection_machine": [],
+      "by_downstream_loss_reason": [],
+      "by_downstream_machine": [],
+      "by_downstream_station": []
     },
-    "charts": {},
     "daily_trend": [],
-    "available_loss_reasons": ["Scratch", "Particle"],
+    "detail_total_count": 0,
     "genealogy_status": "ready",
-    "trace_query_id": "test-uuid-001",
-    "detail_total_count": 2,
-    "by_detection_loss_reason": [
-      {"loss_reason": "Scratch", "reject_qty": 12, "reject_rate": 0.06},
-      {"loss_reason": "Particle", "reject_qty": 6, "reject_rate": 0.03}
-    ],
-    "loss_reason_workcenter_crosstab": {
-      "loss_reasons": ["Scratch", "Particle"],
-      "workcenter_groups": ["測試"],
-      "cells": [
-        {"loss_reason": "Scratch", "workcenter_group": "測試", "reject_qty": 5, "reject_rate": 0.025}
-      ]
+    "kpi": {
+      "detection_defect_qty": 0,
+      "detection_lot_count": 0,
+      "downstream_reject_rate": 0.0,
+      "downstream_stations_reached": 0,
+      "downstream_total_reject": 0,
+      "tracked_lot_count": 0
     },
-    "downstream_trend": [
-      {"date": "2026-06-01", "reject_qty": 3, "reject_rate": 0.015},
-      {"date": "2026-06-02", "reject_qty": 2, "reject_rate": 0.01}
-    ],
-    "amplification": 0.27
+    "trace_query_id": "msd-5be6b8e8830bc009"
   },
   "meta": {
-    "timestamp": "2026-06-30T00:00:00.000000",
-    "app_version": "unknown"
-  }
+    "app_version": "unknown",
+    "timestamp": "2026-06-30T19:48:30.395764"
+  },
+  "success": true
 }

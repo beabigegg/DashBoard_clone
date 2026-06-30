@@ -1,11 +1,11 @@
 {
   "error": {
-    "code": "INTERNAL_ERROR",
-    "message": "伺服器內部錯誤"
+    "code": "CACHE_EXPIRED",
+    "message": "快取資料已過期，請稍後再試"
   },
   "meta": {
     "app_version": "unknown",
-    "timestamp": "2026-06-24T08:57:07.074733"
+    "timestamp": "2026-06-30T19:48:30.400898"
   },
   "success": false
 }
