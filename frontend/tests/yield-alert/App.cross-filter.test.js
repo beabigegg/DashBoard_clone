@@ -421,7 +421,12 @@ describe('Yield Alert App URL and cross-filter behavior', () => {
       await gcRadio.trigger('change');
       await nextTick();
       await nextTick();
-      // Switching process_type should trigger a new primary query
+      // process_type change clears stale state; user must re-click to fetch new data
+      // (see App.vue watch(selectedProcessType) — deliberately no auto-re-query)
+      const reQueryButton = wrapper.find('button.ui-btn--primary');
+      await reQueryButton.trigger('click');
+      await nextTick();
+      await nextTick();
       expect(postCallCount).toBeGreaterThan(postCallsBeforeSwitch);
     } else {
       // If radio not found, at minimum verify the POST body includes process_type
