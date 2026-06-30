@@ -422,6 +422,7 @@ class MsdDuckdbRuntime:
             loss_reasons=loss_reasons,
             pj_types=pj_types,
             packages=packages,
+            station_order_fallback=station_order_fallback,
         )
 
     def _get_forward_summary(
@@ -429,209 +430,194 @@ class MsdDuckdbRuntime:
         loss_reasons: Optional[List[str]] = None,
         pj_types: Optional[List[str]] = None,
         packages: Optional[List[str]] = None,
+        station_order_fallback: int = 999,
     ) -> Optional[Dict[str, Any]]:
-        """Compute forward-direction summary KPIs using detection + events spools.
+        """Compute forward-direction summary KPIs and all Phase-3 charts from spools.
 
-        Single-pass GROUP BY on events spool (SEED_ID denormalized at write time via
-        forward lineage spool).  No per-query lineage JOIN required.
+        Reuses the same in-memory forward builders as
+        ``build_trace_aggregation_from_events`` (direction='forward'), sourcing
+        detection/events data from the parquet spools instead of live Oracle so
+        that the DuckDB spool-hit path produces an identical payload structure to
+        the in-memory path.
 
-        Returns None only when the events spool is missing (safe degrade path so
-        caller can fall back to Oracle/in-memory if events not spooled yet).
-        Never returns None due to missing lineage or detection — those degrade to
-        events-only KPIs (AC-6: must not return None silently when events exist).
+        Returns None only when both the detection spool AND the events spool are
+        missing (safe degrade — caller falls back to Oracle/in-memory).
+        Never returns None due to missing forward-lineage spool — that degrades
+        gracefully to per-CONTAINERID attribution.
         """
         self._resolve_paths()
-        if not self._events_path or not Path(self._events_path).exists():
+        has_detection = bool(self._detection_path and Path(self._detection_path).exists())
+        has_events = bool(self._events_path and Path(self._events_path).exists())
+        if not has_detection and not has_events:
             return None
 
         try:
-            from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
+            import pandas as pd
+            from mes_dashboard.services.mid_section_defect_service import (
+                _apply_population_mask,
+                _attribute_forward_defects,
+                _build_by_detection_loss_reason,
+                _build_daily_trend,
+                _build_detection_lookup,
+                _build_downstream_trend,
+                _build_forward_charts,
+                _build_forward_kpi,
+                _build_loss_reason_workcenter_crosstab,
+                _compute_amplification_kpi,
+                parse_loss_reasons_param,
+            )
 
-            conn = create_heavy_query_connection()
-            try:
-                conn.execute(
-                    f"CREATE VIEW events AS SELECT * FROM read_parquet('{self._events_path}')"
+            # ---- Detection spool ------------------------------------------------
+            if has_detection:
+                detection_df = pd.read_parquet(self._detection_path)
+                # Population mask (pj_types / packages) — both numerator and denominator
+                detection_df = _apply_population_mask(detection_df, pj_types, packages)
+                normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
+                # Available loss reasons: from the population (before loss_reason mask)
+                available_loss_reasons = sorted(
+                    detection_df.loc[detection_df["REJECTQTY"] > 0, "LOSSREASONNAME"]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                    .unique()
+                    .tolist()
                 )
-
-                # Register forward lineage view if available
-                has_fwd_lineage = bool(
-                    self._forward_lineage_path and Path(self._forward_lineage_path).exists()
-                )
-                if has_fwd_lineage:
-                    conn.execute(
-                        f"CREATE VIEW fwd_lineage AS "
-                        f"SELECT * FROM read_parquet('{self._forward_lineage_path}')"
-                    )
-
-                # Register detection view with pj_type/package filters
-                has_detection = bool(
-                    self._detection_path and Path(self._detection_path).exists()
-                )
-                if has_detection:
-                    pj_filter = ""
-                    pkg_filter = ""
-                    if pj_types:
-                        quoted = ", ".join(
-                            f"'{self._sql_quote(str(v).strip())}'" for v in pj_types if str(v).strip()
-                        )
-                        if quoted:
-                            pj_filter = f"AND TRIM(PJ_TYPE) IN ({quoted})"
-                    if packages:
-                        quoted = ", ".join(
-                            f"'{self._sql_quote(str(v).strip())}'" for v in packages if str(v).strip()
-                        )
-                        if quoted:
-                            pkg_filter = f"AND TRIM(PRODUCTLINENAME) IN ({quoted})"
-
-                    lr_filter = ""
-                    if loss_reasons:
-                        quoted_lr = ", ".join(
-                            f"'{self._sql_quote(str(r).strip())}'" for r in loss_reasons if str(r).strip()
-                        )
-                        if quoted_lr:
-                            lr_filter = (
-                                f"AND (LOSSREASONNAME IN ({quoted_lr}) "
-                                f"OR REJECTQTY = 0 OR LOSSREASONNAME IS NULL)"
-                            )
-
-                    conn.execute(
-                        f"""
-                        CREATE VIEW detection AS
-                        SELECT * FROM read_parquet('{self._detection_path}')
-                        WHERE 1=1 {pj_filter} {pkg_filter} {lr_filter}
-                        """
-                    )
-
-                # Detection KPI: lot count + detection reject qty + trackinqty
-                if has_detection:
-                    det_row = conn.execute(
-                        """
-                        SELECT
-                            COUNT(DISTINCT CONTAINERID) AS lot_count,
-                            SUM(CASE WHEN REJECTQTY > 0 THEN REJECTQTY ELSE 0 END) AS detection_reject_qty,
-                            SUM(TRACKINQTY) AS detection_input_qty,
-                            COUNT(DISTINCT CASE WHEN REJECTQTY > 0 THEN CONTAINERID END) AS defect_lot_count
-                        FROM detection
-                        """
-                    ).fetchone()
-                    det_lot_count = int(det_row[0] or 0) if det_row else 0
-                    det_reject_qty = int(det_row[1] or 0) if det_row else 0
-                    det_input_qty = int(det_row[2] or 0) if det_row else 0
-                    det_defect_lot_count = int(det_row[3] or 0) if det_row else 0
-
-                    available_loss_reasons_rows = conn.execute(
-                        """
-                        SELECT DISTINCT LOSSREASONNAME
-                        FROM detection
-                        WHERE REJECTQTY > 0 AND LOSSREASONNAME IS NOT NULL
-                        ORDER BY LOSSREASONNAME
-                        """
-                    ).fetchall()
-                    available_loss_reasons = [r[0] for r in available_loss_reasons_rows if r[0]]
+                # loss_reason soft-mask: keep zero-defect rows so the lot stays in the pop
+                if normalized_loss_reasons and "LOSSREASONNAME" in detection_df.columns:
+                    filtered_df = detection_df[
+                        detection_df["LOSSREASONNAME"].isin(normalized_loss_reasons)
+                        | (detection_df["REJECTQTY"] == 0)
+                        | (detection_df["LOSSREASONNAME"].isna())
+                    ].copy()
                 else:
-                    det_lot_count = 0
-                    det_reject_qty = 0
-                    det_input_qty = 0
-                    det_defect_lot_count = 0
-                    available_loss_reasons = []
+                    filtered_df = detection_df.copy()
+            else:
+                detection_df = pd.DataFrame()
+                filtered_df = pd.DataFrame()
+                normalized_loss_reasons = parse_loss_reasons_param(loss_reasons)
+                available_loss_reasons = []
 
-                # Events KPI: downstream rejects and stations reached
+            detection_data = _build_detection_lookup(filtered_df) if not filtered_df.empty else {}
+            defect_cids: List[str] = (
+                filtered_df.loc[filtered_df["REJECTQTY"] > 0, "CONTAINERID"]
+                .astype(str)
+                .unique()
+                .tolist()
+                if not filtered_df.empty
+                else []
+            )
+
+            # ---- Events spool: reconstruct wip_by_cid and downstream_rejects ---
+            wip_by_cid: Dict[str, List[Dict[str, Any]]] = {}
+            downstream_rejects: Dict[str, List[Dict[str, Any]]] = {}
+            if has_events:
+                events_df = pd.read_parquet(self._events_path)
+                if not events_df.empty and "CONTAINERID" in events_df.columns:
+                    ev_cid = events_df["CONTAINERID"].astype(str)
+                    wcg_col = "WORKCENTER_GROUP" if "WORKCENTER_GROUP" in events_df.columns else None
+                    if wcg_col:
+                        # WIP rows: TRACKINQTY > 0
+                        if "TRACKINQTY" in events_df.columns:
+                            wip_mask = pd.to_numeric(events_df["TRACKINQTY"], errors="coerce").fillna(0) > 0
+                            wip_rows = events_df[wip_mask]
+                            eq_col = "EQUIPMENTNAME" if "EQUIPMENTNAME" in events_df.columns else None
+                            for idx, row in wip_rows.iterrows():
+                                cid = str(ev_cid[idx])
+                                g = str(row[wcg_col]).strip() if row[wcg_col] is not None else ""
+                                if not g:
+                                    continue
+                                eq = str(row[eq_col]).strip() if (eq_col and row.get(eq_col) is not None) else "(NA)"
+                                ts_col = "TRACKINTIMESTAMP" if "TRACKINTIMESTAMP" in events_df.columns else None
+                                ts = str(row[ts_col])[:10] if (ts_col and row.get(ts_col) is not None) else ""
+                                wip_by_cid.setdefault(cid, []).append({
+                                    "workcenter_group": g,
+                                    "equipment_name": eq,
+                                    "trackinqty": int(row["TRACKINQTY"]) if row["TRACKINQTY"] == row["TRACKINQTY"] else 0,
+                                    "trackintimestamp": ts,
+                                })
+                        # Reject rows: REJECT_TOTAL_QTY > 0
+                        if "REJECT_TOTAL_QTY" in events_df.columns:
+                            rej_mask = pd.to_numeric(events_df["REJECT_TOTAL_QTY"], errors="coerce").fillna(0) > 0
+                            rej_rows = events_df[rej_mask]
+                            eq_col = "EQUIPMENTNAME" if "EQUIPMENTNAME" in events_df.columns else None
+                            lr_col = "LOSSREASONNAME" if "LOSSREASONNAME" in events_df.columns else None
+                            td_col = "TXNDATE" if "TXNDATE" in events_df.columns else None
+                            for idx, row in rej_rows.iterrows():
+                                cid = str(ev_cid[idx])
+                                g = str(row[wcg_col]).strip() if row[wcg_col] is not None else ""
+                                if not g:
+                                    continue
+                                eq = str(row[eq_col]).strip() if (eq_col and row.get(eq_col) is not None) else "(NA)"
+                                reason = str(row[lr_col]).strip() if (lr_col and row.get(lr_col) is not None) else "(未填寫)"
+                                txndate = str(row[td_col])[:10] if (td_col and row.get(td_col) is not None) else ""
+                                qty = row["REJECT_TOTAL_QTY"]
+                                downstream_rejects.setdefault(cid, []).append({
+                                    "workcenter_group": g,
+                                    "equipment_name": eq,
+                                    "lossreasonname": reason,
+                                    "reject_total_qty": int(qty) if qty == qty else 0,
+                                    "txndate": txndate,
+                                })
+
+            # ---- Forward lineage spool (AC-4 descendant re-keying) --------------
+            lineage_spool_df: Optional["pd.DataFrame"] = None
+            if self._forward_lineage_path and Path(self._forward_lineage_path).exists():
                 try:
-                    ev_row = conn.execute(
-                        """
-                        SELECT
-                            COUNT(DISTINCT CONTAINERID) AS downstream_lot_count,
-                            SUM(REJECT_TOTAL_QTY) AS downstream_reject_qty,
-                            SUM(TRACKINQTY) AS downstream_input_qty,
-                            COUNT(DISTINCT WORKCENTERNAME) AS station_count
-                        FROM events
-                        WHERE REJECT_TOTAL_QTY > 0 OR TRACKINQTY > 0
-                        """
-                    ).fetchone()
-                    ds_lot_count = int(ev_row[0] or 0) if ev_row else 0
-                    ds_reject_qty = int(ev_row[1] or 0) if ev_row else 0
-                    ds_input_qty = int(ev_row[2] or 0) if ev_row else 0
-                    ds_station_count = int(ev_row[3] or 0) if ev_row else 0
-                except Exception:
-                    ds_lot_count = ds_reject_qty = ds_input_qty = ds_station_count = 0
+                    lineage_spool_df = pd.read_parquet(self._forward_lineage_path)
+                except Exception as _exc:
+                    logger.debug("Failed to load forward_lineage spool: %s", _exc)
 
-                # Daily trend from events
-                daily_trend = self._compute_daily_trend(conn)
+            # ---- Forward attribution --------------------------------------------
+            forward_attr = _attribute_forward_defects(
+                detection_data,
+                defect_cids,
+                wip_by_cid,
+                downstream_rejects,
+                station_order_fallback,
+                lineage_spool_df=lineage_spool_df,
+            )
 
-                # Detail total count from detection
-                detail_total_count = det_lot_count if has_detection else ds_lot_count
+            # ---- Assemble complete Phase-3 payload (mirrors in-memory path) -----
+            fwd_kpi = _build_forward_kpi(detection_data, forward_attr)
 
-                # Downstream reject rate
-                ds_reject_rate = (
-                    round(ds_reject_qty / ds_input_qty * 100, 4)
-                    if ds_input_qty and ds_input_qty > 0
-                    else 0.0
-                )
-
-                # Generic input qty for defect_rate denominator
-                _generic_input = det_input_qty if has_detection else ds_input_qty
-                _generic_defect = ds_reject_qty  # downstream rejects are the "defects" for forward
-                _defect_rate = (
-                    round(_generic_defect / _generic_input * 100, 2)
-                    if _generic_input and _generic_input > 0
-                    else 0.0
-                )
-
-                kpi = {
-                    # Forward-specific KPI keys
-                    "detection_lot_count": det_defect_lot_count if det_defect_lot_count else det_lot_count,
-                    "detection_defect_qty": det_reject_qty,
-                    "tracked_lot_count": det_lot_count,
-                    "downstream_stations_reached": ds_station_count,
-                    "downstream_total_reject": ds_reject_qty,
-                    "downstream_reject_rate": ds_reject_rate,
-                    # Generic events-based KPI keys (for backward compat / events-only path)
-                    "lot_count": det_lot_count if has_detection else ds_lot_count,
-                    "defect_qty": _generic_defect,
-                    "input_qty": _generic_input,
-                    "defect_rate": _defect_rate,
-                }
-
-                # Charts: per-station downstream defect totals
-                charts: list = []
-                try:
-                    chart_rows = conn.execute(
-                        """
-                        SELECT
-                            WORKCENTERNAME AS station,
-                            SUM(REJECT_TOTAL_QTY) AS defect_qty,
-                            SUM(TRACKINQTY) AS input_qty
-                        FROM events
-                        WHERE REJECT_TOTAL_QTY > 0
-                        GROUP BY WORKCENTERNAME
-                        ORDER BY defect_qty DESC
-                        """
-                    ).fetchall()
-                    charts = [
-                        {"station": r[0], "defect_qty": int(r[1] or 0), "input_qty": int(r[2] or 0)}
-                        for r in chart_rows
-                        if r[0]
-                    ]
-                except Exception:
-                    charts = []
-
-            finally:
-                conn.close()
+            detection_total_input = sum(d.get("trackinqty", 0) for d in detection_data.values())
+            detection_total_reject = fwd_kpi.get("detection_defect_qty", 0)
+            downstream_total_reject = fwd_kpi.get("downstream_total_reject", 0)
+            downstream_total_input = sum(a.get("total_input", 0) for a in forward_attr.values())
 
             return {
-                "kpi": kpi,
-                "charts": charts,
-                "daily_trend": daily_trend,
+                "kpi": fwd_kpi,
+                "charts": _build_forward_charts(forward_attr, detection_data),
+                "daily_trend": (
+                    _build_daily_trend(filtered_df, normalized_loss_reasons)
+                    if not filtered_df.empty and "TRACKINTIMESTAMP" in filtered_df.columns
+                    else []
+                ),
                 "available_loss_reasons": available_loss_reasons,
                 "genealogy_status": "ready",
-                "detail_total_count": detail_total_count,
+                "detail_total_count": len(detection_data),
                 "trace_query_id": self.trace_query_id,
+                # Phase-3 forward-specific fields
+                "by_detection_loss_reason": _build_by_detection_loss_reason(detection_data),
+                "loss_reason_workcenter_crosstab": _build_loss_reason_workcenter_crosstab(
+                    detection_data, forward_attr
+                ),
+                "downstream_trend": _build_downstream_trend(
+                    defect_cids, wip_by_cid, downstream_rejects, station_order_fallback
+                ),
+                "amplification": _compute_amplification_kpi(
+                    detection_total_reject=detection_total_reject,
+                    detection_total_input=detection_total_input,
+                    downstream_total_reject=downstream_total_reject,
+                    downstream_total_input=downstream_total_input,
+                ),
             }
 
         except Exception as exc:
             logger.warning(
                 "MsdDuckdbRuntime._get_forward_summary failed (trace_query_id=%s): %s",
-                self.trace_query_id, exc,
+                self.trace_query_id,
+                exc,
             )
             return None
 

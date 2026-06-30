@@ -76,12 +76,16 @@ class TestMsdFullChain:
         rt = MsdDuckdbRuntime("tqid-chain-test")
         rt._events_path = events_path
         rt._lineage_path = lineage_path
+        rt._detection_path = detection_path
         rt._resolved = True
 
+        # Forward direction uses the complete Phase-3 payload.
+        # detection_lot_count reflects unique CIDs in the detection spool (2 lots).
+        # detection_defect_qty sums REJECTQTY from the detection spool (10+5+3=18).
         summary = rt.get_summary(direction="forward")
         assert summary is not None
-        assert summary["kpi"]["lot_count"] == 2
-        assert summary["kpi"]["defect_qty"] == 18  # 10 + 5 + 3
+        assert summary["kpi"]["detection_lot_count"] == 2
+        assert summary["kpi"]["detection_defect_qty"] == 18  # 10 + 5 + 3
 
     def test_detail_from_spool(self, msd_spool):
         from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
@@ -134,8 +138,8 @@ class TestMsdFullChain:
 
         # All three must agree on the total row count
         assert detail["pagination"]["total"] == csv_data_rows == 3
-        # KPI defect sum matches
-        assert summary["kpi"]["defect_qty"] == 18
+        # Forward KPI: detection_defect_qty sums REJECTQTY from detection spool
+        assert summary["kpi"]["detection_defect_qty"] == 18
 
 
 class TestForwardDetailFromSpool:
@@ -562,3 +566,153 @@ def test_forward_get_summary_duckdb_path_end_to_end(tmp_path):
     kpi = summary["kpi"]
     assert "detection_lot_count" in kpi or "lot_count" in kpi
     assert "downstream_total_reject" in kpi or "defect_qty" in kpi
+
+
+# ===========================================================================
+# AC-6 (Phase 3 regression): _get_forward_summary must return complete payload
+# ===========================================================================
+
+def test_forward_summary_phase3_complete_payload(tmp_path):
+    """AC-6: _get_forward_summary returns the full Phase-3 payload.
+
+    Reproduces the production symptom where:
+    - detection_lot_count / detection_defect_qty / tracked_lot_count were 0
+    - charts was a LIST instead of a DICT keyed by by_downstream_station etc.
+    - by_detection_loss_reason / loss_reason_workcenter_crosstab /
+      downstream_trend / amplification were missing entirely
+    - daily_trend y-axis was absurdly large (summed all TRACKINQTY across events)
+
+    The fixture:
+    - Detection spool: 2 lots (SEED-001 has 043_NSOP defect, SEED-002 no defect)
+      at 成型 station (order 4, upstream).
+    - Events spool: downstream wip + reject rows at 測試 (order 11, downstream of 成型)
+      for SEED-001 only.
+
+    Expected after fix:
+    - kpi.detection_lot_count == 2, kpi.detection_defect_qty == 8
+    - kpi.tracked_lot_count == 2
+    - kpi.downstream_stations_reached >= 1
+    - charts is a dict with keys by_downstream_station, by_downstream_loss_reason,
+      by_downstream_machine, by_detection_machine
+    - by_detection_loss_reason is a non-empty list
+    - loss_reason_workcenter_crosstab is a dict with loss_reasons / workcenter_groups / cells
+    - downstream_trend is a list
+    - amplification is not None
+    - daily_trend input_qty is reasonable (NOT 400_000_000)
+    """
+    import pandas as pd
+    from mes_dashboard.services.msd_duckdb_runtime import MsdDuckdbRuntime
+
+    # Detection spool: 2 lots at 成型 (upstream station).
+    # SEED-001 has defect 043_NSOP (qty=8), SEED-002 has no defect.
+    detection_df = pd.DataFrame(
+        [
+            ("SEED-001", "SEED-001-001", "GA", "PKG1", "WF1", "EQP1", 100, "043_NSOP", 8),
+            ("SEED-002", "SEED-002-001", "GA", "PKG1", "WF2", "EQP1", 200, None, 0),
+        ],
+        columns=[
+            "CONTAINERID", "CONTAINERNAME", "PJ_TYPE", "PRODUCTLINENAME",
+            "WORKFLOW", "DETECTION_EQUIPMENTNAME", "TRACKINQTY",
+            "LOSSREASONNAME", "REJECTQTY",
+        ],
+    )
+    # Add TRACKINTIMESTAMP for _build_daily_trend (detection-based path)
+    detection_df["TRACKINTIMESTAMP"] = "2026-06-23"
+
+    # Events spool: merged wip (TRACKINQTY>0) + reject (REJECT_TOTAL_QTY>0) rows
+    # at downstream station 測試 (order 11) for SEED-001 only.
+    events_df = pd.DataFrame(
+        [
+            # wip-reached row: SEED-001 at 測試 (downstream)
+            ("SEED-001", "測試", 100, None, None, "EQP-DS-1", "043_NSOP", "2026-06-24"),
+            # reject row: SEED-001 at 測試
+            ("SEED-001", "測試", None, 15, "2026-06-24", "EQP-DS-1", "043_NSOP", None),
+            # SEED-002 reached downstream but no reject
+            ("SEED-002", "測試", 200, None, None, "EQP-DS-2", None, "2026-06-25"),
+        ],
+        columns=[
+            "CONTAINERID", "WORKCENTER_GROUP",
+            "TRACKINQTY", "REJECT_TOTAL_QTY", "TXNDATE",
+            "EQUIPMENTNAME", "LOSSREASONNAME", "TRACKINTIMESTAMP",
+        ],
+    )
+
+    det_path = tmp_path / "detection.parquet"
+    ev_path = tmp_path / "events.parquet"
+    detection_df.to_parquet(det_path, index=False)
+    events_df.to_parquet(ev_path, index=False)
+
+    rt = MsdDuckdbRuntime("tqid-phase3-regression")
+    rt._detection_path = str(det_path)
+    rt._events_path = str(ev_path)
+    rt._forward_lineage_path = None
+    rt._lineage_path = None
+    rt._resolved = True
+
+    # station_order_fallback=4 = 成型 order (detection station)
+    summary = rt.get_summary(direction="forward", station_order_fallback=4)
+
+    assert summary is not None
+
+    # --- KPI correctness ---
+    kpi = summary["kpi"]
+    # Detection KPIs must be non-zero (bug: these were 0 before fix)
+    assert kpi["detection_lot_count"] == 2, (
+        f"detection_lot_count should be 2 (both lots in detection spool), got {kpi['detection_lot_count']}"
+    )
+    assert kpi["detection_defect_qty"] == 8, (
+        f"detection_defect_qty should be 8 (SEED-001 has 8 rejects), got {kpi['detection_defect_qty']}"
+    )
+    assert kpi["tracked_lot_count"] == 2, (
+        f"tracked_lot_count should be 2, got {kpi['tracked_lot_count']}"
+    )
+    assert kpi["downstream_stations_reached"] >= 1
+
+    # --- charts must be a DICT (bug: was a LIST) ---
+    charts = summary["charts"]
+    assert isinstance(charts, dict), (
+        f"charts must be a dict, got {type(charts).__name__}"
+    )
+    assert "by_downstream_station" in charts, "charts must have by_downstream_station key"
+    assert "by_downstream_loss_reason" in charts, "charts must have by_downstream_loss_reason key"
+    assert "by_downstream_machine" in charts, "charts must have by_downstream_machine key"
+    assert "by_detection_machine" in charts, "charts must have by_detection_machine key"
+
+    # --- Phase-3 fields must be present (bug: all were missing) ---
+    assert "by_detection_loss_reason" in summary, (
+        "by_detection_loss_reason must be in summary"
+    )
+    assert isinstance(summary["by_detection_loss_reason"], list)
+    # SEED-001 has 043_NSOP, so at least one entry
+    assert len(summary["by_detection_loss_reason"]) >= 1, (
+        "by_detection_loss_reason must be non-empty when detection has defects"
+    )
+
+    assert "loss_reason_workcenter_crosstab" in summary, (
+        "loss_reason_workcenter_crosstab must be in summary"
+    )
+    crosstab = summary["loss_reason_workcenter_crosstab"]
+    assert isinstance(crosstab, dict)
+    assert "loss_reasons" in crosstab
+    assert "workcenter_groups" in crosstab
+    assert "cells" in crosstab
+
+    assert "downstream_trend" in summary, "downstream_trend must be in summary"
+    assert isinstance(summary["downstream_trend"], list)
+
+    assert "amplification" in summary, "amplification must be in summary"
+    # detection_defect_qty > 0, so amplification must be a number (not None)
+    assert summary["amplification"] is not None, (
+        "amplification must be non-None when detection has defects"
+    )
+
+    # --- daily_trend must use detection-based input_qty (bug: summed all events TRACKINQTY) ---
+    daily_trend = summary["daily_trend"]
+    assert isinstance(daily_trend, list)
+    if daily_trend:
+        max_input = max(day["input_qty"] for day in daily_trend)
+        # TRACKINQTY in detection spool: 100 + 200 = 300 total, never > 1000
+        assert max_input <= 10_000, (
+            f"daily_trend input_qty is unreasonably large ({max_input}); "
+            "must be detection-based, not sum of all events rows"
+        )

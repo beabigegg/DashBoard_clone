@@ -1,6 +1,6 @@
-# generated: 2026-06-30T04:24:55Z by cdd-kit 3.6.0
-# files: 966, src-lines: 298092, map-lines: 21391, compression: 13.9x
-# sources-digest: cf5254b824b0415f3fa14dad0e3420af255fdd1482a5bab37938b3442625d524
+# generated: 2026-06-30T06:32:47Z by cdd-kit 3.6.0
+# files: 966, src-lines: 298331, map-lines: 21400, compression: 13.9x
+# sources-digest: 3a3c31fdaf8796623540f9107e0ae8332a47c9a2cf9cf42b91bdd792acc07b46
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -7188,7 +7188,7 @@ src/mes_dashboard/services/mid_section_defect_service.py:  # 3668 lines
     - { name: _build_detail_table, lines: 3483-3583 }
     - { name: _build_forward_detail_table, lines: 3586-3668 }
 
-src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2078 lines
+src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2064 lines
   imports:
     - { module: __future__, items: [annotations], line: 25 }
     - { module: logging, items: [], line: 27 }
@@ -7198,7 +7198,7 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2078 lines
     - { name: SPOOL_NAMESPACE, line: 33 }
   classes:
     - name: MsdDuckdbRuntime
-      lines: 40-2078
+      lines: 40-2064
       methods:
         - { name: __init__, lines: 43-49 }
         - { name: _resolve_paths, lines: 51-75 }
@@ -7211,32 +7211,32 @@ src/mes_dashboard/services/msd_duckdb_runtime.py:  # 2078 lines
         - { name: _split_events_by_cid, lines: 203-236 }
         - { name: _build_backward_payload_from_spool, lines: 238-351 }
         - { name: _sort_detail_rows, lines: 354-375 }
-        - { name: get_summary, lines: 381-425 }
-        - { name: _get_forward_summary, lines: 427-636 }
-        - { name: _compute_kpi, lines: 638-670 }
-        - { name: _compute_charts, lines: 672-698 }
-        - { name: _compute_daily_trend, lines: 700-733 }
-        - { name: _compute_attribution, lines: 735-761 }
-        - { name: get_summary_with_detection, lines: 767-867 }
-        - { name: _compute_kpi_from_detection, lines: 869-941 }
-        - { name: _compute_daily_trend_from_detection, lines: 943-988 }
-        - { name: _compute_attribution_from_detection, lines: 990-1021 }
-        - { name: _compute_affected_machine_count, lines: 1023-1041 }
-        - { name: _compute_detection_machine_chart, lines: 1043-1077 }
-        - { name: _compute_wafer_root_chart, lines: 1079-1158 }
-        - { name: _compute_machine_chart, lines: 1160-1202 }
-        - { name: _compute_material_chart, lines: 1204-1237 }
-        - { name: _compute_loss_reason_chart, lines: 1239-1285 }
-        - { name: _compute_available_loss_reasons, lines: 1287-1302 }
-        - { name: _compute_detail_total_count, lines: 1304-1326 }
-        - { name: _compute_workflow_chart, lines: 1328-1361 }
-        - { name: _compute_raw_machine_attribution, lines: 1363-1439 }
-        - { name: _compute_raw_materials_attribution, lines: 1441-1509 }
-        - { name: _to_pareto_items, lines: 1512-1529 }
-        - { name: _get_forward_detail, lines: 1535-1667 }
-        - { name: get_detail, lines: 1669-1932 }
-        - { name: get_all_detail, lines: 1934-1975 }
-        - { name: export_csv, lines: 1981-2078 }
+        - { name: get_summary, lines: 381-426 }
+        - { name: _get_forward_summary, lines: 428-622 }
+        - { name: _compute_kpi, lines: 624-656 }
+        - { name: _compute_charts, lines: 658-684 }
+        - { name: _compute_daily_trend, lines: 686-719 }
+        - { name: _compute_attribution, lines: 721-747 }
+        - { name: get_summary_with_detection, lines: 753-853 }
+        - { name: _compute_kpi_from_detection, lines: 855-927 }
+        - { name: _compute_daily_trend_from_detection, lines: 929-974 }
+        - { name: _compute_attribution_from_detection, lines: 976-1007 }
+        - { name: _compute_affected_machine_count, lines: 1009-1027 }
+        - { name: _compute_detection_machine_chart, lines: 1029-1063 }
+        - { name: _compute_wafer_root_chart, lines: 1065-1144 }
+        - { name: _compute_machine_chart, lines: 1146-1188 }
+        - { name: _compute_material_chart, lines: 1190-1223 }
+        - { name: _compute_loss_reason_chart, lines: 1225-1271 }
+        - { name: _compute_available_loss_reasons, lines: 1273-1288 }
+        - { name: _compute_detail_total_count, lines: 1290-1312 }
+        - { name: _compute_workflow_chart, lines: 1314-1347 }
+        - { name: _compute_raw_machine_attribution, lines: 1349-1425 }
+        - { name: _compute_raw_materials_attribution, lines: 1427-1495 }
+        - { name: _to_pareto_items, lines: 1498-1515 }
+        - { name: _get_forward_detail, lines: 1521-1653 }
+        - { name: get_detail, lines: 1655-1918 }
+        - { name: get_all_detail, lines: 1920-1961 }
+        - { name: export_csv, lines: 1967-2064 }
 
 src/mes_dashboard/services/msd_lineage_job_service.py:  # 348 lines
   imports:
@@ -8200,7 +8200,7 @@ src/mes_dashboard/services/sql_fragments.py:  # 64 lines
     - { name: EQUIPMENT_STATUS_COLUMNS, line: 22 }
     - { name: EQUIPMENT_STATUS_SELECT_SQL, line: 60 }
 
-src/mes_dashboard/services/trace_job_service.py:  # 1782 lines
+src/mes_dashboard/services/trace_job_service.py:  # 1792 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: gc, items: [], line: 11 }
@@ -8241,17 +8241,17 @@ src/mes_dashboard/services/trace_job_service.py:  # 1782 lines
     - { name: _store_result_manifest, lines: 637-701 }
     - { name: _stream_spool_result_ndjson, lines: 704-795 }
     - { name: _update_meta, lines: 801-807 }
-    - { name: execute_trace_events_job, lines: 810-1209 }
-    - { name: _flatten_domain_records, lines: 1215-1225 }
-    - { name: _resolve_msd_lineage_payload, lines: 1228-1249 }
-    - { name: _expand_msd_container_ids, lines: 1252-1294 }
-    - { name: _write_msd_events_spool, lines: 1297-1349 }
-    - { name: _write_msd_events_spool_from_paths, lines: 1352-1475 }
-    - { name: _build_job_msd_aggregation, lines: 1478-1668 }
-    - { name: _trace_domain_spool_id, lines: 1674-1677 }
-    - { name: _write_trace_events_spool, lines: 1680-1710 }
-    - { name: make_general_trace_events_query_id, lines: 1713-1731 }
-    - { name: make_trace_query_id, lines: 1746-1782 }
+    - { name: execute_trace_events_job, lines: 810-1219 }
+    - { name: _flatten_domain_records, lines: 1225-1235 }
+    - { name: _resolve_msd_lineage_payload, lines: 1238-1259 }
+    - { name: _expand_msd_container_ids, lines: 1262-1304 }
+    - { name: _write_msd_events_spool, lines: 1307-1359 }
+    - { name: _write_msd_events_spool_from_paths, lines: 1362-1485 }
+    - { name: _build_job_msd_aggregation, lines: 1488-1678 }
+    - { name: _trace_domain_spool_id, lines: 1684-1687 }
+    - { name: _write_trace_events_spool, lines: 1690-1720 }
+    - { name: make_general_trace_events_query_id, lines: 1723-1741 }
+    - { name: make_trace_query_id, lines: 1756-1792 }
 
 src/mes_dashboard/services/trace_lineage_job_service.py:  # 304 lines
   imports:
@@ -16725,7 +16725,7 @@ tests/test_mid_section_defect_routes.py:  # 463 lines
     - { name: test_container_filter_options_malformed_selected_returns_400, lines: 431-440 }
     - { name: test_analysis_route_malformed_pj_types_no_5xx, lines: 444-463 }  # @patch('mes_dashboard.services.container_filter_cache.get_filter_options')
 
-tests/test_mid_section_defect_service.py:  # 1635 lines
+tests/test_mid_section_defect_service.py:  # 1672 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
@@ -16746,6 +16746,12 @@ tests/test_mid_section_defect_service.py:  # 1635 lines
         - { name: test_partial_failure_warning_logged, lines: 924-932 }
         - { name: test_partial_failure_returned_in_meta, lines: 934-945 }
         - { name: test_partial_failure_propagated_to_query_analysis, lines: 947-972 }
+    - name: TestDetectionInputPartialAggregation
+      lines: 1638-1672
+      methods:
+        - { name: _render, lines: 1649-1659 }
+        - { name: test_detection_input_uses_session_scoped_max_window, lines: 1661-1665 }
+        - { name: test_detection_output_column_is_corrected_value, lines: 1667-1672 }
   functions:
     - { name: test_query_analysis_invalid_date_format_returns_error, lines: 28-32 }
     - { name: test_query_analysis_start_after_end_returns_error, lines: 35-39 }
@@ -16829,7 +16835,7 @@ tests/test_modernization_policy_hardening.py:  # 189 lines
     - { name: test_scope_matrix_loader_returns_defensive_copy, lines: 11-25 }
     - { name: test_scope_matrix_cache_refresh_requires_explicit_clear, lines: 28-45 }
 
-tests/test_msd_duckdb_parity.py:  # 419 lines
+tests/test_msd_duckdb_parity.py:  # 471 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: pathlib, items: [], line: 19 }
@@ -16838,64 +16844,66 @@ tests/test_msd_duckdb_parity.py:  # 419 lines
     - { module: pytest, items: [], line: 23 }
   constants:
     - { name: SAMPLE_EVENTS, line: 30 }
-    - { name: SAMPLE_LINEAGE, line: 40 }
-    - { name: SAMPLE_DETECTION, line: 48 }
-    - { name: SAMPLE_BWD_LINEAGE, line: 56 }
-    - { name: SAMPLE_BWD_EVENTS, line: 63 }
+    - { name: SAMPLE_FWD_DETECTION, line: 43 }
+    - { name: SAMPLE_LINEAGE, line: 53 }
+    - { name: SAMPLE_DETECTION, line: 61 }
+    - { name: SAMPLE_BWD_LINEAGE, line: 69 }
+    - { name: SAMPLE_BWD_EVENTS, line: 76 }
   classes:
     - name: TestKpiParity
-      lines: 167-202
+      lines: 198-237
       methods:
-        - { name: test_kpi_lot_count_matches_distinct_containers, lines: 168-175 }
-        - { name: test_kpi_defect_qty_is_sum, lines: 177-183 }
-        - { name: test_kpi_defect_rate_matches_manual_calculation, lines: 185-193 }
-        - { name: test_kpi_keys_match_legacy_shape, lines: 195-202 }
+        - { name: test_kpi_lot_count_matches_distinct_containers, lines: 199-206 }
+        - { name: test_kpi_defect_qty_is_sum, lines: 208-215 }
+        - { name: test_kpi_downstream_reject_from_events, lines: 217-225 }
+        - { name: test_kpi_keys_match_forward_shape, lines: 227-237 }
     - name: TestChartsParity
-      lines: 209-233
+      lines: 244-275
       methods:
-        - { name: test_charts_by_station_present, lines: 210-216 }
-        - { name: test_charts_station_names_match_events, lines: 218-224 }
-        - { name: test_charts_defect_totals_match, lines: 226-233 }
+        - { name: test_charts_is_dict_with_forward_keys, lines: 245-254 }
+        - { name: test_charts_downstream_station_names_match_events, lines: 256-264 }
+        - { name: test_charts_detection_machine_matches_detection_spool, lines: 266-275 }
     - name: TestDailyTrendParity
-      lines: 240-262
+      lines: 282-311
       methods:
-        - { name: test_trend_dates_sorted, lines: 241-246 }
-        - { name: test_trend_covers_all_event_dates, lines: 248-254 }
-        - { name: test_trend_defect_sum_matches_kpi, lines: 256-262 }
+        - { name: test_trend_dates_sorted, lines: 283-289 }
+        - { name: test_trend_covers_all_detection_dates, lines: 291-301 }
+        - { name: test_trend_defect_sum_matches_detection_kpi, lines: 303-311 }
     - name: TestDetailParity
-      lines: 269-301
+      lines: 318-353
       methods:
-        - { name: test_detail_returns_empty_for_forward, lines: 272-279 }
-        - { name: test_detail_returns_pagination_shape, lines: 281-290 }
-        - { name: test_detail_pagination_page_slicing, lines: 292-301 }
+        - { name: test_detail_returns_empty_for_forward_without_detection, lines: 321-331 }
+        - { name: test_detail_returns_pagination_shape, lines: 333-342 }
+        - { name: test_detail_pagination_page_slicing, lines: 344-353 }
     - name: TestExportCsvParity
-      lines: 308-337
+      lines: 360-389
       methods:
-        - { name: test_export_yields_bytes, lines: 309-315 }
-        - { name: test_export_has_header_row, lines: 317-326 }
-        - { name: test_export_row_count_matches_events, lines: 328-337 }
+        - { name: test_export_yields_bytes, lines: 361-367 }
+        - { name: test_export_has_header_row, lines: 369-378 }
+        - { name: test_export_row_count_matches_events, lines: 380-389 }
     - name: TestIsAvailableParity
-      lines: 344-376
+      lines: 396-428
       methods:
-        - { name: test_is_available_returns_true_when_paths_set, lines: 345-353 }
-        - { name: test_is_available_returns_false_when_no_path, lines: 355-367 }
-        - { name: test_summary_returns_none_when_events_missing, lines: 369-376 }
+        - { name: test_is_available_returns_true_when_paths_set, lines: 397-405 }
+        - { name: test_is_available_returns_false_when_no_path, lines: 407-419 }
+        - { name: test_summary_returns_none_when_events_missing, lines: 421-428 }
     - name: TestBackwardSummary
-      lines: 383-419
+      lines: 435-471
       methods:
-        - { name: test_backward_summary_returns_all_chart_keys, lines: 384-391 }
-        - { name: test_backward_summary_has_attribution_keys, lines: 393-399 }
-        - { name: test_backward_wafer_root_uses_seed_root_name, lines: 401-409 }
-        - { name: test_backward_kpi_has_required_keys, lines: 411-419 }
+        - { name: test_backward_summary_returns_all_chart_keys, lines: 436-443 }
+        - { name: test_backward_summary_has_attribution_keys, lines: 445-451 }
+        - { name: test_backward_wafer_root_uses_seed_root_name, lines: 453-461 }
+        - { name: test_backward_kpi_has_required_keys, lines: 463-471 }
   functions:
-    - { name: _make_events_parquet, lines: 72-79 }
-    - { name: _make_lineage_parquet, lines: 82-86 }
-    - { name: _make_detection_parquet, lines: 89-100 }
-    - { name: _make_bwd_lineage_parquet, lines: 103-110 }
-    - { name: _make_bwd_events_parquet, lines: 113-124 }
-    - { name: spool_paths, lines: 128-130 }  # @pytest.fixture()
-    - { name: backward_spool_paths, lines: 134-140 }  # @pytest.fixture()
-    - { name: _runtime_with_paths, lines: 147-160 }
+    - { name: _make_events_parquet, lines: 85-92 }
+    - { name: _make_fwd_detection_parquet, lines: 95-105 }
+    - { name: _make_lineage_parquet, lines: 108-112 }
+    - { name: _make_detection_parquet, lines: 115-126 }
+    - { name: _make_bwd_lineage_parquet, lines: 129-136 }
+    - { name: _make_bwd_events_parquet, lines: 139-150 }
+    - { name: spool_paths, lines: 154-160 }  # @pytest.fixture()
+    - { name: backward_spool_paths, lines: 164-170 }  # @pytest.fixture()
+    - { name: _runtime_with_paths, lines: 177-191 }
 
 tests/test_msd_duckdb_runtime.py:  # 75 lines
   imports:
@@ -20463,7 +20471,7 @@ tests/test_trace_spool_integration.py:  # 558 lines
     - { name: msd_lineage_full_parquet, lines: 129-141 }  # @pytest.fixture()
     - { name: test_msd_container_mode_worker_writes_real_stage_spools_consumable_by_duckdb, lines: 443-558 }
 
-tests/test_unified_spool_integration.py:  # 564 lines
+tests/test_unified_spool_integration.py:  # 718 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: pathlib, items: [], line: 11 }
@@ -20472,68 +20480,69 @@ tests/test_unified_spool_integration.py:  # 564 lines
     - { module: pytest, items: [], line: 15 }
   classes:
     - name: TestMsdFullChain
-      lines: 22-138
+      lines: 22-142
       methods:
         - { name: msd_spool, lines: 26-62 }
         - { name: test_trace_query_id_is_deterministic, lines: 64-70 }
-        - { name: test_summary_from_spool, lines: 72-84 }
-        - { name: test_detail_from_spool, lines: 86-100 }
-        - { name: test_export_from_spool, lines: 102-116 }
-        - { name: test_full_chain_summary_detail_export_consistency, lines: 118-138 }
+        - { name: test_summary_from_spool, lines: 72-88 }
+        - { name: test_detail_from_spool, lines: 90-104 }
+        - { name: test_export_from_spool, lines: 106-120 }
+        - { name: test_full_chain_summary_detail_export_consistency, lines: 122-142 }
     - name: TestForwardDetailFromSpool
-      lines: 141-212
+      lines: 145-216
       methods:
-        - { name: fwd_spool, lines: 145-172 }
-        - { name: _runtime, lines: 174-182 }
-        - { name: test_forward_detail_not_empty_and_attributes_downstream, lines: 184-195 }
-        - { name: test_forward_detail_pj_type_mask_restricts_population, lines: 197-202 }
-        - { name: test_forward_detail_missing_spool_returns_empty, lines: 204-212 }
+        - { name: fwd_spool, lines: 149-176 }
+        - { name: _runtime, lines: 178-186 }
+        - { name: test_forward_detail_not_empty_and_attributes_downstream, lines: 188-199 }
+        - { name: test_forward_detail_pj_type_mask_restricts_population, lines: 201-206 }
+        - { name: test_forward_detail_missing_spool_returns_empty, lines: 208-216 }
     - name: TestWarmupSchedulerLeader
-      lines: 219-268
+      lines: 223-272
       methods:
-        - { name: _reset_scheduler, lines: 223-228 }
-        - { name: test_concurrent_workers_only_one_enqueues, lines: 230-255 }
-        - { name: test_lock_released_after_enqueue, lines: 257-268 }
+        - { name: _reset_scheduler, lines: 227-232 }
+        - { name: test_concurrent_workers_only_one_enqueues, lines: 234-259 }
+        - { name: test_lock_released_after_enqueue, lines: 261-272 }
     - name: TestWarmupSpoolHitRouteResponse
-      lines: 275-305
+      lines: 279-309
       methods:
-        - { name: test_reject_dataset_has_ensure_dataset_loaded, lines: 278-281 }
-        - { name: test_yield_alert_dataset_has_ensure_dataset_loaded, lines: 283-285 }
-        - { name: test_hold_dataset_has_ensure_dataset_loaded, lines: 287-289 }
-        - { name: test_resource_dataset_has_ensure_dataset_loaded, lines: 291-293 }
-        - { name: test_warmup_jobs_cover_expected_reports, lines: 295-305 }
+        - { name: test_reject_dataset_has_ensure_dataset_loaded, lines: 282-285 }
+        - { name: test_yield_alert_dataset_has_ensure_dataset_loaded, lines: 287-289 }
+        - { name: test_hold_dataset_has_ensure_dataset_loaded, lines: 291-293 }
+        - { name: test_resource_dataset_has_ensure_dataset_loaded, lines: 295-297 }
+        - { name: test_warmup_jobs_cover_expected_reports, lines: 299-309 }
     - name: TestRouteContractUnchanged
-      lines: 312-329
+      lines: 316-333
       methods:
-        - { name: test_resource_history_blueprint_exists, lines: 315-318 }
-        - { name: test_resource_dataset_cache_canonical_base_dataset, lines: 320-323 }
-        - { name: test_production_history_service_has_spool_identity, lines: 325-329 }
+        - { name: test_resource_history_blueprint_exists, lines: 319-322 }
+        - { name: test_resource_dataset_cache_canonical_base_dataset, lines: 324-327 }
+        - { name: test_production_history_service_has_spool_identity, lines: 329-333 }
     - name: TestProductionHistoryWarmupExclusion
-      lines: 336-359
+      lines: 340-363
       methods:
-        - { name: test_warmup_jobs_do_not_contain_production, lines: 339-348 }
-        - { name: test_scheduler_module_documents_exclusion, lines: 350-354 }
-        - { name: test_warmup_job_count_is_exactly_six, lines: 356-359 }
+        - { name: test_warmup_jobs_do_not_contain_production, lines: 343-352 }
+        - { name: test_scheduler_module_documents_exclusion, lines: 354-358 }
+        - { name: test_warmup_job_count_is_exactly_six, lines: 360-363 }
     - name: TestMaterialTraceAsyncPipeline
-      lines: 366-453
+      lines: 370-457
       methods:
-        - { name: test_execute_to_spool_idempotent, lines: 369-378 }
-        - { name: test_duckdb_runtime_pagination, lines: 380-409 }
-        - { name: test_duckdb_runtime_export_csv, lines: 411-434 }
-        - { name: test_rq_material_trace_job_function_exists, lines: 436-439 }
-        - { name: test_route_imports_spool_functions, lines: 441-444 }
-        - { name: test_canonical_query_hash_differs_by_mode, lines: 446-453 }
+        - { name: test_execute_to_spool_idempotent, lines: 373-382 }
+        - { name: test_duckdb_runtime_pagination, lines: 384-413 }
+        - { name: test_duckdb_runtime_export_csv, lines: 415-438 }
+        - { name: test_rq_material_trace_job_function_exists, lines: 440-443 }
+        - { name: test_route_imports_spool_functions, lines: 445-448 }
+        - { name: test_canonical_query_hash_differs_by_mode, lines: 450-457 }
     - name: TestGuardRetirementOrdering
-      lines: 460-506
+      lines: 464-510
       methods:
-        - { name: test_trace_events_legacy_guards_removed, lines: 468-473 }
-        - { name: test_lineage_max_seed_count_removed, lines: 475-480 }
-        - { name: test_lineage_rss_reject_removed, lines: 482-487 }
-        - { name: test_reject_query_rss_guard_removed, lines: 489-493 }
-        - { name: test_material_trace_row_guards_removed, lines: 495-501 }
-        - { name: test_event_fetcher_max_total_rows_present, lines: 503-506 }
+        - { name: test_trace_events_legacy_guards_removed, lines: 472-477 }
+        - { name: test_lineage_max_seed_count_removed, lines: 479-484 }
+        - { name: test_lineage_rss_reject_removed, lines: 486-491 }
+        - { name: test_reject_query_rss_guard_removed, lines: 493-497 }
+        - { name: test_material_trace_row_guards_removed, lines: 499-505 }
+        - { name: test_event_fetcher_max_total_rows_present, lines: 507-510 }
   functions:
-    - { name: test_forward_get_summary_duckdb_path_end_to_end, lines: 513-564 }
+    - { name: test_forward_get_summary_duckdb_path_end_to_end, lines: 517-568 }
+    - { name: test_forward_summary_phase3_complete_payload, lines: 575-718 }
 
 tests/test_user_auth_routes.py:  # 222 lines
   imports:

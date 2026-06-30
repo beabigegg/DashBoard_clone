@@ -1,0 +1,44 @@
+change-id: msd-forward-cause-effect
+timestamp: 2026-06-30T13:10:00Z
+agent: bug-fix-engineer
+status: complete
+files-read:
+  - src/mes_dashboard/services/msd_duckdb_runtime.py
+  - src/mes_dashboard/services/mid_section_defect_service.py
+  - tests/test_unified_spool_integration.py
+  - tests/test_msd_duckdb_parity.py
+artifacts:
+  - { type: symptom, pointer: "Forward summary: detection KPIs=0, charts=list not dict, Phase-3 fields missing, daily_trend y-axis ~400M" }
+  - { type: root-cause, pointer: "src/mes_dashboard/services/msd_duckdb_runtime.py:427-636 — _get_forward_summary was a thin SQL reimplementation that (1) returned kpi.detection_lot_count=0 due to defect_lot_count vs lot_count confusion, (2) returned charts as a list not a dict, (3) never produced by_detection_loss_reason/loss_reason_workcenter_crosstab/downstream_trend/amplification, and (4) summed all events TRACKINQTY for daily_trend instead of detection-spool rows" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/msd_duckdb_runtime.py, tests/test_msd_duckdb_parity.py, tests/test_unified_spool_integration.py" }
+  - { type: regression-evidence, pointer: "tests/test_unified_spool_integration.py::test_forward_summary_phase3_complete_payload: fail before fix, pass after fix" }
+  - { type: residual-risk, pointer: "Service restart required (gunicorn preload) to pick up the change in production. No schema drift." }
+bug-fix:
+  schema-version: 0.1.0
+  symptom: "Forward cause→effect query: 偵測批次數/偵測不良數/追蹤批次數=0, all Phase-3 charts empty (Sankey/heatmap/前段不良原因分布/依下游站點/依下游報廢原因/依下游機台/依偵測機台), 每日不良趨勢 y-axis ~400M (absurd)"
+  expected_behavior: "detection_lot_count=2 (or N), detection_defect_qty=sum of REJECTQTY, charts is a dict with by_downstream_station/by_downstream_loss_reason/by_downstream_machine/by_detection_machine, by_detection_loss_reason/loss_reason_workcenter_crosstab/downstream_trend/amplification all populated, daily_trend y-axis reflects detection input qty (not all-events sum)"
+  actual_behavior: "detection_lot_count=0 or 1 (wrong), all Phase-3 chart fields absent, charts is a list of {station,...} not a dict, daily_trend sums all TRACKINQTY rows from events spool including WIP rows → absurdly large y-axis"
+  observed_surface: "Mid-section defect forward direction (cause→effect) summary API"
+  reproduction:
+    status: test-reproduced
+    command: "conda run -n mes-dashboard python -m pytest tests/test_unified_spool_integration.py::test_forward_summary_phase3_complete_payload -xvs"
+    failing_before_fix: true
+    summary: "n/a (pre-fix run confirmed: AssertionError: detection_lot_count should be 2, got 1)"
+  hypotheses:
+    - { id: H1, candidate: "src/mes_dashboard/services/msd_duckdb_runtime.py::_get_forward_summary", reason: "SQL-only reimplementation diverged from in-memory forward path; never called the Phase-3 builders", result: confirmed }
+    - { id: H2, candidate: "src/mes_dashboard/services/mid_section_defect_service.py::build_trace_aggregation_from_events forward branch", reason: "May have differed in field names from what DuckDB path produced", result: rejected }
+  root_cause:
+    pointer: "src/mes_dashboard/services/msd_duckdb_runtime.py:427-636"
+    summary: "The old _get_forward_summary was a thin SQL-only reimplementation that: (1) used defect_lot_count when detection spool has some zero-REJECTQTY rows, causing lot_count to be undercounted; (2) returned charts as a list not a dict keyed by by_downstream_station etc.; (3) never called the Phase-3 builders (_build_by_detection_loss_reason, _build_loss_reason_workcenter_crosstab, _build_downstream_trend, _compute_amplification_kpi); (4) called _compute_daily_trend(conn) which summed ALL events TRACKINQTY not just detection-based rows"
+  fix:
+    files_changed:
+      - src/mes_dashboard/services/msd_duckdb_runtime.py
+      - tests/test_msd_duckdb_parity.py
+      - tests/test_unified_spool_integration.py
+    summary: "Rewrote _get_forward_summary to: load detection_df from detection spool (with _apply_population_mask + loss_reason soft-mask), build detection_data via _build_detection_lookup, reconstruct wip_by_cid and downstream_rejects from events spool (same logic as _get_forward_detail), load forward_lineage_spool when present, then call all the existing Phase-3 builders (_attribute_forward_defects, _build_forward_kpi, _build_forward_charts, _build_daily_trend, _build_by_detection_loss_reason, _build_loss_reason_workcenter_crosstab, _build_downstream_trend, _compute_amplification_kpi). Also passed station_order_fallback from get_summary into _get_forward_summary. Updated test_msd_duckdb_parity.py and test_unified_spool_integration.py to use correct forward KPI keys and dict-based charts."
+  regression:
+    status: passed
+    command: "conda run -n mes-dashboard python -m pytest tests/test_unified_spool_integration.py tests/test_msd_duckdb_parity.py tests/test_mid_section_defect_engine.py tests/test_mid_section_defect_service.py tests/test_mid_section_defect_routes.py -q"
+    summary: "153 passed, 1 xfailed"
+  residual_risk: "Service restart required (gunicorn preload) before the fix is visible in production. The 2 pre-existing test failures (test_runtime_hardening, test_yield_alert_job_service) are unrelated to this change."
+next-action: "qa-reviewer release-readiness review"

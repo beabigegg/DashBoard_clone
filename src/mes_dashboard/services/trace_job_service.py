@@ -1051,24 +1051,14 @@ def execute_trace_events_job(
                     "children_map": _lineage_payload.get("children_map") or {},
                     "seed_roots": _lineage_payload.get("seed_roots") or {},
                 }
-            aggregation, agg_error = _build_job_msd_aggregation(
-                _payload_for_aggregation,
-                {},
-                domain_quality_meta=domain_quality_meta,
-                trace_query_id=trace_query_id,
-                detection_hash=_msd_detection_hash,
-            )
-
-            if agg_error is not None:
-                raise RuntimeError(agg_error)
-
-            # Date-range FORWARD: the forward aggregation uses the in-memory path
-            # (get_summary(forward) returns None) and never reaches the backward D4
-            # detection-stage write inside _build_job_msd_aggregation.  Now that the
-            # aggregation has run (and _fetch_station_detection_data has populated the
-            # msd_detect spool), register that detection spool as a trace-scoped stage
-            # spool so /analysis/detail (forward) can rebuild per-lot downstream impact
-            # by trace_query_id.  (Backward writes its own in the D4 path.)
+            # Date-range FORWARD: get_summary(direction="forward") builds detection
+            # KPIs + cause→effect aggregations (by_detection_loss_reason, crosstab,
+            # amplification, daily_trend) FROM the detection stage spool. The
+            # msd_detect spool was already warmed during seed resolution (MSD seeds =
+            # detection lots), so register it as the trace-scoped _STAGE_DETECTION stage
+            # spool BEFORE the aggregation runs — otherwise the forward summary has no
+            # detection data and returns an empty payload. (Backward writes its own in
+            # the D4 path inside _build_job_msd_aggregation.)
             if _msd_mode != "container" and _direction != "backward" and _msd_detection_hash:
                 try:
                     from pathlib import Path as _FwdP
@@ -1082,23 +1072,43 @@ def execute_trace_events_job(
                         _STAGE_DETECTION as _FWD_SD,
                     )
                     from mes_dashboard.services.mid_section_defect_service import (
+                        _fetch_station_detection_data,
                         _write_msd_detection_stage_spool,
                     )
                     if not _fwd_gssp(_FWD_NS, trace_query_id, _FWD_SD):
                         _fwd_src = _fwd_gsfp("msd_detect", _msd_detection_hash)
+                        _fwd_det_df = None
                         if _fwd_src and _FwdP(_fwd_src).exists():
-                            _write_msd_detection_stage_spool(
-                                trace_query_id, _fwd_pd.read_parquet(str(_fwd_src))
+                            _fwd_det_df = _fwd_pd.read_parquet(str(_fwd_src))
+                        else:
+                            # msd_detect not warm (e.g. seed stage skipped it) — fetch it
+                            # now so the forward summary has detection data.
+                            _fwd_det_df, _ = _fetch_station_detection_data(
+                                _det_start, _det_end, _msd_params.get("station") or "測試",
                             )
+                        if _fwd_det_df is not None and not _fwd_det_df.empty:
+                            _write_msd_detection_stage_spool(trace_query_id, _fwd_det_df)
                             logger.info(
-                                "trace job MSD forward detection stage spool written job_id=%s",
-                                job_id,
+                                "trace job MSD forward detection stage spool written "
+                                "(pre-aggregation) job_id=%s rows=%d",
+                                job_id, len(_fwd_det_df),
                             )
                 except Exception as _fwd_det_exc:
                     logger.warning(
                         "trace job MSD forward detection stage spool failed job_id=%s: %s",
                         job_id, _fwd_det_exc,
                     )
+
+            aggregation, agg_error = _build_job_msd_aggregation(
+                _payload_for_aggregation,
+                {},
+                domain_quality_meta=domain_quality_meta,
+                trace_query_id=trace_query_id,
+                detection_hash=_msd_detection_hash,
+            )
+
+            if agg_error is not None:
+                raise RuntimeError(agg_error)
 
         else:
             # Non-MSD path: original in-memory fetch (unchanged)
