@@ -157,17 +157,11 @@ async function handleSubmit() {
       <!-- ── Logo / branding ── -->
       <div class="lp-head">
         <div class="lp-logo">
-          <div class="lp-logo-ring" />
           <div class="lp-logo-core">
-            <svg class="lp-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1.2" />
-              <rect x="14" y="3" width="7" height="7" rx="1.2" />
-              <rect x="3" y="14" width="7" height="7" rx="1.2" />
-              <path d="M17.5 14v7M14 17.5h7" />
-            </svg>
+            <img :src="'/static/PANJIT.png'" alt="PANJIT" class="lp-logo-img" />
           </div>
         </div>
-        <h1 class="lp-title">MES 報表管理平台</h1>
+        <h1 class="lp-title">MES DASHBOARD</h1>
         <p class="lp-sub">請使用員工帳號登入</p>
       </div>
 
@@ -378,45 +372,34 @@ async function handleSubmit() {
 
 .lp-logo {
   position: relative;
-  width: 68px; height: 68px;
+  width: 210px; height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
 }
 
-/* Pulsing ring — brand.100 */
-.lp-logo-ring {
-  position: absolute;
-  inset: -8px;
-  border-radius: 20px;
-  border: 2px solid theme('colors.brand.100');
-  animation: logo-ring 2.6s ease-in-out infinite;
-}
-
-@keyframes logo-ring {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.06); opacity: 1; box-shadow: 0 0 0 6px rgba(0,128,200,0.06); }
-}
-
-/* Logo square — brand gradient matching nav */
+/* Logo container — white background to show PANJIT.png clearly */
 .lp-logo-core {
   position: relative;
   z-index: 1;
-  width: 56px; height: 56px;
+  width: 196px; height: 78px;
   border-radius: 14px;
-  background: linear-gradient(140deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+  background: rgba(255, 255, 255, 0.98);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 8px 16px;
   box-shadow:
-    0 6px 20px rgba(0,128,200,0.35),
-    0 2px 6px rgba(0,0,0,0.12);
+    0 4px 16px rgba(0,128,200,0.18),
+    0 2px 6px rgba(0,0,0,0.08);
 }
 
-.lp-logo-icon {
-  width: 26px; height: 26px;
-  color: rgba(255,255,255,0.96);
+.lp-logo-img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .lp-title {
@@ -625,7 +608,7 @@ async function handleSubmit() {
 ═══════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   .lp-card { animation: none; }
-  .lp-orb, .lp-logo-ring { animation: none; }
+  .lp-orb { animation: none; }
   .lp-btn-sheen { display: none; }
 }
 </style>

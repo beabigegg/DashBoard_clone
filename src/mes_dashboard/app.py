@@ -1150,7 +1150,7 @@ def create_app(config_name: str | None = None) -> Flask:
     @app.route('/favicon.ico')
     def favicon():
         """Serve favicon without 404 noise."""
-        return redirect(url_for('static', filename='favicon.svg'), code=302)
+        return redirect(url_for('static', filename='icon-512.png'), code=302)
 
     @app.route('/wip-overview')
     def wip_overview_page():
