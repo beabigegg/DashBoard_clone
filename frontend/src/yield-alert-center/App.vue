@@ -187,6 +187,7 @@ const summaryCards = computed(() => [
     value: Number(summary.value.transaction_qty || 0),
     accent: 'brand',
     format: 'number',
+    precision: 2,
   },
   {
     key: 'scrap',
@@ -194,6 +195,7 @@ const summaryCards = computed(() => [
     value: Number(summary.value.scrap_qty || 0),
     accent: 'warning',
     format: 'number',
+    precision: 2,
   },
   {
     key: 'yield',
@@ -201,6 +203,7 @@ const summaryCards = computed(() => [
     value: Number(summary.value.yield_pct || 0),
     accent: Number(summary.value.yield_pct || 0) < Number(filters.risk_threshold || 98) ? 'danger' : 'success',
     format: 'percent',
+    precision: 2,
   },
 ]);
 
@@ -1024,6 +1027,7 @@ onUnmounted(() => {
           :value="card.value"
           :accent="card.accent"
           :format="card.format"
+          :precision="card.precision"
         />
       </SummaryCardGroup>
     </section>

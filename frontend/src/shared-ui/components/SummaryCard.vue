@@ -6,6 +6,7 @@ interface Props {
   label: string;
   value?: number | string | null;
   format?: 'number' | 'percent' | 'duration' | null;
+  precision?: number | null;
   accent?: string;
   tooltip?: string | null;
   clickable?: boolean;
@@ -20,6 +21,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   value: null,
   format: null,
+  precision: null,
   accent: 'brand',
   tooltip: null,
   clickable: false,
@@ -65,15 +67,16 @@ const formattedValue = computed(() => {
   if (!props.format) return String(v)
 
   const n = animatedMain.value
+  const dec = props.precision ?? 1
   if (props.format === 'number') {
     const abs = Math.abs(n)
     const sign = n < 0 ? '-' : ''
-    if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1)}KK`
-    if (abs >= 1e3) return `${sign}${(abs / 1e3).toFixed(1)}K`
+    if (abs >= 1e6) return dec === 0 ? `${sign}${Math.round(abs / 1e6)}KK` : `${sign}${(abs / 1e6).toFixed(dec)}KK`
+    if (abs >= 1e3) return dec === 0 ? `${sign}${Math.round(abs / 1e3)}K` : `${sign}${(abs / 1e3).toFixed(dec)}K`
     return Math.round(n).toLocaleString('zh-TW')
   }
-  if (props.format === 'percent') return `${n.toFixed(1)}%`
-  if (props.format === 'duration') return `${n.toFixed(1)}`
+  if (props.format === 'percent') return `${n.toFixed(dec)}%`
+  if (props.format === 'duration') return `${n.toFixed(dec)}`
   return String(v)
 })
 
