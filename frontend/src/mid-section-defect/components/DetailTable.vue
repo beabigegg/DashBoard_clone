@@ -36,7 +36,7 @@ const COLUMNS_BACKWARD = [
   { key: 'WORKFLOW', label: 'WORKFLOW', width: '100px' },
   { key: 'DETECTION_EQUIPMENTNAME', label: '偵測設備', width: '110px' },
   { key: 'INPUT_QTY', label: '投入數', width: '70px', numeric: true },
-  { key: 'LOSS_REASON', label: '不良原因', width: '130px' },
+  { key: 'LOSS_REASON', label: '報廢原因', width: '130px' },
   { key: 'DEFECT_QTY', label: '不良數', width: '70px', numeric: true },
   { key: 'DEFECT_RATE', label: '不良率(%)', width: '90px', numeric: true },
   { key: 'ANCESTOR_COUNT', label: '上游LOT數', width: '80px', numeric: true },

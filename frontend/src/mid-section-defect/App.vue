@@ -602,7 +602,7 @@ function firstStageErrorMessage() {
 async function loadLossReasons() {
   try {
     const result = await apiGet('/api/mid-section-defect/loss-reasons');
-    const unwrapped = unwrapApiResult(result, '載入不良原因失敗') as { data?: { loss_reasons?: string[] } } | null;
+    const unwrapped = unwrapApiResult(result, '載入報廢原因失敗') as { data?: { loss_reasons?: string[] } } | null;
     availableLossReasons.value = unwrapped?.data?.loss_reasons || [];
   } catch {
     // Non-blocking, dropdown remains empty.
@@ -950,14 +950,14 @@ void initPage();
                 <ParetoChart title="依Workflow歸因" :data="analysisData.charts?.by_workflow" />
               </div>
               <div class="charts-row">
-                <ParetoChart title="依不良原因" :data="analysisData.charts?.by_loss_reason" />
+                <ParetoChart title="依報廢原因" :data="analysisData.charts?.by_loss_reason" />
                 <ParetoChart title="依偵測機台" :data="analysisData.charts?.by_detection_machine" :show-cumulative="false" />
               </div>
             </template>
             <template v-else>
               <div class="charts-row">
                 <ParetoChart title="依下游站點" :data="analysisData.charts?.by_downstream_station" />
-                <ParetoChart title="依下游不良原因" :data="analysisData.charts?.by_downstream_loss_reason" />
+                <ParetoChart title="依下游報廢原因" :data="analysisData.charts?.by_downstream_loss_reason" />
               </div>
               <div class="charts-row">
                 <ParetoChart title="依下游機台" :data="analysisData.charts?.by_downstream_machine" />

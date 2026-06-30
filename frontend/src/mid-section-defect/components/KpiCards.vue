@@ -49,7 +49,7 @@ const backwardCards = computed(() => [
     accent: 'warning',
   },
   {
-    label: '首要不良原因',
+    label: '首要報廢原因',
     value: props.kpi.top_loss_reason || '-',
     unit: '',
     accent: 'neutral',

@@ -162,12 +162,12 @@ const emit = defineEmits<{
       <!-- Primary prefilter row (BASE_WHERE layer, optional; narrows Oracle query scope) -->
       <div class="filter-group-full primary-prefilter-row" data-testid="primary-prefilter-row">
         <div class="filter-group" data-testid="primary-pj-type-select">
-          <label class="filter-label">PJ Type</label>
+          <label class="filter-label">Type</label>
           <MultiSelect
             :model-value="primaryPjTypes || []"
             :options="primaryPrefilterOptions?.pj_types || []"
-            placeholder="全部 PJ Type"
-            aria-label="PJ Type 預篩選"
+            placeholder="全部 Type"
+            aria-label="Type 預篩選"
             searchable
             :loading="primaryPrefilterLoading"
             data-testid="primary-pj-type-multiselect"
@@ -192,12 +192,12 @@ const emit = defineEmits<{
         </div>
 
         <div class="filter-group" data-testid="primary-pj-function-select">
-          <label class="filter-label">PJ Function</label>
+          <label class="filter-label">Function</label>
           <MultiSelect
             :model-value="primaryPjFunctions || []"
             :options="primaryPrefilterOptions?.pj_functions || []"
-            placeholder="全部 PJ Function"
-            aria-label="PJ Function 預篩選"
+            placeholder="全部 Function"
+            aria-label="Function 預篩選"
             searchable
             :loading="primaryPrefilterLoading"
             data-testid="primary-pj-function-multiselect"

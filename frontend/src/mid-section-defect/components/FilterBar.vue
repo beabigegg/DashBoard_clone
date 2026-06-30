@@ -89,7 +89,7 @@ function updateFilters(patch) {
       </div>
 
       <div class="filter-grid">
-        <!-- Row 1: 偵測站 / 不良原因 -->
+        <!-- Row 1: 偵測站 / 報廢原因 -->
         <div class="filter-field">
           <label>偵測站</label>
           <MultiSelect
@@ -102,7 +102,7 @@ function updateFilters(patch) {
           />
         </div>
         <div class="filter-field">
-          <label>不良原因</label>
+          <label>報廢原因</label>
           <MultiSelect
             :model-value="filters.lossReasons"
             :options="availableLossReasons"

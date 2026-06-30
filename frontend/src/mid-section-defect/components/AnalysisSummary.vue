@@ -81,7 +81,7 @@ function formatInputType(value) {
             <template v-else>
               <li>日期範圍：{{ queryParams.startDate }} ~ {{ queryParams.endDate }}</li>
             </template>
-            <li>不良原因：{{ queryParams.lossReasons?.length ? queryParams.lossReasons.join(', ') : '全部' }}</li>
+            <li>報廢原因：{{ queryParams.lossReasons?.length ? queryParams.lossReasons.join(', ') : '全部' }}</li>
           </ul>
         </div>
 
