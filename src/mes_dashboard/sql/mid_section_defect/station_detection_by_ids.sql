@@ -35,6 +35,15 @@ WITH detection_records AS (
         h.EQUIPMENTID AS DETECTION_EQUIPMENTID,
         h.EQUIPMENTNAME AS DETECTION_EQUIPMENTNAME,
         h.TRACKINQTY,
+        -- PH-06: TRACKINQTY is the qty REMAINING at each partial's start, so it
+        -- DECREASES across partials of the same upload session. Picking rn=1 (the
+        -- last partial) under-counts detection input (e.g. 43200 -> 3600), which
+        -- inflates downstream/defect rates past 100%. The original load qty of a
+        -- session is MAX(TRACKINQTY) over its partials (session = same
+        -- CONTAINERID + TRACKINTIMESTAMP + EQUIPMENTID). Mirror production-history.
+        MAX(h.TRACKINQTY) OVER (
+            PARTITION BY h.CONTAINERID, h.TRACKINTIMESTAMP, h.EQUIPMENTID
+        ) AS ORIG_TRACKINQTY,
         h.TRACKINTIMESTAMP,
         h.TRACKOUTTIMESTAMP,
         h.FINISHEDRUNCARD,
@@ -106,7 +115,7 @@ SELECT
     t.DETECTION_EQUIPMENTID,
     t.DETECTION_EQUIPMENTNAME,
     t.WORKCENTERNAME,
-    t.TRACKINQTY,
+    t.ORIG_TRACKINQTY AS TRACKINQTY,
     t.TRACKINTIMESTAMP,
     r.LOSSREASONNAME,
     NVL(r.REJECTQTY, 0) AS REJECTQTY

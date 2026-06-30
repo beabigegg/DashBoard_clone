@@ -1633,3 +1633,40 @@ def test_amplification_kpi_both_rates_nonzero_correct_ratio():
     )
     assert result2 is not None
     assert abs(result2 - 2.0) < 1e-6
+
+
+class TestDetectionInputPartialAggregation:
+    """Regression: detection input qty must be the original load of a track-in
+    session (MAX(TRACKINQTY)), not the last partial's remaining qty.
+
+    MES records TRACKINQTY as the qty REMAINING at each partial's start, so it
+    decreases across partials of the same upload (business-rule PH-06). The old
+    ``station_detection_by_ids.sql`` picked rn=1 (the last partial) and returned
+    its TRACKINQTY, under-counting the input (e.g. 43200 -> 3600) and inflating
+    downstream/defect rates past 100%. This guards against silent revert.
+    """
+
+    def _render(self):
+        from mes_dashboard.sql import SQLLoader
+
+        return SQLLoader.load_with_params(
+            "mid_section_defect/station_detection_by_ids",
+            CONTAINER_IDS="'x'",
+            STATION_FILTER="1=1",
+            STATION_FILTER_REJECTS="1=1",
+            DETECTION_TIME_FILTER="",
+            REJECT_TIME_FILTER="",
+        )
+
+    def test_detection_input_uses_session_scoped_max_window(self):
+        sql = self._render().upper()
+        # session = same container + track-in timestamp + equipment
+        assert "MAX(H.TRACKINQTY) OVER" in sql
+        assert "PARTITION BY H.CONTAINERID, H.TRACKINTIMESTAMP, H.EQUIPMENTID" in sql
+
+    def test_detection_output_column_is_corrected_value(self):
+        sql = self._render().upper()
+        # the projected TRACKINQTY column must be the corrected ORIG value,
+        # never the raw last-partial t.TRACKINQTY
+        assert "T.ORIG_TRACKINQTY AS TRACKINQTY" in sql
+        assert "\n    T.TRACKINQTY,\n" not in self._render()
