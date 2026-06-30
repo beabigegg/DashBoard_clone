@@ -21,6 +21,7 @@ from typing import Optional
 from flask import Blueprint, current_app, request, send_from_directory
 
 from mes_dashboard.core.rate_limit import configured_rate_limit
+from mes_dashboard.core.route_helpers import parse_pagination
 from mes_dashboard.core.response import (
     cache_expired_error,
     internal_error,
@@ -299,11 +300,9 @@ def api_hold_history_view():
     if raw_duration and raw_duration not in _VALID_DURATION_RANGES:
         return validation_error('Invalid duration_range')
 
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 50, type=int)
-    page = max(page or 1, 1)
+    # Shared facade: silent-default + clamp (page>=1, per_page in [1,200]).
+    page, per_page = parse_pagination(default_per_page=50, max_per_page=200)
     export_mode = request.args.get('export', '0') == '1'
-    per_page = max(1, min(per_page or 50, 200))
 
     raw_sort_col = request.args.get('sort_col', '').strip() or 'holdDate'
     raw_sort_dir = request.args.get('sort_dir', '').strip().lower()

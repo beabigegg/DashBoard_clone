@@ -128,6 +128,31 @@ Patching `requests.post` at function level does not intercept calls routed throu
 
 Evidence: `downtime-analysis-page` — `TestCallLlmText` required this correction in commit `ccb9347`.
 
+## Route Parameter Parsing — Shared Facade (core/route_helpers.py)
+
+**Prefer `core/route_helpers.py` over re-rolling per-route parameter parsing.**
+Routes historically each defined their own `_parse_multi_param` / pagination
+sanitisation with subtly different defaults and edge cases.
+
+- `parse_multi_param(name, source=None)` — order-preserving, de-duped multi-value
+  list. Handles GET repeated/CSV params (Werkzeug `MultiDict`) and POST JSON
+  bodies (plain `dict`; list members verbatim, scalar strings CSV-split).
+  Reference adopters: `reject_history_routes`, `yield_alert_routes`.
+- `parse_pagination(source=None, *, default_per_page, max_per_page, page_key, per_page_key)`
+  — `(page, per_page)` clamped to `page>=1`, `per_page in [1, max_per_page]`,
+  with **silent** default fallback for missing/non-integer input. Reference
+  adopter: `hold_history_routes` (GET path).
+
+`source` defaults to `flask.request.args`; pass an explicit `MultiDict`/`dict`
+to unit-test without an app context.
+
+**Migration caveat — match behaviour before adopting.** `parse_pagination` falls
+back silently on a non-integer value; routes that instead return an explicit
+`validation_error` (e.g. `hold_history_routes` POST body path) must keep their
+bespoke parsing rather than adopt the silent helper. Defaults/caps differ across
+routes (50/200, 100/500, 200/500) — pass them per call site; do not unify the
+numbers.
+
 ## RQ Worker Concurrency Gate — heavy_query_slot Wiring Requirement
 
 **Every `execute_*_job` worker function that runs Oracle-heavy queries MUST wire `heavy_query_slot` before the owning feature flag is promoted to production.**
