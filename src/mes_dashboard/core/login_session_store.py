@@ -29,6 +29,25 @@ LOGIN_SESSION_SQLITE_PATH = os.getenv(
     'logs/login_sessions.sqlite'
 )
 
+
+def _positive_int_env(name: str, default: int) -> int:
+    """Read a positive-int env var; fall back to default on missing/invalid."""
+    try:
+        value = int(os.getenv(name, str(default)))
+        return value if value > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
+# Presence vs engagement windows (minutes).
+#   ONLINE  — "currently online": a heartbeat within this window. The frontend
+#             sends a heartbeat every 5 min, so ~3 missed beats (15 min) is the
+#             default presence cutoff (industry "online now" ≈ 2–3× heartbeat).
+#   ACTIVE  — GA-style "active users (last N min)" engagement window (30 min).
+# Both read SQLite (a shared on-disk file → consistent across gunicorn workers).
+ONLINE_WINDOW_MINUTES = _positive_int_env('ONLINE_WINDOW_MINUTES', 15)
+ACTIVE_WINDOW_MINUTES = _positive_int_env('ACTIVE_WINDOW_MINUTES', 30)
+
 _HOSTNAME = socket.gethostname()
 
 # ============================================================
@@ -304,11 +323,16 @@ class LoginSessionStore:
         except Exception as e:
             logger.error("Failed to close_session: %s", e)
 
-    def get_active_count(self) -> int:
-        """Return count of sessions active within the last 30 minutes."""
+    def _count_active_within(self, minutes: int) -> int:
+        """Count not-logged-out sessions whose last_active is within `minutes`.
+
+        Shared by get_active_count (engagement window) and get_online_count
+        (presence window). Reads the shared SQLite file, so the count is
+        consistent across gunicorn workers.
+        """
         if not self._initialized:
             self.initialize()
-        cutoff = (datetime.now() - timedelta(minutes=30)).isoformat()
+        cutoff = (datetime.now() - timedelta(minutes=minutes)).isoformat()
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -320,8 +344,27 @@ class LoginSessionStore:
                 row = cursor.fetchone()
                 return row[0] if row else 0
         except Exception as e:
-            logger.error("Failed to get_active_count: %s", e)
+            logger.error("Failed to count active sessions (within %sm): %s", minutes, e)
             return 0
+
+    def get_active_count(self, window_minutes: Optional[int] = None) -> int:
+        """Count sessions active within the engagement window (default 30 min).
+
+        GA-style "active users (last N min)". Window defaults to
+        ACTIVE_WINDOW_MINUTES; pass window_minutes to override.
+        """
+        minutes = ACTIVE_WINDOW_MINUTES if window_minutes is None else window_minutes
+        return self._count_active_within(minutes)
+
+    def get_online_count(self, window_minutes: Optional[int] = None) -> int:
+        """Count sessions with a heartbeat within the presence window (default 15 min).
+
+        "Currently online" — tighter than get_active_count so a closed tab drops
+        off sooner. Window defaults to ONLINE_WINDOW_MINUTES; pass window_minutes
+        to override.
+        """
+        minutes = ONLINE_WINDOW_MINUTES if window_minutes is None else window_minutes
+        return self._count_active_within(minutes)
 
     def close_all_active_sessions(self) -> int:
         """Close all sessions with logout_time IS NULL using last_active as logout time.

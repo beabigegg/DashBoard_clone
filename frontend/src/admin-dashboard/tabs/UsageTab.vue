@@ -108,7 +108,8 @@ onMounted(() => {
           <SummaryCard label="不重複使用者" :value="kpiData.overview?.unique_users" accent="brand" />
           <SummaryCard label="總登入次數" :value="kpiData.overview?.total_sessions" accent="info" />
           <SummaryCard label="平均使用時長" :value="formatSessionDuration(kpiData.overview?.avg_duration_sec)" accent="success" />
-          <SummaryCard label="目前在線" :value="kpiData.overview?.active_sessions" accent="warning" />
+          <SummaryCard label="目前在線" :value="kpiData.overview?.online_sessions ?? kpiData.overview?.active_sessions" accent="warning" />
+          <SummaryCard label="活躍 (30 分)" :value="kpiData.overview?.active_sessions" accent="info" />
         </SummaryCardGroup>
       </SectionCard>
 
