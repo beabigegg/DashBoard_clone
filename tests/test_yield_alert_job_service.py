@@ -147,7 +147,11 @@ class TestExecuteYieldAlertJob:
                 params={"start_date": "2024-01-01", "end_date": "2024-02-01"},
             )
 
-        mock_execute_fn.assert_called_once_with(start_date="2024-01-01", end_date="2024-02-01")
+        mock_execute_fn.assert_called_once()
+        kw = mock_execute_fn.call_args.kwargs
+        assert kw["start_date"] == "2024-01-01"
+        assert kw["end_date"] == "2024-02-01"
+        assert kw["process_type"] == "GA%"  # default when not supplied
         mock_complete_job.assert_called_once_with(
             "yield_alert", "yield-alert-cache-miss", query_id="ya-qid-new-001"
         )
