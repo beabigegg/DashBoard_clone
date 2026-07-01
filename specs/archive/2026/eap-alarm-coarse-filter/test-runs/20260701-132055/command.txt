@@ -1,0 +1,1 @@
+cd frontend && PW_WORKERS=1 npx playwright test tests/playwright/eap-alarm-filters.spec.ts --project=chromium

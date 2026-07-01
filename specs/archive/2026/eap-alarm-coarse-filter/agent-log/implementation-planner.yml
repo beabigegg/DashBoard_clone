@@ -1,0 +1,15 @@
+agent: implementation-planner
+change-id: eap-alarm-coarse-filter
+status: complete
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/eap-alarm-coarse-filter/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer" }
+  - { type: scope-summary, pointer: "9 required changes (IP-1..IP-9); in-scope: eap_alarm cache/service/worker/routes + eap-alarm frontend + tests; out-of-scope: ADR-0008 reversal, JOIN+DISTINCT, v2 migration, env/flag, ADR-0008 amend" }
+  - { type: plan-appended, pointer: "Round 2 IP-10..IP-13 appended for D-6/D-7/D-8 (AC-8/AC-9/AC-10) post-ship corrections" }
+notes:
+  - "design.md present and filled (Architecture Review Required=yes satisfied); planned without blockers."
+  - "Flagged non-obvious mapping: product-filter-options must map container_filter_cache keys packages->product_lines, bops->pj_bops (data-shape §3.17 L1129-1142)."
+  - "Flagged dual worker-path lockstep (legacy run_eap_alarm_query_job + unified EapAlarmJob, _EAP_ALARM_USE_UNIFIED_JOB-gated)."
+  - "Round 2 append: IP-10 (_build_equipment_filter L201-216 empty->1=1 no-op; splice L59/L71 unchanged; one edit covers both callers L256+L414). IP-11 (drop _VALID_EQP_TYPES L39-41 + enum check L69-71; validate eqp_types like lot_ids; keep field name). IP-12 (FilterBar handleSubmit L92-102 family-without-machine expansion via machineOptions L77-81). IP-13 (round-2 tests per test-plan AC-8/9/10 + Test Update Contract). Line pointers confirmed vs refreshed code-map."
+  - "Flagged for contract-reviewer: EA-07 prose for D-6/D-7 is NEW (not already drafted, unlike IP-1..IP-9's contract prose) — must be written, not just verified. D-8 has no contract-prose obligation."
+  - "Did not touch design.md / test-plan.md / contracts/ — code+test plan only."

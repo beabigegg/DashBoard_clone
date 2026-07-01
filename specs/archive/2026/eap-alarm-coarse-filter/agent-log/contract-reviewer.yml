@@ -1,0 +1,34 @@
+agent: contract-reviewer
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-07-01"
+status: complete
+summary: >
+  Round 1 (2026-06-30): Updated 5 contract files. API contract: schema 1.33.0→1.34.0;
+  POST /api/eap-alarm/spool extended with 4 optional dims; new
+  GET /api/eap-alarm/product-filter-options + schema EapAlarmProductFilterOptionsResponse.
+  Data-shape: §3.17 extended with spool-key dims table, Oracle EXISTS mapping,
+  product-filter-options payload. Business-rules: EA-01/EA-07 updated; EA-08/EA-09/EA-10
+  added. CHANGELOG entries in all affected files.
+
+  Round 2 (2026-07-01, pre-archive gap fix): reviewed D-6/D-7/D-8 from design.md and
+  AC-8/9/10 from test-plan.md; proposed EA-07 rewrite (drop closed 10-value enum, validate
+  eqp_types like lot_ids, document the `1=1` no-op fix) and an EA-08 phrase touch-up
+  (remove stale "after enum validation" reference). Classified as non-breaking
+  validation-rule relaxation (widens acceptance, narrows nothing); no consumer depended on
+  enum enforcement since it never matched real data. Confirmed no openapi regen needed
+  (eqp_types request field has no machine-encoded enum in openapi.json — route body is
+  x-cdd-unresolved). contract-reviewer is read-only; main Claude applied the proposed
+  edits verbatim to business-rules.md (EA-07/EA-08 rows, frontmatter, in-file CHANGELOG)
+  and contracts/CHANGELOG.md, then re-ran `cdd-kit validate --versions` (passed).
+artifacts:
+  - { type: version-bumps, pointer: "round 1: api 1.33.0→1.34.0; api-inventory 1.3.0→1.4.0; data 1.30.0→1.31.0; business 1.35.0→1.36.0. round 2: business 1.38.0→1.39.0, re-sequenced to 1.40.0→1.41.0 at commit time to sit after the concurrent yield-alert-kpi-csv-parity session's 1.40.0 bump to the same file" }
+  - { type: new-endpoint, pointer: "contracts/api/api-contract.md GET /api/eap-alarm/product-filter-options" }
+  - { type: schema-added, pointer: "contracts/api/api-contract.md EapAlarmProductFilterOptionsResponse" }
+  - { type: rules-added, pointer: "contracts/business/business-rules.md EA-08 EA-09 EA-10 (round 1); EA-07 rewritten + EA-08 touch-up (round 2)" }
+  - { type: breaking-change-assessment, pointer: "round 2: non-breaking (validation relaxation only, no field/schema/endpoint change)" }
+notes: >
+  openapi.json regen is backend-engineer's responsibility (both contracts/openapi.json
+  and contracts/api/openapi.json) — round 1 only; round 2 confirmed no regen needed.
+  max-200 lot_ids cap in EA-09 accepted. product_lines API param = PRODUCTLINENAME Oracle
+  column confirmed. DW_C_CONTAINERNAME index confirmed present (user screenshot).
+  Round 2: cdd-kit validate --versions passed after business-rules.md + CHANGELOG.md edits.

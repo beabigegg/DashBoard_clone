@@ -1,0 +1,41 @@
+change-id: eap-alarm-coarse-filter
+status: in-progress
+tier: 2
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done, note: "spec-architect appended D-6/D-7/D-8 to design.md 2026-07-01" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done, note: "implementation-planner appended IP-10/11/12/13 2026-07-01" }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no new tokens/layers" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no new env var" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done, note: "EA-07 rewritten (dropped 10-code enum), EA-08 phrase touch-up; business-rules.md re-sequenced 1.40.0->1.41.0 to sit after concurrent yield-alert-kpi-csv-parity's 1.40.0 bump; cdd-kit validate --versions passed" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no new gates" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "TestEquipmentFilterEmptyNoOp, enum-removal tests, frontend canSubmit/family-expansion tests landed and verified by qa-reviewer 2026-07-01" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "test_empty_eqp_types_with_product_dims_only_builds_valid_sql lands the ORA-00936 worker-SQL regression; red-green independently reproduced by qa-reviewer 2026-07-01" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "data-boundary covered in integration; monkey not required Tier 2" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "filter reduces load, not a new high-load path" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "IP-10/IP-11 implemented 2026-07-01; 92 passed/11 skipped(integration_real); test-evidence.yml phase-overwrite risk flagged, to reconcile after frontend-engineer completes" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "IP-12 implemented 2026-07-01 (handleSubmit expansion + canSubmit family-only fix); 37/37 unit pass, type-check clean" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no new env var or deploy step" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no new gates required" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "covered by agent-log/visual-reviewer.yml only" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved EA-07/EA-08 rewrite 2026-07-01 (non-breaking); applied by main Claude" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk 2026-07-01; only finding was stale 3.1/3.2 tasks.yml status (now corrected); AC-8 red-green independently reproduced" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate passed 2026-07-01 (contracts, API semantic/conformance, response-shape, env, CI gates, contract versions all green)" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "cdd-kit gate passed 2026-07-01 after tasks.yml 3.1/3.2 correction" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "nightly real-Oracle path unchanged; no action needed" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly gates defined" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "3 lessons promoted to docs/architecture/test-discipline.md (x2) and docs/cdd-kit-patterns.md (x1), pointers added to CLAUDE.md; see archive.md" }

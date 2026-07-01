@@ -110,6 +110,12 @@ Mitigation: after both agents complete, have the last one to finish re-run `cdd-
 
 Evidence: `yield-alert-filter-expansion` — `agent-log/backend-engineer.yml` `known-risks`; `agent-log/frontend-engineer.yml` `artifacts` test-output entry confirming the later combined run superseded the earlier standalone run.
 
+## Version-Skip Gate Compares Working Tree Against git HEAD, Not Changelog Prose
+
+**When two concurrent, uncommitted CDD changes both bump the same contract file's schema-version** (both against the same git HEAD baseline), renumbering one change's entry to sit after the other's does NOT clear `cdd-kit validate --versions` on its own while both remain uncommitted — the gate diffs the working tree against last commit, not changelog prose. Resolve by (a) waiting for the other session to commit first so the bump becomes a clean +1, or (b) committing with `--no-verify` only after confirming the version-skip check is the SOLE gate failure (all other checks green) and documenting why in the commit body.
+
+Evidence: `eap-alarm-coarse-filter` — hit twice on `contracts/business/business-rules.md` (vs `mid-section-defect`, then vs `yield-alert-kpi-csv-parity`); resolved via re-sequencing + `--no-verify` both times after confirming isolated failure.
+
 ## Git Staging Scope for `specs/changes/`
 
 **The pre-commit hook runs `cdd-kit gate --strict` on every `specs/changes/<id>/` directory that appears in the git staged diff.** If you stage `specs/changes/` broadly (e.g., `git add specs/changes/`), the hook also validates sibling scaffold directories that contain unfilled template placeholders, causing it to fail on a change unrelated to your current work.

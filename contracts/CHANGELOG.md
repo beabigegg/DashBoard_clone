@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.40.0] — 2026-07-01
+### Added
+- yield-alert-kpi-csv-parity: YA-13 — KPI summary (`GET /api/yield-alert/view` / `GET /api/yield-alert/summary` `summary.transaction_qty`/`summary.scrap_qty`) scope unified to match the alert-candidate predicate (`SCRAP_QTY<>0`, risk_threshold/min_scrap_qty exclusion, full 6-dim filters) instead of the prior broader scope; documents the `tx_extra_cols` dedup dimension (excludes REASON_CODE/REASON_NAME) required to avoid double-counting `transaction_qty` when a group has multiple distinct reason_codes. Scope limited to the top-level KPI summary; trend/heatmap/station/package summaries unaffected (non-goal).
+
+## [data 1.33.0] — 2026-07-01
+### Added
+- yield-alert-kpi-csv-parity: §3.16.7 Alerts CSV Numeric Export Formatting — `_buildAlertsCSV()` must round `transaction_qty`/`scrap_qty` (post-`toPcs()`) to whole pcs instead of writing raw `String(floatValue)`, eliminating DuckDB-DOUBLE float-noise (e.g. `4011.9999999999995`) that caused Excel to treat cells as text and skip them in `SUM()`.
+
+## [business 1.41.0] — 2026-07-01
+### Changed
+- eap-alarm-coarse-filter (post-ship correction): EA-07 rewritten — the closed 10-value `eqp_types` enum is dropped (it never matched real `DWH.EAP_EVENT.EQUIPMENT_ID` data, which is `<prefix>-<instance>`, not a bare 4-char code); replacement rule validates `eqp_types` exactly like `lot_ids` (non-string/blank entries rejected, any non-empty stripped string accepted, no membership check). Field name `eqp_types` is kept unchanged for backward compatibility despite now holding full equipment-identifier strings. EA-07 also documents the `_build_equipment_filter([])` → `1=1` no-op fix (was an unconditional empty `IN ()` causing ORA-00936 in production for the EA-08-legal `eqp_types=[]` + non-empty product-dim combo). EA-08 wording touched up to remove its stale "after enum validation" phrase; at-least-one-of-three semantics unchanged. No API/schema/spool-key-dimension change — bugfix + data-model correction only.
+
 ## [business 1.38.0] — 2026-07-01
 ### Changed
 - yield-alert-filter-expansion: YA-01 process_type enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. YA-02 rewritten as the full prefix → WIP_CLASS_CODE mapping table (verified via direct Oracle query) with mutual-exclusivity guarantee. New YA-02a documents the GA% non-split non-goal. New YA-10/YA-11/YA-12 document the `workcenter_groups` source swap (global filter_cache → per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME`) for `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` only; `GET /api/yield-alert/filter-options` and other filter_cache consumers unaffected.

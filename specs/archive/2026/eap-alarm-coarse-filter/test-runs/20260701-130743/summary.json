@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && PW_WORKERS=1 npx playwright test tests/playwright/eap-alarm-filters.spec.ts --project=chromium",
+  "duration_ms": 380313,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-130743/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-130743/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-130743/stderr.log"
+  },
+  "next_action": "all phases green"
+}

@@ -114,6 +114,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Pre-commit hook scans all staged `specs/changes/*/` dirs; stage only the completed change's directory, not all of `specs/changes/` — unfilled template placeholders in sibling dirs fail the hook — see docs/cdd-kit-patterns.md
 - Running the full pytest suite re-runs `tests/contract/test_capture_samples.py` and regenerates all ~160 contract samples with live runtime values; `git checkout tests/contract/samples/` to revert the unrelated churn before committing, then re-stage only the samples your change altered — see docs/cdd-kit-patterns.md
 - Parallel implementation agents (e.g. backend-engineer + frontend-engineer) on disjoint source files still race on the shared test-evidence.yml when both call `cdd-kit test run` — concurrent writes overwrite each other's phase rows; the later agent must re-run collect/targeted/changed-area combining both stacks' commands into single entries before gate sign-off — see docs/cdd-kit-patterns.md
+- Two concurrent uncommitted CDD changes bumping the same contract file's schema-version: `cdd-kit validate --versions` diffs working tree against git HEAD, not changelog prose — renumbering one entry to sit after the other's does NOT clear the gate while both are uncommitted; wait for the other session to commit first, or `--no-verify` only after confirming the version-skip is the sole failure — see docs/cdd-kit-patterns.md
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md` for full detail:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS — see docs/architecture/frontend-patterns.md
@@ -178,8 +179,10 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Test BOTH snapshot and Oracle fallback paths for every filter kwarg — see docs/architecture/test-discipline.md
 - Filter fixtures must include every column the function filters on — see docs/architecture/test-discipline.md
 - Cross-filter narrowing has its own test surface: assert "selecting A narrows B" — see docs/architecture/test-discipline.md
+- One-of-N-required filter axes: test each axis EMPTY while a sibling is populated, not just each axis non-empty in isolation — see docs/architecture/test-discipline.md
 - Module-level constants: `monkeypatch.setattr()` not `setenv` (frozen at import); module-level side-effects (e.g. `register_job_type()`): use `importlib.reload()` after clearing the dict to re-run registration — `setattr` alone does not re-execute them; in threaded tests all `monkeypatch.setattr()` calls must complete BEFORE threads are launched — `patch()`/`patch.object()` inside thread bodies causes concurrent attribute restore races that pollute sibling test modules — see docs/architecture/test-discipline.md
 - Env-var contract tests must pin default values, not just assert var name presence — see docs/architecture/test-discipline.md
+- Closed-enum validation feeding an exact-match SQL clause: verify enum format equals real column values via a live read-only sample before shipping — see docs/architecture/test-discipline.md
 - New feature-flag rows in `env-contract.md` must also be added to `contracts/env/env.schema.json` with `enum` + `default`; entries absent from the schema bypass machine enum validation (`cdd-kit validate --contracts` will not catch the typo) — see contracts/env/env.schema.json
 - Check `pytestmark` before adding mock tests to `tests/integration/` — see docs/architecture/test-discipline.md
 - Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md

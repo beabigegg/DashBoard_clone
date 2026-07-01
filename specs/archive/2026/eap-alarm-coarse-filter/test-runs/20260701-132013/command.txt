@@ -1,0 +1,1 @@
+cd frontend && npx vitest list tests/unit/eap-alarm-filter.test.js

@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run type-check",
+  "duration_ms": 8828,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-125956/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-125956/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-125956/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

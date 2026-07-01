@@ -201,6 +201,11 @@ def _build_product_dims_exists(
 def _build_equipment_filter(machines: List[str]) -> tuple[str, Dict[str, Any]]:
     _ORACLE_IN_LIMIT = 999
     eqp_params: Dict[str, Any] = {}
+    # D-6/EA-08: empty machines is a legal at-least-one-of-three axis; this
+    # predicate is spliced unconditionally as `AND {equipment_filter}`, so an
+    # empty list must yield an always-true no-op, not `IN ()` (ORA-00936).
+    if not machines:
+        return "1=1", {}
     if len(machines) <= _ORACLE_IN_LIMIT:
         placeholders = ", ".join(f":r{i}" for i in range(len(machines)))
         return f"e.EQUIPMENT_ID IN ({placeholders})", {f"r{i}": m for i, m in enumerate(machines)}

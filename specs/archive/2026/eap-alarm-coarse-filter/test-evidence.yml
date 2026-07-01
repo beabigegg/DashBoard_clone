@@ -1,0 +1,40 @@
+change-id: eap-alarm-coarse-filter
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      conda run -n mes-dashboard pytest --collect-only -q tests/test_eap_alarm_service.py
+      tests/integration/test_eap_alarm_resilience.py && cd frontend && npx vitest list
+      tests/unit/eap-alarm-filter.test.js
+    summary: specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132940/summary.json
+  - phase: targeted
+    status: passed
+    command: >-
+      conda run -n mes-dashboard pytest tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp
+      tests/test_eap_alarm_service.py::TestMachinesValidation
+      tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql -q &&
+      cd frontend && npx vitest run tests/unit/eap-alarm-filter.test.js -t 'FilterBar handleSubmit family expansion'
+    summary: specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132952/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      conda run -n mes-dashboard pytest tests/test_eap_alarm_service.py tests/integration/test_eap_alarm_resilience.py
+      tests/integration/test_eap_alarm_coarse_filter.py tests/integration/test_eap_alarm_data_boundary.py
+      tests/integration/test_eap_alarm_rq_async.py --run-integration -q && cd frontend && npx vitest run
+      tests/unit/eap-alarm-filter.test.js
+    summary: specs/changes/eap-alarm-coarse-filter/test-runs/20260701-133004/summary.json
+  - phase: quality
+    status: passed
+    command: cd frontend && npm run type-check
+    summary: specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132033/summary.json
+  - phase: full
+    status: passed
+    command: cd frontend && PW_WORKERS=1 npx playwright test tests/playwright/eap-alarm-filters.spec.ts --project=chromium
+    summary: specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132055/summary.json
+final-status: passed

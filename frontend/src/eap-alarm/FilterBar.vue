@@ -95,7 +95,19 @@ function handleSubmit() {
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean);
-  emit('update:filters', { ...props.filters, lot_ids: parsedIds });
+
+  // D-8: a family ("型號") selected without any specific machine ("機台")
+  // must not silently drop the family-level filter. Expand `machines` to
+  // every name in the already-loaded, family-filtered machineOptions pool
+  // before emitting. Specific-machine selections and no-family selections
+  // are left unchanged (client-side only; cascade.families itself is never
+  // sent to the backend).
+  const machines =
+    cascade.families.length > 0 && (props.filters.machines?.length ?? 0) === 0
+      ? [...machineOptions.value]
+      : props.filters.machines;
+
+  emit('update:filters', { ...props.filters, lot_ids: parsedIds, machines });
   // Use nextTick-like approach: emit submit after filter update propagates
   // (parent's Object.assign is synchronous so emit order is sufficient)
   emit('submit');
@@ -126,6 +138,7 @@ const canSubmit = computed(() =>
   !!props.filters.date_to &&
   (
     (props.filters.machines?.length ?? 0) > 0 ||
+    cascade.families.length > 0 ||
     hasLotIds.value ||
     (props.filters.pj_types?.length ?? 0) > 0 ||
     (props.filters.product_lines?.length ?? 0) > 0 ||

@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp tests/test_eap_alarm_service.py::TestMachinesValidation tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql -q && cd frontend && npx vitest run tests/unit/eap-alarm-filter.test.js -t 'FilterBar handleSubmit family expansion'

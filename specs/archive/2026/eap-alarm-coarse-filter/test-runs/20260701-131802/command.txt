@@ -1,0 +1,1 @@
+conda run -n mes-dashboard pytest --collect-only -q tests/test_eap_alarm_service.py tests/integration/test_eap_alarm_resilience.py && cd frontend && npx vitest list tests/unit/eap-alarm-filter.test.js

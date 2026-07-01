@@ -1,0 +1,1 @@
+pytest -q --run-integration -m 'not integration' tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp tests/test_eap_alarm_service.py::TestMachinesValidation && pytest -q --run-integration -m integration tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql

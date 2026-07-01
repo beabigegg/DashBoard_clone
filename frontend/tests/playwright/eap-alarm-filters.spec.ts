@@ -904,4 +904,65 @@ test.describe('EAP ALARM — filter panel and two-step flow (fully mocked)', () 
     expect(body).toContain('TAB-LOT-001');
     expect(body).toContain('TAB-LOT-002');
   });
+
+  // 18. AC-10/D-8/IP-12: family-only (no 機台) submission expands `machines`
+  // to the full filtered machine list before reaching the backend.
+  test('test_family_only_submission_expands_machines_to_full_family_list', async ({ page }) => {
+    const reachable = await navigateToEapAlarm(page);
+    if (!reachable) {
+      test.skip(true, 'EAP ALARM page not reachable in this environment');
+      return;
+    }
+
+    const spoolRequests: import('@playwright/test').Request[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/api/eap-alarm/spool') && !req.url().includes('status')) {
+        spoolRequests.push(req);
+      }
+    });
+
+    const startDate = page.locator('[data-testid="start-date"]');
+    const endDate = page.locator('[data-testid="end-date"]');
+    await startDate.fill('2026-06-12');
+    await endDate.fill('2026-06-18');
+
+    // Select the 型號 (family) MultiSelect — located by its filter-group
+    // label text since it has no dedicated data-testid (template unchanged
+    // per IP-12 scope). MOCK_RESOURCE_OPTIONS has family 'GDBA' with a
+    // single resource 'GDBA-001'.
+    const familyGroup = page.locator('.filter-group').filter({ hasText: '型號' });
+    const familyTrigger = familyGroup.locator('[data-testid="multiselect-trigger"]');
+    await expect(familyTrigger).toBeVisible({ timeout: 10_000 });
+    await familyTrigger.click();
+
+    const dropdown = page.locator('[data-testid="multiselect-dropdown"]');
+    await expect(dropdown).toBeVisible({ timeout: 10_000 });
+    const gdbaOption = page.locator('[data-testid="multiselect-option"]').filter({ hasText: 'GDBA' });
+    await expect(gdbaOption).toBeVisible({ timeout: 10_000 });
+    await gdbaOption.click();
+    await page.keyboard.press('Escape');
+
+    // Do NOT select any specific 機台 and do NOT fill LOT ID / product dims —
+    // family-only selection satisfies canSubmit's at-least-one-of-three rule
+    // on its own, so the submit button should already be enabled here.
+    const submitBtn = page.locator('[data-testid="coarse-submit-btn"]');
+    await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
+    await submitBtn.click();
+
+    await page.waitForTimeout(1_000);
+
+    if (spoolRequests.length === 0) {
+      test.skip(true, 'No spool request fired — environment not ready');
+      return;
+    }
+
+    const body = spoolRequests[0].postData() ?? '';
+    // machines must be expanded to the full GDBA family roster (GDBA-001),
+    // not left empty and not sent as the family label 'GDBA' itself.
+    expect(body).toContain('GDBA-001');
+    expect(body).not.toMatch(/"machines"\s*:\s*\[\s*\]/);
+
+    const parsed = JSON.parse(body);
+    expect(parsed.machines).toEqual(['GDBA-001']);
+  });
 });

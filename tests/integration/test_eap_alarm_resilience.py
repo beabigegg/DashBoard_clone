@@ -5,6 +5,8 @@ Tests:
   - test_oracle_failure_during_spool: RQ job fails on Oracle error → job status = failed
   - test_redis_failure_returns_503: Redis unavailable → 503
   - test_spool_miss_fine_filter_returns_410: fine-filter endpoint with expired spool → 410
+  - test_empty_eqp_types_with_product_dims_only_builds_valid_sql: AC-8/D-6 regression —
+    eqp_types=[] + product_lines-only must not splice `IN ()` into Oracle SQL
 
 pytestmark = pytest.mark.integration
 """
@@ -212,6 +214,47 @@ def test_all_filters_empty_returns_400(monkeypatch):
     assert resp.status_code == 400, f"Expected 400, got {resp.status_code}: {resp.get_json()}"
     data = resp.get_json()
     assert data["success"] is False
+
+
+# ── Round 2 (D-6, AC-8): empty eqp_types + product_dims-only builds valid SQL ─
+
+def test_empty_eqp_types_with_product_dims_only_builds_valid_sql(tmp_path, monkeypatch):
+    """AC-8 required red-green signal: eqp_types=[] with only product_lines supplied
+    must NOT splice `e.EQUIPMENT_ID IN ()` (ORA-00936) into the Oracle SQL. Fails
+    before the `_build_equipment_filter` fix (IP-10), passes after."""
+    captured_sql = []
+
+    def mock_read_sql_slow(sql, *args, **kwargs):
+        captured_sql.append(sql)
+        raise Exception("stop before Oracle: capture-only test")
+
+    monkeypatch.setattr("mes_dashboard.core.database.read_sql_df_slow", mock_read_sql_slow)
+    monkeypatch.setattr("mes_dashboard.rq_worker_preload.ensure_rq_logging", lambda: None)
+    monkeypatch.setattr(
+        "mes_dashboard.services.async_query_job_service.update_job_progress",
+        lambda *a, **kw: None,
+    )
+    monkeypatch.setattr(
+        "mes_dashboard.services.async_query_job_service.complete_job",
+        lambda prefix, job_id, **kw: None,
+    )
+    monkeypatch.setattr("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR", str(tmp_path))
+
+    from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
+
+    with pytest.raises(Exception, match="capture-only test"):
+        run_eap_alarm_query_job(
+            job_id="test-empty-eqp-types-product-dims",
+            date_from="2025-01-01",
+            date_to="2025-01-07",
+            eqp_types=[],
+            product_lines=["SOT-223"],
+        )
+
+    assert len(captured_sql) >= 1, "read_sql_df_slow must have been called"
+    sql = captured_sql[0]
+    assert "1=1" in sql, f"Expected always-true no-op '1=1' in SQL, got: {sql}"
+    assert "IN ()" not in sql, f"SQL must not contain invalid 'IN ()' (ORA-00936 shape), got: {sql}"
 
 
 # ── In-flight job: client abandons polling (page unload simulation) ───────────

@@ -10,6 +10,7 @@ Tests:
   - TestProductDimsFilter: EXISTS SQL generation per supplied dim (EA-10)
   - TestAlarmCategoryDecode: 9 codes; code 99 → "未知"; None → "未知"
   - TestSchemaVersionIsPinned: _SCHEMA_VERSION == 3
+  - TestEquipmentFilterEmptyNoOp: empty machines → "1=1" no-op, not "IN ()" (AC-8, D-6)
 """
 
 from __future__ import annotations
@@ -155,13 +156,19 @@ class TestMissingDateRangeRaisesValueError:
 # ── test_machines_validation ──────────────────────────────────────────────────
 
 class TestMachinesValidation:
-    """eqp_types param: now optional; at-least-one-of-three rule (EA-08); enum check only when supplied."""
+    """eqp_types param: now optional; at-least-one-of-three rule (EA-08); no closed-enum
+    membership check (EA-07/D-7) — validated like lot_ids: reject non-string/blank
+    entries, keep every non-empty stripped value."""
 
     def test_single_valid_eqp_type_no_error(self):
+        """A 4-char-code-shaped value passes — no longer because of enum membership,
+        just because it is a non-blank string (D-7)."""
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GWBK"])
 
     def test_multiple_valid_eqp_types_no_error(self):
+        """Multiple 4-char-code-shaped values pass — values are enum-shaped
+        incidentally, not validated against any membership set (D-7)."""
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GDBA", "GWBK", "GWBA"])
 
@@ -181,6 +188,18 @@ class TestMachinesValidation:
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError, match="invalid machine values"):
             validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GDBA", ""])
+
+    def test_full_equipment_id_string_no_error(self):
+        """D-7: real EQUIPMENT_ID shape (e.g. "GWBK-0241"), not a 4-char type code,
+        must pass validation — the exact value class the old enum never matched."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["GWBK-0241"])
+
+    def test_out_of_old_enum_value_no_longer_raises(self):
+        """D-7: a value never present in the old closed enum (_VALID_EQP_TYPES) must
+        now pass validation — proves the membership check is gone, not merely untested."""
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+        validate_eap_alarm_params("2025-01-01", "2025-01-07", eqp_types=["ZZZZ"])
 
 
 # ── test_alarm_category_decode ────────────────────────────────────────────────
@@ -444,3 +463,18 @@ class TestProductDimsFilter:
         from mes_dashboard.workers.eap_alarm_worker import _build_product_dims_exists
         _, params = _build_product_dims_exists(["  TypeA  "], [], [])
         assert params["pjt_0"] == "TypeA"
+
+
+# ── test_equipment_filter_empty_no_op (Round 2 — AC-8, D-6) ──────────────────
+
+class TestEquipmentFilterEmptyNoOp:
+    """AC-8/D-6: empty machines must yield an always-true no-op predicate, not
+    `e.EQUIPMENT_ID IN ()` (ORA-00936). Pure function, no mocking — this is the
+    round-2 regression proof for the production bug in `_build_equipment_filter`."""
+
+    def test_empty_machines_returns_always_true_no_op(self):
+        from mes_dashboard.workers.eap_alarm_worker import _build_equipment_filter
+        sql_fragment, params = _build_equipment_filter([])
+        assert sql_fragment == "1=1"
+        assert params == {}
+        assert "IN ()" not in sql_fragment

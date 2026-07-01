@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest -q --run-integration -m 'not integration' tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp tests/test_eap_alarm_service.py::TestMachinesValidation && pytest -q --run-integration -m integration tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql",
+  "duration_ms": 2821,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-125632/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-125632/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-125632/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

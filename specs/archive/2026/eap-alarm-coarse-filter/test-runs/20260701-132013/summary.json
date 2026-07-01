@@ -1,0 +1,15 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest list tests/unit/eap-alarm-filter.test.js",
+  "duration_ms": 1574,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132013/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132013/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-132013/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -36,10 +36,6 @@ _DETAIL_PER_PAGE_MAX = 200
 
 _LOT_IDS_MAX = 200
 
-_VALID_EQP_TYPES = frozenset({
-    "GDBA", "GCBA", "GWBA", "GWBK", "GPRA", "GTMH", "GWMT", "GDSD", "GWAC", "GPTA",
-})
-
 
 def validate_eap_alarm_params(
     date_from: Optional[str],
@@ -53,22 +49,22 @@ def validate_eap_alarm_params(
     """Validate EAP ALARM coarse filter params (EA-03, EA-07, EA-08, EA-09).
 
     Raises:
-        ValueError: on missing dates, invalid eqp_type enum value (EA-07 only when supplied),
+        ValueError: on missing dates, non-string/blank eqp_type entries (EA-07),
                     all-empty filter axes (EA-08), or lot_ids overflow (EA-09).
     """
     if not date_from or not date_to:
         raise ValueError("LAST_UPDATE_TIME filter required (date_from and date_to must be provided)")
 
-    # Normalize eqp_types — enum check only when supplied
+    # Normalize eqp_types — validated like lot_ids: reject non-string/blank entries,
+    # keep every non-empty stripped value, no closed-enum membership check (EA-07,
+    # D-7). NOTE: despite the field name, values are full EQUIPMENT_ID strings
+    # (e.g. "GWBK-0241"), not 4-char type codes.
     cleaned_eqp = []
     if eqp_types:
         invalid = [m for m in eqp_types if not isinstance(m, str) or not m.strip()]
         if invalid:
             raise ValueError(f"invalid machine values: {invalid!r}")
         cleaned_eqp = [m for m in eqp_types if m.strip()]
-        invalid_enum = [m for m in cleaned_eqp if m not in _VALID_EQP_TYPES]
-        if invalid_enum:
-            raise ValueError(f"invalid eqp_type values (EA-07): {invalid_enum!r}")
 
     # Normalize lot_ids — strip whitespace, drop empties, dedup
     cleaned_lots: list[str] = []

@@ -1,0 +1,130 @@
+agent: qa-reviewer
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-06-30T18:05:00Z"
+status: complete
+verdict: blocked
+summary: >
+  Release readiness BLOCKED on two independent required-gate failures. (1)
+  cdd-kit gate fails contract-versions validation: data-shape 1.29.0→1.31.0 and
+  business-rules 1.34.0→1.36.0 both skip a minor (interleaving with the
+  uncommitted concurrent msd-forward-cause-effect change broke the version
+  chain). (2) Tier misclassification: tests/integration/test_eap_alarm_rq_async.py
+  carries module-level pytestmark = pytest.mark.integration_real, so the entire
+  TestEapAlarmWorkerFnNewDims class (AC-1 LOT_ID IN + route-forward, AC-2 EXISTS
+  SQL assertions) is SKIPPED in the PR-required gate and only runs in the
+  nightly real-infra job, which ci-gates.md correctly marks required:no. These
+  tests are fully mock-based (monkeypatch read_sql_df_slow + spool dir + RQ
+  logging) — no real Oracle/Redis dependency justifies the integration_real
+  marker. The changed-area evidence run masked this by injecting
+  --run-integration-real, a non-standard flag for a cdd-kit-generated
+  changed-area phase. Other gates green.
+artifacts:
+  - { type: gate-results, pointer: "contract-validate(--contracts): pass; backend-unit(56): pass; integration-tier1(26 pass/17 skipped): pass-with-skips; frontend-unit(32): pass; css-check: pass(warn-only); type-check: pass; cdd-kit-gate: FAIL(contract-versions)" }
+  - { type: ci-run-url, pointer: "n/a (local-only)" }
+  - { type: evidence-quality, pointer: "log" }
+  - { type: decision, pointer: "blocked" }
+  - { type: failure-routing, pointer: "version-skip → contract-reviewer + spec-drift-auditor; integration_real misclassification → change-classifier + test-strategist" }
+blocking-findings:
+  - id: BLOCK-1
+    type: dependency/migration + spec-drift
+    detail: >
+      cdd-kit gate eap-alarm-coarse-filter -> "contract versions validation FAILED:
+      data-shape-contract.md minor version skip not allowed (1.29.0 -> 1.31.0);
+      business-rules.md minor version skip not allowed (1.34.0 -> 1.36.0)".
+      Frontmatter is 1.31.0 / 1.36.0; CHANGELOG has interleaved data 1.30.0 /
+      business 1.35.0 entries attributed to the concurrent uncommitted
+      msd-forward-cause-effect change. Required gate #5 (contract-validation) is red.
+    route: contract-reviewer + spec-drift-auditor
+  - id: BLOCK-2
+    type: misclassification (wrong tier) / test-gap
+    detail: >
+      tests/integration/test_eap_alarm_rq_async.py line 4 + 28:
+      pytestmark = pytest.mark.integration_real. PR CI (.github/workflows/
+      backend-tests.yml:61 `pytest tests/ ... -q`, no --run-integration-real)
+      SKIPS all 17 cases incl. TestEapAlarmWorkerFnNewDims. ci-gates.md line 13
+      and test-plan.md line 36 claim this file is a Tier-1 PR-required gate for
+      AC-1/AC-2; the file marker contradicts that. Tests are mock-based (no real
+      infra needed) -> should be pytest.mark.integration (Tier 1). AC-1
+      worker-SQL `LOT_ID IN` assertion + `test_route_forwards_lot_ids_per_kwarg`
+      have NO required-gate coverage as-shipped.
+    route: change-classifier + test-strategist
+ac-coverage:
+  - { ac: AC-1, required-gate-cover: partial, note: "spool-key half covered by unit TestSpoolKeyComposition (Tier 0, pass); LOT_ID IN SQL + route-forward only in nightly integration_real (not required) -> gap" }
+  - { ac: AC-2, required-gate-cover: partial, note: "helper EXISTS via unit TestProductDimsFilter (pass) + data-boundary empty/char-padded (Tier 1, pass); worker-fn EXISTS SQL only nightly (not required)" }
+  - { ac: AC-3, required-gate-cover: yes, note: "unit TestAtLeastOneFilterRequired (Tier 0) + resilience test_all_filters_empty_returns_400 (Tier 1) pass" }
+  - { ac: AC-4, required-gate-cover: yes, note: "unit TestSchemaVersionIsPinned::test_schema_version_equals_three + TestSpoolKeyComposition pass" }
+  - { ac: AC-5, required-gate-cover: yes, note: "unit TestLotIdNormalization + data-boundary char-padded/dedup (Tier 1) pass" }
+  - { ac: AC-6, required-gate-cover: partial, note: "frontend unit 32 pass (Tier 0); E2E eap-alarm-filters.spec.ts NOT executed in this review (Playwright not run locally)" }
+  - { ac: AC-7, required-gate-cover: yes, note: "resilience test_oracle_error_during_exists_semijoin + test_container_filter_cache_miss_returns_empty_arrays (Tier 1) pass" }
+next-action: >
+  Fix BLOCK-1 (reconcile contract version chain so each minor increments by 1,
+  coordinate with msd-forward-cause-effect) and BLOCK-2 (re-mark the mock-based
+  new-dims cases as pytest.mark.integration so they run in the PR gate, or split
+  them out of the integration_real module), then re-run cdd-kit gate +
+  --run-integration suite. E2E Playwright spec must be executed in CI before merge.
+notes: >
+  Tasks 5.1/5.3/6.1/6.2/6.3 still pending in tasks.yml; gate ran non-strict and
+  warned on 6 pending tasks. test-evidence.yml final-status:passed is not
+  trustworthy as a merge signal because its changed-area command used
+  --run-integration-real, which is the nightly Tier-3 path, not the PR gate.
+
+---
+agent: qa-reviewer
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-07-01T13:35:00Z"
+status: complete
+verdict: approved-with-risk
+summary: >
+  Round 2 (post-ship correction, D-6/D-7/D-8, IP-10..IP-13) release-readiness
+  review, covering the accumulated scope of rounds 1+2 (change not yet
+  archived). Independently verified rather than trusted agent-log claims:
+  (1) re-ran cdd-kit validate --versions myself -> pass, contiguous chain
+  1.36.0->1.37.0->1.38.0(concurrent yield-alert change)->1.39.0; (2) temporarily
+  reverted the D-6 _build_equipment_filter fix and reproduced the exact
+  production failure shape (AND e.EQUIPMENT_ID IN ()) in
+  TestEquipmentFilterEmptyNoOp and the resilience regression test, then
+  restored and confirmed green -- round 1's disproven "safe by design" claim
+  is now backed by real red-green coverage, not just assertion; (3) spot-checked
+  test source for TestEquipmentFilterEmptyNoOp, test_full_equipment_id_string_no_error,
+  test_out_of_old_enum_value_no_longer_raises, and the frontend "canSubmit
+  becomes true when only a family is selected" case -- all exist as claimed;
+  (4) re-ran the full eap-alarm backend+frontend surface (92 passed/11 skipped
+  integration_real + 37 frontend passed), confirmed round-1 BLOCK-2 (wrong
+  pytest tier hiding coverage) remains resolved, not regressed; (5) confirmed
+  test-evidence.yml's combined per-phase commands (pytest && vitest) genuinely
+  exercise both backend and frontend for all 3 required phases, resolving the
+  cdd-kit test run per-phase-overwrite hazard both implementation agents
+  flagged; (6) confirmed EA-07 rewrite is non-breaking -- validation-relaxation
+  only, no field/schema/endpoint/spool-key change, no consumer depended on
+  enum enforcement since it never matched real data.
+  One discrepancy found: tasks.yml 3.1/3.2 were still `pending` despite their
+  round-2 scope being fully implemented and verified -- stale bookkeeping, not
+  missing work. Orchestrator corrected to `done` after this review.
+artifacts:
+  - { type: gate-results, pointer: "cdd-kit-validate-versions: pass (verified independently); cdd-kit-gate(non-strict): pass; cdd-kit-gate(--strict): FAIL(5 pending tasks, pre-correction); backend-changed-area(92 pass/11 skip integration_real): pass; frontend-unit(37): pass; AC-8 red-green: reproduced (fails IN() without D-6 fix, passes with)" }
+  - { type: evidence-quality, pointer: "repro (independently reverted D-6 fix and reproduced red-green; re-ran full eap-alarm surface, not just re-read agent-log claims)" }
+  - { type: decision, pointer: "approved-with-risk" }
+  - { type: residual-risk, pointer: "tasks.yml 3.1/3.2 stale pending (work verified complete) -- corrected by orchestrator to done same day; no code/test/contract change required" }
+  - { type: verified-independently, pointer: "cdd-kit validate --versions pass; AC-8 red(IN())->green(1=1) reproduced; _VALID_EQP_TYPES removed from src (0 code refs remain); EA-07 non-breaking (validation relaxation only, no consumer dependency on enum enforcement)" }
+next-action: >
+  tasks.yml 3.1/3.2 corrected to done by orchestrator; re-run cdd-kit gate
+  (non-strict and --strict) to confirm the change is fully clear, then this
+  change is approved for merge/archive. Recommend spec-drift-auditor before
+  merge given round 1 shipped a defect against a since-disproven "safe by
+  design" claim that escaped round-1 review.
+  Post-review addendum (pre-archive, same day): a concurrent session
+  (yield-alert-kpi-csv-parity) bumped business-rules.md's frontmatter to
+  1.40.0 on top of this change's 1.39.0, on the same shared file, before this
+  change committed. Re-sequenced this change's bump to 1.41.0 (sits after
+  theirs) in both contracts/CHANGELOG.md and the in-file mirror; the
+  1.36.0->...->1.39.0 chain this entry verified is unaffected in content,
+  only the final label moved 1.39.0->1.41.0.
+notes: >
+  Round-1 BLOCK-1 (contract version skip) and BLOCK-2 (integration_real
+  mis-tier hiding coverage) both confirmed still resolved, not regressed, in
+  this round. The 11 skipped tests in the changed-area run are
+  test_eap_alarm_rq_async.py (correctly pytestmark=integration_real, Tier-3
+  nightly, out of PR-gate scope) -- distinct from BLOCK-2's original
+  TestEapAlarmWorkerFnNewDims class, which was moved to
+  test_eap_alarm_coarse_filter.py (pytest.mark.integration) and ran (6 passed)
+  in this round's evidence.

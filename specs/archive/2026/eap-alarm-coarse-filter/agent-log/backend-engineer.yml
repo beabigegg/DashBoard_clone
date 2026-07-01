@@ -1,0 +1,133 @@
+agent: backend-engineer
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-06-30T18:30:00Z"
+status: complete
+summary: >
+  Implemented IP-1 through IP-6 for EAP ALARM coarse filter expansion.
+  Extended spool key to cover all 5 dims; bumped _SCHEMA_VERSION 2→3; updated
+  validate_eap_alarm_params with EA-08/EA-09 rules; added _build_lot_ids_filter
+  and _build_product_dims_exists (EXISTS semi-join, NVL(TRIM())) helpers to
+  worker; updated both code paths (legacy + EapAlarmJob); added new
+  GET /api/eap-alarm/product-filter-options endpoint; regenerated OpenAPI.
+  Fixed pre-existing test fixture schema mismatches (PARAM_NAME→PARAMETER_NAME,
+  EVENT_ID→ALARM_ID, ALARM_TIME→ALARM_START, missing ALARM_END/DURATION_SECONDS).
+  All 99 tests pass. Gate passes.
+  QA fix: moved TestEapAlarmWorkerFnNewDims from test_eap_alarm_rq_async.py
+  (pytestmark=integration_real, skipped in PR gate) to new file
+  tests/integration/test_eap_alarm_coarse_filter.py (pytestmark=integration,
+  runs in PR gate). 32 tests now run and pass under --run-integration.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/eap_alarm_cache.py:1-60" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/eap_alarm_service.py:36-95" }
+  - { type: files-changed, pointer: "src/mes_dashboard/workers/eap_alarm_worker.py:1-400" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/eap_alarm_routes.py:1-120" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestAtLeastOneFilterRequired" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestLotIdNormalization" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestProductDimsFilter" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_resilience.py::test_oracle_error_during_exists_semijoin" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_resilience.py::test_container_filter_cache_miss_returns_empty_arrays" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_resilience.py::test_all_filters_empty_returns_400" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_data_boundary.py::test_lot_ids_whitespace_stripped" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_data_boundary.py::test_char_padded_containername_matches" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_coarse_filter.py::TestEapAlarmWorkerFnNewDims (moved from integration_real file; now pytest.mark.integration)" }
+  - { type: test-output, pointer: "32 passed in 1.38s — test_eap_alarm_coarse_filter + test_eap_alarm_data_boundary + test_eap_alarm_resilience; 0 skipped" }
+  - { type: contracts-touched, pointer: "contracts/api/api-contract.md (EapAlarmProductFilterOptionsResponse + POST /spool dims)" }
+  - { type: contracts-touched, pointer: "contracts/data/data-shape-contract.md (§3.17 extended; schema-version 1.30.0)" }
+  - { type: contracts-touched, pointer: "contracts/business/business-rules.md (EA-08/EA-09/EA-10 added; schema-version 1.35.0)" }
+  - { type: contracts-touched, pointer: "contracts/openapi.json (regenerated 187 endpoints)" }
+  - { type: contracts-touched, pointer: "contracts/api/openapi.json (regenerated 187 endpoints)" }
+next-action: none
+notes: >
+  Version clash with concurrent msd-forward-cause-effect change: both changes
+  modified data-shape-contract.md and business-rules.md in the same working tree.
+  Combined frontmatter bumps (HEAD: data=1.29.0, business=1.34.0) set to
+  data=1.30.0 and business=1.35.0 to satisfy the single-step-increment rule.
+  CHANGELOG retains the eap-alarm entries as data 1.31.0 / business 1.36.0 
+  (those are the correct sequential numbers for eap-alarm's own CHANGELOG entry
+  following msd's 1.30.0/1.35.0 entries). Gate passes.
+  Known risk: _build_equipment_filter([]) with empty eqp_types — validated by
+  EA-08 to never be called without at least one of {eqp_types, lot_ids, product_dims};
+  but when eqp_types is empty and only lot_ids/product_dims are supplied, the
+  equipment filter clause is omitted entirely (not empty IN list) — safe by design.
+
+---
+agent: backend-engineer
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-07-01T13:00:00Z"
+status: complete
+summary: >
+  Round 2 (post-ship corrections, IP-10/IP-11/IP-13). Fixed the production
+  ORA-00936 bug: _build_equipment_filter(machines) in
+  src/mes_dashboard/workers/eap_alarm_worker.py now returns ("1=1", {}) when
+  machines is empty, instead of falling through to the len<=999 branch and
+  emitting the invalid "e.EQUIPMENT_ID IN ()" fragment that gets spliced
+  unconditionally as "AND {equipment_filter}" into both SQL templates. Both
+  call sites (run_eap_alarm_query_job legacy path L261, EapAlarmJob.__init__
+  L419) call this same helper, so the single edit covers both — confirmed via
+  grep, no duplicate edit made.
+  Removed the _VALID_EQP_TYPES closed-enum membership check from
+  validate_eap_alarm_params in src/mes_dashboard/services/eap_alarm_service.py
+  (constant + the invalid_enum block deleted); eqp_types is now validated
+  exactly like lot_ids — reject non-string/blank entries, keep every
+  non-empty stripped value, no membership check. Confirmed via grep that
+  _VALID_EQP_TYPES had no other referrers in src/ or tests/ before deletion.
+  Updated the docstring to drop the enum-check claim and added an in-code
+  comment noting eqp_types now holds full EQUIPMENT_ID strings, not 4-char
+  type codes (field name retained per design Open Risk — no rename).
+correction: >
+  Round 1's "Known Risks" note above claimed
+  "_build_equipment_filter([]) ... safe by design" for the eqp_types=[] +
+  product_dims-only combination. This was WRONG: that exact EA-08-legal
+  combo hit the unconditional "AND {equipment_filter}" splice with an empty
+  IN-list and produced ORA-00936 in production. Verified by temporarily
+  reverting src/mes_dashboard/workers/eap_alarm_worker.py and re-running
+  tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp, which failed
+  with `AssertionError: assert 'e.EQUIPMENT_ID IN ()' == '1=1'` — confirming
+  the bug and the red-green proof. Root cause per test-plan.md: round-1's
+  AC-1/AC-2 unit tests exercised eqp_types-non-empty and product_dims-non-empty
+  separately but never the eqp_types=[] + product_dims-non-empty combination.
+  This entry does not delete Round 1's text; it is preserved above with this
+  correction appended per the task's requirement.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/workers/eap_alarm_worker.py:201-220 (_build_equipment_filter early-return branch)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/eap_alarm_service.py:37-68 (_VALID_EQP_TYPES + invalid_enum check removed)" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp::test_empty_machines_returns_always_true_no_op" }
+  - { type: tests-added, pointer: "tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestMachinesValidation::test_full_equipment_id_string_no_error" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestMachinesValidation::test_out_of_old_enum_value_no_longer_raises" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestMachinesValidation::test_single_valid_eqp_type_no_error (docstring/comment repurposed only, assertion unchanged)" }
+  - { type: tests-added, pointer: "tests/test_eap_alarm_service.py::TestMachinesValidation::test_multiple_valid_eqp_types_no_error (docstring/comment repurposed only, assertion unchanged)" }
+  - { type: test-output, pointer: "pytest -q --run-integration tests/test_eap_alarm_service.py tests/integration/test_eap_alarm_resilience.py tests/integration/test_eap_alarm_rq_async.py tests/integration/test_eap_alarm_data_boundary.py tests/integration/test_eap_alarm_coarse_filter.py: 92 passed, 11 skipped (integration_real, out of scope), 1.15s" }
+  - { type: contracts-touched, pointer: "none — contracts/business/business-rules.md EA-07 already rewritten by contract-reviewer per situation brief; no contract edits made in this round" }
+next-action: >
+  Contract-side EA-07 prose for D-6/D-7 is confirmed already rewritten per the
+  situation brief (out of backend-engineer scope this round). Frontend
+  IP-12/IP-13 (FilterBar.vue family expansion + its unit/e2e tests) is a
+  separate frontend-engineer packet running in parallel — verify its
+  test-evidence.yml phases are preserved/merged; cdd-kit test run's per-phase
+  slot appears to overwrite rather than append across concurrent agents (see
+  notes below), so a final gate check should confirm both backend and
+  frontend phase commands are represented before merge.
+notes: >
+  test-evidence.yml behavior: cdd-kit test run writes one entry per phase name
+  (collect/targeted/changed-area), and reruns with a different command REPLACE
+  the prior command for that same phase slot rather than appending a second
+  entry. Round 1 had frontend-only commands recorded for these three phases
+  (npm run type-check / npm run test); running my backend pytest commands for
+  the same phase names overwrote them in test-evidence.yml. This is the tool's
+  observed behavior, not a bug I introduced — flagging so the frontend-engineer
+  or a final integration pass re-verifies both backend and frontend evidence
+  are captured (e.g. via distinct phase names or a final combined run) before
+  the gate is treated as fully covering both surfaces.
+  Verified _VALID_EQP_TYPES had zero other referrers via
+  `grep -rn "_VALID_EQP_TYPES" src/ tests/` before deletion (only remaining
+  hit after edit is a docstring comment in the new test explaining what was
+  removed, not a code reference).
+  ruff check passed clean on all 4 touched files after edits.
+  RESOLVED (main Claude, post-both-agents): re-ran collect/targeted/changed-area
+  via `cdd-kit test run` with combined `pytest ... && cd frontend && npx vitest ...`
+  commands so each required phase now evidences both backend and frontend in one
+  recorded run; final-status: passed. The quality (type-check) and full
+  (Playwright) phase entries remain frontend-only from frontend-engineer's last
+  run, which is acceptable since collect/targeted/changed-area are the only
+  required phases.

@@ -45,6 +45,12 @@ Canonical pattern: `tests/test_wip_service.py::TestFilterOptionsCrossFilterNarro
 
 Pages that intentionally do NOT cross-filter should pin that contract with an explicit "does_not_narrow" test. Example: `tests/test_reject_history_service.py::test_get_filter_options_does_not_narrow_packages_by_selection`
 
+## One-of-N-Required Filter Axes — Test Each Axis Empty, Not Just Non-Empty
+
+For validation rules requiring "at least one of N optional axes," test each axis being the EMPTY one while a sibling axis is populated — not just each axis non-empty in isolation. The empty-axis branch often triggers different code (e.g. an `IN ()` vs `1=1` no-op) that isolated non-empty tests never exercise.
+
+Evidence: `eap-alarm-coarse-filter` — `_build_equipment_filter([])` produced invalid SQL (`ORA-00936`) for the EA-08-legal combo `eqp_types=[]` + non-empty `product_lines`; round-1 tests covered `eqp_types`-non-empty and `product_dims`-non-empty separately, never together.
+
 ## Module-Level Constants — setattr, Not setenv
 
 **Module-level constants frozen at import time cannot be overridden via `monkeypatch.setenv()`.** When a service reads `os.getenv(...)` into a module-level constant (e.g., `_USE_ROW_COUNT_CHUNKING = os.getenv("USE_ROW_COUNT_CHUNKING", "").lower() == "true"`), the value is frozen at the first import. Patching the env var after import has no effect.
@@ -85,6 +91,12 @@ Evidence: `rq-semaphore-wiring` — `tests/integration/test_rq_semaphore_wiring.
 Pattern: `tests/test_env_contract.py::TestEngineDefaultsMatchContract` — caught BQE-05 (contract said `prod=3`, code default was `5`).
 
 Evidence: `batch-rowcount-unification`.
+
+## Enum-Validated Identifiers Used in Exact-Match SQL — Verify Against Real Data
+
+Before shipping a closed-enum validation rule for a field later used in an exact-match SQL clause (`col IN (...)`), pull a live read-only sample and confirm the enum's format actually equals real column values — not just a display-derived prefix/format. A format mismatch means every legally-validated request silently matches zero rows.
+
+Evidence: `eap-alarm-coarse-filter` EA-07 — a closed 10-value `eqp_types` enum (4-char codes) was validated against a format that never equals real `EQUIPMENT_ID` values (`<prefix>-<instance>`, e.g. `GWBK-0241`); dead code from ship (2026-06-30) to discovery (2026-07-01), confirmed via live 17/17 `RESOURCENAME`-to-`EQUIPMENT_ID` sample.
 
 ## Check pytestmark Before Adding Tests to tests/integration/
 

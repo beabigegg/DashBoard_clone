@@ -1,0 +1,33 @@
+agent: test-strategist
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-07-01T00:00:00Z"
+status: complete
+summary: >
+  Round 2 (post-ship correction, D-6/D-7/D-8): appended AC-8/AC-9/AC-10 to
+  test-plan.md without touching AC-1..AC-7. AC-8 covers the production
+  ORA-00936 regression (_build_equipment_filter([]) emitting invalid
+  "IN ()" instead of "1=1") with a pure-function unit test plus a
+  mocked-Oracle-SQL resilience test for the exact EA-08-legal combo
+  (eqp_types=[] + product_lines-only) that escaped round 1. AC-9 covers
+  dropping the dead _VALID_EQP_TYPES 10-code enum (EA-07) in favor of
+  lot_ids-style non-empty-string validation, and flagged 2 existing
+  TestMachinesValidation tests for update (their assertions still pass
+  but no longer prove an enum check) plus 2 new tests proving the enum
+  membership check is actually gone. AC-10 covers FilterBar.vue
+  handleSubmit family-without-machine expansion to full machineOptions.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/eap-alarm-coarse-filter/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp → src/mes_dashboard/workers/eap_alarm_worker.py:201-216" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql → src/mes_dashboard/workers/eap_alarm_worker.py:48-73" }
+  - { type: tdd-pairs, pointer: "tests/test_eap_alarm_service.py::TestMachinesValidation → src/mes_dashboard/services/eap_alarm_service.py:39-71" }
+  - { type: tdd-pairs, pointer: "frontend/tests/unit/eap-alarm-filter.test.js → frontend/src/eap-alarm/FilterBar.vue:92-102" }
+  - { type: coverage-tiers, pointer: "unit (Tier 0), resilience (Tier 1), e2e (Tier 1)" }
+  - { type: mapping-completeness, pointer: "AC-8/AC-9/AC-10 added; AC-1..AC-7 rows untouched; 5 existing test rows flagged update/add in Test Update Contract" }
+next-action: none
+notes: >
+  Root cause callout (Notes section of test-plan.md): round-1's AC-1/AC-2
+  unit tests never exercised eqp_types=[] combined with a non-empty
+  product dim — the one EA-08-legal shape hitting the unconditional
+  "AND {equipment_filter}" splice with an empty IN-list. AC-8's regression
+  test is the required red-green signal for round 2, same role
+  TestSchemaVersionIsPinned played in round 1.

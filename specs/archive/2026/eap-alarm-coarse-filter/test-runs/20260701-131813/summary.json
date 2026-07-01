@@ -1,0 +1,18 @@
+{
+  "change_id": "eap-alarm-coarse-filter",
+  "phase": "targeted",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "conda run -n mes-dashboard pytest tests/test_eap_alarm_service.py::TestEquipmentFilterEmptyNoOp tests/test_eap_alarm_service.py::TestMachinesValidation tests/integration/test_eap_alarm_resilience.py::test_empty_eqp_types_with_product_dims_only_builds_valid_sql -q && cd frontend && npx vitest run tests/unit/eap-alarm-filter.test.js -t 'FilterBar handleSubmit family expansion'",
+  "duration_ms": 5263,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "message": "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯"
+  },
+  "artifacts": {
+    "summary": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-131813/summary.json",
+    "stdout": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-131813/stdout.log",
+    "stderr": "specs/changes/eap-alarm-coarse-filter/test-runs/20260701-131813/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

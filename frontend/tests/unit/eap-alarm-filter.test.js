@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Unit tests for useEapAlarmFilter composable
  *
@@ -8,9 +9,12 @@
  * - parseLotIdText normalizes textarea input
  * - Fine filter state management
  * - Default date range is set correctly
+ * - FilterBar.vue handleSubmit family-without-machine expansion (AC-10/D-8/IP-12)
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { defineComponent } from 'vue';
+import { shallowMount } from '@vue/test-utils';
 
 // Mock onMounted so the composable can be called outside a component context
 // without Vue warnings. The product-filter-options fetch is not under test here.
@@ -31,8 +35,23 @@ vi.mock('../../src/core/api.js', () => ({
 }));
 
 import { useEapAlarmFilter } from '../../src/eap-alarm/composables/useEapAlarmFilter.js';
+import FilterBar from '../../src/eap-alarm/FilterBar.vue';
 
 // Vitest runs in jsdom environment; Vue reactivity should work fine.
+
+// ── MultiSelect stub (mirrors the pattern used in App.cross-filter tests) ────
+const MultiSelectStub = defineComponent({
+  name: 'MultiSelect',
+  props: {
+    modelValue: { type: Array, default: () => [] },
+    options: { type: Array, default: () => [] },
+    placeholder: { type: String, default: '' },
+    disabled: { type: Boolean, default: false },
+    searchable: { type: Boolean, default: false },
+  },
+  emits: ['update:modelValue'],
+  template: '<div class="multi-select-stub">{{ (modelValue || []).join(",") }}</div>',
+});
 
 describe('useEapAlarmFilter', () => {
   let filter;
@@ -296,5 +315,132 @@ describe('useEapAlarmFilter', () => {
       expect(filter.productOptionsLoading).toBeDefined();
       expect(filter.productOptionsLoading.value).toBe(false);
     });
+  });
+});
+
+// ── AC-10 / D-8 / IP-12: FilterBar family-without-machine expansion ──────────
+describe('FilterBar handleSubmit family expansion', () => {
+  const RESOURCE_OPTIONS = {
+    families: ['GWBK', 'GDBA'],
+    resources: [
+      { id: 'GWBK-0001', name: 'GWBK-0001', family: 'GWBK', workcenterGroup: 'WB' },
+      { id: 'GWBK-0002', name: 'GWBK-0002', family: 'GWBK', workcenterGroup: 'WB' },
+      { id: 'GWBK-0241', name: 'GWBK-0241', family: 'GWBK', workcenterGroup: 'WB' },
+      { id: 'GDBA-001', name: 'GDBA-001', family: 'GDBA', workcenterGroup: 'DB' },
+    ],
+  };
+
+  const PRODUCT_FILTER_OPTIONS = {
+    pj_types: [],
+    product_lines: [],
+    pj_bops: [],
+    updated_at: null,
+  };
+
+  function makeFilters(overrides = {}) {
+    return {
+      date_from: '2026-06-01',
+      date_to: '2026-06-30',
+      machines: [],
+      lot_ids: [],
+      pj_types: [],
+      product_lines: [],
+      pj_bops: [],
+      ...overrides,
+    };
+  }
+
+  function mountFilterBar(filters) {
+    return shallowMount(FilterBar, {
+      props: {
+        filters,
+        resourceOptions: RESOURCE_OPTIONS,
+        productFilterOptions: PRODUCT_FILTER_OPTIONS,
+        loading: { querying: false },
+        productOptionsLoading: false,
+      },
+      global: {
+        stubs: {
+          MultiSelect: MultiSelectStub,
+        },
+      },
+    });
+  }
+
+  it('family selected + machines=[] expands submitted machines to every name in the family machineOptions', async () => {
+    // family-only selection (no lot_ids/machines/product dims) now satisfies
+    // canSubmit on its own — no workaround axis needed.
+    const filters = makeFilters({ machines: [] });
+    const wrapper = mountFilterBar(filters);
+
+    // Select the GWBK family via the 型號 MultiSelect stub (first MultiSelect
+    // rendered in the template is the family cascade selector).
+    const multiSelects = wrapper.findAllComponents(MultiSelectStub);
+    const familySelect = multiSelects[0];
+    await familySelect.vm.$emit('update:modelValue', ['GWBK']);
+
+    await wrapper.find('[data-testid="coarse-submit-btn"]').trigger('click');
+
+    const updateEvents = wrapper.emitted('update:filters');
+    expect(updateEvents).toBeTruthy();
+    const lastPayload = updateEvents[updateEvents.length - 1][0];
+
+    expect(lastPayload.machines).toEqual(
+      expect.arrayContaining(['GWBK-0001', 'GWBK-0002', 'GWBK-0241'])
+    );
+    expect(lastPayload.machines).toHaveLength(3);
+    expect(lastPayload.machines).not.toContain('GDBA-001');
+
+    expect(wrapper.emitted('submit')).toBeTruthy();
+  });
+
+  it('canSubmit becomes true when only a family is selected (no machines, lot_ids, or product dims)', async () => {
+    const filters = makeFilters(); // machines/lot_ids/pj_types/product_lines/pj_bops all empty
+    const wrapper = mountFilterBar(filters);
+
+    const submitBtn = wrapper.find('[data-testid="coarse-submit-btn"]');
+    // Before any family selection: at-least-one-of-three is not satisfied.
+    expect(submitBtn.attributes('disabled')).toBeDefined();
+
+    const multiSelects = wrapper.findAllComponents(MultiSelectStub);
+    const familySelect = multiSelects[0];
+    await familySelect.vm.$emit('update:modelValue', ['GWBK']);
+
+    // Family-only selection now satisfies canSubmit on its own.
+    expect(wrapper.find('[data-testid="coarse-submit-btn"]').attributes('disabled')).toBeUndefined();
+  });
+
+  it('family selected + specific machines already chosen submits exactly those machines unchanged', async () => {
+    const filters = makeFilters({ machines: ['GWBK-0241'] });
+    const wrapper = mountFilterBar(filters); // machines non-empty already satisfies canSubmit
+
+    const multiSelects = wrapper.findAllComponents(MultiSelectStub);
+    const familySelect = multiSelects[0];
+    await familySelect.vm.$emit('update:modelValue', ['GWBK']);
+
+    await wrapper.find('[data-testid="coarse-submit-btn"]').trigger('click');
+
+    const updateEvents = wrapper.emitted('update:filters');
+    expect(updateEvents).toBeTruthy();
+    const lastPayload = updateEvents[updateEvents.length - 1][0];
+
+    expect(lastPayload.machines).toEqual(['GWBK-0241']);
+  });
+
+  it('no family and no machine selected leaves submitted machines as empty array unchanged', async () => {
+    // canSubmit requires at-least-one-of-three; set lot_ids (orthogonal to
+    // family/machine) so the submit button is enabled without touching the
+    // 型號/機台 axes under test here.
+    const filters = makeFilters({ machines: [], lot_ids: ['LOT-001'] });
+    const wrapper = mountFilterBar(filters);
+
+    // No family selection performed — cascade.families stays empty.
+    await wrapper.find('[data-testid="coarse-submit-btn"]').trigger('click');
+
+    const updateEvents = wrapper.emitted('update:filters');
+    expect(updateEvents).toBeTruthy();
+    const lastPayload = updateEvents[updateEvents.length - 1][0];
+
+    expect(lastPayload.machines).toEqual([]);
   });
 });

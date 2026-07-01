@@ -1,0 +1,38 @@
+agent: spec-architect
+change-id: eap-alarm-coarse-filter
+timestamp: "2026-07-01"
+status: complete
+summary: >
+  Round 1 (2026-06-30): wrote design.md (under 150 lines) for the EAP-alarm
+  coarse-filter expansion. Recorded D-1 (5-dim spool-key hash, empty-list-as-
+  empty-string to prevent cross-dim collision), D-2 (reuse container_filter_cache
+  for product-filter-options), D-3 (EXISTS semi-join not LEFT JOIN+DISTINCT — no
+  row explosion), D-4 (at-least-one-of-three validated route-side pre-key), D-5
+  (_SCHEMA_VERSION 2→3 self-invalidating). Extends ADR 0008 rather than opening a
+  new boundary; flagged ADR 0008 for amendment (still proposed, still says
+  coarse-only sha256(eqp_types)). No new ADR written.
+
+  Round 2 (2026-07-01, pre-archive gap fix): appended D-6/D-7/D-8 to the same
+  design.md. D-6: `_build_equipment_filter([])` must return `1=1` no-op instead
+  of the broken `IN ()` that produced ORA-00936 in production for the EA-08-legal
+  eqp_types=[]+product_lines-only combo. D-7: drop the `_VALID_EQP_TYPES` 10-code
+  closed enum (EA-07) — confirmed dead-on-arrival via live Oracle sample
+  (EQUIPMENT_ID is `<prefix>-<instance>`, never a bare 4-char code); replace with
+  lot_ids-style non-empty-string validation. D-8: FilterBar.vue submit-time
+  client-side expansion of family-only selection to the full filtered machine
+  list (no new backend dependency). Updated Affected Components table and
+  Migration/Rollback (no new schema/spool-key dimension). Added Open Risks notes:
+  eqp_types field-name/semantics drift (recommend keep name, document misnomer),
+  D-8 cache-key-cardinality note, and a flag for test-strategist that both D-6/D-7
+  defects shipped green (regression net gap). No new ADR.
+artifacts:
+  - { type: adr-written, pointer: "none — extends docs/adr/0008; flagged for owner amendment in design.md Open Risks" }
+  - { type: affected-areas, pointer: "eap-alarm spool-key, oracle worker query, route validation, container_filter_cache, frontend filter bar" }
+  - { type: decision-summary, pointer: "5-dim spool key + EXISTS semi-join + at-least-one-of-three validation + schema_version 2→3; round 2: D-6 empty-list no-op, D-7 drop closed enum, D-8 client-side family expansion" }
+  - { type: risks-noted, pointer: "round 1: 0 high, 3 medium (ADR-0008 amendment, CHAR-pad TRIM parity, cold-cache empty-options UX); round 2: eqp_types misnomer, cache-key cardinality, D-6/D-7 test-coverage gap flagged to test-strategist" }
+notes: >
+  Contracts (data §3.17, business EA-01/08/09/10, api) were already drafted by
+  contract-reviewer and are consistent with the round-1 decisions — design.md
+  references them rather than restating. Round 2's EA-07 contract rewrite is
+  explicitly left to contract-reviewer in the next step; design.md only records
+  the decision. No SQL/code blocks written in either round.

@@ -1,0 +1,199 @@
+change-id: eap-alarm-coarse-filter
+agent: frontend-engineer
+timestamp: "2026-06-30T17:58:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/composables/useEapAlarmFilter.js" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/FilterBar.vue" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/App.vue" }
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/style.css" }
+  - { type: files-changed, pointer: "frontend/tests/unit/eap-alarm-filter.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/eap-alarm-filters.spec.ts" }
+  - { type: components-affected, pointer: "FilterBar (IP-8: LOT_ID textarea + TYPE/PACKAGE/BOP MultiSelects; BLOCKING FIX 1 + BLOCKING FIX 2)" }
+  - { type: components-affected, pointer: "useEapAlarmFilter (IP-7: coarseFilter + productFilterOptions + productOptionsLoading + buildCoarseParams)" }
+  - { type: components-affected, pointer: "App.vue (IP-8: @update:filters wiring + productOptionsLoading prop pass-through)" }
+  - { type: screenshot-paths, pointer: "n/a (no visual capture in this run)" }
+  - { type: accessibility-audit, pointer: "all new inputs have associated <label>; submit button has :title for disabled-reason; MultiSelects show loading placeholder" }
+next-action: none
+notes: |
+  Run 2 — ui-ux-reviewer BLOCKING FIX pass (2026-06-30):
+
+  BLOCKING FIX 1 (prop mutation eliminated):
+    - FilterBar.vue: removed all direct `props.filters.X = ...` writes.
+    - Added `emit('update:filters', { ...props.filters, <key>: value })` in:
+        onLotIdBlur(), updateFamilies(), updateMachines(), handleSubmit(), handleClear().
+    - Inline @update:model-value handlers for pj_types / product_lines / pj_bops
+      now emit via `emit('update:filters', { ...filters, dim: v })` instead of direct `filters.dim = v`.
+    - App.vue: wires `@update:filters="(val) => Object.assign(coarseFilter, val)"` on <FilterBar>.
+
+  BLOCKING FIX 2 (canSubmit at-least-one-of-three):
+    - Added `hasLotIds` computed: checks lot_ids?.length > 0 OR lotIdRaw.value.trim().length > 0
+      (covers the case where user typed but blur hasn't fired yet).
+    - canSubmit now gates on: !loading.querying && date_from && date_to &&
+      (machines.length > 0 || hasLotIds || pj_types.length > 0 || product_lines.length > 0 || pj_bops.length > 0).
+    - Submit button gets :title="'請選擇至少一項：機台、LOT ID 或產品條件'" when !canSubmit.
+
+  ADVISORY (productOptionsLoading flag):
+    - useEapAlarmFilter.js: added `productOptionsLoading = ref(false)`;
+      loadProductFilterOptions() now sets it true before fetch and false in finally block.
+    - FilterBar.vue: accepts `productOptionsLoading?: boolean` prop;
+      TYPE/PACKAGE/BOP MultiSelects are :disabled when productOptionsLoading is true,
+      and show :placeholder="'載入中...'" during load.
+    - App.vue: passes `:product-options-loading="productOptionsLoading"`.
+
+  ADVISORY (BOP/Package label bilingual):
+    - "BOP" → "BOP 製程 / BOP"; "Package" → "Package / 封裝".
+
+  BLOCKING FIX 3 (Playwright LOT_ID Tab→Enter test):
+    - Added test 17: `test_lot_id_tab_then_enter_forwards_lot_ids`
+      types LOT IDs, presses Tab (triggers blur→update:filters), focuses submit button,
+      presses Enter, asserts spool request body contains the LOT ID values.
+    - Updated submitCoarseFilter() helper: fills a default LOT ID when textarea is empty
+      to satisfy the new canSubmit at-least-one-of-three requirement for existing tests.
+
+  Tests:
+    - 34 unit tests pass (34 eap-alarm; +1 new productOptionsLoading ref test).
+    - css:check: 0 errors, 307 warnings (all pre-existing).
+    - type-check: 0 errors.
+    - cdd-kit test run: collect/targeted/changed-area all green.
+
+  Pre-existing failure noted (not introduced here):
+    tests/yield-alert/App.cross-filter.test.js::test_process_type_selector_propagates_to_all_views.
+
+---
+round: 2
+timestamp: "2026-07-01T13:26:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/eap-alarm/FilterBar.vue:91-147" }
+  - { type: files-changed, pointer: "frontend/tests/unit/eap-alarm-filter.test.js:13-15,32-45,318-437" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/eap-alarm-filters.spec.ts:908-968" }
+  - { type: components-affected, pointer: "FilterBar (IP-12: handleSubmit family-without-machine expansion + canSubmit family-only axis, D-8/AC-10)" }
+  - { type: screenshot-paths, pointer: "n/a (no visual change — submit-time/gating logic only, no template/CSS edit)" }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements added; existing MultiSelect/labels/button unchanged)" }
+next-action: none
+notes: |
+  Round 2 — post-ship correction IP-12/IP-13 (D-8 family-without-machine expansion),
+  plus a coordinator-directed follow-up fix to `canSubmit` landed in the same round.
+
+  Scope: fixed a silent-drop bug where selecting a 型號 (family) without any
+  specific 機台 (machine) caused `handleSubmit` to emit `machines: []`,
+  discarding the family-level filter entirely even though the UI placeholder
+  ("全部篩選後機台") implied "all machines in this family" would be applied.
+
+  IP-12 fix #1 (frontend/src/eap-alarm/FilterBar.vue::handleSubmit, ~L91-113):
+    - When `cascade.families.length > 0 && (props.filters.machines?.length ?? 0) === 0`,
+      expand the emitted `machines` array to every name in the already-computed
+      `machineOptions.value` (the family-filtered machine pool) before emitting
+      `update:filters`/`submit`.
+    - When specific machines are already selected, or no family is selected,
+      `machines` is forwarded unchanged (existing behavior preserved).
+    - `cascade.families` remains local-only; never sent to the backend.
+
+  IP-12 fix #2 (coordinator-directed, same round — frontend/src/eap-alarm/FilterBar.vue::canSubmit, ~L135-147):
+    - Initially I left `canSubmit` untouched, reasoning IP-12 said "no
+      template/prop change required" and scoped only `handleSubmit`. The
+      coordinator correctly flagged this as in-scope: without this fix, the
+      exact D-8/AC-10 scenario (型號-only, no 機台/LOT/product-dims) is
+      unreachable through the UI because the submit button stays disabled,
+      making fix #1 dead code from the user's perspective.
+    - Added `cascade.families.length > 0` as a fourth satisfied axis in
+      `canSubmit`'s at-least-one-of-three OR-chain, alongside
+      `machines.length > 0`, `hasLotIds`, `pj_types/product_lines/pj_bops`.
+      Family-only selection now enables the submit button on its own.
+    - No template/prop/CSS change — both fixes are pure computed/handler
+      logic; the acceptance criterion this addresses ("型號有選、機台未選 →
+      應該回傳屬於此機型的所有機台") is now reachable end-to-end via the UI.
+    - Previously-flagged "remaining risk" (canSubmit not counting family-only
+      selection, blocking the D-8 scenario in the live UI) is now RESOLVED,
+      not just flagged.
+
+  IP-13 (frontend portion) — tests added exactly per test-plan.md AC-10 rows,
+  plus one additional case for the canSubmit fix:
+    - frontend/tests/unit/eap-alarm-filter.test.js: new top-level
+      `describe('FilterBar handleSubmit family expansion')` (mounts FilterBar.vue
+      via `@vue/test-utils` `shallowMount` + a MultiSelect stub, following the
+      pattern already used in tests/yield-alert/App.cross-filter.test.js).
+      Added `// @vitest-environment jsdom` pragma to the file header (file was
+      previously `environment: node`; DOM mounting requires jsdom) — mirrors
+      the pragma already used in tests/components/FilterPanel.test.js.
+      4 cases:
+        1. family selected + machines=[] (family-only, no lot_ids workaround
+           needed now that canSubmit counts family) → emitted machines ==
+           full family machineOptions; submit fires.
+        2. canSubmit becomes true when only a family is selected (no
+           machines/lot_ids/product dims) — asserts the submit button's
+           `disabled` attribute toggles from present to absent purely from
+           selecting a family.
+        3. family selected + specific machines already chosen → emitted
+           machines unchanged (exactly those machines).
+        4. no family + no machine (lot_ids set to satisfy canSubmit,
+           orthogonal to the axis under test — this precondition is
+           intentional here, not a workaround, since this case tests the
+           "neither selected" branch) → emitted machines stays [].
+      Removed the LOT-ID-as-workaround pattern from case 1 (and only case 1 —
+      case 4 legitimately needs it since it deliberately tests the "neither"
+      branch) now that canSubmit's own fix makes family-only submission
+      directly testable, per coordinator direction.
+    - frontend/tests/playwright/eap-alarm-filters.spec.ts: new test 18
+      `test_family_only_submission_expands_machines_to_full_family_list`.
+      Selects 型號=GDBA only (MOCK_RESOURCE_OPTIONS: GDBA family has a single
+      resource GDBA-001) via the MultiSelect trigger/dropdown/option UI
+      (located by `.filter-group` with-text '型號', since no dedicated
+      data-testid exists on that control and IP-12 forbids template changes).
+      Removed the LOT-ID-workaround and its now-stale comment (canSubmit
+      counts family-only selection, so the button is already enabled without
+      it) — the test now exercises literal family-only submission, matching
+      test-plan.md's e2e row without any auxiliary axis.
+      Asserts the mocked spool POST body's `machines` field equals `['GDBA-001']`
+      (the full family roster), not empty and not the family label itself.
+
+  Verification:
+    - Reverted FilterBar.vue's handleSubmit fix temporarily: confirmed the
+      family-expansion unit test fails red without it, passes green restored.
+    - Reverted FilterBar.vue's canSubmit fix temporarily: confirmed both the
+      new canSubmit test AND the family-only submission test fail red without
+      it (submit button stays disabled → click never fires → machines stays
+      []); both pass green with it restored.
+    - `cd frontend && npx vitest run tests/unit/eap-alarm-filter.test.js`: 37/37 pass.
+    - `cd frontend && npm run type-check`: 0 errors.
+    - `cd frontend && npm run build`: succeeds (rebuilt dist to exercise e2e, twice — once per fix).
+    - Playwright `eap-alarm-filters.spec.ts` (18 tests incl. new #18): all 18
+      SKIP uniformly in this shared local dev environment — `navigateToEapAlarm`'s
+      reachability guard returns false because portal-shell requires a live
+      login and no Playwright auth/storageState setup exists locally (pre-existing
+      environment limitation affecting all 17 prior tests identically, not
+      introduced by this change). `test-results/.last-run.json`: `status: passed,
+      failedTests: []` (no failures/errors — clean skip, not a crash) on both
+      the pre-fix and post-fix builds. Locator logic (`.filter-group` scoped
+      by-text '型號', not overlapping '機台') was manually verified against the
+      rendered template and MultiSelect placeholder text to confirm it would
+      not double-match once the environment supports login.
+
+  cdd-kit test run (bounded ladder, this round, re-run after the canSubmit fix):
+    - collect: `cd frontend && npx vitest list tests/unit/eap-alarm-filter.test.js` → passed
+    - targeted: `cd frontend && npx vitest run tests/unit/eap-alarm-filter.test.js -t 'FilterBar handleSubmit family expansion'` → passed
+    - changed-area: `cd frontend && npx vitest run tests/unit/eap-alarm-filter.test.js` → passed
+    - quality: `cd frontend && npm run type-check` → passed
+    - full: `cd frontend && PW_WORKERS=1 npx playwright test tests/playwright/eap-alarm-filters.spec.ts --project=chromium` → passed (18 skipped, 0 failed)
+    - test-evidence.yml final-status: passed
+
+  IMPORTANT — test-evidence.yml phase overwrite caveat (unchanged from earlier
+  in this round, still applies):
+    `cdd-kit test run` replaces the entry for a given phase name (no append/history
+    per phase — confirmed by reading the CLI's `ev.runs.findIndex(r => r.phase ===
+    run.phase)` upsert logic). Before my round-2 runs, the `collect`/`targeted`/
+    `changed-area` phase slots held the backend-engineer's Python-only commands
+    (pytest against eap_alarm_service/worker/resilience tests) from their own
+    parallel round-2 pass. My frontend-only commands for those same phase names
+    have now overwritten those pointers in test-evidence.yml. This matches this
+    project's own established convention (see the archived eap-alarm-analysis
+    change's test-evidence.yml, which also shows only one command per phase,
+    last-writer-wins across stacks) — but it means the backend Python evidence
+    for those 3 phases is no longer the *pointer* in test-evidence.yml (their
+    test-runs/ artifact directories from their run still exist on disk with full
+    logs, just not referenced by the current YAML). Flagging this explicitly so
+    the orchestrator/backend-engineer can decide whether a final combined re-run
+    (or a single `&&`-chained command per phase covering both stacks) is needed
+    before `cdd-kit gate` is invoked, so neither stack's evidence is the one that
+    silently loses the pointer at gate time.
