@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-MES Dashboard 是一個供工廠工程師自助查詢 MES 生產數據的 Web 報表平台（Flask + Vue3/Vite），支援 WIP、Hold、良率、設備、材料追溯等 16 個報表頁面，並整合 AI 自然語言查詢、異常偵測排程與系統管理儀表板。
+MES Dashboard 是一個供工廠工程師自助查詢 MES 生產數據的 Web 報表平台（Flask + Vue3/Vite），支援 WIP、Hold、良率、設備、材料追溯等報表頁面（現行清單見 `docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json`），並整合 AI 自然語言查詢、異常偵測排程與系統管理儀表板。
 
 ## Dev commands
 
@@ -40,18 +40,17 @@ cdd-kit detect-stack                  # 偵測專案技術棧
 ```
 src/mes_dashboard/
   app.py                  # Flask app factory；Blueprint 掛載；runtime-contract 驗證
-  routes/                 # 20+ Blueprint 模組（每個功能模組一個檔案）
+  routes/                 # 28 個 Blueprint 模組（每個功能模組一個檔案）
   services/               # 業務邏輯層（routes 呼叫 services，禁止直接 DB）
-  core/
-    response.py           # success_response / error_response 統一回應輔助函式
-    config.py             # 環境設定（從 .env 載入）
-  workers/                # RQ async job workers（reject/yield/trace/material-trace）
+  core/response.py        # success_response / error_response 統一回應輔助函式
+  config/settings.py      # 環境設定（從 .env 載入）
+  workers/                # RQ async job workers（downtime/eap_alarm/production_history/reject_history/resource_history）
 
 frontend/
   src/
     portal-shell/         # 主 SPA shell（路由、導覽、權限守衛）
     <feature>/            # 每個報表功能獨立 Vue 應用（wip/hold/resource 等）
-    shared-ui/            # 共用元件（DataTable、SummaryCard、LoadingOverlay 等）
+    shared-ui/, shared-composables/  # 共用元件與 composables（跨多個 apps）
     styles/tailwind.css   # 全域 base/components 層（唯一允許寫 @layer 的地方）
   tailwind.config.js      # Design token 唯一真實來源
 
@@ -102,107 +101,105 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 <!-- cdd-kit:learnings:start -->
 ### Promoted Learnings
 
-**CDD Kit operations** — see `docs/cdd-kit-patterns.md` for full detail:
-- Keep local cdd-kit in sync with CI (no version pin → always installs latest); upgrade after any `spec traceability` CI failure — see docs/cdd-kit-patterns.md
-- `ci-gates.md` must contain literal "workflow" / "promotion policy" / "rollback policy" section headers or `cdd-kit gate` fails — see docs/cdd-kit-patterns.md
-- Section-6 tasks: 6.2/6.3 may be `done` when Tier-1 passes locally; 6.4 `skipped` when no nightly/weekly gates defined — see docs/cdd-kit-patterns.md
-- Version entries must go to `contracts/CHANGELOG.md` only — `cdd-kit validate --versions` never checks individual contract files — see docs/cdd-kit-patterns.md
-- `context-manifest.md` Allowed Paths must use directory-level paths, not glob patterns — see docs/cdd-kit-patterns.md
-- `cdd-kit validate --contracts` requires `pip install jsonschema` before the step in CI (not bundled); also required locally when `response-samples.json` exists — see docs/cdd-kit-patterns.md
-- Response schema cells must be bare identifiers (`/^[A-Za-z][A-Za-z0-9_]*/`); Tier-A tables require `| field | type | required |` headers; `dataPath` only for inner-payload schemas; regen BOTH `contracts/openapi.json` AND `contracts/api/openapi.json` after every endpoint-table, schema, OR schema-version edit — a schema-version-only bump still drifts the export and CI `openapi-sync` (`cdd-kit openapi export --check`) catches it while the local gate does not — see contracts/api/api-contract.md §Schema Authoring Rules
-- New concurrency-critical modules/wiring that are inert at merge — either zero callers, or all flags default-off: add `tier-floor-override` to `tasks.yml` frontmatter (≥20 chars); for zero-caller modules the override expires when the first real caller lands (that change must be Tier 1 + stress-soak-report.md); for flag-gated wiring the override stands for the full flag-off period (same Tier-1 + stress-soak-report.md required when any flag flips to on); a third case — pure keyword-scan false positives with zero real concurrency/auth/payments/migration surface — uses the same override with no expiration trigger — see docs/cdd-kit-patterns.md
-- Pre-commit hook scans all staged `specs/changes/*/` dirs; stage only the completed change's directory, not all of `specs/changes/` — unfilled template placeholders in sibling dirs fail the hook — see docs/cdd-kit-patterns.md
-- Running the full pytest suite re-runs `tests/contract/test_capture_samples.py` and regenerates all ~160 contract samples with live runtime values; `git checkout tests/contract/samples/` to revert the unrelated churn before committing, then re-stage only the samples your change altered — see docs/cdd-kit-patterns.md
-- Parallel implementation agents (e.g. backend-engineer + frontend-engineer) on disjoint source files still race on the shared test-evidence.yml when both call `cdd-kit test run` — concurrent writes overwrite each other's phase rows; the later agent must re-run collect/targeted/changed-area combining both stacks' commands into single entries before gate sign-off — see docs/cdd-kit-patterns.md
-- Two concurrent uncommitted CDD changes bumping the same contract file's schema-version: `cdd-kit validate --versions` diffs working tree against git HEAD, not changelog prose — renumbering one entry to sit after the other's does NOT clear the gate while both are uncommitted; wait for the other session to commit first, or `--no-verify` only after confirming the version-skip is the sole failure — see docs/cdd-kit-patterns.md
+**CDD Kit operations** — see `docs/cdd-kit-patterns.md`:
+- No CI version pin; upgrade local cdd-kit after any `spec traceability` failure
+- `ci-gates.md` needs literal "workflow" / "promotion policy" / "rollback policy" headers or the gate fails
+- Tasks 6.2/6.3 `done` when Tier-1 passes locally; 6.4 `skipped` when no nightly/weekly gates defined
+- Version entries go only in `contracts/CHANGELOG.md`, never per-contract files
+- `context-manifest.md` Allowed Paths: directory-level only, no globs
+- `pip install jsonschema` required before `cdd-kit validate --contracts` (CI and local)
+- Inert concurrency code (zero callers, or all flags default-off): add `tier-floor-override` to `tasks.yml` (≥20 chars); expires on first real caller / first flag flip-on; keyword-scan false positives get a permanent override
+- Concurrent backend+frontend agents both calling `cdd-kit test run` race on `test-evidence.yml` — last agent must re-run combining both stacks' commands
+- Two uncommitted changes bumping the same contract's schema-version: `validate --versions` diffs working tree vs git HEAD, not changelog prose — wait for the other to commit, or `--no-verify` only if it's the sole failure
+- Stage only the specific `specs/changes/<id>/`, never all of `specs/changes/` — sibling scaffolds fail the pre-commit hook
+- `gate --strict` only runs the changed-area test ladder; before pushing a removal or shape change, grep the full test tree and run full pytest locally
+- Full pytest run regenerates ~160 contract samples; `git checkout tests/contract/samples/` then re-stage only your change's samples
 
-**Frontend patterns** — see `docs/architecture/frontend-patterns.md` for full detail:
-- TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS — see docs/architecture/frontend-patterns.md
-- Node ≥22.6 required (`node --experimental-strip-types` parity tests) — see docs/architecture/frontend-patterns.md
-- vue-echarts: bind `@click` on `<VChart>`, not imperative `.on()` — wrapper handles lifecycle cleanup — see docs/architecture/frontend-patterns.md
-- `MultiSelect.vue` is shared by 12 apps; changes must be additive; grep consumers before editing — see docs/architecture/frontend-patterns.md
-- Snapshot-diff filter composables must re-sync `_lastCommitted` from `selection` after every `fetchFilterOptions` — see docs/architecture/frontend-patterns.md
-- Oracle DATE midnight UTC columns: inspect H/M/S via regex before `new Date()` to avoid ±8h TZ shift — see docs/architecture/frontend-patterns.md
-- WAI-ARIA combobox close must `nextTick(() => triggerEl.focus())` to return keyboard focus — see docs/architecture/frontend-patterns.md
-- `fetchAllViews()` fan-out: use a per-endpoint staleness dict (`{ summary: 0, pareto: 0, … }`) not a shared counter — shared counter clears all in-flight flags on the first response — see docs/architecture/frontend-patterns.md
+**Frontend patterns** — see `docs/architecture/frontend-patterns.md`:
+- TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS
+- Node ≥22.6 required (`--experimental-strip-types` parity tests)
+- vue-echarts: bind `@click` on `<VChart>`, not imperative `.on()`
+- `MultiSelect.vue` shared by 12 apps — changes must be additive, grep consumers first
+- Snapshot-diff filter composables: re-sync `_lastCommitted` from `selection` after every `fetchFilterOptions`
+- Oracle DATE midnight UTC columns: inspect H/M/S via regex before `new Date()` (avoids ±8h TZ shift)
+- WAI-ARIA combobox close must `nextTick(() => triggerEl.focus())`
+- `fetchAllViews()` fan-out: per-endpoint staleness dict, not a shared counter (shared counter clears all in-flight flags on first response)
 
 **CSS architecture** — see `docs/architecture/css-patterns.md` and `contracts/css/css-contract.md`:
-- All feature CSS must be scoped under `.theme-<name>`; unscoped rules bleed permanently (enforced by `css:check` Rule 6) — see docs/architecture/css-patterns.md
-- Local Playwright/E2E runs against gunicorn serve the pre-built static dist/, not live source — CSS, JS, and Vue edits all require `npm run build` first, or hashed dist filenames orphan stale content silently — see docs/architecture/css-patterns.md
-- `<Teleport to="body">` breaks descendant selectors; wrap content in thin `<div class="theme-<feature>">` — see contracts/css/css-contract.md rule 4.4
-- `resource-shared/styles.css` `:is()` groups must include every portal-shell page theme; use `sed` batch replace — see contracts/css/css-contract.md rule 4.5
+- Feature CSS must be scoped under `.theme-<name>`; unscoped rules bleed permanently (`css:check` Rule 6)
+- Local Playwright/E2E runs serve pre-built `dist/`, not live source — `npm run build` before testing CSS/JS/Vue changes
+- `<Teleport to="body">` breaks descendant selectors — wrap content in a `.theme-<feature>` div (rule 4.4)
+- `resource-shared/styles.css` `:is()` groups must include every portal-shell page theme (rule 4.5)
 
-**Cache & spool patterns** — see `docs/architecture/cache-spool-patterns.md` for full detail:
-- Pre-warm cache namespace must exactly match the key pattern user queries read — see docs/architecture/cache-spool-patterns.md
-- Multi-worker gunicorn startup: use file-based exclusive lock (`O_CREAT|O_EXCL` sentinel) for Oracle load tasks — see docs/architecture/cache-spool-patterns.md
-- Parquet schema breaking changes: add `rm` to rollback runbook AND bump `_SCHEMA_VERSION` in same commit — see docs/architecture/cache-spool-patterns.md
-- Spool-schema "UNCHANGED" assertions: when legacy and unified paths produce different column sets, document each path's columns separately — a blanket "UNCHANGED" claim when columns differ is a false contract — see docs/architecture/cache-spool-patterns.md
-- query-tool has no persistent spool — skip parquet cleanup in all rollbacks — see docs/architecture/cache-spool-patterns.md
-- hold-history spool: use `DESCRIBE`-based column detection for live schema compat without forced purge — see docs/architecture/cache-spool-patterns.md
-- SQL-to-API rename layer at route boundary absorbs column renames; audit it before touching frontend — see docs/architecture/cache-spool-patterns.md
-- SyncWorker: `COUNT > 0` guard before `TRUNCATE`/`DELETE`; version `REPLACE` still runs even when skipped — see docs/architecture/cache-spool-patterns.md
-- `/api/resource/status/options` has its own inline filter dict independent of `query_resource_filter_options()` — see docs/architecture/cache-spool-patterns.md
-- Oracle `CHAR` column lookups: apply `strip()` at both dict-build and per-record lookup — see docs/architecture/cache-spool-patterns.md
-- Type-A spool frontend: read the route's `success_response(...)` call for exact JSON wrapper key — see docs/architecture/cache-spool-patterns.md
-- Canonical spool: implement two-phase key resolution (superset warmup reuse + exact-match Oracle fallback) — see docs/architecture/cache-spool-patterns.md
-- `spool_routes._ALLOWED_NAMESPACES`: add namespace AND parametrize test in the same PR as the spool write — see docs/architecture/cache-spool-patterns.md
-- BatchQueryEngine `ROW_NUMBER()` chunking is incompatible with cross-row reductions; classify at design time — see docs/adr/0003-downtime-rowcount-chunking-exclusion.md
-- Type B async: when inner fn can't accept `progress_callback`, use coarse bracket milestones 5→15→90→100 bracketing the call; avoid hash-mirroring unless per-chunk granularity is required — see docs/architecture/cache-spool-patterns.md
-- `*_USE_UNIFIED_JOB` flags must be set identically in gunicorn AND the RQ worker service environment; module-level constants freeze at boot so drift causes silent split-brain routing — see contracts/env/env-contract.md §Worker Feature-Flag Env-Var Parity
-- Coarse spool key (excludes fine-filter dims): inject fine-filter WHERE into DuckDB runtime views at `_register_runtime_views`, not at spool-write time; stage spools under finer keys (e.g., `trace_query_id`) should be saved pre-filtered — see docs/architecture/cache-spool-patterns.md
+**Cache & spool patterns** — see `docs/architecture/cache-spool-patterns.md`:
+- Pre-warm namespace must exactly match the key pattern user queries read
+- Multi-worker gunicorn Oracle loads: file-based `O_CREAT|O_EXCL` exclusive lock
+- Parquet schema breaks: add `rm` to rollback runbook AND bump `_SCHEMA_VERSION` in the same commit
+- Legacy vs. unified spool paths with different columns: document each path's columns separately — never a blanket "UNCHANGED"
+- query-tool has no persistent spool — skip parquet cleanup in its rollbacks
+- hold-history spool: DESCRIBE-based column detection, no forced purge
+- SQL-to-API rename layer at the route boundary absorbs column renames — audit it before touching frontend
+- SyncWorker: `COUNT > 0` guard before `TRUNCATE`/`DELETE`; version `REPLACE` still runs when skipped
+- `/api/resource/status/options` has its own inline filter dict, independent of `query_resource_filter_options()`
+- Oracle `CHAR` column lookups: `strip()` at both dict-build and per-record lookup
+- Type-A spool frontend: read the route's `success_response()` call for the exact JSON wrapper key
+- Canonical spool: two-phase key resolution (superset warmup reuse + exact-match Oracle fallback)
+- `spool_routes._ALLOWED_NAMESPACES`: add namespace + parametrized test in the same PR as the spool write
+- Type B async without `progress_callback` support: coarse bracket milestones 5→15→90→100
+- `*_USE_UNIFIED_JOB` flags must match between gunicorn and RQ worker env (frozen at boot) — see contracts/env/env-contract.md §Worker Feature-Flag Env-Var Parity
+- Coarse spool key: inject fine-filter WHERE at `_register_runtime_views`, not spool-write time; `trace_query_id`-keyed stage spools should be pre-filtered
 
-**Service architecture** — see `docs/architecture/service-patterns.md` for full detail:
-- `downtime_analysis_service`: patch `load_downtime_events` at definition site (`downtime_analysis_cache`), not the service module — see docs/architecture/service-patterns.md
-- `_get_wip_search_index`: new filter fields must be added in BOTH incremental and full-rebuild paths — see docs/architecture/service-patterns.md
-- `rq_monitor_service` module-level import: patch at service boundary (`get_rq_monitor_summary`), not `redis_client` — see docs/architecture/service-patterns.md
-- `QueryBuilder`: two independent `IN`-list builders require counter-forwarding between them — see docs/architecture/service-patterns.md
-- `_PARTIAL_NONKEY_COLS_LOT`: add new non-key column atomically with SQL change; pin with membership test — see docs/architecture/service-patterns.md
-- SQL CTE changes: update both the CTE SELECT list and the outer SELECT (two-location edits) — see docs/architecture/service-patterns.md
-- SQL-frontend column gap: cross-check SQL output against Vue template rendering, not just the route response — see docs/architecture/service-patterns.md
-- AI pipeline `raw_params` callables: require `dispatch: raw_params` flag in `ai_functions.yaml` — see docs/architecture/service-patterns.md
-- AI pipeline `advance_query_state`: pops entire `_SESSION_STORE`; extract/restore cross-turn state before/after — see docs/architecture/service-patterns.md
-- `_AI_SESSION` is a module-level `requests.Session`; patch at `ai_query_service._AI_SESSION`, not `requests.post` — see docs/architecture/service-patterns.md
-- Every `execute_*_job` worker must wire `acquire_heavy_query_slot` before its `*_USE_RQ` flag goes to production; current gap: query-tool/hold/resource/reject all unwired — see docs/architecture/service-patterns.md §RQ Worker Concurrency Gate
-- COUNT(*) fail-open pre-check: domains without date range use `count_*_rows()` → `classify_query_cost(domain=..., row_count=count)`; COUNT error must fail-open to sync, never 503 — see docs/architecture/service-patterns.md §Async Routing Pre-Check Pattern
+**Service architecture** — see `docs/architecture/service-patterns.md`:
+- `downtime_analysis_service`: patch `load_downtime_events` at `downtime_analysis_cache`, not the service module
+- `_get_wip_search_index`: new filter fields need both incremental and full-rebuild paths
+- `rq_monitor_service`: patch at `get_rq_monitor_summary`, not `redis_client`
+- `QueryBuilder`: two independent `IN`-list builders need counter-forwarding between them
+- `_PARTIAL_NONKEY_COLS_LOT`: add new non-key columns atomically with the SQL change, pin with a membership test
+- SQL CTE changes: update both the CTE SELECT list and the outer SELECT
+- SQL-frontend column gap: cross-check SQL output against the Vue template, not just the route response
+- AI pipeline `raw_params` callables require `dispatch: raw_params` in `ai_functions.yaml`
+- AI pipeline `advance_query_state` pops the entire `_SESSION_STORE` — extract/restore cross-turn state around it
+- `_AI_SESSION` is a module-level `requests.Session` — patch `ai_query_service._AI_SESSION`, not `requests.post`
+- Every `execute_*_job` worker must wire `acquire_heavy_query_slot` before its `*_USE_RQ` flag ships — see docs/architecture/service-patterns.md §RQ Worker Concurrency Gate
+- COUNT(*) fail-open pre-check for domains without a date range must fail open to sync, never 503 — see docs/architecture/service-patterns.md §Async Routing Pre-Check Pattern
 
 **MES domain semantics:**
 - `LOTWIPHISTORY.TRACKINQTY` is remaining-qty-per-partial (decrements across partials); use only `TRACKINTIMESTAMP` as session key — see contracts/business/business-rules.md §PH-06
 
-**Modernization policy** — see `docs/architecture/modernization-policy.md` for full detail:
-- Page add/remove: update BOTH `asset_readiness_manifest.json` AND `route_scope_matrix.json` in `docs/migration/` — see docs/architecture/modernization-policy.md
-- `data/page_status.json`: manually delete page entry on code removal (never auto-updated by code deletion) — see docs/architecture/modernization-policy.md
-- `drawer_id` change in `page_status.json`: update corresponding test assertion and rename method — see docs/architecture/modernization-policy.md
+**Modernization policy** — see `docs/architecture/modernization-policy.md`:
+- Page add/remove: update BOTH `asset_readiness_manifest.json` AND `route_scope_matrix.json` in `docs/migration/`
+- `data/page_status.json`: manually delete page entry on code removal (never auto-updated)
+- `drawer_id` change in `page_status.json`: update corresponding test assertion and rename method
 
-**Test coverage discipline** — see `docs/architecture/test-discipline.md` for full detail (8 rules against silent-drop filter bugs):
-- Use `call_args.kwargs[key]` per-kwarg assertions, not `assert_called_once_with()` whitelist — see docs/architecture/test-discipline.md
-- Assert route forwarding per-kwarg with non-default values — see docs/architecture/test-discipline.md
-- Test BOTH snapshot and Oracle fallback paths for every filter kwarg — see docs/architecture/test-discipline.md
-- Filter fixtures must include every column the function filters on — see docs/architecture/test-discipline.md
-- Cross-filter narrowing has its own test surface: assert "selecting A narrows B" — see docs/architecture/test-discipline.md
-- One-of-N-required filter axes: test each axis EMPTY while a sibling is populated, not just each axis non-empty in isolation — see docs/architecture/test-discipline.md
-- Module-level constants: `monkeypatch.setattr()` not `setenv` (frozen at import); module-level side-effects (e.g. `register_job_type()`): use `importlib.reload()` after clearing the dict to re-run registration — `setattr` alone does not re-execute them; in threaded tests all `monkeypatch.setattr()` calls must complete BEFORE threads are launched — `patch()`/`patch.object()` inside thread bodies causes concurrent attribute restore races that pollute sibling test modules — see docs/architecture/test-discipline.md
-- Env-var contract tests must pin default values, not just assert var name presence — see docs/architecture/test-discipline.md
-- Closed-enum validation feeding an exact-match SQL clause: verify enum format equals real column values via a live read-only sample before shipping — see docs/architecture/test-discipline.md
-- New feature-flag rows in `env-contract.md` must also be added to `contracts/env/env.schema.json` with `enum` + `default`; entries absent from the schema bypass machine enum validation (`cdd-kit validate --contracts` will not catch the typo) — see contracts/env/env.schema.json
-- Check `pytestmark` before adding mock tests to `tests/integration/` — see docs/architecture/test-discipline.md
-- Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls — see docs/architecture/test-discipline.md
-- Cross-change spec gaps (e.g. async vs sync column-name parity): mark with `xfail(strict=True)` not `xfail` or `skip` — `strict=True` converts the test into a tripwire that auto-fails CI if the gap is accidentally closed without removing the marker — see docs/architecture/test-discipline.md
-- Partial-trackout fixtures: include rows with different `TRACKINQTY` per session (real arithmetic) — see docs/architecture/test-discipline.md
-- New modules using `oracle_arrow_reader` or `base_chunked_duckdb_job`: add stem to `_APPROVED_CALLERS` in `tests/test_query_cost_policy.py` in the same PR; also update `tests/test_job_registry.py` count for new `register_job_type()` calls — see docs/architecture/test-discipline.md
-- `BaseChunkedDuckDBJob` domain migrations: dual-tier parity test required (mock chunk-seam unit + real-path parquet diff on business key); see docs/architecture/test-discipline.md §P2+ Domain Migration
-- `cdd-kit gate --strict` runs only the bounded (changed-area) test ladder; before pushing a behavioral removal or endpoint/data-shape change, `grep` the full test tree for references and run the full pytest suite locally — stale assertions in other files pass the local gate but fail CI's `unit-and-integration-tests` — see docs/cdd-kit-patterns.md
-- Over-limit boundary tests must strictly *exceed* the configured cap (e.g., date range > 365 days for a 365-day limit), not equal it — equal-to-cap passes validation silently and the test asserts the wrong code path — see docs/architecture/test-discipline.md
+**Test coverage discipline** — see `docs/architecture/test-discipline.md`:
+- Use `call_args.kwargs[key]` per-kwarg assertions, not `assert_called_once_with()` whitelist
+- Assert route forwarding per-kwarg with non-default values
+- Test BOTH snapshot and Oracle fallback paths for every filter kwarg
+- Filter fixtures must include every column the function filters on
+- Cross-filter narrowing has its own test surface: assert "selecting A narrows B"
+- One-of-N-required filter axes: test each axis EMPTY while a sibling is populated
+- Module-level constants: `monkeypatch.setattr()` not `setenv`; module-level registration side-effects need `importlib.reload()` after clearing; in threaded tests, all `setattr()` calls must complete before threads launch
+- Env-var contract tests must pin default values, not just assert var-name presence
+- Closed-enum validation feeding an exact-match SQL clause: verify enum format equals real column values first
+- New feature-flag rows in `env-contract.md` must also get `enum` + `default` in `contracts/env/env.schema.json`
+- Check `pytestmark` before adding mock tests to `tests/integration/`
+- Use `ast.parse()` + walk `ast.Call` to prove absence of removed startup calls
+- Cross-change spec gaps: mark `xfail(strict=True)`, not `xfail`/`skip`, so it tripwires when the gap closes
+- Partial-trackout fixtures: include rows with different `TRACKINQTY` per session
+- New `oracle_arrow_reader`/`base_chunked_duckdb_job` callers: add to `_APPROVED_CALLERS` and update the job-registry count test, same PR
+- `BaseChunkedDuckDBJob` domain migrations need a dual-tier parity test (mock chunk-seam unit + real-path parquet diff on business key)
+- Over-limit boundary tests must strictly exceed the cap, not equal it
 
-**CI workflow & GunicornHarness** — see `docs/architecture/ci-workflow.md` for full detail:
-- New Playwright specs: add `npx playwright install --with-deps chromium` step in CI before running tests — see docs/architecture/ci-workflow.md
-- `GunicornHarness`: use `mes_dashboard:create_app()` app URI and prepend `src/` to `PYTHONPATH` — see docs/architecture/ci-workflow.md
-- `GunicornHarness`: pop `FLASK_ENV`/`FLASK_TESTING`/`PYTEST_CURRENT_TEST`, set `REDIS_ENABLED=true` before `Popen` — see docs/architecture/ci-workflow.md
-- `start_duckdb_prewarm()`: assert "background thread started" sentinel, not "prewarm complete" — see docs/architecture/ci-workflow.md
-- `GunicornHarness`: set both `REGISTER_INTERNAL_METRICS=true` and `INTERNAL_METRICS_ENABLED=1` for `/internal/metrics` — see docs/architecture/ci-workflow.md
-- Playwright `page.route()` is LIFO: register catch-all routes FIRST and specific routes LAST so specific routes take priority — see docs/architecture/ci-workflow.md
-- Playwright specs for reject-history / reject-material: `DetailTable` only renders after `queryId` is set — always click the submit button in `beforeEach` before asserting table content — see docs/architecture/ci-workflow.md
-- Playwright resilience specs: use `page.goto(...).catch(()=>{})` + early-return guard, NOT `page.request.post()` (`loginViaApi`), which is not interceptable by `page.route()` and throws ECONNREFUSED in CI — see docs/architecture/ci-workflow.md
-- Playwright `pageRendered` guard: check app-specific content (theme class or feature keyword), NOT `bodyText.length > 100` — Chrome's ECONNREFUSED error page body exceeds 100 chars — see docs/architecture/ci-workflow.md
-- Async-gated route unit tests: mock `is_async_available()=True` + enqueue fn instead of spool-hit mocks; CI has no Redis, so routes without this mock fall to 503 — see docs/architecture/ci-workflow.md
+**CI workflow & GunicornHarness** — see `docs/architecture/ci-workflow.md`:
+- New Playwright specs: add `npx playwright install --with-deps chromium` in CI before running tests
+- `GunicornHarness`: use `mes_dashboard:create_app()` app URI, prepend `src/` to `PYTHONPATH`
+- `GunicornHarness`: pop `FLASK_ENV`/`FLASK_TESTING`/`PYTEST_CURRENT_TEST`, set `REDIS_ENABLED=true` before `Popen`
+- `start_duckdb_prewarm()`: assert "background thread started", not "prewarm complete"
+- `GunicornHarness`: set both `REGISTER_INTERNAL_METRICS=true` and `INTERNAL_METRICS_ENABLED=1` for `/internal/metrics`
+- Playwright `page.route()` is LIFO: register catch-all routes first, specific routes last
+- reject-history/reject-material specs: click submit in `beforeEach` before asserting `DetailTable` content
+- Resilience specs: use `page.goto(...).catch(()=>{})`, not `page.request.post()` (`loginViaApi`) — not interceptable, throws ECONNREFUSED in CI
+- `pageRendered` guard: check app-specific content, not `bodyText.length > 100` — Chrome's ECONNREFUSED error page exceeds 100 chars
+- Async-gated route unit tests: mock `is_async_available()=True` + enqueue fn, not spool-hit mocks — CI has no Redis
 
 <!-- cdd-kit:learnings:end -->
