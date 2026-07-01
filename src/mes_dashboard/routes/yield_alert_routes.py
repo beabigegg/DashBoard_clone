@@ -12,6 +12,7 @@ from flask import Blueprint, request
 from mes_dashboard.core.heavy_query_telemetry import (
     record_memory_error,
 )
+from mes_dashboard.core.route_helpers import parse_multi_param as _parse_multi_param
 from mes_dashboard.core.response import (
     VALIDATION_ERROR,
     SERVICE_UNAVAILABLE,
@@ -92,21 +93,9 @@ def _parse_date_range(required: bool = True):
     return start_date, end_date, None
 
 
-def _parse_multi_param(name: str) -> list[str]:
-    values: list[str] = []
-    for raw in request.args.getlist(name):
-        for token in str(raw).split(","):
-            item = token.strip()
-            if item:
-                values.append(item)
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return deduped
+# _parse_multi_param is the shared route_helpers.parse_multi_param (imported above).
+# yield-alert only reads request.args (GET); behaviour is identical to the former
+# local copy via the MultiDict getlist + CSV-split + order-preserving de-dup path.
 
 
 def _common_filters() -> dict:

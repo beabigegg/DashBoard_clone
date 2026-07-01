@@ -11,6 +11,7 @@ from typing import Optional
 from flask import Blueprint, Response, request
 
 from mes_dashboard.core.cache import cache_get, cache_set, make_cache_key
+from mes_dashboard.core.route_helpers import parse_multi_param as _parse_multi_param
 from mes_dashboard.core.response import (
     success_response,
     validation_error,
@@ -144,37 +145,9 @@ def _get_request_args() -> dict:
     return request.args
 
 
-def _parse_multi_param(name: str, args=None) -> list[str]:
-    source = args if args is not None else request.args
-    values = []
-    # Use getlist() for MultiDict (GET query string); plain dict comes from POST JSON body.
-    if hasattr(source, 'getlist'):
-        for raw in source.getlist(name):
-            for token in str(raw).split(","):
-                item = token.strip()
-                if item:
-                    values.append(item)
-    else:
-        raw_value = source.get(name)
-        if isinstance(raw_value, list):
-            for item in raw_value:
-                token = str(item).strip()
-                if token:
-                    values.append(token)
-        elif raw_value is not None:
-            for token in str(raw_value).split(","):
-                item = token.strip()
-                if item:
-                    values.append(item)
-    # Deduplicate while preserving order.
-    seen = set()
-    deduped = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
-    return deduped
+# _parse_multi_param is the shared route_helpers.parse_multi_param (imported above);
+# behaviour is identical to the former local copy (GET MultiDict + POST dict, CSV split,
+# order-preserving de-dup).
 
 
 def _overload_error(message: str):
