@@ -134,11 +134,19 @@ Evidence: `downtime-analysis-page` — `TestCallLlmText` required this correctio
 
 The `global_concurrency` semaphore (`MAX_CONCURRENT = 3`) bounds simultaneous Oracle connections from RQ workers to prevent DB exhaustion. Without wiring, flag-on workers bypass the gate entirely — the semaphore exists but is never acquired.
 
-Wiring status (as of rq-semaphore-wiring):
+Wiring status — **legacy per-domain workers** (flag-off path; as of rq-semaphore-wiring):
 - `execute_query_tool_job` — **wired** (guarded by `_QUERY_TOOL_CONCURRENCY_WIRED`)
 - `execute_hold_history_query_job` — **wired** (guarded by `HOLD_ASYNC_ENABLED`)
 - `execute_resource_history_query_job` — **wired** (guarded by `RESOURCE_ASYNC_ENABLED`)
 - `execute_reject_query_job` — **wired at cache layer** (`reject_dataset_cache.execute_primary_query` acquires internally; no job-level acquire to avoid double-counting)
+- `query_production_history` — **wired** (`production_history_service` acquires around `_run_oracle_to_spool`)
+- `execute_wip_detail_job` — **wired** (unconditional; no routing flag)
+
+Wiring status — **unified job core** (`*_USE_UNIFIED_JOB=on` path; as of base-job-semaphore-wiring):
+- `BaseChunkedDuckDBJob.run()` — **wired centrally**: the Oracle fan-out (`_fan_out_reduction`/`_fan_out_append`) is bracketed by `heavy_query_slot(f"{namespace}:{job_id}")`. This covers **all** subclasses that do not override `run()`: `RejectHistoryJob`, `ProductionHistoryJob`, `DowntimeJob`, `EapAlarmJob`, `ResourceHistoryBaseJob`, `ResourceHistoryOeeJob`. Slot is unconditional — `run()` executes only on the flag-on path, so there is no flag-off parity concern, and the legacy acquires above live on the mutually-exclusive flag-off path (no double-count). `post_aggregate` stays OUTSIDE the slot (DuckDB-local, Oracle-phase-only per D1).
+- `MaterialTraceJob.run()` — **wired in the override**: material_trace overrides `run()`, so it acquires `heavy_query_slot` itself around its Oracle fetch loop (no legacy per-domain acquire exists, so this is its only gate).
+
+> ⚠️ Before base-job-semaphore-wiring, the unified path (EAP_ALARM/DOWNTIME/MATERIAL_TRACE `USE_UNIFIED_JOB=on` by default) bypassed the gate entirely — the legacy acquires only cover the flag-off path. Any new `BaseChunkedDuckDBJob` subclass inherits the slot automatically; a subclass that overrides `run()` MUST wire the slot itself (see MaterialTraceJob).
 
 Use the `heavy_query_slot(owner)` contextmanager from `global_concurrency` — it wraps
 `acquire_heavy_query_slot` / `release_heavy_query_slot` with an exception-safe
