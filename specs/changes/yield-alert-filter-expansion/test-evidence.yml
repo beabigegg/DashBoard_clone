@@ -1,0 +1,46 @@
+change-id: yield-alert-filter-expansion
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      python -m pytest --collect-only -q tests/test_yield_alert_routes.py tests/test_yield_alert_dataset_cache.py
+      tests/test_yield_alert_sql_runtime.py && cd frontend && npx vitest run
+      tests/validation/useYieldAlert.validation.test.js tests/yield-alert/App.cross-filter.test.js
+      tests/yield-alert/useYieldAlertDuckDB.departments.test.js --reporter=verbose --run
+    summary: specs/changes/yield-alert-filter-expansion/test-runs/20260701-102819/summary.json
+  - phase: targeted
+    status: passed
+    command: >-
+      python -m pytest tests/test_yield_alert_routes.py::test_query_accepts_each_new_process_type
+      tests/test_yield_alert_routes.py::test_query_requires_valid_process_type
+      tests/test_yield_alert_dataset_cache.py::test_primary_query_id_differs_for_each_process_type
+      tests/test_yield_alert_dataset_cache.py::test_process_type_like_patterns_mutually_exclusive
+      tests/test_yield_alert_dataset_cache.py::test_process_type_f_uses_f_pattern
+      tests/test_yield_alert_sql_runtime.py::TestQueryFilterOptions
+      tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions
+      tests/test_yield_alert_routes.py::test_view_workcenter_groups_sourced_from_spool_not_filter_cache
+      tests/test_yield_alert_routes.py::test_cross_filter_options_workcenter_groups_from_spool
+      tests/test_yield_alert_routes.py::test_view_new_process_type_zero_rows_returns_empty_not_error
+      tests/test_yield_alert_routes.py::test_filter_options_still_uses_filter_cache -q --maxfail=1 --tb=short -ra && cd
+      frontend && npx vitest run tests/validation/useYieldAlert.validation.test.js
+      tests/yield-alert/App.cross-filter.test.js tests/yield-alert/useYieldAlertDuckDB.departments.test.js
+    summary: specs/changes/yield-alert-filter-expansion/test-runs/20260701-102832/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      python -m pytest tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_routes.py
+      tests/test_yield_alert_sql_runtime.py -q --maxfail=1 --tb=short -ra && cd frontend && npx vitest run
+      tests/yield-alert/ tests/validation/useYieldAlert.validation.test.js tests/abort/yield-alert-abort.test.js && npm
+      run type-check
+    summary: specs/changes/yield-alert-filter-expansion/test-runs/20260701-102843/summary.json
+  - phase: contract
+    status: passed
+    command: cdd-kit validate --contracts
+    summary: specs/changes/yield-alert-filter-expansion/test-runs/20260701-102116/summary.json
+final-status: passed

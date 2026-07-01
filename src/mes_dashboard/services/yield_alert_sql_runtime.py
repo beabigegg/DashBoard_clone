@@ -736,6 +736,9 @@ def _query_filter_options(conn: Any) -> Dict[str, List[str]]:
         ("packages", "PACKAGE_NAME"),
         ("types", "TYPE_NAME"),
         ("functions", "FUNCTION_NAME"),
+        # workcenter_groups: raw DEPARTMENT_NAME (NOT the normalized DEPARTMENT_GROUP
+        # column used elsewhere for the `departments` filter-apply key) — YA-10.
+        ("workcenter_groups", "DEPARTMENT_NAME"),
     ]
     exclude_values = {"(NA)", "-1", ""}
 
@@ -791,11 +794,16 @@ def compute_cross_filter_options(
         return None
 
     # (col_name, option_key, other_filter_keys_to_apply)
+    # NOTE: "workcenter_groups" (raw DEPARTMENT_NAME) is a NET-NEW dimension, additive
+    # alongside the pre-existing "departments" (normalized DEPARTMENT_GROUP) filter-apply
+    # key — it is not a rename/repurpose of "departments". See YA-10 / implementation-plan
+    # Pitfall #1 and #2.
     dim_specs = [
-        ("LINE_NAME",     "lines",     ["departments", "packages", "types", "functions"]),
-        ("PACKAGE_NAME",  "packages",  ["departments", "lines",    "types", "functions"]),
-        ("TYPE_NAME",     "types",     ["departments", "lines",    "packages", "functions"]),
-        ("FUNCTION_NAME", "functions", ["departments", "lines",    "packages", "types"]),
+        ("LINE_NAME",       "lines",             ["departments", "packages", "types", "functions", "workcenter_groups"]),
+        ("PACKAGE_NAME",    "packages",          ["departments", "lines",    "types", "functions", "workcenter_groups"]),
+        ("TYPE_NAME",       "types",             ["departments", "lines",    "packages", "functions", "workcenter_groups"]),
+        ("FUNCTION_NAME",   "functions",         ["departments", "lines",    "packages", "types", "workcenter_groups"]),
+        ("DEPARTMENT_NAME", "workcenter_groups", ["departments", "lines",    "packages", "types", "functions"]),
     ]
     exclude_values: Set[str] = {"(NA)", "-1", ""}
 

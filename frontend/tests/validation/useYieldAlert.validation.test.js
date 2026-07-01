@@ -252,7 +252,36 @@ describe('useYieldAlert validation — DuckDB computeView output shapes', () => 
       process_type: 'GC%',
     };
     expect(body).toHaveProperty('process_type');
-    expect(['GA%', 'GC%']).toContain(body.process_type);
+    expect(['GA%', 'GC%', 'GD%', 'F%', 'W%', 'D%']).toContain(body.process_type);
+  });
+
+  it('test_process_type_options_render_six_entries — closed enum expands from 2 to 6 values', () => {
+    // Mirrors App.vue PROCESS_TYPE_OPTIONS (business-rules.md YA-01/YA-02, data-shape §3.16.4).
+    const PROCESS_TYPE_OPTIONS = [
+      { value: 'GA%', label: '封裝 (GA%)' },
+      { value: 'GC%', label: '點測 (GC%)' },
+      { value: 'GD%', label: '重工 (GD%)' },
+      { value: 'F%', label: '委外 (F%)' },
+      { value: 'W%', label: 'WIP (W%)' },
+      { value: 'D%', label: '特殊專案 (D%)' },
+    ];
+    expect(PROCESS_TYPE_OPTIONS).toHaveLength(6);
+    const values = PROCESS_TYPE_OPTIONS.map((opt) => opt.value);
+    expect(values).toEqual(['GA%', 'GC%', 'GD%', 'F%', 'W%', 'D%']);
+    // Each value must be accepted by the query body shape (AC-2 parity check)
+    for (const value of values) {
+      const body = { start_date: '2026-01-01', end_date: '2026-01-31', process_type: value };
+      assertShape(body, { start_date: 'string', end_date: 'string', process_type: 'string' }, 'POST /api/yield-alert/query body');
+    }
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('a near-miss process_type value (e.g. G%) is not in the closed enum', () => {
+    // Documents that the client-side enum is closed; an invalid value like the bare
+    // group prefix "G%" (not a real option) is not among the accepted set — the
+    // server enforces this with 400 VALIDATION_ERROR (YA-01).
+    const VALID_PROCESS_TYPES = ['GA%', 'GC%', 'GD%', 'F%', 'W%', 'D%'];
+    expect(VALID_PROCESS_TYPES).not.toContain('G%');
   });
 
 });

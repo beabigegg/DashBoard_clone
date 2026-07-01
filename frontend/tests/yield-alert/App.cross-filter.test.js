@@ -437,6 +437,256 @@ describe('Yield Alert App URL and cross-filter behavior', () => {
     }
   });
 
+  it.each(['GD%', 'F%', 'W%', 'D%'])(
+    'test_process_type_switch_clears_query_id_and_state — switching to %s clears stale state and forces re-query',
+    async (newProcessType) => {
+      // Set up a clean state with no existing query_id
+      window.history.replaceState({}, '', '/yield-alert-center?start_date=2026-03-01&end_date=2026-03-07');
+
+      let postCallCount = 0;
+      apiPostMock.mockImplementation(async (_url, body) => {
+        postCallCount++;
+        expect(body).toHaveProperty('process_type');
+        return { success: true, data: { query_id: `qid-pt-${postCallCount}` } };
+      });
+
+      apiGetMock.mockImplementation(async (url) => {
+        if (url === '/api/yield-alert/filter-options') {
+          return { success: true, data: { workcenter_groups: [] } };
+        }
+        if (url === '/api/yield-alert/view') {
+          return {
+            success: true,
+            data: {
+              summary: { transaction_qty: 50, scrap_qty: 1, yield_pct: 98 },
+              trend: { items: [] },
+              heatmap: { items: [] },
+              station_summary: { items: [] },
+              package_summary: { items: [] },
+              alerts: { items: [], pagination: { page: 1, per_page: 20, total: 0, total_pages: 1 } },
+              filter_options: {},
+            },
+          };
+        }
+        return { success: true, data: {} };
+      });
+
+      const { default: YieldAlertApp } = await import('../../src/yield-alert-center/App.vue');
+
+      const wrapper = shallowMount(YieldAlertApp, {
+        global: {
+          stubs: {
+            MultiSelect: MultiSelectStub,
+            EmptyState: true,
+            ErrorBanner: true,
+            LoadingOverlay: true,
+            LoadingSpinner: true,
+            SummaryCard: true,
+            SummaryCardGroup: true,
+            YieldHeatmap: true,
+            YieldStationChart: true,
+            YieldPackageChart: true,
+            YieldTrendChart: true,
+            AsyncQueryProgress: true,
+          },
+        },
+      });
+
+      await nextTick();
+      await nextTick();
+
+      // Run the initial query so queryId/hasQueried are populated
+      const primaryButton = wrapper.find('button.ui-btn--primary');
+      await primaryButton.trigger('click');
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.text()).toContain('資料已載入');
+
+      const postCallsBeforeSwitch = postCallCount;
+
+      // Switch to the new process_type radio
+      const radio = wrapper.find(`input[type="radio"][value="${newProcessType}"]`);
+      expect(radio.exists()).toBe(true);
+      await radio.trigger('change');
+      await nextTick();
+      await nextTick();
+
+      // Stale state cleared: dimension multi-selects reset to empty
+      const selectTexts = wrapper.findAll('.multi-select-stub').map((node) => node.text());
+      for (const text of selectTexts) {
+        expect(text).toBe('');
+      }
+
+      // User must click again to force a new query (no auto re-query)
+      const reQueryButton = wrapper.find('button.ui-btn--primary');
+      await reQueryButton.trigger('click');
+      await nextTick();
+      await nextTick();
+      expect(postCallCount).toBeGreaterThan(postCallsBeforeSwitch);
+
+      const lastCallBody = apiPostMock.mock.calls[apiPostMock.mock.calls.length - 1][1];
+      expect(lastCallBody.process_type).toBe(newProcessType);
+    },
+  );
+
+  it('test_workcenter_groups_wired_from_view_response — /view filter_options.workcenter_groups populates dropdown options', async () => {
+    window.history.replaceState({}, '', '/yield-alert-center?start_date=2026-03-01&end_date=2026-03-07');
+
+    apiPostMock.mockResolvedValue({ success: true, data: { query_id: 'qid-wg-001' } });
+    apiGetMock.mockImplementation(async (url) => {
+      if (url === '/api/yield-alert/filter-options') {
+        return { success: true, data: { workcenter_groups: ['焊接_WB'] } };
+      }
+      if (url === '/api/yield-alert/view') {
+        return {
+          success: true,
+          data: {
+            summary: { transaction_qty: 100, scrap_qty: 1, yield_pct: 99 },
+            trend: { items: [] },
+            heatmap: { items: [] },
+            station_summary: { items: [] },
+            package_summary: { items: [] },
+            alerts: { items: [], pagination: { page: 1, per_page: 20, total: 0, total_pages: 1 } },
+            filter_options: {
+              lines: ['L1'],
+              packages: ['PKG-A'],
+              types: ['TYPE-A'],
+              functions: ['FUNC-A'],
+              workcenter_groups: ['重工站A', '重工站B'],
+            },
+          },
+        };
+      }
+      return { success: true, data: {} };
+    });
+
+    const { default: YieldAlertApp } = await import('../../src/yield-alert-center/App.vue');
+
+    const wrapper = shallowMount(YieldAlertApp, {
+      global: {
+        stubs: {
+          MultiSelect: MultiSelectStub,
+          EmptyState: true,
+          ErrorBanner: true,
+          LoadingOverlay: true,
+          LoadingSpinner: true,
+          PageHeader: true,
+          SummaryCard: true,
+          SummaryCardGroup: true,
+          YieldHeatmap: true,
+          YieldStationChart: true,
+          YieldPackageChart: true,
+          YieldTrendChart: true,
+          AsyncQueryProgress: true,
+        },
+      },
+    });
+
+    await nextTick();
+    await nextTick();
+
+    // Run the primary query so applyFullView() processes the /view response.
+    const primaryButton = wrapper.find('button.ui-btn--primary');
+    await primaryButton.trigger('click');
+    await nextTick();
+    await nextTick();
+
+    const multiSelects = wrapper.findAllComponents(MultiSelectStub);
+    const workcenterSelect = multiSelects[0];
+    expect(workcenterSelect.props('options')).toEqual(['重工站A', '重工站B']);
+  });
+
+  it('test_workcenter_groups_wired_from_cross_filter_options — /cross-filter-options workcenter_groups populates dropdown options', async () => {
+    window.history.replaceState({}, '', '/yield-alert-center?query_id=qid-wg-002&start_date=2026-03-01&end_date=2026-03-07');
+
+    apiPostMock.mockResolvedValue({ success: true, data: { query_id: 'qid-wg-002' } });
+    apiGetMock.mockImplementation(async (url) => {
+      if (url === '/api/yield-alert/filter-options') {
+        return { success: true, data: { workcenter_groups: ['焊接_WB'] } };
+      }
+      if (url === '/api/yield-alert/view') {
+        return {
+          success: true,
+          data: {
+            summary: { transaction_qty: 100, scrap_qty: 1, yield_pct: 99 },
+            trend: { items: [] },
+            heatmap: { items: [] },
+            station_summary: { items: [] },
+            package_summary: { items: [] },
+            alerts: { items: [], pagination: { page: 1, per_page: 20, total: 0, total_pages: 1 } },
+            filter_options: {
+              lines: ['L1', 'L2'],
+              packages: ['PKG-A'],
+              types: ['TYPE-A'],
+              functions: ['FUNC-A'],
+            },
+          },
+        };
+      }
+      if (url.startsWith('/api/yield-alert/cross-filter-options?')) {
+        return {
+          success: true,
+          data: {
+            lines: ['L1'],
+            packages: ['PKG-A'],
+            types: ['TYPE-A'],
+            functions: ['FUNC-A'],
+            workcenter_groups: ['重工站C'],
+          },
+        };
+      }
+      return { success: true, data: {} };
+    });
+
+    const { default: YieldAlertApp } = await import('../../src/yield-alert-center/App.vue');
+
+    const wrapper = shallowMount(YieldAlertApp, {
+      global: {
+        stubs: {
+          MultiSelect: MultiSelectStub,
+          EmptyState: true,
+          ErrorBanner: true,
+          LoadingOverlay: true,
+          LoadingSpinner: true,
+          PageHeader: true,
+          SummaryCard: true,
+          SummaryCardGroup: true,
+          YieldHeatmap: true,
+          YieldStationChart: true,
+          YieldPackageChart: true,
+          YieldTrendChart: true,
+          AsyncQueryProgress: true,
+        },
+      },
+    });
+
+    await nextTick();
+    await nextTick();
+
+    // Run the primary query first so queryId/hasQueried are populated and the
+    // supplementary filter panel (with its MultiSelect controls) renders.
+    const primaryButton = wrapper.find('button.ui-btn--primary');
+    await primaryButton.trigger('click');
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    const multiSelects = wrapper.findAllComponents(MultiSelectStub);
+    expect(multiSelects.length).toBeGreaterThanOrEqual(2);
+
+    // Trigger a supplementary filter change (lines) to fire fetchCrossFilterOptions
+    await multiSelects[1].vm.$emit('update:modelValue', ['L1']);
+    await nextTick();
+    vi.advanceTimersByTime(350);
+    await nextTick();
+    await nextTick();
+
+    const workcenterSelect = wrapper.findAllComponents(MultiSelectStub)[0];
+    expect(workcenterSelect.props('options')).toEqual(['重工站C']);
+  });
+
   it('test_other_filter_orchestrator_consumers_unaffected — useFilterOrchestrator mock still returns valid object', async () => {
     // This test verifies that the useFilterOrchestrator mock used in the test suite
     // is unaffected by the process_type selector addition (which is NOT threaded through

@@ -81,6 +81,10 @@ def test_view_supports_workcenter_group_filters(mock_view, client):
             "quality": {},
             "sort": {"sort_by": "date_bucket", "sort_dir": "desc"},
         },
+        "filter_options": {
+            "lines": [], "packages": [], "types": [], "functions": [],
+            "workcenter_groups": ["焊接_WB_1線", "焊接_WB_2線"],
+        },
         "meta": {"cache": {"query_id": "qid-001"}},
     }
     response = client.get(
@@ -95,6 +99,72 @@ def test_view_supports_workcenter_group_filters(mock_view, client):
     assert kwargs["filters"]["workcenter_groups"] == ["焊接_WB"]
     assert "焊接_WB" in kwargs["filters"]["departments"]
     assert "焊接_DW" in kwargs["filters"]["departments"]
+    # AC-5/YA-10: workcenter_groups in the /view response is spool-sourced (raw
+    # DEPARTMENT_NAME values), not the global filter_cache grouped output.
+    assert payload["data"]["filter_options"]["workcenter_groups"] == [
+        "焊接_WB_1線", "焊接_WB_2線",
+    ]
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_options")
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_view_workcenter_groups_sourced_from_spool_not_filter_cache(mock_view, mock_groups, client):
+    """AC-5/YA-10 regression: GET /api/yield-alert/view must NOT call
+    get_yield_workcenter_group_options() (the filter_cache-backed helper) — its
+    workcenter_groups value comes solely from apply_cached_view's filter_options."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 100, "scrap_qty": 1, "yield_pct": 99},
+        "trend": {"items": [], "granularity": "day"},
+        "alerts": {
+            "items": [],
+            "pagination": {"page": 1, "per_page": 50, "total": 0, "total_pages": 1},
+            "quality": {},
+            "sort": {"sort_by": "date_bucket", "sort_dir": "desc"},
+        },
+        "filter_options": {
+            "lines": [], "packages": [], "types": [], "functions": [],
+            "workcenter_groups": ["切割_A線"],
+        },
+        "meta": {"cache": {"query_id": "qid-002"}},
+    }
+
+    response = client.get("/api/yield-alert/view?query_id=qid-002")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["data"]["filter_options"]["workcenter_groups"] == ["切割_A線"]
+    assert not mock_groups.called, (
+        "GET /api/yield-alert/view must not call get_yield_workcenter_group_options "
+        "(filter_cache path) — workcenter_groups is spool-sourced per YA-10"
+    )
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_view_new_process_type_zero_rows_returns_empty_not_error(mock_view, client):
+    """AC-7/YA-12: a new process_type with zero matching spool rows must return a
+    valid empty result — empty alerts array and empty workcenter_groups — not a 500."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 0, "scrap_qty": 0, "yield_pct": 0},
+        "trend": {"items": [], "granularity": "day"},
+        "alerts": {
+            "items": [],
+            "pagination": {"page": 1, "per_page": 50, "total": 0, "total_pages": 1},
+            "quality": {},
+            "sort": {"sort_by": "date_bucket", "sort_dir": "desc"},
+        },
+        "filter_options": {
+            "lines": [], "packages": [], "types": [], "functions": [], "workcenter_groups": [],
+        },
+        "meta": {"cache": {"query_id": "qid-zero-row"}},
+    }
+
+    response = client.get("/api/yield-alert/view?query_id=qid-zero-row")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert payload["data"]["alerts"]["items"] == []
+    assert payload["data"]["filter_options"]["workcenter_groups"] == []
 
 
 @patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
@@ -226,6 +296,26 @@ def test_filter_options_returns_workcenter_groups(mock_groups, client):
     assert payload["data"]["workcenter_groups"] == ["焊接_DB", "焊接_WB", "成型"]
 
 
+def test_filter_options_still_uses_filter_cache(client):
+    """AC-8/YA-11 regression guard: GET /api/yield-alert/filter-options must keep
+    calling get_yield_workcenter_group_options() (-> filter_cache.get_workcenter_groups())
+    unchanged. Unlike /view and /cross-filter-options, this endpoint is NOT re-pointed
+    to the spool by this change."""
+    with patch(
+        "mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_options"
+    ) as mock_groups:
+        mock_groups.return_value = ["焊接_DB", "焊接_WB"]
+        response = client.get("/api/yield-alert/filter-options")
+
+    assert response.status_code == 200
+    assert mock_groups.called, (
+        "GET /api/yield-alert/filter-options must still call "
+        "get_yield_workcenter_group_options (filter_cache path)"
+    )
+    payload = response.get_json()
+    assert payload["data"]["workcenter_groups"] == ["焊接_DB", "焊接_WB"]
+
+
 @patch("mes_dashboard.routes.yield_alert_routes.compute_cross_filter_options")
 def test_cross_filter_options_forwards_query_id_and_filters(mock_compute, client):
     mock_compute.return_value = {
@@ -233,6 +323,7 @@ def test_cross_filter_options_forwards_query_id_and_filters(mock_compute, client
         "packages": ["PKG-A"],
         "types": ["TYPE-A"],
         "functions": ["FUNC-A"],
+        "workcenter_groups": ["焊接_WB_1線"],
     }
 
     response = client.get(
@@ -246,6 +337,7 @@ def test_cross_filter_options_forwards_query_id_and_filters(mock_compute, client
     payload = response.get_json()
     assert payload["success"] is True
     assert payload["data"]["packages"] == ["PKG-A"]
+    assert payload["data"]["workcenter_groups"] == ["焊接_WB_1線"]
     mock_compute.assert_called_once()
     _, kwargs = mock_compute.call_args
     assert kwargs["query_id"] == "qid-001"
@@ -253,6 +345,28 @@ def test_cross_filter_options_forwards_query_id_and_filters(mock_compute, client
     assert "焊接_WB" in kwargs["filters"]["departments"]
     assert "焊接_DW" in kwargs["filters"]["departments"]
     assert kwargs["filters"]["lines"] == ["L1"]
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_options")
+@patch("mes_dashboard.routes.yield_alert_routes.compute_cross_filter_options")
+def test_cross_filter_options_workcenter_groups_from_spool(mock_compute, mock_groups, client):
+    """AC-5/YA-10 regression: GET /api/yield-alert/cross-filter-options must NOT call
+    get_yield_workcenter_group_options() (filter_cache path) — workcenter_groups comes
+    solely from compute_cross_filter_options (spool path)."""
+    mock_compute.return_value = {
+        "lines": [], "packages": [], "types": [], "functions": [],
+        "workcenter_groups": ["切割_A線"],
+    }
+
+    response = client.get("/api/yield-alert/cross-filter-options?query_id=qid-003")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["data"]["workcenter_groups"] == ["切割_A線"]
+    assert not mock_groups.called, (
+        "GET /api/yield-alert/cross-filter-options must not call "
+        "get_yield_workcenter_group_options (filter_cache path)"
+    )
 
 
 @patch("mes_dashboard.routes.yield_alert_routes.build_drilldown_payload")
@@ -347,19 +461,44 @@ class TestJobExpiry410PollingRace:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_query_requires_valid_process_type(client):
-    """B4: POST /api/yield-alert/query with invalid process_type must return 400 VALIDATION_ERROR."""
+    """B4/AC-2: POST /api/yield-alert/query with invalid process_type must return
+    400 VALIDATION_ERROR. Covers a clearly-invalid value and a near-miss (`G%`) that
+    must still 400 under the expanded 6-value enum (GA%/GC%/GD%/F%/W%/D%)."""
+    for bad_value in ("INVALID", "G%"):
+        response = client.post(
+            "/api/yield-alert/query",
+            json={
+                "start_date": "2026-02-01",
+                "end_date": "2026-02-28",
+                "process_type": bad_value,
+            },
+        )
+        assert response.status_code == 400, f"process_type={bad_value!r} must 400"
+        payload = response.get_json()
+        assert payload["success"] is False
+        assert payload["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.parametrize("process_type", ["GA%", "GC%", "GD%", "F%", "W%", "D%"])
+@patch("mes_dashboard.routes.yield_alert_routes.execute_primary_query")
+def test_query_accepts_each_new_process_type(mock_primary, client, process_type):
+    """AC-2: each of the 6 accepted process_type values is forwarded to
+    execute_primary_query and returns 200 (not 400)."""
+    mock_primary.return_value = {"query_id": f"ya-{process_type}", "meta": {"cache_hit": False}}
+
     response = client.post(
         "/api/yield-alert/query",
         json={
             "start_date": "2026-02-01",
             "end_date": "2026-02-28",
-            "process_type": "INVALID",
+            "process_type": process_type,
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 200, f"process_type={process_type!r} must be accepted"
     payload = response.get_json()
-    assert payload["success"] is False
-    assert payload["error"]["code"] == "VALIDATION_ERROR"
+    assert payload["success"] is True
+    call_kwargs = mock_primary.call_args.kwargs
+    assert call_kwargs.get("process_type") == process_type
 
 
 @patch("mes_dashboard.routes.yield_alert_routes.execute_primary_query")

@@ -617,6 +617,18 @@ async function queryFilterOptions(client: DuckDBClient): Promise<FilterOptions> 
   `;
   const pcRows = await client.sendQuery(pcSql) as Array<Record<string, unknown>>;
   options.process_categories = pcRows.map(r => String(r.v)).filter(v => v && v !== 'OTHER').sort();
+
+  // workcenter_groups: raw DEPARTMENT_NAME distinct values (§3.16.5/§3.16.6) —
+  // NOT DEPARTMENT_GROUP (that column feeds the unrelated `departments` filter-apply key
+  // via buildDimensionWhere). Mirrors server-side _query_filter_options() for WASM parity.
+  const wgSql = `
+    SELECT DISTINCT CAST(${qid('DEPARTMENT_NAME')} AS VARCHAR) AS v
+    FROM ${qid(TABLE_NAME)}
+    WHERE ${qid('DEPARTMENT_NAME')} IS NOT NULL ORDER BY 1
+  `;
+  const wgRows = await client.sendQuery(wgSql) as Array<Record<string, unknown>>;
+  options.workcenter_groups = wgRows.map(r => String(r.v)).filter(v => v.trim() && !exclude.has(v)).sort();
+
   return options;
 }
 

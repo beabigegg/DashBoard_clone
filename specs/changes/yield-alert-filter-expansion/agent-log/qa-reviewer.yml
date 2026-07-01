@@ -1,0 +1,14 @@
+change-id: yield-alert-filter-expansion
+agent: qa-reviewer
+status: done
+artifacts:
+  - { type: gate-results, pointer: "backend-targeted(22): pass, frontend-targeted(40): pass, changed-area-backend(89): pass, contract-validate: pass, openapi-sync-both-mirrors: pass" }
+  - { type: evidence-quality, pointer: "repro (independently re-ran targeted/changed-area suites against current tree; results match recorded test-evidence.yml)" }
+  - { type: decision, pointer: "qa-report.md" }
+notes: >
+  ready-with-known-risks (approved-with-risk). All 8 AC verified (5 spot-checked
+  directly against source). Scope discipline confirmed (filter_cache.py,
+  config/workcenter_groups.py untouched; /filter-options unchanged). All agent
+  concerns (contract-reviewer pitfalls #1/#2, planner confirm-only scope, WASM
+  parity) verified addressed at source. Full findings in qa-report.md.
+next-action: run-gate

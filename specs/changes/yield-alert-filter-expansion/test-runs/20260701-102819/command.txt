@@ -1,0 +1,1 @@
+python -m pytest --collect-only -q tests/test_yield_alert_routes.py tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_sql_runtime.py && cd frontend && npx vitest run tests/validation/useYieldAlert.validation.test.js tests/yield-alert/App.cross-filter.test.js tests/yield-alert/useYieldAlertDuckDB.departments.test.js --reporter=verbose --run

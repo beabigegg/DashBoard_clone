@@ -1,0 +1,14 @@
+change-id: yield-alert-filter-expansion
+agent: change-classifier
+status: done
+artifacts:
+  - { type: tier, pointer: "change-classification.md#tier" }
+  - { type: risk, pointer: "change-classification.md#risk-level" }
+  - { type: context-manifest-draft, pointer: "context-manifest.md#allowed-paths" }
+notes: >
+  Tier 2, feature lane, module-level impact. No atomic split (single feature,
+  <3 surfaces, 3/6 contracts). No spec-architect required (data-flow decision
+  already resolved in change-request.md). Two context-expansion asks (yield-alert
+  backend modules, tests/) folded directly into Allowed Paths rather than left
+  pending, since they were the mechanical minimum for implementation-planner.
+next-action: run-contract-reviewer

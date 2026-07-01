@@ -1,0 +1,70 @@
+agent: frontend-engineer
+change-id: yield-alert-filter-expansion
+status: done
+summary: >-
+  Implemented IP-6/IP-7/IP-8 in frontend/src/yield-alert-center/. IP-7:
+  extended PROCESS_TYPE_OPTIONS in App.vue with 4 new entries (GD%/F%/W%/D%,
+  labels 重工/委外/WIP/其他). Verified watch(selectedProcessType, ...) at
+  App.vue:805-824 is genuinely value-change-keyed (guards only on `!oldVal`
+  for initial-mount skip, not on specific GA%/GC% values) — already
+  generalizes to all 6 values, no fix needed. IP-8: wired workcenter_groups
+  from the /view response (applyFullView) and /cross-filter-options response
+  (fetchCrossFilterOptions) into workcenterGroupOptions.value, leaving the
+  /filter-options initial-load seed (loadFilterOptions, :316-331) unchanged as
+  required. IP-6: added a raw-DEPARTMENT_NAME SELECT DISTINCT dimension
+  emitting workcenter_groups to queryFilterOptions() in useYieldAlertDuckDB.ts
+  for WASM-path parity with the server's _query_filter_options(); left
+  buildDimensionWhere's unrelated departments->DEPARTMENT_GROUP filter-apply
+  mapping untouched. Wrote tests before/alongside each source edit (TDD):
+  extended useYieldAlert.validation.test.js (6-value enum), extended
+  App.cross-filter.test.js (parametrized watcher/force-requery test over
+  GD%/F%/W%/D%, plus 2 new tests proving workcenter_groups wiring from both
+  /view and /cross-filter-options), added new
+  useYieldAlertDuckDB.departments.test.js (WASM parity + raw-column + empty-
+  spool + sentinel-exclusion coverage), and parametrized/extended
+  yield-alert-center.spec.ts Playwright spec (process_type filter over 5
+  values, new 6-option-render test). Ran the full suite against a rebuilt
+  static bundle (npm run build) since the live E2E server was gunicorn
+  serving a stale pre-change build, not Vite dev/HMR.
+i18n-finding: >-
+  No i18n system exists anywhere in frontend/src/ (confirmed via repo-wide
+  grep for i18n/useI18n/locale — zero hits, no locale/translation files in the
+  tree). PROCESS_TYPE_OPTIONS labels in App.vue are hardcoded Traditional
+  Chinese strings directly in the options array literal, not routed through
+  any i18n key mechanism. Per the plan's i18n instruction ("if hardcoded
+  strings not routed through an i18n key, no i18n sync needed") — confirmed
+  this is the hardcoded-literal case; no i18n file sync required or performed.
+watcher-finding: >-
+  The existing watch(selectedProcessType, (_newVal, oldVal) => { if (!oldVal)
+  return; ...clear state... }) at App.vue:805-824 was already
+  value-change-keyed, NOT special-cased to GA%/GC%. It fires on any change
+  away from a truthy previous value (the `!oldVal` guard only skips the
+  initial-mount watcher invocation where oldVal is undefined). Verified via
+  App.cross-filter.test.js parametrized test switching to each of
+  GD%/F%/W%/D% — state (query_id, dimension filters/options, summary/trend/
+  heatmap/station/package/alerts) clears correctly on every new value, and
+  Playwright confirms the same end-to-end for all 5 non-default values. No
+  source fix was required for this item.
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/yield-alert-center/App.vue:90-96 (PROCESS_TYPE_OPTIONS +4 entries)" }
+  - { type: files-changed, pointer: "frontend/src/yield-alert-center/App.vue:500-514 (applyFullView: +workcenter_groups wiring)" }
+  - { type: files-changed, pointer: "frontend/src/yield-alert-center/App.vue:829-848 (fetchCrossFilterOptions: +workcenter_groups wiring)" }
+  - { type: files-changed, pointer: "frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:598-630 (queryFilterOptions: +DEPARTMENT_NAME distinct dimension emitting workcenter_groups)" }
+  - { type: components-affected, pointer: "yield-alert-center App.vue (process-type radiogroup, 站別群組 MultiSelect), useYieldAlertDuckDB.ts (WASM composable)" }
+  - { type: tests-added, pointer: "frontend/tests/validation/useYieldAlert.validation.test.js::test_process_type_options_render_six_entries (AC-1)" }
+  - { type: tests-added, pointer: "frontend/tests/validation/useYieldAlert.validation.test.js (near-miss enum documentation test, AC-2)" }
+  - { type: tests-added, pointer: "frontend/tests/validation/useYieldAlert.validation.test.js (process_type-is-included-in-query-body assertion extended to 6-value enum)" }
+  - { type: tests-added, pointer: "frontend/tests/yield-alert/App.cross-filter.test.js::test_process_type_switch_clears_query_id_and_state (parametrized GD%/F%/W%/D%, AC-4)" }
+  - { type: tests-added, pointer: "frontend/tests/yield-alert/App.cross-filter.test.js::test_workcenter_groups_wired_from_view_response (IP-8 /view wiring)" }
+  - { type: tests-added, pointer: "frontend/tests/yield-alert/App.cross-filter.test.js::test_workcenter_groups_wired_from_cross_filter_options (IP-8 /cross-filter-options wiring)" }
+  - { type: tests-added, pointer: "frontend/tests/yield-alert/useYieldAlertDuckDB.departments.test.js (new file, 3 tests: AC-6 WASM parity, raw-column assertion, empty-spool, sentinel-exclusion)" }
+  - { type: tests-added, pointer: "frontend/tests/playwright/yield-alert-center.spec.ts::test_process_type_filter (parametrized GC%/GD%/F%/W%/D%, AC-1/AC-4)" }
+  - { type: tests-added, pointer: "frontend/tests/playwright/yield-alert-center.spec.ts::test_process_type_selector_shows_six_options (AC-1)" }
+  - { type: test-output, pointer: "cd frontend && npx vitest run tests/yield-alert/ tests/validation/ tests/abort/yield-alert-abort.test.js -> 9 files, 176 passed | 1 skipped" }
+  - { type: test-output, pointer: "cd frontend && npm run type-check (vue-tsc --noEmit) -> clean, 0 errors" }
+  - { type: test-output, pointer: "cd frontend && npx playwright test tests/playwright/yield-alert-center.spec.ts -g process_type -> 6 passed (all process_type + selector-6-options tests green after npm run build)" }
+  - { type: test-output, pointer: "cdd-kit test run phases collect/targeted/changed-area/contract all passed (combined backend+frontend commands, see test-evidence.yml; backend-engineer's later combined runs superseded my earlier standalone frontend-only runs of the same required phases — all green)" }
+known-risks:
+  - "frontend/tests/playwright/yield-alert-center.spec.ts::test_page_loads_with_filter_panel fails locally on a missing [data-testid=\"clear-btn\"] element that does not exist anywhere in App.vue's current source (confirmed via grep — zero matches). This is a pre-existing gap unrelated to this change's diff (not touched by IP-6/7/8, not part of process_type or workcenter_groups scope) — not fixed here per Handoff Constraints scope boundary. Flagging for separate triage."
+  - "Local E2E verification required an explicit `npm run build` because the running server (gunicorn on 127.0.0.1:8080) serves the pre-built static dist/, not Vite dev/HMR — App.vue/useYieldAlertDuckDB.ts source edits are invisible to Playwright until rebuilt. This matches the CLAUDE.md promoted-learning precedent for CSS (hashed dist filenames orphan stale builds); same applies to JS/Vue bundles. No action needed beyond the rebuild already performed for this verification pass."
+next-reviewer: ui-ux-reviewer (其他(D%) label wording decision remains open per plan Non-goals), ci-cd-gatekeeper / test-strategist for gate sign-off

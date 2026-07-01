@@ -1,6 +1,6 @@
-# generated: 2026-06-30T10:52:37Z by cdd-kit 3.6.0
-# files: 967, src-lines: 300375, map-lines: 21477, compression: 14.0x
-# sources-digest: 65608543caecaab08d2d5d82b687e678cb85d63d1f8f730c2718cc9f4fd5eb28
+# generated: 2026-07-01T04:05:45Z by cdd-kit 3.6.0
+# files: 977, src-lines: 302697, map-lines: 21685, compression: 14.0x
+# sources-digest: d6a94c11394a699f0898f9f6c996981291c56e0a7916bd4c5810bb7c94d387e4
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -43,16 +43,20 @@ frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   functions:
     - { name: async resolve, lines: 16-50 }
 
-frontend/src/admin-dashboard/App.vue:  # 155 lines
+frontend/src/admin-dashboard/App.vue:  # 175 lines
   imports:
     - { module: vue, items: [computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch], line: 2 }
     - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 12 }
     - { module: '../shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 13 }
+    - { module: '../core/api', items: [apiGet], line: 14 }
+  constants:
+    - { name: DEFAULT_POLL_INTERVAL_MS, line: 57 }
   functions:
-    - { name: async refreshActiveTab, lines: 59-61 }
-    - { name: async refreshNow, lines: 63-71 }
-    - { name: setActiveTab, lines: 79-83 }
-    - { name: toggleAutoRefresh, lines: 85-91 }
+    - { name: async syncPollInterval, lines: 60-70 }
+    - { name: async refreshActiveTab, lines: 78-80 }
+    - { name: async refreshNow, lines: 82-90 }
+    - { name: setActiveTab, lines: 98-102 }
+    - { name: toggleAutoRefresh, lines: 104-110 }
 
 frontend/src/admin-dashboard/components/DauTrendChart.vue:  # 65 lines
   imports:
@@ -182,7 +186,7 @@ frontend/src/admin-dashboard/tabs/PerformanceTab.vue:  # 220 lines
     - { name: async refresh, lines: 115-123 }
     - { name: formatBytes, lines: 138-148 }
 
-frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 159 lines
+frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 160 lines
   imports:
     - { module: vue, items: [computed, onMounted, ref], line: 2 }
     - { module: '../components/DauTrendChart.vue', items: ['default:DauTrendChart'], line: 4 }
@@ -978,14 +982,15 @@ frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 224 lines
   functions:
     - { name: useEapAlarmFilter, lines: 12-224 }
 
-frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 251 lines
+frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 249 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 7 }
     - { module: '../../core/api', items: [apiGet], line: 8 }
+    - { module: '../../shared-composables/useViewStaleness', items: [useViewStaleness], line: 9 }
   constants:
-    - { name: DEFAULT_PER_PAGE, line: 10 }
+    - { name: DEFAULT_PER_PAGE, line: 11 }
   functions:
-    - { name: useEapAlarmViews, lines: 12-251 }
+    - { name: useEapAlarmViews, lines: 13-249 }
 
 frontend/src/eap-alarm/main.js:  # 9 lines
   imports:
@@ -2031,7 +2036,21 @@ frontend/src/shared-composables/TraceProgressBar.vue:  # 166 lines
     - { name: hasStageError, lines: 27-30 }
     - { name: stageState, lines: 32-43 }
 
-frontend/src/shared-composables/index.ts:  # 8 lines
+frontend/src/shared-composables/__tests__/useAutoRefresh.interval.test.ts:  # 82 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: vue, items: [defineComponent, h], line: 3 }
+    - { module: '@vue/test-utils', items: [mount], line: 4 }
+    - { module: '../useAutoRefresh', items: [useAutoRefresh], line: 6 }
+  functions:
+    - { name: mountWith, lines: 9-19 }
+
+frontend/src/shared-composables/__tests__/useViewStaleness.test.ts:  # 57 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 1 }
+    - { module: '../useViewStaleness', items: [useViewStaleness], line: 2 }
+
+frontend/src/shared-composables/index.ts:  # 10 lines
 
 frontend/src/shared-composables/useAiChat.ts:  # 202 lines
   imports:
@@ -2062,14 +2081,14 @@ frontend/src/shared-composables/useAsyncJobPolling.ts:  # 106 lines
     - { name: AsyncJobPollingComposable, lines: 27-29 }
     - { name: JobError, lines: 31-33 }  # local
 
-frontend/src/shared-composables/useAutoRefresh.ts:  # 23 lines
+frontend/src/shared-composables/useAutoRefresh.ts:  # 29 lines
   imports:
     - { module: '../wip-shared/composables/useAutoRefresh', items: ['useAutoRefresh:useAutoRefreshBase'], line: 1 }
   functions:
-    - { name: useAutoRefresh, lines: 21-23 }
+    - { name: useAutoRefresh, lines: 27-29 }
   interfaces:
-    - { name: AutoRefreshOptions, lines: 3-9 }
-    - { name: AutoRefreshComposable, lines: 11-19 }
+    - { name: AutoRefreshOptions, lines: 3-15 }
+    - { name: AutoRefreshComposable, lines: 17-25 }
 
 frontend/src/shared-composables/useAutocomplete.ts:  # 33 lines
   imports:
@@ -2187,6 +2206,12 @@ frontend/src/shared-composables/useUrlSync.ts:  # 42 lines
     - { name: UrlSyncState, lines: 1-3 }
     - { name: UrlSync, lines: 5-8 }
 
+frontend/src/shared-composables/useViewStaleness.ts:  # 59 lines
+  functions:
+    - { name: useViewStaleness, lines: 37-59 }
+  interfaces:
+    - { name: ViewStaleness, lines: 1-8 }
+
 frontend/src/shared-ui/components/AiChartRenderer.vue:  # 423 lines
 
 frontend/src/shared-ui/components/AiChatMessage.vue:  # 264 lines
@@ -2293,7 +2318,7 @@ frontend/src/wip-shared/components/Pagination.vue:  # 23 lines
 
 frontend/src/wip-shared/components/ParetoSection.vue:  # 254 lines
 
-frontend/src/wip-shared/composables/useAutoRefresh.ts:  # 123 lines
+frontend/src/wip-shared/composables/useAutoRefresh.ts:  # 131 lines
   imports:
     - { module: vue, items: [onBeforeUnmount, onMounted], line: 1 }
     - { module: '../../shared-composables/useAutoRefresh', items: [AutoRefreshOptions], line: 3 }
@@ -2302,7 +2327,7 @@ frontend/src/wip-shared/composables/useAutoRefresh.ts:  # 123 lines
     - { name: JITTER_FACTOR, line: 6 }
   functions:
     - { name: jitteredInterval, lines: 8-11 }
-    - { name: useAutoRefresh, lines: 13-123 }
+    - { name: useAutoRefresh, lines: 13-131 }
 
 frontend/src/wip-shared/composables/useAutocomplete.ts:  # 150 lines
   imports:
@@ -2339,15 +2364,15 @@ frontend/src/workers/duckdb-worker.js:  # 147 lines
     - { name: async execQuery, lines: 81-98 }
     - { name: async destroyDuckDB, lines: 100-105 }
 
-frontend/src/yield-alert-center/App.vue:  # 1202 lines
+frontend/src/yield-alert-center/App.vue:  # 1224 lines
 
 frontend/src/yield-alert-center/YieldHeatmap.vue:  # 173 lines
 
-frontend/src/yield-alert-center/YieldPackageChart.vue:  # 164 lines
+frontend/src/yield-alert-center/YieldPackageChart.vue:  # 170 lines
 
-frontend/src/yield-alert-center/YieldStationChart.vue:  # 94 lines
+frontend/src/yield-alert-center/YieldStationChart.vue:  # 96 lines
 
-frontend/src/yield-alert-center/YieldTrendChart.vue:  # 229 lines
+frontend/src/yield-alert-center/YieldTrendChart.vue:  # 231 lines
 
 frontend/src/yield-alert-center/main.ts:  # 10 lines
   imports:
@@ -2358,7 +2383,7 @@ frontend/src/yield-alert-center/main.ts:  # 10 lines
     - { module: './style.css', items: [], line: 6 }
     - { module: '../core/shell-navigation', items: [restoreUrlState], line: 7 }
 
-frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 710 lines
+frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 722 lines
   imports:
     - { module: vue, items: [ref, readonly, Ref], line: 15 }
     - { module: '../core/duckdb-client', items: [getDuckDBClient, isDuckDBSupported, DuckDBClient], line: 16 }
@@ -2382,8 +2407,8 @@ frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 710 lines
     - { name: async queryStationSummary, lines: 372-413 }
     - { name: async queryPackageSummary, lines: 415-453 }
     - { name: async queryAlerts, lines: 455-596 }
-    - { name: async queryFilterOptions, lines: 598-621 }
-    - { name: useYieldAlertDuckDB, lines: 625-710 }
+    - { name: async queryFilterOptions, lines: 598-633 }
+    - { name: useYieldAlertDuckDB, lines: 637-722 }
   interfaces:
     - { name: SummaryResult, lines: 56-60 }  # local
     - { name: TrendItem, lines: 62-67 }  # local
@@ -2398,11 +2423,14 @@ frontend/src/yield-alert-center/useYieldAlertDuckDB.ts:  # 710 lines
     - { name: TrendWhereParams, lines: 145-147 }  # local
     - { name: AlertQueryParams, lines: 149-158 }  # local
 
-frontend/src/yield-alert-center/utils.ts:  # 52 lines
+frontend/src/yield-alert-center/utils.ts:  # 62 lines
+  constants:
+    - { name: KPCS_TO_PCS, line: 4 }
   functions:
-    - { name: parseTokenList, lines: 1-19 }
-    - { name: toQueryParams, lines: 21-38 }
-    - { name: buildDrilldownNotice, lines: 40-52 }
+    - { name: toPcs, lines: 6-9 }
+    - { name: parseTokenList, lines: 11-29 }
+    - { name: toQueryParams, lines: 31-48 }
+    - { name: buildDrilldownNotice, lines: 50-62 }
 
 frontend/tailwind.config.js:  # 259 lines
 
@@ -3173,7 +3201,7 @@ frontend/tests/playwright/material-trace.spec.ts:  # 742 lines
     - { name: async pageRendered, lines: 230-234 }
     - { name: async fillAndSubmit, lines: 240-250 }
 
-frontend/tests/playwright/mid-section-defect.spec.ts:  # 1324 lines
+frontend/tests/playwright/mid-section-defect.spec.ts:  # 1341 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page, Request], line: 19 }
   constants:
@@ -3189,13 +3217,13 @@ frontend/tests/playwright/mid-section-defect.spec.ts:  # 1324 lines
     - { name: MOCK_SEED_RESULT, line: 145 }
     - { name: MOCK_LINEAGE_RESULT, line: 151 }
     - { name: MOCK_EVENTS_RESULT, line: 157 }
-    - { name: MOCK_FORWARD_ANALYSIS_DATA, line: 662 }
-    - { name: MOCK_FORWARD_EVENTS_RESULT, line: 724 }
-    - { name: MOCK_FORWARD_DETAIL_RESPONSE, line: 735 }
+    - { name: MOCK_FORWARD_ANALYSIS_DATA, line: 676 }
+    - { name: MOCK_FORWARD_EVENTS_RESULT, line: 738 }
+    - { name: MOCK_FORWARD_DETAIL_RESPONSE, line: 749 }
   functions:
     - { name: async installBaseRoutes, lines: 172-258 }
     - { name: async gotoPage, lines: 265-275 }
-    - { name: async runForwardQuery, lines: 771-804 }
+    - { name: async runForwardQuery, lines: 785-820 }
 
 frontend/tests/playwright/portal-shell-login.spec.ts:  # 211 lines
   imports:
@@ -3489,28 +3517,28 @@ frontend/tests/playwright/wip-overview.spec.ts:  # 184 lines
     - { name: async setupMocks, lines: 66-103 }
     - { name: async gotoWipOverview, lines: 105-111 }
 
-frontend/tests/playwright/yield-alert-center.spec.ts:  # 789 lines
+frontend/tests/playwright/yield-alert-center.spec.ts:  # 814 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect], line: 26 }
-    - { module: './_auth.js', items: [navigateViaSidebar], line: 27 }
+    - { module: '@playwright/test', items: [test, expect], line: 27 }
+    - { module: './_auth.js', items: [navigateViaSidebar], line: 28 }
   constants:
-    - { name: BASE_URL, line: 33 }
-    - { name: PAGE_URL, line: 34 }
-    - { name: JOB_ID, line: 36 }
-    - { name: QUERY_ID, line: 37 }
-    - { name: STATUS_URL, line: 38 }
-    - { name: MOCK_META, line: 40 }
-    - { name: MOCK_FILTER_OPTIONS, line: 46 }
-    - { name: MOCK_200_SYNC, line: 55 }
-    - { name: MOCK_202, line: 113 }
-    - { name: MOCK_JOB_STARTED, line: 125 }
-    - { name: MOCK_JOB_FINISHED, line: 140 }
-    - { name: MOCK_VIEW, line: 155 }
-    - { name: MOCK_200_EMPTY, line: 165 }
-    - { name: MOCK_REASON_DETAIL, line: 181 }
+    - { name: BASE_URL, line: 34 }
+    - { name: PAGE_URL, line: 35 }
+    - { name: JOB_ID, line: 37 }
+    - { name: QUERY_ID, line: 38 }
+    - { name: STATUS_URL, line: 39 }
+    - { name: MOCK_META, line: 41 }
+    - { name: MOCK_FILTER_OPTIONS, line: 47 }
+    - { name: MOCK_200_SYNC, line: 56 }
+    - { name: MOCK_202, line: 114 }
+    - { name: MOCK_JOB_STARTED, line: 126 }
+    - { name: MOCK_JOB_FINISHED, line: 141 }
+    - { name: MOCK_VIEW, line: 156 }
+    - { name: MOCK_200_EMPTY, line: 166 }
+    - { name: MOCK_REASON_DETAIL, line: 182 }
   functions:
-    - { name: async registerCatchAllRoutes, lines: 209-287 }
-    - { name: async gotoPage, lines: 294-310 }
+    - { name: async registerCatchAllRoutes, lines: 210-288 }
+    - { name: async gotoPage, lines: 295-311 }
 
 frontend/tests/query-tool/App.url-state.test.js:  # 430 lines
   imports:
@@ -3640,12 +3668,12 @@ frontend/tests/validation/useRejectHistory.validation.test.js:  # 376 lines
   functions:
     - { name: buildPrimaryQueryBody, lines: 223-248 }
 
-frontend/tests/validation/useYieldAlert.validation.test.js:  # 291 lines
+frontend/tests/validation/useYieldAlert.validation.test.js:  # 320 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: '../../src/core/dev-warnings.js', items: [guardResponse, detectUnknownEnvelope, _resetWarned], line: 16 }
     - { module: '../../src/core/schema-guard.js', items: [assertShape, '_resetWarned:_resetSchemaWarned'], line: 17 }
-    - { module: '../../src/core/dev-warnings.js', items: [detectSpoolContentType], line: 264 }
+    - { module: '../../src/core/dev-warnings.js', items: [detectSpoolContentType], line: 293 }
   constants:
     - { name: SUMMARY_SHAPE, line: 75 }
     - { name: TREND_ITEM_SHAPE, line: 81 }
@@ -3656,7 +3684,7 @@ frontend/tests/validation/wip-url-params.test.js:  # 86 lines
     - { module: vitest, items: [describe, it, expect], line: 10 }
     - { module: '../../src/core/wip-derive', items: [buildWipOverviewQueryParams], line: 11 }
 
-frontend/tests/yield-alert/App.cross-filter.test.js:  # 454 lines
+frontend/tests/yield-alert/App.cross-filter.test.js:  # 709 lines
   imports:
     - { module: vitest, items: [beforeEach, describe, expect, it, vi], line: 2 }
     - { module: vue, items: [defineComponent, nextTick, ref], line: 3 }
@@ -3664,6 +3692,12 @@ frontend/tests/yield-alert/App.cross-filter.test.js:  # 454 lines
   functions:
     - { name: MultiSelectStub, lines: 42-50 }
     - { name: buildViewPayload, lines: 52-86 }
+
+frontend/tests/yield-alert/useYieldAlertDuckDB.departments.test.js:  # 146 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 12 }
+  functions:
+    - { name: buildMockClient, lines: 38-55 }
 
 frontend/vite.config.ts:  # 125 lines
   imports:
@@ -4041,7 +4075,7 @@ src/mes_dashboard/core/__init__.py:  # 43 lines
     - { module: '.utils', items: [get_days_back, build_filter_conditions, build_equipment_filter_sql, convert_datetime_fields, format_api_response], line: 13 }
     - { module: '.redis_client', items: [try_acquire_lock, release_lock, with_distributed_lock], line: 20 }
 
-src/mes_dashboard/core/base_chunked_duckdb_job.py:  # 336 lines
+src/mes_dashboard/core/base_chunked_duckdb_job.py:  # 347 lines
   imports:
     - { module: __future__, items: [annotations], line: 25 }
     - { module: logging, items: [], line: 27 }
@@ -4055,29 +4089,30 @@ src/mes_dashboard/core/base_chunked_duckdb_job.py:  # 336 lines
     - { module: typing, items: [Iterator], line: 35 }
     - { module: pyarrow, items: [], line: 37 }
     - { module: pyarrow.parquet, items: [], line: 38 }
-    - { module: mes_dashboard.core.oracle_arrow_reader, items: [OracleArrowReader], line: 40 }
+    - { module: mes_dashboard.core.global_concurrency, items: [heavy_query_slot], line: 40 }
+    - { module: mes_dashboard.core.oracle_arrow_reader, items: [OracleArrowReader], line: 41 }
   constants:
-    - { name: DUCKDB_JOB_DIR, line: 54 }
+    - { name: DUCKDB_JOB_DIR, line: 55 }
   classes:
     - name: ChunkStrategy
-      lines: 57-70
+      lines: 58-71
     - name: BaseChunkedDuckDBJob
-      lines: 73-336
+      lines: 74-347
       methods:
-        - { name: __init__, lines: 101-104 }
-        - { name: pre_query, lines: 111-117 }
-        - { name: build_chunk_sql, lines: 120-129 }
-        - { name: post_aggregate, lines: 132-146 }
-        - { name: chunk_to_duckdb, lines: 152-173 }
-        - { name: progress_report, lines: 175-186 }
-        - { name: run, lines: 192-232 }
-        - { name: _make_job_duckdb_path, lines: 238-243 }
-        - { name: _cleanup_job_duckdb, lines: 245-253 }
-        - { name: _make_chunk_parquet_dir, lines: 255-264 }
-        - { name: _cleanup_chunk_parquet_dir, lines: 266-275 }
-        - { name: _fetch_chunk, lines: 277-282 }
-        - { name: _fan_out_reduction, lines: 284-303 }
-        - { name: _fan_out_append, lines: 305-336 }
+        - { name: __init__, lines: 102-105 }
+        - { name: pre_query, lines: 112-118 }
+        - { name: build_chunk_sql, lines: 121-130 }
+        - { name: post_aggregate, lines: 133-147 }
+        - { name: chunk_to_duckdb, lines: 153-174 }
+        - { name: progress_report, lines: 176-187 }
+        - { name: run, lines: 193-243 }
+        - { name: _make_job_duckdb_path, lines: 249-254 }
+        - { name: _cleanup_job_duckdb, lines: 256-264 }
+        - { name: _make_chunk_parquet_dir, lines: 266-275 }
+        - { name: _cleanup_chunk_parquet_dir, lines: 277-286 }
+        - { name: _fetch_chunk, lines: 288-293 }
+        - { name: _fan_out_reduction, lines: 295-314 }
+        - { name: _fan_out_append, lines: 316-347 }
 
 src/mes_dashboard/core/cache.py:  # 570 lines
   imports:
@@ -4504,7 +4539,7 @@ src/mes_dashboard/core/log_store.py:  # 725 lines
     - { name: get_log_store, lines: 706-713 }
     - { name: get_sqlite_log_handler, lines: 716-725 }
 
-src/mes_dashboard/core/login_session_store.py:  # 468 lines
+src/mes_dashboard/core/login_session_store.py:  # 511 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
     - { module: logging, items: [], line: 10 }
@@ -4519,26 +4554,31 @@ src/mes_dashboard/core/login_session_store.py:  # 468 lines
     - { module: typing, items: [Any, Dict, Generator, List, Optional], line: 19 }
   constants:
     - { name: LOGIN_SESSION_SQLITE_PATH, line: 27 }
+    - { name: ONLINE_WINDOW_MINUTES, line: 48 }
+    - { name: ACTIVE_WINDOW_MINUTES, line: 49 }
   classes:
     - name: LoginSessionStore
-      lines: 72-452
+      lines: 91-495
       methods:
-        - { name: __init__, lines: 79-83 }
-        - { name: initialize, lines: 85-101 }
-        - { name: _get_connection, lines: 104-125 }
-        - { name: _generate_sync_id, lines: 127-128 }
-        - { name: create_session, lines: 130-227 }
-        - { name: update_last_active, lines: 229-266 }
-        - { name: close_session, lines: 268-305 }
-        - { name: get_active_count, lines: 307-324 }
-        - { name: close_all_active_sessions, lines: 326-357 }
-        - { name: get_unsynced, lines: 359-373 }
-        - { name: mark_synced, lines: 375-389 }
-        - { name: cleanup_orphan_sessions, lines: 391-422 }
-        - { name: cleanup_synced, lines: 424-443 }
-        - { name: close, lines: 445-452 }
+        - { name: __init__, lines: 98-102 }
+        - { name: initialize, lines: 104-120 }
+        - { name: _get_connection, lines: 123-144 }
+        - { name: _generate_sync_id, lines: 146-147 }
+        - { name: create_session, lines: 149-246 }
+        - { name: update_last_active, lines: 248-285 }
+        - { name: close_session, lines: 287-324 }
+        - { name: _count_active_within, lines: 326-348 }
+        - { name: get_active_count, lines: 350-357 }
+        - { name: get_online_count, lines: 359-367 }
+        - { name: close_all_active_sessions, lines: 369-400 }
+        - { name: get_unsynced, lines: 402-416 }
+        - { name: mark_synced, lines: 418-432 }
+        - { name: cleanup_orphan_sessions, lines: 434-465 }
+        - { name: cleanup_synced, lines: 467-486 }
+        - { name: close, lines: 488-495 }
   functions:
-    - { name: get_login_session_store, lines: 462-468 }
+    - { name: _positive_int_env, lines: 33-39 }
+    - { name: get_login_session_store, lines: 505-511 }
 
 src/mes_dashboard/core/metrics.py:  # 231 lines
   imports:
@@ -4725,19 +4765,19 @@ src/mes_dashboard/core/permissions.py:  # 90 lines
     - { name: login_required, lines: 71-78 }
     - { name: admin_required, lines: 81-90 }
 
-src/mes_dashboard/core/query_cost_policy.py:  # 120 lines
+src/mes_dashboard/core/query_cost_policy.py:  # 165 lines
   imports:
-    - { module: __future__, items: [annotations], line: 18 }
-    - { module: dataclasses, items: [dataclass], line: 20 }
-    - { module: datetime, items: [date], line: 21 }
-    - { module: typing, items: [Callable, Literal, Optional], line: 22 }
+    - { module: __future__, items: [annotations], line: 22 }
+    - { module: dataclasses, items: [dataclass], line: 24 }
+    - { module: datetime, items: [date], line: 25 }
+    - { module: typing, items: [Callable, Literal, Optional], line: 26 }
   classes:
     - name: CostPolicy
-      lines: 29-40
+      lines: 30-41
   functions:
-    - { name: classify_query_cost, lines: 43-99 }
-    - { name: _default_policy_for, lines: 106-110 }
-    - { name: _date_span_days, lines: 113-120 }
+    - { name: classify_query_cost, lines: 86-142 }
+    - { name: _default_policy_for, lines: 149-155 }
+    - { name: _date_span_days, lines: 158-165 }
 
 src/mes_dashboard/core/query_quality_contract.py:  # 337 lines
   imports:
@@ -4997,6 +5037,17 @@ src/mes_dashboard/core/response.py:  # 408 lines
     - { name: context_limit_error, lines: 386-393 }
     - { name: query_timeout_error, lines: 396-408 }
 
+src/mes_dashboard/core/route_helpers.py:  # 108 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: typing, items: [Tuple], line: 20 }
+    - { module: flask, items: [request], line: 22 }
+  functions:
+    - { name: _resolve_source, lines: 25-27 }
+    - { name: parse_multi_param, lines: 30-73 }
+    - { name: _coerce_int, lines: 76-83 }
+    - { name: parse_pagination, lines: 86-108 }
+
 src/mes_dashboard/core/runtime_contract.py:  # 144 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
@@ -5255,7 +5306,7 @@ src/mes_dashboard/routes/__init__.py:  # 88 lines
   functions:
     - { name: register_routes, lines: 34-59 }
 
-src/mes_dashboard/routes/admin_routes.py:  # 1410 lines
+src/mes_dashboard/routes/admin_routes.py:  # 1425 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -5283,36 +5334,37 @@ src/mes_dashboard/routes/admin_routes.py:  # 1410 lines
   functions:
     - { name: performance, lines: 73-75 }  # @admin_bp.route('/performance')
     - { name: dashboard, lines: 80-104 }  # @admin_bp.route('/dashboard')
-    - { name: api_system_status, lines: 109-216 }  # @admin_bp.route('/api/system-status', methods=['GET'])
-    - { name: api_metrics, lines: 221-239 }  # @admin_bp.route('/api/metrics', methods=['GET'])
-    - { name: api_logs, lines: 244-301 }  # @admin_bp.route('/api/logs', methods=['GET'])
-    - { name: _query_mysql_logs, lines: 304-346 }
-    - { name: _count_mysql_logs, lines: 349-377 }
-    - { name: _collect_spool_disk_usage, lines: 380-412 }
-    - { name: _collect_redis_namespace_memory, lines: 415-459 }
-    - { name: api_performance_detail, lines: 464-671 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
-    - { name: api_performance_history, lines: 676-706 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
-    - { name: _query_mysql_metrics, lines: 709-780 }
-    - { name: api_performance_history_purge, lines: 785-791 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
-    - { name: api_storage_info, lines: 796-866 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
-    - { name: api_log_files_cleanup, lines: 871-919 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
-    - { name: api_logs_cleanup, lines: 924-975 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
-    - { name: _get_restart_state, lines: 982-984 }
-    - { name: _iso_from_epoch, lines: 987-990 }
-    - { name: _check_restart_cooldown, lines: 993-1002 }
-    - { name: _get_restart_history, lines: 1005-1008 }
-    - { name: _get_restart_churn_summary, lines: 1011-1014 }
-    - { name: _get_restart_policy_state, lines: 1017-1037 }
-    - { name: _build_restart_alerts, lines: 1040-1058 }
-    - { name: _log_restart_audit, lines: 1061-1068 }
-    - { name: api_worker_restart, lines: 1073-1198 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
-    - { name: api_worker_status, lines: 1203-1295 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
-    - { name: user_usage_kpi, lines: 1304-1306 }  # @admin_bp.route('/user-usage-kpi')
-    - { name: api_user_usage_kpi, lines: 1311-1330 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
-    - { name: pages, lines: 1339-1363 }  # @admin_bp.route('/pages')
-    - { name: api_get_pages, lines: 1368-1370 }  # @admin_bp.route('/api/pages', methods=['GET'])
-    - { name: api_update_page, lines: 1375-1397 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
-    - { name: recalculate_anomaly_detection, lines: 1402-1410 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
+    - { name: _metrics_history_interval_seconds, lines: 107-113 }
+    - { name: api_system_status, lines: 118-231 }  # @admin_bp.route('/api/system-status', methods=['GET'])
+    - { name: api_metrics, lines: 236-254 }  # @admin_bp.route('/api/metrics', methods=['GET'])
+    - { name: api_logs, lines: 259-316 }  # @admin_bp.route('/api/logs', methods=['GET'])
+    - { name: _query_mysql_logs, lines: 319-361 }
+    - { name: _count_mysql_logs, lines: 364-392 }
+    - { name: _collect_spool_disk_usage, lines: 395-427 }
+    - { name: _collect_redis_namespace_memory, lines: 430-474 }
+    - { name: api_performance_detail, lines: 479-686 }  # @admin_bp.route('/api/performance-detail', methods=['GET'])
+    - { name: api_performance_history, lines: 691-721 }  # @admin_bp.route('/api/performance-history', methods=['GET'])
+    - { name: _query_mysql_metrics, lines: 724-795 }
+    - { name: api_performance_history_purge, lines: 800-806 }  # @admin_bp.route('/api/performance-history/purge', methods=['POST'])
+    - { name: api_storage_info, lines: 811-881 }  # @admin_bp.route('/api/storage-info', methods=['GET'])
+    - { name: api_log_files_cleanup, lines: 886-934 }  # @admin_bp.route('/api/log-files/cleanup', methods=['POST'])
+    - { name: api_logs_cleanup, lines: 939-990 }  # @admin_bp.route('/api/logs/cleanup', methods=['POST'])
+    - { name: _get_restart_state, lines: 997-999 }
+    - { name: _iso_from_epoch, lines: 1002-1005 }
+    - { name: _check_restart_cooldown, lines: 1008-1017 }
+    - { name: _get_restart_history, lines: 1020-1023 }
+    - { name: _get_restart_churn_summary, lines: 1026-1029 }
+    - { name: _get_restart_policy_state, lines: 1032-1052 }
+    - { name: _build_restart_alerts, lines: 1055-1073 }
+    - { name: _log_restart_audit, lines: 1076-1083 }
+    - { name: api_worker_restart, lines: 1088-1213 }  # @admin_bp.route('/api/worker/restart', methods=['POST'])
+    - { name: api_worker_status, lines: 1218-1310 }  # @admin_bp.route('/api/worker/status', methods=['GET'])
+    - { name: user_usage_kpi, lines: 1319-1321 }  # @admin_bp.route('/user-usage-kpi')
+    - { name: api_user_usage_kpi, lines: 1326-1345 }  # @admin_bp.route('/api/user-usage-kpi', methods=['GET'])
+    - { name: pages, lines: 1354-1378 }  # @admin_bp.route('/pages')
+    - { name: api_get_pages, lines: 1383-1385 }  # @admin_bp.route('/api/pages', methods=['GET'])
+    - { name: api_update_page, lines: 1390-1412 }  # @admin_bp.route('/api/pages/<path:route>', methods=['PUT'])
+    - { name: recalculate_anomaly_detection, lines: 1417-1425 }  # @admin_bp.route('/api/analytics/recalculate', methods=['POST'])
 
 src/mes_dashboard/routes/ai_routes.py:  # 75 lines
   imports:
@@ -5461,7 +5513,7 @@ src/mes_dashboard/routes/health_routes.py:  # 863 lines
     - { name: deep_health_check, lines: 631-837 }  # @health_bp.route('/health/deep', methods=['GET'])
     - { name: frontend_shell_health_check, lines: 841-863 }  # @health_bp.route('/health/frontend-shell', methods=['GET'])
 
-src/mes_dashboard/routes/hold_history_routes.py:  # 428 lines
+src/mes_dashboard/routes/hold_history_routes.py:  # 427 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: logging, items: [], line: 11 }
@@ -5471,29 +5523,30 @@ src/mes_dashboard/routes/hold_history_routes.py:  # 428 lines
     - { module: typing, items: [Optional], line: 19 }
     - { module: flask, items: [Blueprint, current_app, request, send_from_directory], line: 21 }
     - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 23 }
-    - { module: mes_dashboard.core.response, items: [cache_expired_error, internal_error, service_unavailable_error, success_response, validation_error], line: 24 }
-    - { module: mes_dashboard.core.modernization_policy, items: [missing_in_scope_asset_response, maybe_redirect_to_canonical_shell], line: 31 }
-    - { module: mes_dashboard.services.hold_dataset_cache, items: [apply_view, execute_primary_query], line: 35 }
-    - { module: mes_dashboard.services.hold_today_snapshot_service, items: [execute_today_snapshot], line: 39 }
-    - { module: mes_dashboard.core.database, items: [DatabaseCircuitOpenError, DatabasePoolExhaustedError], line: 40 }
-    - { module: mes_dashboard.core.query_cost_policy, items: [_classify_query_cost], line: 41 }
-    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 42 }
-    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 46 }
+    - { module: mes_dashboard.core.route_helpers, items: [parse_pagination], line: 24 }
+    - { module: mes_dashboard.core.response, items: [cache_expired_error, internal_error, service_unavailable_error, success_response, validation_error], line: 25 }
+    - { module: mes_dashboard.core.modernization_policy, items: [missing_in_scope_asset_response, maybe_redirect_to_canonical_shell], line: 32 }
+    - { module: mes_dashboard.services.hold_dataset_cache, items: [apply_view, execute_primary_query], line: 36 }
+    - { module: mes_dashboard.services.hold_today_snapshot_service, items: [execute_today_snapshot], line: 40 }
+    - { module: mes_dashboard.core.database, items: [DatabaseCircuitOpenError, DatabasePoolExhaustedError], line: 41 }
+    - { module: mes_dashboard.core.query_cost_policy, items: [_classify_query_cost], line: 42 }
+    - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 43 }
+    - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 47 }
   constants:
-    - { name: HOLD_ASYNC_ENABLED, line: 64 }
-    - { name: HOLD_WORKER_QUEUE, line: 67 }
-    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 68 }
+    - { name: HOLD_ASYNC_ENABLED, line: 65 }
+    - { name: HOLD_WORKER_QUEUE, line: 68 }
+    - { name: HOLD_JOB_TIMEOUT_SECONDS, line: 69 }
   functions:
-    - { name: _inject_hold_spool_info, lines: 74-91 }
-    - { name: _inject_workcenter_mapping, lines: 94-104 }
-    - { name: _validate_date, lines: 140-146 }
-    - { name: _normalize_hold_type, lines: 149-151 }
-    - { name: _normalize_record_type, lines: 154-162 }
-    - { name: hold_history_page, lines: 171-189 }  # @hold_history_bp.route('/hold-history')
-    - { name: api_hold_history_query, lines: 199-276 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
-    - { name: api_hold_history_view, lines: 286-334 }  # @hold_history_bp.route('/api/hold-history/view')
-    - { name: api_hold_history_config, lines: 343-348 }  # @hold_history_bp.route('/api/hold-history/config')
-    - { name: api_hold_history_today_snapshot, lines: 358-428 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
+    - { name: _inject_hold_spool_info, lines: 75-92 }
+    - { name: _inject_workcenter_mapping, lines: 95-105 }
+    - { name: _validate_date, lines: 141-147 }
+    - { name: _normalize_hold_type, lines: 150-152 }
+    - { name: _normalize_record_type, lines: 155-163 }
+    - { name: hold_history_page, lines: 172-190 }  # @hold_history_bp.route('/hold-history')
+    - { name: api_hold_history_query, lines: 200-277 }  # @hold_history_bp.route('/api/hold-history/query', methods=['POST'])
+    - { name: api_hold_history_view, lines: 287-333 }  # @hold_history_bp.route('/api/hold-history/view')
+    - { name: api_hold_history_config, lines: 342-347 }  # @hold_history_bp.route('/api/hold-history/config')
+    - { name: api_hold_history_today_snapshot, lines: 357-427 }  # @hold_history_bp.route('/api/hold-history/today-snapshot', methods=['POST'])
 
 src/mes_dashboard/routes/hold_overview_routes.py:  # 295 lines
   imports:
@@ -5721,7 +5774,7 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 1044 lines
     - { name: get_equipment_recent_jobs_route, lines: 848-861 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
     - { name: export_csv, lines: 871-1044 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
-src/mes_dashboard/routes/reject_history_routes.py:  # 1065 lines
+src/mes_dashboard/routes/reject_history_routes.py:  # 1038 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5730,40 +5783,40 @@ src/mes_dashboard/routes/reject_history_routes.py:  # 1065 lines
     - { module: typing, items: [Optional], line: 9 }
     - { module: flask, items: [Blueprint, Response, request], line: 11 }
     - { module: mes_dashboard.core.cache, items: [cache_get, cache_set, make_cache_key], line: 13 }
-    - { module: mes_dashboard.core.response, items: [success_response, validation_error, not_found_error, internal_error, cache_expired_error, cache_miss_error, error_response, VALIDATION_ERROR, SERVICE_UNAVAILABLE], line: 14 }
-    - { module: mes_dashboard.core.heavy_query_telemetry, items: [record_memory_error], line: 25 }
-    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 26 }
-    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 27 }
-    - { module: mes_dashboard.core.request_validation, items: [validate_optional_date_range], line: 28 }
-    - { module: mes_dashboard.core.utils, items: [parse_bool_query], line: 29 }
-    - { module: mes_dashboard.services.reject_dataset_cache, items: [apply_view, compute_batch_pareto, compute_dimension_pareto, execute_primary_query, export_csv_from_cache, _has_cached_df, _make_query_id, _CACHE_SCHEMA_VERSION], line: 30 }
-    - { module: mes_dashboard.services.reject_history_service, items: [_list_to_csv, export_csv, get_filter_options, view_analytics, view_count, view_list, view_summary, view_trend], line: 40 }
+    - { module: mes_dashboard.core.route_helpers, items: [_parse_multi_param], line: 14 }
+    - { module: mes_dashboard.core.response, items: [success_response, validation_error, not_found_error, internal_error, cache_expired_error, cache_miss_error, error_response, VALIDATION_ERROR, SERVICE_UNAVAILABLE], line: 15 }
+    - { module: mes_dashboard.core.heavy_query_telemetry, items: [record_memory_error], line: 26 }
+    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 27 }
+    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 28 }
+    - { module: mes_dashboard.core.request_validation, items: [validate_optional_date_range], line: 29 }
+    - { module: mes_dashboard.core.utils, items: [parse_bool_query], line: 30 }
+    - { module: mes_dashboard.services.reject_dataset_cache, items: [apply_view, compute_batch_pareto, compute_dimension_pareto, execute_primary_query, export_csv_from_cache, _has_cached_df, _make_query_id, _CACHE_SCHEMA_VERSION], line: 31 }
+    - { module: mes_dashboard.services.reject_history_service, items: [_list_to_csv, export_csv, get_filter_options, view_analytics, view_count, view_list, view_summary, view_trend], line: 41 }
   functions:
-    - { name: _default_date_range, lines: 104-107 }
-    - { name: _validate_primary_query_date_range, lines: 110-123 }
-    - { name: _parse_date_range, lines: 126-137 }
-    - { name: _get_request_args, lines: 140-144 }
-    - { name: _parse_multi_param, lines: 147-177 }
-    - { name: _overload_error, lines: 180-188 }
-    - { name: _normalized_list_for_cache, lines: 191-198 }
-    - { name: _extract_meta, lines: 201-212 }
-    - { name: _parse_common_bools, lines: 230-252 }
-    - { name: _parse_pareto_selection, lines: 255-270 }
-    - { name: _parse_multi_pareto_selections, lines: 273-279 }
-    - { name: api_reject_history_options, lines: 283-350 }  # @reject_history_bp.route('/api/reject-history/options', methods=['GET'])
-    - { name: api_reject_history_summary, lines: 354-385 }  # @reject_history_bp.route('/api/reject-history/summary', methods=['GET'])
-    - { name: api_reject_history_trend, lines: 389-422 }  # @reject_history_bp.route('/api/reject-history/trend', methods=['GET'])
-    - { name: api_reject_history_reason_pareto, lines: 426-463 }  # @reject_history_bp.route('/api/reject-history/reason-pareto', methods=['GET'])
-    - { name: api_reject_history_batch_pareto, lines: 467-511 }  # @reject_history_bp.route('/api/reject-history/batch-pareto', methods=['GET', 'POS...
-    - { name: api_reject_history_list, lines: 516-554 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
-    - { name: api_reject_history_export, lines: 559-593 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
-    - { name: api_reject_history_analytics, lines: 597-631 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
-    - { name: api_reject_history_query, lines: 641-824 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
-    - { name: api_reject_history_count, lines: 828-854 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
-    - { name: api_reject_history_job_status, lines: 859-869 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
-    - { name: _inject_reject_spool_info, lines: 876-889 }
-    - { name: api_reject_history_view, lines: 893-983 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
-    - { name: api_reject_history_export_cached, lines: 987-1065 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
+    - { name: _default_date_range, lines: 105-108 }
+    - { name: _validate_primary_query_date_range, lines: 111-124 }
+    - { name: _parse_date_range, lines: 127-138 }
+    - { name: _get_request_args, lines: 141-145 }
+    - { name: _overload_error, lines: 153-161 }
+    - { name: _normalized_list_for_cache, lines: 164-171 }
+    - { name: _extract_meta, lines: 174-185 }
+    - { name: _parse_common_bools, lines: 203-225 }
+    - { name: _parse_pareto_selection, lines: 228-243 }
+    - { name: _parse_multi_pareto_selections, lines: 246-252 }
+    - { name: api_reject_history_options, lines: 256-323 }  # @reject_history_bp.route('/api/reject-history/options', methods=['GET'])
+    - { name: api_reject_history_summary, lines: 327-358 }  # @reject_history_bp.route('/api/reject-history/summary', methods=['GET'])
+    - { name: api_reject_history_trend, lines: 362-395 }  # @reject_history_bp.route('/api/reject-history/trend', methods=['GET'])
+    - { name: api_reject_history_reason_pareto, lines: 399-436 }  # @reject_history_bp.route('/api/reject-history/reason-pareto', methods=['GET'])
+    - { name: api_reject_history_batch_pareto, lines: 440-484 }  # @reject_history_bp.route('/api/reject-history/batch-pareto', methods=['GET', 'POS...
+    - { name: api_reject_history_list, lines: 489-527 }  # @reject_history_bp.route('/api/reject-history/list', methods=['GET'])
+    - { name: api_reject_history_export, lines: 532-566 }  # @reject_history_bp.route('/api/reject-history/export', methods=['GET'])
+    - { name: api_reject_history_analytics, lines: 570-604 }  # @reject_history_bp.route('/api/reject-history/analytics', methods=['GET'])
+    - { name: api_reject_history_query, lines: 614-797 }  # @reject_history_bp.route('/api/reject-history/query', methods=['POST'])
+    - { name: api_reject_history_count, lines: 801-827 }  # @reject_history_bp.route('/api/reject-history/count', methods=['GET'])
+    - { name: api_reject_history_job_status, lines: 832-842 }  # @reject_history_bp.route('/api/reject-history/job/<job_id>', methods=['GET'])
+    - { name: _inject_reject_spool_info, lines: 849-862 }
+    - { name: api_reject_history_view, lines: 866-956 }  # @reject_history_bp.route('/api/reject-history/view', methods=['GET', 'POST'])
+    - { name: api_reject_history_export_cached, lines: 960-1038 }  # @reject_history_bp.route('/api/reject-history/export-cached', methods=['GET', 'PO...
 
 src/mes_dashboard/routes/resource_history_routes.py:  # 543 lines
   imports:
@@ -5901,7 +5954,7 @@ src/mes_dashboard/routes/trace_routes.py:  # 1117 lines
     - { name: job_result, lines: 1069-1091 }  # @trace_bp.route('/job/<job_id>/result', methods=['GET'])
     - { name: job_stream, lines: 1096-1117 }  # @trace_bp.route('/job/<job_id>/stream', methods=['GET'])
 
-src/mes_dashboard/routes/user_auth_routes.py:  # 231 lines
+src/mes_dashboard/routes/user_auth_routes.py:  # 238 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5926,7 +5979,7 @@ src/mes_dashboard/routes/user_auth_routes.py:  # 231 lines
     - { name: login, lines: 117-176 }  # @user_auth_bp.route('/api/auth/login', methods=['POST'])
     - { name: logout, lines: 180-195 }  # @user_auth_bp.route('/api/auth/logout', methods=['POST'])
     - { name: me, lines: 199-212 }  # @user_auth_bp.route('/api/auth/me', methods=['GET'])
-    - { name: heartbeat, lines: 217-231 }  # @user_auth_bp.route('/api/auth/heartbeat', methods=['PATCH'])
+    - { name: heartbeat, lines: 217-238 }  # @user_auth_bp.route('/api/auth/heartbeat', methods=['PATCH'])
 
 src/mes_dashboard/routes/wip_routes.py:  # 566 lines
   imports:
@@ -5951,7 +6004,7 @@ src/mes_dashboard/routes/wip_routes.py:  # 566 lines
     - { name: api_meta_filter_options, lines: 462-498 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
     - { name: api_meta_search, lines: 502-566 }  # @wip_bp.route('/meta/search')
 
-src/mes_dashboard/routes/yield_alert_routes.py:  # 658 lines
+src/mes_dashboard/routes/yield_alert_routes.py:  # 647 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -5959,31 +6012,31 @@ src/mes_dashboard/routes/yield_alert_routes.py:  # 658 lines
     - { module: datetime, items: [date, timedelta], line: 8 }
     - { module: flask, items: [Blueprint, request], line: 10 }
     - { module: mes_dashboard.core.heavy_query_telemetry, items: [record_memory_error], line: 12 }
-    - { module: mes_dashboard.core.response, items: [VALIDATION_ERROR, SERVICE_UNAVAILABLE, cache_expired_error, error_response, internal_error, not_found_error, success_response, validation_error], line: 15 }
-    - { module: mes_dashboard.core.cache, items: [cache_get, cache_set], line: 26 }
-    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 27 }
-    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 28 }
-    - { module: mes_dashboard.services.yield_alert_dataset_cache, items: [SpoolWriteError, apply_cached_view, execute_linkage_query, execute_primary_query], line: 29 }
-    - { module: mes_dashboard.services.yield_alert_service, items: [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_QUERY_DAYS, VALID_SORT_FIELDS, build_drilldown_payload, build_query_cache_key, expand_workcenter_groups_to_departments, get_yield_workcenter_group_options, query_alert_candidates, query_reason_detail], line: 35 }
-    - { module: mes_dashboard.services.yield_alert_sql_runtime, items: [compute_cross_filter_options], line: 47 }
+    - { module: mes_dashboard.core.route_helpers, items: [_parse_multi_param], line: 15 }
+    - { module: mes_dashboard.core.response, items: [VALIDATION_ERROR, SERVICE_UNAVAILABLE, cache_expired_error, error_response, internal_error, not_found_error, success_response, validation_error], line: 16 }
+    - { module: mes_dashboard.core.cache, items: [cache_get, cache_set], line: 27 }
+    - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 28 }
+    - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 29 }
+    - { module: mes_dashboard.services.yield_alert_dataset_cache, items: [SpoolWriteError, apply_cached_view, execute_linkage_query, execute_primary_query], line: 30 }
+    - { module: mes_dashboard.services.yield_alert_service, items: [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_QUERY_DAYS, VALID_SORT_FIELDS, build_drilldown_payload, build_query_cache_key, expand_workcenter_groups_to_departments, get_yield_workcenter_group_options, query_alert_candidates, query_reason_detail], line: 36 }
+    - { module: mes_dashboard.services.yield_alert_sql_runtime, items: [compute_cross_filter_options], line: 48 }
   functions:
-    - { name: _default_date_range, lines: 71-74 }
-    - { name: _parse_date_range, lines: 77-92 }
-    - { name: _parse_multi_param, lines: 95-109 }
-    - { name: _common_filters, lines: 112-125 }
-    - { name: _cache_response, lines: 128-144 }
-    - { name: api_yield_alert_query, lines: 149-270 }  # @yield_alert_bp.route('/api/yield-alert/query', methods=['POST'])
-    - { name: api_yield_alert_job_status, lines: 276-282 }  # @yield_alert_bp.route('/api/yield-alert/job/<job_id>', methods=['GET'])
-    - { name: api_yield_alert_analyze, lines: 287-306 }  # @yield_alert_bp.route('/api/yield-alert/analyze', methods=['POST'])
-    - { name: _inject_spool_info, lines: 313-331 }
-    - { name: api_yield_alert_view, lines: 336-410 }  # @yield_alert_bp.route('/api/yield-alert/view', methods=['GET'])
-    - { name: api_yield_alert_summary, lines: 415-451 }  # @yield_alert_bp.route('/api/yield-alert/summary', methods=['GET'])
-    - { name: api_yield_alert_trend, lines: 456-484 }  # @yield_alert_bp.route('/api/yield-alert/trend', methods=['GET'])
-    - { name: api_yield_alert_alerts, lines: 489-568 }  # @yield_alert_bp.route('/api/yield-alert/alerts', methods=['GET'])
-    - { name: api_yield_alert_reason_detail, lines: 573-596 }  # @yield_alert_bp.route('/api/yield-alert/reason-detail', methods=['GET'])
-    - { name: api_yield_alert_drilldown_context, lines: 601-621 }  # @yield_alert_bp.route('/api/yield-alert/drilldown-context', methods=['GET'])
-    - { name: api_yield_alert_filter_options, lines: 626-637 }  # @yield_alert_bp.route('/api/yield-alert/filter-options', methods=['GET'])
-    - { name: api_yield_alert_cross_filter_options, lines: 642-658 }  # @yield_alert_bp.route('/api/yield-alert/cross-filter-options', methods=['GET'])
+    - { name: _default_date_range, lines: 72-75 }
+    - { name: _parse_date_range, lines: 78-93 }
+    - { name: _common_filters, lines: 101-114 }
+    - { name: _cache_response, lines: 117-133 }
+    - { name: api_yield_alert_query, lines: 138-259 }  # @yield_alert_bp.route('/api/yield-alert/query', methods=['POST'])
+    - { name: api_yield_alert_job_status, lines: 265-271 }  # @yield_alert_bp.route('/api/yield-alert/job/<job_id>', methods=['GET'])
+    - { name: api_yield_alert_analyze, lines: 276-295 }  # @yield_alert_bp.route('/api/yield-alert/analyze', methods=['POST'])
+    - { name: _inject_spool_info, lines: 302-320 }
+    - { name: api_yield_alert_view, lines: 325-399 }  # @yield_alert_bp.route('/api/yield-alert/view', methods=['GET'])
+    - { name: api_yield_alert_summary, lines: 404-440 }  # @yield_alert_bp.route('/api/yield-alert/summary', methods=['GET'])
+    - { name: api_yield_alert_trend, lines: 445-473 }  # @yield_alert_bp.route('/api/yield-alert/trend', methods=['GET'])
+    - { name: api_yield_alert_alerts, lines: 478-557 }  # @yield_alert_bp.route('/api/yield-alert/alerts', methods=['GET'])
+    - { name: api_yield_alert_reason_detail, lines: 562-585 }  # @yield_alert_bp.route('/api/yield-alert/reason-detail', methods=['GET'])
+    - { name: api_yield_alert_drilldown_context, lines: 590-610 }  # @yield_alert_bp.route('/api/yield-alert/drilldown-context', methods=['GET'])
+    - { name: api_yield_alert_filter_options, lines: 615-626 }  # @yield_alert_bp.route('/api/yield-alert/filter-options', methods=['GET'])
+    - { name: api_yield_alert_cross_filter_options, lines: 631-647 }  # @yield_alert_bp.route('/api/yield-alert/cross-filter-options', methods=['GET'])
 
 src/mes_dashboard/rq_worker_preload.py:  # 55 lines
   imports:
@@ -6992,7 +7045,7 @@ src/mes_dashboard/services/material_consumption_service.py:  # 697 lines
     - { name: enqueue_job, lines: 649-651 }
     - { name: start_parts_cache_warmup, lines: 654-685 }
 
-src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 503 lines
+src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 512 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: csv, items: [], line: 13 }
@@ -7010,13 +7063,13 @@ src/mes_dashboard/services/material_trace_duckdb_runtime.py:  # 503 lines
         - { name: get_page, lines: 73-128 }
         - { name: export_csv, lines: 130-178 }
     - name: MaterialTraceJob
-      lines: 185-503
+      lines: 185-512
       methods:
         - { name: __init__, lines: 212-221 }
         - { name: pre_query, lines: 223-284 }
         - { name: build_chunk_sql, lines: 286-317 }
         - { name: post_aggregate, lines: 319-444 }
-        - { name: run, lines: 446-503 }
+        - { name: run, lines: 446-512 }
 
 src/mes_dashboard/services/material_trace_service.py:  # 1015 lines
   imports:
@@ -8271,7 +8324,7 @@ src/mes_dashboard/services/trace_lineage_job_service.py:  # 304 lines
     - { name: _build_forward_response, lines: 218-229 }
     - { name: _execute_trace_lineage_job, lines: 232-292 }
 
-src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
+src/mes_dashboard/services/user_usage_kpi_service.py:  # 440 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: logging, items: [], line: 9 }
@@ -8281,10 +8334,10 @@ src/mes_dashboard/services/user_usage_kpi_service.py:  # 434 lines
   functions:
     - { name: _get_sqlite_active_session_ids, lines: 18-35 }
     - { name: get_user_usage_kpi, lines: 49-80 }
-    - { name: _query_mysql, lines: 87-241 }
-    - { name: _query_sqlite, lines: 248-405 }
-    - { name: _safe_int, lines: 412-419 }
-    - { name: _compute_duration_buckets, lines: 422-434 }
+    - { name: _query_mysql, lines: 87-244 }
+    - { name: _query_sqlite, lines: 251-411 }
+    - { name: _safe_int, lines: 418-425 }
+    - { name: _compute_duration_buckets, lines: 428-440 }
 
 src/mes_dashboard/services/wip_query_job_service.py:  # 410 lines
   imports:
@@ -8536,7 +8589,7 @@ src/mes_dashboard/services/yield_alert_service.py:  # 970 lines
     - { name: query_reason_detail, lines: 866-931 }
     - { name: build_drilldown_payload, lines: 934-970 }
 
-src/mes_dashboard/services/yield_alert_sql_runtime.py:  # 980 lines
+src/mes_dashboard/services/yield_alert_sql_runtime.py:  # 988 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: logging, items: [], line: 14 }
@@ -8565,9 +8618,9 @@ src/mes_dashboard/services/yield_alert_sql_runtime.py:  # 980 lines
     - { name: _query_station_summary, lines: 376-430 }
     - { name: _query_package_summary, lines: 433-486 }
     - { name: _query_alerts, lines: 491-726 }
-    - { name: _query_filter_options, lines: 731-768 }
-    - { name: compute_cross_filter_options, lines: 773-839 }
-    - { name: try_compute_view_from_spool, lines: 844-980 }
+    - { name: _query_filter_options, lines: 731-771 }
+    - { name: compute_cross_filter_options, lines: 776-847 }
+    - { name: try_compute_view_from_spool, lines: 852-988 }
 
 src/mes_dashboard/sql/__init__.py:  # 90 lines
   imports:
@@ -10334,6 +10387,30 @@ tests/integration/conftest.py:  # 375 lines
     - { name: _wait_for_health, lines: 294-313 }
     - { name: oracle_xe_app, lines: 336-375 }  # @pytest.fixture()
 
+tests/integration/test_base_job_semaphore_wiring.py:  # 270 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 23 }
+    - { module: threading, items: [], line: 25 }
+    - { module: time, items: [], line: 26 }
+    - { module: contextlib, items: [contextmanager], line: 27 }
+    - { module: typing, items: [List, Tuple], line: 28 }
+    - { module: pytest, items: [], line: 30 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 32 }
+  classes:
+    - name: _IntegJob
+      lines: 37-49
+      methods:
+        - { name: pre_query, lines: 42-43 }
+        - { name: build_chunk_sql, lines: 45-46 }
+        - { name: post_aggregate, lines: 48-49 }
+    - name: TestBaseJobConcurrencyCap
+      lines: 52-270
+      methods:
+        - { name: test_peak_slot_entries_bounded_by_worker_count, lines: 57-113 }
+        - { name: test_all_jobs_complete_no_deadlock, lines: 115-154 }
+        - { name: test_semaphore_fully_released_after_run, lines: 156-203 }
+        - { name: test_slot_released_after_fanout_exception_in_worker, lines: 205-270 }
+
 tests/integration/test_downtime_rq_async.py:  # 1254 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
@@ -11564,6 +11641,31 @@ tests/stress/test_async_job_stress.py:  # 311 lines
     - { name: _production_history_payload, lines: 34-47 }
     - { name: _yield_alert_payload, lines: 50-52 }
 
+tests/stress/test_base_job_semaphore_stress.py:  # 197 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 19 }
+    - { module: threading, items: [], line: 21 }
+    - { module: time, items: [], line: 22 }
+    - { module: contextlib, items: [contextmanager], line: 23 }
+    - { module: typing, items: [List, Tuple], line: 24 }
+    - { module: pytest, items: [], line: 26 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 28 }
+  classes:
+    - name: _StressJob
+      lines: 33-47
+      methods:
+        - { name: pre_query, lines: 40-41 }
+        - { name: build_chunk_sql, lines: 43-44 }
+        - { name: post_aggregate, lines: 46-47 }
+    - name: TestBaseJobSemaphoreStress
+      lines: 81-197
+      methods:
+        - { name: test_burst_peak_bounded_no_leak, lines: 86-142 }
+        - { name: test_burst_no_deadlock_with_mixed_success_failure, lines: 144-197 }
+  functions:
+    - { name: _recording_cm_factory, lines: 50-64 }
+    - { name: _compute_peak_concurrent, lines: 67-77 }
+
 tests/stress/test_chunk_boundary.py:  # 485 lines
   imports:
     - { module: os, items: [], line: 16 }
@@ -12204,7 +12306,7 @@ tests/stress/test_yield_alert_stress.py:  # 390 lines
     - { name: _make_yield_alert_df, lines: 151-203 }
     - { name: _make_query_id_for_test, lines: 206-220 }
 
-tests/test_admin_routes.py:  # 262 lines
+tests/test_admin_routes.py:  # 272 lines
   imports:
     - { module: __future__, items: [annotations], line: 14 }
     - { module: unittest.mock, items: [patch], line: 16 }
@@ -12216,21 +12318,22 @@ tests/test_admin_routes.py:  # 262 lines
     - { name: auth_patches, lines: 36-46 }  # @pytest.fixture
     - { name: test_system_status_success_envelope, lines: 51-56 }
     - { name: test_system_status_blocked_without_auth, lines: 59-62 }
-    - { name: test_worker_status_success_envelope, lines: 67-83 }
-    - { name: test_api_pages_slim_shape, lines: 88-110 }
-    - { name: test_api_pages_blocked_without_auth, lines: 113-115 }
-    - { name: test_get_api_drawers_returns_404, lines: 120-123 }
-    - { name: test_post_api_drawers_returns_404, lines: 126-129 }
-    - { name: test_put_api_drawers_id_returns_404, lines: 132-135 }
-    - { name: test_delete_api_drawers_id_returns_404, lines: 138-141 }
-    - { name: test_put_page_with_valid_status_accepted, lines: 146-151 }
-    - { name: test_put_page_without_status_returns_400, lines: 154-158 }
-    - { name: test_put_page_with_name_field_rejected, lines: 161-180 }
-    - { name: test_put_page_with_drawer_id_field_rejected, lines: 183-197 }
-    - { name: test_put_page_with_order_field_rejected, lines: 200-214 }
-    - { name: test_metrics_returns_success_or_graceful_empty, lines: 219-224 }
-    - { name: test_user_usage_kpi_with_dates_returns_success, lines: 229-241 }
-    - { name: test_user_usage_kpi_no_500_mysql_unavailable, lines: 246-262 }
+    - { name: test_system_status_exposes_metrics_history_interval, lines: 65-72 }
+    - { name: test_worker_status_success_envelope, lines: 77-93 }
+    - { name: test_api_pages_slim_shape, lines: 98-120 }
+    - { name: test_api_pages_blocked_without_auth, lines: 123-125 }
+    - { name: test_get_api_drawers_returns_404, lines: 130-133 }
+    - { name: test_post_api_drawers_returns_404, lines: 136-139 }
+    - { name: test_put_api_drawers_id_returns_404, lines: 142-145 }
+    - { name: test_delete_api_drawers_id_returns_404, lines: 148-151 }
+    - { name: test_put_page_with_valid_status_accepted, lines: 156-161 }
+    - { name: test_put_page_without_status_returns_400, lines: 164-168 }
+    - { name: test_put_page_with_name_field_rejected, lines: 171-190 }
+    - { name: test_put_page_with_drawer_id_field_rejected, lines: 193-207 }
+    - { name: test_put_page_with_order_field_rejected, lines: 210-224 }
+    - { name: test_metrics_returns_success_or_graceful_empty, lines: 229-234 }
+    - { name: test_user_usage_kpi_with_dates_returns_success, lines: 239-251 }
+    - { name: test_user_usage_kpi_no_500_mysql_unavailable, lines: 256-272 }
 
 tests/test_admin_routes_logs.py:  # 353 lines
   imports:
@@ -13441,6 +13544,36 @@ tests/test_base_chunked_duckdb_job.py:  # 607 lines
     - { name: _fake_batch, lines: 112-113 }
     - { name: _patch_reader, lines: 116-123 }
     - { name: _make_batch, lines: 371-376 }
+
+tests/test_base_job_semaphore_wiring.py:  # 170 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 20 }
+    - { module: ast, items: [], line: 22 }
+    - { module: contextlib, items: [contextmanager], line: 23 }
+    - { module: pathlib, items: [Path], line: 24 }
+    - { module: pytest, items: [], line: 26 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 28 }
+  classes:
+    - name: _FakeAppendJob
+      lines: 34-48
+      methods:
+        - { name: pre_query, lines: 41-42 }
+        - { name: build_chunk_sql, lines: 44-45 }
+        - { name: post_aggregate, lines: 47-48 }
+    - name: _FakeReductionJob
+      lines: 51-54
+    - name: TestBaseRunSlotWiring
+      lines: 69-135
+      methods:
+        - { name: test_append_path_acquires_slot_once, lines: 70-95 }
+        - { name: test_reduction_path_acquires_slot_once, lines: 97-114 }
+        - { name: test_slot_released_when_fanout_raises, lines: 116-135 }
+    - name: TestMaterialTraceSlotWiring
+      lines: 138-170
+      methods:
+        - { name: test_material_trace_run_references_heavy_query_slot, lines: 147-170 }
+  functions:
+    - { name: _recording_slot, lines: 57-66 }
 
 tests/test_batch_query_engine.py:  # 1217 lines
   imports:
@@ -16147,7 +16280,7 @@ tests/test_log_store.py:  # 526 lines
         - { name: test_normalize_unparseable_string, lines: 505-509 }
         - { name: test_query_logs_normalizes_naive_timestamp, lines: 511-526 }
 
-tests/test_login_session_store.py:  # 75 lines
+tests/test_login_session_store.py:  # 141 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: os, items: [], line: 6 }
@@ -16162,6 +16295,11 @@ tests/test_login_session_store.py:  # 75 lines
     - { name: _insert_synced_session, lines: 34-47 }
     - { name: test_cleanup_synced_retains_within_24h, lines: 50-61 }
     - { name: test_cleanup_synced_deletes_beyond_24h, lines: 64-75 }
+    - { name: _insert_session, lines: 82-98 }
+    - { name: test_online_count_uses_tighter_window_than_active_count, lines: 101-115 }
+    - { name: test_active_count_default_window_is_30_min, lines: 118-122 }
+    - { name: test_windows_are_configurable, lines: 125-134 }
+    - { name: test_count_window_override_argument, lines: 137-141 }
 
 tests/test_map_service_errors_decorator.py:  # 104 lines
   imports:
@@ -16643,14 +16781,14 @@ tests/test_metrics.py:  # 201 lines
       methods:
         - { name: test_concurrent_recording, lines: 183-201 }
 
-tests/test_metrics_history.py:  # 525 lines
+tests/test_metrics_history.py:  # 552 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: os, items: [], line: 11 }
     - { module: sqlite3, items: [], line: 12 }
     - { module: tempfile, items: [], line: 13 }
     - { module: datetime, items: [datetime, timedelta], line: 14 }
-    - { module: unittest.mock, items: [patch], line: 15 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 15 }
     - { module: mes_dashboard.core.metrics_history, items: [MetricsHistoryCollector, MetricsHistoryStore], line: 18 }
   classes:
     - name: TestRSSMeasurement
@@ -16697,16 +16835,17 @@ tests/test_metrics_history.py:  # 525 lines
         - { name: test_schema_contains_cache_hit_miss_columns, lines: 393-406 }
         - { name: test_write_snapshot_persists_cache_hit_miss_counts, lines: 408-427 }
     - name: TestCollectorObservability
-      lines: 430-485
+      lines: 430-512
       methods:
         - { name: test_collector_records_cache_hit_miss_delta, lines: 431-443 }
         - { name: test_dead_worker_alert_warning_logged, lines: 445-469 }
-        - { name: test_collector_records_service_rss_bytes, lines: 471-485 }
+        - { name: test_online_count_uses_presence_window_not_engagement_window, lines: 471-496 }
+        - { name: test_collector_records_service_rss_bytes, lines: 498-512 }
     - name: TestHeavyQueryGuardColumns
-      lines: 488-525
+      lines: 515-552
       methods:
-        - { name: test_schema_contains_heavy_query_guard_columns, lines: 489-502 }
-        - { name: test_collector_persists_heavy_query_guard_counters, lines: 504-525 }
+        - { name: test_schema_contains_heavy_query_guard_columns, lines: 516-529 }
+        - { name: test_collector_persists_heavy_query_guard_counters, lines: 531-552 }
   functions:
     - { name: _insert_snapshot, lines: 28-56 }
 
@@ -17833,7 +17972,7 @@ tests/test_qc_gate_service.py:  # 150 lines
     - { name: test_get_qc_gate_summary_returns_empty_when_no_match, lines: 115-135 }  # @patch('mes_dashboard.services.qc_gate_service.get_spec_order_mapping', return_va...
     - { name: test_get_qc_gate_summary_returns_empty_when_cache_missing, lines: 141-150 }  # @patch('mes_dashboard.services.qc_gate_service.get_cache_updated_at', return_valu...
 
-tests/test_query_cost_policy.py:  # 354 lines
+tests/test_query_cost_policy.py:  # 412 lines
   imports:
     - { module: __future__, items: [annotations], line: 7 }
     - { module: ast, items: [], line: 9 }
@@ -17873,11 +18012,20 @@ tests/test_query_cost_policy.py:  # 354 lines
         - { name: test_l3_row_count_fn_error_does_not_raise, lines: 214-226 }
         - { name: test_l2_short_circuits_l3, lines: 228-241 }
         - { name: test_all_under_threshold_returns_sync, lines: 243-255 }
-    - name: TestNoPandasAndNoCallers
-      lines: 281-354
+    - name: TestDomainPolicyRegistry
+      lines: 262-313
       methods:
-        - { name: test_no_pandas_import_in_new_modules, lines: 283-296 }
-        - { name: test_no_caller_outside_tests, lines: 298-354 }
+        - { name: test_always_async_set_is_exactly_the_three_heavy_domains, lines: 274-278 }
+        - { name: test_always_async_domains_resolve_to_always_async_policy, lines: 281-284 }
+        - { name: test_classifier_domains_are_registered, lines: 287-291 }
+        - { name: test_classifier_domains_preserve_default_thresholds, lines: 294-301 }
+        - { name: test_unregistered_domain_falls_back_to_default, lines: 303-306 }
+        - { name: test_registry_resolution_matches_classify_result, lines: 308-313 }
+    - name: TestNoPandasAndNoCallers
+      lines: 339-412
+      methods:
+        - { name: test_no_pandas_import_in_new_modules, lines: 341-354 }
+        - { name: test_no_caller_outside_tests, lines: 356-412 }
   functions:
     - { name: _call, lines: 23-44 }
 
@@ -19171,6 +19319,17 @@ tests/test_reject_query_job_service.py:  # 558 lines
         - { name: test_job_service_forwards_reasons_to_execute, lines: 510-536 }
         - { name: test_reasons_absent_in_params_forwarded_as_empty_list, lines: 538-558 }
 
+tests/test_reject_schema_version_key.py:  # 75 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 14 }
+    - { module: ast, items: [], line: 16 }
+    - { module: pathlib, items: [Path], line: 17 }
+    - { module: mes_dashboard.services, items: [cache_svc], line: 19 }
+  functions:
+    - { name: test_make_query_id_is_sensitive_to_schema_version, lines: 24-34 }
+    - { name: test_schema_version_constant_is_present, lines: 37-39 }
+    - { name: test_every_make_query_id_call_site_includes_schema_version, lines: 42-75 }
+
 tests/test_resilience.py:  # 58 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
@@ -19845,6 +20004,36 @@ tests/test_resource_service.py:  # 675 lines
         - { name: test_package_groups_filter_warm_cache_path, lines: 618-636 }
         - { name: test_package_groups_filter_oracle_fallback_path, lines: 638-657 }
         - { name: test_package_groups_empty_list_returns_all_resources, lines: 659-675 }
+
+tests/test_route_helpers.py:  # 85 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 8 }
+    - { module: werkzeug.datastructures, items: [MultiDict], line: 10 }
+    - { module: mes_dashboard.core.route_helpers, items: [parse_multi_param, parse_pagination], line: 12 }
+  classes:
+    - name: TestParseMultiParam
+      lines: 15-49
+      methods:
+        - { name: test_get_repeated_params, lines: 16-18 }
+        - { name: test_get_csv_value_is_split, lines: 20-22 }
+        - { name: test_get_repeated_and_csv_combined, lines: 24-26 }
+        - { name: test_order_preserving_dedup, lines: 28-30 }
+        - { name: test_whitespace_and_empty_tokens_dropped, lines: 32-34 }
+        - { name: test_missing_key_returns_empty_list, lines: 36-37 }
+        - { name: test_post_dict_list_value_taken_verbatim, lines: 39-42 }
+        - { name: test_post_dict_scalar_csv_is_split, lines: 44-46 }
+        - { name: test_post_dict_none_returns_empty, lines: 48-49 }
+    - name: TestParsePagination
+      lines: 52-85
+      methods:
+        - { name: test_defaults_when_absent, lines: 53-55 }
+        - { name: test_reads_valid_values, lines: 57-59 }
+        - { name: test_page_clamped_to_minimum_one, lines: 61-63 }
+        - { name: test_per_page_capped_at_max, lines: 65-67 }
+        - { name: test_per_page_floor_one, lines: 69-71 }
+        - { name: test_non_integer_falls_back_to_defaults, lines: 73-75 }
+        - { name: test_custom_keys_and_default, lines: 77-82 }
+        - { name: test_post_dict_source, lines: 84-85 }
 
 tests/test_rq_monitor_service.py:  # 234 lines
   imports:
@@ -20621,7 +20810,7 @@ tests/test_unified_spool_integration.py:  # 789 lines
     - { name: test_forward_summary_phase3_complete_payload, lines: 582-740 }
     - { name: test_forward_summary_derives_station_order_when_fallback_is_999, lines: 748-789 }
 
-tests/test_user_auth_routes.py:  # 222 lines
+tests/test_user_auth_routes.py:  # 226 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: unittest.mock, items: [patch, MagicMock], line: 18 }
@@ -20655,11 +20844,11 @@ tests/test_user_auth_routes.py:  # 222 lines
         - { name: test_me_returns_null_data_when_not_logged_in, lines: 173-177 }
         - { name: test_me_envelope_has_meta_and_timestamp, lines: 179-183 }
     - name: TestHeartbeat
-      lines: 186-222
+      lines: 186-226
       methods:
         - { name: test_heartbeat_requires_login, lines: 189-192 }
-        - { name: test_heartbeat_updates_session_when_logged_in, lines: 194-207 }
-        - { name: test_heartbeat_handles_store_error_gracefully, lines: 209-222 }
+        - { name: test_heartbeat_updates_session_when_logged_in, lines: 194-211 }
+        - { name: test_heartbeat_handles_store_error_gracefully, lines: 213-226 }
 
 tests/test_user_usage_kpi_service.py:  # 139 lines
   imports:
@@ -21243,7 +21432,7 @@ tests/test_yield_alert_contracts.py:  # 132 lines
         - { name: test_match_status_values, lines: 123-127 }
         - { name: test_risk_level_values, lines: 129-132 }
 
-tests/test_yield_alert_dataset_cache.py:  # 769 lines
+tests/test_yield_alert_dataset_cache.py:  # 824 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: pathlib, items: [Path], line: 6 }
@@ -21282,9 +21471,11 @@ tests/test_yield_alert_dataset_cache.py:  # 769 lines
     - { name: test_source_code_not_null_rows_have_tx_zero, lines: 685-715 }
     - { name: test_package_filter_not_applied_to_ga_percent, lines: 718-724 }
     - { name: test_process_type_gc_uses_gc_pattern, lines: 727-752 }
-    - { name: test_primary_query_id_differs_for_ga_and_gc, lines: 755-769 }
+    - { name: test_primary_query_id_differs_for_each_process_type, lines: 758-772 }
+    - { name: test_process_type_like_patterns_mutually_exclusive, lines: 775-799 }
+    - { name: test_process_type_f_uses_f_pattern, lines: 802-824 }
 
-tests/test_yield_alert_job_service.py:  # 264 lines
+tests/test_yield_alert_job_service.py:  # 268 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 14 }
@@ -21301,15 +21492,15 @@ tests/test_yield_alert_job_service.py:  # 264 lines
         - { name: test_passes_ttl_and_timeout_from_config, lines: 72-80 }
         - { name: test_passes_retry_configuration_to_enqueue_job, lines: 82-91 }
     - name: TestExecuteYieldAlertJob
-      lines: 98-264
+      lines: 98-268
       methods:
         - { name: test_cache_hit_skips_oracle_and_calls_complete_job, lines: 101-126 }
-        - { name: test_cache_miss_calls_execute_primary_query_then_complete, lines: 128-153 }
-        - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 155-183 }
-        - { name: _make_cache_miss_mocks, lines: 185-195 }
-        - { name: test_update_job_progress_called_with_pct_0_at_start, lines: 197-213 }
-        - { name: test_update_job_progress_called_with_pct_30_after_query, lines: 215-231 }
-        - { name: test_update_job_progress_called_with_pct_100_before_complete, lines: 233-264 }
+        - { name: test_cache_miss_calls_execute_primary_query_then_complete, lines: 128-157 }
+        - { name: test_failure_path_calls_complete_job_with_error_and_reraises, lines: 159-187 }
+        - { name: _make_cache_miss_mocks, lines: 189-199 }
+        - { name: test_update_job_progress_called_with_pct_0_at_start, lines: 201-217 }
+        - { name: test_update_job_progress_called_with_pct_30_after_query, lines: 219-235 }
+        - { name: test_update_job_progress_called_with_pct_100_before_complete, lines: 237-268 }
 
 tests/test_yield_alert_lock_behavior.py:  # 76 lines
   imports:
@@ -21327,7 +21518,7 @@ tests/test_yield_alert_lock_behavior.py:  # 76 lines
     - { name: streaming_enabled, lines: 30-33 }  # @pytest.fixture()
     - { name: cache_miss, lines: 37-40 }  # @pytest.fixture()
 
-tests/test_yield_alert_routes.py:  # 456 lines
+tests/test_yield_alert_routes.py:  # 595 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
@@ -21335,12 +21526,12 @@ tests/test_yield_alert_routes.py:  # 456 lines
     - { module: mes_dashboard.app, items: [create_app], line: 10 }
   classes:
     - name: TestJobExpiry410PollingRace
-      lines: 278-342
+      lines: 392-456
       methods:
-        - { name: test_view_returns_410_when_cache_expired, lines: 285-299 }
-        - { name: test_view_410_has_envelope_meta, lines: 301-314 }
-        - { name: test_view_410_polling_race_after_job_complete, lines: 316-335 }
-        - { name: test_view_missing_query_id_returns_400_not_410, lines: 337-342 }
+        - { name: test_view_returns_410_when_cache_expired, lines: 399-413 }
+        - { name: test_view_410_has_envelope_meta, lines: 415-428 }
+        - { name: test_view_410_polling_race_after_job_complete, lines: 430-449 }
+        - { name: test_view_missing_query_id_returns_400_not_410, lines: 451-456 }
   functions:
     - { name: app, lines: 14-17 }  # @pytest.fixture
     - { name: client, lines: 21-22 }  # @pytest.fixture
@@ -21349,19 +21540,24 @@ tests/test_yield_alert_routes.py:  # 456 lines
     - { name: test_query_returns_query_id, lines: 42-52 }  # @patch('mes_dashboard.routes.yield_alert_routes.execute_primary_query')
     - { name: test_view_requires_query_id, lines: 55-60 }
     - { name: test_view_returns_cache_expired_when_query_missing, lines: 64-70 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
-    - { name: test_view_supports_workcenter_group_filters, lines: 74-97 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
-    - { name: test_summary_spool_path_returns_summary, lines: 101-118 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
-    - { name: test_alerts_rejects_invalid_sort_key, lines: 121-129 }
-    - { name: test_alerts_caps_per_page_and_returns_payload, lines: 133-162 }  # @patch('mes_dashboard.routes.yield_alert_routes.query_alert_candidates')
-    - { name: test_alerts_supports_workcenter_group_filters, lines: 166-198 }  # @patch('mes_dashboard.routes.yield_alert_routes.query_alert_candidates')
-    - { name: test_query_spool_write_error_returns_503, lines: 202-215 }  # @patch('mes_dashboard.routes.yield_alert_routes.execute_primary_query')
-    - { name: test_filter_options_returns_workcenter_groups, lines: 219-226 }  # @patch('mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_option...
-    - { name: test_cross_filter_options_forwards_query_id_and_filters, lines: 230-255 }  # @patch('mes_dashboard.routes.yield_alert_routes.compute_cross_filter_options')
-    - { name: test_drilldown_context_returns_payload, lines: 259-275 }  # @patch('mes_dashboard.routes.yield_alert_routes.build_drilldown_payload')
-    - { name: test_query_requires_valid_process_type, lines: 349-362 }
-    - { name: test_query_defaults_process_type_to_ga, lines: 366-380 }  # @patch('mes_dashboard.routes.yield_alert_routes.execute_primary_query')
-    - { name: test_trend_endpoint_uses_spool_not_oracle, lines: 384-414 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
-    - { name: test_alerts_response_includes_source_code_field, lines: 418-456 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
+    - { name: test_view_supports_workcenter_group_filters, lines: 74-106 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
+    - { name: test_view_workcenter_groups_sourced_from_spool_not_filter_cache, lines: 111-139 }  # @patch('mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_option...
+    - { name: test_view_new_process_type_zero_rows_returns_empty_not_error, lines: 143-167 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
+    - { name: test_summary_spool_path_returns_summary, lines: 171-188 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
+    - { name: test_alerts_rejects_invalid_sort_key, lines: 191-199 }
+    - { name: test_alerts_caps_per_page_and_returns_payload, lines: 203-232 }  # @patch('mes_dashboard.routes.yield_alert_routes.query_alert_candidates')
+    - { name: test_alerts_supports_workcenter_group_filters, lines: 236-268 }  # @patch('mes_dashboard.routes.yield_alert_routes.query_alert_candidates')
+    - { name: test_query_spool_write_error_returns_503, lines: 272-285 }  # @patch('mes_dashboard.routes.yield_alert_routes.execute_primary_query')
+    - { name: test_filter_options_returns_workcenter_groups, lines: 289-296 }  # @patch('mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_option...
+    - { name: test_filter_options_still_uses_filter_cache, lines: 299-316 }
+    - { name: test_cross_filter_options_forwards_query_id_and_filters, lines: 320-347 }  # @patch('mes_dashboard.routes.yield_alert_routes.compute_cross_filter_options')
+    - { name: test_cross_filter_options_workcenter_groups_from_spool, lines: 352-369 }  # @patch('mes_dashboard.routes.yield_alert_routes.get_yield_workcenter_group_option...
+    - { name: test_drilldown_context_returns_payload, lines: 373-389 }  # @patch('mes_dashboard.routes.yield_alert_routes.build_drilldown_payload')
+    - { name: test_query_requires_valid_process_type, lines: 463-479 }
+    - { name: test_query_accepts_each_new_process_type, lines: 484-501 }  # @pytest.mark.parametrize('process_type', ['GA%', 'GC%', 'GD%', 'F%', 'W%', 'D%'])
+    - { name: test_query_defaults_process_type_to_ga, lines: 505-519 }  # @patch('mes_dashboard.routes.yield_alert_routes.execute_primary_query')
+    - { name: test_trend_endpoint_uses_spool_not_oracle, lines: 523-553 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
+    - { name: test_alerts_response_includes_source_code_field, lines: 557-595 }  # @patch('mes_dashboard.routes.yield_alert_routes.apply_cached_view')
 
 tests/test_yield_alert_service.py:  # 418 lines
   imports:
@@ -21395,53 +21591,65 @@ tests/test_yield_alert_shell_coverage.py:  # 26 lines
     - { name: _login_as_admin, lines: 11-13 }
     - { name: test_yield_alert_page_redirects_to_shell_when_spa_enabled, lines: 16-26 }
 
-tests/test_yield_alert_sql_runtime.py:  # 150 lines
+tests/test_yield_alert_sql_runtime.py:  # 340 lines
   imports:
     - { module: sys, items: [], line: 4 }
     - { module: os, items: [], line: 5 }
     - { module: duckdb, items: [], line: 8 }
     - { module: pandas, items: [], line: 9 }
     - { module: unittest.mock, items: [MagicMock], line: 10 }
-    - { module: mes_dashboard.services.yield_alert_sql_runtime, items: [_qid, _sql_str_literal, _attach_spool_view, compute_cross_filter_options, SQL_FALLBACK_DISABLED, SQL_FALLBACK_DEP_MISSING, SQL_FALLBACK_SPOOL_MISS, SQL_FALLBACK_RUNTIME_ERROR, _SPOOL_NAMESPACE, _DEPT_SEQ_MAP, _YIELD_WORKCENTER_GROUP_ORDER], line: 12 }
+    - { module: mes_dashboard.services.yield_alert_sql_runtime, items: [_qid, _sql_str_literal, _attach_spool_view, _query_filter_options, compute_cross_filter_options, SQL_FALLBACK_DISABLED, SQL_FALLBACK_DEP_MISSING, SQL_FALLBACK_SPOOL_MISS, SQL_FALLBACK_RUNTIME_ERROR, _SPOOL_NAMESPACE, _DEPT_SEQ_MAP, _YIELD_WORKCENTER_GROUP_ORDER], line: 12 }
   classes:
     - name: TestQidHelper
-      lines: 27-37
+      lines: 28-38
       methods:
-        - { name: test_simple_identifier_quoted, lines: 28-29 }
-        - { name: test_double_quotes_in_name_escaped, lines: 31-33 }
-        - { name: test_result_wrapped_in_double_quotes, lines: 35-37 }
+        - { name: test_simple_identifier_quoted, lines: 29-30 }
+        - { name: test_double_quotes_in_name_escaped, lines: 32-34 }
+        - { name: test_result_wrapped_in_double_quotes, lines: 36-38 }
     - name: TestSqlStrLiteralHelper
-      lines: 40-50
+      lines: 41-51
       methods:
-        - { name: test_plain_string, lines: 41-42 }
-        - { name: test_single_quote_escaped, lines: 44-46 }
-        - { name: test_path_string, lines: 48-50 }
+        - { name: test_plain_string, lines: 42-43 }
+        - { name: test_single_quote_escaped, lines: 45-47 }
+        - { name: test_path_string, lines: 49-51 }
     - name: TestAttachSpoolView
-      lines: 53-66
+      lines: 54-67
       methods:
-        - { name: test_creates_yield_alert_src_view, lines: 54-60 }
-        - { name: test_creates_or_replaces_view, lines: 62-66 }
+        - { name: test_creates_yield_alert_src_view, lines: 55-61 }
+        - { name: test_creates_or_replaces_view, lines: 63-67 }
     - name: TestFallbackConstants
-      lines: 69-80
+      lines: 70-81
       methods:
-        - { name: test_disabled_constant, lines: 70-71 }
-        - { name: test_dep_missing_constant, lines: 73-74 }
-        - { name: test_spool_miss_constant, lines: 76-77 }
-        - { name: test_runtime_error_constant, lines: 79-80 }
+        - { name: test_disabled_constant, lines: 71-72 }
+        - { name: test_dep_missing_constant, lines: 74-75 }
+        - { name: test_spool_miss_constant, lines: 77-78 }
+        - { name: test_runtime_error_constant, lines: 80-81 }
     - name: TestSpoolNamespace
-      lines: 83-85
+      lines: 84-86
       methods:
-        - { name: test_namespace_matches_dataset, lines: 84-85 }
+        - { name: test_namespace_matches_dataset, lines: 85-86 }
     - name: TestDeptSeqMap
-      lines: 88-98
+      lines: 89-99
       methods:
-        - { name: test_seq_map_covers_all_workcenter_groups, lines: 89-91 }
-        - { name: test_seq_map_values_are_unique_indices, lines: 93-95 }
-        - { name: test_seq_map_starts_at_zero, lines: 97-98 }
+        - { name: test_seq_map_covers_all_workcenter_groups, lines: 90-92 }
+        - { name: test_seq_map_values_are_unique_indices, lines: 94-96 }
+        - { name: test_seq_map_starts_at_zero, lines: 98-99 }
     - name: TestCrossFilterOptions
-      lines: 101-150
+      lines: 139-292
       methods:
-        - { name: test_compute_cross_filter_options_applies_other_dimension_filters, lines: 102-150 }
+        - { name: test_compute_cross_filter_options_applies_other_dimension_filters, lines: 140-165 }
+        - { name: test_compute_cross_filter_options_includes_departments_dimension, lines: 167-185 }
+        - { name: test_departments_use_raw_department_name_not_department_group, lines: 187-210 }
+        - { name: test_selecting_department_narrows_lines_packages_types_functions, lines: 212-235 }
+        - { name: test_selecting_line_narrows_departments, lines: 237-258 }
+        - { name: test_workcenter_groups_change_with_process_type_query_id, lines: 260-292 }
+    - name: TestQueryFilterOptions
+      lines: 295-340
+      methods:
+        - { name: test_query_filter_options_returns_departments_from_spool_distinct, lines: 296-325 }
+        - { name: test_query_filter_options_empty_spool_returns_empty_workcenter_groups, lines: 327-340 }
+  functions:
+    - { name: _make_cross_filter_fixture, lines: 102-136 }
 
 tools/test_oracle_connection.py:  # 152 lines
   imports:

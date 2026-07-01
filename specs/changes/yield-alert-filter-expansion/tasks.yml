@@ -1,0 +1,42 @@
+change-id: yield-alert-filter-expansion
+status: in-progress
+tier: 2
+context-governance: v1
+tier-floor-override: "Keyword scan false-positive: 'cache'/'query'/'session' hits are generic filter_cache (confirm-only, untouched)/query_id widening/mid-session prose in docs, not auth, payments, migration, or new concurrency primitives. No login, secrets, or queue/lock wiring touched."
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "Architecture Review Required: no (change-classification.md)" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "contract-reviewer confirmed no new authored CSS (text-options-only selector change)" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no env var/flag added (change-classification.md)" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no gate/workflow change (change-classification.md)" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "Playwright yield-alert-center.spec.ts extended and passes locally; not CI-wired (pre-existing gap, ci-gates.md)" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "zero-row process_type boundary cases (AC-7/YA-12) covered; monkey/fuzz not required per classification" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "stress: no, soak: no (change-classification.md)" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env var/flag added (change-classification.md)" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "rides existing gate set, no new workflow (ci-gates.md)" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done, note: "approve-with-changes; D% label relabeled 特殊專案(D%)" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "visual: no (change-classification.md) — text-options-only selector change" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "ready-with-known-risks (approved-with-risk); qa-report.md written" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate yield-alert-filter-expansion passed" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "rides existing gate set (backend-tests.yml, frontend-tests.yml, contract-driven-gates.yml, openapi-sync.yml); passes locally per ci-gates.md" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "no new informational gate; Playwright spec extended but pre-existing not-CI-wired gap documented in ci-gates.md/qa-report.md" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly/manual gate defined for this change (ci-gates.md)" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

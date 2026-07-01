@@ -1,0 +1,14 @@
+- type: tier-floor-override
+  change-id: yield-alert-filter-expansion
+  timestamp: '2026-07-01T02:48:13.810Z'
+  declared-tier: 2
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - cache
+    - query
+    - session
+  reason: >-
+    Keyword scan false-positive: 'cache'/'query'/'session' hits are generic filter_cache
+    (confirm-only, untouched)/query_id widening/mid-session prose in docs, not auth, payments,
+    migration, or new concurrency primitives. No login, secrets, or queue/lock wiring touched.

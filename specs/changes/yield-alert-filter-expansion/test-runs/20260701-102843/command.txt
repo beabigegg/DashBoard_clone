@@ -1,0 +1,1 @@
+python -m pytest tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_routes.py tests/test_yield_alert_sql_runtime.py -q --maxfail=1 --tb=short -ra && cd frontend && npx vitest run tests/yield-alert/ tests/validation/useYieldAlert.validation.test.js tests/abort/yield-alert-abort.test.js && npm run type-check

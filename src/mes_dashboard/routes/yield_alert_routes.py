@@ -154,8 +154,8 @@ def api_yield_alert_query():
     if not start_date or not end_date:
         return validation_error("缺少必要參數: start_date, end_date")
 
-    # B4: Validate process_type — must be GA% or GC%; default to GA%
-    _VALID_PROCESS_TYPES = frozenset({"GA%", "GC%"})
+    # B4: Validate process_type — one of the 6 accepted values; default to GA%
+    _VALID_PROCESS_TYPES = frozenset({"GA%", "GC%", "GD%", "F%", "W%", "D%"})
     raw_process_type = body.get("process_type")
     if raw_process_type is None:
         process_type = "GA%"

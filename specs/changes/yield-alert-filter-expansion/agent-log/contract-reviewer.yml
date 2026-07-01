@@ -1,0 +1,22 @@
+change-id: yield-alert-filter-expansion
+agent: contract-reviewer
+status: done
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/api/api-contract.md, contracts/data/data-shape-contract.md, contracts/business/business-rules.md" }
+  - { type: version-bumps, pointer: "api-contract: 1.34.0 -> 1.35.0; data-shape-contract: 1.31.0 -> 1.32.0; business-rules: 1.37.0 -> 1.38.0; all applied by main Claude since contract-reviewer is read-only" }
+  - { type: breaking-changes, pointer: "workcenter_groups value-source swap (GET /api/yield-alert/view, GET /api/yield-alert/cross-filter-options) documented in data-shape-contract.md #3.16.5 and api-contract.md Compatibility Notes" }
+  - { type: no-edit-confirmed, pointer: "contracts/css/css-contract.md (no new authored CSS), contracts/api/api-inventory.md (no new endpoint)" }
+notes: >
+  contract-reviewer is read-only (no Edit tool); it drafted full target text for
+  all three contracts plus two implementation concerns (raw DEPARTMENT_NAME vs
+  normalized DEPARTMENT_GROUP; workcenter_groups is a net-new dimension in
+  _query_filter_options()/compute_cross_filter_options(), not a re-point of an
+  existing one; DuckDB-WASM client parity gap in useYieldAlertDuckDB.ts).
+  Main Claude applied all edits verbatim (api-contract.md via `cdd-kit contract
+  endpoint set` for the row + direct script edit for frontmatter/compat-notes/
+  changelog since those have no CLI form yet; data-shape-contract.md and
+  business-rules.md via direct Edit, outside the contract-write hook's scope).
+  Regenerated both contracts/openapi.json and contracts/api/openapi.json.
+  `cdd-kit validate --contracts` passes (contracts, API semantic, API
+  conformance, response shape, env semantic all green).
+next-action: run-test-strategist

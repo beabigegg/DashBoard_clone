@@ -1,0 +1,15 @@
+change-id: yield-alert-filter-expansion
+agent: implementation-planner
+status: done
+artifacts:
+  - { type: plan, pointer: "implementation-plan.md" }
+notes: >
+  Not blocked; all three brief assumptions verified against source (watcher
+  generalizes, process_type needs only frozenset widening, dim_specs pattern
+  extends additively). Flagged one gap beyond the brief: App.vue does not
+  currently consume workcenter_groups from /view or /cross-filter-options
+  responses (IP-8, additive). Two hard constraints for backend-engineer:
+  raw DEPARTMENT_NAME vs normalized DEPARTMENT_GROUP (pitfall #1), and
+  workcenter_groups is a net-new dim_spec, not a re-point (pitfall #2).
+  Confirmed no _CACHE_SCHEMA_VERSION bump / no spool rm needed (read-side only).
+next-action: run-backend-engineer-then-frontend-engineer

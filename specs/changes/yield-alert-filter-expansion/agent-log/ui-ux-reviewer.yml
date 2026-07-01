@@ -1,0 +1,14 @@
+change-id: yield-alert-filter-expansion
+agent: ui-ux-reviewer
+status: done
+artifacts:
+  - { type: journeys-reviewed, pointer: "yield-alert-center: process-type selector (6-option toggle-group), workcenter_groups cross-filter wiring" }
+  - { type: copy-issues, pointer: "D% label changed 其他(D%) -> 特殊專案(D%) per YA-02 (D2->PJ_NST_A 100%, not a generic catch-all); applied by main Claude to App.vue:96 and mirrored test fixture in useYieldAlert.validation.test.js:266" }
+  - { type: follow-up, pointer: "pre-existing, out-of-scope: App.vue:91 labels GA% as 封裝 vs 量產 used consistently in business-rules.md YA-02/YA-02a — flagged for separate triage, not fixed in this change" }
+notes: >
+  Verdict: approve-with-changes. Required change (D% relabel) applied.
+  6-option selector layout, CSS scoping, keyboard/AT semantics (radiogroup +
+  sr-only radio + :has(focus-visible)) all sound, no rework needed. One
+  pre-existing a11y debt item noted (no prefers-reduced-motion guard on
+  .active shimmer animation) — not introduced by this change, not blocking.
+next-action: run-qa-reviewer

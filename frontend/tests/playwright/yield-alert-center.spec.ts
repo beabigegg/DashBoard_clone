@@ -18,7 +18,8 @@
  *  7. test_empty_state_no_alerts                 — empty alerts → empty-state visible
  *  8. test_pagination_view_loads                 — /view called with page=1
  *  9. test_granularity_switch                    — granularity in query payload
- * 10. test_process_type_filter                   — process_type=GC% in payload
+ * 10. test_process_type_filter                   — process_type propagated in payload, parametrized over GC%/GD%/F%/W%/D%
+ * 10b. test_process_type_selector_shows_six_options — 6 process_type radio options render (AC-1)
  * 11. test_api_error_shows_banner                — 500 from /query → error-banner
  * 12. test_row_expand_shows_detail               — expand row → reason-detail visible
  */
@@ -652,47 +653,71 @@ test.describe('yield-alert-center', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 10. Process type filter — GC% propagated to /query payload
+  // 10. Process type filter — each process_type value propagated to /query payload
   // ──────────────────────────────────────────────────────────────────────────
-  test('test_process_type_filter', async ({ page }) => {
-    await registerCatchAllRoutes(page);
+  for (const processType of ['GC%', 'GD%', 'F%', 'W%', 'D%']) {
+    test(`test_process_type_filter (${processType})`, async ({ page }) => {
+      await registerCatchAllRoutes(page);
 
-    const capturedBodies: string[] = [];
-    await page.route('**/api/yield-alert/query**', async (route) => {
-      capturedBodies.push(route.request().postData() ?? '');
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_200_SYNC),
+      const capturedBodies: string[] = [];
+      await page.route('**/api/yield-alert/query**', async (route) => {
+        capturedBodies.push(route.request().postData() ?? '');
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(MOCK_200_SYNC),
+        });
       });
+
+      const mounted = await gotoPage(page);
+      if (!mounted) {
+        console.warn(`[yield-alert-center] test_process_type_filter (${processType}): no dev server — skip`);
+        return;
+      }
+
+      // Select the target radio button.  The <input> is visually hidden
+      // (class="sr-only") and its <label> intercepts pointer events, so
+      // clicking the input directly times out.  Click the wrapping label
+      // instead (real user interaction).
+      const radio = page.locator(`[data-testid="process-type-select"] input[value="${processType}"]`);
+      const label = page
+        .locator('[data-testid="process-type-select"] label.process-type-option')
+        .filter({ has: page.locator(`input[value="${processType}"]`) });
+      await expect(label).toBeVisible({ timeout: 10_000 });
+      await label.click();
+      await expect(radio).toBeChecked();
+
+      // Fill dates and submit
+      await page.locator('[data-testid="start-date"]').fill('2026-06-01');
+      await page.locator('[data-testid="end-date"]').fill('2026-06-20');
+      await page.locator('[data-testid="query-submit-btn"]').click();
+      await page.waitForTimeout(4_000);
+
+      expect(capturedBodies.length).toBeGreaterThan(0);
+      const payload = JSON.parse(capturedBodies[capturedBodies.length - 1]);
+      expect(payload.process_type).toBe(processType);
     });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 10b. Process type selector renders all 6 options (AC-1)
+  // ──────────────────────────────────────────────────────────────────────────
+  test('test_process_type_selector_shows_six_options', async ({ page }) => {
+    await registerCatchAllRoutes(page);
 
     const mounted = await gotoPage(page);
     if (!mounted) {
-      console.warn('[yield-alert-center] test_process_type_filter: no dev server — skip');
+      console.warn('[yield-alert-center] test_process_type_selector_shows_six_options: no dev server — skip');
       return;
     }
 
-    // Select GC% radio button.  The <input> is visually hidden (class="sr-only")
-    // and its <label> intercepts pointer events, so clicking the input directly
-    // times out.  Click the wrapping label instead (real user interaction).
-    const gcRadio = page.locator('[data-testid="process-type-select"] input[value="GC%"]');
-    const gcLabel = page
-      .locator('[data-testid="process-type-select"] label.process-type-option')
-      .filter({ has: page.locator('input[value="GC%"]') });
-    await expect(gcLabel).toBeVisible({ timeout: 10_000 });
-    await gcLabel.click();
-    await expect(gcRadio).toBeChecked();
+    await expect(page.locator('[data-testid="process-type-select"]')).toBeVisible({ timeout: 10_000 });
+    const radios = page.locator('[data-testid="process-type-select"] input[type="radio"]');
+    await expect(radios).toHaveCount(6);
 
-    // Fill dates and submit
-    await page.locator('[data-testid="start-date"]').fill('2026-06-01');
-    await page.locator('[data-testid="end-date"]').fill('2026-06-20');
-    await page.locator('[data-testid="query-submit-btn"]').click();
-    await page.waitForTimeout(4_000);
-
-    expect(capturedBodies.length).toBeGreaterThan(0);
-    const payload = JSON.parse(capturedBodies[capturedBodies.length - 1]);
-    expect(payload.process_type).toBe('GC%');
+    for (const value of ['GA%', 'GC%', 'GD%', 'F%', 'W%', 'D%']) {
+      await expect(page.locator(`[data-testid="process-type-select"] input[value="${value}"]`)).toHaveCount(1);
+    }
   });
 
   // ──────────────────────────────────────────────────────────────────────────

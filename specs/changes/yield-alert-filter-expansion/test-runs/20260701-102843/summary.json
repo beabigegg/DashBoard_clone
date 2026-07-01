@@ -1,0 +1,15 @@
+{
+  "change_id": "yield-alert-filter-expansion",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_routes.py tests/test_yield_alert_sql_runtime.py -q --maxfail=1 --tb=short -ra && cd frontend && npx vitest run tests/yield-alert/ tests/validation/useYieldAlert.validation.test.js tests/abort/yield-alert-abort.test.js && npm run type-check",
+  "duration_ms": 18981,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102843/summary.json",
+    "stdout": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102843/stdout.log",
+    "stderr": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102843/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

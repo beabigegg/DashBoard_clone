@@ -90,6 +90,10 @@ const selectedProcessType = ref('GA%');
 const PROCESS_TYPE_OPTIONS = [
   { value: 'GA%', label: '封裝 (GA%)' },
   { value: 'GC%', label: '點測 (GC%)' },
+  { value: 'GD%', label: '重工 (GD%)' },
+  { value: 'F%', label: '委外 (F%)' },
+  { value: 'W%', label: 'WIP (W%)' },
+  { value: 'D%', label: '特殊專案 (D%)' },
 ];
 
 const summary = ref({ transaction_qty: 0, scrap_qty: 0, yield_pct: 100 });
@@ -511,6 +515,7 @@ function applyFullView(payload = {}) {
   if (fo.packages?.length) packageOptions.value = fo.packages;
   if (fo.types?.length) typeOptions.value = fo.types;
   if (fo.functions?.length) functionOptions.value = fo.functions;
+  if (fo.workcenter_groups?.length) workcenterGroupOptions.value = fo.workcenter_groups;
 }
 
 async function loadCachedView(page = 1) {
@@ -838,10 +843,11 @@ async function fetchCrossFilterOptions() {
     const resp = await apiGet(`/api/yield-alert/cross-filter-options?${params.toString()}`, { timeout: 15000 });
     if (!resp.success) return;
     const fo = resp.data || {};
-    if (fo.lines?.length)     lineOptions.value     = fo.lines;
-    if (fo.packages?.length)  packageOptions.value  = fo.packages;
-    if (fo.types?.length)     typeOptions.value     = fo.types;
-    if (fo.functions?.length) functionOptions.value = fo.functions;
+    if (fo.lines?.length)             lineOptions.value            = fo.lines;
+    if (fo.packages?.length)          packageOptions.value         = fo.packages;
+    if (fo.types?.length)             typeOptions.value            = fo.types;
+    if (fo.functions?.length)         functionOptions.value        = fo.functions;
+    if (fo.workcenter_groups?.length) workcenterGroupOptions.value = fo.workcenter_groups;
   } catch (_e) {
     // Cross-filter is best-effort; silently ignore network errors
   }

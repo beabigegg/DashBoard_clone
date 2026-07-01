@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.38.0] — 2026-07-01
+### Changed
+- yield-alert-filter-expansion: YA-01 process_type enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. YA-02 rewritten as the full prefix → WIP_CLASS_CODE mapping table (verified via direct Oracle query) with mutual-exclusivity guarantee. New YA-02a documents the GA% non-split non-goal. New YA-10/YA-11/YA-12 document the `workcenter_groups` source swap (global filter_cache → per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME`) for `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` only; `GET /api/yield-alert/filter-options` and other filter_cache consumers unaffected.
+
+## [data 1.32.0] — 2026-07-01
+### Changed
+- yield-alert-filter-expansion: §3.16.4 `process_type` scope table expands from 2 to 6 rows (`GA%`/`GC%`/`GD%`/`F%`/`W%`/`D%`) with `WIP_CLASS_CODE` domain mapping. New §3.16.5 documents the `workcenter_groups` payload shape change for `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` (global `filter_cache` → per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME`; breaking value semantics, JSON key unchanged). New §3.16.6 flags the DuckDB-WASM client parity requirement. `GET /api/yield-alert/filter-options` and other `filter_cache` consumers unaffected.
+
+## [api 1.35.0] — 2026-07-01 (yield-alert-filter-expansion)
+### Changed
+- `POST /api/yield-alert/query` `process_type` enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. `GET /api/yield-alert/view` + `GET /api/yield-alert/cross-filter-options` `workcenter_groups` value source changes from global `filter_cache`/`DW_MES_SPEC_WORKCENTER_V` to per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME` (breaking shape semantics; JSON key unchanged). `GET /api/yield-alert/filter-options` unchanged.
+
 ## [api 1.34.0] — 2026-06-30
 ### Added
 - eap-alarm-coarse-filter: `GET /api/eap-alarm/product-filter-options` — new endpoint; `EapAlarmProductFilterOptionsResponse` schema.

@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.31.0
-last-changed: 2026-06-30
+schema-version: 1.32.0
+last-changed: 2026-07-01
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1057,7 +1057,7 @@ Added by change `yield-alert-spool-refactor`. Spool namespace: `tmp/query_spool/
 
 | column | type | nullable | description |
 |---|---|---|---|
-| WIP_ENTITY_NAME | VARCHAR | no | Workorder entity name; prefix determines process scope (`GA%` = packaging/assembly, `GC%` = wafer-sort/point-test) |
+| WIP_ENTITY_NAME | VARCHAR | no | Workorder entity name; prefix determines process scope — see §3.16.4 for the full `process_type` → prefix → `WIP_CLASS_CODE` mapping |
 | LINE | VARCHAR | yes | Production line identifier |
 | TYPE | VARCHAR | yes | Product type |
 | PACKAGE | VARCHAR | yes | Package type; may be `null` — `PACKAGE IS NOT NULL` filter is NOT applied (removed: 0 GA% rows have PACKAGE=NA; GC% PACKAGE=NA is valid data) |
@@ -1066,7 +1066,7 @@ Added by change `yield-alert-spool-refactor`. Spool namespace: `tmp/query_spool/
 | SCRAP_QTY | INTEGER | no | Scrap quantity (yield numerator) |
 | SOURCE_CODE | VARCHAR | yes | LOT ID (`DW_MES_WIP.CONTAINERNAME` equivalent; format `GA26020192-A00-003-01`); null for workorder-level rows. When NOT NULL, TX_QTY = 0 (scrap-only row; does not inflate the TX numerator). |
 | REJECT_LINKED | BOOLEAN | no | True when this row has a matching reject record from the reject linkage join (folded into initial spool pull; no separate Oracle `_compute_reject_linkage` query). |
-| process_type | VARCHAR | no | Process scope applied at query time: `'GA%'` or `'GC%'`. Derived from the `process_type` request parameter. |
+| process_type | VARCHAR | no | Process scope applied at query time: one of `'GA%'`, `'GC%'`, `'GD%'`, `'F%'`, `'W%'`, `'D%'`. Derived from the `process_type` request parameter. |
 
 #### 3.16.2 SOURCE_CODE Invariant
 
@@ -1080,12 +1080,38 @@ Added by change `yield-alert-spool-refactor`. Spool namespace: `tmp/query_spool/
 
 #### 3.16.4 process_type Scope
 
-| process_type | WIP_ENTITY_NAME pattern | domain |
-|---|---|---|
-| `GA%` | `LIKE 'GA%'` | Packaging / assembly |
-| `GC%` | `LIKE 'GC%'` | Wafer-sort / point-test |
+Added by change `yield-alert-filter-expansion`: 4 new `process_type` values (`GD%`, `F%`, `W%`, `D%`), expanding the closed enum from 2 to 6. Verified mutually exclusive via direct Oracle query against `DWH.ERP_WIP_MOVETXN` (6-month sample; see business-rules.md YA-02 for the full prefix census and `WIP_CLASS_CODE` cross-tab).
+
+| process_type | WIP_ENTITY_NAME pattern | domain | primary WIP_CLASS_CODE |
+|---|---|---|---|
+| `GA%` | `LIKE 'GA%'` | Packaging / assembly | 量產 (+ 9 minor classes, not split — see business-rules.md YA-02a) |
+| `GC%` | `LIKE 'GC%'` | Wafer-sort / point-test | 點測 |
+| `GD%` | `LIKE 'GD%'` | Rework | 重工RW |
+| `F%` | `LIKE 'F%'` | Outsourcing (covers `F2`/`FA`/`FB` prefixes) | 委外 |
+| `W%` | `LIKE 'W%'` | WIP (covers `W2` prefix) | 量產 (majority) + PJ_NST_A (minor) |
+| `D%` | `LIKE 'D%'` | Other (covers `D2` prefix) | PJ_NST_A |
 
 **Breaking-change surface:** column add/remove/rename to `yield_alert_dataset` parquet orphans existing files. `rm -f tmp/query_spool/yield_alert_dataset/*.parquet` required on both deploy and rollback.
+
+#### 3.16.5 workcenter_groups Payload Shape Change (yield-alert-center only)
+
+Added by change `yield-alert-filter-expansion`. Applies to `data.filter_options.workcenter_groups` in `GET /api/yield-alert/view` and `data.workcenter_groups` in `GET /api/yield-alert/cross-filter-options`.
+
+| aspect | before | after |
+|---|---|---|
+| source | global `filter_cache.get_workcenter_groups()` (`DWH.DW_MES_SPEC_WORKCENTER_V`) | `SELECT DISTINCT DEPARTMENT_NAME` against the `query_id` spool parquet (same mechanism as `lines`/`packages`/`types`/`functions`) |
+| display transform | `_YIELD_WORKCENTER_GROUP_ORDER` / `_DEPT_SEQ_MAP` grouping + fixed ordering | none — raw spool `DEPARTMENT_NAME` string values, sorted alphabetically (same convention as the other filter dimensions) |
+| query-dependence | independent of `query_id` / `process_type` — identical across all queries | scoped to the current `query_id`; varies by `process_type` because each process_type has its own spool |
+| empty-spool / zero-row behavior | N/A (always non-empty; independent source) | empty array when the spool has zero matching rows (e.g. a new process_type with no data yet) — not an error |
+| column source | n/a | `DEPARTMENT_NAME` (raw, trimmed-only spool column) — explicitly **not** `DEPARTMENT_GROUP` (the separately normalized column already used by `_normalize_yield_department_group()` for heatmap/station_summary aggregation elsewhere in this module) |
+
+**Not affected:** `GET /api/yield-alert/filter-options` (the initial-load dropdown-seed endpoint) continues to read `filter_cache.get_workcenter_groups()` unchanged. Every other page/consumer of `filter_cache.get_workcenter_groups()` (e.g. `material_trace_routes.py`, `downtime_worker.py`) is unaffected — this change re-points only the two yield-alert-center endpoints named above.
+
+**Breaking-change note:** the JSON key `workcenter_groups` is unchanged in both endpoints, but its value semantics change (raw vs. grouped, query-dependent vs. static). Any caller that cached these values across a `process_type` switch, or matched them against the old grouped display names, will observe different values after this change ships. Sole known consumer: `frontend/src/yield-alert-center/App.vue`, updated in the same change (atomic cutover, no deprecation window — same precedent as `nav-config-to-code`).
+
+#### 3.16.6 DuckDB-WASM Client Parity Gap (flag for implementation)
+
+`frontend/src/yield-alert-center/useYieldAlertDuckDB.ts` independently reimplements filter-options computation for the browser-side large-dataset path (used when row count crosses the DuckDB-WASM threshold). As of `yield-alert-filter-expansion`, this client-side path must gain the same `SELECT DISTINCT DEPARTMENT_NAME` dimension as the server-side `_query_filter_options()` / `compute_cross_filter_options()`, or large queries that switch to WASM mode mid-session will silently lose `workcenter_groups` cross-filtering. Implementation must keep both paths in parity.
 
 ---
 
@@ -1526,6 +1552,10 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ---
 
 ## CHANGELOG
+## [data 1.32.0] — 2026-07-01
+### Changed
+- yield-alert-filter-expansion: §3.16.4 `process_type` scope table expands from 2 to 6 rows (`GA%`/`GC%`/`GD%`/`F%`/`W%`/`D%`) with `WIP_CLASS_CODE` domain mapping. New §3.16.5 documents the `workcenter_groups` payload shape change for `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` (global `filter_cache` → per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME`; breaking value semantics, JSON key unchanged). New §3.16.6 flags the DuckDB-WASM client parity requirement. `GET /api/yield-alert/filter-options` and other `filter_cache` consumers unaffected.
+
 ## [data 1.28.0] — 2026-06-29
 ### Added
 - msd-type-package-filter: §2.13 (MSD Container-Filter-Options Response — GET /api/mid-section-defect/container-filter-options). Shape mirrors §2.7 (production-history filter-options): data={pj_types, packages, bops, pj_functions} arrays; meta={updated_at, schema_version} (D-CR-01: not in data). Same Redis key and 24h TTL as §2.7 (shared container_filter_cache). bops/pj_functions returned but not consumed by analysis endpoint. Analysis response shape unchanged under pj_types[]/packages[] filtering. Additive; no existing schemas changed.

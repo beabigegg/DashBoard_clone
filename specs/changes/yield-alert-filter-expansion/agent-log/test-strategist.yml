@@ -1,0 +1,29 @@
+change-id: yield-alert-filter-expansion
+agent: test-strategist
+status: done
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/yield-alert-filter-expansion/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_yield_alert_routes.py::test_query_accepts_each_new_process_type -> src/mes_dashboard/routes/yield_alert_routes.py::api_yield_alert_query" }
+  - { type: tdd-pairs, pointer: "tests/test_yield_alert_dataset_cache.py::test_process_type_like_patterns_mutually_exclusive -> src/mes_dashboard/services/yield_alert_dataset_cache.py::_load_primary_detail_df" }
+  - { type: tdd-pairs, pointer: "tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions::test_compute_cross_filter_options_includes_departments_dimension -> src/mes_dashboard/services/yield_alert_sql_runtime.py::compute_cross_filter_options" }
+  - { type: tdd-pairs, pointer: "tests/test_yield_alert_sql_runtime.py::TestQueryFilterOptions::test_query_filter_options_returns_departments_from_spool_distinct -> src/mes_dashboard/services/yield_alert_sql_runtime.py::_query_filter_options" }
+  - { type: tdd-pairs, pointer: "frontend/tests/yield-alert/useYieldAlertDuckDB.departments.test.js::test_query_filter_options_includes_departments -> frontend/src/yield-alert-center/useYieldAlertDuckDB.ts::queryFilterOptions" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, e2e, data-boundary" }
+  - { type: mapping-completeness, pointer: "AC-1..AC-8 all mapped; resilience/fuzz/stress/soak explicitly out of scope per change-classification.md" }
+notes: >
+  Existing backend test files found via .cdd/code-map.yml (fresh, generated
+  2026-07-01): tests/test_yield_alert_routes.py, tests/test_yield_alert_dataset_cache.py,
+  tests/test_yield_alert_sql_runtime.py — extended these rather than creating new files.
+  Confirmed via source read (yield_alert_sql_runtime.py compute_cross_filter_options,
+  lines 794-799) that "departments" is already referenced in other_filter_keys_to_apply
+  lists but has no dim_spec entry — net-new dimension, matches contract-reviewer's
+  concern #1. Confirmed _build_dimension_filter_sql col_map uses DEPARTMENT_GROUP
+  (line 156) for the existing "departments" key used elsewhere (dept_proc_only path);
+  the new spool-DISTINCT dimension must use raw DEPARTMENT_NAME per contract-reviewer's
+  concern #2 (data-shape-contract.md §3.16.5) — flagged as its own test
+  (test_departments_use_raw_department_name_not_department_group).
+  Existing test_yield_alert_sql_runtime.py::TestCrossFilterOptions fixture (line ~104)
+  has no DEPARTMENT_NAME column — flagged as required fixture extension in Test Update
+  Contract. tests/property/test_cross_filter.py has zero yield-alert references
+  (grep-confirmed) — left out of scope, not force-extended.
+next-action: run-implementation-planner (or backend-engineer if plan already exists)

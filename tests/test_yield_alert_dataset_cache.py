@@ -752,18 +752,73 @@ def test_process_type_gc_uses_gc_pattern(monkeypatch):
     )
 
 
-def test_primary_query_id_differs_for_ga_and_gc():
-    """B2: _make_query_id must produce different IDs for GA% and GC% process_type."""
-    id_ga = dataset_cache._make_query_id({
-        "cache_schema_version": dataset_cache._CACHE_SCHEMA_VERSION,
-        "start_date": "2026-02-01",
-        "end_date": "2026-02-28",
-        "process_type": "GA%",
-    })
-    id_gc = dataset_cache._make_query_id({
-        "cache_schema_version": dataset_cache._CACHE_SCHEMA_VERSION,
-        "start_date": "2026-02-01",
-        "end_date": "2026-02-28",
-        "process_type": "GC%",
-    })
-    assert id_ga != id_gc, "GA% and GC% must produce distinct cache/query IDs"
+_ALL_PROCESS_TYPES = ("GA%", "GC%", "GD%", "F%", "W%", "D%")
+
+
+def test_primary_query_id_differs_for_each_process_type():
+    """AC-3: _make_query_id must produce a distinct query_id per process_type value
+    across the full 6-value enum (GA%/GC%/GD%/F%/W%/D%)."""
+    ids = {
+        pt: dataset_cache._make_query_id({
+            "cache_schema_version": dataset_cache._CACHE_SCHEMA_VERSION,
+            "start_date": "2026-02-01",
+            "end_date": "2026-02-28",
+            "process_type": pt,
+        })
+        for pt in _ALL_PROCESS_TYPES
+    }
+    assert len(set(ids.values())) == len(_ALL_PROCESS_TYPES), (
+        f"All 6 process_type values must produce distinct query_ids, got {ids}"
+    )
+
+
+def test_process_type_like_patterns_mutually_exclusive():
+    """AC-3 / YA-02: the 6 process_type LIKE patterns must be mutually exclusive —
+    a given WIP_ENTITY_NAME value matches exactly one pattern (never zero, never two+),
+    for all 8 observed prefixes (GA, GC, GD, F2, FA, FB, D2, W2)."""
+    import fnmatch
+
+    observed_prefixes = {
+        "GA26020192-A00-003-01": "GA%",
+        "GC12345678-A00-001-01": "GC%",
+        "GD98765432-A00-002-01": "GD%",
+        "F212345678-A00-001-01": "F%",
+        "FA12345678-A00-001-01": "F%",
+        "FB12345678-A00-001-01": "F%",
+        "D212345678-A00-001-01": "D%",
+        "W212345678-A00-001-01": "W%",
+    }
+
+    for wip_entity_name, expected_pattern in observed_prefixes.items():
+        matches = [
+            pt for pt in _ALL_PROCESS_TYPES
+            if fnmatch.fnmatchcase(wip_entity_name, pt.replace("%", "*"))
+        ]
+        assert matches == [expected_pattern], (
+            f"{wip_entity_name} must match exactly {expected_pattern}, got {matches}"
+        )
+
+
+def test_process_type_f_uses_f_pattern():
+    """AC-3: F% must not match GA/GC/GD/D/W-prefixed values, and vice versa —
+    the mutual-exclusivity guarantee explicitly called out for F% in the plan."""
+    import fnmatch
+
+    f_prefixed = ["F212345678-A00-001-01", "FA12345678-A00-001-01", "FB12345678-A00-001-01"]
+    non_f_prefixed = [
+        "GA26020192-A00-003-01",
+        "GC12345678-A00-001-01",
+        "GD98765432-A00-002-01",
+        "D212345678-A00-001-01",
+        "W212345678-A00-001-01",
+    ]
+
+    for name in f_prefixed:
+        assert fnmatch.fnmatchcase(name, "F*"), f"{name} must match F%"
+        for other in ("GA%", "GC%", "GD%", "D%", "W%"):
+            assert not fnmatch.fnmatchcase(name, other.replace("%", "*")), (
+                f"{name} (F% value) must NOT also match {other}"
+            )
+
+    for name in non_f_prefixed:
+        assert not fnmatch.fnmatchcase(name, "F*"), f"{name} must NOT match F%"

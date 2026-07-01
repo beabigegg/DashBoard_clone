@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.37.0
-last-changed: 2026-06-30
+schema-version: 1.38.0
+last-changed: 2026-07-01
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -165,8 +165,9 @@ breaking-change-policy: deprecate-2-minors
 
 | rule id | name | current behavior | tests |
 |---|---|---|---|
-| YA-01 | Process-type scope | `POST /api/yield-alert/query` accepts optional `process_type` field (enum: `"GA%"` = packaging/assembly default, `"GC%"` = wafer-sort/point-test). Applied as `WIP_ENTITY_NAME LIKE process_type` at Oracle query time. All downstream views (trend, summary, heatmap, alerts) are scoped to the same process type via the spool. Omitting `process_type` defaults to `"GA%"` (backward-compatible). Any value not in `{"GA%","GC%"}` → 400 `VALIDATION_ERROR`. | route tests |
-| YA-02 | GA%/GC% distinction | GA% (`WIP_ENTITY_NAME LIKE 'GA%'`) covers packaging/assembly workorders. GC% (`WIP_ENTITY_NAME LIKE 'GC%'`) covers wafer-sort/point-test workorders. Both reside in the same Oracle tables. They are NOT interchangeable: GC% PACKAGE=NA is valid data; GA% PACKAGE=NA has 0 rows. No filter should conflate the two. | route tests |
+| YA-01 | Process-type scope | `POST /api/yield-alert/query` accepts optional `process_type` field — closed enum `{"GA%","GC%","GD%","F%","W%","D%"}`, default `"GA%"`. Applied as `WIP_ENTITY_NAME LIKE process_type` at Oracle query time. All downstream views (trend, summary, heatmap, alerts) are scoped to the same process type via the spool. `process_type` is also one of the `query_id` hash inputs — each value produces its own spool file, so switching values never reuses another value's cached data. Omitting `process_type` defaults to `"GA%"` (backward-compatible). Any value not in the enum → 400 `VALIDATION_ERROR`. | route tests |
+| YA-02 | process_type → WIP_ENTITY_NAME prefix → WIP_CLASS_CODE mapping | Verified by direct Oracle query against `DWH.ERP_WIP_MOVETXN` (6-month sample, near-exhaustive prefix census): `WIP_ENTITY_NAME` has exactly 8 observed 2-char prefixes (`GA`, `GC`, `GD`, `F2`, `FA`, `FB`, `D2`, `W2`), collapsing to 4 leading letters (`G`, `F`, `D`, `W`). Mapping: `GA%`→量產 (majority) + 9 minor `WIP_CLASS_CODE` values (see YA-02a); `GC%`→點測 (100%); `GD%`→重工RW (100%); `F%` (covers `F2`/`FA`/`FB`)→委外 (100%); `W%` (covers `W2`)→量產 (390 rows) + PJ_NST_A (9 rows); `D%` (covers `D2`)→PJ_NST_A (100%). The 6 LIKE patterns are mutually exclusive by construction (disjoint leading-character sets: `GA%`/`GC%`/`GD%` are 2-char-exact prefixes under the shared `G` letter and do not overlap each other; `F%`, `W%`, `D%` are single-leading-letter patterns disjoint from `G%` and from each other). A future `WIP_ENTITY_NAME` prefix outside these 8 (e.g. a hypothetical new `GB%`) would match none of the 6 options and remain invisible — not silently miscounted into an existing bucket. | unit tests (query_id hash + LIKE-pattern disjointness assertions) |
+| YA-02a | GA% is not sub-split by WIP_CLASS_CODE | GA% remains a single `process_type` option despite internally covering 10 distinct `WIP_CLASS_CODE` values (量產, 代工, 樣品, 工程, 餘晶, 已驗證, 久存, WIP, 試量產, 打帶跑 — 量產 is the overwhelming majority). This change does not split GA% further; a future change may. | n/a (non-goal, documented for traceability) |
 | YA-03 | PACKAGE IS NOT NULL filter removal | The `PACKAGE IS NOT NULL` predicate is removed from all GA% queries. Rationale: verified by direct Oracle query — zero GA% workorder rows have PACKAGE=NA. The filter was redundant and added unnecessary exclusion risk. For GC%, PACKAGE=NA is valid data and must never be filtered. | data-invariant test |
 | YA-04 | SOURCE_CODE NOT NULL ⇒ TX_QTY=0 | When `ERP_WIP_MOVETXN_DETAIL.SOURCE_CODE IS NOT NULL`, the row is a LOT-level scrap attribution row and its `TRANSACTION_QTY` (TX) is always 0. Verified by direct Oracle query: 100% of SOURCE_CODE NOT NULL rows have TX=0. These rows MUST NOT be summed into the TX denominator. The yield formula (`SCRAP_QTY / TX_QTY`) at workorder grain is unchanged. | unit tests (data-invariant assertion) |
 | YA-05 | LOT dimension in alert list | The alert list (`GET /api/yield-alert/alerts`) exposes `source_code: string \| null` per row. Non-null `source_code` identifies the LOT ID (`DW_MES_WIP.CONTAINERNAME` equivalent) responsible for the scrap. This adds display precision without changing alert-level scrap totals or yield thresholds. Alert triggering logic operates on workorder-grain aggregates that exclude TX=0 rows (YA-04). | route + unit tests |
@@ -174,6 +175,9 @@ breaking-change-policy: deprecate-2-minors
 | YA-07 | Reject linkage in single spool pull | The `REJECT_LINKED` boolean flag for each spool row is computed during the initial Oracle pull (by joining against the reject table in the same query). The prior separate `_compute_reject_linkage` Oracle query after the main pull is retired. | unit + integration tests |
 | YA-08 | ERP_WIP_MOVETXN_DETAIL as data source | Trend and summary aggregations use `ERP_WIP_MOVETXN_DETAIL` (row-level detail table) instead of `ERP_WIP_MOVETXN` (pre-aggregated). Verified by direct Oracle comparison: GA% totals identical (TX=70,494,377, SCRAP=81,972). `ERP_WIP_MOVETXN_DETAIL` provides `SOURCE_CODE` (LOT ID) which the aggregate table does not. | parity test (totals match) |
 | YA-09 | Spool schema version | `yield_alert_dataset_cache.py` contains a `_SCHEMA_VERSION` integer constant that participates in the spool cache key. Bumping `_SCHEMA_VERSION` orphans stale parquets by key without requiring a manual `rm`. Any column add/remove/rename MUST bump `_SCHEMA_VERSION` in the same commit. Schema-breaking rollback also requires: `rm -f tmp/query_spool/yield_alert_dataset/*.parquet`. | env-validation / constant-pin test |
+| YA-10 | workcenter_groups computed from spool, not global cache | For `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` ONLY, `workcenter_groups` is computed as `SELECT DISTINCT DEPARTMENT_NAME` against the `query_id` spool — the same mechanism already used for `lines`/`packages`/`types`/`functions`/`process_categories`. It no longer reads the global `filter_cache.get_workcenter_groups()` (`DWH.DW_MES_SPEC_WORKCENTER_V`) or applies the `_YIELD_WORKCENTER_GROUP_ORDER`/`_DEPT_SEQ_MAP` grouping/ordering layer for this page. The source column is `DEPARTMENT_NAME` (raw, trimmed-only) — explicitly not `DEPARTMENT_GROUP` (the normalized column `_normalize_yield_department_group()` produces for heatmap/station_summary aggregation elsewhere in this module). | integration tests (spool-derived, cross-filter narrowing) |
+| YA-11 | Shared filter_cache path unaffected | `GET /api/yield-alert/filter-options` (the initial-load dropdown-seed endpoint) and every other page/consumer of `filter_cache.get_workcenter_groups()` are unchanged by YA-10 — this rule re-points only the two yield-alert-center endpoints named above, not the shared cache itself. | regression test (other filter_cache consumers unaffected) |
+| YA-12 | workcenter_groups empty-spool behavior | When the `query_id` spool has zero rows for the current filter selection (e.g. a new `process_type` value with no matching data yet), `workcenter_groups` returns an empty array — not an error — consistent with the empty-result handling of the other filter dimensions (YA-01/YA-02 new process_type values must not 500 on zero rows). | data-boundary test |
 
 ## Reject-History Prefilter Rules
 
@@ -412,6 +416,10 @@ The 焊接_DB workcenter group contains the following 12 DB process SPECs (autho
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.38.0] — 2026-07-01
+### Changed
+- yield-alert-filter-expansion: YA-01 process_type enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. YA-02 rewritten as the full prefix → WIP_CLASS_CODE mapping table (verified via direct Oracle query) with mutual-exclusivity guarantee. New YA-02a documents the GA% non-split non-goal. New YA-10/YA-11/YA-12 document the `workcenter_groups` source swap (global filter_cache → per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME`) for `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` only; `GET /api/yield-alert/filter-options` and other filter_cache consumers unaffected.
 
 ## [business 1.32.0] — 2026-06-26
 ### Added

@@ -1,0 +1,15 @@
+{
+  "change_id": "yield-alert-filter-expansion",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/validation/useYieldAlert.validation.test.js tests/yield-alert/App.cross-filter.test.js tests/yield-alert/useYieldAlertDuckDB.departments.test.js",
+  "duration_ms": 2672,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102625/summary.json",
+    "stdout": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102625/stdout.log",
+    "stderr": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102625/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

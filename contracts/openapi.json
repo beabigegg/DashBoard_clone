@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.34.0"
+    "version": "1.35.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -2203,7 +2203,7 @@
           }
         ],
         "requestBody": {
-          "description": "Contract request: JSON body `{start_date, end_date, process_type (opt, enum: GA% or GC%, default GA%), lines[], packages[], types[]}` (schema not machine-resolved; see contract)",
+          "description": "Contract request: JSON body `{start_date, end_date, process_type (opt, closed enum: GA%/GC%/GD%/F%/W%/D%, default GA%), lines[], packages[], types[]}` (schema not machine-resolved; see contract)",
           "content": {},
           "x-cdd-unresolved": true
         },

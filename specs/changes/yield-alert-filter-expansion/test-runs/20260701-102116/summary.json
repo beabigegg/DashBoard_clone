@@ -1,0 +1,15 @@
+{
+  "change_id": "yield-alert-filter-expansion",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts",
+  "duration_ms": 1625,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102116/summary.json",
+    "stdout": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102116/stdout.log",
+    "stderr": "specs/changes/yield-alert-filter-expansion/test-runs/20260701-102116/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

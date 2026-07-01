@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.34.0
-last-changed: 2026-06-30
+schema-version: 1.35.0
+last-changed: 2026-07-01
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -140,7 +140,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/reject-history/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
 | GET | /api/reject-history/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | POST | /api/reject-history/view | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
-| POST | /api/yield-alert/query | required | JSON body `{start_date, end_date, process_type (opt, enum: GA% or GC%, default GA%), lines[], packages[], types[]}` | GenericSuccessResponse | 202/400/500 | route tests |
+| POST | /api/yield-alert/query | required | JSON body `{start_date, end_date, process_type (opt, closed enum: GA%/GC%/GD%/F%/W%/D%, default GA%), lines[], packages[], types[]}` | GenericSuccessResponse | 202/400/500 | route tests |
 | GET | /api/yield-alert/job/{job_id} | required | — | JobStatusResponse | 404 | route tests |
 | POST | /api/yield-alert/analyze | required | JSON body | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/yield-alert/view | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
@@ -448,6 +448,7 @@ breaking-change-policy: deprecate-2-minors
 
 
 - **eap-alarm-analysis (2026-06-18)**: New endpoint family `/api/eap-alarm/*` (7 endpoints). All auth required; Type B async (POST /spool → 202 → poll /api/job/<id>?prefix=eap-alarm). Spool key: `eap_alarm:{date_from}:{date_to}:{sorted_eqp_types_hash}`; namespace `eap_alarm` added to `_ALLOWED_NAMESPACES`. Fine-filter options (alarm_text, alarm_category, equipment_id) derived from DuckDB spool only — no Oracle re-query (EA-02). AlarmCategory decoded server-side per EA-05 decode table. Navigation: new "EAP" top-level category in portal shell. Additive; no existing endpoints changed.
+- **yield-alert-filter-expansion (2026-07-01):** `POST /api/yield-alert/query` `process_type` accepted-value enum expands from `{GA%, GC%}` to `{GA%, GC%, GD%, F%, W%, D%}` (additive for existing callers sending GA%/GC%; new values unlock previously-invisible ~1.65% of `ERP_WIP_MOVETXN_DETAIL` transactions). `process_type` remains a `query_id` hash input, so each of the 6 values produces its own spool file — GA/GC spool behavior is unchanged. BREAKING (shape semantics, not JSON key): `GET /api/yield-alert/view` (`data.filter_options.workcenter_groups`) and `GET /api/yield-alert/cross-filter-options` (`data.workcenter_groups`) now compute `workcenter_groups` as `SELECT DISTINCT DEPARTMENT_NAME` (raw spool column) against the query_id spool — same mechanism as `lines`/`packages`/`types`/`functions` — instead of the global, query-independent `filter_cache.get_workcenter_groups()` (`DWH.DW_MES_SPEC_WORKCENTER_V`) with `_YIELD_WORKCENTER_GROUP_ORDER`/`_DEPT_SEQ_MAP` grouping. Values now vary by query_id/process_type and are no longer grouped/ordered display names. `GET /api/yield-alert/filter-options` (separate endpoint, initial dropdown seed) and the shared `filter_cache` path used by other pages are unchanged. See data-shape-contract.md §3.16.4/§3.16.5 and business-rules.md YA-01/YA-02/YA-10/YA-11. Sole consumer: `frontend/src/yield-alert-center/`. No external partners or mobile consumers known.
 
 ## Breaking Change Policy
 
@@ -466,6 +467,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.35.0] — 2026-07-01 (yield-alert-filter-expansion):** `POST /api/yield-alert/query` `process_type` enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. `GET /api/yield-alert/view` + `GET /api/yield-alert/cross-filter-options` `workcenter_groups` value source changes from global `filter_cache`/`DW_MES_SPEC_WORKCENTER_V` to per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME` (breaking shape semantics; JSON key unchanged). `GET /api/yield-alert/filter-options` unchanged.
 - **[api 1.34.0] — 2026-06-30 (eap-alarm-coarse-filter):** `POST /api/eap-alarm/spool` gains `lot_ids[]`, `pj_types[]`, `product_lines[]`, `pj_bops[]` (all optional); `eqp_types[]` now optional; at-least-one-of-three validation (EA-08). New `GET /api/eap-alarm/product-filter-options` — reads `container_filter_cache`, maps `packages→product_lines` and `bops→pj_bops`; cold-cache = empty arrays (not 500). Spool key hash extended to all 5 dims; `_SCHEMA_VERSION` 2→3. New schema `EapAlarmProductFilterOptionsResponse`. Additive for clients that always supply `eqp_types`.
 - **[api 1.33.0] — 2026-06-30 (msd-forward-cause-effect):** `GET /api/mid-section-defect/analysis?direction=forward` gains `by_detection_loss_reason[]`, `loss_reason_workcenter_crosstab`, `downstream_trend[]`, `amplification`; schema `MsdForwardAnalysisResponse`. Detail gains `DETECTION_LOSS_REASON`; schema `MsdForwardDetailResponse`. Additive.
 - **[api 1.32.0] — 2026-06-29 (msd-type-package-filter):** New `GET /api/mid-section-defect/container-filter-options?selected=<json>` — cross-filter cached options for Type/Package FilterBar MultiSelects; reuses shared `container_filter_cache`; no Oracle at request time; 400 on malformed `selected` JSON; 500 on Oracle build error; response schema `MsdContainerFilterOptionsResponse`. `GET /api/mid-section-defect/analysis` gains optional `pj_types[]` and `packages[]` multi-value query params (absent/empty = no restriction; AND-semantics when both present; post-query filter on detection_df BEFORE spool derivation). Both params added to analysis result cache key to prevent collision. Additive; no existing fields removed or renamed.

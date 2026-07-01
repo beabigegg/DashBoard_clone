@@ -1,0 +1,1 @@
+cd frontend && npx vitest run tests/validation/useYieldAlert.validation.test.js tests/yield-alert/App.cross-filter.test.js tests/yield-alert/useYieldAlertDuckDB.departments.test.js

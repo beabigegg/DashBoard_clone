@@ -1,0 +1,1 @@
+cd frontend && npx vitest run tests/yield-alert/ tests/validation/useYieldAlert.validation.test.js tests/abort/yield-alert-abort.test.js && npm run type-check

@@ -1,0 +1,94 @@
+agent: backend-engineer
+change-id: yield-alert-filter-expansion
+status: done
+summary: >-
+  Implemented IP-1 (process_type enum widened to 6 values in
+  yield_alert_routes.py), confirmed IP-2/IP-5 as no-edit-required, and
+  implemented IP-3/IP-4 (net-new workcenter_groups dimension, sourced from raw
+  DEPARTMENT_NAME, added to _query_filter_options() and
+  compute_cross_filter_options() in yield_alert_sql_runtime.py). Extended
+  backend unit/integration tests per test-plan.md Test Update Contract before
+  editing source (TDD). Both handoff pitfalls confirmed respected: raw
+  DEPARTMENT_NAME used (not DEPARTMENT_GROUP), and workcenter_groups is an
+  additive net-new dim_spec (not a rename/repurpose of the existing
+  `departments` filter-apply key). IP-5's "no edit needed" assumption held —
+  verified apply_view()/try_compute_view_from_spool() pass filter_options
+  through unchanged; apply_cached_view (routes import alias) is literally
+  apply_view, no separate function.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/yield_alert_routes.py:157-158" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/yield_alert_sql_runtime.py:731-768 (_query_filter_options: +workcenter_groups dim reading raw DEPARTMENT_NAME)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/yield_alert_sql_runtime.py:773-838 (compute_cross_filter_options: +DEPARTMENT_NAME dim_spec, +workcenter_groups wired into every existing spec's other_filter_keys_to_apply)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_query_accepts_each_new_process_type[GA%/GC%/GD%/F%/W%/D%] (parametrized, AC-2)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_query_requires_valid_process_type (extended: near-miss 'G%' 400s under 6-value enum)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_view_workcenter_groups_sourced_from_spool_not_filter_cache (AC-5/YA-10 regression: get_yield_workcenter_group_options NOT called by /view)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_cross_filter_options_workcenter_groups_from_spool (AC-5/YA-10 regression: get_yield_workcenter_group_options NOT called by /cross-filter-options)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_filter_options_still_uses_filter_cache (AC-8/YA-11 regression guard: /filter-options still calls get_yield_workcenter_group_options)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_view_new_process_type_zero_rows_returns_empty_not_error (AC-7/YA-12 data-boundary)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_view_supports_workcenter_group_filters (extended: asserts spool-derived filter_options.workcenter_groups)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_cross_filter_options_forwards_query_id_and_filters (extended: asserts workcenter_groups in response)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_dataset_cache.py::test_primary_query_id_differs_for_each_process_type (renamed from _for_ga_and_gc, 6-way, AC-3)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_dataset_cache.py::test_process_type_like_patterns_mutually_exclusive (AC-3/YA-02, all 8 observed WIP_ENTITY_NAME prefixes)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_dataset_cache.py::test_process_type_f_uses_f_pattern (AC-3: F% disjoint from GA/GC/GD/D/W)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestQueryFilterOptions::test_query_filter_options_returns_departments_from_spool_distinct (AC-5, raw DEPARTMENT_NAME, exclude-set, sort convention)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestQueryFilterOptions::test_query_filter_options_empty_spool_returns_empty_workcenter_groups (AC-7/YA-12)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions::test_compute_cross_filter_options_includes_departments_dimension (AC-5)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions::test_departments_use_raw_department_name_not_department_group (Pitfall #1 proof: DEPARTMENT_NAME finer-grained than DEPARTMENT_GROUP in fixture)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions::test_selecting_department_narrows_lines_packages_types_functions (AC-6, direction 1)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions::test_selecting_line_narrows_departments (AC-6, direction 2, reverse narrowing)" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestCrossFilterOptions::test_workcenter_groups_change_with_process_type_query_id (AC-6, query_id-scoped variance)" }
+  - { type: test-output, pointer: "conda run -n mes-dashboard pytest tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_routes.py tests/test_yield_alert_sql_runtime.py tests/test_yield_alert_service.py tests/test_yield_alert_contracts.py -q -> 115 passed in 2.52s" }
+  - { type: test-output, pointer: "full suite: conda run -n mes-dashboard pytest tests/ --ignore=tests/e2e --ignore=tests/stress -q -> 1 failed (tests/test_runtime_hardening.py::test_health_reports_pool_saturation_degraded_reason, unrelated pre-existing failure, no yield_alert/process_type/workcenter reference, not caused by this change), 5131 passed, 285 skipped, 1 xfailed" }
+  - { type: contracts-touched, pointer: "none — all contract edits pre-applied by contract-reviewer per implementation-plan.md Contract Updates; confirmed cdd-kit validate --contracts green post-implementation" }
+artifacts-note: >-
+  Contract sample churn: full pytest run regenerated tests/contract/samples/*
+  (169 files, timestamp-only diffs). Inspected all yield-alert sample diffs —
+  every changed yield-alert sample is a 404/failure envelope (timestamp field
+  only; capture harness has no live query_id/spool fixture), none reflect the
+  new workcenter_groups success-payload shape. Ran `git checkout
+  tests/contract/samples/` to revert all churn per CLAUDE.md Promoted
+  Learnings; nothing yield-alert-specific needed re-staging.
+pitfall-confirmation:
+  pitfall-1-raw-vs-normalized-column: >-
+    CONFIRMED respected. _query_filter_options() reads CAST(DEPARTMENT_NAME AS
+    VARCHAR) (yield_alert_sql_runtime.py:731-753), NOT DEPARTMENT_GROUP.
+    compute_cross_filter_options() dim_specs uses DEPARTMENT_NAME as the col
+    for the new "workcenter_groups" key (line ~799). _build_dimension_filter_sql
+    col_map (departments -> DEPARTMENT_GROUP, lines 155-158) left untouched —
+    that filter-apply mechanism is unchanged. Proven by test
+    test_departments_use_raw_department_name_not_department_group with a
+    fixture where two DEPARTMENT_NAME values collapse to one DEPARTMENT_GROUP.
+  pitfall-2-additive-not-repoint: >-
+    CONFIRMED respected. Added a 5th tuple ("DEPARTMENT_NAME",
+    "workcenter_groups", [...]) to dim_specs — did not rename/remove any of
+    the 4 existing tuples (lines/packages/types/functions). Added
+    "workcenter_groups" to every existing spec's other_filter_keys_to_apply
+    list (both directions of cross-filter narrowing); the DEPARTMENT_NAME dim
+    spec's own other_keys list points back at
+    departments/lines/packages/types/functions (excluding itself).
+  ip5-confirm-only-verified: >-
+    TRUE, no edit needed. Read yield_alert_dataset_cache.py:891-970
+    (apply_view): try_compute_view_from_spool() returns sql_result whose
+    "filter_options" key is _query_filter_options(conn)'s return value
+    unmodified (yield_alert_sql_runtime.py:944, 959); apply_view returns
+    "filter_options": sql_result["filter_options"] verbatim (line 969). routes
+    import "apply_view as apply_cached_view" (yield_alert_routes.py:32) — it
+    is the same function, not a separate implementation. Once IP-3 added
+    workcenter_groups to _query_filter_options()'s dict, it flowed through
+    automatically with zero further edits. Also confirmed
+    /cross-filter-options route (yield_alert_routes.py:643-647) passes
+    compute_cross_filter_options()'s full return dict straight into
+    success_response(result) with no key allow-list, so workcenter_groups
+    surfaces there automatically too.
+ya11-ac8-regression-confirmed: >-
+  GET /api/yield-alert/filter-options handler (yield_alert_routes.py:613-626)
+  untouched; still calls get_yield_workcenter_group_options() ->
+  filter_cache.get_workcenter_groups(). filter_cache.py and
+  config/workcenter_groups.py confirmed untouched via git diff --stat (no
+  output). New regression test test_filter_options_still_uses_filter_cache
+  added; test_get_yield_workcenter_group_options_applies_dw_merge in
+  test_yield_alert_service.py (pre-existing) still passes.
+known-risks:
+  - "tests/test_runtime_hardening.py::test_health_reports_pool_saturation_degraded_reason fails on full-suite run; unrelated to this change's scope (resilience/recovery-recommendation assertion, no yield-alert/process_type/workcenter reference); not fixed here per scope boundary, flagged for triage as a separate pre-existing issue."
+  - "Parallel frontend-engineer session running concurrently overwrote this agent's collect/targeted/changed-area test-evidence.yml phase rows with frontend-only vitest commands (per this repo's known parallel-session-entanglement pattern). Re-ran all three phases with combined backend-pytest + frontend-vitest commands so evidence reflects both agents' scope; final-status: passed for all required phases."
+next-reviewer: frontend-engineer (IP-6/IP-7/IP-8 already appear in-progress/complete per git status; verify parity) and ci-cd-gatekeeper / test-strategist for gate sign-off
