@@ -10,7 +10,7 @@ import { isDuckDBSupported } from '../core/duckdb-client';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import { replaceRuntimeHistory } from '../core/shell-navigation';
 import { useFilterOrchestrator } from '../shared-composables/useFilterOrchestrator';
-import { toQueryParams } from './utils';
+import { toPcs, toQueryParams } from './utils';
 
 import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
@@ -180,32 +180,46 @@ const alertEmptyMessage = computed(() => {
   return '目前無符合條件的告警候選';
 });
 
-const summaryCards = computed(() => [
-  {
-    key: 'transaction',
-    label: '移轉量',
-    value: Number(summary.value.transaction_qty || 0),
-    accent: 'brand',
-    format: 'number',
-    precision: 2,
-  },
-  {
-    key: 'scrap',
-    label: '報廢量',
-    value: Number(summary.value.scrap_qty || 0),
-    accent: 'warning',
-    format: 'number',
-    precision: 2,
-  },
-  {
-    key: 'yield',
-    label: '良率',
-    value: Number(summary.value.yield_pct || 0),
-    accent: Number(summary.value.yield_pct || 0) < Number(filters.risk_threshold || 98) ? 'danger' : 'success',
-    format: 'percent',
-    precision: 2,
-  },
-]);
+// Raw value in small text below the main (possibly K/KK-abbreviated) figure,
+// same convention as hold-history's SummaryCards.vue.
+function rawFor(v: number): number | undefined {
+  return Math.abs(v) >= 1000 ? v : undefined;
+}
+
+const summaryCards = computed(() => {
+  const transactionPcs = toPcs(summary.value.transaction_qty);
+  const scrapPcs = toPcs(summary.value.scrap_qty);
+  return [
+    {
+      key: 'transaction',
+      label: '移轉量',
+      value: transactionPcs,
+      accent: 'brand',
+      format: 'number',
+      precision: 2,
+      subValue: rawFor(transactionPcs),
+      subUnit: ' pcs',
+    },
+    {
+      key: 'scrap',
+      label: '報廢量',
+      value: scrapPcs,
+      accent: 'warning',
+      format: 'number',
+      precision: 2,
+      subValue: rawFor(scrapPcs),
+      subUnit: ' pcs',
+    },
+    {
+      key: 'yield',
+      label: '良率',
+      value: Number(summary.value.yield_pct || 0),
+      accent: Number(summary.value.yield_pct || 0) < Number(filters.risk_threshold || 98) ? 'danger' : 'success',
+      format: 'percent',
+      precision: 2,
+    },
+  ];
+});
 
 function alertRowKey(row) {
   const lotPart = row.source_code != null ? `|${row.source_code}` : '';
@@ -622,7 +636,7 @@ function sortIconComponent(field: string) {
 }
 
 function _buildAlertsCSV(items) {
-  const header = ['\u65e5\u671f', '\u5de5\u55ae', 'LOT', '\u539f\u56e0\u78bc', '\u7ad9\u5225\u7fa4\u7d44', 'Package', 'Type', '\u8f49\u51fa\u6578', '\u5831\u5ee2\u91cf', '\u826f\u7387(%)', '\u98a8\u96aa\u7b49\u7d1a', '\u98a8\u96aa\u5206\u6578'].join(',');
+  const header = ['\u65e5\u671f', '\u5de5\u55ae', 'LOT', '\u539f\u56e0\u78bc', '\u7ad9\u5225\u7fa4\u7d44', 'Package', 'Type', '\u8f49\u51fa\u6578(pcs)', '\u5831\u5ee2\u91cf(pcs)', '\u826f\u7387(%)', '\u98a8\u96aa\u7b49\u7d1a', '\u98a8\u96aa\u5206\u6578'].join(',');
   const rows = items.map((r) => [
     r.date_bucket,
     r.workorder,
@@ -631,8 +645,8 @@ function _buildAlertsCSV(items) {
     r.department ?? '',
     r.package ?? '',
     r.type ?? '',
-    Number(r.transaction_qty ?? 0),
-    Number(r.scrap_qty ?? 0),
+    toPcs(r.transaction_qty),
+    toPcs(r.scrap_qty),
     Number(r.yield_pct ?? 0).toFixed(4),
     r.risk_level ?? '',
     Number(r.risk_score ?? 0).toFixed(2),
@@ -1028,6 +1042,8 @@ onUnmounted(() => {
           :accent="card.accent"
           :format="card.format"
           :precision="card.precision"
+          :sub-value="card.subValue"
+          :sub-unit="card.subUnit"
         />
       </SummaryCardGroup>
     </section>
@@ -1134,8 +1150,8 @@ onUnmounted(() => {
                 <td class="ya-td">{{ row.department }}</td>
                 <td class="ya-td">{{ row.package || '' }}</td>
                 <td class="ya-td">{{ row.type || '' }}</td>
-                <td class="ya-td ya-td--right">{{ Number(row.transaction_qty || 0).toLocaleString() }}</td>
-                <td class="ya-td ya-td--right">{{ Number(row.scrap_qty || 0).toLocaleString() }}</td>
+                <td class="ya-td ya-td--right">{{ toPcs(row.transaction_qty).toLocaleString() }}</td>
+                <td class="ya-td ya-td--right">{{ toPcs(row.scrap_qty).toLocaleString() }}</td>
                 <td class="ya-td ya-td--right">{{ Number(row.yield_pct || 0).toFixed(2) }}</td>
                 <td class="ya-td">
                   <span class="risk-pill" :class="riskClass(row.risk_level)">

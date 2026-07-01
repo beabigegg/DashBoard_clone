@@ -1,3 +1,13 @@
+// ERP_WIP_MOVETXN.TRANSACTION_QUANTITY / SCRAP_QUANTITY are stored in K-PCS
+// (thousand pcs); every value is an exact multiple of 0.001 (1 pcs). Convert
+// to real pcs before displaying any absolute quantity to the user.
+export const KPCS_TO_PCS = 1000;
+
+export function toPcs(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n * KPCS_TO_PCS : 0;
+}
+
 export function parseTokenList(input: unknown): string[] {
   if (!input) {
     return [];

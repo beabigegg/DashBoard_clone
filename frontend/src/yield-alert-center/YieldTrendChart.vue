@@ -8,6 +8,8 @@ import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
+import { toPcs } from './utils';
+
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, MarkLineComponent, LegendComponent]);
 
 const GRANULARITY_LABEL = { day: '日', week: '週', month: '月', year: '年' };
@@ -24,11 +26,11 @@ function downloadCSV() {
   const items = props.trend || [];
   if (!items.length) return;
   const granLabel = props.granularity || 'day';
-  const header = ['日期', '移轉量', '報廢量', '良率(%)'].join(',');
+  const header = ['日期', '移轉量(pcs)', '報廢量(pcs)', '良率(%)'].join(',');
   const rows = items.map((r) => [
     r.date_bucket,
-    Number(r.transaction_qty ?? 0),
-    Number(r.scrap_qty ?? 0),
+    toPcs(r.transaction_qty),
+    toPcs(r.scrap_qty),
     Number(r.yield_pct ?? 0).toFixed(4),
   ].join(','));
   const csv = ['﻿', header, ...rows].join('\n');
@@ -48,7 +50,7 @@ const chartOption = computed(() => {
   const threshold = Number(props.riskThreshold || 98);
 
   const yieldVals = items.map((i) => Number(i.yield_pct ?? 0));
-  const inputVals = items.map((i) => Number(i.transaction_qty ?? 0));
+  const inputVals = items.map((i) => toPcs(i.transaction_qty));
   const dataMin = yieldVals.length ? Math.min(...yieldVals) : 0;
   const dataMax = yieldVals.length ? Math.max(...yieldVals) : 100;
   const yMin = Math.max(0, Math.floor(Math.min(dataMin, threshold) - 2));
@@ -95,8 +97,8 @@ const chartOption = computed(() => {
         return [
           `<div style="font-weight:600;color:#111827;margin-bottom:6px;font-size:12px">${(p[0] as Record<string, unknown>)?.name ?? ''}</div>`,
           `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:3px"><span style="color:#6b7280">良率</span><b style="color:${yldColor}">${yld.toFixed(2)}%</b></div>`,
-          `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:3px"><span style="color:#6b7280">Input</span><span>${Number(item.transaction_qty ?? 0).toLocaleString()} pcs</span></div>`,
-          `<div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6b7280">報廢</span><span>${Number(item.scrap_qty ?? 0).toLocaleString()} pcs</span></div>`,
+          `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:3px"><span style="color:#6b7280">Input</span><span>${toPcs(item.transaction_qty).toLocaleString()} pcs</span></div>`,
+          `<div style="display:flex;justify-content:space-between;gap:16px"><span style="color:#6b7280">報廢</span><span>${toPcs(item.scrap_qty).toLocaleString()} pcs</span></div>`,
         ].join('');
       },
     },
@@ -124,7 +126,7 @@ const chartOption = computed(() => {
         axisLabel: {
           fontSize: 11,
           color: '#9ca3af',
-          formatter: (v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
+          formatter: (v: number) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
           margin: 10,
         },
         axisLine: { show: false },

@@ -11,6 +11,8 @@ import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
+import { toPcs } from './utils';
+
 use([CanvasRenderer, BarChart, LineChart, GridComponent, TooltipComponent, LegendComponent]);
 
 const props = defineProps({
@@ -64,8 +66,8 @@ const chartOption = computed(() => {
         const color = yldPct < threshold ? '#ef4444' : '#22c55e';
         return [
           `<b style="font-size:13px">${row.package || '(NA)'}</b>`,
-          `<span style="color:#666">報廢量：</span><b>${Number(row.scrap_qty ?? 0).toLocaleString()}</b> pcs`,
-          `<span style="color:#666">移轉量：</span>${Number(row.transaction_qty ?? 0).toLocaleString()} pcs`,
+          `<span style="color:#666">報廢量：</span><b>${toPcs(row.scrap_qty).toLocaleString()}</b> pcs`,
+          `<span style="color:#666">移轉量：</span>${toPcs(row.transaction_qty).toLocaleString()} pcs`,
           `<span style="color:#666">良率：</span><b style="color:${color}">${yldPct.toFixed(2)}%</b>`,
         ].join('<br/>');
       },
@@ -97,7 +99,11 @@ const chartOption = computed(() => {
     yAxis: [
       {
         type: 'value',
-        axisLabel: { fontSize: 11, color: '#888' },
+        axisLabel: {
+          fontSize: 11,
+          color: '#888',
+          formatter: (v: number) => v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}k` : String(v),
+        },
         splitLine: { lineStyle: { type: 'dashed', color: '#eee' } },
       },
       {
@@ -122,7 +128,7 @@ const chartOption = computed(() => {
         emphasis: {
           itemStyle: { shadowBlur: 12, shadowColor: 'rgba(99,102,241,0.4)' },
         },
-        data: rows.map((r) => Number(r.scrap_qty ?? 0)),
+        data: rows.map((r) => toPcs(r.scrap_qty)),
       },
       {
         name: '良率(%)',

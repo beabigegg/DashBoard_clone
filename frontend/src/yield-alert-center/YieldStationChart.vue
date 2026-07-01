@@ -7,6 +7,8 @@ import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
+import { toPcs } from './utils';
+
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 
 const props = defineProps({
@@ -41,8 +43,8 @@ const chartOption = computed(() => {
         return [
           `<b>${row.station || '--'}</b>`,
           `良率：<b>${Number(row.yield_pct ?? 0).toFixed(2)}%</b>`,
-          `移轉量：${Number(row.transaction_qty ?? 0).toLocaleString()}`,
-          `報廢量：${Number(row.scrap_qty ?? 0).toLocaleString()}`,
+          `移轉量：${toPcs(row.transaction_qty).toLocaleString()} pcs`,
+          `報廢量：${toPcs(row.scrap_qty).toLocaleString()} pcs`,
         ].join('<br/>');
       },
     },
