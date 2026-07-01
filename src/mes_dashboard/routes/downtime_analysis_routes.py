@@ -77,7 +77,8 @@ _JOB_TIMEOUT: int = int(os.getenv("DOWNTIME_JOB_TIMEOUT_SECONDS", "1800"))
 # ── Unified DuckDB job flag (downtime-duckdb-join-migration, P5) ──────────────
 # DOWNTIME_USE_UNIFIED_JOB=on → enqueue DowntimeJob (BaseChunkedDuckDBJob) via
 # the 'downtime-unified' job type (DuckDB bridge JOIN, OOM elimination).
-# DOWNTIME_USE_UNIFIED_JOB=off (default) → legacy query_downtime_dataset path.
+# DOWNTIME_USE_UNIFIED_JOB=off → legacy query_downtime_dataset path.
+# Default promoted to on 2026-06-20 (contracts/env/env-contract.md).
 # Frozen at import time; tests must use monkeypatch.setattr().
 # Legacy _bridge_jobid Path B is NOT deleted while this flag exists (AC-8).
 from mes_dashboard.core.feature_flags import resolve_bool_flag as _resolve_bool_flag  # noqa: E402

@@ -7,6 +7,7 @@ Run with: pytest tests/e2e/test_resource_history_e2e.py -v --run-integration
 
 import json
 import pytest
+from pathlib import Path
 from unittest.mock import patch
 import pandas as pd
 from datetime import datetime
@@ -423,19 +424,22 @@ class TestResourceHistoryNavigation:
     """E2E tests for navigation integration."""
 
     def test_portal_includes_history_tab(self, client):
-        """Portal should include resource history tab."""
+        """Portal should include resource history tab.
+
+        After nav-config-to-code, drawer/page structure lives client-side in
+        navigationManifest.js — /api/portal/navigation only returns statuses,
+        so the SPA-enabled assertion checks the manifest source directly.
+        """
         if bool(client.application.config.get("PORTAL_SPA_ENABLED", False)):
-            response = client.get('/api/portal/navigation')
-            assert response.status_code == 200
-            payload = response.get_json()
-            pages = [
-                page
-                for drawer in payload.get("drawers", [])
-                for page in drawer.get("pages", [])
-            ]
-            history_pages = [page for page in pages if page.get("route") == "/resource-history"]
-            assert history_pages, "resource-history route missing from portal navigation contract"
-            assert history_pages[0].get("name") == "設備歷史績效"
+            manifest_path = (
+                Path(__file__).resolve().parents[2]
+                / "frontend" / "src" / "portal-shell" / "navigationManifest.js"
+            )
+            manifest_source = manifest_path.read_text(encoding="utf-8")
+            assert "'/resource-history'" in manifest_source, (
+                "resource-history route missing from portal-shell navigationManifest.js"
+            )
+            assert "設備歷史績效" in manifest_source
         else:
             response = client.get('/')
             content = response.data.decode('utf-8')

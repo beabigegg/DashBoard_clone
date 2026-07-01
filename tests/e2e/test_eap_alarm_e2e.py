@@ -49,9 +49,14 @@ def _post_spool(
 def _poll_job_to_completion(
     app_server: str,
     job_id: str,
-    timeout_seconds: float = 120.0,
+    timeout_seconds: float = 240.0,
 ) -> dict:
-    """Poll GET /api/eap-alarm/spool/status?job_id= until terminal state."""
+    """Poll GET /api/eap-alarm/spool/status?job_id= until terminal state.
+
+    A single EAP-alarm RQ worker processes one job at a time; a real Oracle
+    query here takes ~60-95s. 240s tolerates this job queueing behind one
+    other job (e.g. a sibling test's cold enqueue) without going flaky.
+    """
     status_url = f"{app_server}/api/eap-alarm/spool/status"
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -102,6 +107,24 @@ def _spool_and_get_query_id(app_server: str) -> str:
 @pytest.mark.e2e
 class TestEapAlarmSpoolE2E:
     """E2E tests for EAP ALARM spool pipeline (AC-6 coverage)."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    @classmethod
+    def shared_query_id(cls, app_server: str) -> str:
+        """Spool once (before any test in this class) and share query_id.
+
+        Every test in this class posts the identical default params
+        (date_from/date_to/eqp_types=GDBA). Against a real (slow, ~90s/job)
+        Oracle backend with a single EAP-alarm RQ worker, each test's own
+        independent POST used to enqueue its own cold job (since the spool
+        only becomes a cache-hit once a prior job's result is written) —
+        several of these queueing up behind each other pushed later polls
+        well past the per-test timeout even though every job eventually
+        completed. autouse=True runs this before test_post_spool_returns_202_async
+        and friends, so their POSTs land on an already-warm spool (fast 200
+        hit) instead of each enqueueing another ~90s job.
+        """
+        return _spool_and_get_query_id(app_server)
 
     def test_post_spool_missing_date_from_returns_400(self, app_server: str):
         """POST /spool without date_from → 400 VALIDATION_ERROR (EA-03)."""
@@ -187,9 +210,9 @@ class TestEapAlarmSpoolE2E:
         assert resp.status_code == 410
         assert resp.json()["success"] is False
 
-    def test_filter_options_returns_structured_options(self, app_server: str):
+    def test_filter_options_returns_structured_options(self, app_server: str, shared_query_id: str):
         """GET /filter-options returns alarm_text, alarm_category, equipment_id lists (AC-4/AC-6)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/filter-options",
             params={"query_id": query_id},
@@ -208,9 +231,9 @@ class TestEapAlarmSpoolE2E:
             "equipment_id_options must be a list"
         )
 
-    def test_summary_returns_totals(self, app_server: str):
+    def test_summary_returns_totals(self, app_server: str, shared_query_id: str):
         """GET /summary returns total_alarm_count and affected_equipment_count (AC-6)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/summary",
             params={"query_id": query_id},
@@ -227,9 +250,9 @@ class TestEapAlarmSpoolE2E:
             f"total_alarm_count must be int, got {type(data['total_alarm_count'])}"
         )
 
-    def test_pareto_returns_items_list(self, app_server: str):
+    def test_pareto_returns_items_list(self, app_server: str, shared_query_id: str):
         """GET /pareto returns items list with alarm_text and count (AC-6)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/pareto",
             params={"query_id": query_id},
@@ -245,9 +268,9 @@ class TestEapAlarmSpoolE2E:
         assert isinstance(data["items"], list), "pareto items must be a list"
         assert "total" in data, f"pareto missing total: {data}"
 
-    def test_trend_returns_series_data(self, app_server: str):
+    def test_trend_returns_series_data(self, app_server: str, shared_query_id: str):
         """GET /trend returns labels and series (AC-6)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/trend",
             params={"query_id": query_id},
@@ -264,9 +287,9 @@ class TestEapAlarmSpoolE2E:
         assert isinstance(data["labels"], list), "trend labels must be a list"
         assert isinstance(data["series"], list), "trend series must be a list"
 
-    def test_detail_returns_paginated_rows(self, app_server: str):
+    def test_detail_returns_paginated_rows(self, app_server: str, shared_query_id: str):
         """GET /detail returns rows with correct pagination metadata (AC-6/AC-7)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/detail",
             params={"query_id": query_id, "page": 1, "per_page": 20},
@@ -284,9 +307,9 @@ class TestEapAlarmSpoolE2E:
         assert "total_count" in meta, f"detail meta missing total_count: {meta}"
         assert "page" in meta, f"detail meta missing page: {meta}"
 
-    def test_detail_per_page_capped_at_200(self, app_server: str):
+    def test_detail_per_page_capped_at_200(self, app_server: str, shared_query_id: str):
         """GET /detail with per_page=999 → response meta.per_page ≤ 200 (data-shape §3.17)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/detail",
             params={"query_id": query_id, "page": 1, "per_page": 999},
@@ -298,9 +321,9 @@ class TestEapAlarmSpoolE2E:
             f"per_page must be capped at 200, got {data.get('meta', {}).get('per_page')}"
         )
 
-    def test_detail_rows_contain_expected_fields(self, app_server: str):
+    def test_detail_rows_contain_expected_fields(self, app_server: str, shared_query_id: str):
         """GET /detail rows contain required fields per §3.17 (AC-6)."""
-        query_id = _spool_and_get_query_id(app_server)
+        query_id = shared_query_id
         resp = requests.get(
             f"{app_server}/api/eap-alarm/detail",
             params={"query_id": query_id, "page": 1, "per_page": 20},

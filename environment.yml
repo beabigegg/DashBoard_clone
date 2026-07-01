@@ -44,6 +44,7 @@ dependencies:
 
       # Configuration
       - python-dotenv>=1.0.0,<2.0.0
+      - pyyaml>=6.0,<7.0          # AI function registry YAML loader
 
       # WSGI Server (Production)
       - gunicorn>=21.2.0,<25.0.0

@@ -40,9 +40,13 @@ def client(app):
 def redis_enabled(monkeypatch):
     """Enable Redis for spool storage in E2E tests."""
     import mes_dashboard.core.query_spool_store as _spool_mod
+    import mes_dashboard.core.redis_df_store as _df_store_mod
     monkeypatch.setattr(_redis_mod, 'REDIS_ENABLED', True)
     monkeypatch.setattr(_redis_mod, '_REDIS_CLIENT', None)
     monkeypatch.setattr(_spool_mod, 'QUERY_SPOOL_ENABLED', True)
+    # redis_df_store imports REDIS_ENABLED at module level (separate binding) —
+    # BatchQueryEngine chunk persistence checks this copy, not redis_client's.
+    monkeypatch.setattr(_df_store_mod, 'REDIS_ENABLED', True)
 
     from mes_dashboard.services.downtime_analysis_cache import _events_cache
 
@@ -56,6 +60,13 @@ def redis_enabled(monkeypatch):
                 keys = rc.keys(f"{prefix}:{ns}:spool_meta:*")
                 if keys:
                     rc.delete(*keys)
+            # BatchQueryEngine chunk/meta keys are cached by a deterministic
+            # query_hash (start_date/end_date/flags) — real Redis persists them
+            # across test runs, so a fixed date range can silently reuse a
+            # stale prior run's chunk data instead of the mocked Oracle rows.
+            batch_keys = rc.keys(f"{prefix}:batch:downtime_analysis:*")
+            if batch_keys:
+                rc.delete(*batch_keys)
 
     _clear_state()
     yield
@@ -129,17 +140,32 @@ def _make_job_rows():
 class TestSummaryEndpointIntegration:
     """E2E: real spool write/read cycle with fixture Oracle rows."""
 
-    @patch('mes_dashboard.services.downtime_analysis_service.read_sql_df')
-    @patch('mes_dashboard.services.downtime_analysis_service.has_downtime_events', return_value=False)
-    @patch('mes_dashboard.services.downtime_analysis_service.store_downtime_events')
-    @patch('mes_dashboard.services.downtime_analysis_service.load_downtime_events')
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=False)
+    @patch('mes_dashboard.core.database.read_sql_df_slow')
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
     def test_summary_endpoint_returns_merged_hours(
         self,
         mock_load, mock_store, mock_has_cache,
-        mock_read_sql,
+        mock_read_sql, mock_use_duckdb, mock_get_resources,
         client,
+        monkeypatch,
+        redis_enabled,
     ):
+        # _apply_resource_filters restricts events to HISTORYIDs known to
+        # resource_cache — fixture HISTORYIDs (R-001/R-002) must be present.
+        mock_get_resources.return_value = [
+            {'RESOURCEID': 'R-001'}, {'RESOURCEID': 'R-002'},
+        ]
         """POST /query merges 3 fragments → 1 event (14h) and returns correct summary."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False
+        )
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False
+        )
         base_rows = _make_oracle_rows()
         job_rows = _make_job_rows()
 
@@ -179,17 +205,24 @@ class TestSummaryEndpointIntegration:
         assert summary['udt_hours'] == pytest.approx(16.0, abs=0.5)  # 14h (R-001) + 2h (R-002)
         assert summary['event_count'] == 2  # 1 merged event (R-001) + 1 event (R-002)
 
-    @patch('mes_dashboard.services.downtime_analysis_service.read_sql_df')
-    @patch('mes_dashboard.services.downtime_analysis_service.has_downtime_events', return_value=False)
-    @patch('mes_dashboard.services.downtime_analysis_service.store_downtime_events')
-    @patch('mes_dashboard.services.downtime_analysis_service.load_downtime_events')
+    @patch('mes_dashboard.core.database.read_sql_df_slow')
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
     def test_summary_structure_matches_contract(
         self,
         mock_load, mock_store, mock_has_cache,
         mock_read_sql,
         client,
+        monkeypatch,
     ):
         """POST /query response structure matches §3.12.1."""
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False
+        )
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False
+        )
         mock_read_sql.return_value = _make_oracle_rows()
         mock_store.return_value = None
 
@@ -219,17 +252,32 @@ class TestSummaryEndpointIntegration:
 class TestEventDetailMatchSourceNoneRowsPresent:
     """E2E: no-match events are included, not dropped (AC-5)."""
 
-    @patch('mes_dashboard.services.downtime_analysis_service.read_sql_df')
-    @patch('mes_dashboard.services.downtime_analysis_service.has_downtime_events', return_value=False)
-    @patch('mes_dashboard.services.downtime_analysis_service.store_downtime_events')
-    @patch('mes_dashboard.services.downtime_analysis_service.load_downtime_events')
+    @patch('mes_dashboard.services.resource_cache.get_all_resources')
+    @patch('mes_dashboard.services.downtime_analysis_duckdb_cache.should_use_duckdb', return_value=False)
+    @patch('mes_dashboard.core.database.read_sql_df_slow')
+    @patch('mes_dashboard.services.downtime_analysis_cache.has_downtime_events', return_value=False)
+    @patch('mes_dashboard.services.downtime_analysis_cache.store_downtime_events')
+    @patch('mes_dashboard.services.downtime_analysis_cache.load_downtime_events')
     def test_no_match_events_included_in_summary(
         self,
         mock_load, mock_store, mock_has_cache,
-        mock_read_sql,
+        mock_read_sql, mock_use_duckdb, mock_get_resources,
         client,
+        monkeypatch,
+        redis_enabled,
     ):
         """Events with no JOB match must be counted in event_count, not dropped."""
+        # _apply_resource_filters restricts events to HISTORYIDs known to
+        # resource_cache — fixture HISTORYIDs (R-003/R-004) must be present.
+        mock_get_resources.return_value = [
+            {'RESOURCEID': 'R-003'}, {'RESOURCEID': 'R-004'},
+        ]
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False
+        )
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False
+        )
         # All rows have null JOBID — all should appear as match_source='none'
         no_match_rows = pd.DataFrame([
             {
@@ -251,7 +299,17 @@ class TestEventDetailMatchSourceNoneRowsPresent:
                 'JOBID': None,
             },
         ])
-        mock_read_sql.return_value = no_match_rows
+        # Second Oracle call is job_bridge.sql, which needs CREATEDATE/COMPLETEDATE —
+        # a distinct shape from base_events rows. Its RESOURCEID (R-001) doesn't
+        # match R-003/R-004, so it naturally yields no match either way.
+        job_rows = _make_job_rows()
+        call_count = {'n': 0}
+
+        def _sql_side_effect(sql, params, **kwargs):
+            call_count['n'] += 1
+            return no_match_rows if call_count['n'] == 1 else job_rows
+
+        mock_read_sql.side_effect = _sql_side_effect
         mock_store.return_value = None
 
         resp = client.post(
@@ -263,7 +321,7 @@ class TestEventDetailMatchSourceNoneRowsPresent:
         # Both rows must be counted
         assert result['summary']['event_count'] == 2
 
-    @patch('mes_dashboard.services.downtime_analysis_service.apply_view')
+    @patch('mes_dashboard.routes.downtime_analysis_routes.apply_view')
     def test_event_detail_view_returns_no_match_rows(self, mock_apply, client):
         """GET /event-detail must return events with match_source='none' when spool has them."""
         mock_apply.return_value = {
@@ -582,6 +640,11 @@ class TestFeatureFlagFallback:
         """DOWNTIME_BROWSER_DUCKDB=false → response has summary/daily_trend/big_category/top_reasons."""
         monkeypatch.setattr(
             'mes_dashboard.routes.downtime_analysis_routes._BROWSER_DUCKDB_ENABLED', False
+        )
+        # DOWNTIME_USE_UNIFIED_JOB defaults to True (promoted 2026-06-20) — must also
+        # be disabled to reach the true legacy query_downtime_dataset path.
+        monkeypatch.setattr(
+            'mes_dashboard.routes.downtime_analysis_routes._DOWNTIME_USE_UNIFIED_JOB', False
         )
         mock_qbase.return_value = _make_oracle_rows()
         mock_qjob.return_value = _make_job_rows()
