@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_vite
-visible-dirs: 207
-visible-files: 1104
+visible-dirs: 204
+visible-files: 1079
 omitted-dirs: 68
 truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -95,6 +95,7 @@ DashBoard_vite/
 |   |   |-- 130930a01b21082f
 |   |   |-- 137aac6b65143dec
 |   |   |-- 1513f65c38d604ee
+|   |   |-- 1587c2151a27c07a
 |   |   |-- 15a2721810beed32
 |   |   |-- 16e5986e942e026b
 |   |   |-- 17a6952f61650689
@@ -103,8 +104,7 @@ DashBoard_vite/
 |   |   |-- 1ae1a5c44c5de27d
 |   |   |-- 1b488e9c0e7c5031
 |   |   |-- 1bfae4d4f286c3d1
-|   |   |-- 1c079de4646a8d8b
-|   |   \-- ... (371 more entries truncated; cap=50)
+|   |   \-- ... (373 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -703,7 +703,8 @@ DashBoard_vite/
 |   |   |   |-- useYieldAlert.validation.test.js
 |   |   |   \-- wip-url-params.test.js
 |   |   |-- yield-alert/
-|   |   |   \-- App.cross-filter.test.js
+|   |   |   |-- App.cross-filter.test.js
+|   |   |   \-- useYieldAlertDuckDB.departments.test.js
 |   |   |-- pending-jobs-registry.test.js
 |   |   |-- schema-guard.test.js
 |   |   \-- unwrap-api-result.test.js
@@ -729,19 +730,19 @@ DashBoard_vite/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260701_091646.log
-|   |   |-- error_20260701_091646.log
-|   |   |-- rq_downtime_worker_20260701_091646.log
-|   |   |-- rq_eap_alarm_worker_20260701_091646.log
-|   |   |-- rq_hold_hist_worker_20260701_091646.log
-|   |   |-- rq_msd_worker_20260701_091646.log
-|   |   |-- rq_prod_hist_worker_20260701_091646.log
-|   |   |-- rq_reject_worker_20260701_091646.log
-|   |   |-- rq_resource_worker_20260701_091646.log
-|   |   |-- rq_warmup_worker_20260701_091646.log
-|   |   |-- rq_worker_20260701_091646.log
-|   |   |-- rq_yield_alert_worker_20260701_091646.log
-|   |   \-- watchdog_20260701_091646.log
+|   |   |-- access_20260701_115808.log
+|   |   |-- error_20260701_115808.log
+|   |   |-- rq_downtime_worker_20260701_115808.log
+|   |   |-- rq_eap_alarm_worker_20260701_115808.log
+|   |   |-- rq_hold_hist_worker_20260701_115808.log
+|   |   |-- rq_msd_worker_20260701_115808.log
+|   |   |-- rq_prod_hist_worker_20260701_115808.log
+|   |   |-- rq_reject_worker_20260701_115808.log
+|   |   |-- rq_resource_worker_20260701_115808.log
+|   |   |-- rq_warmup_worker_20260701_115808.log
+|   |   |-- rq_worker_20260701_115808.log
+|   |   |-- rq_yield_alert_worker_20260701_115808.log
+|   |   \-- watchdog_20260701_115808.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1279,55 +1280,23 @@ DashBoard_vite/
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- hold_dataset/
-|   |   |   |-- 0fff9d37f176e65b.parquet
-|   |   |   |-- 11a2c97b5a96a454.parquet
-|   |   |   |-- 48bb537827ec0fec.parquet
-|   |   |   |-- 60f0e8a37a9a83c6.parquet
-|   |   |   |-- 6f0c5b8121eae4a0.parquet
-|   |   |   |-- 8a003098d7652a4c.parquet
-|   |   |   |-- 8d7f362592148ba9.parquet
-|   |   |   |-- 90fcf843d6e3272a.parquet
-|   |   |   |-- 926b775d679ecb7b.parquet
 |   |   |   |-- ae71f1c389741435.parquet
-|   |   |   |-- c2e85539f96b7d4c.parquet
-|   |   |   |-- d471f508576e4b11.parquet
-|   |   |   |-- e35ff75f05f87d74.parquet
 |   |   |   |-- e367c4ed78d6d70a.parquet
-|   |   |   |-- ef38f59047af8118.parquet
-|   |   |   \-- fec0bb61072b593a.parquet
-|   |   |-- msd-events/
-|   |   |   |-- msd-518efb94d59bb7d5_detection.parquet
-|   |   |   |-- msd-518efb94d59bb7d5_events.parquet
-|   |   |   \-- msd-518efb94d59bb7d5_lineage.parquet
-|   |   |-- production_history/
-|   |   |   |-- ph-0bc7485381f8d642.parquet
-|   |   |   |-- ph-149427171ddf91d9.parquet
-|   |   |   |-- ph-2220011028a0a2c4.parquet
-|   |   |   \-- ph-427e6500efd104cd.parquet
+|   |   |   \-- ef38f59047af8118.parquet
 |   |   |-- reject_dataset/
 |   |   |   |-- 01a58ef66a9ad017.parquet
-|   |   |   |-- 074a472b2bb1a4fc.parquet
-|   |   |   |-- 18fdcf00fd5498b0.parquet
-|   |   |   |-- 791f589d5736f387.parquet
-|   |   |   \-- e8bc078f5547ab03.parquet
+|   |   |   \-- 18fdcf00fd5498b0.parquet
 |   |   |-- resource_dataset/
 |   |   |   |-- 2d8da6ce841992b8.parquet
 |   |   |   |-- 58383bcb2be3dff8.parquet
-|   |   |   |-- 58eecbd1e5f966c5.parquet
 |   |   |   |-- 5ce2411ee1a6cec9.parquet
-|   |   |   |-- 7d2ee9025463aabc.parquet
-|   |   |   \-- deae631b977e1907.parquet
+|   |   |   \-- 7d2ee9025463aabc.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- 3c78d8651c857958.parquet
 |   |   |   |-- 43dc6676a902087d.parquet
 |   |   |   |-- 58383bcb2be3dff8.parquet
-|   |   |   |-- 58eecbd1e5f966c5.parquet
 |   |   |   |-- 5ce2411ee1a6cec9.parquet
 |   |   |   \-- 6651e0b8fb9d4d9c.parquet
-|   |   |-- trace_lineage/
-|   |   |   \-- trace-lineage-query-tool-52782b1b991e3e78260d6bb1.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   |-- 2593c807819e4096.parquet
 |   |   |   |-- 6134fde4c72712e3.parquet
 |   |   |   |-- 6466620d35bc1a18.parquet
 |   |   |   |-- e0abeb7e48bee179.parquet
@@ -1370,7 +1339,10 @@ DashBoard_vite/
 |   |   |-- probe_1052817.json
 |   |   |-- probe_1052864.json
 |   |   |-- probe_1052948.json
-|   |   \-- ... (1036 more entries truncated; cap=50)
+|   |   |-- probe_1053022.json
+|   |   |-- probe_1055095.json
+|   |   |-- probe_1055122.json
+|   |   \-- ... (1049 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json

@@ -38,5 +38,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "rides existing gate set (backend-tests.yml, frontend-tests.yml, contract-driven-gates.yml, openapi-sync.yml); passes locally per ci-gates.md" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "no new informational gate; Playwright spec extended but pre-existing not-CI-wired gap documented in ci-gates.md/qa-report.md" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "no nightly/weekly/manual gate defined for this change (ci-gates.md)" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "3 promoted (tier-floor-override case 3, parallel-agent test-evidence race, npm-run-build generalization); 2 do-not-promote (contract-write-hook workaround, CHANGELOG.md-only recurrence)" }

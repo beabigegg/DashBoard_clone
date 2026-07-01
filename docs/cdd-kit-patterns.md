@@ -39,7 +39,7 @@ Evidence: `migrate-material-trace-ts` — pre-commit hook rejected commit with 6
 
 Always write version entries to `contracts/CHANGELOG.md`, never to the individual files.
 
-Evidence: `ai-pipeline-upgrade` — backend-engineer embedded entries in individual files; gate failed until entries were moved to `contracts/CHANGELOG.md`.
+Evidence: `ai-pipeline-upgrade` — backend-engineer embedded entries in individual files; gate failed until entries were moved to `contracts/CHANGELOG.md`. Recurred in `yield-alert-filter-expansion` — same fix, entries were added only inside individual contract files' own `## CHANGELOG` sections on the first pass and had to be added to `contracts/CHANGELOG.md` separately before the gate passed.
 
 ## context-manifest.md Allowed Paths — Directory Paths Only
 
@@ -93,6 +93,22 @@ tier-floor-override: "All wiring is flag-off by default and inert until each *_U
 ```
 
 Evidence: `rq-semaphore-wiring` — `tier-floor-override` in `tasks.yml:4`; audit.yml reason "All wiring is flag-off by default and inert…"; `contracts/business/business-rules.md` ASYNC-15 gates flag-on promotion behind real-Redis evidence.
+
+A third valid case is a **pure keyword-scan false positive** — the scanner matches generic terms ("cache", "query", "session") in prose or confirm-only/unchanged code paths that have no actual auth, payments, migration, or new concurrency primitive behind them. Unlike the two cases above, there is no deferred stress obligation and no expiration trigger — the override is permanent for that change once the reviewing agent confirms the matched keywords do not correspond to real critical-surface code.
+
+```yaml
+tier-floor-override: "Keyword scan false-positive: 'cache'/'query'/'session' hits are generic filter_cache (confirm-only, untouched)/query_id widening/mid-session prose in docs, not auth, payments, migration, or new concurrency primitives. No login, secrets, or queue/lock wiring touched."
+```
+
+Evidence: `yield-alert-filter-expansion` — `tasks.yml:5`; `agent-log/audit.yml` recorded `declared-tier:2 / floor-tier:0 / matched:[cache,query,session] / bypassed-by:tier-floor-override`.
+
+## Parallel Implementation Agents Racing on test-evidence.yml
+
+**Running `backend-engineer` and `frontend-engineer` concurrently on disjoint source files is safe for source edits but not for `test-evidence.yml`.** Both agents independently call `cdd-kit test run`, and each invocation overwrites the shared `collect`/`targeted`/`changed-area` phase rows rather than merging them. If the backend agent finishes and writes its phase rows, then the frontend agent's later `cdd-kit test run` overwrites those rows with frontend-only commands (and vice versa) — the evidence file self-heals only if the *last* agent to run re-executes all required phases with combined backend-pytest + frontend-vitest commands.
+
+Mitigation: after both agents complete, have the last one to finish re-run `cdd-kit test run` for every required phase with both stacks' test commands, and confirm `final-status: passed` reflects combined coverage before gate sign-off.
+
+Evidence: `yield-alert-filter-expansion` — `agent-log/backend-engineer.yml` `known-risks`; `agent-log/frontend-engineer.yml` `artifacts` test-output entry confirming the later combined run superseded the earlier standalone run.
 
 ## Git Staging Scope for `specs/changes/`
 

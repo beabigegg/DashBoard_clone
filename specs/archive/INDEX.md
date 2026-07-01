@@ -75,3 +75,4 @@
 | add-db-scheduling-page | 2026 | 2026-06-27 | specs/archive/2026/add-db-scheduling-page/ |
 | msd-type-package-filter | 2026 | 2026-06-29 | specs/archive/2026/msd-type-package-filter/ |
 | msd-forward-cause-effect | 2026 | 2026-06-30 | specs/archive/2026/msd-forward-cause-effect/ |
+| yield-alert-filter-expansion | 2026 | 2026-07-01 | specs/archive/2026/yield-alert-filter-expansion/ |
