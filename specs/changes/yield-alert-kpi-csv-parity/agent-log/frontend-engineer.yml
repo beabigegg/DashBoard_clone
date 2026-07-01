@@ -1,0 +1,47 @@
+change-id: yield-alert-kpi-csv-parity
+agent: frontend-engineer
+timestamp: "2026-07-01T14:32:00Z"
+status: complete
+files-read:
+  - specs/changes/yield-alert-kpi-csv-parity/context-manifest.md
+  - specs/changes/yield-alert-kpi-csv-parity/implementation-plan.md
+  - specs/changes/yield-alert-kpi-csv-parity/design.md
+  - contracts/data/data-shape-contract.md:1116-1135 (§3.16.7 Alerts CSV Numeric Export Formatting)
+  - frontend/src/yield-alert-center/App.vue:640-680 (_buildAlertsCSV, _triggerCSVDownload, exportAllAlertsCSV)
+  - frontend/src/yield-alert-center/utils.ts (toPcs)
+  - frontend/tests/yield-alert/App.csv-export.test.js (bug-fix-engineer's failing regression tests)
+  - specs/changes/yield-alert-kpi-csv-parity/agent-log/bug-fix-engineer.yml
+  - specs/changes/yield-alert-kpi-csv-parity/test-evidence.yml
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/yield-alert-center/App.vue:653-654 (_buildAlertsCSV) -- wrapped toPcs(r.transaction_qty) and toPcs(r.scrap_qty) in Math.round(...); no other lines touched, utils.ts untouched, no export added (test drives _buildAlertsCSV indirectly via mounted-component + click, not a direct import)" }
+  - { type: components-affected, pointer: "yield-alert-center App.vue (_buildAlertsCSV CSV formatter only; on-screen table's .toLocaleString() display path untouched, yield_pct/risk_score .toFixed() untouched)" }
+  - { type: tests-added, pointer: "n/a (tests already written by bug-fix-engineer: frontend/tests/yield-alert/App.csv-export.test.js -- builds_alerts_csv_reproduces_and_fixes_duckdb_float_residue_case, builds_alerts_csv_rounds_transaction_qty_and_scrap_qty_to_whole_pcs)" }
+  - { type: test-results, pointer: "npx vitest run frontend/tests/yield-alert/: 3 test files, 16/16 passed (App.csv-export.test.js 2/2, App.cross-filter.test.js, useYieldAlertDuckDB.departments.test.js all green, no regressions)" }
+  - { type: test-results, pointer: "npm run type-check (vue-tsc --noEmit): 0 errors after App.vue edit" }
+  - { type: test-evidence, pointer: "cdd-kit test run yield-alert-kpi-csv-parity --phase targeted --command 'cd frontend && npx vitest run tests/yield-alert/App.csv-export.test.js' -> passed; updated existing targeted phase row (previously bug-fix-engineer's pre-fix failing baseline) in test-evidence.yml. Did NOT touch collect/changed-area phases -- those hold backend-engineer's in-progress backend commands (still status: failed as of this run, meaning backend IP-3/IP-4/IP-5 not yet complete); per implementation-plan.md Handoff Constraints, avoided overwriting backend-engineer's concurrent phase entries." }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements; existing .btn-export-csv button and its aria semantics unchanged)" }
+next-action: >
+  IP-7 complete and verified green. Backend-engineer's IP-3/IP-4/IP-5 (rescoped
+  _query_summary, threshold param wiring) still shows failed in test-evidence.yml
+  changed-area phase as of this handoff -- not a frontend blocker, but the shared
+  agent-log/bug-fix-engineer.yml regression block (status: failed, pre-fix) must be
+  updated to passed by whichever of backend-engineer/frontend-engineer completes
+  LAST, per bug-fix-engineer.yml's own next-action note. Since backend is still in
+  progress at the time of this log, frontend-engineer is NOT the last to complete
+  and does not update that shared block -- leaving it for backend-engineer to close
+  out once IP-3/IP-4/IP-5 pass, combining both stacks' final green evidence.
+notes: >
+  Fix scope matched design.md Decision 4 and data-shape-contract.md §3.16.7
+  exactly: Math.round(toPcs(...)) at the CSV-formatting call site only. Did not
+  touch utils.ts's toPcs() (shared helper also used by the on-screen table's
+  .toLocaleString() display path, which already masks float noise via its own
+  rounding and must not be double-rounded or altered). Did not touch
+  yield_pct/risk_score .toFixed() formatting (out of scope per design.md
+  Decision 4 rejected-alternative note). No export/defineExpose change was
+  needed: the test suite exercises _buildAlertsCSV indirectly by mounting the
+  full component, restoring a query via URL params, clicking
+  query-submit-btn to populate alerts.value, then clicking .btn-export-csv and
+  capturing the Blob passed to the mocked Blob constructor -- consistent with
+  this file's existing black-box test convention (see
+  App.cross-filter.test.js). Confirmed via git diff --stat that only App.vue
+  changed (2 insertions, 2 deletions).

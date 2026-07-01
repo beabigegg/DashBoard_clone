@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Unit tests for yield alert service helpers."""
 
+import duckdb
 import pandas as pd
 
 import mes_dashboard.services.yield_alert_service as yield_alert_service
@@ -416,3 +417,110 @@ def test_query_yield_summary_no_longer_calls_oracle(monkeypatch):
     assert not oracle_called["called"], (
         "query_yield_summary must NOT call Oracle (read_sql_df_slow) after spool refactor"
     )
+
+
+# ── AC-1/AC-4: KPI <-> CSV/alerts reconciliation (YA-13) ──────────────────────
+
+class TestKpiCsvReconciliation:
+    """AC-1/AC-4: end-to-end reconciliation across `apply_view` (route-facing
+    orchestrator) proving the KPI summary and the alerts list (source of the
+    CSV export) agree on the same alert-candidate row set, including a
+    multi-reason-code group that would double-count under a naive SUM.
+    """
+
+    def _make_reconciliation_fixture(self, tmp_path):
+        parquet_path = tmp_path / "kpi-csv-reconciliation.parquet"
+        common = {
+            "DEPARTMENT_NAME": "焊接_WB_1線",
+            "DEPARTMENT_GROUP": "焊接_WB",
+            "PROCESS_CATEGORY": "PC1",
+            "LINE_NAME": "L1",
+            "PACKAGE_NAME": "PKG1",
+            "TYPE_NAME": "TY1",
+            "FUNCTION_NAME": "FN1",
+            "OPERATION_TEXT": "OP1",
+            "DATE_BUCKET": "2026-03-01",
+        }
+        rows = [
+            # Group A — WO-1, two reason codes sharing one tx_extra_cols group.
+            {**common, "WORKORDER": "WO-1", "REASON_CODE": "R1", "REASON_NAME": "Reason1",
+             "TRANSACTION_QTY": 600.0, "SCRAP_QTY": 10.0},
+            {**common, "WORKORDER": "WO-1", "REASON_CODE": "R2", "REASON_NAME": "Reason2",
+             "TRANSACTION_QTY": 400.0, "SCRAP_QTY": 5.0},
+            # Group B — WO-2, excluded by risk_threshold/min_scrap_qty (high yield, tiny scrap).
+            {**common, "WORKORDER": "WO-2", "REASON_CODE": "R3", "REASON_NAME": "Reason3",
+             "TRANSACTION_QTY": 2000.0, "SCRAP_QTY": 1.0},
+            # Group C — WO-3, excluded directly by SCRAP_QTY <> 0.
+            {**common, "WORKORDER": "WO-3", "REASON_CODE": "R4", "REASON_NAME": "Reason4",
+             "TRANSACTION_QTY": 500.0, "SCRAP_QTY": 0.0},
+        ]
+        pd.DataFrame(rows).to_parquet(parquet_path, index=False)
+        return parquet_path
+
+    def test_summary_and_alerts_reconcile_end_to_end_with_multi_reason_group(
+        self, tmp_path, monkeypatch,
+    ):
+        """KPI summary.transaction_qty/scrap_qty must equal the tx_extra_cols-
+        deduped sum / plain sum of the alerts list actually returned (the same
+        row set the CSV export uses), for a query containing a multi-reason-code
+        group (Group A) and rows excluded by threshold/scrap predicates
+        (Groups B, C)."""
+        from mes_dashboard.services import yield_alert_dataset_cache as dataset_cache
+
+        parquet_path = self._make_reconciliation_fixture(tmp_path)
+
+        monkeypatch.setattr(
+            dataset_cache,
+            "_get_cached_payload",
+            lambda _qid: {
+                "linkage_df": pd.DataFrame(),
+                "spool_ready": True,
+                "empty_result": False,
+            },
+        )
+        monkeypatch.setattr(dataset_cache, "_load_excluded_reason_tokens", lambda: set())
+        monkeypatch.setattr(
+            "mes_dashboard.services.yield_alert_sql_runtime.get_spool_file_path",
+            lambda namespace, query_id: str(parquet_path),
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.core.duckdb_runtime.create_heavy_query_connection",
+            lambda: duckdb.connect(database=":memory:"),
+        )
+
+        result = dataset_cache.apply_view(
+            query_id="qid-reconcile-001",
+            risk_threshold=98.0,
+            min_scrap_qty=2.0,
+        )
+
+        assert result is not None
+        summary = result["summary"]
+        alert_items = result["alerts"]["items"]
+
+        # Only Group A's 2 reason-coded rows must surface as alert candidates.
+        workorders = {item["workorder"] for item in alert_items}
+        assert workorders == {"WO-1"}, (
+            f"expected only WO-1 (Group A) to be alert candidates, got {workorders}"
+        )
+
+        # CSV-equivalent totals computed the same way the CSV export would:
+        # transaction_qty deduped by (workorder, dims, date_bucket) — Group A's
+        # 2 rows share one group, so its transaction_qty (1000) is counted once.
+        distinct_tx_groups = {
+            (item["workorder"], item["date_bucket"]): item["transaction_qty"]
+            for item in alert_items
+        }
+        csv_tx_total = sum(distinct_tx_groups.values())
+        csv_scrap_total = sum(item["scrap_qty"] for item in alert_items)
+
+        assert csv_tx_total == 1000.0
+        assert csv_scrap_total == 15.0
+        assert summary["transaction_qty"] == csv_tx_total, (
+            f"KPI transaction_qty ({summary['transaction_qty']}) must reconcile "
+            f"with the deduped alerts-list total ({csv_tx_total})"
+        )
+        assert summary["scrap_qty"] == csv_scrap_total, (
+            f"KPI scrap_qty ({summary['scrap_qty']}) must reconcile with the "
+            f"alerts-list total ({csv_scrap_total})"
+        )

@@ -1,0 +1,10 @@
+agent: implementation-planner
+change-id: yield-alert-kpi-csv-parity
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/yield-alert-kpi-csv-parity/implementation-plan.md" }
+  - { type: owner-map, pointer: "bug-fix-engineer (reproduce), backend-engineer (SQL/route/samples), frontend-engineer (CSV)" }
+  - { type: scope-summary, pointer: "in: shared CTE builder + rescoped _query_summary + threshold wiring + /summary route forward + CSV Math.round + sample regen; out: trend/heatmap/station/package scope, api-contract.md (deferred), apply_view signature (already threads params)" }
+notes:
+  - "Verified design.md assumption: apply_view/apply_cached_view (yield_alert_dataset_cache.py 891-902) ALREADY thread risk_threshold/min_scrap_qty into try_compute_view_from_spool (926-937). No cache-layer signature change needed."
+  - "Confirmed the two real wiring gaps: (a) try_compute_view_from_spool passes threshold params to _query_alerts (945-946) but NOT to _query_summary (901-907); (b) api_yield_alert_summary route (430-434) drops risk_threshold/min_scrap_qty (calls apply_cached_view with only query_id+filters) while api_yield_alert_view (369-370) forwards them."
+  - "FLAG for backend-engineer/test-strategist: test-plan AC-6 test is named test_changelog_has_version_entries_for_business_data_api, but CHANGELOG intentionally has only business 1.40.0 + data 1.33.0 (no api entry — api-contract.md deferred). Reconcile test to business+data only; do NOT add an api-contract.md CHANGELOG entry (hook-blocked, user-declined). Recorded as Known Risk #2 in the plan."

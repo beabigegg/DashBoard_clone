@@ -1,0 +1,18 @@
+change-id: yield-alert-kpi-csv-parity
+agent: change-classifier
+timestamp: "2026-07-01T13:45:00Z"
+status: complete
+artifacts:
+  - { type: tier, pointer: "Tier 2" }
+  - { type: risk, pointer: "medium" }
+  - { type: lane, pointer: "bug-fix (data symptom), promoted with business-logic-change primary type" }
+  - { type: required-agents, pointer: "spec-architect, implementation-planner, bug-fix-engineer, backend-engineer, frontend-engineer, test-strategist, contract-reviewer, qa-reviewer" }
+  - { type: context-manifest-draft, pointer: "specs/changes/yield-alert-kpi-csv-parity/context-manifest.md#allowed-paths" }
+next-action: none
+notes: >
+  Architecture Review Required = yes because the tx-dedup dimension decision
+  (excluding REASON_CODE when summing transaction_qty) is architecturally
+  significant and shared across summary/trend/heatmap CTE patterns in
+  yield_alert_sql_runtime.py. Two context expansion requests approved and
+  folded into context-manifest.md: src/mes_dashboard/sql/yield_alert/ and the
+  four confirmed yield-alert backend test files.

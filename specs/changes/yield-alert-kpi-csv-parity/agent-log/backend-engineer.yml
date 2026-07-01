@@ -1,0 +1,61 @@
+change-id: yield-alert-kpi-csv-parity
+agent: backend-engineer
+timestamp: "2026-07-01T14:45:00Z"
+status: complete
+files-read:
+  - specs/changes/yield-alert-kpi-csv-parity/design.md
+  - specs/changes/yield-alert-kpi-csv-parity/implementation-plan.md
+  - specs/changes/yield-alert-kpi-csv-parity/test-plan.md
+  - contracts/business/business-rules.md (YA-13)
+  - src/mes_dashboard/services/yield_alert_sql_runtime.py (full file)
+  - src/mes_dashboard/routes/yield_alert_routes.py:323-441 (api_yield_alert_view, api_yield_alert_summary)
+  - src/mes_dashboard/services/yield_alert_dataset_cache.py:891-951 (apply_view / try_compute_view_from_spool call)
+  - tests/test_yield_alert_sql_runtime.py (full file, incl. bug-fix-engineer's TestQuerySummaryAlertScopeParity)
+  - tests/test_yield_alert_routes.py
+  - tests/test_yield_alert_service.py
+  - tests/test_yield_alert_contracts.py
+  - tests/test_yield_alert_dataset_cache.py
+  - tests/contract/samples/get_yield_alert_view.json
+  - tests/contract/samples/get_yield_alert_summary.json
+  - tests/contract/test_capture_samples.py
+  - tests/contract/capture_samples.py
+  - contracts/CHANGELOG.md
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/services/yield_alert_sql_runtime.py: extracted `_build_alerts_filtered_cte()` (new shared builder, factored out of `_query_alerts`'s CTE chain) + module constants `_ALERT_EXTRA_COLS`/`_TX_EXTRA_COLS`; `_query_alerts()` now calls the shared builder instead of inlining the CTE; `_query_summary()` rescoped to accept `risk_threshold`/`min_scrap_qty`/`granularity` and compute totals from the shared `alerts_filtered` CTE (DISTINCT tx_extra_cols dedup for transaction_qty, plain SUM for scrap_qty); `try_compute_view_from_spool()` now forwards `risk_threshold`/`min_scrap_qty`/`granularity` into `_query_summary`" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/yield_alert_routes.py: api_yield_alert_summary (~402-448) now parses risk_threshold/min_scrap_qty from request.args (same defaults 98/1 as api_yield_alert_view) and forwards them into apply_cached_view" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestQuerySummaryAlertScopeParity::test_naive_sum_over_reason_coded_rows_would_double_count_documents_the_trap" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestQuerySummaryAlertScopeParity::test_department_name_split_within_one_tx_lookup_group_does_not_break_dedup" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestQuerySummaryAlertScopeParity::test_summary_and_alerts_share_the_same_cte_builder" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_sql_runtime.py::TestQuerySummaryAlertScopeParity::test_try_compute_view_forwards_risk_threshold_and_min_scrap_qty_to_summary" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_summary_route_forwards_risk_threshold_and_min_scrap_qty" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_summary_route_uses_default_thresholds_when_absent" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_routes.py::test_view_and_summary_response_shape_unchanged_after_scope_unification" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_service.py::TestKpiCsvReconciliation::test_summary_and_alerts_reconcile_end_to_end_with_multi_reason_group" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_contracts.py::TestBusinessRuleYA13::test_ya13_rule_documents_kpi_scope_and_tx_extra_cols_dedup_dimension" }
+  - { type: tests-added, pointer: "tests/test_yield_alert_contracts.py::TestBusinessRuleYA13::test_changelog_has_version_entries_for_business_data_api (asserts business+data entries only; deliberately does NOT require an api entry, per implementation-plan.md Known Risks #2 — api-contract.md deferred/hook-blocked)" }
+  - { type: test-output, pointer: "conda run -n mes-dashboard pytest tests/test_yield_alert_sql_runtime.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py tests/test_yield_alert_contracts.py tests/test_yield_alert_dataset_cache.py tests/test_yield_alert_async_routes.py tests/test_yield_alert_job_service.py tests/test_yield_alert_lock_behavior.py tests/test_yield_alert_shell_coverage.py -q -> 150 passed in 3.02s" }
+  - { type: test-output, pointer: "ruff check src/mes_dashboard/services/yield_alert_sql_runtime.py src/mes_dashboard/routes/yield_alert_routes.py tests/test_yield_alert_sql_runtime.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py tests/test_yield_alert_contracts.py -> All checks passed" }
+  - { type: test-output, pointer: "cdd-kit validate --contracts -> all validations passed (187 endpoints, 173 sampled response shapes; pre-existing unrelated warning on GET /api/spool/yield_alert_dataset/{query_id}.parquet, not touched by this change)" }
+  - { type: contracts-touched, pointer: "none (business-rules.md YA-13, data-shape-contract.md §3.16.7, CHANGELOG business 1.40.0/data 1.33.0 were already applied by spec-architect/contract-reviewer before this agent ran; contracts/api/api-contract.md intentionally NOT touched, deferred per change-classification.md)" }
+  - { type: contract-samples, pointer: "tests/contract/samples/get_yield_alert_view.json, get_yield_alert_summary.json: regenerated via tests/contract/capture_samples.py (offline env). Both responses remain CACHE_EXPIRED (query_id=test-id never resolves to a real DuckDB spool in the offline capture harness) — only the timestamp field changed, no value or shape drift. Reverted the regenerated files (git checkout) since the timestamp-only diff carries no contract-verification value and would just add noise; also reverted ~167 unrelated sample files that a full capture run regenerates as a side effect (per CLAUDE.md promoted learning), keeping git status clean for tests/contract/samples/." }
+test-evidence:
+  - { phase: collect, status: passed, command: "python -m pytest --collect-only -q tests/test_yield_alert_sql_runtime.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py tests/test_yield_alert_contracts.py" }
+  - { phase: targeted, status: passed, command: "python -m pytest tests/test_yield_alert_sql_runtime.py::TestQuerySummaryAlertScopeParity tests/test_yield_alert_routes.py::test_summary_route_forwards_risk_threshold_and_min_scrap_qty tests/test_yield_alert_routes.py::test_summary_route_uses_default_thresholds_when_absent tests/test_yield_alert_routes.py::test_view_and_summary_response_shape_unchanged_after_scope_unification tests/test_yield_alert_service.py::TestKpiCsvReconciliation tests/test_yield_alert_contracts.py::TestBusinessRuleYA13 -v" }
+  - { phase: changed-area, status: passed, command: "python -m pytest tests/test_yield_alert_sql_runtime.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py tests/test_yield_alert_contracts.py tests/test_yield_alert_dataset_cache.py -q" }
+  - { phase: contract, status: passed, command: "python -m pytest tests/test_yield_alert_contracts.py -q" }
+scope-confirmation:
+  - "Did NOT touch _query_trend, _query_heatmap, _query_station_summary, _query_package_summary (design.md Decision 3) — verified via git diff that their function bodies are byte-unchanged; _TX_DEDUP_COLS module constant remains intact and is still the dedup key those four functions use."
+  - "Did NOT touch contracts/api/api-contract.md (git diff --stat shows no change) — deferred per change-classification.md."
+  - "Did NOT touch query_alert_candidates() legacy pandas path in yield_alert_service.py, nor apply_view/apply_cached_view's signature (already threaded risk_threshold/min_scrap_qty before this change; confirmed by direct read, no edit needed)."
+  - "Did NOT touch frontend/src/yield-alert-center/App.vue or frontend/tests/yield-alert/App.csv-export.test.js (frontend-engineer's IP-7 scope, already complete per their agent-log)."
+next-action: "backend scope (IP-3/IP-4/IP-5/IP-6) complete; shared bug-fix-engineer.yml regression block updated to passed (backend completed last, combining both stacks' green evidence per that file's own instruction). Ready for qa-reviewer / cdd-kit gate yield-alert-kpi-csv-parity."
+notes: >
+  Decision 1 implemented literally: _build_alerts_filtered_cte() is the single
+  source of the alerts_filtered CTE chain; both _query_summary and _query_alerts
+  call it (asserted structurally in
+  test_summary_and_alerts_share_the_same_cte_builder via inspect.getsource).
+  Decision 2 implemented literally: _query_summary dedups transaction_qty on
+  _TX_EXTRA_COLS (renamed from _query_alerts's local tx_extra_cols list to a
+  module constant so both functions share it) + DATE_BUCKET, NOT the
+  module-level _TX_DEDUP_COLS (which still exists, untouched, for the four
+  out-of-scope functions). No third variant introduced.

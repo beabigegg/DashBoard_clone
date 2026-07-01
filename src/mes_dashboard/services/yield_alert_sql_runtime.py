@@ -191,7 +191,7 @@ def _granularity_bucket_expr(granularity: str, col: str = "DATE_BUCKET") -> str:
     return f"CAST({qcol} AS VARCHAR)"
 
 
-# ── Task 4.3: Summary SQL ─────────────────────────────────────────────────────
+# ── Task 4.3 / YA-13: Summary SQL ─────────────────────────────────────────────
 
 def _query_summary(
     conn: Any,
@@ -200,33 +200,48 @@ def _query_summary(
     dept_proc_params: List[Any],
     reason_excl_sql: str,
     reason_excl_params: List[Any],
+    risk_threshold: float,
+    min_scrap_qty: float,
+    granularity: str = "day",
 ) -> Dict[str, float]:
-    """Compute overall transaction_qty, scrap_qty, yield_pct."""
-    tx_dedup_cols = ", ".join(_qid(c) for c in _TX_DEDUP_COLS)
-    dept_where_clause = f"WHERE {dept_proc_where}" if dept_proc_where else ""
-    scrap_where_clause = (
-        f"WHERE {dept_proc_where} AND {reason_excl_sql}"
-        if dept_proc_where
-        else f"WHERE {reason_excl_sql}"
-    )
+    """Compute KPI totals (transaction_qty, scrap_qty, yield_pct) over the SAME
+    alert-candidate row set as `_query_alerts()` (YA-13 / design.md Decisions 1+2).
 
-    sql = f"""
+    Reuses the shared `alerts_filtered` CTE chain (built by
+    `_build_alerts_filtered_cte`, the same builder `_query_alerts()` uses) so
+    the KPI cards can never independently drift from the CSV export's row set.
+    `transaction_qty` is summed over DISTINCT `_TX_EXTRA_COLS` (+ bucketed
+    `DATE_BUCKET`) groups to avoid double-counting when one group spans
+    multiple `REASON_CODE` rows; `scrap_qty` is a plain SUM (already
+    REASON_CODE-grouped upstream, no fan-out).
+    """
+    base_sql, all_cte_params = _build_alerts_filtered_cte(
+        full_where=dept_proc_where,
+        full_params=dept_proc_params,
+        reason_excl_sql=reason_excl_sql,
+        reason_excl_params=reason_excl_params,
+        granularity=granularity,
+        risk_threshold=risk_threshold,
+        min_scrap_qty=min_scrap_qty,
+    )
+    tx_dedup_sql = ", ".join(_qid(c) for c in _TX_EXTRA_COLS)
+
+    sql = (
+        base_sql
+        + f"""
         SELECT
-            (SELECT COALESCE(SUM(TRANSACTION_QTY), 0)
+            (SELECT COALESCE(SUM(transaction_qty), 0)
              FROM (
-                 SELECT SUM("TRANSACTION_QTY") AS TRANSACTION_QTY
-                 FROM yield_alert_src
-                 {dept_where_clause}
-                 GROUP BY {tx_dedup_cols}
+                 SELECT DISTINCT "DATE_BUCKET", {tx_dedup_sql}, transaction_qty
+                 FROM alerts_filtered
              )
             ) AS transaction_qty,
-            (SELECT COALESCE(SUM("SCRAP_QTY"), 0)
-             FROM yield_alert_src
-             {scrap_where_clause}
+            (SELECT COALESCE(SUM(scrap_qty), 0)
+             FROM alerts_filtered
             ) AS scrap_qty
-    """
-    combined_params = (dept_proc_params + dept_proc_params + reason_excl_params)
-    row = _fetch_dict_rows(conn, sql, combined_params)
+        """
+    )
+    row = _fetch_dict_rows(conn, sql, all_cte_params)
     if not row:
         return {"transaction_qty": 0.0, "scrap_qty": 0.0, "yield_pct": 100.0}
 
@@ -486,10 +501,25 @@ def _query_package_summary(
     return result
 
 
-# ── Task 4.7: Alerts SQL ──────────────────────────────────────────────────────
+# ── Task 4.7 / IP-3: Shared alert-candidate CTE builder ───────────────────────
 
-def _query_alerts(
-    conn: Any,
+# Non-date columns used in alert grouping (includes REASON_CODE/REASON_NAME).
+_ALERT_EXTRA_COLS = [
+    "WORKORDER", "REASON_CODE", "REASON_NAME",
+    "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+    "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+]
+# Non-date columns used in TX dedup (no REASON_* columns) — see YA-13 / design.md
+# Decision 2. This is the definitive tx-dedup key for the alert-candidate CTE
+# chain; do NOT substitute `_TX_DEDUP_COLS` (wrong, over-fine key).
+_TX_EXTRA_COLS = [
+    "WORKORDER",
+    "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+    "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
+]
+
+
+def _build_alerts_filtered_cte(
     *,
     full_where: str,
     full_params: List[Any],
@@ -498,17 +528,15 @@ def _query_alerts(
     granularity: str,
     risk_threshold: float,
     min_scrap_qty: float,
-    sort_by: str,
-    sort_dir: str,
-    page: int,
-    per_page: int,
-) -> Dict[str, Any]:
-    """Compute alert groups with SQL-level filtering, sorting, and pagination.
+) -> Tuple[str, List[Any]]:
+    """Build the shared alert-candidate CTE chain (`_tx_daily` -> `tx_lookup` ->
+    `alert_groups` -> `alert_with_tx` -> `alerts_computed` -> `alerts_filtered`).
 
-    Applies the same time-granularity bucketing as trend/heatmap so that
-    the alerts table rows match the selected granularity (day/week/month/year).
-    TX dedup uses a two-level approach (inner: dedup per raw daily date;
-    outer: sum bucketed totals) to avoid double-counting.
+    Reused by both `_query_alerts()` (paged alert list / CSV export) and
+    `_query_summary()` (KPI totals) so the two paths can never independently
+    drift out of sync (design.md Decision 1 / YA-13). Returns the CTE SQL
+    fragment (a ``WITH ... alerts_filtered AS (...)`` prefix, no trailing
+    SELECT) and its ordered bind params.
     """
     bucket_expr = _granularity_bucket_expr(granularity)
 
@@ -524,27 +552,14 @@ def _query_alerts(
 
     tx_where = f"WHERE {full_where}" if full_where else ""
 
-    # Non-date columns used in alert grouping
-    alert_extra_cols = [
-        "WORKORDER", "REASON_CODE", "REASON_NAME",
-        "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
-        "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
-    ]
-    # Non-date columns used in TX dedup (no REASON_* columns)
-    tx_extra_cols = [
-        "WORKORDER",
-        "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
-        "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME", "OPERATION_TEXT",
-    ]
-
-    alert_extra_sql = ", ".join(_qid(c) for c in alert_extra_cols)
-    tx_extra_sql    = ", ".join(_qid(c) for c in tx_extra_cols)
+    alert_extra_sql = ", ".join(_qid(c) for c in _ALERT_EXTRA_COLS)
+    tx_extra_sql    = ", ".join(_qid(c) for c in _TX_EXTRA_COLS)
 
     tx_join_on = (
         'ag."DATE_BUCKET" IS NOT DISTINCT FROM tx."DATE_BUCKET" AND '
         + " AND ".join(
             f'ag.{_qid(c)} IS NOT DISTINCT FROM tx.{_qid(c)}'
-            for c in tx_extra_cols
+            for c in _TX_EXTRA_COLS
         )
     )
 
@@ -614,12 +629,48 @@ def _query_alerts(
 
     # tx_lookup uses full_params (dimension filters only);
     # alert_groups uses combined_params (dimension + reason exclusion + scrap filter)
-    all_cte_params = full_params + combined_params
+    all_cte_params = full_params + combined_params + threshold_params
+    return base_sql, all_cte_params
+
+
+# ── Task 4.7: Alerts SQL ──────────────────────────────────────────────────────
+
+def _query_alerts(
+    conn: Any,
+    *,
+    full_where: str,
+    full_params: List[Any],
+    reason_excl_sql: str,
+    reason_excl_params: List[Any],
+    granularity: str,
+    risk_threshold: float,
+    min_scrap_qty: float,
+    sort_by: str,
+    sort_dir: str,
+    page: int,
+    per_page: int,
+) -> Dict[str, Any]:
+    """Compute alert groups with SQL-level filtering, sorting, and pagination.
+
+    Applies the same time-granularity bucketing as trend/heatmap so that
+    the alerts table rows match the selected granularity (day/week/month/year).
+    TX dedup uses a two-level approach (inner: dedup per raw daily date;
+    outer: sum bucketed totals) to avoid double-counting.
+    """
+    base_sql, all_cte_params = _build_alerts_filtered_cte(
+        full_where=full_where,
+        full_params=full_params,
+        reason_excl_sql=reason_excl_sql,
+        reason_excl_params=reason_excl_params,
+        granularity=granularity,
+        risk_threshold=risk_threshold,
+        min_scrap_qty=min_scrap_qty,
+    )
 
     # Count total
     count_sql = base_sql + "SELECT COUNT(*) AS total FROM alerts_filtered"
     count_rows = _fetch_dict_rows(
-        conn, count_sql, all_cte_params + threshold_params
+        conn, count_sql, all_cte_params
     )
     total = int(count_rows[0].get("total") or 0) if count_rows else 0
 
@@ -666,7 +717,7 @@ def _query_alerts(
     )
     page_rows = _fetch_dict_rows(
         conn, page_sql,
-        all_cte_params + threshold_params + [per_page, offset]
+        all_cte_params + [per_page, offset]
     )
 
     items: List[Dict[str, Any]] = []
@@ -709,7 +760,7 @@ def _query_alerts(
         """
     )
     all_quality_keys = _fetch_dict_rows(
-        conn, keys_sql, all_cte_params + threshold_params
+        conn, keys_sql, all_cte_params
     )
 
     return {
@@ -904,6 +955,9 @@ def try_compute_view_from_spool(
             dept_proc_params=full_params,
             reason_excl_sql=reason_excl_sql,
             reason_excl_params=reason_excl_params,
+            risk_threshold=risk_threshold,
+            min_scrap_qty=min_scrap_qty,
+            granularity=granularity,
         )
         trend_items = _query_trend(
             conn,

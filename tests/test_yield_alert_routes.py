@@ -593,3 +593,96 @@ def test_alerts_response_includes_source_code_field(mock_view, client):
     assert "source_code" in items[0], (
         "Alert items must include 'source_code' field after spool-refactor B6"
     )
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_summary_route_forwards_risk_threshold_and_min_scrap_qty(mock_view, client):
+    """AC-3/YA-13: GET /api/yield-alert/summary must forward risk_threshold and
+    min_scrap_qty into apply_cached_view (previously dropped -> defaults only),
+    so /view and /summary return identical KPI numbers for the same query."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 1000, "scrap_qty": 15, "yield_pct": 98.5},
+        "trend": {"items": []},
+        "alerts": {"items": [], "pagination": {}, "quality": {}, "sort": {}},
+        "heatmap": {},
+        "station_summary": {},
+        "package_summary": {},
+        "filter_options": {},
+        "meta": {"view_source": "duckdb"},
+    }
+
+    response = client.get(
+        "/api/yield-alert/summary"
+        "?query_id=qid-threshold-001&risk_threshold=95.5&min_scrap_qty=3.5"
+    )
+
+    assert response.status_code == 200
+    _, kwargs = mock_view.call_args
+    assert kwargs["risk_threshold"] == 95.5, (
+        "risk_threshold must be parsed from request.args and forwarded, not dropped"
+    )
+    assert kwargs["min_scrap_qty"] == 3.5, (
+        "min_scrap_qty must be parsed from request.args and forwarded, not dropped"
+    )
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_summary_route_uses_default_thresholds_when_absent(mock_view, client):
+    """When risk_threshold/min_scrap_qty are absent from the query string, the
+    /summary route must forward the same defaults as /view (98 / 1)."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 1000, "scrap_qty": 15, "yield_pct": 98.5},
+        "trend": {"items": []},
+        "alerts": {"items": [], "pagination": {}, "quality": {}, "sort": {}},
+        "heatmap": {},
+        "station_summary": {},
+        "package_summary": {},
+        "filter_options": {},
+        "meta": {"view_source": "duckdb"},
+    }
+
+    response = client.get("/api/yield-alert/summary?query_id=qid-threshold-002")
+
+    assert response.status_code == 200
+    _, kwargs = mock_view.call_args
+    assert kwargs["risk_threshold"] == 98.0
+    assert kwargs["min_scrap_qty"] == 1.0
+
+
+@patch("mes_dashboard.routes.yield_alert_routes.apply_cached_view")
+def test_view_and_summary_response_shape_unchanged_after_scope_unification(mock_view, client):
+    """AC-7: GET /view and GET /summary response envelopes keep their existing
+    shape after the KPI rescoping fix — only summary numeric values/semantics
+    change, not the response schema."""
+    mock_view.return_value = {
+        "summary": {"transaction_qty": 1000.0, "scrap_qty": 15.0, "yield_pct": 98.5},
+        "trend": {"items": [], "granularity": "day"},
+        "alerts": {
+            "items": [],
+            "pagination": {"page": 1, "per_page": 50, "total": 0, "total_pages": 1},
+            "quality": {},
+            "sort": {"sort_by": "date_bucket", "sort_dir": "desc"},
+        },
+        "heatmap": {"items": []},
+        "station_summary": {"items": []},
+        "package_summary": {"items": []},
+        "filter_options": {
+            "lines": [], "packages": [], "types": [], "functions": [], "workcenter_groups": [],
+        },
+        "meta": {"cache": {"query_id": "qid-shape-001"}},
+    }
+
+    view_response = client.get("/api/yield-alert/view?query_id=qid-shape-001")
+    assert view_response.status_code == 200
+    view_payload = view_response.get_json()
+    assert set(view_payload["data"]["summary"].keys()) == {
+        "transaction_qty", "scrap_qty", "yield_pct",
+    }
+
+    summary_response = client.get("/api/yield-alert/summary?query_id=qid-shape-001")
+    assert summary_response.status_code == 200
+    summary_payload = summary_response.get_json()
+    assert set(summary_payload["data"].keys()) == {
+        "transaction_qty", "scrap_qty", "yield_pct",
+    }
+    assert summary_payload["data"] == view_payload["data"]["summary"]

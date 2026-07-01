@@ -1,0 +1,15 @@
+{
+  "change_id": "yield-alert-kpi-csv-parity",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/yield-alert/App.csv-export.test.js",
+  "duration_ms": 2037,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-143142/summary.json",
+    "stdout": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-143142/stdout.log",
+    "stderr": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-143142/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

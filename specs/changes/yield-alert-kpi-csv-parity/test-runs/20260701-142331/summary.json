@@ -1,0 +1,20 @@
+{
+  "change_id": "yield-alert-kpi-csv-parity",
+  "phase": "changed-area",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "python -m pytest tests/test_yield_alert_sql_runtime.py -v --junitxml='/home/egg/Project/DashBoard_vite/specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142331/junit.xml' -q --maxfail=1 --tb=short -ra",
+  "duration_ms": 1713,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests.test_yield_alert_sql_runtime.TestQuerySummaryAlertScopeParity::test_transaction_qty_matches_tx_extra_cols_dedup_sum_of_alert_candidates",
+    "message": "TypeError: _query_summary() got an unexpected keyword argument 'risk_threshold'"
+  },
+  "artifacts": {
+    "summary": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142331/summary.json",
+    "stdout": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142331/stdout.log",
+    "stderr": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142331/stderr.log",
+    "junit": "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142331/junit.xml"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

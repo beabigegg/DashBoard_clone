@@ -130,3 +130,85 @@ class TestLiteralTypes:
         for level in ("high", "medium", "low"):
             val: RiskLevel = level
             assert isinstance(val, str)
+
+
+# ── AC-6: YA-13 business rule + CHANGELOG version entries ─────────────────────
+
+import pathlib  # noqa: E402
+
+_REPO_ROOT = pathlib.Path(__file__).parent.parent
+_BUSINESS_RULES = (_REPO_ROOT / "contracts/business/business-rules.md").read_text(encoding="utf-8")
+_CHANGELOG = (_REPO_ROOT / "contracts/CHANGELOG.md").read_text(encoding="utf-8")
+
+
+class TestBusinessRuleYA13:
+    """AC-6: business-rules.md YA-13 must document the KPI-summary alert-candidate
+    scope + the tx_extra_cols dedup dimension (design.md Decisions 1/2), and
+    contracts/CHANGELOG.md must record the business+data version entries this
+    change introduced.
+
+    Per implementation-plan.md Known Risks #2: contracts/CHANGELOG.md
+    intentionally has ONLY `business` and `data` entries for this change —
+    `contracts/api/api-contract.md` is deliberately deferred (hook-blocked), so
+    this test asserts business+data entries only, NOT an `api` entry.
+    """
+
+    def test_ya13_rule_documents_kpi_scope_and_tx_extra_cols_dedup_dimension(self):
+        assert "YA-13" in _BUSINESS_RULES
+
+        # Locate the YA-13 row text for targeted assertions.
+        ya13_line = next(
+            (line for line in _BUSINESS_RULES.splitlines() if "YA-13" in line),
+            "",
+        )
+        assert ya13_line, "YA-13 row not found in business-rules.md"
+
+        # Alert-candidate predicate must be documented verbatim.
+        assert "SCRAP_QTY <> 0" in ya13_line
+        assert "risk_threshold" in ya13_line
+        assert "min_scrap_qty" in ya13_line
+
+        # Dedup dimension must be the _query_alerts local tx_extra_cols set,
+        # NOT the module-level _TX_DEDUP_COLS (design.md Decision 2).
+        assert "tx_extra_cols" in ya13_line
+        assert "_TX_DEDUP_COLS" in ya13_line
+        for col in [
+            "WORKORDER", "DEPARTMENT_GROUP", "PROCESS_CATEGORY",
+            "LINE_NAME", "PACKAGE_NAME", "TYPE_NAME", "FUNCTION_NAME",
+            "OPERATION_TEXT", "DATE_BUCKET",
+        ]:
+            assert col in ya13_line, f"YA-13 must enumerate dedup column {col}"
+
+        # Scope boundary: trend/heatmap/station/package are explicitly excluded.
+        assert "trend" in ya13_line
+        assert "heatmap" in ya13_line
+        assert "station_summary" in ya13_line
+        assert "package_summary" in ya13_line
+
+    def test_changelog_has_version_entries_for_business_data_api(self):
+        """CHANGELOG must record this change's business + data version bumps.
+
+        NOTE: no `api` entry is expected or required — api-contract.md is
+        deliberately deferred for this change (hook-blocked; see
+        change-classification.md Clarifications). Do not add one to satisfy
+        this test; asserting its absence documents the deferral is intentional.
+        """
+        assert "yield-alert-kpi-csv-parity" in _CHANGELOG
+
+        business_entries = [
+            line for line in _CHANGELOG.splitlines()
+            if line.startswith("## [business ")
+        ]
+        data_entries = [
+            line for line in _CHANGELOG.splitlines()
+            if line.startswith("## [data ")
+        ]
+        assert business_entries, "CHANGELOG must have at least one [business ...] entry"
+        assert data_entries, "CHANGELOG must have at least one [data ...] entry"
+
+        assert "## [business 1.40.0]" in _CHANGELOG
+        assert "## [data 1.33.0]" in _CHANGELOG
+
+        # This change's business/data entries must mention YA-13 / the change id.
+        assert "YA-13" in _CHANGELOG
+        assert "yield-alert-kpi-csv-parity" in _CHANGELOG

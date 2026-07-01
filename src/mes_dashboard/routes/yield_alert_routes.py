@@ -428,9 +428,17 @@ def api_yield_alert_summary():
     filters = _common_filters()
 
     try:
+        risk_threshold = float(request.args.get("risk_threshold", "98"))
+        min_scrap_qty = float(request.args.get("min_scrap_qty", "1"))
+    except (TypeError, ValueError):
+        return validation_error("risk_threshold/min_scrap_qty 需為數值")
+
+    try:
         result = apply_cached_view(
             query_id=query_id,
             filters=filters,
+            risk_threshold=risk_threshold,
+            min_scrap_qty=min_scrap_qty,
         )
         if result is None:
             return cache_expired_error()

@@ -1,0 +1,61 @@
+change-id: yield-alert-kpi-csv-parity
+timestamp: 2026-07-01T14:23:40Z
+agent: bug-fix-engineer
+status: complete
+files-read:
+  - specs/changes/yield-alert-kpi-csv-parity/change-request.md
+  - specs/changes/yield-alert-kpi-csv-parity/change-classification.md
+  - specs/changes/yield-alert-kpi-csv-parity/design.md
+  - specs/changes/yield-alert-kpi-csv-parity/test-plan.md
+  - specs/changes/yield-alert-kpi-csv-parity/implementation-plan.md
+  - src/mes_dashboard/services/yield_alert_sql_runtime.py
+  - tests/test_yield_alert_sql_runtime.py
+  - frontend/src/yield-alert-center/App.vue
+  - frontend/src/yield-alert-center/utils.ts
+  - frontend/tests/yield-alert/App.cross-filter.test.js
+  - frontend/tests/hold-overview/csv-export.test.js
+  - frontend/vitest.config.js
+artifacts:
+  - { type: symptom, pointer: "yield-alert-center KPI cards (移轉量/報廢量) do not reconcile with the CSV detail export under the same filters; CSV numeric cells contain raw float noise e.g. 4011.9999999999995" }
+  - { type: root-cause, pointer: "src/mes_dashboard/services/yield_alert_sql_runtime.py:196-240 (_query_summary) sums the whole dept/proc-filtered scope via dept_proc_where/reason_excl_sql only -- it never applies SCRAP_QTY<>0 nor the (yield_pct>=risk_threshold AND scrap_qty<min_scrap_qty) exclusion that _query_alerts() (491-670) applies; confirmed by direct read, _query_summary's SQL (213-227) has no threshold parameters and no SCRAP_QTY<>0 predicate at all" }
+  - { type: root-cause, pointer: "src/mes_dashboard/services/yield_alert_sql_runtime.py:569-581 (alert_groups groups by REASON_CODE via alert_extra_cols; alert_with_tx LEFT JOINs each REASON_CODE row to the SAME tx_lookup value keyed on the coarser tx_extra_cols, 534-548) -- confirmed by direct execution (see reproduction) that a naive SUM(transaction_qty) over 2 reason-coded rows sharing one tx_extra_cols group double-counts (1000 -> 2000)" }
+  - { type: root-cause, pointer: "frontend/src/yield-alert-center/App.vue:653-654 (_buildAlertsCSV) wraps toPcs(r.transaction_qty)/toPcs(r.scrap_qty) with no Math.round/toFixed, unlike yield_pct (655) and risk_score (657) which do .toFixed(...); String(v) on line 660 writes the raw float straight into the CSV cell" }
+  - { type: reproduction, pointer: "test-reproduced -- pytest tests/test_yield_alert_sql_runtime.py -k TestQuerySummaryAlertScopeParity: 4/4 new tests fail with TypeError: _query_summary() got an unexpected keyword argument 'risk_threshold' (current _query_summary has no risk_threshold/min_scrap_qty kwargs at all, confirming the scope-divergence root cause at the signature level); vitest run frontend/tests/yield-alert/App.csv-export.test.js: 2/2 new tests fail, CSV data line contains the raw '4011.9999999999995' / '50.9999999999999' float strings instead of rounded '4012'/'51' integers" }
+  - { type: hypothesis, pointer: "H1 (change-classification.md): KPI scope divergence from alert-candidate scope -- CONFIRMED by direct source read of _query_summary (196-240) vs _query_alerts (491-670); design.md corrects the change-request's claim that the divergence is dimension-filter scope (dept_proc_where already uses full_where per try_compute_view_from_spool:897-899) -- the real and only divergence is the missing SCRAP_QTY<>0 / risk_threshold / min_scrap_qty predicate" }
+  - { type: hypothesis, pointer: "H2 (change-classification.md): naive SUM over alerts_filtered.transaction_qty double-counts when a group has multiple reason_codes -- CONFIRMED by direct script execution against a real DuckDB fixture: WO-1 with REASON_CODE R1 (tx=600) and R2 (tx=400) produces tx_lookup=1000 (correctly deduped, since _tx_daily's GROUP BY excludes REASON_CODE), but alert_groups produces 2 rows (R1, R2) each carrying the same joined transaction_qty=1000, so naive SUM over both = 2000, not 1000" }
+  - { type: hypothesis, pointer: "H3 (change-classification.md): missing rounding in _buildAlertsCSV() -- CONFIRMED by direct source read; App.vue:653-654 has no Math.round/toFixed on toPcs(transaction_qty)/toPcs(scrap_qty), reproduced end-to-end via mounted-component test capturing the downloaded Blob content" }
+  - { type: files-changed, pointer: "tests/test_yield_alert_sql_runtime.py (new class TestQuerySummaryAlertScopeParity, 4 tests, ~155 lines appended); frontend/tests/yield-alert/App.csv-export.test.js (new file, 2 tests)" }
+  - { type: regression-evidence, pointer: "pytest tests/test_yield_alert_sql_runtime.py -k TestQuerySummaryAlertScopeParity -v: 4 failed, 0 passed, all with TypeError: _query_summary() got an unexpected keyword argument 'risk_threshold' (pins the exact target signature backend-engineer must implement)" }
+  - { type: regression-evidence, pointer: "pytest tests/test_yield_alert_sql_runtime.py -v (full file, changed-area phase): 24 passed (all pre-existing tests unaffected), 1 failed at maxfail=1 (new TestQuerySummaryAlertScopeParity tests) -- see specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142331/summary.json" }
+  - { type: regression-evidence, pointer: "npx vitest run frontend/tests/yield-alert/App.csv-export.test.js: 2 failed -- 'expected ... not to contain 4011.9999999999995' and 'expected \"4011.9999999999995\" to match /^\"\\d+\"$/' -- see specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142340/summary.json" }
+  - { type: residual-risk, pointer: "None from this diagnostic change (no production code touched). Residual risk for the eventual fix: backend-engineer must preserve the _query_alerts param order convention (all_cte_params = full_params + combined_params, then threshold_params, per implementation-plan.md IP-3) when refactoring _query_summary to share the CTE; frontend-engineer's Math.round must not alter yield_pct/risk_score formatting (out of scope, design.md Decision 4)." }
+  - { type: post-fix-verification, pointer: "backend-engineer's IP-3/IP-4/IP-5 (rescoped _query_summary sharing _query_alerts's alerts_filtered CTE via new _build_alerts_filtered_cte, risk_threshold/min_scrap_qty threaded through try_compute_view_from_spool and api_yield_alert_summary) + frontend-engineer's IP-7 (Math.round in _buildAlertsCSV) both complete; 150/150 yield-alert backend tests passed, App.csv-export.test.js 2/2 passed -- see specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-144022/summary.json (backend changed-area phase) and agent-log/frontend-engineer.yml (frontend targeted phase)" }
+bug-fix:
+  schema-version: 0.1.0
+  symptom: "yield-alert-center KPI cards (移轉量/報廢量) do not reconcile with the CSV detail export under the same filters, and the exported CSV contains raw float-noise values such as 4011.9999999999995 in the transaction_qty/scrap_qty columns."
+  expected_behavior: "KPI 移轉量/報廢量 reflect the alert-candidate totals under the current filters (same scope as _query_alerts(): SCRAP_QTY<>0 plus the risk_threshold/min_scrap_qty exclusion, with transaction_qty deduped over tx_extra_cols so multi-reason-code groups are not double-counted), reconciling with the CSV detail sums; CSV numeric fields are cleanly rounded whole-pcs integers."
+  actual_behavior: "_query_summary() sums the whole dept/proc-filtered scope with no SCRAP_QTY<>0 filter and no risk_threshold/min_scrap_qty exclusion, so it includes rows _query_alerts() would drop; a naive SUM(transaction_qty) over multi-reason-code alert rows would additionally double-count transaction_qty for groups with 2+ REASON_CODE values; _buildAlertsCSV() writes String(toPcs(transaction_qty))/String(toPcs(scrap_qty)) with no rounding, so DuckDB DOUBLE float residue is amplified by the *1000 K-PCS-to-pcs conversion into values like 4011.9999999999995."
+  observed_surface: "yield-alert-center KPI summary cards and the '匯出全部 CSV' (export all CSV) button's downloaded file"
+  reproduction:
+    status: test-reproduced
+    command: "python -m pytest tests/test_yield_alert_sql_runtime.py -k TestQuerySummaryAlertScopeParity -v"
+    failing_before_fix: true
+    summary: "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-142323/summary.json"
+  hypotheses:
+    - { id: H1, candidate: "src/mes_dashboard/services/yield_alert_sql_runtime.py::_query_summary", reason: "change-classification.md Bug Evidence hypothesis 1: KPI scope divergence from alert-candidate scope", result: confirmed }
+    - { id: H2, candidate: "src/mes_dashboard/services/yield_alert_sql_runtime.py::_query_alerts (alert_groups/tx_lookup join)", reason: "change-classification.md Bug Evidence hypothesis 2: naive SUM over alerts_filtered.transaction_qty double-counts multi-reason-code groups", result: confirmed }
+    - { id: H3, candidate: "frontend/src/yield-alert-center/App.vue::_buildAlertsCSV", reason: "change-classification.md Bug Evidence hypothesis 3: missing rounding in _buildAlertsCSV()", result: confirmed }
+  root_cause:
+    pointer: "src/mes_dashboard/services/yield_alert_sql_runtime.py:196-240"
+    summary: "_query_summary() aggregates SUM(TRANSACTION_QTY)/SUM(SCRAP_QTY) over dept_proc_where + reason_excl_sql only -- it has no risk_threshold/min_scrap_qty parameters and no SCRAP_QTY<>0 predicate, so it includes rows _query_alerts() (which does apply that full alert-candidate predicate, line 516-518 and 602-611) would exclude. Additionally, since alert_groups (569-577) groups by REASON_CODE while tx_lookup (564-567) does not, any future naive SUM(transaction_qty) directly over alerts_filtered-shaped rows (rather than a DISTINCT-deduped sum keyed on tx_extra_cols) will double-count groups with multiple reason codes -- proven at src/mes_dashboard/services/yield_alert_sql_runtime.py:534-581."
+  fix:
+    files_changed:
+      - tests/test_yield_alert_sql_runtime.py
+      - frontend/tests/yield-alert/App.csv-export.test.js
+    summary: "Bug-fix-engineer scope per lane routing: added FAILING regression tests only (no production code changed). Backend fix (rescope _query_summary to the alerts_filtered CTE with tx_extra_cols dedup, thread risk_threshold/min_scrap_qty through try_compute_view_from_spool and the /summary route) is owned by backend-engineer (IP-3/IP-4/IP-5). Frontend fix (Math.round around toPcs(transaction_qty)/toPcs(scrap_qty) in _buildAlertsCSV) is owned by frontend-engineer (IP-7)."
+  regression:
+    status: passed
+    command: "python -m pytest tests/test_yield_alert_sql_runtime.py tests/test_yield_alert_routes.py tests/test_yield_alert_service.py tests/test_yield_alert_contracts.py tests/test_yield_alert_dataset_cache.py -q"
+    summary: "specs/changes/yield-alert-kpi-csv-parity/test-runs/20260701-144022/summary.json"
+  residual_risk: "None outstanding. IP-3/IP-4/IP-5/IP-7 all implemented and green; contract samples get_yield_alert_view.json/get_yield_alert_summary.json re-captured (no content drift — query_id=test-id never resolves to a real spool in the offline capture harness, both remain CACHE_EXPIRED; only the non-meaningful timestamp changed, reverted to avoid noise)."
+next-action: "backend-engineer (this update) closes out the shared regression block per this file's own prior next-action instruction, since backend completed last. gate-ready for qa-reviewer: cdd-kit gate yield-alert-kpi-csv-parity."

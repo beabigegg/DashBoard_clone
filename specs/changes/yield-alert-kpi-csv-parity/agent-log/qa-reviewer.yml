@@ -1,0 +1,24 @@
+change-id: yield-alert-kpi-csv-parity
+agent: qa-reviewer
+timestamp: "2026-07-01T18:20:00Z"
+status: complete
+artifacts:
+  - { type: gate-results, pointer: "ruff: pass, type-check: pass, backend-unit/integration: pass (96), frontend-unit: pass (16), contract: pass, cdd-kit validate --contracts: pass" }
+  - { type: decision, pointer: "approved" }
+  - { type: failure-routing, pointer: "none" }
+next-action: none
+notes: >
+  Independently re-ran full backend (96 passed) and frontend (16 passed) suites,
+  ruff, and vue-tsc — all green. Verified design.md Decisions 1-3 against actual
+  git diff (shared CTE builder, tx_extra_cols dedup, trend/heatmap/station/package
+  byte-unchanged). Verified YA-13 text matches implementation. Verified
+  double-count regression test uses a real fixture proving the trap before
+  asserting the fix. Verified api-contract.md deferral is legitimately
+  non-blocking (no endpoint shape changed). Noted a benign discrepancy:
+  backend-engineer.yml claimed it edited existing stale assertions, but git diff
+  shows the test file changes were purely additive (0 deletions) — no
+  test-weakening occurred, so this is a log inaccuracy, not a defect. Flagged
+  commit-hygiene reminder: working tree also contains the concurrent
+  eap-alarm-coarse-filter change sharing business-rules.md/CHANGELOG.md; this
+  change's entries are intact and must be isolated at commit time per
+  CLAUDE.md's parallel-session guidance.

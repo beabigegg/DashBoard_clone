@@ -1,0 +1,25 @@
+change-id: yield-alert-kpi-csv-parity
+agent: contract-reviewer
+timestamp: "2026-07-01T14:10:00Z"
+status: needs-review
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/business/business-rules.md:164-181" }
+  - { type: contracts-reviewed, pointer: "contracts/api/api-contract.md:146-147" }
+  - { type: contracts-reviewed, pointer: "contracts/data/data-shape-contract.md:1012-1116" }
+  - { type: contracts-reviewed, pointer: "contracts/CHANGELOG.md:1-25" }
+  - { type: version-bumps, pointer: "business 1.39.0->1.40.0, data 1.32.0->1.33.0, api 1.35.0->1.36.0" }
+  - { type: breaking-changes, pointer: "none; value-semantics-only change, sole consumer frontend/src/yield-alert-center/, atomic cutover, same precedent as yield-alert-filter-expansion" }
+next-action: spec-architect must settle whether the unified KPI transaction_qty dedup reuses the existing module-level _TX_DEDUP_COLS constant (yield_alert_sql_runtime.py, includes DEPARTMENT_NAME) or _query_alerts' local tx_extra_cols (excludes DEPARTMENT_NAME) before YA-13 wording is finalized verbatim.
+notes: >
+  Verdict: changes-required. Direction (KPI scope unification + tx dedup) is sound
+  and reuses an existing pattern (_TX_DEDUP_COLS already used by trend/heatmap/
+  station_summary), but exact YA-13 column-list wording depends on spec-architect's
+  design decision. Drafted exact text for business-rules.md (new YA-13), a new
+  data-shape-contract.md subsection 3.16.7 (CSV numeric formatting), an
+  api-contract.md Compatibility Notes entry, and CHANGELOG.md entries for all
+  three contract types (business 1.40.0 / data 1.33.0 / api 1.36.0). Flagged that
+  since api-contract.md schema-version bumps, contracts/openapi.json AND
+  contracts/api/openapi.json must be regenerated even though no endpoint table/
+  schema shape changed. No existing YA-01..YA-12 rule contradicts this change
+  (confirmed none reference _query_summary or whole-plant scope as authoritative)
+  — this is a pure gap-fill, not a correction of a documented rule.

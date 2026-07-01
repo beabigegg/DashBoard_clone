@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.32.0
+schema-version: 1.33.0
 last-changed: 2026-07-01
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1113,6 +1113,25 @@ Added by change `yield-alert-filter-expansion`. Applies to `data.filter_options.
 
 `frontend/src/yield-alert-center/useYieldAlertDuckDB.ts` independently reimplements filter-options computation for the browser-side large-dataset path (used when row count crosses the DuckDB-WASM threshold). As of `yield-alert-filter-expansion`, this client-side path must gain the same `SELECT DISTINCT DEPARTMENT_NAME` dimension as the server-side `_query_filter_options()` / `compute_cross_filter_options()`, or large queries that switch to WASM mode mid-session will silently lose `workcenter_groups` cross-filtering. Implementation must keep both paths in parity.
 
+#### 3.16.7 Alerts CSV Numeric Export Formatting
+
+Added by change `yield-alert-kpi-csv-parity`. Applies to the client-side CSV built by `_buildAlertsCSV()` in `frontend/src/yield-alert-center/App.vue` from alert-candidate rows (server-paginated `GET /api/yield-alert/alerts` fallback, or the DuckDB-WASM `computeView()` full-export path — row source differs, but both feed the same CSV builder).
+
+**Problem:** `transaction_qty`/`scrap_qty` are stored in Oracle as K-PCS values that are always exact multiples of 0.001 (1 pcs). DuckDB DOUBLE arithmetic across multi-CTE SUM/ROUND leaves binary floating-point residue (e.g. `4.012` becomes `4.0119999999999996`). The frontend `toPcs()` helper (`frontend/src/yield-alert-center/utils.ts`) multiplies by 1000 to convert K-PCS → pcs, amplifying the residue into values like `4011.9999999999995`. The on-screen table masks this via `.toLocaleString()` (`App.vue`), but the CSV path wrote `String(v)` directly with no rounding — writing the raw float-noise string into the exported file.
+
+**Rule:** `_buildAlertsCSV()` MUST round `toPcs(r.transaction_qty)` and `toPcs(r.scrap_qty)` to whole pcs (`Math.round(...)`) before writing to the CSV cell — pcs is the real-world data granularity (Oracle source values are exact multiples of 0.001 K-PCS = 1 pcs), so no sub-pcs fractional part is ever meaningful. This mirrors the existing `.toFixed()` treatment already applied to `yield_pct` (4 decimals) and `risk_score` (2 decimals) in the same function — every numeric CSV cell in this export must be deterministically formatted, none left as raw `String(floatValue)`.
+
+**Column formatting summary (`_buildAlertsCSV`):**
+
+| CSV column | source field | format |
+|---|---|---|
+| 轉出數(pcs) | `toPcs(r.transaction_qty)` | `Math.round(...)` — whole pcs, no decimal |
+| 報廢量(pcs) | `toPcs(r.scrap_qty)` | `Math.round(...)` — whole pcs, no decimal |
+| 良率(%) | `r.yield_pct` | `.toFixed(4)` (unchanged) |
+| 風險分數 | `r.risk_score` | `.toFixed(2)` (unchanged) |
+
+**Excel-parseability invariant:** rounded whole-pcs values written as plain numeric strings (no trailing decimal noise) must not be misread by Excel as "number stored as text" — long float-noise strings were the second contributing cause (alongside the KPI/CSV scope divergence fixed by business-rules.md YA-13) of user-reported `SUM()` mismatches on the exported CSV.
+
 ---
 
 ### §3.17 EAP ALARM Spool Schema
@@ -1552,6 +1571,10 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ---
 
 ## CHANGELOG
+## [data 1.33.0] — 2026-07-01
+### Added
+- yield-alert-kpi-csv-parity: §3.16.7 Alerts CSV Numeric Export Formatting — `_buildAlertsCSV()` must round `transaction_qty`/`scrap_qty` (post-`toPcs()`) to whole pcs instead of writing raw `String(floatValue)`, eliminating DuckDB-DOUBLE float-noise (e.g. `4011.9999999999995`) that caused Excel to treat cells as text and skip them in `SUM()`. See business-rules.md YA-13 for the related KPI/alert-candidate scope unification.
+
 ## [data 1.32.0] — 2026-07-01
 ### Changed
 - yield-alert-filter-expansion: §3.16.4 `process_type` scope table expands from 2 to 6 rows (`GA%`/`GC%`/`GD%`/`F%`/`W%`/`D%`) with `WIP_CLASS_CODE` domain mapping. New §3.16.5 documents the `workcenter_groups` payload shape change for `GET /api/yield-alert/view` and `GET /api/yield-alert/cross-filter-options` (global `filter_cache` → per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME`; breaking value semantics, JSON key unchanged). New §3.16.6 flags the DuckDB-WASM client parity requirement. `GET /api/yield-alert/filter-options` and other `filter_cache` consumers unaffected.

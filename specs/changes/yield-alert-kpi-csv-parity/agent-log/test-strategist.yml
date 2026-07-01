@@ -1,0 +1,28 @@
+agent: test-strategist
+change-id: yield-alert-kpi-csv-parity
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/yield-alert-kpi-csv-parity/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_yield_alert_sql_runtime.py::TestQuerySummaryAlertScopeParity → src/mes_dashboard/services/yield_alert_sql_runtime.py::_query_summary" }
+  - { type: tdd-pairs, pointer: "frontend/tests/yield-alert/App.csv-export.test.js → frontend/src/yield-alert-center/App.vue::_buildAlertsCSV" }
+  - { type: tdd-pairs, pointer: "tests/test_yield_alert_routes.py::test_summary_route_forwards_risk_threshold_and_min_scrap_qty → src/mes_dashboard/routes/yield_alert_routes.py::api_yield_alert_summary" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, data-boundary; e2e deferred (Tier 2 optional)" }
+  - { type: mapping-completeness, pointer: "AC-1..AC-7 all mapped; plus one unlisted-but-required surface (design.md Open Risk #2: /summary route risk_threshold/min_scrap_qty forwarding) added as its own row under AC-3" }
+notes: |
+  Read design.md before finalizing (it was written after change-classification.md's
+  AC-1..7 draft). Two corrections from the change-request's stated root cause,
+  both already reflected in design.md and now in test-plan.md:
+  (1) the 6-dimension-filter gap does not exist in current code (full_where already
+      flows into _query_summary); the real remaining gap is the missing
+      alert-candidate predicate (SCRAP_QTY<>0 + threshold exclusion).
+  (2) the tx-dedup key is _query_alerts's local tx_extra_cols (excludes raw
+      DEPARTMENT_NAME), NOT the module-level _TX_DEDUP_COLS constant that
+      trend/heatmap/station/package already use — using the wrong constant would
+      dedup too finely and break CSV/KPI parity. Added an explicit regression test
+      (test_department_name_split_within_one_tx_lookup_group_does_not_break_dedup)
+      as a tripwire against implementation agents defaulting to the "prefer the
+      shared constant" habit.
+  Also added a route-level kwarg-forwarding test for /summary's risk_threshold/
+  min_scrap_qty per design.md's flagged Open Risk #2 (currently dropped), since a
+  silent omission there would re-open the exact reconciliation gap this change
+  fixes. No open questions remain — design.md fully settled all decisions this
+  plan depended on.

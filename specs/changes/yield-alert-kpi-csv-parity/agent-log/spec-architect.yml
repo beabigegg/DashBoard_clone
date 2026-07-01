@@ -1,0 +1,13 @@
+agent: spec-architect
+change-id: yield-alert-kpi-csv-parity
+artifacts:
+  - { type: adr-written, pointer: "none (decisions captured in design.md; no boundary/persistence/consistency change warranting an ADR)" }
+  - { type: affected-areas, pointer: "yield-alert-center: SQL runtime summary aggregation, /summary route wiring, Vue CSV export" }
+  - { type: decision-summary, pointer: "rescope KPI to alert-candidate set via shared alerts_filtered CTE; dedup tx on tx_extra_cols (not _TX_DEDUP_COLS); CSV Math.round to pcs; summary-only scope" }
+  - { type: risks-noted, pointer: "0 high, 3 medium (/summary drops threshold params; stale change-request root-cause text; code-map uncommitted)" }
+notes: |
+  Source inspection corrected the change-request root cause: _query_summary already
+  receives full_where (all 6 dims). Real gap is the alert-candidate predicate
+  (SCRAP_QTY<>0 + threshold exclusion), not the dimension filters. YA-13 dedup key
+  is tx_extra_cols (excludes DEPARTMENT_NAME), NOT the module-level _TX_DEDUP_COLS —
+  contract-reviewer's draft assumed _TX_DEDUP_COLS and MUST be corrected.
