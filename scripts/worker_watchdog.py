@@ -28,7 +28,7 @@ import os
 import signal
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -298,7 +298,7 @@ def process_restart_request() -> bool:
             requested_by=flag_data.get("user"),
             requested_at=flag_data.get("timestamp"),
             requested_ip=flag_data.get("ip"),
-            completed_at=datetime.now().isoformat(),
+            completed_at=datetime.now(timezone.utc).isoformat(),
             success=False,
             source=source,
             decision=decision["decision"],
@@ -329,7 +329,7 @@ def process_restart_request() -> bool:
             requested_by=flag_data.get("user"),
             requested_at=flag_data.get("timestamp"),
             requested_ip=flag_data.get("ip"),
-            completed_at=datetime.now().isoformat(),
+            completed_at=datetime.now(timezone.utc).isoformat(),
             success=False,
             source=source,
             decision="failed",

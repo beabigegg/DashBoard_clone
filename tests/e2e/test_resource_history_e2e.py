@@ -305,8 +305,16 @@ class TestResourceHistoryAPIWorkflow:
 
     @patch('mes_dashboard.services.resource_history_service._get_filtered_resources')
     @patch('mes_dashboard.services.resource_history_service.read_sql_df')
-    def test_export_workflow(self, mock_read_sql, mock_resources, client):
-        """Export workflow should return valid CSV."""
+    def test_export_workflow(self, mock_read_sql, mock_resources, client, monkeypatch):
+        """Export workflow should return valid CSV.
+
+        RESOURCE_HISTORY_USE_UNIFIED_JOB defaults to "on", which routes /export
+        to the async unified-job path (503 without a real RQ worker). This test
+        exercises the legacy mocked-Oracle CSV stream, so force the flag off.
+        """
+        monkeypatch.setattr(
+            'mes_dashboard.routes.resource_history_routes.RESOURCE_HISTORY_USE_UNIFIED_JOB', False
+        )
         mock_resources.return_value = [
             {
                 'RESOURCEID': 'RES001',

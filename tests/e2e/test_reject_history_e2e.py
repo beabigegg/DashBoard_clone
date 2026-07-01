@@ -66,7 +66,7 @@ def _query_and_wait(app_server: str, body: dict) -> str:
     assert query_payload.get("success") is True, query_payload
 
     if query_resp.status_code == 200:
-        query_id = query_payload.get("query_id")
+        query_id = query_payload.get("data", {}).get("query_id")
         assert query_id, f"Sync 200 response missing query_id: {query_payload}"
         return query_id
 

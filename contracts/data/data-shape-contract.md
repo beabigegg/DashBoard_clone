@@ -133,11 +133,12 @@ breaking-change-policy: deprecate-2-minors
   "data": {
     "query_id": "<string>",
     "summary": {
-      "onHoldTotalCount": 0,
-      "onHoldTotalQty": 0,
+      "onHoldLots": 0,
+      "onHoldQty": 0,
       "todayNewQty": 0,
       "todayReleaseQty": 0,
       "todayFutureHoldQty": 0,
+      "repeatQualityHoldQty": 0,
       "onHoldAvgHours": 0.0,
       "onHoldMaxHours": 0.0
     },

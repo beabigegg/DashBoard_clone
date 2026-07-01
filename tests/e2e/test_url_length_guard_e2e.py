@@ -181,8 +181,9 @@ class TestWipDrilldownBackE2E:
         )
         wait(timeout_seconds=30.0)
 
-        # The back element must be a <button> (not <a>)
-        back_btn = page.locator("button.ui-btn--ghost").filter(has_text="Overview").first
+        # The back element must be a <button> (not <a>). It's icon-only;
+        # "Overview" lives in aria-label, not visible text.
+        back_btn = page.locator('button.ui-btn--ghost[aria-label*="Overview"]').first
         assert back_btn.count() > 0, (
             "Back navigation element was not found as a <button>. "
             "It may still be an <a href> which can cause 400 errors with long filter sets."

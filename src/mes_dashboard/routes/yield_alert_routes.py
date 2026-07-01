@@ -44,6 +44,7 @@ from mes_dashboard.services.yield_alert_service import (
     get_yield_workcenter_group_options,
     query_alert_candidates,
     query_reason_detail,
+    validate_date_range,
 )
 from mes_dashboard.services.yield_alert_sql_runtime import compute_cross_filter_options
 
@@ -153,6 +154,15 @@ def api_yield_alert_query():
     end_date = str(body.get("end_date", "")).strip()
     if not start_date or not end_date:
         return validation_error("缺少必要參數: start_date, end_date")
+
+    # Validate date range up-front — the async-enqueue branch below has no other
+    # validation gate, so an over-limit range would otherwise silently become a
+    # 202 background job instead of a 400 (only the sync/cache-hit paths called
+    # execute_primary_query, which validates internally).
+    try:
+        validate_date_range(start_date, end_date)
+    except ValueError as exc:
+        return error_response(VALIDATION_ERROR, str(exc), status_code=400, meta={"max_query_days": MAX_QUERY_DAYS})
 
     # B4: Validate process_type — one of the 6 accepted values; default to GA%
     _VALID_PROCESS_TYPES = frozenset({"GA%", "GC%", "GD%", "F%", "W%", "D%"})

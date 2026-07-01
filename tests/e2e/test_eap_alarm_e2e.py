@@ -49,13 +49,15 @@ def _post_spool(
 def _poll_job_to_completion(
     app_server: str,
     job_id: str,
-    timeout_seconds: float = 240.0,
+    timeout_seconds: float = 420.0,
 ) -> dict:
     """Poll GET /api/eap-alarm/spool/status?job_id= until terminal state.
 
     A single EAP-alarm RQ worker processes one job at a time; a real Oracle
-    query here takes ~60-95s. 240s tolerates this job queueing behind one
-    other job (e.g. a sibling test's cold enqueue) without going flaky.
+    query normally takes ~60-95s but has been observed at ~248s with no other
+    job queued when the full e2e suite runs many domains' RQ workers
+    concurrently against the same Oracle instance. 420s tolerates that
+    contention plus one other job queued ahead of this one.
     """
     status_url = f"{app_server}/api/eap-alarm/spool/status"
     deadline = time.time() + timeout_seconds
@@ -153,14 +155,21 @@ class TestEapAlarmSpoolE2E:
         assert resp.status_code == 400
         assert resp.json()["success"] is False
 
-    def test_post_spool_invalid_eqp_type_returns_400(self, app_server: str):
-        """POST /spool with invalid eqp_type → 400 (EA-07)."""
+    def test_post_spool_blank_eqp_type_entry_returns_400(self, app_server: str):
+        """POST /spool with a blank/whitespace eqp_type entry → 400 (EA-07).
+
+        eqp_types values are free-form EQUIPMENT_ID strings, not a closed enum
+        (redesigned in 9ef51fe0 — real IDs are formatted like "GWBK-0241" and
+        never matched the old 4-char enum). An unrecognised-but-well-formed
+        value is now accepted (matches zero rows, not a validation error);
+        only non-string/blank entries are still rejected.
+        """
         resp = requests.post(
             f"{app_server}/api/eap-alarm/spool",
             json={
                 "date_from": "2026-06-10",
                 "date_to": "2026-06-17",
-                "eqp_types": ["INVALID_TYPE_XYZ"],
+                "eqp_types": ["   "],
             },
             timeout=30,
         )

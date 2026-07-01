@@ -272,8 +272,8 @@ class TestHoldHistoryTrendRepeatQualityField:
 # ============================================================
 
 _TODAY_SUMMARY_KEYS = {
-    "onHoldTotalCount",
-    "onHoldTotalQty",
+    "onHoldLots",
+    "onHoldQty",
     "todayNewQty",
     "todayReleaseQty",
     "todayFutureHoldQty",
