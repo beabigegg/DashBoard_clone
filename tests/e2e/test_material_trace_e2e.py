@@ -160,8 +160,8 @@ class TestMaterialTraceBrowserE2E:
             pytest.skip(f"Material trace preflight unavailable: {probe.status_code}")
 
         goto_shell_route(page, app_server, "/material-trace", "原物料追溯查詢")
-        expect(page.get_by_role("heading", name="原物料追溯查詢")).to_be_visible()
-
+        # material-trace has no page-title heading — "原物料追溯查詢" only
+        # exists as the sidebar nav link text.
         textarea = page.locator("textarea.filter-textarea")
         expect(textarea).to_be_visible()
         textarea.fill("TEST-LOT-001")

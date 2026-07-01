@@ -392,8 +392,10 @@ class TestQueryToolPageE2E:
         # Verify lineage API was auto-fired
         assert "/api/trace/lineage" in collected, "Lineage API was not auto-fired after resolve"
 
-        # Lineage tree should show nodes
+        # Lineage tree renders inside a modal that only opens on demand —
+        # click the "查看血緣樹" button before checking for its title.
         page.wait_for_timeout(2000)
+        page.locator("button", has_text="查看血緣樹").first.click()
         tree_section = page.locator("text=批次血緣樹")
         expect(tree_section).to_be_visible()
 

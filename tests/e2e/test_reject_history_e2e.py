@@ -357,8 +357,8 @@ class TestRejectHistoryBrowserE2E:
             pytest.skip("reject-history service busy")
 
         goto_shell_route(page, app_server, "/reject-history", "報廢歷史查詢")
-        expect(page.get_by_role("heading", name="報廢歷史查詢")).to_be_visible()
-
+        # reject-history imports PageHeader but never renders it — no
+        # page-title heading exists; "報廢歷史查詢" is only the sidebar link text.
         query_button = page.locator(".filter-panel .ui-btn--primary").first
         expect(query_button).to_be_enabled(timeout=60000)
         query_button.click()

@@ -552,8 +552,8 @@ class TestYieldAlertBrowserE2E:
             pytest.skip("Yield alert service busy")
 
         goto_shell_route(page, app_server, "/yield-alert-center", "良率查詢")
-        expect(page.get_by_role("heading", name="良率查詢")).to_be_visible()
-
+        # yield-alert-center has no page-title heading — "良率查詢" only
+        # exists as the sidebar nav link text.
         query_button = page.locator(".primary-query-panel .ui-btn--primary").first
         expect(query_button).to_be_enabled(timeout=60000)
         query_button.click()

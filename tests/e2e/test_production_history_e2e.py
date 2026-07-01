@@ -138,9 +138,9 @@ class TestProductionHistoryBrowserE2E:
             pytest.skip("Unable to resolve production-history type label")
 
         goto_shell_route(page, app_server, "/production-history", "生產歷程查詢")
-        expect(page.get_by_role("heading", name="生產歷程查詢")).to_be_visible()
-
-        trigger = page.locator(".ph-app__filter-field--type .multi-select-trigger").first
+        # production-history has no page-title heading — "生產歷程查詢" only
+        # exists as the sidebar nav link text.
+        trigger = page.locator('[data-testid="ph-first-tier-type"] .multi-select-trigger').first
         expect(trigger).to_be_visible(timeout=60000)
         trigger.click()
         page.locator(".multi-select-option", has_text=type_label).first.click()

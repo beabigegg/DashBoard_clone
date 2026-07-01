@@ -128,7 +128,8 @@ class TestJobQueryBrowserE2E:
             start_date="2026-03-01",
             end_date="2026-03-07",
         )
-        expect(page.get_by_role("heading", name="設備維修查詢")).to_be_visible()
+        # job-query has no page-title heading — "設備維修查詢" only exists as
+        # the sidebar nav link text, not on the page itself.
         expect(page.locator("text=已選設備：1")).to_be_visible(timeout=60000)
 
         wait_for_any_visible(

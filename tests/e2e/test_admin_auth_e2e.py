@@ -266,23 +266,31 @@ class TestPortalDynamicTabs:
     """E2E tests for dynamic portal tabs based on page status."""
 
     def test_portal_hides_dev_tabs_for_non_admin(self, client, temp_page_status):
-        """Test portal hides dev page tabs for non-admin users."""
+        """Test portal reports statuses for the frontend to hide dev tabs for non-admin.
+
+        After nav-config-to-code, drawer/page structure and the admin-based
+        dev-tab filtering both live client-side in navigationState.js
+        (buildDynamicNavigationState). The backend's only remaining
+        responsibility is to report each route's raw status and is_admin
+        faithfully (unfiltered) — that's what this test verifies.
+        """
         response = client.get("/api/portal/navigation")
         assert response.status_code == 200
         payload = response.get_json()
-        routes = {
-            page["route"]
-            for drawer in payload.get("drawers", [])
-            for page in drawer.get("pages", [])
-        }
-        assert "/wip-overview" in routes
-        assert "/production-history" not in routes
+        statuses = payload.get("statuses", {})
+        assert statuses.get("/wip-overview") == "released"
+        assert statuses.get("/production-history") == "dev"
         assert payload.get("is_admin") is False
 
     @patch('mes_dashboard.routes.user_auth_routes.is_admin', return_value=True)
     @patch('mes_dashboard.routes.user_auth_routes.authenticate')
     def test_portal_shows_all_tabs_for_admin(self, mock_auth, _mock_is_admin, client, temp_page_status):
-        """Test portal shows all tabs for admin users."""
+        """Test portal reports is_admin=True so the frontend shows all tabs.
+
+        Same rationale as test_portal_hides_dev_tabs_for_non_admin — statuses
+        are always returned unfiltered; only is_admin distinguishes the two
+        cases at the backend layer.
+        """
         mock_auth.return_value = _mock_admin_user()
 
         # Login as admin
@@ -295,13 +303,9 @@ class TestPortalDynamicTabs:
         response = client.get("/api/portal/navigation")
         assert response.status_code == 200
         payload = response.get_json()
-        routes = {
-            page["route"]
-            for drawer in payload.get("drawers", [])
-            for page in drawer.get("pages", [])
-        }
-        assert "/wip-overview" in routes
-        assert "/production-history" in routes
+        statuses = payload.get("statuses", {})
+        assert statuses.get("/wip-overview") == "released"
+        assert statuses.get("/production-history") == "dev"
         assert payload.get("is_admin") is True
 
 

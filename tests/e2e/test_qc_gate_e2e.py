@@ -18,7 +18,8 @@ class TestQcGateBrowserE2E:
             pytest.skip(f"QC-GATE summary unavailable: {summary_resp.status_code}")
 
         goto_shell_route(page, app_server, "/qc-gate", "QC-GATE 狀態")
-        expect(page.get_by_role("heading", name="QC-GATE 狀態")).to_be_visible()
+        # QC-GATE has no page-title heading (only section titles below) —
+        # "QC-GATE 狀態" only exists as the sidebar nav link text.
         expect(page.locator("text=站點等待時間分布")).to_be_visible()
         expect(page.locator("text=LOT 明細")).to_be_visible()
 

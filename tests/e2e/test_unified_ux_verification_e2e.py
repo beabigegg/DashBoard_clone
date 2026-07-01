@@ -250,10 +250,14 @@ class TestFilterCrossImpactMatrix:
         paths = [r["path"] for r in responses]
 
         if hold_type_btns.count() > 1 and paths:
-            # Should prefer /view over /query for supplementary changes
+            # Should prefer /view (or today-mode's /today-snapshot) over a
+            # fresh /query for supplementary changes.
             has_view = any("/view" in p for p in paths)
             has_query = any("/query" in p for p in paths)
-            assert has_view or has_query, f"Supplementary change triggered no API call. Paths: {paths}"
+            has_today_snapshot = any("/today-snapshot" in p for p in paths)
+            assert has_view or has_query or has_today_snapshot, (
+                f"Supplementary change triggered no API call. Paths: {paths}"
+            )
 
     def test_wip_overview_status_toggle_triggers_matrix_only(self, page: Page, app_server: str):
         """Status toggle → matrix reload only (not summary)."""

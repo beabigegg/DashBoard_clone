@@ -18,8 +18,8 @@ class TestResourceHistoryBrowserE2E:
             pytest.skip(f"Resource history options unavailable: {options_resp.status_code}")
 
         goto_shell_route(page, app_server, "/resource-history", "設備歷史績效")
-        expect(page.get_by_role("heading", name="設備歷史績效")).to_be_visible()
-
+        # resource-history has no page-title heading — "設備歷史績效" only
+        # exists as the sidebar nav link text.
         wait_for_any_visible(
             page,
             [

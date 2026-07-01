@@ -49,6 +49,11 @@ class TestPortalPage:
     def test_portal_sidebar_navigation_uses_direct_routes(self, page: Page, app_server: str):
         goto_shell_route(page, app_server, "/wip-overview", "WIP 即時概況")
 
+        # Sidebar is a closed-by-default off-canvas drawer (translateX(-100%))
+        # at every viewport width, not just mobile — must be opened before
+        # its links are within the viewport and clickable.
+        page.locator(".sidebar-toggle").click()
+
         first_route = _sidebar_links(page).first
         expect(first_route).to_be_visible(timeout=30000)
         target_href = first_route.get_attribute("href")
