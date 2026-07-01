@@ -32,6 +32,17 @@ Pattern: `downtime_analysis_cache.py::_SCHEMA_VERSION`; `downtime_analysis_servi
 
 Evidence: `prod-history-detail-raw-rows` (removed aggregated aliases); `downtime-browser-duckdb` (`data-shape-contract.md §3.13`).
 
+**Embed-in-key inventory (verified query-arch A-4):** `reject_dataset`
+(`_CACHE_SCHEMA_VERSION`), `resource_dataset` (`_CANONICAL_BASE_SCHEMA_VERSION`),
+and `yield_alert_dataset` (`_CACHE_SCHEMA_VERSION`) all embed `cache_schema_version`
+in the query-id at **every** `_make_query_id` call site — bumping the constant
+orphans old parquet. `reject_dataset` is pinned against regression by
+`tests/test_reject_schema_version_key.py` (AST guard over all call sites).
+`hold_dataset` deliberately has **no** version constant: it uses DESCRIBE-based
+column detection instead (see *hold-history Spool* below), so it tolerates schema
+drift at read time without a key bump. (An earlier audit that flagged
+`reject_dataset` as missing the embed was incorrect — the embed is present.)
+
 ## query-tool Has No Persistent Spool
 
 **The query-tool executes Oracle SQL on-demand and does NOT persist DuckDB parquet files.** Do not add `rm tmp/query_spool/query_tool/*.parquet` to any deploy or rollback runbook for query-tool changes.
