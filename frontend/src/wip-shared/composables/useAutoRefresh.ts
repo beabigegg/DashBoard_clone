@@ -20,6 +20,14 @@ export function useAutoRefresh({
   const controllers = new Map<string, AbortController>();
   let pageHideHandler: (() => void) | null = null;
 
+  // intervalMs may be a number or a getter; resolve per scheduling cycle so a
+  // dynamic interval (e.g. aligned to a backend cadence) takes effect on the
+  // next tick. A non-finite/positive result falls back to the default.
+  function resolveIntervalMs(): number {
+    const raw = typeof intervalMs === 'function' ? intervalMs() : intervalMs;
+    return typeof raw === 'number' && raw > 0 ? raw : DEFAULT_REFRESH_INTERVAL_MS;
+  }
+
   function stopAutoRefresh(): void {
     if (refreshTimer) {
       clearTimeout(refreshTimer);
@@ -34,7 +42,7 @@ export function useAutoRefresh({
         void onRefresh?.();
       }
       scheduleNextRefresh();
-    }, jitteredInterval(intervalMs));
+    }, jitteredInterval(resolveIntervalMs()));
   }
 
   function startAutoRefresh(): void {

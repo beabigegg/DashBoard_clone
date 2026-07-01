@@ -104,6 +104,15 @@ def dashboard():
     return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
 
 
+def _metrics_history_interval_seconds() -> int:
+    """Return the metrics-snapshot cadence (METRICS_HISTORY_INTERVAL), or 30 on error."""
+    try:
+        from mes_dashboard.core.metrics_history import METRICS_HISTORY_INTERVAL
+        return int(METRICS_HISTORY_INTERVAL)
+    except Exception:
+        return 30
+
+
 @admin_bp.route("/api/system-status", methods=["GET"])
 @admin_required
 def api_system_status():
@@ -212,7 +221,13 @@ def api_system_status():
         },
         "runtime_contract": runtime_contract,
         "single_port_bind": GUNICORN_BIND,
-        "worker_pid": os.getpid()
+        "worker_pid": os.getpid(),
+        "monitoring": {
+            # Backend metrics-snapshot cadence (METRICS_HISTORY_INTERVAL). The admin
+            # UI reads this to align its auto-refresh poll to the snapshot interval
+            # instead of a hard-coded 30s, so a tuned interval stays in sync.
+            "metrics_history_interval_seconds": _metrics_history_interval_seconds(),
+        },
     })
 
 

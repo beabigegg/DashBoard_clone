@@ -11,6 +11,7 @@ import {
 
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
+import { apiGet } from '../core/api';
 
 const tabs = [
   {
@@ -50,6 +51,24 @@ const tabRef = ref(null);
 const refreshing = ref(false);
 const autoRefreshEnabled = ref(true);
 
+// Auto-refresh poll interval (ms). Defaults to 30s and is aligned to the backend
+// metrics-snapshot cadence (METRICS_HISTORY_INTERVAL) once system-status is read,
+// so polling stays in sync with how often the backend actually snapshots.
+const DEFAULT_POLL_INTERVAL_MS = 30_000;
+const pollIntervalMs = ref(DEFAULT_POLL_INTERVAL_MS);
+
+async function syncPollInterval() {
+  try {
+    const resp = await apiGet('/admin/api/system-status');
+    const seconds = resp?.data?.monitoring?.metrics_history_interval_seconds;
+    if (typeof seconds === 'number' && seconds > 0) {
+      pollIntervalMs.value = seconds * 1000;
+    }
+  } catch {
+    // Non-fatal — keep the default poll interval.
+  }
+}
+
 const currentTab = computed(
   () => tabs.find((tab) => tab.key === activeTabKey.value) || tabs[0],
 );
@@ -72,7 +91,7 @@ async function refreshNow() {
 
 const { startAutoRefresh, stopAutoRefresh } = useAutoRefresh({
   onRefresh: refreshNow,
-  intervalMs: 30_000,
+  intervalMs: () => pollIntervalMs.value,
   autoStart: false,
 });
 
@@ -97,6 +116,7 @@ watch(activeTabKey, async () => {
 
 onMounted(async () => {
   await nextTick();
+  await syncPollInterval();
   await refreshNow();
   if (autoRefreshEnabled.value) {
     startAutoRefresh();

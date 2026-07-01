@@ -267,6 +267,9 @@ Added by `downtime-duckdb-join-migration`. Prior per-worker parity notes in indi
 | LOG_STORE_ENABLED | observability | all | no | no | true | true | platform-team | true or false | no | — |
 | LOG_SQLITE_PATH | observability | all | no | no | logs/admin_logs.sqlite | logs/admin_logs.sqlite | platform-team | writable path | no | logging 停用 |
 | LOG_SQLITE_RETENTION_DAYS | observability | all | no | no | 7 | 7 | platform-team | positive integer | no | — |
+| METRICS_HISTORY_INTERVAL | observability | all | no | no | 30 | 30 | platform-team | positive integer (seconds); metrics-snapshot cadence; surfaced in /admin/api/system-status so the admin UI aligns its poll | no | uses default 30 |
+| METRICS_HISTORY_RETENTION_DAYS | observability | all | no | no | 3 | 3 | platform-team | positive integer (days) | no | uses default 3 |
+| METRICS_HISTORY_MAX_ROWS | observability | all | no | no | 50000 | 50000 | platform-team | positive integer | no | uses default 50000 |
 
 ---
 

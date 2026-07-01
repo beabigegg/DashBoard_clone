@@ -62,6 +62,16 @@ def test_system_status_blocked_without_auth(client):
     assert resp.status_code in (401, 403, 302)
 
 
+def test_system_status_exposes_metrics_history_interval(client, auth_patches):
+    """B-2: system-status surfaces the snapshot cadence for admin poll alignment."""
+    resp = client.get("/admin/api/system-status")
+    assert resp.status_code == 200
+    monitoring = resp.get_json()["data"].get("monitoring")
+    assert monitoring is not None, "system-status must include a monitoring block"
+    interval = monitoring.get("metrics_history_interval_seconds")
+    assert isinstance(interval, int) and interval > 0
+
+
 # ── GET /admin/api/worker/status ─────────────────────────────────────────────
 
 def test_worker_status_success_envelope(client, auth_patches):
