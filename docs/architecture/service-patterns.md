@@ -173,6 +173,8 @@ Wiring status — **unified job core** (`*_USE_UNIFIED_JOB=on` path; as of base-
 
 > ⚠️ Before base-job-semaphore-wiring, the unified path (EAP_ALARM/DOWNTIME/MATERIAL_TRACE `USE_UNIFIED_JOB=on` by default) bypassed the gate entirely — the legacy acquires only cover the flag-off path. Any new `BaseChunkedDuckDBJob` subclass inherits the slot automatically; a subclass that overrides `run()` MUST wire the slot itself (see MaterialTraceJob).
 
+Stress/integration evidence for this wiring: `docs/architecture/base-job-semaphore-wiring-stress-soak-report.md` (`tests/stress/test_base_job_semaphore_stress.py`, `tests/integration/test_base_job_semaphore_wiring.py`).
+
 Use the `heavy_query_slot(owner)` contextmanager from `global_concurrency` — it wraps
 `acquire_heavy_query_slot` / `release_heavy_query_slot` with an exception-safe
 try/finally and guards release with `if acquired` (fail-open never double-releases):

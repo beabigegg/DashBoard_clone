@@ -42,7 +42,7 @@ dispatch (one input box that routes to different query shapes).
 | **material-consumption** | `useConsumptionQuery.ts`; some option narrowing | light | no | 🟡 **Medium** — migrate after the clean ones |
 | **production-history** | `useFirstTierFilters.ts` — cross-filter + `_lastCommitted` snapshot-diff | yes | yes | 🟠 **Needs snapshot-diff support first** |
 | **eap-alarm** | `useEapAlarmFilter.js` — snapshot-diff (`_lastCommitted`) + fine-filter re-query | yes | yes | ⛔ **Keep bespoke** (canonical snapshot-diff) |
-| **downtime-analysis** | `useFilterState.ts` (106L) + 7 cross-filter sites coupled to `useDowntimeDuckDB.ts` (1111L) | heavy | yes | ⛔ **Keep bespoke** (DuckDB-runtime coupling) |
+| **downtime-analysis** | `useFilterState.ts` (106L) + 7 cross-filter sites coupled to `useDowntimeDuckDB.ts` (1111L) | heavy | no | ⛔ **Keep bespoke** (DuckDB-runtime coupling) |
 | **query-tool** | input-type-driven; 6 composables (`useLotDetail`, `useEquipmentQuery`, …) | yes | no | ⛔ **Keep bespoke** (not a filter-grid model) |
 | **anomaly-overview**, **qc-gate**, **material-trace** | no MultiSelect / no filter grid | n/a | n/a | ➖ **N/A** — no filter surface to converge |
 

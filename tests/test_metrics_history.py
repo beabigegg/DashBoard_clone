@@ -12,7 +12,7 @@ import os
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 from mes_dashboard.core.metrics_history import (
@@ -467,6 +467,33 @@ class TestCollectorObservability:
                 call.args and call.args[0].startswith("RQ dead worker alert:")
                 for call in mock_warning.call_args_list
             )
+
+    def test_online_count_uses_presence_window_not_engagement_window(self):
+        """The 'online_count' snapshot column must use get_online_count() (15-min
+        presence), matching the heartbeat/UsageTab 'online' figure -- not
+        get_active_count() (30-min engagement), which would silently diverge
+        from the same-named field shown elsewhere on the admin Usage tab."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_online_count_window.sqlite")
+            store = MetricsHistoryStore(db_path=db_path)
+            store.initialize()
+            collector = MetricsHistoryCollector(app=None, store=store)
+
+            mock_store = MagicMock()
+            mock_store.get_online_count.return_value = 4
+            mock_store.get_active_count.return_value = 9
+
+            with patch(
+                "mes_dashboard.core.login_session_store.get_login_session_store",
+                return_value=mock_store,
+            ):
+                collector._collect_snapshot()
+
+            mock_store.get_online_count.assert_called_once()
+            mock_store.get_active_count.assert_not_called()
+
+            rows = store.query_snapshots(minutes=5)
+            assert rows[-1]["online_count"] == 4
 
     def test_collector_records_service_rss_bytes(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -744,10 +744,10 @@ class MetricsHistoryCollector:
                 data["heavy_query_memory_error_total"] = 0
                 data["heavy_query_async_fallback_total"] = 0
 
-            # Online count
+            # Online count (presence window, consistent with heartbeat/UsageTab).
             try:
                 from mes_dashboard.core.login_session_store import get_login_session_store
-                data["online_count"] = get_login_session_store().get_active_count()
+                data["online_count"] = get_login_session_store().get_online_count()
             except Exception:
                 data["online_count"] = None
 
