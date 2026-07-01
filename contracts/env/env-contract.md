@@ -26,6 +26,8 @@ breaking-change-policy: deprecate-2-minors
 | SESSION_LIFETIME | app | all | no | no | 28800 | 28800 | platform-team | positive integer (seconds) | no | 使用預設 |
 | PERMANENT_SESSION_LIFETIME | app | all | no | no | 28800 | 28800 | platform-team | positive integer (seconds) | no | 使用預設 |
 | LOGIN_SESSION_SQLITE_PATH | app | all | no | no | logs/login_sessions.sqlite | logs/login_sessions.sqlite | platform-team | writable path | no | fallback to in-memory |
+| ONLINE_WINDOW_MINUTES | app | all | no | no | 15 | 15 | platform-team | positive integer (minutes); presence window for "currently online" count (heartbeat within window) | no | uses default 15 |
+| ACTIVE_WINDOW_MINUTES | app | all | no | no | 30 | 30 | platform-team | positive integer (minutes); GA-style "active users (last N min)" engagement window | no | uses default 30 |
 
 ## Database（Oracle）
 

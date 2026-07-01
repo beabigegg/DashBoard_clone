@@ -112,9 +112,12 @@ def _query_mysql(
             "avg_duration_sec": _safe_int(row["avg_duration_sec"]) if row else 0,
         }
 
-        # Active sessions — always use SQLite (authoritative real-time source)
+        # Active sessions — always use SQLite (authoritative real-time source).
+        # online_sessions = presence (short window); active_sessions = 30-min engagement.
         from mes_dashboard.core.login_session_store import get_login_session_store
-        overview["active_sessions"] = get_login_session_store().get_active_count()
+        _store = get_login_session_store()
+        overview["online_sessions"] = _store.get_online_count()
+        overview["active_sessions"] = _store.get_active_count()
 
         # DAU trend
         dau_rows = conn.execute(text(f"""
@@ -277,9 +280,12 @@ def _query_sqlite(
             "avg_duration_sec": _safe_int(row[2]) if row else 0,
         }
 
-        # Active sessions — use LoginSessionStore (consistent with MySQL path)
+        # Active sessions — use LoginSessionStore (consistent with MySQL path).
+        # online_sessions = presence (short window); active_sessions = 30-min engagement.
         from mes_dashboard.core.login_session_store import get_login_session_store
-        overview["active_sessions"] = get_login_session_store().get_active_count()
+        _store = get_login_session_store()
+        overview["online_sessions"] = _store.get_online_count()
+        overview["active_sessions"] = _store.get_active_count()
 
         # DAU trend
         cursor.execute(f"""

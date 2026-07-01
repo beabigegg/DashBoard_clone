@@ -193,6 +193,7 @@ class TestHeartbeat:
 
     def test_heartbeat_updates_session_when_logged_in(self, client):
         mock_store = MagicMock()
+        mock_store.get_online_count.return_value = 2
         mock_store.get_active_count.return_value = 3
 
         with client.session_transaction() as sess:
@@ -204,6 +205,9 @@ class TestHeartbeat:
         assert rv.status_code == 200
         body = rv.get_json()
         assert body["success"] is True
+        # B-1: heartbeat returns both presence (online) and engagement (active) counts.
+        assert body["data"]["online_count"] == 2
+        assert body["data"]["active_count"] == 3
         mock_store.update_last_active.assert_called_once_with("sid-hb")
 
     def test_heartbeat_handles_store_error_gracefully(self, client):
