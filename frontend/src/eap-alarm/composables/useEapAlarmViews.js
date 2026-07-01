@@ -6,6 +6,7 @@
  */
 import { reactive, ref } from 'vue';
 import { apiGet } from '../../core/api';
+import { useViewStaleness } from '../../shared-composables/useViewStaleness';
 
 const DEFAULT_PER_PAGE = 20;
 
@@ -58,16 +59,13 @@ export function useEapAlarmViews() {
   const detailPerPage = ref(DEFAULT_PER_PAGE);
 
   // ── Request staleness (per-endpoint to avoid cross-fetch cancellation) ──
-  const _activeRequestId = { summary: 0, pareto: 0, trend: 0 };
-
-  function nextRequestId(key) {
-    _activeRequestId[key] += 1;
-    return _activeRequestId[key];
-  }
-
-  function isStale(key, id) {
-    return id !== _activeRequestId[key];
-  }
+  // Shared composable: a per-key counter so a fast endpoint never invalidates
+  // a slow sibling's in-flight request (see useViewStaleness).
+  const { nextRequestId, isStaleRequest: isStale } = useViewStaleness([
+    'summary',
+    'pareto',
+    'trend',
+  ]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

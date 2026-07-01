@@ -4,5 +4,7 @@ export { usePaginationState } from './usePaginationState';
 export { readQueryState, writeQueryState } from './useQueryState';
 export { useTraceProgress } from './useTraceProgress';
 export { useRequestGuard } from './useRequestGuard';
+export { useViewStaleness } from './useViewStaleness';
+export type { ViewStaleness } from './useViewStaleness';
 export { useUrlSync } from './useUrlSync';
 export { useFilterOrchestrator } from './useFilterOrchestrator';

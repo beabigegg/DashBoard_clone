@@ -71,6 +71,36 @@ staleCounters.summary++; const s = staleCounters.summary
 
 Evidence: `eap-alarm-analysis` — summary cards showed 0 because shared counter was zeroed by the fastest endpoint.
 
+### Shared composable: `useViewStaleness`
+
+The per-endpoint pattern is now a shared composable —
+`frontend/src/shared-composables/useViewStaleness.ts` — so apps don't re-roll it:
+
+```ts
+import { useViewStaleness } from '../shared-composables/useViewStaleness';
+const { nextRequestId, isStaleRequest } = useViewStaleness(['summary', 'pareto', 'trend']);
+
+async function fetchSummary(params) {
+  const rid = nextRequestId('summary');
+  const data = await apiGet('/api/x/summary', params);
+  if (isStaleRequest('summary', rid)) return;  // a newer summary fetch superseded us
+  summary.value = data;
+}
+```
+
+**Which guard to use:**
+- `useViewStaleness` (per-key) — endpoints that are re-fetched **independently** (changing
+  the detail page re-fetches only `detail`; changing granularity re-fetches only `trend`).
+  A fast endpoint must not invalidate a slow sibling. Reference consumer: `eap-alarm`.
+- `useRequestGuard` (single counter) — a single batch where **latest user action wins** and
+  in-flight work is cancelled together (often paired with an `AbortController`). Reference
+  consumer: `hold-overview` (`fetchSummary/Matrix/Hold/Lots` always run together in one
+  `Promise.all`, so a single counter is correct — do NOT migrate it to per-key).
+
+**Adoption candidates** (multi-view apps to evaluate for `useViewStaleness` when they gain
+independent per-view re-fetch): `wip-overview`, `downtime-analysis`. Migrate only after
+confirming the app re-fetches views independently rather than as one batch.
+
 ## Oracle DATE Midnight UTC — TZ-Safe Formatting
 
 **Oracle DATE columns serialised as midnight UTC (`T00:00:00`) must NOT be passed to `new Date()` in a non-UTC locale.**
