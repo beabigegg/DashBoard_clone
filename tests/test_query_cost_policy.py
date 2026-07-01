@@ -256,6 +256,64 @@ class TestL3RowCount:
 
 
 # ---------------------------------------------------------------------------
+# Per-domain policy registry (_DOMAIN_POLICIES) — single source of truth
+# ---------------------------------------------------------------------------
+
+class TestDomainPolicyRegistry:
+    """The registry centralises per-domain thresholds; these pin its contract.
+
+    All entries are behaviour-preserving (30 days / 200k rows) at introduction —
+    these tests fail loudly if a future edit silently changes a domain's routing.
+    """
+
+    # Every domain that calls classify_query_cost() must be registered so the
+    # table stays the source of truth. Update this list when a domain is added.
+    _CLASSIFIER_DOMAINS = ["resource", "hold", "reject", "downtime", "query_tool", "wip"]
+    _ALWAYS_ASYNC = ["eap_alarm", "trace", "msd"]
+
+    def test_always_async_set_is_exactly_the_three_heavy_domains(self):
+        """_ALWAYS_ASYNC_DOMAINS is derived from the registry and must not drift."""
+        from mes_dashboard.core.query_cost_policy import _ALWAYS_ASYNC_DOMAINS
+
+        assert _ALWAYS_ASYNC_DOMAINS == frozenset({"eap_alarm", "trace", "msd"})
+
+    @pytest.mark.parametrize("domain", _ALWAYS_ASYNC)
+    def test_always_async_domains_resolve_to_always_async_policy(self, domain):
+        from mes_dashboard.core.query_cost_policy import _default_policy_for
+
+        assert _default_policy_for(domain).always_async is True
+
+    @pytest.mark.parametrize("domain", _CLASSIFIER_DOMAINS)
+    def test_classifier_domains_are_registered(self, domain):
+        """Each threshold domain is present in the registry (not falling back)."""
+        from mes_dashboard.core.query_cost_policy import _DOMAIN_POLICIES
+
+        assert domain in _DOMAIN_POLICIES
+
+    @pytest.mark.parametrize("domain", _CLASSIFIER_DOMAINS)
+    def test_classifier_domains_preserve_default_thresholds(self, domain):
+        """Behaviour-preservation pin: all threshold domains stay 30d / 200k."""
+        from mes_dashboard.core.query_cost_policy import _default_policy_for
+
+        policy = _default_policy_for(domain)
+        assert policy.always_async is False
+        assert policy.day_threshold == 30
+        assert policy.row_threshold == 200_000
+
+    def test_unregistered_domain_falls_back_to_default(self):
+        from mes_dashboard.core.query_cost_policy import _DEFAULT_POLICY, _default_policy_for
+
+        assert _default_policy_for("totally_unknown_domain") is _DEFAULT_POLICY
+
+    def test_registry_resolution_matches_classify_result(self):
+        """A 40-day span on a registered 30-day domain routes ASYNC via the registry."""
+        # resource is registered at day_threshold=30 → 40-day span → ASYNC
+        assert _call(domain="resource", date_from="2025-01-01", date_to="2025-02-10") == "ASYNC"
+        # ...and a 10-day span stays SYNC.
+        assert _call(domain="resource", date_from="2025-01-01", date_to="2025-01-11") == "SYNC"
+
+
+# ---------------------------------------------------------------------------
 # Deprecation warning
 # ---------------------------------------------------------------------------
 
