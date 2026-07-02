@@ -325,6 +325,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     scope: 'in-scope',
     compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
+  '/production-achievement': buildContract({
+    route: '/production-achievement',
+    routeId: 'production-achievement',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '生產達成率',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
 });
 
 const REQUIRED_FIELDS = Object.freeze([
