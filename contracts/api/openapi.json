@@ -5803,13 +5803,7 @@
               }
             }
           },
-          "400": {
-            "description": "Error response (see contract error format)"
-          },
           "500": {
-            "description": "Error response (see contract error format)"
-          },
-          "503": {
             "description": "Error response (see contract error format)"
           }
         },
@@ -5818,7 +5812,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cdd-errors": "400/500/503"
+        "x-cdd-errors": "500"
       },
       "put": {
         "summary": "PUT /api/production-achievement/targets",
