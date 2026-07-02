@@ -33,20 +33,63 @@
 --                                            ROW_NUMBER, one workflow row per
 --                                            container — see mid_section_defect
 --                                            precedent for this join shape)
+--
+-- scoped_containers pre-filters to only the CONTAINERIDs that can actually
+-- need wb.WORKFLOWNAME resolved. Of PA-05's branches, only three reference
+-- wb.WORKFLOWNAME at all (the plain D/B specs that must NOT be 雙晶/三晶,
+-- plus the 雙晶-specific and 三晶-specific SPECNAME lists) -- every other
+-- branch (金線/銀線/銅線 group, 2DB2WB, 2DB1WB, 2DB, 1DB, DBCB, CBRO group)
+-- never touches WORKFLOWNAME.
+--
+-- DW_MES_WIP (95M+ rows) has NO index on CONTAINERID, only on CONTAINERNAME
+-- and TXNDATE (confirmed via ALL_IND_COLUMNS against the real dev DB) --
+-- joining/filtering it by CONTAINERID forces a full-table scan regardless
+-- of how tightly scoped_containers is narrowed (measured: unscoped ROW_NUMBER()
+-- OVER DW_MES_WIP by CONTAINERID timed out at 55s DPY-4024; scoping by date
+-- range alone still took 47.5s for ~36K containers; scoping further by the
+-- SPECNAME allowlist above only got to 41s for ~16.7K containers -- the cost
+-- is dominated by the full scan itself, not the join cardinality). The fix
+-- is bridging through DW_MES_CONTAINER (5.5M rows, indexed on BOTH
+-- CONTAINERID and CONTAINERNAME) to translate our CONTAINERID scope into
+-- CONTAINERNAMEs, then joining DW_MES_WIP via its indexed CONTAINERNAME
+-- column instead. Measured after this fix: 30-day window down to ~22s.
 
-WITH workflow_info AS (
-    SELECT CONTAINERID, WORKFLOWNAME
+WITH scoped_containers AS (
+    SELECT DISTINCT weh.CONTAINERID
+    FROM DWH.DW_MES_LOTWIPHISTORY weh
+    WHERE weh.TRACKOUTTIMESTAMP >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
+      AND weh.TRACKOUTTIMESTAMP <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD')
+      {{ CONTAINERNAME_FILTER }}
+      AND weh.SPECNAME IN (
+        'Epoxy D/B','Eutectic D/B','Solder Paste D/B','Solder D/B+E-Clip+固化',
+        'Solder D/B+E-Clip+固化-DW','Solder Paste D/B+E-Clip','Solder Paste D/B+E-Clip-DW',
+        'Epoxy D/B-2','Eutectic D/B-2','Eutectic D/B-雙晶','Epoxy D/B-3','Eutectic D/B-3'
+      )
+),
+scoped_container_names AS (
+    SELECT c.CONTAINERID, c.CONTAINERNAME
+    FROM DWH.DW_MES_CONTAINER c
+    WHERE c.CONTAINERID IN (SELECT CONTAINERID FROM scoped_containers)
+),
+workflow_info_by_name AS (
+    SELECT CONTAINERNAME, WORKFLOWNAME
     FROM (
         SELECT
-            w.CONTAINERID,
+            w.CONTAINERNAME,
             w.WORKFLOWNAME,
             ROW_NUMBER() OVER (
-                PARTITION BY w.CONTAINERID
+                PARTITION BY w.CONTAINERNAME
                 ORDER BY w.WORKFLOWNAME
             ) AS wf_rn
         FROM DWH.DW_MES_WIP w
+        WHERE w.CONTAINERNAME IN (SELECT CONTAINERNAME FROM scoped_container_names)
     )
     WHERE wf_rn = 1
+),
+workflow_info AS (
+    SELECT scn.CONTAINERID, wi.WORKFLOWNAME
+    FROM scoped_container_names scn
+    LEFT JOIN workflow_info_by_name wi ON scn.CONTAINERNAME = wi.CONTAINERNAME
 )
 SELECT
     CASE
