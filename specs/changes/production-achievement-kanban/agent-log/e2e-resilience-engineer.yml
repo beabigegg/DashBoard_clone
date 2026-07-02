@@ -1,0 +1,115 @@
+change-id: production-achievement-kanban
+agent: e2e-resilience-engineer
+
+summary: >
+  Built frontend dist, started a real gunicorn+preload_app server
+  (GunicornHarness pattern: mes_dashboard:create_app(), src/ on PYTHONPATH,
+  REDIS_ENABLED=true, FLASK_ENV/FLASK_TESTING/PYTEST_CURRENT_TEST popped,
+  plus SECRET_KEY and CONDA_DEFAULT_ENV=mes-dashboard required to clear
+  ProductionConfig/runtime-contract checks not covered by the harness
+  defaults), and ran all three new Playwright specs for real against it.
+  Found and fixed two real implementation bugs plus one test-URL bug; all
+  10 test cases now pass with zero retries, exercising real network/DOM
+  behavior (not the vacuous "page not rendered — skip" scaffold branch).
+
+environment_notes: >
+  Oracle/MySQL not reachable in this worktree; not required for these specs
+  since all three specs mock every API call at the Playwright network layer
+  and MYSQL_OPS_ENABLED defaults false (no .env override present). Shared
+  Playwright browser cache pinned to a different revision (1228) than this
+  npm package expects (1208); worked around via a private
+  PLAYWRIGHT_BROWSERS_PATH with symlinks aliasing 1228->1208 folder names
+  (scratchpad-only, does not touch the shared ms-playwright cache).
+
+bugs_found:
+  - id: BUG-1-test
+    severity: test-bug
+    fixed: true
+    description: >
+      All three new specs used PAGE_URL='/portal-shell.html#/production-achievement'
+      (hash-routing style). portal-shell/router.js uses createWebHistory('/portal-shell')
+      (path-based routing, no .html route exists server-side -> 404). Fixed to
+      '/portal-shell/production-achievement' and '/portal-shell/admin/pages',
+      matching the working convention in resource-history-async.spec.ts /
+      mid-section-defect.spec.ts.
+  - id: BUG-2-test
+    severity: test-bug
+    fixed: true
+    description: >
+      setupBaseRoutes() in all three specs mocked GET /api/portal/navigation
+      wrapped in the {success,data,meta} envelope. The real endpoint
+      (app.py::portal_navigation_config) returns a plain unwrapped object
+      (statuses/is_admin/admin_user at top level). App.vue reads
+      payload.statuses directly, so the wrapped mock silently produced an
+      empty status map -> zero dynamic routes registered. Fixed all four
+      occurrences to the real unwrapped shape.
+  - id: BUG-3-implementation
+    severity: implementation-bug
+    fixed: true
+    fix_scope: small-obviously-correct
+    file: frontend/src/portal-shell/App.vue
+    description: >
+      Real race condition (reproducible independent of the test bugs above):
+      App.vue's onMounted -> loadNavigation() reads `route.name`/`route.path`
+      via useRoute() to detect the 'shell-fallback' catch-all and
+      self-heal-replace to the newly-synced dynamic route. On a direct/hard
+      navigation to a native-module deep link (e.g. /production-achievement),
+      this async function's own /api/portal/navigation fetch can resolve
+      BEFORE vue-router's own async initial-navigation guard (which does its
+      own /api/auth/me fetch) finishes resolving. loadNavigation() then reads
+      a not-yet-resolved `route` (name=undefined, path stuck at '/'), the
+      `route.name === 'shell-fallback'` check is false, and the self-heal
+      replace() never fires -- the page is stuck rendering ShellHomeView
+      forever even though the dynamic route was already registered. Fixed by
+      adding `await router.isReady()` before reading `route` in that block.
+      Confirmed via window.__DEBUG_TRACE instrumentation (not console.log,
+      which esbuild's production `drop: ['console']` strips) that this
+      exact race was occurring, and that the fix resolves it deterministically
+      across repeated runs. This affects any dynamically-registered native
+      route reached by a fresh/hard navigation, not just production-achievement.
+  - id: BUG-4-test
+    severity: test-bug
+    fixed: true
+    description: >
+      App.vue passes data-testid="pa-report-table" to <DataTable>, but
+      DataTable.vue's template has multiple root nodes (a <slot/> for column
+      registrations plus the .data-table-root div) -- Vue 3 only falls
+      through non-prop attributes to a single root element, so
+      data-testid="pa-report-table" is silently dropped and never appears in
+      the DOM. The rendered table only carries DataTable's own built-in
+      data-testid="datatable". Also, TargetEditPanel.vue's target-value
+      DataTable renders the SAME testid on the same page, so a plain
+      [data-testid="datatable"] selector is ambiguous (strict-mode
+      violation, 2 matches). Fixed test-side: scope by the ".ui-card"
+      containing heading text "生產達成率明細" then locate
+      "[data-testid=datatable]" within it. Flagging pa-report-table as a
+      real (if minor) implementation gap for frontend-engineer: either wrap
+      <DataTable> in a stable single-root div carrying the testid (pattern
+      already used by db-scheduling/material-trace's own App.vue), or accept
+      the shared "datatable" testid and rely on card-heading scoping
+      long-term.
+
+sanity_checks:
+  - achievement_rate null/Infinity/NaN: PASS. utils.ts formatQty/
+    formatAchievementRate both guard `value === null || undefined ||
+    !Number.isFinite(value)` -> NULL_DISPLAY ("—"). Confirmed live in
+    browser DOM (table body contains "—", never "Infinity"/"NaN"/"null").
+  - admin permission block wiring: PASS. admin-pages/App.vue
+    handleTogglePermission() -> PUT /admin/api/production-achievement/permissions/{id}
+    {can_edit_targets}; handleGrantNewPermission() reuses the same PUT with
+    true; loadPermissions() -> GET /admin/api/production-achievement/permissions.
+    Confirmed live: E2E test toggles aria-pressed true->false and grants a
+    new user (toggle count 1->2) against real component code, mocked network.
+  - resilience spec MySQL-off exercisability (task 5): CONFIRMED not
+    MySQL-dependent. Both resilience tests are pure page.route() mocks; no
+    MYSQL_OPS_ENABLED override present in this worktree (defaults false per
+    env-contract.md) and both passed cleanly in that state.
+
+artifacts:
+  - { type: test-files, pointer: "frontend/tests/playwright/production-achievement.spec.js" }
+  - { type: test-files, pointer: "frontend/tests/playwright/resilience/production-achievement-resilience.spec.js" }
+  - { type: test-files, pointer: "frontend/tests/playwright/data-boundary/production-achievement-data-boundary.spec.js" }
+  - { type: test-files, pointer: "frontend/src/portal-shell/App.vue:160-165 (router.isReady() fix)" }
+  - { type: scenarios-covered, pointer: "happy-path nav+filter+render, target-edit authorized/unauthorized-403, admin assign/revoke, mysql-unavailable degrade-to-null, mysql-unavailable 503-on-write, negative/non-numeric target_qty client-side rejection, empty-result-set empty-state" }
+  - { type: mutation-checks, pointer: "none" }
+  - { type: trace-artifacts, pointer: "frontend/test-results/ (screenshots/videos/traces from failing runs during investigation; final run 10/10 passed with no failure artifacts)" }

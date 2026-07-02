@@ -157,6 +157,15 @@ async function loadNavigation() {
     });
     drawers.value = state.drawers;
 
+    // Wait for the router's own initial navigation to finish resolving before
+    // inspecting `route`. Without this, on a direct/hard-navigated deep link
+    // (e.g. /production-achievement) this async loadNavigation() call can
+    // read `route` while it is still mid-resolution (route.name undefined,
+    // route.path stuck at the pre-navigation placeholder) — so the
+    // `shell-fallback` self-heal replace below silently never fires and the
+    // page is stuck showing ShellHomeView even though allowedPaths already
+    // contains the freshly-synced dynamic route.
+    await router.isReady();
     if (route.name === 'shell-fallback') {
       if (state.allowedPaths.includes(route.path)) {
         await router.replace(route.fullPath);

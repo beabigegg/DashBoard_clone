@@ -1,0 +1,18 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "collect",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "cd frontend && npx vitest run --reporter=basic src/production-achievement src/admin-pages",
+  "duration_ms": 441,
+  "first_failure": {
+    "kind": "unknown",
+    "message": "}"
+  },
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-075606/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-075606/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-075606/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

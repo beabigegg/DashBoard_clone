@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts",
+  "duration_ms": 1207,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-075934/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-075934/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-075934/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

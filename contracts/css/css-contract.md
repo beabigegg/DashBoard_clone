@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.11.0
-last-changed: 2026-06-30
+schema-version: 1.12.0
+last-changed: 2026-07-02
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -148,6 +148,10 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.12.0] — 2026-07-02
+### Added
+- production-achievement-kanban: `frontend/src/production-achievement/style.css` scoped under `.theme-production-achievement` (Rule 4.2/4.3); zero unscoped top-level rules permitted, enforced by `npm run css:check` Rule 6. Rule 4.5 applies: `.theme-production-achievement` must be batch-added via `sed` to all `:is(.theme-X, …)` groups in `frontend/src/resource-shared/styles.css` if this page reuses any shared component styles from that file. Rule 4.4 (Teleport wrapper) applies if the admin permission-block modal/dropdown uses `<Teleport to="body">`. The admin permission-management block lives inside the existing `admin-pages` app (`.theme-admin-pages` scope) — it is an addition to the existing Admin page, not a new route, so it needs no new theme class of its own.
 
 ## [css 1.11.0] — 2026-06-30
 ### Added

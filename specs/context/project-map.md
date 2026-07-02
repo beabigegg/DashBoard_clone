@@ -2,11 +2,11 @@
 artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
-root: DashBoard_vite
-visible-dirs: 204
-visible-files: 1079
-omitted-dirs: 68
-truncated-dirs: 6
+root: yield-achievement-kanban
+visible-dirs: 164
+visible-files: 826
+omitted-dirs: 63
+truncated-dirs: 3
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -31,11 +31,8 @@ Use this deterministic map to choose candidate context paths before reading file
 ## Tree
 
 ```
-DashBoard_vite/
+yield-achievement-kanban/
 |-- .cdd/
-|   |-- .hooks-installed
-|   |-- code-graph.index.json
-|   |-- code-map.index.json
 |   |-- code-map.yml
 |   |-- conformance.json
 |   |-- context-policy.json
@@ -52,64 +49,6 @@ DashBoard_vite/
 |       |-- released-pages-hardening-gates.yml
 |       |-- soak-tests.yml
 |       \-- stress-tests.yml
-|-- .hypothesis/
-|   |-- constants/
-|   |   |-- 003dc30e458ea11d
-|   |   |-- 00731426b90af740
-|   |   |-- 00e4935d1440a2ca
-|   |   |-- 010e00414068858a
-|   |   |-- 0199bae5456ba1ac
-|   |   |-- 01cb19e636d04082
-|   |   |-- 0252574dd854487b
-|   |   |-- 02bca2c9d2f8566d
-|   |   |-- 039f8a28fa91d19f
-|   |   |-- 03d72be617fe07b9
-|   |   |-- 0478f49b48ee4a27
-|   |   |-- 04e26e6472111f2c
-|   |   |-- 04f75a340f5aee98
-|   |   |-- 05224b1f50d4c8e2
-|   |   |-- 05c158cd4e4da3b0
-|   |   |-- 06e37be44b7c2558
-|   |   |-- 080fe7d7b77357e4
-|   |   |-- 0860b7ce1f462945
-|   |   |-- 08fea481e286d665
-|   |   |-- 09af02b32eace3be
-|   |   |-- 0a24b457adbbced2
-|   |   |-- 0ac8c61031ebb16b
-|   |   |-- 0af5fbfe62f0cb5e
-|   |   |-- 0bb0d7320a5cea09
-|   |   |-- 0c14e8a6e0dfaa9a
-|   |   |-- 0ce71eec09fdba96
-|   |   |-- 0e749cfd569a40b7
-|   |   |-- 0eaea0baf0eb7dcf
-|   |   |-- 0ec66aabb29bda7c
-|   |   |-- 0f2d4ac438e36262
-|   |   |-- 0f3094f4c41337a3
-|   |   |-- 0f584482e7d3db29
-|   |   |-- 0fb4599ed66628f4
-|   |   |-- 0fe1e1a4cd35a9e8
-|   |   |-- 1131d28f548032e7
-|   |   |-- 11326b1300e7c559
-|   |   |-- 11d2c913de0cba90
-|   |   |-- 122fc4d943da0a54
-|   |   |-- 130930a01b21082f
-|   |   |-- 137aac6b65143dec
-|   |   |-- 1513f65c38d604ee
-|   |   |-- 1587c2151a27c07a
-|   |   |-- 15a2721810beed32
-|   |   |-- 16e5986e942e026b
-|   |   |-- 17a6952f61650689
-|   |   |-- 1968d36e3319a49f
-|   |   |-- 1a701b0588e51868
-|   |   |-- 1ae1a5c44c5de27d
-|   |   |-- 1b488e9c0e7c5031
-|   |   |-- 1bfae4d4f286c3d1
-|   |   \-- ... (373 more entries truncated; cap=50)
-|   |-- unicode_data/
-|   |   \-- 14.0.0/
-|   |       |-- charmap.json.gz
-|   |       \-- codec-utf-8.json.gz
-|   \-- .gitignore
 |-- ci/
 |   |-- gate-policy.md
 |   |-- playwright-nightly.md
@@ -192,22 +131,10 @@ DashBoard_vite/
 |   |   |-- service-patterns.md
 |   |   \-- test-discipline.md
 |   |-- migration/
-|   |   |-- full-modernization-architecture-blueprint/
-|   |   |   |-- asset_readiness_manifest.json
-|   |   |   |-- bug_revalidation_records.json
-|   |   |   |-- exception_registry.json
-|   |   |   |-- known_bug_baseline.json
-|   |   |   |-- manual_acceptance_records.json
-|   |   |   |-- quality_gate_policy.json
-|   |   |   |-- quality_gate_report.json
-|   |   |   |-- route_contracts.json
-|   |   |   |-- route_scope_matrix.json
-|   |   |   \-- style_inventory.json
-|   |   \-- portal-no-iframe/
-|   |       |-- baseline_api_payload_contracts.json
-|   |       |-- baseline_drawer_contract_validation.json
-|   |       |-- baseline_drawer_visibility.json
-|   |       \-- baseline_route_query_contracts.json
+|   |   \-- full-modernization-architecture-blueprint/
+|   |       |-- asset_readiness_manifest.json
+|   |       |-- route_contracts.json
+|   |       \-- route_scope_matrix.json
 |   |-- cache-strategy.md
 |   |-- cdd-kit-patterns.md
 |   |-- ci_real_infra_gate_policy.md
@@ -216,72 +143,7 @@ DashBoard_vite/
 |   \-- real_infra_stability_report.md
 |-- frontend/
 |   |-- .cdd/
-|   |   |-- code-graph.index.json
-|   |   |-- code-map.index.json
 |   |   \-- code-map.yml
-|   |-- .hypothesis/
-|   |   |-- constants/
-|   |   |   |-- 00731426b90af740
-|   |   |   |-- 00e4935d1440a2ca
-|   |   |   |-- 01cb19e636d04082
-|   |   |   |-- 02bca2c9d2f8566d
-|   |   |   |-- 05224b1f50d4c8e2
-|   |   |   |-- 06e37be44b7c2558
-|   |   |   |-- 0860b7ce1f462945
-|   |   |   |-- 09af02b32eace3be
-|   |   |   |-- 0a24b457adbbced2
-|   |   |   |-- 0ec66aabb29bda7c
-|   |   |   |-- 0f584482e7d3db29
-|   |   |   |-- 11326b1300e7c559
-|   |   |   |-- 1513f65c38d604ee
-|   |   |   |-- 1968d36e3319a49f
-|   |   |   |-- 1a701b0588e51868
-|   |   |   |-- 1b488e9c0e7c5031
-|   |   |   |-- 1c079de4646a8d8b
-|   |   |   |-- 21753c2266950be2
-|   |   |   |-- 2487e0dd67ee4005
-|   |   |   |-- 25db02c884e47e34
-|   |   |   |-- 263226a93d9fd720
-|   |   |   |-- 267688019eacc507
-|   |   |   |-- 284335a248b2d321
-|   |   |   |-- 28d9bc818b741a80
-|   |   |   |-- 2a82a499c11a5de8
-|   |   |   |-- 2b2923cb2e7b99f7
-|   |   |   |-- 2f2ae64af48e93fe
-|   |   |   |-- 2f46fe56abf81670
-|   |   |   |-- 327c52ae13744797
-|   |   |   |-- 34f845ad3468bfeb
-|   |   |   |-- 35342e8dd172004d
-|   |   |   |-- 392d6328bece7db8
-|   |   |   |-- 397bc9bcb3adb4ac
-|   |   |   |-- 3b7bbdff8600e45e
-|   |   |   |-- 3c878969b2713c8e
-|   |   |   |-- 4093a4056e3ed640
-|   |   |   |-- 40bd549cffe1dc41
-|   |   |   |-- 41d662f99bd58f37
-|   |   |   |-- 432ffc6b1d3385af
-|   |   |   |-- 436a639fd17d1c38
-|   |   |   |-- 46b03a60678f44dd
-|   |   |   |-- 471dc2d32d0357fb
-|   |   |   |-- 47b65f8dbbcf8e4a
-|   |   |   |-- 4ae095b17a1de95e
-|   |   |   |-- 4c096d5ec0e788dc
-|   |   |   |-- 4cccca20455f65f9
-|   |   |   |-- 4d2caeaa9fae5afc
-|   |   |   |-- 4de62505eddd49cf
-|   |   |   |-- 4fd39ba380ac15b3
-|   |   |   |-- 507b64d2cb101174
-|   |   |   \-- ... (99 more entries truncated; cap=50)
-|   |   |-- unicode_data/
-|   |   |   \-- 14.0.0/
-|   |   |       \-- ... (max depth)
-|   |   \-- .gitignore
-|   |-- logs/
-|   |   |-- admin_logs.sqlite
-|   |   |-- login_sessions.sqlite
-|   |   \-- metrics_history.sqlite
-|   |-- playwright-report/
-|   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
 |   |   \-- ts-resolver-loader.mjs
@@ -577,8 +439,6 @@ DashBoard_vite/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
-|   |-- test-results/
-|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -704,21 +564,11 @@ DashBoard_vite/
 |   |   |   \-- wip-url-params.test.js
 |   |   |-- yield-alert/
 |   |   |   |-- App.cross-filter.test.js
+|   |   |   |-- App.csv-export.test.js
 |   |   |   \-- useYieldAlertDuckDB.departments.test.js
 |   |   |-- pending-jobs-registry.test.js
 |   |   |-- schema-guard.test.js
 |   |   \-- unwrap-api-result.test.js
-|   |-- tmp/
-|   |   |-- duckdb_jobs/
-|   |   |   \-- test_ns/
-|   |   |       \-- ... (max depth)
-|   |   \-- query_spool/
-|   |       |-- downtime_analysis/
-|   |       |   \-- ... (max depth)
-|   |       |-- msd-events/
-|   |       |   \-- ... (max depth)
-|   |       |-- probe_1370088.json
-|   |       \-- reject_5544a9037037c7cb_streaming_0a5wst7t.tmp.parquet
 |   |-- .gitignore
 |   |-- package-lock.json
 |   |-- package.json
@@ -728,48 +578,6 @@ DashBoard_vite/
 |   |-- tsconfig.json
 |   |-- vite.config.ts
 |   \-- vitest.config.js
-|-- logs/
-|   |-- archive/
-|   |   |-- access_20260701_115808.log
-|   |   |-- error_20260701_115808.log
-|   |   |-- rq_downtime_worker_20260701_115808.log
-|   |   |-- rq_eap_alarm_worker_20260701_115808.log
-|   |   |-- rq_hold_hist_worker_20260701_115808.log
-|   |   |-- rq_msd_worker_20260701_115808.log
-|   |   |-- rq_prod_hist_worker_20260701_115808.log
-|   |   |-- rq_reject_worker_20260701_115808.log
-|   |   |-- rq_resource_worker_20260701_115808.log
-|   |   |-- rq_warmup_worker_20260701_115808.log
-|   |   |-- rq_worker_20260701_115808.log
-|   |   |-- rq_yield_alert_worker_20260701_115808.log
-|   |   \-- watchdog_20260701_115808.log
-|   |-- access.log
-|   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
-|   |-- error.log
-|   |-- flask_dev.log
-|   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
-|   |-- metrics_history.sqlite
-|   |-- metrics_history.sqlite-shm
-|   |-- metrics_history.sqlite-wal
-|   |-- rq_downtime_worker.log
-|   |-- rq_eap_alarm_worker.log
-|   |-- rq_hold_hist_worker.log
-|   |-- rq_hold_history_worker.log
-|   |-- rq_msd_worker.log
-|   |-- rq_prod_hist_worker.log
-|   |-- rq_query_tool_worker.log
-|   |-- rq_reject_worker.log
-|   |-- rq_resource_worker.log
-|   |-- rq_warmup_worker.log
-|   |-- rq_worker.log
-|   |-- rq_yield_alert_worker.log
-|   |-- startup.log
-|   |-- vite_dev.log
-|   \-- watchdog.log
 |-- scripts/
 |   |-- capture_spool_snapshot.py
 |   |-- deploy.sh
@@ -1110,9 +918,6 @@ DashBoard_vite/
 |   |   |-- test_wip_hold_pages_e2e.py
 |   |   \-- test_yield_alert_e2e.py
 |   |-- fixtures/
-|   |   |-- spool_snapshots/
-|   |   |   \-- job__gpta0008_q1/
-|   |   |       \-- ... (max depth)
 |   |   |-- cache_benchmark_fixture.json
 |   |   |-- frontend_compute_parity.json
 |   |   \-- route_contract_matrix.py
@@ -1263,115 +1068,9 @@ DashBoard_vite/
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
 |   \-- ... (189 more entries truncated; cap=50)
-|-- tmp/
-|   |-- duckdb_jobs/
-|   |   |-- eap_alarm/
-|   |   |-- material_trace/
-|   |   |-- production_history/
-|   |   |-- reject_dataset/
-|   |   \-- test_ns/
-|   |-- query_spool/
-|   |   |-- anomaly_hold_dataset/
-|   |   |   \-- 7c193f4e1ec6e300.parquet
-|   |   |-- anomaly_reject_dataset/
-|   |   |   \-- 858f092b53042f96.parquet
-|   |   |-- anomaly_resource_dataset/
-|   |   |   \-- daa76e309ed12ee6.parquet
-|   |   |-- anomaly_yield_dataset/
-|   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- hold_dataset/
-|   |   |   |-- ae71f1c389741435.parquet
-|   |   |   |-- e367c4ed78d6d70a.parquet
-|   |   |   \-- ef38f59047af8118.parquet
-|   |   |-- reject_dataset/
-|   |   |   |-- 01a58ef66a9ad017.parquet
-|   |   |   \-- 18fdcf00fd5498b0.parquet
-|   |   |-- resource_dataset/
-|   |   |   |-- 2d8da6ce841992b8.parquet
-|   |   |   |-- 58383bcb2be3dff8.parquet
-|   |   |   |-- 5ce2411ee1a6cec9.parquet
-|   |   |   \-- 7d2ee9025463aabc.parquet
-|   |   |-- resource_oee/
-|   |   |   |-- 43dc6676a902087d.parquet
-|   |   |   |-- 58383bcb2be3dff8.parquet
-|   |   |   |-- 5ce2411ee1a6cec9.parquet
-|   |   |   \-- 6651e0b8fb9d4d9c.parquet
-|   |   |-- yield_alert_dataset/
-|   |   |   |-- 6134fde4c72712e3.parquet
-|   |   |   |-- 6466620d35bc1a18.parquet
-|   |   |   |-- e0abeb7e48bee179.parquet
-|   |   |   \-- f187dc0bdf26e358.parquet
-|   |   |-- probe_100033.json
-|   |   |-- probe_101202.json
-|   |   |-- probe_103174.json
-|   |   |-- probe_103452.json
-|   |   |-- probe_10348.json
-|   |   |-- probe_1038537.json
-|   |   |-- probe_1038627.json
-|   |   |-- probe_104444.json
-|   |   |-- probe_1050995.json
-|   |   |-- probe_1051070.json
-|   |   |-- probe_1051128.json
-|   |   |-- probe_1051195.json
-|   |   |-- probe_1051267.json
-|   |   |-- probe_1051320.json
-|   |   |-- probe_1051390.json
-|   |   |-- probe_1051461.json
-|   |   |-- probe_1051561.json
-|   |   |-- probe_1051633.json
-|   |   |-- probe_1051681.json
-|   |   |-- probe_1051758.json
-|   |   |-- probe_1051817.json
-|   |   |-- probe_1051885.json
-|   |   |-- probe_1051949.json
-|   |   |-- probe_1052013.json
-|   |   |-- probe_1052098.json
-|   |   |-- probe_1052156.json
-|   |   |-- probe_1052221.json
-|   |   |-- probe_1052271.json
-|   |   |-- probe_1052353.json
-|   |   |-- probe_1052423.json
-|   |   |-- probe_1052508.json
-|   |   |-- probe_1052547.json
-|   |   |-- probe_1052608.json
-|   |   |-- probe_1052689.json
-|   |   |-- probe_1052737.json
-|   |   |-- probe_1052817.json
-|   |   |-- probe_1052864.json
-|   |   |-- probe_1052948.json
-|   |   |-- probe_1053022.json
-|   |   |-- probe_1055095.json
-|   |   |-- probe_1055122.json
-|   |   \-- ... (1049 more entries truncated; cap=50)
-|   |-- downtime_analysis.duckdb
-|   |-- gunicorn.pid
-|   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_downtime_worker.pid
-|   |-- rq_eap_alarm_worker.pid
-|   |-- rq_hold_hist_worker.pid
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_query_tool_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_resource_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_warmup_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
-|-- tools/
-|   |-- generate_documentation.py
-|   |-- query_table_schema.py
-|   |-- test_oracle_connection.py
-|   \-- update_oracle_authorized_objects.py
-|-- .coverage
 |-- .dockerignore
-|-- .env
-|-- .env.dev
 |-- .env.example
-|-- .env.prd
 |-- .gitignore
-|-- AGENTS.md
 |-- Check.md
 |-- CLAUDE.md
 |-- docker-compose.prd.yml

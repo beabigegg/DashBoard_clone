@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.41.0
-last-changed: 2026-07-01
+schema-version: 1.42.0
+last-changed: 2026-07-02
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -161,6 +161,18 @@ breaking-change-policy: deprecate-2-minors
 | PHF-07 | Identifier-mode date optionality | `POST /api/production-history/query` 當 request 含至少一個 identifier wildcard token（`mfg_orders` / `lot_ids` / `wafer_lots`，通過 PHF-02 解析後非空）且未提供 `start_date` / `end_date` 時，`validate_query_params` 不再要求日期，改以 wide / all-time 查詢路徑執行（identifier 述詞已充分 scope 查詢）。日期若有提供仍套用 730d 上限（VAL-03 / SYS-04）。Identifier-mode 查詢不要求 `pj_types`。（AC-4） | unit + contract + integration tests |
 | PHF-08 | Classification-mode required params | `POST /api/production-history/query` 當 request 不含任何 identifier wildcard token 時為 classification mode：`pj_types`、`start_date`、`end_date` 皆為必填，缺少任一 → 400 `VALIDATION_ERROR`（行為與 prod-history-query-mode-tabs 之前完全一致，為 VAL-02 在 mode-split 後的精確化表述）。（AC-2、AC-7） | unit + contract + route tests |
 
+## Production-Achievement Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| PA-01 | SHIFT_CODE classification (two-shift current regime) | For `TRACKOUTTIMESTAMP` where `TO_CHAR(ts,'YYYYMMDD') <= '20191231'` OR `TO_CHAR(ts,'YYYYMMDD') >= '20200330'` (i.e. all dates except the historical 2020/01/01–2020/03/29 window), shift is computed from time-of-day only: `00:00:00–07:29:59` → `N`; `07:30:00–19:29:59` → `D`; `19:30:00–23:59:59` → `N`. This is the current production regime and applies to all data outside the historical three-shift window. Re-implements Oracle function `PJ_GET_CLASSCODE_F(P_TIMESTAMP)` (not previously implemented in this codebase) in Python/SQL. Boundary seconds (07:29:59/07:30:00/19:29:59/19:30:00) are exact cutover points — no gap, no overlap. | unit tests (boundary-second assertions) |
+| PA-02 | SHIFT_CODE classification (three-shift historical regime) | For `TRACKOUTTIMESTAMP` where `TO_CHAR(ts,'YYYYMMDD')` is strictly between `20191231` and `20200330` (i.e. the historical window `2020/01/01`–`2020/03/29` inclusive), shift is computed as: `08:00:00–15:59:59` → `A`; `16:00:00–23:59:59` → `B`; `00:00:00–07:59:59` → `C`. This regime is no longer in production use and exists only for correct interpretation of historical data queried within that date window. | unit tests (boundary-second assertions) |
+| PA-03 | output_date cross-night attribution (two-shift current regime) | `output_date` for a given `TRACKOUTTIMESTAMP` defaults to `TRUNC(TRACKOUTTIMESTAMP)` (the calendar date), EXCEPT: for the two-shift regime (PA-01 date range), the early-morning portion of the overnight N shift — `00:00:00–07:29:59` — attributes to the PREVIOUS calendar day: `output_date = TRUNC(TRACKOUTTIMESTAMP) - 1`. Rationale: this window is the tail end of the N shift that began the prior evening (19:30:00 onward); the trackout calendar date has already rolled over but the shift instance has not. Confirmed example: 4/26 19:30–4/27 07:29 is entirely N-shift, output_date=4/26 for the whole span (including the 4/27 00:00–07:29 portion). Re-implements Oracle function `PJ_GET_OUTPUTDATE_F(TRACKOUTTIMESTAMP)`. All other two-shift time bands (`07:30:00–23:59:59`) use `output_date = TRUNC(TRACKOUTTIMESTAMP)` unchanged. | unit tests (boundary-second + cross-midnight case 4/26→4/27) |
+| PA-04 | output_date cross-night attribution (three-shift historical regime) — **UNVERIFIED ASSUMPTION** | For the three-shift historical regime (PA-02 date range, 2020/01/01–2020/03/29 only): by analogy to PA-03, the C-shift early-morning band `00:00:00–07:59:59` is ASSUMED to attribute to the previous calendar day (`output_date = TRUNC(TRACKOUTTIMESTAMP) - 1`); all other three-shift bands (`08:00:00–23:59:59`) use `output_date = TRUNC(TRACKOUTTIMESTAMP)`. **This rule is NOT confirmed by the business owner** — it is inferred from the two-shift pattern (PA-03) under the assumption that C mirrors N's structural role as the shift spanning midnight. Not in scope for this change's acceptance criteria; do not treat as verified until a domain expert confirms it against real 2020 Q1 historical data. Any code path implementing this MUST log or flag three-shift-regime queries as using an unverified rule. | unit tests (documents the assumption; no production data verification performed) |
+| PA-05 | Effective-output station/process qualifying predicate | A `DW_MES_LOTWIPHISTORY` (aliased `weh`) trackout row counts as production output ("有效產出") only when it satisfies the compound predicate below (in addition to the existing `CONTAINERNAME` prefix filter, which is a caller-supplied optional param, not part of the qualifying condition itself). The predicate combines `WC.SPECNAME` (station spec name), `WB.WORKFLOWNAME` (雙晶/三晶 workflow classification), and `weh.processtypename` (process type), and MUST be preserved verbatim in the achievement-rate service query — this is not a simplifiable filter: `(CASE WHEN (WB.WORKFLOWNAME LIKE '%雙晶%' OR WB.WORKFLOWNAME LIKE '%三晶%') THEN 1 ELSE 0 END = 0 AND WC.SPECNAME IN ('Epoxy D/B','Eutectic D/B','Solder Paste D/B','Solder D/B+E-Clip+固化','Solder D/B+E-Clip+固化-DW','Solder Paste D/B+E-Clip','Solder Paste D/B+E-Clip-DW')) OR WC.SPECNAME IN ('金線製程','銀線製程','銅線製程','手工跳線','雷射焊接','Eutectic D/B+Ag Wire','Eutectic D/B+Au Wire','Eutectic D/B+Cu Wire','E-Clip+固化','包膠-WB') OR (WC.SPECNAME IN ('2DB2WB','1DB2WB') AND weh.processtypename IN ('DWB_WB2')) OR (WC.SPECNAME IN ('2DB1WB','1DB1WB') AND weh.processtypename IN ('DWB_WB')) OR (WB.WORKFLOWNAME LIKE '%雙晶%' AND WC.SPECNAME IN ('Epoxy D/B-2','Eutectic D/B-2','Eutectic D/B-雙晶')) OR (WB.WORKFLOWNAME LIKE '%三晶%' AND WC.SPECNAME IN ('Epoxy D/B-3','Eutectic D/B-3')) OR (WC.SPECNAME IN ('2DB') AND weh.processtypename IN ('2DB_DB2')) OR (WC.SPECNAME IN ('1DB') AND weh.processtypename IN ('2DB_DB')) OR (WC.SPECNAME IN ('DBCB') AND weh.processtypename IN ('DBCB_CB')) OR (WC.SPECNAME IN ('2DBCBRO','1DBCBRO','CBRO') AND weh.processtypename IN ('CBA_RO'))`. Any row not matching this predicate is excluded from `SUM(TRACKOUTQTY)` and does not contribute to the achievement-rate numerator. `TRACKOUTQTY` is used directly (no `TRACKINPROCESSSPLITQTY` compensation — DWDB source is already integrated). | unit tests (predicate branch coverage: 雙晶 exclusion clause, 三晶 exclusion clause, each SPECNAME/processtypename pairing) |
+| PA-06 | Achievement-rate grouping and formula | Actual output is `SUM(TRACKOUTQTY)` over PA-05-qualifying rows, grouped by `(output_date, shift_code, workcenter_group)`. `workcenter_group` is resolved via the existing `services/filter_cache.get_spec_workcenter_mapping()` (`SPECNAME → {workcenter, group, sequence}`, backed by `DW_MES_SPEC_WORKCENTER_V` / `FILTER_CACHE_SPEC_WORKCENTER_VIEW`) — the `group` field (`WORK_CENTER_GROUP`) is the 大站點/PACKAGE dimension. No new SPECNAME→station mapping is hardcoded. `achievement_rate = actual_output_qty / target_qty`. Target qty is read from the new target-value table (data-shape-contract.md §3.26), keyed by `(shift_code, workcenter_group)` only — no date dimension (same target value reused for every output_date in range). A `SPECNAME` that has no entry in `get_spec_workcenter_mapping()` is excluded from grouped output (unmapped station — cannot be assigned a 大站點/PACKAGE bucket); this is a data-boundary condition, not an error. | unit tests (grouping correctness, missing-target-row division semantics, unmapped-SPECNAME exclusion) |
+| PA-07 | Achievement-rate division-by-zero / missing-target semantics | When no target-value row exists for a `(shift_code, workcenter_group)` combination present in the actual-output grouping, `achievement_rate` for that group is `null` (displayed as "—" in the UI), never `0`, `Infinity`, or a raised error. When `target_qty = 0` explicitly (a stored zero target, distinct from a missing row) and `actual_output_qty > 0`, `achievement_rate` is also `null` (division-by-zero guard; do not emit `Infinity`). When both `actual_output_qty = 0` and a non-null `target_qty > 0` exist, `achievement_rate = 0.0` (a real, displayable 0% achievement). | unit tests (missing-target null, zero-target null, zero-output-nonzero-target = 0.0) |
+
 ## Yield Alert Rules
 
 | rule id | name | current behavior | tests |
@@ -310,6 +322,20 @@ breaking-change-policy: deprecate-2-minors
 | D/B-START lot: no WORKFLOWNAME match, BOP[0]=E | Query Epoxy D/B only; matchSource="bop-fallback" | DB-03 | unit tests |
 | D/B-START lot: no WORKFLOWNAME match, BOP[0]=P | Query DBCB + Solder Paste + 錫膏網印 group; matchSource="bop-fallback" | DB-03 | unit tests |
 | D/B-START lot: no WORKFLOWNAME match, BOP[0] other or BOP null | No recommendation row; matchSource="none"; no error | DB-03 | unit tests |
+| `TRACKOUTTIMESTAMP` date outside 2020/01/01–2020/03/29, time 00:00:00–07:29:59 or 19:30:00–23:59:59 | `SHIFT_CODE = N` | PA-01 | unit tests |
+| `TRACKOUTTIMESTAMP` date outside 2020/01/01–2020/03/29, time 07:30:00–19:29:59 | `SHIFT_CODE = D` | PA-01 | unit tests |
+| `TRACKOUTTIMESTAMP` date within 2020/01/01–2020/03/29, time 08:00:00–15:59:59 | `SHIFT_CODE = A` | PA-02 | unit tests |
+| `TRACKOUTTIMESTAMP` date within 2020/01/01–2020/03/29, time 16:00:00–23:59:59 | `SHIFT_CODE = B` | PA-02 | unit tests |
+| `TRACKOUTTIMESTAMP` date within 2020/01/01–2020/03/29, time 00:00:00–07:59:59 | `SHIFT_CODE = C` | PA-02 | unit tests |
+| Two-shift regime, time 00:00:00–07:29:59 (N-shift tail) | `output_date = TRUNC(TRACKOUTTIMESTAMP) - 1` | PA-03 | unit tests |
+| Two-shift regime, time 07:30:00–23:59:59 | `output_date = TRUNC(TRACKOUTTIMESTAMP)` | PA-03 | unit tests |
+| Three-shift regime, time 00:00:00–07:59:59 (C-shift tail) — UNVERIFIED | `output_date = TRUNC(TRACKOUTTIMESTAMP) - 1` (assumption) | PA-04 | unit tests (assumption documented, not production-verified) |
+| Three-shift regime, time 08:00:00–23:59:59 | `output_date = TRUNC(TRACKOUTTIMESTAMP)` | PA-04 | unit tests |
+| Trackout row matches PA-05 predicate | Row counts toward `SUM(TRACKOUTQTY)` for its `(output_date, shift_code, workcenter_group)` group | PA-05 | unit tests |
+| Trackout row does not match PA-05 predicate | Row excluded from achievement-rate numerator entirely | PA-05 | unit tests |
+| Target row missing for `(shift_code, workcenter_group)` | `achievement_rate = null` (display "—") | PA-07 | unit tests |
+| Target row present with `target_qty = 0`, `actual_output_qty > 0` | `achievement_rate = null` (never Infinity) | PA-07 | unit tests |
+| Target row present with `target_qty > 0`, `actual_output_qty = 0` | `achievement_rate = 0.0` | PA-07 | unit tests |
 
 ## Material Consumption Rules
 
@@ -417,6 +443,10 @@ The 焊接_DB workcenter group contains the following 12 DB process SPECs (autho
 4. 若行為是 breaking change（影響 client），走 deprecate-2-minors 流程。
 
 ## CHANGELOG
+
+## [business 1.42.0] — 2026-07-02
+### Added
+- production-achievement-kanban: Added `## Production-Achievement Rules` section (PA-01..PA-07) — two-shift/three-shift SHIFT_CODE classification (re-implements `PJ_GET_CLASSCODE_F`), output_date cross-night attribution (re-implements `PJ_GET_OUTPUTDATE_F`; three-shift C-band explicitly flagged as an UNVERIFIED ASSUMPTION per user's Open Questions), effective-output station/process qualifying predicate (SPECNAME + processtypename/WORKFLOWNAME 雙晶/三晶 combinations, preserved verbatim), achievement-rate grouping/formula reusing `filter_cache.get_spec_workcenter_mapping()`, and division-by-zero/missing-target null semantics. Fifteen new Decision Table rows. Additive; no existing rules changed.
 
 ## [business 1.41.0] — 2026-07-01
 ### Changed

@@ -79,6 +79,10 @@
     {
       "route": "/db-scheduling",
       "category": "report"
+    },
+    {
+      "route": "/production-achievement",
+      "category": "report"
     }
   ],
   "deferred": []

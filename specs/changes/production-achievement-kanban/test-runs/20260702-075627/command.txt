@@ -1,0 +1,1 @@
+cd frontend && npx vitest run src/production-achievement src/admin-pages && npx playwright test --list tests/playwright/production-achievement.spec.js tests/playwright/resilience/production-achievement-resilience.spec.js tests/playwright/data-boundary/production-achievement-data-boundary.spec.js

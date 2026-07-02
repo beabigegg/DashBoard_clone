@@ -59,6 +59,9 @@
     ],
     "/db-scheduling": [
       "db-scheduling.js"
+    ],
+    "/production-achievement": [
+      "production-achievement.js"
     ]
   },
   "deferred_routes": []

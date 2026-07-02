@@ -1,0 +1,47 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: backend-engineer
+status: done
+summary: >
+  Implemented the backend half of the 生產達成率 report (IP-1..IP-6, IP-10 backend
+  portion) per implementation-plan.md, following TDD (all test files authored
+  before implementation). Added can_edit_targets()/targets_edit_required to the
+  existing core/permissions.py (fail-closed, independent of admin_required).
+  Created production_achievement_permission_service.py and
+  production_achievement_target_service.py for direct-MySQL read/upsert via
+  core/mysql_client.get_mysql_connection() (never sync_worker), with
+  MYSQL_OPS_ENABLED-off/unreachable degrade semantics (reads -> null/empty,
+  writes -> raise for 503). Created production_achievement_service.py (Oracle
+  read via sql/production_achievement.sql — PA-05 predicate verbatim, PA-01..04
+  shift_code/output_date as SQL CASE — plus a Python mirror for unit tests only)
+  and production_achievement_routes.py (6 endpoints, registered in
+  routes/__init__.py's register_routes()). Added the idempotent DDL script.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/core/permissions.py:93-148 (can_edit_targets, targets_edit_required)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_achievement_service.py (new, 260 lines)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_achievement_target_service.py (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_achievement_permission_service.py (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/production_achievement.sql (new, PA-05 predicate verbatim)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/production_achievement_routes.py (new, 6 endpoints)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/__init__.py (register production_achievement_bp + production_achievement_admin_bp)" }
+  - { type: files-changed, pointer: "scripts/sql/production_achievement_tables.sql (new, idempotent DDL, not wired to startup)" }
+  - { type: contracts-touched, pointer: "contracts/api/api-contract.md: ProductionAchievementReportResponse and ProductionAchievementPermissionsResponse converted Tier-A->Tier-B (required:[success] only, matching AnomalySummaryResponse precedent) -- their Tier-A 'data required:yes' form rejected the endpoints' own documented 500/503 error-envelope captures; mechanical fix, no field/route/success-shape change. Regenerated contracts/openapi.json + contracts/api/openapi.json." }
+  - { type: tests-added, pointer: "tests/test_production_achievement_shift_code.py (10 cases, PA-01/PA-02 boundary seconds + date cutoffs)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_output_date.py (4 cases incl. confirmed 4/26-4/27 cross-midnight)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_service.py (PA-05 predicate branch coverage, grouping, PA-07 achievement math)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_target_service.py (validation, upsert, no-date-dimension read)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_permissions.py (allow/deny/fail-closed/distinct-from-admin)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_routes.py (per-kwarg forwarding, 403/503 paths, admin gating)" }
+  - { type: tests-added, pointer: "tests/integration/test_production_achievement_mysql_roundtrip.py (fake-conn write-then-read roundtrip + OPS-off degrade)" }
+  - { type: tests-added, pointer: "tests/integration/test_production_achievement_filter_cache_reuse.py (asserts service imports get_spec_workcenter_mapping from filter_cache, not a new map)" }
+  - { type: tests-added, pointer: "tests/test_permissions.py::TestCanEditTargetsIndependentGate (3 new cases, additive per Test Update Contract)" }
+  - { type: tests-added, pointer: "tests/contract/capture_samples.py: 6 new ENDPOINTS entries; tests/contract/response-samples.json + samples/*.json for all 6 endpoints incl. PUT targets 403 path" }
+  - { type: test-output, pointer: "109/109 backend unit+integration tests passed (pytest -q, --run-integration for the 2 integration files)" }
+  - { type: test-output, pointer: "cdd-kit validate --contracts: contracts/API-semantic/API-conformance/response-shape/env-semantic all passed (193 endpoints)" }
+  - { type: test-output, pointer: "test-evidence.yml: collect/targeted/changed-area/contract all passed, final-status: passed (combined backend+frontend commands per two-stack concurrency note)" }
+  - { type: deviation, pointer: "Converted 2 of 3 new Tier-A response schemas to Tier-B (see contracts-touched above) -- required to pass the Tier-1 response-shape-validate gate given these endpoints' own contracted error codes (500 for /report, 503 for admin GET /permissions) cannot carry a 'data' field; kept the change mechanical (schema-shape only, matching an existing precedent) rather than altering route/error-handling behavior to force a data-bearing response." }
+handoff:
+  known-risks:
+    - "DDL script (scripts/sql/production_achievement_tables.sql) must be applied manually pre-deploy; MYSQL_OPS_ENABLED defaults false so the feature is inert until an operator completes both steps (per design.md)."
+    - "PA-04 three-shift C-band output_date rule is implemented as specified but flagged UNVERIFIED per business-rules.md; production_achievement_service.compute_output_date() logs a warning on every three-shift-regime row, matching the contract's flagging requirement."
+  next-reviewer: qa-reviewer / ci-cd-gatekeeper
