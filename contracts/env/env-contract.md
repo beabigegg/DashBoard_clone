@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.22
-last-changed: 2026-06-20
+schema-version: 1.0.23
+last-changed: 2026-07-02
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -59,6 +59,24 @@ breaking-change-policy: deprecate-2-minors
 | REDIS_PERSISTENCE_ENABLED | redis | all | no | no | true | true | platform-team | true or false | no | — |
 | REDIS_MAXMEMORY_POLICY | redis | all | no | no | allkeys-lru | allkeys-lru | platform-team | valid Redis policy | no | — |
 | CACHE_CHECK_INTERVAL | redis | all | no | no | 600 | 600 | platform-team | positive integer (seconds) | no | — |
+
+## MySQL OPS — Direct Read/Write Persistence
+
+| name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
+|---|---|---|---:|---:|---|---|---|---|---:|---|
+| MYSQL_OPS_ENABLED | db | all | no | no | false | true | platform-team | true or false | yes | false = MySQL OPS read/write paths degrade (see per-endpoint behavior below); true = required for production-achievement targets/permissions to function |
+| MYSQL_OPS_HOST | db | all | conditional* | no | localhost | 10.1.1.60 | platform-team | reachable hostname or IP; required when MYSQL_OPS_ENABLED=true | yes | connection failure when enabled |
+| MYSQL_OPS_PORT | db | all | conditional* | no | 3306 | 3306 | platform-team | valid port 1-65535 | yes | connection failure when enabled |
+| MYSQL_OPS_DATABASE | db | all | conditional* | no | — | mes_ops | platform-team | non-empty string; required when MYSQL_OPS_ENABLED=true | yes | connection failure when enabled |
+| MYSQL_OPS_USER | db | all | conditional* | yes | — | — | platform-team | non-empty string; required when MYSQL_OPS_ENABLED=true | yes | connection failure when enabled |
+| MYSQL_OPS_PASSWORD | db | all | conditional* | yes | — | — | platform-team | non-empty string; required when MYSQL_OPS_ENABLED=true | yes | connection failure when enabled |
+| MYSQL_SYNC_ENABLED | db | all | no | no | true | true | platform-team | true or false | yes | controls the separate SQLite→MySQL `core/sync_worker.py` log/metrics sync only — NOT read by the production-achievement target/permission tables, which bypass sync_worker entirely (see note below) |
+
+\* "conditional" = required only when `MYSQL_OPS_ENABLED=true`; unused when the flag is `false`.
+
+- `MYSQL_OPS_ENABLED`: Master feature flag gating all direct MySQL OPS read/write paths exposed via `core/mysql_client.py`. **This variable pre-dates this contract entry** — it already existed in code (`core/mysql_client.py`) but was previously undocumented in this contract (known gap, closed by change `production-achievement-kanban`). Default `false`. The production-achievement feature (target-value table + edit-permission table, data-shape-contract.md §3.26/§3.27) is the first consumer whose correctness depends on this flag being `true` in production — this is a deployment precondition for that feature specifically, not a change to any pre-existing MySQL OPS consumer's flag-off behavior. When `false`: `GET /api/production-achievement/targets` and the report's `target_qty`/`achievement_rate` fields degrade to `null` (never 500, per data-shape-contract.md §3.26); `PUT /api/production-achievement/targets` and the admin permission-whitelist write endpoints return 503 `SERVICE_UNAVAILABLE`; the `can_edit_targets` permission check fails closed (deny) when MySQL is unreachable regardless of flag state. Module-level constant frozen at import — restart required.
+- `MYSQL_OPS_HOST` / `MYSQL_OPS_PORT` / `MYSQL_OPS_DATABASE` / `MYSQL_OPS_USER` / `MYSQL_OPS_PASSWORD`: Standard MySQL connection parameters for `core/mysql_client.py` (pre-existing, now documented). Only required when `MYSQL_OPS_ENABLED=true`.
+- `MYSQL_SYNC_ENABLED`: Pre-existing flag controlling the separate, one-way, eventually-consistent (max ~10 min lag) `core/sync_worker.py` path used for log/metrics tables (`dashboard_logs`, `dashboard_metrics_snapshots`). The production-achievement target-value and permission tables are explicitly NOT synced via this path — they read/write MySQL directly through `core/mysql_client.py` for immediate consistency, so this flag has no effect on them.
 
 ## Frontend Build
 
@@ -298,6 +316,10 @@ Variables such as `VITE_`, `NEXT_PUBLIC_`, and `PUBLIC_` are browser-exposed. Ne
 - `DB_HOST` / `DB_SERVICE` 空值：app factory 啟動時即失敗，不會延遲到首次查詢。
 
 ## CHANGELOG
+
+## [env 1.0.23] — 2026-07-02
+### Added
+- production-achievement-kanban: New `## MySQL OPS — Direct Read/Write Persistence` section documenting `MYSQL_OPS_ENABLED`/`MYSQL_OPS_HOST`/`MYSQL_OPS_PORT`/`MYSQL_OPS_DATABASE`/`MYSQL_OPS_USER`/`MYSQL_OPS_PASSWORD`/`MYSQL_SYNC_ENABLED` — all pre-existing vars in `core/mysql_client.py`/`core/sync_worker.py` previously undocumented in this contract (known gap, closed by this change). `MYSQL_OPS_ENABLED` defaults `false`; the new production-achievement target-value/permission tables are the first feature whose correctness depends on it being `true` in production. Documentation-only; no var default or runtime semantics changed.
 
 ## [env 1.0.19] — 2026-06-19
 ### Added

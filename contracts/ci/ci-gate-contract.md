@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.34
-last-changed: 2026-06-24
+schema-version: 1.3.35
+last-changed: 2026-07-02
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -26,7 +26,7 @@ breaking-change-policy: deprecate-2-minors
 | frontend-type-check | 1 | PR | informational | `cd frontend && npm run type-check` | application-team | — |
 | playwright-resilience | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/resilience/` | application-team | playwright trace |
 | playwright-data-boundary | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/data-boundary/` | application-team | playwright trace |
-| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js tests/playwright/eap-alarm.spec.js` | application-team | playwright trace |
+| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js tests/playwright/eap-alarm.spec.js tests/playwright/production-achievement.spec.js` | application-team | playwright trace |
 | visual-regression | 2 | PR | informational | (TBD — Playwright screenshot diff) | application-team | screenshot diff |
 | nightly-integration | 3 | weekly schedule / dispatch | yes (nightly) | `pytest tests/integration/ --run-integration-real -m "integration_real or multi_worker" -x` | application-team | test report |
 | stress-load | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/stress/ -m "stress or load"` | platform-team | perf report |
@@ -690,7 +690,40 @@ gate tier, command, or status changed.
 
 **Schema-version bump to 1.3.32 (patch)**: additive gate-compatibility note for cross-worker semaphore wiring. No gate tier, command, or status changed.
 
+## production-achievement-kanban Gate Compatibility Note
+
+**Tier-1 unit/contract/integration coverage** (covered by existing `unit-mock-integration` gate):
+- Shift-code and output_date boundary-second tests (business-rules.md PA-01..PA-04); PA-05 predicate branch coverage; PA-06/PA-07 achievement-math (missing-target null, zero-target null, zero-output-nonzero-target = 0.0).
+- Response-shape samples for the 6 new endpoints (`tests/contract/response-samples.json`), including the `PUT /api/production-achievement/targets` 403 permission-denied path.
+- MySQL round-trip integration tests (`tests/integration/`, `integration_real` marker) for both new tables via `core/mysql_client.py`; `MYSQL_OPS_ENABLED=false` fallback (read degrades to null, write returns 503); `filter_cache.get_spec_workcenter_mapping()` reuse verified (no new SPECNAME map introduced).
+- New CSS scoping (`.theme-production-achievement`) is caught automatically by the existing `css-governance` gate (Rule 6) — no new command needed.
+
+**Playwright coverage** (covered by existing `playwright-critical-journeys`, `playwright-resilience`, `playwright-data-boundary` gate commands):
+- `tests/playwright/production-achievement.spec.js` added to the `playwright-critical-journeys` gate command (see the endpoints table above): navigate 生產輔助 → 生產達成率, filter (date/shift/workcenter-group), render table/chart; admin permission block assign/revoke; authorized vs unauthorized target-edit path.
+- Resilience: MySQL unavailable / `MYSQL_OPS_ENABLED=false` — report degrades safely (null target/achievement), permission check fails closed (deny), no 500 — under `tests/playwright/resilience/`.
+- Data-boundary: negative/non-numeric `target_qty` input, unmapped SPECNAME exclusion, empty qualifying-row set — under `tests/playwright/data-boundary/`.
+
+**Deploy checklist** (verify before serving traffic):
+1. Verify `docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json` includes `/production-achievement` → dist asset. Missing entry crashes gunicorn via `_validate_in_scope_asset_readiness()`.
+2. Verify `docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json` classifies `/production-achievement` as in-scope.
+3. Verify `frontend/src/portal-shell/navigationManifest.js` includes the new page under the existing 生產輔助 drawer.
+4. Verify `MYSQL_OPS_ENABLED=true` in the production environment (env-contract.md §MySQL OPS) — target-value writes and permission-whitelist writes both return 503 without it.
+5. Confirm the two new MySQL tables (`production_achievement_targets`, `production_achievement_edit_permissions`) exist in the target MySQL OPS database — this change introduces no automated migration runner (see design.md); DDL must be applied manually or via whatever mechanism design.md specifies before first deploy.
+
+**Rollback checklist**:
+1. Remove `/production-achievement` entries from `asset_readiness_manifest.json`, `route_scope_matrix.json`, and `navigationManifest.js`.
+2. No Oracle spool cleanup required — this feature does not use the DuckDB spool pattern (sync-only report read; explicit non-goal: not an auto-refresh kanban).
+3. The two new MySQL tables are NOT dropped automatically on rollback; leaving them in place is safe (orphaned but harmless) unless a table-schema-breaking change was also shipped, in which case follow whatever migration-rollback path design.md defines.
+4. No RQ worker service to stop/start — this feature has no async job surface.
+
+**No new gate tier, command, or workflow file** beyond the one explicit spec-list addition to `playwright-critical-journeys` above.
+
+**Schema-version bump to 1.3.35 (patch)**: deploy/rollback checklist + one gate command spec-list addition. No gate tier or status changed.
+
 ## CHANGELOG
+
+## [ci 1.3.35] — 2026-07-02
+- production-achievement-kanban: Added `tests/playwright/production-achievement.spec.js` to `playwright-critical-journeys` gate command. Added deploy/rollback checklist for the new page (manifest entries, `MYSQL_OPS_ENABLED=true` precondition, new MySQL table DDL). No new gate tier, command, or workflow file. Additive; no existing gates changed.
 
 ## [ci 1.3.34] — 2026-06-24
 - nav-config-to-code: Gate-compatibility note for breaking drawer CRUD removal, `page_status.json` → route→status map shrink, and `navigationManifest.js` frontend refactor. Sample retire/regen instructions (`get_admin_drawers.json`, `delete_admin_drawers_id.json`, `post_admin_drawers.json`, `put_admin_drawers_id.json` retired; `get_admin_pages.json` and `get_portal_navigation.json` regenerated). Deploy/rollback checklist (no parquet/Redis/RQ ops). `playwright-critical-journeys` gate command extended with `admin-pages.spec.ts` and `portal-shell-login.spec.ts`. Stale `material-part-consumption` deploy step 5 and rollback step 2 annotated with Update supersession. No new workflow file or gate tier. Additive; no existing gates changed.

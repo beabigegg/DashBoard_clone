@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest --collect-only -q tests/test_production_achievement_shift_code.py tests/test_production_achievement_output_date.py tests/test_production_achievement_service.py tests/integration/test_production_achievement_filter_cache_reuse.py tests/test_production_achievement_target_service.py tests/integration/test_production_achievement_mysql_roundtrip.py tests/test_production_achievement_permissions.py tests/test_production_achievement_routes.py tests/test_permissions.py && cd frontend && npx vitest run src/production-achievement src/admin-pages",
+  "duration_ms": 3601,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-075946/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-075946/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-075946/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

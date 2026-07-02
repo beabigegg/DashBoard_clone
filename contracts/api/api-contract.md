@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.35.0
-last-changed: 2026-07-01
+schema-version: 1.36.0
+last-changed: 2026-07-02
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -253,6 +253,12 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
+| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementReportResponse | 400/500 | route tests |
+| GET | /api/production-achievement/filter-options | required | - | GenericSuccessResponse | 500 | route tests |
+| GET | /api/production-achievement/targets | required | ?shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementTargetsResponse | 500 | route tests |
+| PUT | /api/production-achievement/targets | required | body {shift_code, workcenter_group, target_qty}; also gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
+| GET | /admin/api/production-achievement/permissions | admin | - | ProductionAchievementPermissionsResponse | 403/500/503 | route tests |
+| PUT | /admin/api/production-achievement/permissions/{user_identifier} | admin | body {can_edit_targets} | AckResponse | 400/403/500/503 | route tests |
 | GET | /api/job/{job_id}/result | required | ?prefix= | GenericSuccessResponse | 400/404 | route tests |
 | GET | /api/eap-alarm/product-filter-options | required | - | EapAlarmProductFilterOptionsResponse | 500 | route tests |
 
@@ -457,6 +463,15 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## Compatibility Notes
 
+- **production-achievement-kanban (2026-07-02):** New endpoint family `/api/production-achievement/*` (4 endpoints) + `/admin/api/production-achievement/permissions*` (2 endpoints), all additive — new page, no existing endpoints changed.
+  - `GET /api/production-achievement/report` — filters: `start_date`, `end_date` (both required, 730-day cap per SYS-04), `shift_code` (opt, enum `N|D|A|B|C`), `workcenter_group` (opt). Response: array of rows per data-shape-contract.md §3.25. Reuses `filter_cache.get_spec_workcenter_mapping()` for station grouping (business-rules.md PA-06) — no new SPECNAME→station mapping.
+  - `GET /api/production-achievement/filter-options` — returns available `shift_code` and `workcenter_group` values for the FilterBar; sourced from `filter_cache` + the shift-code enum, not a new cache namespace.
+  - `GET /api/production-achievement/targets` — read current target values, no permission gate (view-only for any authenticated user).
+  - `PUT /api/production-achievement/targets` — permission-gated write (new `can_edit_targets` check, independent of `admin_required`); reads/writes the new MySQL table `production_achievement_targets` directly via `core/mysql_client.py` (data-shape-contract.md §3.26), NOT via `core/sync_worker.py`. Requires `MYSQL_OPS_ENABLED=true` in production (env-contract.md). 403 `FORBIDDEN` when caller is not whitelisted; 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled.
+  - `GET /admin/api/production-achievement/permissions` / `PUT /admin/api/production-achievement/permissions/{user_identifier}` — admin-only whitelist management for the new MySQL table `production_achievement_edit_permissions` (data-shape-contract.md §3.27), also direct mysql_client read/write.
+  - New nav entry under existing 生產輔助 drawer (alongside `/db-scheduling`); `navigationManifest.js` + `nativeModuleRegistry.js` + migration manifests updated in the same change.
+  - Sole consumer: `frontend/src/production-achievement/` (new) + `frontend/src/admin-pages/` (permission block). No external partners.
+
 - **add-db-scheduling-page (2026-06-26):** 新增 `GET /api/db-scheduling/queue`（auth required；sync；read-only）。返回 D/B-START lot 的推薦設備清單；資料來源 `DWH.DW_MES_LOT_V` 5-min WIP cache。結果按 PACKAGE_LEF → PJ_TYPE → WAFERLOT → UTS 排序。一個 lot 可對應多筆 row（一筆設備一行）。matchSource 閉合 enum：workflow / bop-fallback / none。Additive；無現有端點變更。
 
 - **nav-config-to-code (2026-06-24):** BREAKING — 4 drawer endpoints removed (all return **404**): `GET /admin/api/drawers`, `POST /admin/api/drawers`, `PUT /admin/api/drawers/{drawer_id}`, `DELETE /admin/api/drawers/{drawer_id}`. `PUT /admin/api/pages/{route}` body narrows to `{status}` — `name`, `drawer_id`, `order` silently ignored, MUST NOT persist. `GET /admin/api/pages` response narrows to `{pages:[{route,status}]}` — `name`, `drawer_id`, `order` absent. `GET /api/portal/navigation` drops `drawers`, adds `statuses` (route → status map; absent route = released). Sole consumers `frontend/src/admin-pages/` + `portal-shell/` — monorepo atomic cutover, no deprecation window.
@@ -467,6 +482,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.36.0] — 2026-07-02 (production-achievement-kanban):** New endpoint family `/api/production-achievement/*` (4 endpoints: report, filter-options, targets GET/PUT) + `/admin/api/production-achievement/permissions*` (2 endpoints). New schemas: `ProductionAchievementReportResponse`, `ProductionAchievementTargetsResponse`, `ProductionAchievementPermissionsResponse`. `PUT /api/production-achievement/targets` is permission-gated by a new independent `can_edit_targets` check (not `admin_required`); 403 on unauthorized write. All additive; no existing endpoints changed.
 - **[api 1.35.0] — 2026-07-01 (yield-alert-filter-expansion):** `POST /api/yield-alert/query` `process_type` enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. `GET /api/yield-alert/view` + `GET /api/yield-alert/cross-filter-options` `workcenter_groups` value source changes from global `filter_cache`/`DW_MES_SPEC_WORKCENTER_V` to per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME` (breaking shape semantics; JSON key unchanged). `GET /api/yield-alert/filter-options` unchanged.
 - **[api 1.34.0] — 2026-06-30 (eap-alarm-coarse-filter):** `POST /api/eap-alarm/spool` gains `lot_ids[]`, `pj_types[]`, `product_lines[]`, `pj_bops[]` (all optional); `eqp_types[]` now optional; at-least-one-of-three validation (EA-08). New `GET /api/eap-alarm/product-filter-options` — reads `container_filter_cache`, maps `packages→product_lines` and `bops→pj_bops`; cold-cache = empty arrays (not 500). Spool key hash extended to all 5 dims; `_SCHEMA_VERSION` 2→3. New schema `EapAlarmProductFilterOptionsResponse`. Additive for clients that always supply `eqp_types`.
 - **[api 1.33.0] — 2026-06-30 (msd-forward-cause-effect):** `GET /api/mid-section-defect/analysis?direction=forward` gains `by_detection_loss_reason[]`, `loss_reason_workcenter_crosstab`, `downstream_trend[]`, `amplification`; schema `MsdForwardAnalysisResponse`. Detail gains `DETECTION_LOSS_REASON`; schema `MsdForwardDetailResponse`. Additive.
@@ -1129,6 +1145,91 @@ Tier-B — response for `GET /api/db-scheduling/queue`. Array of lot-equipment r
 | produceRegion | string | no |  | produce region (PJ_PRODUCEREGION) |
 | specName | string | no |  | spec name |
 | workflowName | string | no |  | workflow name |
+
+### ProductionAchievementReportRow
+| field | type | required |
+|---|---|---|
+| output_date | string | yes |
+| shift_code | string | yes |
+| workcenter_group | string | yes |
+| actual_output_qty | integer | yes |
+| target_qty | integer | yes |
+| achievement_rate | number | yes |
+
+See data-shape-contract.md §3.25 for field semantics (nullable `target_qty`/`achievement_rate`, PA-01..PA-07 business rules).
+
+### ProductionAchievementReportResponse
+
+Tier-B — `GET /api/production-achievement/report`; row shape per `ProductionAchievementReportRow` above. Contract error codes `400/500` mean an error-envelope capture (`success:false`, no `data`) is a valid sample — only `success` is required, matching `AnomalySummaryResponse`'s pattern for endpoints whose upstream (Oracle) dependency can genuinely fail.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data":    {},
+    "error":   {},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+### ProductionAchievementTargetRow
+| field | type | required |
+|---|---|---|
+| shift_code | string | yes |
+| workcenter_group | string | yes |
+| target_qty | integer | yes |
+| updated_at | string | yes |
+| updated_by | string | yes |
+
+See data-shape-contract.md §3.26 for field semantics.
+
+### ProductionAchievementTargetsResponse
+| field | type | required |
+|---|---|---|
+| success | boolean | yes |
+| data | ProductionAchievementTargetRow[] | yes |
+
+### ProductionAchievementPermissionRow
+| field | type | required |
+|---|---|---|
+| user_identifier | string | yes |
+| can_edit_targets | boolean | yes |
+| granted_at | string | yes |
+| granted_by | string | yes |
+
+See data-shape-contract.md §3.27 for field semantics.
+
+### ProductionAchievementPermissionsResponse
+
+Tier-B — `GET /admin/api/production-achievement/permissions`; row shape per `ProductionAchievementPermissionRow` above. Contract error codes `403/500/503` mean an error-envelope capture (`success:false`, no `data`) is a valid sample — only `success` is required, matching `AnomalySummaryResponse`'s pattern (this endpoint returns 503 when `MYSQL_OPS_ENABLED=false`, per design.md's per-endpoint MySQL-failure behavior).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data":    {},
+    "error":   {},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
 
 ### MsdContainerFilterOptionsResponse
 

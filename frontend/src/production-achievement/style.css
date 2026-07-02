@@ -1,0 +1,113 @@
+/* Production Achievement Rate page styles
+ * Scoped under .theme-production-achievement
+ * All feature-specific styles must live here (css-contract.md Rule 4.2/4.3).
+ */
+
+.theme-production-achievement .pa-app__filter-panel {
+  @apply p-4 flex flex-col gap-3 overflow-visible;
+}
+
+/* Scoped override for the global `.ui-card { overflow: hidden }` rule so the
+ * filter-panel's MultiSelect dropdown isn't clipped — per css-contract.md
+ * "Known Global Rule Interactions" (never override the global rule itself). */
+.theme-production-achievement .pa-filter-card {
+  overflow: visible;
+}
+
+.theme-production-achievement .pa-app__filter-row {
+  @apply flex flex-wrap gap-3 items-end;
+}
+
+.theme-production-achievement .pa-app__required {
+  @apply text-red-500;
+}
+
+.theme-production-achievement .pa-app__input {
+  width: 100%;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  border: 1px solid theme('colors.token.hdbe4ef');
+  border-radius: 8px;
+  font-size: 13px;
+  background: theme('colors.token.hffffff');
+}
+
+.theme-production-achievement .pa-app__input:focus {
+  outline: none;
+  border-color: theme('colors.token.h0ea5e9');
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
+}
+
+.theme-production-achievement .pa-app__filter-actions {
+  @apply flex flex-wrap justify-between items-center gap-3 gap-y-2 pt-3;
+}
+
+.theme-production-achievement .pa-app__empty-state {
+  @apply text-center text-gray-400 py-16 text-sm;
+}
+
+/* ── Chart ─────────────────────────────────────────────────────────────── */
+
+.theme-production-achievement .pa-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme('colors.text.primary');
+}
+
+.theme-production-achievement .pa-chart-wrap {
+  height: 320px;
+}
+
+.theme-production-achievement .pa-chart-empty {
+  @apply text-center text-gray-400 py-12 text-sm;
+}
+
+/* ── Target-value edit panel ─────────────────────────────────────────────── */
+
+.theme-production-achievement .pa-target-panel {
+  @apply bg-white border rounded-lg p-4 flex flex-col gap-3;
+  border-color: theme('colors.stroke.soft');
+}
+
+.theme-production-achievement .pa-target-panel__header {
+  @apply flex items-center justify-between;
+}
+
+.theme-production-achievement .pa-target-panel__readonly-note {
+  @apply text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded px-3 py-2;
+}
+
+.theme-production-achievement .pa-target-panel__error {
+  @apply text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2;
+}
+
+.theme-production-achievement .pa-target-panel__new-row {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.theme-production-achievement .pa-target-panel__select,
+.theme-production-achievement .pa-target-panel__input {
+  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  border: 1px solid theme('colors.token.hdbe4ef');
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.theme-production-achievement .pa-target-panel__input {
+  width: 100px;
+}
+
+.theme-production-achievement .pa-target-panel__input--sm {
+  width: 90px;
+}
+
+.theme-production-achievement .pa-target-panel__edit-cell {
+  @apply flex flex-col gap-1;
+}
+
+.theme-production-achievement .pa-target-panel__inline-error {
+  @apply text-xs text-red-600;
+}
+
+.theme-production-achievement .pa-target-panel__empty-note {
+  @apply text-center text-gray-400 py-6 text-sm;
+}

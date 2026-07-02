@@ -14,6 +14,8 @@ from mes_dashboard.core.permissions import (
     get_current_user,
     admin_required,
     login_required,
+    can_edit_targets,
+    targets_edit_required,
 )
 
 
@@ -155,6 +157,62 @@ class TestLoginRequired:
         with app.test_client() as client:
             response = client.get("/test-login-noauth")
             assert response.status_code == 401
+
+
+class TestCanEditTargetsIndependentGate:
+    """New independent single-flag gate (production-achievement-kanban).
+
+    Additive to this module -- see tests/test_production_achievement_permissions.py
+    for the full allow/deny/fail-closed unit-test surface. These cases only
+    confirm the gate is distinct from is_admin_logged_in/admin_required.
+    """
+
+    def test_can_edit_targets_denied_for_non_admin_non_whitelisted(self, app):
+        from unittest.mock import patch
+        with app.test_request_context():
+            from flask import session
+            session["user"] = {"username": "user", "is_admin": False}
+            with patch(
+                "mes_dashboard.services.production_achievement_permission_service.is_user_whitelisted",
+                return_value=False,
+            ):
+                assert can_edit_targets() is False
+
+    def test_targets_edit_required_returns_403_when_denied(self, app):
+        from unittest.mock import patch
+
+        @app.route("/test-targets-edit")
+        @targets_edit_required
+        def test_route():
+            return "success"
+
+        with patch(
+            "mes_dashboard.core.permissions.can_edit_targets", return_value=False
+        ):
+            with app.test_client() as client:
+                with client.session_transaction() as sess:
+                    sess["user"] = {"username": "user", "is_admin": False}
+                response = client.get("/test-targets-edit")
+                assert response.status_code == 403
+
+    def test_targets_edit_required_distinct_from_admin_required(self, app):
+        """An admin user without a whitelist row is still denied -- the two
+        gates are independent (design.md Key Decisions)."""
+        from unittest.mock import patch
+
+        @app.route("/test-targets-edit-admin")
+        @targets_edit_required
+        def test_route():
+            return "success"
+
+        with patch(
+            "mes_dashboard.core.permissions.can_edit_targets", return_value=False
+        ):
+            with app.test_client() as client:
+                with client.session_transaction() as sess:
+                    sess["user"] = {"username": "admin", "is_admin": True}
+                response = client.get("/test-targets-edit-admin")
+                assert response.status_code == 403
 
 
 if __name__ == "__main__":

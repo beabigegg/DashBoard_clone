@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.33.0
-last-changed: 2026-07-01
+schema-version: 1.34.0
+last-changed: 2026-07-02
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1571,6 +1571,10 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ---
 
 ## CHANGELOG
+## [data 1.34.0] — 2026-07-02
+### Added
+- production-achievement-kanban: §3.25 Production-Achievement Rate Row (grouped by output_date + shift_code + workcenter_group; actual_output_qty, target_qty nullable, achievement_rate nullable-never-Infinity). §3.26 new MySQL target-value table `production_achievement_targets` (shift_code + workcenter_group keyed, no date dimension, direct mysql_client read/write, MYSQL_OPS_ENABLED=false degrades reads to null-target not 500, writes 503 when disabled). §3.27 new MySQL permission table `production_achievement_edit_permissions` (single-flag whitelist, absence = default-deny, fail-closed on MySQL unavailability). Additive; no existing schemas changed.
+
 ## [data 1.33.0] — 2026-07-01
 ### Added
 - yield-alert-kpi-csv-parity: §3.16.7 Alerts CSV Numeric Export Formatting — `_buildAlertsCSV()` must round `transaction_qty`/`scrap_qty` (post-`toPcs()`) to whole pcs instead of writing raw `String(floatValue)`, eliminating DuckDB-DOUBLE float-noise (e.g. `4011.9999999999995`) that caused Excel to treat cells as text and skip them in `SUM()`. See business-rules.md YA-13 for the related KPI/alert-candidate scope unification.
@@ -1724,3 +1728,53 @@ Within-cohort ratio, NOT flagged-vs-clean lift.
 ```
 
 Empty result (no defect seeds / no downstream rejects) → `{rows: [], cols: [], cells: [], row_pct: []}`. Additive field on `direction=forward`; absent on `direction=backward`. `row_pct` is the primary display (frontend heat-table shades by row %) so cohort-overlap double-counting does not distort within-row reading.
+
+### §3.25 Production-Achievement Rate Row (`GET /api/production-achievement/report`)
+
+One row per `(output_date, shift_code, workcenter_group)` group. Rows are produced by grouping PA-05-qualifying `DW_MES_LOTWIPHISTORY` trackout events (business-rules.md PA-06) and joining against the target-value table (§3.26) on `(shift_code, workcenter_group)`.
+
+| field | type | required |
+|---|---|---|
+| output_date | string | yes |
+| shift_code | string | yes |
+| workcenter_group | string | yes |
+| actual_output_qty | integer | yes |
+| target_qty | integer | yes |
+| achievement_rate | number | yes |
+
+Notes: `output_date` is `YYYY-MM-DD`, with business-rules.md PA-03/PA-04 cross-night attribution already applied. `shift_code` is a closed enum: `N | D` (current two-shift regime) or `A | B | C` (historical three-shift regime, only for rows in the 2020/01/01–2020/03/29 window) — business-rules.md PA-01/PA-02. `workcenter_group` is the 大站點/PACKAGE dimension sourced from `filter_cache.get_spec_workcenter_mapping()` `WORK_CENTER_GROUP` (business-rules.md PA-06) — no new SPECNAME→station mapping is introduced. `actual_output_qty` is `SUM(TRACKOUTQTY)` over PA-05-qualifying rows in this group; `0` when no qualifying rows (not null). `target_qty` is nullable in practice (see §3.26) even though marked required — it is `null` when no target row exists for this `(shift_code, workcenter_group)` combination. `achievement_rate` is nullable — `actual_output_qty / target_qty`, `null` when `target_qty` is missing or `0` (business-rules.md PA-07); never `Infinity`.
+
+Row-grain rule: one row per distinct `(output_date, shift_code, workcenter_group)` combination observed in the qualifying trackout set for the requested date range — NOT a dense cross-product with target rows that have no matching output (a `(shift_code, workcenter_group)` target with zero output in the date range does not synthesize a zero-output row; only groups with ≥1 qualifying trackout event in range appear). Sort order: `output_date ASC, shift_code ASC, workcenter_group ASC`.
+
+### §3.26 Production-Achievement Target-Value Table (MySQL, `production_achievement_targets`)
+
+New independent MySQL table, read/written directly via `core/mysql_client.py` (NOT via the SQLite `core/sync_worker.py` dual-layer path — see the change's design.md for the immediate-consistency rationale). No date dimension: one row per `(shift_code, workcenter_group)`; the same target value is reused for every `output_date`.
+
+| field | type | required |
+|---|---|---|
+| id | integer | yes |
+| shift_code | string | yes |
+| workcenter_group | string | yes |
+| target_qty | integer | yes |
+| updated_at | string | yes |
+| updated_by | string | yes |
+
+Notes: `id` is the primary key (auto-increment). `shift_code` is a closed enum `N \| D \| A \| B \| C` (business-rules.md PA-01/PA-02); part of a unique key with `workcenter_group`. `workcenter_group` must match a value producible by `filter_cache.get_spec_workcenter_mapping()`; part of the same unique key. `target_qty` is a non-negative integer — the denominator for achievement-rate calculation (business-rules.md PA-06/PA-07); negative or non-numeric input is rejected with 400 `VALIDATION_ERROR` at the API layer before reaching MySQL. `updated_at` is a server-side ISO-8601 timestamp updated on every write. `updated_by` is the username/account of the last editor (audit trail).
+
+Constraints: unique constraint on `(shift_code, workcenter_group)` — exactly one target row per combination; writes are upsert (`INSERT ... ON DUPLICATE KEY UPDATE`), never append-only history. No `output_date` column — this table is explicitly date-independent (目標值固定值，重複使用於每天). When `MYSQL_OPS_ENABLED=false`, read endpoints MUST degrade to returning `target_qty: null` for all groups (achievement_rate becomes null via PA-07), NOT a 500. Write endpoints MUST return 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled (write cannot degrade gracefully — there is nowhere else to persist it).
+
+### §3.27 Production-Achievement Permission Table (MySQL, `production_achievement_edit_permissions`)
+
+New independent MySQL table, read/written directly via `core/mysql_client.py`. Single-flag whitelist: presence of a row for a user with `can_edit_targets = true` = that user may edit target values. This is NOT a general permission framework — one boolean-shaped capability only, and is independent of the existing `is_admin`/`admin_required` gate in `core/permissions.py`.
+
+| field | type | required |
+|---|---|---|
+| id | integer | yes |
+| user_identifier | string | yes |
+| can_edit_targets | boolean | yes |
+| granted_at | string | yes |
+| granted_by | string | yes |
+
+Notes: `id` is the primary key (auto-increment). `user_identifier` is the account/username matching the auth session identity (e.g. LDAP username); unique. `can_edit_targets` is the single flag this table exists to hold. `granted_at` is when the whitelist entry was created (ISO-8601). `granted_by` is the admin account that granted the permission (audit trail).
+
+Constraints: unique constraint on `user_identifier`. Absence of a row for a user is the default-deny state — permission check MUST fail closed (deny) both when the table has no row for the user AND when MySQL is unreachable/`MYSQL_OPS_ENABLED=false` (never fail-open to allow). This table is managed exclusively via the new Admin permission-management endpoints (api-contract.md); no direct end-user-facing read of this table beyond "am I allowed" resolved server-side.

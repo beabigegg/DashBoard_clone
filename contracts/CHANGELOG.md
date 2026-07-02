@@ -8,6 +8,30 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.42.0] — 2026-07-02
+### Added
+- production-achievement-kanban: Added `## Production-Achievement Rules` section (PA-01..PA-07) — two-shift/three-shift SHIFT_CODE classification (re-implements `PJ_GET_CLASSCODE_F`), output_date cross-night attribution (re-implements `PJ_GET_OUTPUTDATE_F`; three-shift C-band explicitly flagged as an UNVERIFIED ASSUMPTION), effective-output station/process qualifying predicate (SPECNAME + processtypename/WORKFLOWNAME 雙晶/三晶 combinations, preserved verbatim), achievement-rate grouping/formula reusing `filter_cache.get_spec_workcenter_mapping()`, and division-by-zero/missing-target null semantics. Fifteen new Decision Table rows. Additive; no existing rules changed.
+
+## [data 1.34.0] — 2026-07-02
+### Added
+- production-achievement-kanban: §3.25 Production-Achievement Rate Row (grouped by output_date + shift_code + workcenter_group; actual_output_qty, target_qty nullable, achievement_rate nullable-never-Infinity). §3.26 new MySQL target-value table `production_achievement_targets` (shift_code + workcenter_group keyed, no date dimension, direct mysql_client read/write, MYSQL_OPS_ENABLED=false degrades reads to null-target not 500, writes 503 when disabled). §3.27 new MySQL permission table `production_achievement_edit_permissions` (single-flag whitelist, absence = default-deny, fail-closed on MySQL unavailability). Additive; no existing schemas changed.
+
+## [api 1.36.0] — 2026-07-02 (production-achievement-kanban)
+### Added
+- New endpoint family `/api/production-achievement/*` (4 endpoints: report, filter-options, targets GET/PUT) + `/admin/api/production-achievement/permissions*` (2 endpoints). New schemas: `ProductionAchievementReportRow`/`ProductionAchievementReportResponse`, `ProductionAchievementTargetRow`/`ProductionAchievementTargetsResponse`, `ProductionAchievementPermissionRow`/`ProductionAchievementPermissionsResponse`. `PUT /api/production-achievement/targets` is gated by a new independent `can_edit_targets` check (not `admin_required`); 403 on unauthorized write. All additive; no existing endpoints changed.
+
+## [env 1.0.23] — 2026-07-02
+### Added
+- production-achievement-kanban: New `## MySQL OPS — Direct Read/Write Persistence` section documenting `MYSQL_OPS_ENABLED`/`MYSQL_OPS_HOST`/`MYSQL_OPS_PORT`/`MYSQL_OPS_DATABASE`/`MYSQL_OPS_USER`/`MYSQL_OPS_PASSWORD`/`MYSQL_SYNC_ENABLED` — all pre-existing vars in `core/mysql_client.py`/`core/sync_worker.py` previously undocumented in this contract (known gap, closed by this change). `MYSQL_OPS_ENABLED` defaults `false`; the new production-achievement target-value/permission tables are the first feature whose correctness depends on it being `true` in production. Documentation-only; no var default or runtime semantics changed.
+
+## [css 1.12.0] — 2026-07-02
+### Added
+- production-achievement-kanban: `frontend/src/production-achievement/style.css` scoped under `.theme-production-achievement` (Rule 4.2/4.3). Admin permission-management block lives inside the existing `admin-pages` app (`.theme-admin-pages` scope) — no new theme class needed for it.
+
+## [ci 1.3.35] — 2026-07-02
+### Added
+- production-achievement-kanban: Added `tests/playwright/production-achievement.spec.js` to `playwright-critical-journeys` gate command. Added deploy/rollback checklist for the new page (manifest entries, `MYSQL_OPS_ENABLED=true` precondition, new MySQL table DDL). No new gate tier, command, or workflow file.
+
 ## [business 1.40.0] — 2026-07-01
 ### Added
 - yield-alert-kpi-csv-parity: YA-13 — KPI summary (`GET /api/yield-alert/view` / `GET /api/yield-alert/summary` `summary.transaction_qty`/`summary.scrap_qty`) scope unified to match the alert-candidate predicate (`SCRAP_QTY<>0`, risk_threshold/min_scrap_qty exclusion, full 6-dim filters) instead of the prior broader scope; documents the `tx_extra_cols` dedup dimension (excludes REASON_CODE/REASON_NAME) required to avoid double-counting `transaction_qty` when a group has multiple distinct reason_codes. Scope limited to the top-level KPI summary; trend/heatmap/station/package summaries unaffected (non-goal).

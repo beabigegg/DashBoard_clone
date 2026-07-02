@@ -1,0 +1,19 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: visual-reviewer
+status: done
+verdict: changes-required -> fixed
+summary: >
+  CSS scoping (100% under .theme-production-achievement), Teleport (n/a),
+  and css:check (0 errors, 307 pre-existing unrelated warnings) all passed.
+  Found one real defect: App.vue's root carried a vestigial "dashboard"
+  class copied from production-history without importing
+  resource-shared/styles.css, leaving the page-width cap dead (would
+  stretch edge-to-edge on wide monitors, unlike every sibling report page).
+  Also flagged an overly-broad `.ui-card { overflow: visible }` rule
+  (should be scoped to the specific card per css-contract.md's "Known
+  Global Rule Interactions" pattern, not applied page-wide).
+artifacts:
+  - { type: fix-applied, pointer: "frontend/src/production-achievement/App.vue: removed dead 'dashboard' class, added 'pa-app__page' + scoped 'pa-filter-card' modifier classes; frontend/src/production-achievement/style.css: added self-contained max-width:1800px page-width cap (following the db-scheduling precedent of not importing resource-shared/styles.css, since this native-module page uses no other resource-shared classes) and narrowed the overflow:visible override to .pa-filter-card only" }
+  - { type: verification, pointer: "npm run css:check (0 errors), npm run type-check (0 errors), npx vitest run src/production-achievement (30/30 pass) all re-run clean after the fix" }
+next-action: proceed to qa-reviewer

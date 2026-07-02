@@ -1,0 +1,18 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: ui-ux-reviewer
+status: done
+verdict: changes-required (non-blocking polish items)
+summary: >
+  Reviewed filter/query/view flow, target-edit optimistic-then-403 UX, and
+  admin permission assign/revoke. PA-07 null display, empty/loading states,
+  and copy consistency all solid. Flagged: no confirmation before revoking
+  can_edit_targets, window.alert() for admin feedback instead of the
+  in-app error-banner idiom, no focus-transfer into target-edit input on
+  open, one dev-identifier string ("can_edit_targets") leaking into admin
+  subtitle copy, and a pre-existing MultiSelect label-association gap
+  (shared component, not a new regression).
+artifacts:
+  - { type: correction, pointer: "reviewer attributed the revoke-confirmation gap to change-request.md; verified by main Claude that change-request.md contains no such requirement — treated as a UX polish suggestion, not a violated acceptance criterion" }
+  - { type: disposition, pointer: "none of the flagged items fixed in this pass — all are low-severity polish, tracked here for a possible follow-up change rather than blocking this one" }
+next-action: proceed to qa-reviewer

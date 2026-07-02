@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run src/production-achievement src/admin-pages && npx playwright test --list tests/playwright/production-achievement.spec.js tests/playwright/resilience/production-achievement-resilience.spec.js tests/playwright/data-boundary/production-achievement-data-boundary.spec.js",
+  "duration_ms": 2190,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-075627/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-075627/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-075627/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -1,0 +1,25 @@
+- type: tier-floor-override
+  change-id: production-achievement-kanban
+  timestamp: '2026-07-02T01:32:20.509Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - cache
+    - migration
+    - permissions
+    - route
+    - worker
+  reason: >-
+    Matched keywords are mostly false positives: 'cache' is confirm-only reuse of existing
+    filter_cache.get_spec_workcenter_mapping(), 'migration' is prose about a DDL script (no existing
+    data migrated), 'worker' is a false hit from docs stating this feature has NO RQ worker
+    (explicit non-goal), 'route' is a generic term matching any new Flask endpoint. The one genuine
+    surface, 'permissions' (new can_edit_targets gate), is a single isolated boolean whitelist flag
+    that fails closed on every error path, does not replace or weaken admin_required, and is
+    additionally flag-gated end-to-end by MYSQL_OPS_ENABLED defaulting to false in production
+    (writes 503, reads degrade to null) until an operator manually applies
+    scripts/sql/production_achievement_tables.sql and flips the flag. No new concurrency primitive
+    (lock/pool/semaphore/queue) is introduced. No expiration trigger; keyword-scan false positive
+    per docs/cdd-kit-patterns.md case 3, combined with flag-gated-wiring rationale for the
+    permissions surface specifically.

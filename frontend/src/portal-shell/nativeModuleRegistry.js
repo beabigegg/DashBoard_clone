@@ -106,6 +106,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../db-scheduling/App.vue'),
     [() => import('../db-scheduling/style.css')],
   ),
+  '/production-achievement': createNativeLoader(
+    () => import('../production-achievement/App.vue'),
+    [() => import('../styles/tailwind.css'), () => import('../production-achievement/style.css')],
+  ),
 });
 
 export function getNativeModuleLoader(route) {

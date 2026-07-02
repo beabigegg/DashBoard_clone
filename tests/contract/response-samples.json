@@ -172,5 +172,11 @@
   "GET /api/get_table_info": "samples/get_get_table_info.json",
   "POST /api/get_table_columns": "samples/post_get_table_columns.json",
   "POST /api/query_table": "samples/post_query_table.json",
-  "GET /api/db-scheduling/queue": "samples/get_db_scheduling_queue.json"
+  "GET /api/db-scheduling/queue": "samples/get_db_scheduling_queue.json",
+  "GET /api/production-achievement/report": "samples/get_production_achievement_report.json",
+  "GET /api/production-achievement/filter-options": "samples/get_production_achievement_filter_options.json",
+  "GET /api/production-achievement/targets": "samples/get_production_achievement_targets.json",
+  "PUT /api/production-achievement/targets": "samples/put_production_achievement_targets_forbidden.json",
+  "GET /admin/api/production-achievement/permissions": "samples/get_admin_production_achievement_permissions.json",
+  "PUT /admin/api/production-achievement/permissions/{user_identifier}": "samples/put_admin_production_achievement_permissions.json"
 }

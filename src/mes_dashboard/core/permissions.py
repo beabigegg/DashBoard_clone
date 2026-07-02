@@ -88,3 +88,60 @@ def admin_required(f: Callable) -> Callable:
             return forbidden_error("需要管理員權限")
         return f(*args, **kwargs)
     return decorated
+
+
+def can_edit_targets(user_identifier: str | None = None) -> bool:
+    """Check whether a user may edit production-achievement target values.
+
+    New independent single-flag gate (production-achievement-kanban),
+    unrelated to ``is_admin_logged_in``/``admin_required``. Delegates the
+    MySQL whitelist lookup to
+    ``services.production_achievement_permission_service.is_user_whitelisted``,
+    which already fails closed (returns False) on a missing row,
+    ``MYSQL_OPS_ENABLED=false``, or any MySQL exception -- this function does
+    not add its own try/except because the service never raises.
+
+    Args:
+        user_identifier: Explicit identity to check. Defaults to the current
+            session's username (``session["user"]["username"]``), matching
+            ``get_owner_token()``'s canonical identity form.
+
+    Returns:
+        True only if a whitelist row exists with ``can_edit_targets = true``.
+        Always False (deny) on any failure mode -- never fails open.
+    """
+    if user_identifier is None:
+        user = session.get("user") or {}
+        user_identifier = user.get("username", "")
+
+    if not user_identifier:
+        return False
+
+    try:
+        from mes_dashboard.services.production_achievement_permission_service import (
+            is_user_whitelisted,
+        )
+        return bool(is_user_whitelisted(user_identifier))
+    except Exception:
+        # Defense in depth: even though is_user_whitelisted already fails
+        # closed internally, never let an unexpected exception here escape
+        # as an allow.
+        return False
+
+
+def targets_edit_required(f: Callable) -> Callable:
+    """Decorator: require the can_edit_targets whitelist flag for a route.
+
+    Returns JSON 401 when not logged in, 403 (forbidden_error) when the
+    current session's user is not whitelisted. Independent of
+    ``admin_required`` -- an admin user without a whitelist row is still
+    denied (design.md Key Decisions).
+    """
+    @wraps(f)
+    def decorated(*args: Any, **kwargs: Any) -> Any:
+        if not is_user_logged_in():
+            return unauthorized_error("請先登入")
+        if not can_edit_targets():
+            return forbidden_error("無權限編輯目標值")
+        return f(*args, **kwargs)
+    return decorated

@@ -1,0 +1,40 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: frontend-engineer
+status: done
+summary: >
+  Built the 生產達成率 report page (frontend/src/production-achievement/) modeled
+  on production-history's filter + DataTable/chart pattern (implementation-plan.md
+  IP-7), without the async-job/spool machinery (explicit non-goal). Added the
+  target-value edit UI (inline per-row editor + new-target row) and the admin
+  can_edit_targets permission-management block inside the existing admin-pages
+  app (IP-8, .theme-admin-pages scope, no new theme class). Wired navigation
+  manifest, native-module registry, both migration-blueprint JSON manifests,
+  and data/page_status.json (IP-9). Authored unit/component tests (TDD for the
+  null-display/achievement-rate formatter and client-side target_qty validator)
+  and all three Playwright specs from test-plan.md (IP-10 frontend portion).
+  Built against api-contract.md rows 256-261 / openapi.json schemas directly
+  (ProductionAchievementReportRow/TargetRow/PermissionRow) since backend-engineer
+  is implementing routes in parallel on disjoint files.
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/production-achievement/App.vue, style.css, main.ts, index.html, utils.ts, composables/useProductionAchievement.ts, components/AchievementChart.vue, components/TargetEditPanel.vue" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/App.vue (edit), frontend/src/admin-pages/components/TargetPermissionsPanel.vue (new), frontend/src/admin-pages/style.css (edit, additive .pa-perm-* rules)" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/navigationManifest.js, frontend/src/portal-shell/nativeModuleRegistry.js (additive entries for /production-achievement)" }
+  - { type: files-changed, pointer: "docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json, route_scope_matrix.json (category: report), data/page_status.json (status: released)" }
+  - { type: components-affected, pointer: "production-achievement/App.vue, AchievementChart, TargetEditPanel; admin-pages/App.vue, TargetPermissionsPanel" }
+  - { type: tests-added, pointer: "frontend/src/production-achievement/__tests__/{utils,useProductionAchievement,TargetEditPanel}.test.ts (30 cases); frontend/src/admin-pages/components/__tests__/TargetPermissionsPanel.test.ts (5 cases)" }
+  - { type: tests-added, pointer: "frontend/tests/playwright/production-achievement.spec.js (6 tests: nav, filter+table+chart, authorized edit, unauthorized 403, admin assign/revoke)" }
+  - { type: tests-added, pointer: "frontend/tests/playwright/resilience/production-achievement-resilience.spec.js (2 tests: MySQL-down report degrade, 503 vs 403 distinction)" }
+  - { type: tests-added, pointer: "frontend/tests/playwright/data-boundary/production-achievement-data-boundary.spec.js (3 tests: negative/non-numeric target_qty client-side rejection, empty result set)" }
+  - { type: test-result, pointer: "vitest: 38/38 passed (src/production-achievement + src/admin-pages); npx playwright test --list: 10/10 specs parsed and listed correctly" }
+  - { type: test-result, pointer: "npm run type-check: 0 errors; npm run css:check: 0 errors, 0 new warnings for production-achievement files" }
+  - { type: accessibility-audit, pointer: "manual: role=alert on error banners, aria-pressed on permission toggle, native <select>/<input> for target-edit form (no custom widget), DataTable sortable column aria-sort inherited from shared component" }
+  - { type: deviation, pointer: "No contract endpoint exists for a non-admin user to pre-check can_edit_targets (only ungated GET .../targets and admin-only GET .../permissions exist per api-contract.md). Implemented the plan's proactive-hide instruction as best-effort: edit control shown optimistically to any authenticated user, and the composable flips editForbidden=true (hiding/disabling the control for the rest of the session) the first time a PUT 403s -- satisfies 'gracefully handle a 403 that slips through' but cannot pre-hide before any attempt without inventing an endpoint. Flagged rather than guessed at a backend field." }
+  - { type: deviation, pointer: "core/api.ts's apiPost() hardcodes method:'POST' with no override hook, so PUT /api/production-achievement/targets uses a small dedicated fetch-based apiPut() helper inside the composable, following the existing admin-pages/App.vue putJson() precedent (same CSRF-header + envelope pattern) rather than modifying the shared api.ts contract surface out of scope." }
+  - { type: deviation, pointer: "page_status.json status set to 'released' (not 'dev' like sibling /db-scheduling) because this change ships the full page + backend endpoints together in one change, per task instructions to default released unless dev judged more appropriate." }
+  - { type: known-risk, pointer: "Playwright specs verified via --list (parse + registration correctness) only; no live gunicorn+built-dist server was available in this worktree to execute them end-to-end, and backend routes do not exist yet in this parallel-agent worktree. Must be executed for real once backend-engineer's routes land and dist is rebuilt, before gate sign-off." }
+next-action: >
+  backend-engineer to finish routes/services; once both stacks are committed,
+  rebuild frontend dist and run the three new Playwright specs for real against
+  a live gunicorn server, then combine test-evidence.yml contract/full phases
+  per CLAUDE.md's two-stack concurrency note before gate sign-off.

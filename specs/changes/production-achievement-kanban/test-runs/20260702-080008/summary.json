@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/integration/test_production_achievement_filter_cache_reuse.py tests/integration/test_production_achievement_mysql_roundtrip.py tests/test_permissions.py tests/test_production_achievement_output_date.py tests/test_production_achievement_permissions.py tests/test_production_achievement_routes.py tests/test_production_achievement_service.py tests/test_production_achievement_shift_code.py tests/test_production_achievement_target_service.py -q --tb=short -ra --run-integration && cd frontend && npx vitest run src/production-achievement src/admin-pages && npx playwright test --list tests/playwright/production-achievement.spec.js tests/playwright/resilience/production-achievement-resilience.spec.js tests/playwright/data-boundary/production-achievement-data-boundary.spec.js",
+  "duration_ms": 5158,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-080008/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-080008/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-080008/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

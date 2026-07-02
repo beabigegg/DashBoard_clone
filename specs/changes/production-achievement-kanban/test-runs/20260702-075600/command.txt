@@ -1,0 +1,1 @@
+cd frontend && npx vitest run src/production-achievement src/admin-pages

@@ -1,0 +1,19 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "targeted",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "conda run -n mes-dashboard python -m pytest tests/test_production_achievement_shift_code.py tests/test_production_achievement_output_date.py tests/test_production_achievement_service.py tests/integration/test_production_achievement_filter_cache_reuse.py tests/test_production_achievement_target_service.py tests/integration/test_production_achievement_mysql_roundtrip.py tests/test_production_achievement_permissions.py tests/test_production_achievement_routes.py tests/test_permissions.py -q --maxfail=1 --tb=short -ra",
+  "duration_ms": 2959,
+  "first_failure": {
+    "kind": "assertion-failure",
+    "nodeid": "tests/test_production_achievement_routes.py::TestAdminPermissionsRoutes::test_admin_get_permissions_requires_admin",
+    "message": "ERROR conda.cli.main_run:execute(148): `conda run python -m pytest tests/test_production_achievement_shift_code.py tests/test_production_achievement_output_date.py tests/test_production_achievement_service.py tests/integration/test_production_achievement_filter_cache_reuse.py tests/test_production_achievement_target_service.py tests/integration/test_production_achievement_mysql_roundtrip.py tests/test_production_achievement_permissions.py tests/test_production_achievement_routes.py tests/test_pe..."
+  },
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-075130/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-075130/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-075130/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}
