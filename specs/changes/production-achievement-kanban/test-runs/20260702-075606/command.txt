@@ -1,0 +1,1 @@
+cd frontend && npx vitest run --reporter=basic src/production-achievement src/admin-pages

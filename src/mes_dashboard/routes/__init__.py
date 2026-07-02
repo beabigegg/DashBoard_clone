@@ -29,6 +29,10 @@ from .material_consumption_routes import material_consumption_bp
 from .downtime_analysis_routes import downtime_analysis_bp
 from .eap_alarm_routes import eap_alarm_bp
 from .db_scheduling_routes import db_scheduling_bp
+from .production_achievement_routes import (
+    production_achievement_bp,
+    production_achievement_admin_bp,
+)
 
 
 def register_routes(app) -> None:
@@ -57,6 +61,8 @@ def register_routes(app) -> None:
     app.register_blueprint(downtime_analysis_bp)
     app.register_blueprint(eap_alarm_bp)
     app.register_blueprint(db_scheduling_bp)
+    app.register_blueprint(production_achievement_bp)
+    app.register_blueprint(production_achievement_admin_bp)
 
 __all__ = [
     'wip_bp',
@@ -84,5 +90,7 @@ __all__ = [
     'downtime_analysis_bp',
     'eap_alarm_bp',
     'db_scheduling_bp',
+    'production_achievement_bp',
+    'production_achievement_admin_bp',
     'register_routes',
 ]

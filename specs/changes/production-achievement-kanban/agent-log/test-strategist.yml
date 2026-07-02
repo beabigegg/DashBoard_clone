@@ -1,0 +1,12 @@
+agent: test-strategist
+change-id: production-achievement-kanban
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/production-achievement-kanban/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_shift_code.py -> new shift_code service module (PA-01/PA-02)" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_output_date.py -> new output_date service module (PA-03/PA-04)" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_service.py -> new production_achievement_service.py (PA-05/PA-06/PA-07)" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_target_service.py -> new target-value CRUD service (mysql_client, no sync_worker)" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_permissions.py -> core/permissions.py new can_edit_targets gate" }
+  - { type: tdd-pairs, pointer: "tests/playwright/production-achievement.spec.js -> frontend/src/production-achievement/ + admin permission block" }
+  - { type: coverage-tiers, pointer: "unit (tier 0), contract, integration, e2e, data-boundary, resilience (tier 1)" }
+  - { type: mapping-completeness, pointer: "AC-1..AC-8 all mapped to at least one test family" }

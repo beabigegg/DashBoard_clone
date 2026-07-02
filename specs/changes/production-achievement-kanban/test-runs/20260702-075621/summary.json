@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-kanban",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run src/production-achievement src/admin-pages",
+  "duration_ms": 1306,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-kanban/test-runs/20260702-075621/summary.json",
+    "stdout": "specs/changes/production-achievement-kanban/test-runs/20260702-075621/stdout.log",
+    "stderr": "specs/changes/production-achievement-kanban/test-runs/20260702-075621/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

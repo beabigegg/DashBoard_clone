@@ -1,0 +1,19 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: implementation-planner
+status: done
+summary: >
+  Wrote implementation-plan.md as the execution packet. All three design.md
+  decisions (can_edit_targets in permissions.py fail-closed; direct-MySQL via
+  get_mysql_connection bypassing sync_worker; idempotent DDL script at
+  scripts/sql/production_achievement_tables.sql; shift/output_date as SQL CASE
+  with Python mirror for tests) were sufficient — not blocked. 10 IP items map
+  to backend-engineer + frontend-engineer; file-level plan covers 3 services,
+  1 SQL file, 1 routes module, permissions.py edit, DDL script, frontend app +
+  admin block, 5 manifest/nav edits, and all test files from test-plan.md.
+  Contracts already registered by contract-reviewer (openapi current) — only
+  response-samples.json additions remain as a test artifact.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/production-achievement-kanban/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer, frontend-engineer" }
+  - { type: scope-summary, pointer: "in-scope: 3 services + SQL + routes + permissions edit + DDL + frontend page/admin block + 5 nav/manifest edits + full test set; out-of-scope: PA-04 verification, multi-perm framework, new SPECNAME map, sync_worker path, DDL auto-wiring, spool/RQ/async, table DROP on rollback" }

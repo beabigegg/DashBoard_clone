@@ -424,6 +424,21 @@ ENDPOINTS = [
     # ── DB Scheduling ─────────────────────────────────────────────────────
     ("GET",  "/api/db-scheduling/queue", "get_db_scheduling_queue", True,
      None, None),
+    # ── Production Achievement ───────────────────────────────────────────
+    ("GET",  "/api/production-achievement/report", "get_production_achievement_report",
+     True, None, "start_date=2026-04-01&end_date=2026-04-02"),
+    ("GET",  "/api/production-achievement/filter-options",
+     "get_production_achievement_filter_options", True, None, None),
+    ("GET",  "/api/production-achievement/targets", "get_production_achievement_targets",
+     True, None, None),
+    ("PUT",  "/api/production-achievement/targets",
+     "put_production_achievement_targets_forbidden", True,
+     {"shift_code": "D", "workcenter_group": "切割", "target_qty": 1000}, None),
+    ("GET",  "/admin/api/production-achievement/permissions",
+     "get_admin_production_achievement_permissions", True, None, None),
+    ("PUT",  "/admin/api/production-achievement/permissions/testuser",
+     "put_admin_production_achievement_permissions", True,
+     {"can_edit_targets": True}, None),
 ]
 
 
@@ -457,6 +472,7 @@ def _canonical_manifest_key(endpoint_tuple):
     path = _re.sub(r"/TEST-EQ-001(?=/|$)", "/{equipment_id}", path)
     path = _re.sub(r"/TEST-JOB-001(?=/|$)", "/{job_id}", path)
     path = _re.sub(r"/TEST(?=/|$)", "/{workcenter}", path)
+    path = _re.sub(r"/testuser(?=/|$)", "/{user_identifier}", path)
     return f"{method} {path}"
 
 def capture(client, authenticated_client, admin_client, endpoint_tuple):

@@ -1,0 +1,16 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: contract-reviewer
+status: done
+summary: >
+  Reviewed and proposed updates for all six contract areas (business rules,
+  data shape, API, env, CSS, CI gates). Main Claude applied the proposed
+  additions verbatim (with type-syntax fixes for cdd-kit's openapi exporter)
+  and regenerated both openapi.json artifacts. cdd-kit validate --contracts
+  and --versions both pass (API conformance failure is expected until
+  backend-engineer implements the routes).
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/business/business-rules.md, contracts/data/data-shape-contract.md, contracts/api/api-contract.md, contracts/api/api-inventory.md, contracts/env/env-contract.md, contracts/env/env.schema.json, contracts/css/css-contract.md, contracts/css/css-inventory.md, contracts/ci/ci-gate-contract.md, contracts/CHANGELOG.md" }
+  - { type: breaking-changes, pointer: "none (all additions are additive)" }
+  - { type: open-follow-up, pointer: "exact MySQL OPS env var names confirmed directly against src/mes_dashboard/core/mysql_client.py by main Claude (matched reviewer's proposed names exactly)" }
+next-action: proceed to test-strategist and spec-architect

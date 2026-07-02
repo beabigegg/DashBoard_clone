@@ -150,6 +150,11 @@ export const routes = Object.freeze({
     order: 1,
     displayName: 'DB 排程助手',
   },
+  '/production-achievement': {
+    drawerId: 'production-assist',
+    order: 2,
+    displayName: '生產達成率',
+  },
 
   // ── Standalone / drilldown routes (no drawer) ───────────────────────────
   // These are code-owned by STANDALONE_DRILLDOWN_ROUTES in navigationState.js.

@@ -3,6 +3,7 @@
   "statuses": {
     "/admin/dashboard": "dev",
     "/query-tool": "released",
-    "/db-scheduling": "dev"
+    "/db-scheduling": "dev",
+    "/production-achievement": "released"
   }
 }

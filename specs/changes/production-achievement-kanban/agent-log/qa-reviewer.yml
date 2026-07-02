@@ -1,0 +1,14 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: qa-reviewer
+status: done
+verdict: PASS
+summary: >
+  Independently verified (not just trusted prior agent logs): test-evidence.yml
+  final-status passed, cdd-kit validate --contracts passed, PA-05 predicate
+  preserved verbatim in SQL, PA-03 cross-midnight rule correct, permission
+  gate fails closed under all three failure modes, portal-shell App.vue
+  regression-checked clean. No blocking gaps found.
+artifacts:
+  - { type: qa-report, pointer: "specs/changes/production-achievement-kanban/qa-report.md" }
+next-action: run cdd-kit gate production-achievement-kanban

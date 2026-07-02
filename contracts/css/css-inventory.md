@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.8
+schema-version: 1.2.9
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-06-30
+last-changed: 2026-07-02
 ---
 
 # CSS Inventory (Governed Source List)
@@ -77,6 +77,7 @@ last-changed: 2026-06-30
 | `frontend/src/wip-overview/style.css` | `theme-wip-overview` | wip-overview |
 | `frontend/src/yield-alert-center/style.css` | `theme-yield-alert-center` | yield-alert-center |
 | `frontend/src/production-history/style.css` | `theme-production-history` | production-history |
+| `frontend/src/production-achievement/style.css` | `theme-production-achievement` | production-achievement |
 
 ---
 
@@ -85,6 +86,10 @@ last-changed: 2026-06-30
 任何新增/刪除/重新命名/搬移 `frontend/src/**/*.css` 的 PR 必須在同一變更同步更新此清單。
 
 ## CHANGELOG
+
+## [css-inventory 1.2.9] — 2026-07-02
+### Added
+- production-achievement-kanban: `frontend/src/production-achievement/style.css` registered with `theme-production-achievement` root. Route-Local Feature Layers table.
 
 ## [css-inventory 1.2.8] — 2026-06-30
 ### Changed

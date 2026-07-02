@@ -1,0 +1,17 @@
+{
+  "data": {
+    "shift_codes": [
+      "N",
+      "D",
+      "A",
+      "B",
+      "C"
+    ],
+    "workcenter_groups": []
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-07-02T07:54:44.510052"
+  },
+  "success": true
+}

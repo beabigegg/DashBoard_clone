@@ -1,6 +1,6 @@
-# generated: 2026-07-01T08:47:22Z by cdd-kit 3.6.0
-# files: 978, src-lines: 304015, map-lines: 21744, compression: 14.0x
-# sources-digest: c277a629293b3133ceee127ff795963ecfc23b4ff876c59febfe08aeaf2b5485
+# generated: 2026-07-01T13:11:16Z by cdd-kit 3.6.0
+# files: 976, src-lines: 303669, map-lines: 21711, compression: 14.0x
+# sources-digest: f334372a413f8cee3c13f7810aac53dadcb21c59481c1f49bcdc6191226da3e7
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -21709,36 +21709,3 @@ tests/test_yield_alert_sql_runtime.py:  # 739 lines
   functions:
     - { name: _make_cross_filter_fixture, lines: 109-143 }
     - { name: _make_kpi_csv_parity_fixture, lines: 388-417 }
-
-tools/test_oracle_connection.py:  # 152 lines
-  imports:
-    - { module: sys, items: [], line: 6 }
-    - { module: io, items: [], line: 7 }
-    - { module: os, items: [], line: 8 }
-    - { module: oracledb, items: [], line: 9 }
-    - { module: datetime, items: [datetime], line: 10 }
-    - { module: pathlib, items: [Path], line: 11 }
-  constants:
-    - { name: DB_HOST, line: 25 }
-    - { name: DB_PORT, line: 26 }
-    - { name: DB_SERVICE, line: 27 }
-    - { name: DB_USER, line: 28 }
-    - { name: DB_PASSWORD, line: 29 }
-    - { name: DB_CONFIG, line: 31 }
-    - { name: MES_TABLES, line: 38 }
-  functions:
-    - { name: test_connection, lines: 58-130 }
-    - { name: main, lines: 133-148 }
-
-tools/update_oracle_authorized_objects.py:  # 194 lines
-  imports:
-    - { module: os, items: [], line: 7 }
-    - { module: sys, items: [], line: 8 }
-    - { module: collections, items: [Counter], line: 9 }
-    - { module: datetime, items: [datetime], line: 10 }
-    - { module: pathlib, items: [Path], line: 11 }
-    - { module: oracledb, items: [], line: 13 }
-  functions:
-    - { name: load_env, lines: 16-34 }
-    - { name: get_connection, lines: 37-47 }
-    - { name: main, lines: 50-190 }

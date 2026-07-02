@@ -1,0 +1,15 @@
+change-id: production-achievement-kanban
+timestamp: 2026-07-02
+agent: ci-cd-gatekeeper
+status: done
+summary: >
+  Wrote ci-gates.md (workflow / promotion policy / rollback policy sections).
+  Confirmed no new gate tier, job, or workflow YAML needed beyond the
+  playwright-critical-journeys spec-list addition already made in
+  contracts/ci/ci-gate-contract.md. Tier 4 stress/soak explicitly not
+  applicable. Manual DDL-script + MYSQL_OPS_ENABLED=true preconditions
+  flagged as non-gate-enforceable deploy-checklist items that never block
+  merge.
+artifacts:
+  - { type: gate-plan, pointer: "specs/changes/production-achievement-kanban/ci-gates.md" }
+next-action: proceed to implementation-planner

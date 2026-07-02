@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.35.0"
+    "version": "1.36.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -5734,6 +5734,213 @@
         "x-cdd-errors": "400/500"
       }
     },
+    "/api/production-achievement/report": {
+      "get": {
+        "summary": "GET /api/production-achievement/report",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementReportResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/500"
+      }
+    },
+    "/api/production-achievement/filter-options": {
+      "get": {
+        "summary": "GET /api/production-achievement/filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: GenericSuccessResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/production-achievement/targets": {
+      "get": {
+        "summary": "GET /api/production-achievement/targets",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementTargetsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementTargetsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/500/503"
+      },
+      "put": {
+        "summary": "PUT /api/production-achievement/targets",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: body {shift_code, workcenter_group, target_qty}; also gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
+    },
+    "/admin/api/production-achievement/permissions": {
+      "get": {
+        "summary": "GET /admin/api/production-achievement/permissions",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementPermissionsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementPermissionsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "403/500/503"
+      }
+    },
+    "/admin/api/production-achievement/permissions/{user_identifier}": {
+      "put": {
+        "summary": "PUT /admin/api/production-achievement/permissions/{user_identifier}",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: body {can_edit_targets} (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
+    },
     "/api/job/{job_id}/result": {
       "get": {
         "summary": "GET /api/job/{job_id}/result",
@@ -7171,6 +7378,153 @@
           "success",
           "equipment"
         ]
+      },
+      "ProductionAchievementReportRow": {
+        "type": "object",
+        "properties": {
+          "output_date": {
+            "type": "string"
+          },
+          "shift_code": {
+            "type": "string"
+          },
+          "workcenter_group": {
+            "type": "string"
+          },
+          "actual_output_qty": {
+            "type": "integer"
+          },
+          "target_qty": {
+            "type": "integer"
+          },
+          "achievement_rate": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "output_date",
+          "shift_code",
+          "workcenter_group",
+          "actual_output_qty",
+          "target_qty",
+          "achievement_rate"
+        ]
+      },
+      "ProductionAchievementReportResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {},
+          "error": {},
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string"
+              },
+              "app_version": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ProductionAchievementTargetRow": {
+        "type": "object",
+        "properties": {
+          "shift_code": {
+            "type": "string"
+          },
+          "workcenter_group": {
+            "type": "string"
+          },
+          "target_qty": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "shift_code",
+          "workcenter_group",
+          "target_qty",
+          "updated_at",
+          "updated_by"
+        ]
+      },
+      "ProductionAchievementTargetsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionAchievementTargetRow"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementPermissionRow": {
+        "type": "object",
+        "properties": {
+          "user_identifier": {
+            "type": "string"
+          },
+          "can_edit_targets": {
+            "type": "boolean"
+          },
+          "granted_at": {
+            "type": "string"
+          },
+          "granted_by": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_identifier",
+          "can_edit_targets",
+          "granted_at",
+          "granted_by"
+        ]
+      },
+      "ProductionAchievementPermissionsResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {},
+          "error": {},
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string"
+              },
+              "app_version": {
+                "type": "string"
+              }
+            }
+          }
+        }
       },
       "MsdContainerFilterOptionsResponse": {
         "type": "object",
