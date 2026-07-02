@@ -28,3 +28,19 @@ Evidence: `remove-unused-pages` — `/tables` entry persisted in sidebar after a
 The test method is named by convention `test_page_status_contains_<page>_in_<drawer>` — if the drawer changes, rename the method and update the assert.
 
 Evidence: `material-part-consumption` — CI failed after page moved from `drawer-2` to `drawer` without updating the test.
+
+## vite.config.ts INPUT_MAP and routeContracts.js ROUTE_CONTRACTS — Also Required
+
+**`frontend/vite.config.ts`'s `INPUT_MAP`** (page → entry file) must include every new page. Omission makes
+`npm run build` silently skip the page; `_validate_in_scope_asset_readiness()` then refuses to boot (missing
+dist asset), a hard startup failure.
+
+**`frontend/src/portal-shell/routeContracts.js`'s `ROUTE_CONTRACTS`** (routeId/title/owner/visibilityPolicy/
+scope/compatibilityPolicy) must include every new route. Omission does not block boot but emits
+"部分導覽項目缺少 route contract" at runtime — a soft failure easy to miss.
+
+No automated test currently asserts either registry's completeness against `navigationManifest.js`'s
+registered pages — this exact gap caused two of three post-merge production bugs in `production-achievement-kanban`.
+
+Evidence: `production-achievement-kanban` — new page's INPUT_MAP entry omitted, build silently
+skipped it, gunicorn refused to boot; routeContracts.js entry also omitted, runtime nav warning.

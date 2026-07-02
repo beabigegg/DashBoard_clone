@@ -79,3 +79,4 @@
 | yield-alert-csv-fallback-400 | abandoned | 2026-07-01 | Discovered during yield-alert-kpi-csv-parity investigation; documented as a proposal for future pickup (see change-request.md), not in scope for that change. Filed away, not actively worked. |
 | yield-alert-csv-fallback-400 | 2026 | 2026-07-01 | specs/archive/2026/yield-alert-csv-fallback-400/ |
 | eap-alarm-coarse-filter | 2026 | 2026-07-01 | specs/archive/2026/eap-alarm-coarse-filter/ |
+| production-achievement-kanban | 2026 | 2026-07-02 | specs/archive/2026/production-achievement-kanban/ |
