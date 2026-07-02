@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: yield-achievement-kanban
-visible-dirs: 164
-visible-files: 826
-omitted-dirs: 63
+visible-dirs: 205
+visible-files: 931
+omitted-dirs: 67
 truncated-dirs: 3
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -33,6 +33,8 @@ Use this deterministic map to choose candidate context paths before reading file
 ```
 yield-achievement-kanban/
 |-- .cdd/
+|   |-- code-graph.index.json
+|   |-- code-map.index.json
 |   |-- code-map.yml
 |   |-- conformance.json
 |   |-- context-policy.json
@@ -144,6 +146,54 @@ yield-achievement-kanban/
 |-- frontend/
 |   |-- .cdd/
 |   |   \-- code-map.yml
+|   |-- playwright-report/
+|   |   |-- data/
+|   |   |   |-- 214be76945d583c20bb0046db5a8d37a8a582670.zip
+|   |   |   |-- 283821f7974a904efc8efff1ad5a76dda632102e.zip
+|   |   |   |-- 2860592cb4e227be9c76fd6888b75c17d2ae7e82.zip
+|   |   |   |-- 31009525fd0e52d2f3d070ebed9b8af1f8a3b34b.zip
+|   |   |   |-- 3837a250edceb034d479a4dd7b376702bc0dcbf9.zip
+|   |   |   |-- 476720430030f8be66210a13e0442571ce7ee70e.zip
+|   |   |   |-- 4d34c2732bd8b0995c24bcf8dcd885c4d5250d6f.zip
+|   |   |   |-- 562a3972667b6ad0c4500afbe7c074394498423a.zip
+|   |   |   |-- 59570001857fe3ac87aa9252066ed09ae62f9bac.zip
+|   |   |   |-- 6309795d6ee70f0701b50f261cfcd46498a53eba.zip
+|   |   |   |-- 63cf9da6d23008ddb605a79d78589d1cb15c02d9.zip
+|   |   |   |-- 70970c028df079abf2bd5d82fc828fb92877a533.zip
+|   |   |   |-- 71d0953e2373bb94402c4aafed6aed4cce4fbb9d.zip
+|   |   |   |-- 8aff59ad76396324ea4079fa55881bfc59ecaabb.zip
+|   |   |   |-- 96736f59938fc224cac9cc1f77300ff1d24e95de.zip
+|   |   |   |-- a177346cd8080d39045786fa7fe147e09c904525.zip
+|   |   |   |-- a21d5b0588fd500f6164b5744cc5e34b6f05a75e.zip
+|   |   |   |-- a3e4a85c201290cb51215c8606934b05ae0baecf.zip
+|   |   |   |-- ac4e1a7b1f0130eacc60125f2b02c0901468d96f.zip
+|   |   |   |-- b8f8d5a520f63e75f184c8c1f89007b6d54ba4ed.zip
+|   |   |   |-- b915ea7b659af1e8fd8b41836cd31d8ab55952c7.zip
+|   |   |   |-- d70273b34989ff1fe1be9ae4d30c7fc2492151f7.zip
+|   |   |   |-- e71da03115546c62d31c7e85a9aee4308631aa6e.zip
+|   |   |   |-- ef40fd9ee79e413ec9f093ce17c462ed0bac7826.zip
+|   |   |   |-- f216f1341e05b967d5f13d22f402c01299e0e6cf.zip
+|   |   |   |-- f81154645846ec5e0c36007fee612265ed7e4de8.zip
+|   |   |   |-- f85c7d6a062483ecc93e3fb10f7882ccc4deb9e1.zip
+|   |   |   \-- fb12fe91ba78f1103ed0d7259a9aee2e6e4c7a10.zip
+|   |   |-- trace/
+|   |   |   |-- assets/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- codeMirrorModule.DYBRYzYX.css
+|   |   |   |-- codicon.DCmgc-ay.ttf
+|   |   |   |-- defaultSettingsView.7ch9cixO.css
+|   |   |   |-- index.BDwrLSGN.js
+|   |   |   |-- index.BVu7tZDe.css
+|   |   |   |-- index.html
+|   |   |   |-- manifest.webmanifest
+|   |   |   |-- playwright-logo.svg
+|   |   |   |-- snapshot.html
+|   |   |   |-- sw.bundle.js
+|   |   |   |-- uiMode.Btcz36p_.css
+|   |   |   |-- uiMode.CQJ9SCIQ.js
+|   |   |   |-- uiMode.html
+|   |   |   \-- xtermModule.DYP7pi_n.css
+|   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
 |   |   \-- ts-resolver-loader.mjs
@@ -320,6 +370,18 @@ yield-achievement-kanban/
 |   |   |   |-- router.js
 |   |   |   |-- sidebarState.js
 |   |   |   \-- style.css
+|   |   |-- production-achievement/
+|   |   |   |-- __tests__/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- components/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- App.vue
+|   |   |   |-- index.html
+|   |   |   |-- main.ts
+|   |   |   |-- style.css
+|   |   |   \-- utils.ts
 |   |   |-- production-history/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -439,6 +501,64 @@ yield-achievement-kanban/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
+|   |-- test-results/
+|   |   |-- admin-pages-test-api-error-shows-error-panel-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-api-error-shows-error-panel-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-drawer-management-panel-absent-AC-2-AC-3--chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-drawer-management-panel-absent-AC-2-AC-3--chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-no-get-admin-drawers-request-AC-3--chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-no-get-admin-drawers-request-AC-3--chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-page-header-with-title-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-page-header-with-title-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-page-loads-with-pages-panel-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-page-loads-with-pages-panel-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-page-status-badge-renders-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-page-status-badge-renders-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-pages-table-renders-rows-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-pages-table-renders-rows-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-status-to-02869-sed-to-dev-round-trip-AC-2--chromium/
+|   |   |   \-- trace.zip
+|   |   |-- admin-pages-test-status-to-02869-sed-to-dev-round-trip-AC-2--chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-au-d10da-ts-unauthenticated-to-login-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-au-d10da-ts-unauthenticated-to-login-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-bad-credentials-shows-error-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-bad-credentials-shows-error-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-empty-submit-shows-validation-error-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-empty-submit-shows-validation-error-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-login-page-renders-form-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-login-page-renders-form-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-no-8b66a-ebar-drawers-match-baseline-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-no-8b66a-ebar-drawers-match-baseline-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-su-b7f12-n-redirects-away-from-login-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- portal-shell-login-test-su-b7f12-n-redirects-away-from-login-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -523,6 +643,7 @@ yield-achievement-kanban/
 |   |   |   |-- material-trace.spec.ts
 |   |   |   |-- mid-section-defect.spec.ts
 |   |   |   |-- portal-shell-login.spec.ts
+|   |   |   |-- production-achievement.spec.js
 |   |   |   |-- production-history-cross-filter.spec.ts
 |   |   |   |-- production-history-filter-options-error.spec.ts
 |   |   |   |-- production-history-multi-line-input.spec.ts
@@ -578,7 +699,13 @@ yield-achievement-kanban/
 |   |-- tsconfig.json
 |   |-- vite.config.ts
 |   \-- vitest.config.js
+|-- logs/
+|   |-- admin_logs.sqlite
+|   |-- login_sessions.sqlite
+|   \-- metrics_history.sqlite
 |-- scripts/
+|   |-- sql/
+|   |   \-- production_achievement_tables.sql
 |   |-- capture_spool_snapshot.py
 |   |-- deploy.sh
 |   |-- extract_sql_schema.py
@@ -690,6 +817,7 @@ yield-achievement-kanban/
 |       |   |-- material_consumption_routes.py
 |       |   |-- material_trace_routes.py
 |       |   |-- mid_section_defect_routes.py
+|       |   |-- production_achievement_routes.py
 |       |   |-- production_history_routes.py
 |       |   |-- qc_gate_routes.py
 |       |   |-- query_tool_routes.py
@@ -748,11 +876,11 @@ yield-achievement-kanban/
 |       |   |-- msd_seed_job_service.py
 |       |   |-- navigation_contract.py
 |       |   |-- page_registry.py
+|       |   |-- production_achievement_permission_service.py
+|       |   |-- production_achievement_service.py
+|       |   |-- production_achievement_target_service.py
 |       |   |-- production_history_job_service.py
-|       |   |-- production_history_service.py
-|       |   |-- production_history_sql_runtime.py
-|       |   |-- qc_gate_service.py
-|       |   \-- ... (29 more entries truncated; cap=50)
+|       |   \-- ... (32 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -792,6 +920,7 @@ yield-achievement-kanban/
 |       |   |-- builder.py
 |       |   |-- filters.py
 |       |   |-- loader.py
+|       |   |-- production_achievement.sql
 |       |   \-- wildcards.py
 |       |-- static/
 |       |   |-- js/
@@ -827,6 +956,7 @@ yield-achievement-kanban/
 |   |   |   |-- get_admin_pages.json
 |   |   |   |-- get_admin_performance_detail.json
 |   |   |   |-- get_admin_performance_history.json
+|   |   |   |-- get_admin_production_achievement_permissions.json
 |   |   |   |-- get_admin_storage_info.json
 |   |   |   |-- get_admin_system_status.json
 |   |   |   |-- get_admin_user_usage_kpi.json
@@ -870,8 +1000,7 @@ yield-achievement-kanban/
 |   |   |   |-- get_mid_section_defect_analysis_detail.json
 |   |   |   |-- get_mid_section_defect_analysis.json
 |   |   |   |-- get_mid_section_defect_container_filter_options.json
-|   |   |   |-- get_mid_section_defect_export.json
-|   |   |   \-- ... (127 more entries truncated; cap=50)
+|   |   |   \-- ... (133 more entries truncated; cap=50)
 |   |   |-- capture_samples.py
 |   |   |-- README.md
 |   |   |-- response-samples.example.json
@@ -943,6 +1072,8 @@ yield-achievement-kanban/
 |   |   |-- test_oracle_error_codes.py
 |   |   |-- test_oracle_error_path.py
 |   |   |-- test_preload_fork_safety.py
+|   |   |-- test_production_achievement_filter_cache_reuse.py
+|   |   |-- test_production_achievement_mysql_roundtrip.py
 |   |   |-- test_production_history_rq_async.py
 |   |   |-- test_query_tool_rq_async.py
 |   |   |-- test_race_conditions.py
@@ -1067,7 +1198,26 @@ yield-achievement-kanban/
 |   |-- test_container_filter_cache.py
 |   |-- test_container_resolution_policy.py
 |   |-- test_core_exceptions.py
-|   \-- ... (189 more entries truncated; cap=50)
+|   \-- ... (195 more entries truncated; cap=50)
+|-- tmp/
+|   |-- query_spool/
+|   |   |-- probe_515509.json
+|   |   |-- probe_578737.json
+|   |   |-- probe_580544.json
+|   |   |-- probe_582022.json
+|   |   |-- probe_583362.json
+|   |   |-- probe_584579.json
+|   |   |-- probe_586570.json
+|   |   |-- probe_587788.json
+|   |   |-- probe_589255.json
+|   |   |-- probe_590135.json
+|   |   |-- probe_590997.json
+|   |   |-- probe_592490.json
+|   |   |-- probe_593702.json
+|   |   |-- probe_594400.json
+|   |   |-- probe_595767.json
+|   |   \-- probe_596994.json
+|   \-- mes_dashboard_restart.flag
 |-- .dockerignore
 |-- .env.example
 |-- .gitignore

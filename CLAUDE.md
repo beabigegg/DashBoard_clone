@@ -162,12 +162,13 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `_AI_SESSION` is a module-level `requests.Session` — patch `ai_query_service._AI_SESSION`, not `requests.post`
 - Every `execute_*_job` worker must wire `acquire_heavy_query_slot` before its `*_USE_RQ` flag ships — see docs/architecture/service-patterns.md §RQ Worker Concurrency Gate
 - COUNT(*) fail-open pre-check for domains without a date range must fail open to sync, never 503 — see docs/architecture/service-patterns.md §Async Routing Pre-Check Pattern
+- `DW_MES_WIP` has no `CONTAINERID` index (`CONTAINERNAME`/`TXNDATE` only, 95M+ rows) — bridge `CONTAINERID`→`CONTAINERNAME` via indexed `DW_MES_CONTAINER` before joining — see docs/architecture/service-patterns.md
 
 **MES domain semantics:**
 - `LOTWIPHISTORY.TRACKINQTY` is remaining-qty-per-partial (decrements across partials); use only `TRACKINTIMESTAMP` as session key — see contracts/business/business-rules.md §PH-06
 
 **Modernization policy** — see `docs/architecture/modernization-policy.md`:
-- Page add/remove: update BOTH `asset_readiness_manifest.json` AND `route_scope_matrix.json` in `docs/migration/`
+- Page add/remove: update `asset_readiness_manifest.json` + `route_scope_matrix.json` (`docs/migration/`), `vite.config.ts` `INPUT_MAP`, and `portal-shell/routeContracts.js` `ROUTE_CONTRACTS` — omitting `INPUT_MAP` blocks boot, omitting `ROUTE_CONTRACTS` only warns
 - `data/page_status.json`: manually delete page entry on code removal (never auto-updated)
 - `drawer_id` change in `page_status.json`: update corresponding test assertion and rename method
 

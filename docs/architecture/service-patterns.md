@@ -223,3 +223,13 @@ except Exception:
 The `count_*_rows()` function must reproduce the same filter predicate as the main query so the estimate is tight. For domains with a date range, `classify_query_cost(domain=..., date_span_days=...)` is preferred (no extra DB round-trip).
 
 Evidence: `query-path-c-elimination-cleanup` — spec-architect D2 decision; `wip_service.count_wip_rows`; `test_wip_rowcount_rq_routing.py::test_wip_count_error_fails_open_stays_inline`.
+
+## DW_MES_WIP Has No CONTAINERID Index — Bridge Through DW_MES_CONTAINER
+
+**`DWH.DW_MES_WIP` (95M+ rows) has no index on `CONTAINERID` — only `CONTAINERNAME` and `TXNDATE`** (confirmed via `ALL_TABLES`/`ALL_IND_COLUMNS` against the real dev DB). Any join or dedup keyed on `CONTAINERID` (e.g. `ROW_NUMBER() OVER (PARTITION BY CONTAINERID ...)`, the pattern copied from `mid_section_defect`'s precedent query) forces a full-table scan regardless of how tightly the outer query is date/predicate-scoped — measured: unscoped timeout (55s call_timeout); date-scoped to ~36K containers still 47.5s; further predicate-scoped to ~16.7K containers still 41s. The cost is dominated by the mandatory full scan itself, not join cardinality — narrowing the outer scope does not meaningfully help.
+
+Fix: bridge through `DWH.DW_MES_CONTAINER` (5.5M rows, indexed on **both** `CONTAINERID` and `CONTAINERNAME`) to translate the `CONTAINERID` scope into `CONTAINERNAME`s first, then join `DW_MES_WIP` via its indexed `CONTAINERNAME` column instead. Measured after fix: the same 30-day query dropped from timeout to ~22-32s.
+
+Unverified whether the `mid_section_defect` precedent query (origin of this join pattern) tolerates the full scan because its container set is always small — flag for follow-up if that query is ever touched.
+
+Evidence: `production-achievement-kanban` — `sql/production_achievement.sql`; verified against the real dev Oracle DB with explicit user authorization for each live-connection diagnostic query.
