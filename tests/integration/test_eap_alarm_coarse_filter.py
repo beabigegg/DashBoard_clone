@@ -8,6 +8,8 @@ required, so the marker is integration (PR-gate) not integration_real.
 Test classes:
   TestEapAlarmWorkerFnNewDims — AC-1/AC-2 lot_ids IN clause + EXISTS semi-join
                                  SQL assertions; route per-kwarg forwarding.
+  TestEapAlarmFineFilterRouteParams — product-dim fine filters + pareto dim /
+                                 trend group_by route param validation & forwarding.
 """
 
 from __future__ import annotations
@@ -203,3 +205,108 @@ class TestEapAlarmWorkerFnNewDims:
         assert captured.get("pj_bops") == ["BopC"], (
             f"pj_bops must be forwarded per-kwarg, got: {captured.get('pj_bops')!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestEapAlarmFineFilterRouteParams — new fine filters + dim/group_by params
+# ---------------------------------------------------------------------------
+
+class TestEapAlarmFineFilterRouteParams:
+    """Routes parse product-dim fine filters and validate dim/group_by enums."""
+
+    def _spool_hit(self, monkeypatch):
+        monkeypatch.setattr(
+            "mes_dashboard.routes.eap_alarm_routes._get_spool_path",
+            lambda key: "/tmp/fake_spool.parquet",
+        )
+
+    def test_summary_forwards_product_fine_filters(self, monkeypatch):
+        """GET /summary forwards lot_id/pj_type/product_line/pj_bop per-kwarg."""
+        self._spool_hit(monkeypatch)
+        captured: Dict[str, Any] = {}
+
+        def _mock_get_summary(spool_path, filters):
+            captured["filters"] = dict(filters)
+            return {"total_alarm_count": 0}
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.eap_alarm_service.get_summary",
+            _mock_get_summary,
+        )
+
+        app = _make_app()
+        with app.test_client() as client:
+            resp = client.get(
+                "/api/eap-alarm/summary?query_id=k1"
+                "&lot_id[]=LOT-001&lot_id[]=LOT-002"
+                "&pj_type[]=TypeA&product_line[]=LineB&pj_bop[]=BopC"
+            )
+
+        assert resp.status_code == 200, resp.get_json()
+        filters = captured["filters"]
+        assert filters["lot_id"] == ["LOT-001", "LOT-002"]
+        assert filters["pj_type"] == ["TypeA"]
+        assert filters["product_line"] == ["LineB"]
+        assert filters["pj_bop"] == ["BopC"]
+
+    def test_pareto_forwards_dim(self, monkeypatch):
+        """GET /pareto?dim=product_line forwards dim kwarg to service."""
+        self._spool_hit(monkeypatch)
+        captured: Dict[str, Any] = {}
+
+        def _mock_get_pareto(spool_path, filters, dim="alarm_text"):
+            captured["dim"] = dim
+            return {"items": [], "dim": dim, "total": 0}
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.eap_alarm_service.get_pareto",
+            _mock_get_pareto,
+        )
+
+        app = _make_app()
+        with app.test_client() as client:
+            resp = client.get("/api/eap-alarm/pareto?query_id=k1&dim=product_line")
+
+        assert resp.status_code == 200, resp.get_json()
+        assert captured["dim"] == "product_line"
+
+    def test_pareto_invalid_dim_returns_400(self, monkeypatch):
+        """GET /pareto with unknown dim → 400 VALIDATION_ERROR (closed enum)."""
+        self._spool_hit(monkeypatch)
+        app = _make_app()
+        with app.test_client() as client:
+            resp = client.get("/api/eap-alarm/pareto?query_id=k1&dim=bogus")
+        assert resp.status_code == 400, resp.get_json()
+
+    def test_trend_forwards_group_by(self, monkeypatch):
+        """GET /trend?group_by=pj_type forwards group_by kwarg to service."""
+        self._spool_hit(monkeypatch)
+        captured: Dict[str, Any] = {}
+
+        def _mock_get_trend(spool_path, filters, granularity="day", group_by="alarm_text"):
+            captured["granularity"] = granularity
+            captured["group_by"] = group_by
+            return {"labels": [], "series": [], "group_by": group_by}
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.eap_alarm_service.get_trend",
+            _mock_get_trend,
+        )
+
+        app = _make_app()
+        with app.test_client() as client:
+            resp = client.get(
+                "/api/eap-alarm/trend?query_id=k1&granularity=hour&group_by=pj_type"
+            )
+
+        assert resp.status_code == 200, resp.get_json()
+        assert captured["group_by"] == "pj_type"
+        assert captured["granularity"] == "hour"
+
+    def test_trend_invalid_group_by_returns_400(self, monkeypatch):
+        """GET /trend with unknown group_by → 400 VALIDATION_ERROR (closed enum)."""
+        self._spool_hit(monkeypatch)
+        app = _make_app()
+        with app.test_client() as client:
+            resp = client.get("/api/eap-alarm/trend?query_id=k1&group_by=bogus")
+        assert resp.status_code == 400, resp.get_json()

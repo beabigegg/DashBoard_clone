@@ -73,10 +73,12 @@ WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
 """
 
 # ── DuckDB pairing query ───────────────────────────────────────────────────────
-# Registers two tables:
+# Registers three tables:
 #   events_raw   — from Oracle main query (EVENT_ID, EQP_ID, ...)
 #   detail_pivot — pre-pivoted in Python (EVENT_ID, ALARM_CODE_STR,
 #                  ALARM_TEXT_DETAIL, DETAIL_PARAMS)
+#   lot_product  — LOT_ID → product dims lookup (LOT_ID, PJ_TYPE,
+#                  PRODUCT_LINE, PJ_BOP) from DWH.DW_MES_CONTAINER
 # Produces one row per alarm occurrence (SET + optional CLEAR pair).
 _PAIR_SQL = """\
 WITH events AS (
@@ -94,9 +96,13 @@ WITH events AS (
         CASE WHEN d.ALARM_CODE_STR IS NOT NULL
              THEN ABS(TRY_CAST(d.ALARM_CODE_STR AS INTEGER)) & 127 END AS ALARM_CATEGORY_CODE,
         d.DETAIL_PARAMS,
-        e.ALARM_TIME
+        e.ALARM_TIME,
+        lp.PJ_TYPE,
+        lp.PRODUCT_LINE,
+        lp.PJ_BOP
     FROM events_raw e
     LEFT JOIN detail_pivot d ON d.EVENT_ID = e.EVENT_ID
+    LEFT JOIN lot_product lp ON lp.LOT_ID = TRIM(e.LOT_ID)
 ),
 set_events AS (
     SELECT * FROM events WHERE IS_SET
@@ -116,6 +122,9 @@ paired AS (
         s.ALARM_TIME                AS ALARM_START,
         MIN(c.CLEAR_TIME)           AS ALARM_END,
         s.DETAIL_PARAMS,
+        s.PJ_TYPE,
+        s.PRODUCT_LINE,
+        s.PJ_BOP,
         s.EVENT_ID
     FROM set_events s
     LEFT JOIN clear_events c
@@ -124,7 +133,8 @@ paired AS (
           AND c.CLEAR_TIME > s.ALARM_TIME
     GROUP BY
         s.EVENT_ID, s.ALARM_ID, s.EQP_ID, s.EQP_TYPE, s.LOT_ID,
-        s.ALARM_TEXT, s.ALARM_CATEGORY_CODE, s.ALARM_TIME, s.DETAIL_PARAMS
+        s.ALARM_TEXT, s.ALARM_CATEGORY_CODE, s.ALARM_TIME, s.DETAIL_PARAMS,
+        s.PJ_TYPE, s.PRODUCT_LINE, s.PJ_BOP
 )
 SELECT
     ALARM_ID,
@@ -139,10 +149,93 @@ SELECT
          THEN epoch(CAST(ALARM_END AS TIMESTAMP)) - epoch(CAST(ALARM_START AS TIMESTAMP))
     END                             AS DURATION_SECONDS,
     DETAIL_PARAMS,
+    PJ_TYPE,
+    PRODUCT_LINE,
+    PJ_BOP,
     '{machines_hash}'               AS eqp_types_filter
 FROM paired
 ORDER BY ALARM_START DESC
 """
+
+# ── LOT_ID → product dims lookup (spool enrichment, schema v4) ────────────────
+# DW_MES_CONTAINER is indexed on CONTAINERNAME (service-patterns.md); the
+# lookup runs once per job over the distinct LOT_IDs in the result set.
+# NVL(TRIM(...), '(NA)') mirrors the coarse EXISTS filter semantics so a lot
+# whose container row has a NULL dim reads back as '(NA)' in both places.
+_LOT_PRODUCT_SQL_TEMPLATE = """\
+SELECT
+    TRIM(c.CONTAINERNAME)                 AS LOT_ID,
+    NVL(TRIM(c.PJ_TYPE), '(NA)')          AS PJ_TYPE,
+    NVL(TRIM(c.PRODUCTLINENAME), '(NA)')  AS PRODUCT_LINE,
+    NVL(TRIM(c.PJ_BOP), '(NA)')           AS PJ_BOP
+FROM DWH.DW_MES_CONTAINER c
+WHERE c.CONTAINERNAME IN ({placeholders})
+"""
+
+_LOT_PRODUCT_COLUMNS = ["LOT_ID", "PJ_TYPE", "PRODUCT_LINE", "PJ_BOP"]
+
+
+def _empty_lot_product_df():
+    import pandas as pd
+    return pd.DataFrame(columns=_LOT_PRODUCT_COLUMNS)
+
+
+def _fetch_lot_product_df(lot_ids, timeout_seconds: int):
+    """Fetch product dims (PJ_TYPE/PRODUCT_LINE/PJ_BOP) for the given LOT_IDs.
+
+    Chunked ``CONTAINERNAME IN (...)`` lookups (≤999 binds per chunk, Oracle
+    IN-list limit). LOT_IDs are stripped/deduped/sorted before binding and the
+    result is deduped on LOT_ID (CHAR-padding safety: strip at both dict-build
+    and lookup). Any failure or unexpected result shape degrades to an empty
+    frame — spool rows then carry NULL product dims instead of failing the job.
+    """
+    import pandas as pd
+
+    cleaned = sorted({str(v).strip() for v in lot_ids if v is not None and str(v).strip()})
+    if not cleaned:
+        return _empty_lot_product_df()
+
+    from mes_dashboard.core.database import read_sql_df_slow
+
+    _ORACLE_IN_LIMIT = 999
+    frames = []
+    for start in range(0, len(cleaned), _ORACLE_IN_LIMIT):
+        chunk = cleaned[start:start + _ORACLE_IN_LIMIT]
+        placeholders = ", ".join(f":c{i}" for i in range(len(chunk)))
+        params = {f"c{i}": v for i, v in enumerate(chunk)}
+        frames.append(read_sql_df_slow(
+            _LOT_PRODUCT_SQL_TEMPLATE.format(placeholders=placeholders),
+            params=params,
+            timeout_seconds=timeout_seconds,
+            caller="eap_alarm_worker_lot_product",
+        ))
+
+    combined = pd.concat(frames, ignore_index=True) if frames else _empty_lot_product_df()
+    if not set(_LOT_PRODUCT_COLUMNS).issubset(set(combined.columns)):
+        logger.warning(
+            "eap_alarm_worker: lot_product lookup returned unexpected columns %s; "
+            "proceeding without product dims", list(combined.columns),
+        )
+        return _empty_lot_product_df()
+    combined = combined[_LOT_PRODUCT_COLUMNS].dropna(subset=["LOT_ID"])
+    combined["LOT_ID"] = combined["LOT_ID"].astype(str).str.strip()
+    return combined.drop_duplicates(subset=["LOT_ID"], keep="first")
+
+
+def _safe_lot_product_df(events_df, timeout_seconds: int):
+    """Best-effort lot→product enrichment frame for the given events frame."""
+    try:
+        if events_df is None or events_df.empty or "LOT_ID" not in events_df.columns:
+            return _empty_lot_product_df()
+        return _fetch_lot_product_df(
+            events_df["LOT_ID"].dropna().unique().tolist(), timeout_seconds
+        )
+    except Exception as lp_exc:
+        logger.warning(
+            "eap_alarm_worker: lot_product lookup failed, proceeding without "
+            "product dims: %s", lp_exc,
+        )
+        return _empty_lot_product_df()
 
 
 def _build_lot_ids_filter(lot_ids: List[str]) -> tuple[str, Dict[str, Any]]:
@@ -314,6 +407,9 @@ def run_eap_alarm_query_job(
 
         update_job_progress(_JOB_PREFIX, job_id, status="running", progress="pairing SET/CLEAR", pct="50")
 
+        # ── LOT_ID → product dims lookup (spool enrichment, schema v4) ──
+        lot_product_df = _safe_lot_product_df(events_df, EAP_ALARM_JOB_TIMEOUT_SECONDS)
+
         # ── Pre-pivot detail EAV in Python (avoids DuckDB version-specific agg) ──
         import json
         import pandas as pd
@@ -339,6 +435,7 @@ def run_eap_alarm_query_job(
         try:
             con.register("events_raw", events_df)
             con.register("detail_pivot", detail_pivot_df)
+            con.register("lot_product", lot_product_df)
 
             # Re-create directory immediately before write: the spool cleanup daemon
             # calls rmdir() on empty directories every ~5 min, so the directory
@@ -548,12 +645,16 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
                 columns=["EVENT_ID", "ALARM_CODE_STR", "ALARM_TEXT_DETAIL", "DETAIL_PARAMS"]
             )
 
+        # LOT_ID → product dims lookup (spool enrichment, schema v4)
+        lot_product_df = _safe_lot_product_df(events_df, EAP_ALARM_JOB_TIMEOUT_SECONDS)
+
         os.makedirs(os.path.dirname(self._spool_path), exist_ok=True)
 
         con = duckdb.connect()
         try:
             con.register("events_raw", events_df)
             con.register("detail_pivot", detail_pivot_df)
+            con.register("lot_product", lot_product_df)
 
             pair_sql = _PAIR_SQL.format(machines_hash=self._machines_hash)
 

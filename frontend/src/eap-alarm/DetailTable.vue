@@ -8,6 +8,9 @@ interface DetailRow {
   eqp_id: string | null;
   eqp_type: string | null;
   lot_id: string | null;
+  pj_type: string | null;
+  product_line: string | null;
+  pj_bop: string | null;
   alarm_text: string | null;
   alarm_category_code: number | null;
   alarm_start: string | null;
@@ -107,6 +110,9 @@ const hasExpandable = computed(() =>
         <DataTableColumn column-key="alarm_end"       label="解除時間"     :sortable="false" />
         <DataTableColumn column-key="duration_seconds"label="排除時間"     :sortable="false" />
         <DataTableColumn column-key="lot_id"          label="LOT ID"       :sortable="false" />
+        <DataTableColumn column-key="pj_type"         label="PJ 類型"      :sortable="false" />
+        <DataTableColumn column-key="product_line"    label="Package"      :sortable="false" />
+        <DataTableColumn column-key="pj_bop"          label="BOP"          :sortable="false" />
 
         <template #cell="{ row, columnKey }">
           <template v-if="columnKey === 'alarm_start'">
@@ -122,6 +128,15 @@ const hasExpandable = computed(() =>
           </template>
           <template v-else-if="columnKey === 'lot_id'">
             {{ row.lot_id ?? '—' }}
+          </template>
+          <template v-else-if="columnKey === 'pj_type'">
+            {{ row.pj_type ?? '—' }}
+          </template>
+          <template v-else-if="columnKey === 'product_line'">
+            {{ row.product_line ?? '—' }}
+          </template>
+          <template v-else-if="columnKey === 'pj_bop'">
+            {{ row.pj_bop ?? '—' }}
           </template>
           <template v-else-if="columnKey === 'alarm_text'">
             <span class="alarm-text-cell" :title="String(row.alarm_text ?? '')">

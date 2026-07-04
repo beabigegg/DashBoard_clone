@@ -4,17 +4,18 @@
 All DuckDB views operate solely on the spool parquet (EA-02/EA-04).
 No Oracle re-query after the spool is built.
 
-Spool schema (v2): one row = one alarm occurrence (SET event + optional CLEAR).
+Spool schema (v4): one row = one alarm occurrence (SET event + optional CLEAR).
   ALARM_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE,
   ALARM_START, ALARM_END (nullable), DURATION_SECONDS (nullable),
-  DETAIL_PARAMS, eqp_types_filter
+  DETAIL_PARAMS, PJ_TYPE (nullable), PRODUCT_LINE (nullable),
+  PJ_BOP (nullable), eqp_types_filter
 
 Public API:
   validate_eap_alarm_params(date_from, date_to, machines)  → raises ValueError
   get_filter_options(spool_path, filters) → dict
   get_summary(spool_path, filters) → dict
-  get_pareto(spool_path, filters) → dict
-  get_trend(spool_path, filters, granularity) → dict
+  get_pareto(spool_path, filters, dim) → dict
+  get_trend(spool_path, filters, granularity, group_by) → dict
   get_detail(spool_path, filters, page, per_page) → dict
 """
 
@@ -105,12 +106,26 @@ def _escape_sql(s: str) -> str:
     return s.replace("'", "''")
 
 
+# Exact-match fine-filter axes: request key → spool column (all IN-list semantics)
+_EXACT_FILTER_COLUMNS: Dict[str, str] = {
+    "equipment_id": "EQP_ID",
+    "lot_id": "LOT_ID",
+    "pj_type": "PJ_TYPE",
+    "product_line": "PRODUCT_LINE",
+    "pj_bop": "PJ_BOP",
+}
+
+
 def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> tuple[str, dict]:
     """Build WHERE clause from fine filters.
 
     Supported keys:
-      alarm_text (list[str])   — ILIKE match on ALARM_TEXT
-      equipment_id (list[str]) — exact match on EQP_ID
+      alarm_text (list[str])    — ILIKE match on ALARM_TEXT
+      equipment_id (list[str])  — exact match on EQP_ID
+      lot_id (list[str])        — exact match on LOT_ID
+      pj_type (list[str])       — exact match on PJ_TYPE (product dim)
+      product_line (list[str])  — exact match on PRODUCT_LINE (product dim)
+      pj_bop (list[str])        — exact match on PJ_BOP (product dim)
     """
     prefix = f"{alias}." if alias else ""
     clauses = []
@@ -126,10 +141,11 @@ def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> t
         )
         clauses.append(f"({like_parts})")
 
-    eqp_ids = [str(e) for e in (filters.get("equipment_id") or []) if e is not None]
-    if eqp_ids:
-        quoted = ", ".join(f"'{_escape_sql(e)}'" for e in eqp_ids)
-        clauses.append(f"{prefix}EQP_ID IN ({quoted})")
+    for key, column in _EXACT_FILTER_COLUMNS.items():
+        values = [str(v) for v in (filters.get(key) or []) if v is not None]
+        if values:
+            quoted = ", ".join(f"'{_escape_sql(v)}'" for v in values)
+            clauses.append(f"{prefix}{column} IN ({quoted})")
 
     if clauses:
         return "WHERE " + " AND ".join(clauses), {}
@@ -145,37 +161,35 @@ def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None
         {
           alarm_text_options: list[str],
           equipment_id_options: list[str],
+          lot_id_options: list[str],
+          pj_type_options: list[str],
+          product_line_options: list[str],
+          pj_bop_options: list[str],
         }
     """
     conn = _get_duckdb_conn()
     try:
         where_sql, _ = _build_filter_where(filters)
 
-        alarm_texts: List[str] = [
-            row[0]
-            for row in conn.execute(f"""
-                SELECT DISTINCT ALARM_TEXT
-                FROM read_parquet('{spool_path}')
-                {where_sql}
-                ORDER BY ALARM_TEXT
-            """).fetchall()
-            if row[0] is not None
-        ]
-
-        eqp_ids: List[str] = [
-            row[0]
-            for row in conn.execute(f"""
-                SELECT DISTINCT EQP_ID
-                FROM read_parquet('{spool_path}')
-                {where_sql}
-                ORDER BY EQP_ID
-            """).fetchall()
-            if row[0] is not None
-        ]
+        def _distinct(column: str) -> List[str]:
+            return [
+                row[0]
+                for row in conn.execute(f"""
+                    SELECT DISTINCT {column}
+                    FROM read_parquet('{spool_path}')
+                    {where_sql}
+                    ORDER BY {column}
+                """).fetchall()
+                if row[0] is not None
+            ]
 
         return {
-            "alarm_text_options": alarm_texts,
-            "equipment_id_options": eqp_ids,
+            "alarm_text_options": _distinct("ALARM_TEXT"),
+            "equipment_id_options": _distinct("EQP_ID"),
+            "lot_id_options": _distinct("LOT_ID"),
+            "pj_type_options": _distinct("PJ_TYPE"),
+            "product_line_options": _distinct("PRODUCT_LINE"),
+            "pj_bop_options": _distinct("PJ_BOP"),
         }
     finally:
         conn.close()
@@ -190,6 +204,8 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
         {
           total_alarm_count: int,        — total alarm occurrences
           affected_equipment_count: int,
+          affected_lot_count: int,       — distinct LOT_ID (NULL lot excluded)
+          affected_product_line_count: int,  — distinct PRODUCT_LINE (NULL excluded)
           unresolved_count: int,         — alarms without a CLEAR in the window
           avg_duration_minutes: float | null,  — avg resolution time (resolved only)
         }
@@ -202,6 +218,8 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
             SELECT
                 COUNT(*) AS total_alarm_count,
                 COUNT(DISTINCT EQP_ID) AS affected_equipment_count,
+                COUNT(DISTINCT LOT_ID) AS affected_lot_count,
+                COUNT(DISTINCT PRODUCT_LINE) AS affected_product_line_count,
                 SUM(CASE WHEN ALARM_END IS NULL THEN 1 ELSE 0 END) AS unresolved_count,
                 AVG(DURATION_SECONDS) AS avg_duration_seconds
             FROM read_parquet('{spool_path}')
@@ -210,8 +228,10 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
 
         total_alarm_count = int(row[0] or 0)
         affected_equipment_count = int(row[1] or 0)
-        unresolved_count = int(row[2] or 0)
-        avg_dur_sec = row[3]
+        affected_lot_count = int(row[2] or 0)
+        affected_product_line_count = int(row[3] or 0)
+        unresolved_count = int(row[4] or 0)
+        avg_dur_sec = row[5]
         avg_duration_minutes = (
             round(float(avg_dur_sec) / 60, 1) if avg_dur_sec is not None else None
         )
@@ -219,6 +239,8 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
         return {
             "total_alarm_count": total_alarm_count,
             "affected_equipment_count": affected_equipment_count,
+            "affected_lot_count": affected_lot_count,
+            "affected_product_line_count": affected_product_line_count,
             "unresolved_count": unresolved_count,
             "avg_duration_minutes": avg_duration_minutes,
         }
@@ -228,15 +250,46 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
 
 # ── Pareto ────────────────────────────────────────────────────────────────────
 
-def get_pareto(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> dict:
-    """Top-50 alarm_text Pareto (count of occurrences).
+# Groupable dimensions for pareto/trend: request value → (column, NULL label).
+# Closed enum — routes validate against these keys before calling the service.
+GROUP_DIMENSIONS: Dict[str, tuple[str, str]] = {
+    "alarm_text": ("ALARM_TEXT", "(無說明)"),
+    "eqp_id": ("EQP_ID", "(未知)"),
+    "eqp_type": ("EQP_TYPE", "(未知)"),
+    "lot_id": ("LOT_ID", "(無批號)"),
+    "pj_type": ("PJ_TYPE", "(NA)"),
+    "product_line": ("PRODUCT_LINE", "(NA)"),
+    "pj_bop": ("PJ_BOP", "(NA)"),
+}
+
+
+def _group_expr(dim: str) -> str:
+    """COALESCE'd group expression for a GROUP_DIMENSIONS key."""
+    column, null_label = GROUP_DIMENSIONS[dim]
+    return f"COALESCE({column}, '{_escape_sql(null_label)}')"
+
+
+def get_pareto(
+    spool_path: str,
+    filters: Optional[Dict[str, Any]] = None,
+    dim: str = "alarm_text",
+) -> dict:
+    """Top-50 Pareto over the requested dimension (count of occurrences).
+
+    dim: one of GROUP_DIMENSIONS keys (default "alarm_text").
 
     Returns:
         {
-          items: [{alarm_text, count, cumulative_pct}],
+          items: [{name, alarm_text, count, cumulative_pct}],
+          dim: str,
           total: int,
         }
+        `alarm_text` mirrors `name` for backward compatibility with pre-dim
+        consumers; new consumers should read `name`.
     """
+    if dim not in GROUP_DIMENSIONS:
+        raise ValueError(f"invalid pareto dim: {dim!r}")
+
     conn = _get_duckdb_conn()
     try:
         where_sql, _ = _build_filter_where(filters)
@@ -246,15 +299,15 @@ def get_pareto(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> dic
         ).fetchone()[0] or 0)
 
         if total == 0:
-            return {"items": [], "total": 0}
+            return {"items": [], "dim": dim, "total": 0}
 
         rows = conn.execute(f"""
             SELECT
-                COALESCE(ALARM_TEXT, '(無說明)') AS alarm_text,
+                {_group_expr(dim)} AS grp,
                 COUNT(*) AS cnt
             FROM read_parquet('{spool_path}')
             {where_sql}
-            GROUP BY ALARM_TEXT
+            GROUP BY grp
             ORDER BY cnt DESC
             LIMIT 50
         """).fetchall()
@@ -265,12 +318,13 @@ def get_pareto(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> dic
             count = int(row[1])
             cumulative += count
             items.append({
+                "name": str(row[0]),
                 "alarm_text": str(row[0]),
                 "count": count,
                 "cumulative_pct": round(cumulative / total * 100, 2),
             })
 
-        return {"items": items, "total": total}
+        return {"items": items, "dim": dim, "total": total}
     finally:
         conn.close()
 
@@ -281,77 +335,91 @@ def get_trend(
     spool_path: str,
     filters: Optional[Dict[str, Any]] = None,
     granularity: str = "day",
+    group_by: str = "alarm_text",
 ) -> dict:
-    """Stacked trend by ALARM_TEXT (top 10), bucketed by ALARM_START.
+    """Stacked trend by the requested dimension (top 10), bucketed by ALARM_START.
+
+    group_by: one of GROUP_DIMENSIONS keys (default "alarm_text").
 
     Returns:
         {
           labels: list[str],
-          series: [{alarm_text, data: list[int]}],
+          series: [{name, alarm_text, data: list[int]}],
+          group_by: str,
         }
+        `alarm_text` mirrors `name` for backward compatibility with pre-dim
+        consumers; new consumers should read `name`.
     """
+    if group_by not in GROUP_DIMENSIONS:
+        raise ValueError(f"invalid trend group_by: {group_by!r}")
+
     conn = _get_duckdb_conn()
     try:
         where_sql, _ = _build_filter_where(filters)
+        grp_expr = _group_expr(group_by)
 
         if granularity == "hour":
             ts_expr = "strftime(ALARM_START, '%Y-%m-%d %H:00')"
         else:
             ts_expr = "strftime(ALARM_START, '%Y-%m-%d')"
 
-        # Limit to top-10 alarm texts to keep chart readable
-        top_texts = [
+        # Limit to top-10 group values to keep chart readable
+        top_groups = [
             row[0]
             for row in conn.execute(f"""
-                SELECT COALESCE(ALARM_TEXT, '(無說明)') AS alarm_text
+                SELECT {grp_expr} AS grp
                 FROM read_parquet('{spool_path}')
                 {where_sql}
-                GROUP BY alarm_text
+                GROUP BY grp
                 ORDER BY COUNT(*) DESC
                 LIMIT 10
             """).fetchall()
         ]
 
-        if not top_texts:
-            return {"labels": [], "series": []}
+        if not top_groups:
+            return {"labels": [], "series": [], "group_by": group_by}
 
-        quoted = ", ".join(f"'{_escape_sql(t)}'" for t in top_texts)
+        quoted = ", ".join(f"'{_escape_sql(t)}'" for t in top_groups)
         rows = conn.execute(f"""
             SELECT
                 {ts_expr} AS label,
-                COALESCE(ALARM_TEXT, '(無說明)') AS alarm_text,
+                {grp_expr} AS grp,
                 COUNT(*) AS cnt
             FROM read_parquet('{spool_path}')
             {where_sql}
-            {"AND" if where_sql else "WHERE"} COALESCE(ALARM_TEXT, '(無說明)') IN ({quoted})
-            GROUP BY label, alarm_text
-            ORDER BY label, alarm_text
+            {"AND" if where_sql else "WHERE"} {grp_expr} IN ({quoted})
+            GROUP BY label, grp
+            ORDER BY label, grp
         """).fetchall()
 
         if not rows:
-            return {"labels": [], "series": []}
+            return {"labels": [], "series": [], "group_by": group_by}
 
         label_set: dict[str, int] = {}
-        text_counts: dict[str, dict[str, int]] = {}
+        group_counts: dict[str, dict[str, int]] = {}
 
         for row in rows:
             label = str(row[0])
-            alarm_text = str(row[1])
+            grp = str(row[1])
             cnt = int(row[2])
             if label not in label_set:
                 label_set[label] = len(label_set)
-            if alarm_text not in text_counts:
-                text_counts[alarm_text] = {}
-            text_counts[alarm_text][label] = cnt
+            if grp not in group_counts:
+                group_counts[grp] = {}
+            group_counts[grp][label] = cnt
 
         labels = sorted(label_set.keys())
         series = [
-            {"alarm_text": at, "data": [text_counts[at].get(lbl, 0) for lbl in labels]}
-            for at in top_texts
-            if at in text_counts
+            {
+                "name": grp,
+                "alarm_text": grp,
+                "data": [group_counts[grp].get(lbl, 0) for lbl in labels],
+            }
+            for grp in top_groups
+            if grp in group_counts
         ]
 
-        return {"labels": labels, "series": series}
+        return {"labels": labels, "series": series, "group_by": group_by}
     finally:
         conn.close()
 
@@ -368,9 +436,9 @@ def get_detail(
 
     Returns:
         {
-          rows: [{alarm_id, eqp_id, eqp_type, lot_id, alarm_text,
-                  alarm_category_code, alarm_start, alarm_end,
-                  duration_seconds, detail_params}],
+          rows: [{alarm_id, eqp_id, eqp_type, lot_id, pj_type, product_line,
+                  pj_bop, alarm_text, alarm_category_code, alarm_start,
+                  alarm_end, duration_seconds, detail_params}],
           meta: {page, per_page, total_count, total_pages},
         }
     """
@@ -398,7 +466,10 @@ def get_detail(
                 ALARM_START,
                 ALARM_END,
                 DURATION_SECONDS,
-                DETAIL_PARAMS
+                DETAIL_PARAMS,
+                PJ_TYPE,
+                PRODUCT_LINE,
+                PJ_BOP
             FROM read_parquet('{spool_path}')
             {where_sql}
             ORDER BY ALARM_START DESC, ALARM_ID
@@ -437,6 +508,9 @@ def get_detail(
                 "alarm_end":          _fmt_ts(r[7]),
                 "duration_seconds":   round(float(duration), 1) if duration is not None else None,
                 "detail_params":      detail_params,
+                "pj_type":            str(r[10]) if r[10] is not None else None,
+                "product_line":       str(r[11]) if r[11] is not None else None,
+                "pj_bop":             str(r[12]) if r[12] is not None else None,
             })
 
         return {

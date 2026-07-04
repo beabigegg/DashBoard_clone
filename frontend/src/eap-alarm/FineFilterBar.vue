@@ -5,11 +5,19 @@ import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 interface FineFilter {
   alarm_text: string[];
   eqp_id: string[];
+  lot_id: string[];
+  pj_type: string[];
+  product_line: string[];
+  pj_bop: string[];
 }
 
 interface FilterOptions {
   alarm_text_options: string[];
   equipment_id_options: string[];
+  lot_id_options: string[];
+  pj_type_options: string[];
+  product_line_options: string[];
+  pj_bop_options: string[];
 }
 
 const props = defineProps<{
@@ -21,13 +29,8 @@ const emit = defineEmits<{
   (e: 'change'): void;
 }>();
 
-function onAlarmTextChange(values: string[]): void {
-  props.fineFilter.alarm_text = values;
-  emit('change');
-}
-
-function onEqpIdChange(values: string[]): void {
-  props.fineFilter.eqp_id = values;
+function onFilterChange(key: keyof FineFilter, values: string[]): void {
+  props.fineFilter[key] = values;
   emit('change');
 }
 
@@ -52,7 +55,7 @@ function handleMultiSelectClose(event: Event): void {
           :options="filterOptions.alarm_text_options"
           placeholder="全部 ALARM 訊息"
           searchable
-          @update:model-value="onAlarmTextChange"
+          @update:model-value="(v: string[]) => onFilterChange('alarm_text', v)"
           @dropdown-close="handleMultiSelectClose"
         />
       </div>
@@ -64,7 +67,59 @@ function handleMultiSelectClose(event: Event): void {
           :options="filterOptions.equipment_id_options"
           placeholder="全部機台"
           searchable
-          @update:model-value="onEqpIdChange"
+          @update:model-value="(v: string[]) => onFilterChange('eqp_id', v)"
+          @dropdown-close="handleMultiSelectClose"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">LOT ID</label>
+        <MultiSelect
+          :model-value="fineFilter.lot_id"
+          :options="filterOptions.lot_id_options"
+          placeholder="全部 LOT"
+          searchable
+          data-testid="fine-lot-id-select"
+          @update:model-value="(v: string[]) => onFilterChange('lot_id', v)"
+          @dropdown-close="handleMultiSelectClose"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">PJ 類型 / PJ Type</label>
+        <MultiSelect
+          :model-value="fineFilter.pj_type"
+          :options="filterOptions.pj_type_options"
+          placeholder="全部 PJ 類型"
+          searchable
+          data-testid="fine-pj-type-select"
+          @update:model-value="(v: string[]) => onFilterChange('pj_type', v)"
+          @dropdown-close="handleMultiSelectClose"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Package / 封裝</label>
+        <MultiSelect
+          :model-value="fineFilter.product_line"
+          :options="filterOptions.product_line_options"
+          placeholder="全部 Package"
+          searchable
+          data-testid="fine-product-line-select"
+          @update:model-value="(v: string[]) => onFilterChange('product_line', v)"
+          @dropdown-close="handleMultiSelectClose"
+        />
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">BOP 製程 / BOP</label>
+        <MultiSelect
+          :model-value="fineFilter.pj_bop"
+          :options="filterOptions.pj_bop_options"
+          placeholder="全部 BOP"
+          searchable
+          data-testid="fine-pj-bop-select"
+          @update:model-value="(v: string[]) => onFilterChange('pj_bop', v)"
           @dropdown-close="handleMultiSelectClose"
         />
       </div>

@@ -26,22 +26,41 @@ const SERIES_COLORS = Object.freeze([
 ]);
 
 interface TrendSeries {
-  alarm_text: string;
+  // `name` is the generic dim value; `alarm_text` is the legacy alias kept in
+  // the API for backward compatibility — read name first, fall back to alias.
+  name?: string;
+  alarm_text?: string;
   data: number[];
 }
+
+// Selectable stack dimensions (must match backend GROUP_DIMENSIONS keys)
+const GROUP_BY_OPTIONS = Object.freeze([
+  { value: 'alarm_text', label: 'ALARM 訊息' },
+  { value: 'eqp_id', label: '機台' },
+  { value: 'lot_id', label: 'LOT' },
+  { value: 'pj_type', label: 'PJ 類型' },
+  { value: 'product_line', label: 'Package' },
+  { value: 'pj_bop', label: 'BOP' },
+]);
 
 const props = defineProps<{
   labels?: string[];
   series?: TrendSeries[];
   granularity?: string;
+  groupBy?: string;
   loading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'granularity-change', value: string): void;
+  (e: 'group-by-change', value: string): void;
 }>();
 
 const hasData = computed(() => Array.isArray(props.series) && (props.series?.length ?? 0) > 0);
+
+function seriesName(s: TrendSeries): string {
+  return s.name ?? s.alarm_text ?? '(未知)';
+}
 
 const chartOption = computed(() => {
   const labels = props.labels ?? [];
@@ -53,7 +72,7 @@ const chartOption = computed(() => {
       axisPointer: { type: 'cross' },
     },
     legend: {
-      data: seriesData.map((s) => s.alarm_text),
+      data: seriesData.map((s) => seriesName(s)),
       bottom: 0,
       type: 'scroll',
     },
@@ -78,7 +97,7 @@ const chartOption = computed(() => {
       },
     },
     series: seriesData.map((s, i) => ({
-      name: s.alarm_text,
+      name: seriesName(s),
       type: 'line',
       data: s.data,
       smooth: false,
@@ -97,6 +116,17 @@ const chartOption = computed(() => {
   <section class="card ui-card">
     <div class="card-header ui-card-header">
       <div class="card-title ui-card-title">ALARM 趨勢</div>
+      <div class="trend-granularity-toggle" data-testid="trend-group-by-toggle">
+        <button
+          v-for="opt in GROUP_BY_OPTIONS"
+          :key="opt.value"
+          type="button"
+          :class="['ui-btn ui-btn--sm', (groupBy ?? 'alarm_text') === opt.value ? 'ui-btn--primary' : 'ui-btn--ghost']"
+          @click="emit('group-by-change', opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
       <div class="trend-granularity-toggle">
         <button
           type="button"

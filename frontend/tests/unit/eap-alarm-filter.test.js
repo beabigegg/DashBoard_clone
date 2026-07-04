@@ -68,6 +68,10 @@ describe('useEapAlarmFilter', () => {
   it('initializes fine filter as empty', () => {
     expect(filter.fineFilter.alarm_text).toHaveLength(0);
     expect(filter.fineFilter.eqp_id).toHaveLength(0);
+    expect(filter.fineFilter.lot_id).toHaveLength(0);
+    expect(filter.fineFilter.pj_type).toHaveLength(0);
+    expect(filter.fineFilter.product_line).toHaveLength(0);
+    expect(filter.fineFilter.pj_bop).toHaveLength(0);
   });
 
   it('setDefaultDateRange sets date_from before date_to', () => {
@@ -164,6 +168,62 @@ describe('useEapAlarmFilter', () => {
       filter.fineFilter.eqp_id = ['EQ-01', 'EQ-02'];
       const params = filter.buildFineFilterParams();
       expect(params['equipment_id[]']).toEqual(['EQ-01', 'EQ-02']);
+    });
+
+    it('includes product-dim arrays when filters are set', () => {
+      filter.setQueryId('q-005');
+      filter.fineFilter.lot_id = ['LOT-001'];
+      filter.fineFilter.pj_type = ['TypeA'];
+      filter.fineFilter.product_line = ['LineB'];
+      filter.fineFilter.pj_bop = ['BopC'];
+      const params = filter.buildFineFilterParams();
+      expect(params['lot_id[]']).toEqual(['LOT-001']);
+      expect(params['pj_type[]']).toEqual(['TypeA']);
+      expect(params['product_line[]']).toEqual(['LineB']);
+      expect(params['pj_bop[]']).toEqual(['BopC']);
+    });
+
+    it('omits product-dim params when their filters are empty', () => {
+      filter.setQueryId('q-006');
+      const params = filter.buildFineFilterParams();
+      expect(params['lot_id[]']).toBeUndefined();
+      expect(params['pj_type[]']).toBeUndefined();
+      expect(params['product_line[]']).toBeUndefined();
+      expect(params['pj_bop[]']).toBeUndefined();
+    });
+  });
+
+  describe('product-dim fine filter state', () => {
+    it('applyFilterOptions applies new option lists and re-syncs snapshot', () => {
+      filter.fineFilter.pj_type = ['TypeA'];
+      filter.applyFilterOptions({
+        alarm_text_options: [],
+        equipment_id_options: [],
+        lot_id_options: ['LOT-001'],
+        pj_type_options: ['TypeA', 'TypeB'],
+        product_line_options: ['LineA'],
+        pj_bop_options: ['BopA'],
+      });
+      expect(filter.filterOptions.lot_id_options).toEqual(['LOT-001']);
+      expect(filter.filterOptions.pj_type_options).toEqual(['TypeA', 'TypeB']);
+      expect(filter.filterOptions.product_line_options).toEqual(['LineA']);
+      expect(filter.filterOptions.pj_bop_options).toEqual(['BopA']);
+      expect(filter.hasFineFilterChanged()).toBe(false);
+    });
+
+    it('hasFineFilterChanged detects change on a product-dim axis', () => {
+      filter.commitFineFilter();
+      filter.fineFilter.product_line = ['LineA'];
+      expect(filter.hasFineFilterChanged()).toBe(true);
+    });
+
+    it('resetFineFilter clears product-dim axes', () => {
+      filter.fineFilter.lot_id = ['LOT-001'];
+      filter.fineFilter.pj_bop = ['BopA'];
+      filter.resetFineFilter();
+      expect(filter.fineFilter.lot_id).toHaveLength(0);
+      expect(filter.fineFilter.pj_bop).toHaveLength(0);
+      expect(filter.hasFineFilterChanged()).toBe(false);
     });
   });
 

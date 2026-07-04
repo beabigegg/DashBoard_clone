@@ -62,14 +62,17 @@ const {
   error: viewError,
   summary,
   pareto,
+  paretoDim,
   trend,
   trendGranularity,
+  trendGroupBy,
   detail,
   detailPage,
   detailPerPage,
   resetAll: resetViews,
   fetchFilterOptions,
   fetchAllViews,
+  fetchPareto,
   fetchTrend,
   fetchDetail,
 } = useEapAlarmViews();
@@ -105,7 +108,14 @@ onMounted(() => {
 
 // ── Fine filter watcher: re-fetch views on change ────────────────────────────
 watch(
-  () => [fineFilter.alarm_text, fineFilter.eqp_id],
+  () => [
+    fineFilter.alarm_text,
+    fineFilter.eqp_id,
+    fineFilter.lot_id,
+    fineFilter.pj_type,
+    fineFilter.product_line,
+    fineFilter.pj_bop,
+  ],
   async () => {
     if (!queryId.value) return;
     const params = buildFineFilterParams();
@@ -257,7 +267,21 @@ async function handleGranularityChange(value: string): Promise<void> {
   trendGranularity.value = value;
   if (!queryId.value) return;
   const params = buildFineFilterParams();
-  await fetchTrend(queryId.value, params, value);
+  await fetchTrend(queryId.value, params, value, trendGroupBy.value);
+}
+
+async function handleTrendGroupByChange(value: string): Promise<void> {
+  trendGroupBy.value = value;
+  if (!queryId.value) return;
+  const params = buildFineFilterParams();
+  await fetchTrend(queryId.value, params, trendGranularity.value, value);
+}
+
+async function handleParetoDimChange(value: string): Promise<void> {
+  paretoDim.value = value;
+  if (!queryId.value) return;
+  const params = buildFineFilterParams();
+  await fetchPareto(queryId.value, params, value);
 }
 
 async function handleDetailPageChange(page: number): Promise<void> {
@@ -274,11 +298,24 @@ async function handleFineFilterChange(): Promise<void> {
   await fetchAllViews(queryId.value, params);
 }
 
-async function handleParetoClick(alarmText: string): Promise<void> {
+// Pareto dim → fine-filter key the clicked bar value feeds into
+// (eqp_type has no fine-filter axis, so eqp_type bars are not click-filterable)
+const PARETO_DIM_TO_FINE_KEY: Record<string, keyof typeof fineFilter> = {
+  alarm_text: 'alarm_text',
+  eqp_id: 'eqp_id',
+  lot_id: 'lot_id',
+  pj_type: 'pj_type',
+  product_line: 'product_line',
+  pj_bop: 'pj_bop',
+};
+
+async function handleParetoClick(name: string): Promise<void> {
   if (!queryId.value) return;
-  // Add clicked alarm_text to fine filter
-  if (!fineFilter.alarm_text.includes(alarmText)) {
-    fineFilter.alarm_text = [...fineFilter.alarm_text, alarmText];
+  // Add clicked bar value to the fine filter matching the current pareto dim
+  const key = PARETO_DIM_TO_FINE_KEY[paretoDim.value];
+  if (!key) return;
+  if (!fineFilter[key].includes(name)) {
+    fineFilter[key] = [...fineFilter[key], name];
   }
 }
 </script>
@@ -352,16 +389,20 @@ async function handleParetoClick(alarmText: string): Promise<void> {
             <ParetoChart
               :items="pareto.items"
               :total="pareto.total"
+              :dim="paretoDim"
               :loading="viewLoading.pareto"
               data-testid="pareto-chart"
               @bar-click="handleParetoClick"
+              @dim-change="handleParetoDimChange"
             />
             <TrendChart
               :labels="trend.labels"
               :series="trend.series"
               :granularity="trendGranularity"
+              :group-by="trendGroupBy"
               :loading="viewLoading.trend"
               @granularity-change="handleGranularityChange"
+              @group-by-change="handleTrendGroupByChange"
             />
           </div>
 

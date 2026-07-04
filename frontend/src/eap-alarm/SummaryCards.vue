@@ -5,6 +5,8 @@ import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 interface SummaryData {
   total_alarm_count: number;
   affected_equipment_count: number;
+  affected_lot_count: number;
+  affected_product_line_count: number;
   unresolved_count: number;
   avg_duration_minutes: number | null;
 }
@@ -16,7 +18,7 @@ defineProps<{
 </script>
 
 <template>
-  <SummaryCardGroup :columns="4">
+  <SummaryCardGroup :columns="6">
     <SummaryCard
       label="ALARM 發生次數"
       :value="summary.total_alarm_count"
@@ -26,6 +28,18 @@ defineProps<{
     <SummaryCard
       label="受影響機台數"
       :value="summary.affected_equipment_count"
+      format="number"
+      accent="info"
+    />
+    <SummaryCard
+      label="受影響 LOT 數"
+      :value="summary.affected_lot_count"
+      format="number"
+      accent="info"
+    />
+    <SummaryCard
+      label="受影響 Package 數"
+      :value="summary.affected_product_line_count"
       format="number"
       accent="info"
     />

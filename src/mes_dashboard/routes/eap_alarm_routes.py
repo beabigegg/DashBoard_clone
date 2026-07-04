@@ -67,6 +67,10 @@ def _parse_fine_filters() -> Dict[str, Any]:
     alarm_texts = _parse_list_param("alarm_text")
     alarm_category_codes_raw = _parse_list_param("alarm_category")
     equipment_ids = _parse_list_param("equipment_id")
+    lot_ids = _parse_list_param("lot_id")
+    pj_types = _parse_list_param("pj_type")
+    product_lines = _parse_list_param("product_line")
+    pj_bops = _parse_list_param("pj_bop")
 
     alarm_category_codes = []
     for c in alarm_category_codes_raw:
@@ -79,6 +83,10 @@ def _parse_fine_filters() -> Dict[str, Any]:
         "alarm_text": alarm_texts or None,
         "alarm_category_code": alarm_category_codes or None,
         "equipment_id": equipment_ids or None,
+        "lot_id": lot_ids or None,
+        "pj_type": pj_types or None,
+        "product_line": product_lines or None,
+        "pj_bop": pj_bops or None,
     }
 
 
@@ -359,7 +367,11 @@ def api_eap_alarm_summary():
 
 @eap_alarm_bp.route("/api/eap-alarm/pareto", methods=["GET"])
 def api_eap_alarm_pareto():
-    """Return top-50 alarm_text Pareto from DuckDB spool."""
+    """Return top-50 Pareto from DuckDB spool.
+
+    ``dim`` selects the group dimension (default alarm_text); closed enum
+    validated against service GROUP_DIMENSIONS → 400 on unknown value.
+    """
     query_id, err = _require_query_id()
     if err is not None:
         return err
@@ -370,9 +382,16 @@ def api_eap_alarm_pareto():
 
     filters = _parse_fine_filters()
 
+    from mes_dashboard.services.eap_alarm_service import GROUP_DIMENSIONS
+    dim = (request.args.get("dim") or "alarm_text").strip().lower()
+    if dim not in GROUP_DIMENSIONS:
+        return validation_error(
+            f"無效的 dim 參數: {dim}（允許值: {', '.join(sorted(GROUP_DIMENSIONS))}）"
+        )
+
     try:
         from mes_dashboard.services.eap_alarm_service import get_pareto
-        result = get_pareto(spool_path, filters)
+        result = get_pareto(spool_path, filters, dim=dim)
         return success_response(result)
     except Exception as exc:
         logger.error("eap_alarm_routes: pareto failed query_id=%s: %s", query_id, exc)
@@ -383,7 +402,11 @@ def api_eap_alarm_pareto():
 
 @eap_alarm_bp.route("/api/eap-alarm/trend", methods=["GET"])
 def api_eap_alarm_trend():
-    """Return stacked trend (by eqp_type) from DuckDB spool."""
+    """Return stacked trend from DuckDB spool.
+
+    ``group_by`` selects the stack dimension (default alarm_text); closed enum
+    validated against service GROUP_DIMENSIONS → 400 on unknown value.
+    """
     query_id, err = _require_query_id()
     if err is not None:
         return err
@@ -397,9 +420,16 @@ def api_eap_alarm_trend():
     if granularity not in ("day", "hour"):
         granularity = "day"
 
+    from mes_dashboard.services.eap_alarm_service import GROUP_DIMENSIONS
+    group_by = (request.args.get("group_by") or "alarm_text").strip().lower()
+    if group_by not in GROUP_DIMENSIONS:
+        return validation_error(
+            f"無效的 group_by 參數: {group_by}（允許值: {', '.join(sorted(GROUP_DIMENSIONS))}）"
+        )
+
     try:
         from mes_dashboard.services.eap_alarm_service import get_trend
-        result = get_trend(spool_path, filters, granularity=granularity)
+        result = get_trend(spool_path, filters, granularity=granularity, group_by=group_by)
         return success_response(result)
     except Exception as exc:
         logger.error("eap_alarm_routes: trend failed query_id=%s: %s", query_id, exc)

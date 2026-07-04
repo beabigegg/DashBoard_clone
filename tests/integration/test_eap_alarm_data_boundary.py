@@ -25,7 +25,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 _PARQUET_SCHEMA = pa.schema([
-    # Matches _PAIR_SQL output column aliases (§3.17 parquet schema, v3)
+    # Matches _PAIR_SQL output column aliases (§3.17 parquet schema, v4)
     pa.field("ALARM_ID", pa.string(), nullable=True),
     pa.field("EQP_ID", pa.string(), nullable=False),
     pa.field("EQP_TYPE", pa.string(), nullable=False),
@@ -36,6 +36,9 @@ _PARQUET_SCHEMA = pa.schema([
     pa.field("ALARM_END", pa.timestamp("us"), nullable=True),
     pa.field("DURATION_SECONDS", pa.float64(), nullable=True),
     pa.field("DETAIL_PARAMS", pa.string(), nullable=True),
+    pa.field("PJ_TYPE", pa.string(), nullable=True),
+    pa.field("PRODUCT_LINE", pa.string(), nullable=True),
+    pa.field("PJ_BOP", pa.string(), nullable=True),
     pa.field("eqp_types_filter", pa.string(), nullable=False),
 ])
 
@@ -55,6 +58,9 @@ def _write_parquet(tmp_path, rows: list[dict]) -> str:
             df["ALARM_END"] = None
         if "DURATION_SECONDS" not in df.columns:
             df["DURATION_SECONDS"] = None
+        for col in ("PJ_TYPE", "PRODUCT_LINE", "PJ_BOP"):
+            if col not in df.columns:
+                df[col] = None
         if "eqp_types_filter" not in df.columns:
             df["eqp_types_filter"] = "test1234"
         table = pa.Table.from_pandas(df, schema=_PARQUET_SCHEMA, safe=False)
@@ -72,6 +78,9 @@ def _write_parquet(tmp_path, rows: list[dict]) -> str:
                 "ALARM_END": pa.array([], type=pa.timestamp("us")),
                 "DURATION_SECONDS": pa.array([], type=pa.float64()),
                 "DETAIL_PARAMS": pa.array([], type=pa.string()),
+                "PJ_TYPE": pa.array([], type=pa.string()),
+                "PRODUCT_LINE": pa.array([], type=pa.string()),
+                "PJ_BOP": pa.array([], type=pa.string()),
                 "eqp_types_filter": pa.array([], type=pa.string()),
             },
             schema=_PARQUET_SCHEMA,
@@ -93,6 +102,9 @@ def _base_row(**overrides) -> dict:
         "ALARM_END": None,
         "DURATION_SECONDS": None,
         "DETAIL_PARAMS": None,
+        "PJ_TYPE": "TypeA",
+        "PRODUCT_LINE": "LineA",
+        "PJ_BOP": "BopA",
         "eqp_types_filter": "test1234",
     }
     base.update(overrides)
@@ -331,3 +343,143 @@ def test_empty_product_dims_no_exists_clause():
     clauses, params = _build_product_dims_exists([], [], [])
     assert clauses == []
     assert params == {}
+
+
+# ── Product-dim fine filters (spool schema v4) ────────────────────────────────
+
+def _product_mix_rows() -> list[dict]:
+    """3 rows over 2 lots / 2 product lines / 2 pj_types / 2 bops."""
+    return [
+        _base_row(ALARM_ID="ROW001", LOT_ID="LOT001",
+                  PJ_TYPE="TypeA", PRODUCT_LINE="LineA", PJ_BOP="BopA"),
+        _base_row(ALARM_ID="ROW002", LOT_ID="LOT001",
+                  PJ_TYPE="TypeA", PRODUCT_LINE="LineA", PJ_BOP="BopA"),
+        _base_row(ALARM_ID="ROW003", LOT_ID="LOT002", EQP_ID="GCBA-002",
+                  PJ_TYPE="TypeB", PRODUCT_LINE="LineB", PJ_BOP="BopB"),
+    ]
+
+
+@pytest.mark.parametrize("filter_key,filter_value,expected_alarm_ids", [
+    ("lot_id", ["LOT002"], {"ROW003"}),
+    ("pj_type", ["TypeA"], {"ROW001", "ROW002"}),
+    ("product_line", ["LineB"], {"ROW003"}),
+    ("pj_bop", ["BopA"], {"ROW001", "ROW002"}),
+])
+def test_detail_product_dim_fine_filter(tmp_path, filter_key, filter_value, expected_alarm_ids):
+    """Each new fine-filter axis narrows detail rows by exact match."""
+    spool_path = _write_parquet(tmp_path, _product_mix_rows())
+
+    from mes_dashboard.services.eap_alarm_service import get_detail
+    result = get_detail(spool_path, filters={filter_key: filter_value}, page=1, per_page=50)
+    assert {r["alarm_id"] for r in result["rows"]} == expected_alarm_ids
+
+
+def test_detail_rows_include_product_columns(tmp_path):
+    """Detail rows expose pj_type/product_line/pj_bop; NULL dims → None."""
+    spool_path = _write_parquet(tmp_path, [
+        _base_row(ALARM_ID="ROW001", PJ_TYPE="TypeA", PRODUCT_LINE="LineA", PJ_BOP="BopA"),
+        _base_row(ALARM_ID="ROW002", PJ_TYPE=None, PRODUCT_LINE=None, PJ_BOP=None),
+    ])
+
+    from mes_dashboard.services.eap_alarm_service import get_detail
+    result = get_detail(spool_path, filters=None, page=1, per_page=50)
+    by_id = {r["alarm_id"]: r for r in result["rows"]}
+    assert by_id["ROW001"]["pj_type"] == "TypeA"
+    assert by_id["ROW001"]["product_line"] == "LineA"
+    assert by_id["ROW001"]["pj_bop"] == "BopA"
+    assert by_id["ROW002"]["pj_type"] is None
+    assert by_id["ROW002"]["product_line"] is None
+    assert by_id["ROW002"]["pj_bop"] is None
+
+
+def test_filter_options_include_product_dims(tmp_path):
+    """Filter options expose lot/product dims; NULLs excluded."""
+    spool_path = _write_parquet(tmp_path, [
+        _base_row(ALARM_ID="ROW001", LOT_ID="LOT001",
+                  PJ_TYPE="TypeA", PRODUCT_LINE="LineA", PJ_BOP="BopA"),
+        _base_row(ALARM_ID="ROW002", LOT_ID=None,
+                  PJ_TYPE=None, PRODUCT_LINE=None, PJ_BOP=None),
+    ])
+
+    from mes_dashboard.services.eap_alarm_service import get_filter_options
+    result = get_filter_options(spool_path, filters=None)
+    assert result["lot_id_options"] == ["LOT001"]
+    assert result["pj_type_options"] == ["TypeA"]
+    assert result["product_line_options"] == ["LineA"]
+    assert result["pj_bop_options"] == ["BopA"]
+
+
+def test_filter_options_cross_narrowing(tmp_path):
+    """Selecting a product_line narrows the equipment/lot option lists."""
+    spool_path = _write_parquet(tmp_path, _product_mix_rows())
+
+    from mes_dashboard.services.eap_alarm_service import get_filter_options
+    result = get_filter_options(spool_path, filters={"product_line": ["LineB"]})
+    assert result["equipment_id_options"] == ["GCBA-002"]
+    assert result["lot_id_options"] == ["LOT002"]
+
+
+def test_summary_lot_and_product_line_counts(tmp_path):
+    """Summary exposes affected_lot_count / affected_product_line_count (distinct, NULL excluded)."""
+    spool_path = _write_parquet(tmp_path, [
+        _base_row(ALARM_ID="ROW001", LOT_ID="LOT001", PRODUCT_LINE="LineA"),
+        _base_row(ALARM_ID="ROW002", LOT_ID="LOT001", PRODUCT_LINE="LineA"),
+        _base_row(ALARM_ID="ROW003", LOT_ID="LOT002", PRODUCT_LINE="LineB"),
+        _base_row(ALARM_ID="ROW004", LOT_ID=None, PRODUCT_LINE=None),
+    ])
+
+    from mes_dashboard.services.eap_alarm_service import get_summary
+    result = get_summary(spool_path, filters=None)
+    assert result["affected_lot_count"] == 2
+    assert result["affected_product_line_count"] == 2
+
+
+def test_pareto_product_line_dim(tmp_path):
+    """Pareto over product_line groups by PRODUCT_LINE; NULL → '(NA)'."""
+    spool_path = _write_parquet(tmp_path, [
+        _base_row(ALARM_ID="ROW001", PRODUCT_LINE="LineA"),
+        _base_row(ALARM_ID="ROW002", PRODUCT_LINE="LineA"),
+        _base_row(ALARM_ID="ROW003", PRODUCT_LINE=None),
+    ])
+
+    from mes_dashboard.services.eap_alarm_service import get_pareto
+    result = get_pareto(spool_path, filters=None, dim="product_line")
+    assert result["dim"] == "product_line"
+    assert result["total"] == 3
+    names = {i["name"]: i["count"] for i in result["items"]}
+    assert names == {"LineA": 2, "(NA)": 1}
+    # back-compat alias mirrors name
+    assert all(i["alarm_text"] == i["name"] for i in result["items"])
+
+
+def test_pareto_invalid_dim_raises(tmp_path):
+    """Unknown pareto dim → ValueError (closed enum)."""
+    spool_path = _write_parquet(tmp_path, [_base_row()])
+    from mes_dashboard.services.eap_alarm_service import get_pareto
+    with pytest.raises(ValueError, match="invalid pareto dim"):
+        get_pareto(spool_path, filters=None, dim="not_a_dim")
+
+
+def test_trend_group_by_pj_type(tmp_path):
+    """Trend grouped by pj_type stacks series per PJ_TYPE value."""
+    spool_path = _write_parquet(tmp_path, [
+        _base_row(ALARM_ID="ROW001", PJ_TYPE="TypeA",
+                  ALARM_START=datetime(2025, 1, 3, 10, 0, 0)),
+        _base_row(ALARM_ID="ROW002", PJ_TYPE="TypeB",
+                  ALARM_START=datetime(2025, 1, 4, 10, 0, 0)),
+    ])
+
+    from mes_dashboard.services.eap_alarm_service import get_trend
+    result = get_trend(spool_path, filters=None, granularity="day", group_by="pj_type")
+    assert result["group_by"] == "pj_type"
+    assert result["labels"] == ["2025-01-03", "2025-01-04"]
+    series = {s["name"]: s["data"] for s in result["series"]}
+    assert series == {"TypeA": [1, 0], "TypeB": [0, 1]}
+
+
+def test_trend_invalid_group_by_raises(tmp_path):
+    """Unknown trend group_by → ValueError (closed enum)."""
+    spool_path = _write_parquet(tmp_path, [_base_row()])
+    from mes_dashboard.services.eap_alarm_service import get_trend
+    with pytest.raises(ValueError, match="invalid trend group_by"):
+        get_trend(spool_path, filters=None, group_by="not_a_dim")

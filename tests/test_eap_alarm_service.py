@@ -9,7 +9,7 @@ Tests:
   - TestLotIdNormalization: strip/dedup/max-200 (EA-09)
   - TestProductDimsFilter: EXISTS SQL generation per supplied dim (EA-10)
   - TestAlarmCategoryDecode: 9 codes; code 99 → "未知"; None → "未知"
-  - TestSchemaVersionIsPinned: _SCHEMA_VERSION == 3
+  - TestSchemaVersionIsPinned: _SCHEMA_VERSION == 4
   - TestEquipmentFilterEmptyNoOp: empty machines → "1=1" no-op, not "IN ()" (AC-8, D-6)
 """
 
@@ -267,7 +267,7 @@ class TestAlarmCategoryDecode:
 # ── test_schema_version_is_pinned ─────────────────────────────────────────────
 
 class TestSchemaVersionIsPinned:
-    """EA-06: _SCHEMA_VERSION must be pinned to exactly 3 (AC-4 red-green tripwire)."""
+    """EA-06: _SCHEMA_VERSION must be pinned to exactly 4 (AC-4 red-green tripwire)."""
 
     def test_schema_version_is_integer(self):
         import mes_dashboard.services.eap_alarm_cache as cache_mod
@@ -275,10 +275,11 @@ class TestSchemaVersionIsPinned:
             f"_SCHEMA_VERSION must be int, got {type(cache_mod._SCHEMA_VERSION)}"
         )
 
-    def test_schema_version_equals_three(self):
+    def test_schema_version_equals_four(self):
+        """v4: added product-dim columns PJ_TYPE / PRODUCT_LINE / PJ_BOP."""
         import mes_dashboard.services.eap_alarm_cache as cache_mod
-        assert cache_mod._SCHEMA_VERSION == 3, (
-            f"_SCHEMA_VERSION pin test: expected 3, got {cache_mod._SCHEMA_VERSION}. "
+        assert cache_mod._SCHEMA_VERSION == 4, (
+            f"_SCHEMA_VERSION pin test: expected 4, got {cache_mod._SCHEMA_VERSION}. "
             "If you changed the parquet schema, bump the version AND update this assertion."
         )
 

@@ -32,21 +32,53 @@ export function useEapAlarmFilter() {
   const productOptionsLoading = ref(false);
 
   // ── Fine filter (DuckDB only, no Oracle re-query) ──────────────────────────
+  // Fine-filter key → backend query param (array form)
+  const FINE_FILTER_PARAM_MAP = {
+    alarm_text: 'alarm_text[]',
+    eqp_id: 'equipment_id[]',
+    lot_id: 'lot_id[]',
+    pj_type: 'pj_type[]',
+    product_line: 'product_line[]',
+    pj_bop: 'pj_bop[]',
+  };
+  const FINE_FILTER_KEYS = Object.keys(FINE_FILTER_PARAM_MAP);
+
   const fineFilter = reactive({
     alarm_text: [],
     eqp_id: [],
+    lot_id: [],
+    pj_type: [],
+    product_line: [],
+    pj_bop: [],
   });
 
   // ── Fine filter options (populated after spool) ──────────────────────────
+  const FILTER_OPTION_KEYS = [
+    'alarm_text_options',
+    'equipment_id_options',
+    'lot_id_options',
+    'pj_type_options',
+    'product_line_options',
+    'pj_bop_options',
+  ];
+
   const filterOptions = reactive({
     alarm_text_options: [],
     equipment_id_options: [],
+    lot_id_options: [],
+    pj_type_options: [],
+    product_line_options: [],
+    pj_bop_options: [],
   });
 
   // ── Snapshot-diff: tracks last committed fine filter to detect changes ───
   let _lastCommitted = {
     alarm_text: [],
     eqp_id: [],
+    lot_id: [],
+    pj_type: [],
+    product_line: [],
+    pj_bop: [],
   };
 
   // ── Query state ────────────────────────────────────────────────────────────
@@ -59,14 +91,16 @@ export function useEapAlarmFilter() {
   }
 
   function resetFineFilter() {
-    fineFilter.alarm_text = [];
-    fineFilter.eqp_id = [];
+    for (const key of FINE_FILTER_KEYS) {
+      fineFilter[key] = [];
+    }
     _syncLastCommitted();
   }
 
   function resetFilterOptions() {
-    filterOptions.alarm_text_options = [];
-    filterOptions.equipment_id_options = [];
+    for (const key of FILTER_OPTION_KEYS) {
+      filterOptions[key] = [];
+    }
   }
 
   /**
@@ -74,10 +108,9 @@ export function useEapAlarmFilter() {
    * Must be called after every fetchFilterOptions (snapshot-diff rule).
    */
   function _syncLastCommitted() {
-    _lastCommitted = {
-      alarm_text: [...fineFilter.alarm_text],
-      eqp_id: [...fineFilter.eqp_id],
-    };
+    _lastCommitted = Object.fromEntries(
+      FINE_FILTER_KEYS.map((key) => [key, [...fineFilter[key]]]),
+    );
   }
 
   /**
@@ -85,12 +118,9 @@ export function useEapAlarmFilter() {
    * Called by the view composable after GET /api/eap-alarm/filter-options.
    */
   function applyFilterOptions(options) {
-    filterOptions.alarm_text_options = Array.isArray(options.alarm_text_options)
-      ? options.alarm_text_options
-      : [];
-    filterOptions.equipment_id_options = Array.isArray(options.equipment_id_options)
-      ? options.equipment_id_options
-      : [];
+    for (const key of FILTER_OPTION_KEYS) {
+      filterOptions[key] = Array.isArray(options[key]) ? options[key] : [];
+    }
     _syncLastCommitted();
   }
 
@@ -99,11 +129,11 @@ export function useEapAlarmFilter() {
    * (used to decide whether to trigger DuckDB recompute).
    */
   function hasFineFilterChanged() {
-    const a = _lastCommitted;
-    const b = fineFilter;
     const arrEq = (x, y) =>
       x.length === y.length && x.every((v, i) => v === y[i]);
-    return !arrEq(a.alarm_text, b.alarm_text) || !arrEq(a.eqp_id, b.eqp_id);
+    return FINE_FILTER_KEYS.some(
+      (key) => !arrEq(_lastCommitted[key] ?? [], fineFilter[key]),
+    );
   }
 
   function commitFineFilter() {
@@ -112,11 +142,10 @@ export function useEapAlarmFilter() {
 
   function buildFineFilterParams() {
     const params = { query_id: queryId.value };
-    if (fineFilter.alarm_text.length > 0) {
-      params['alarm_text[]'] = fineFilter.alarm_text;
-    }
-    if (fineFilter.eqp_id.length > 0) {
-      params['equipment_id[]'] = fineFilter.eqp_id;
+    for (const key of FINE_FILTER_KEYS) {
+      if (fineFilter[key].length > 0) {
+        params[FINE_FILTER_PARAM_MAP[key]] = fineFilter[key];
+      }
     }
     return params;
   }

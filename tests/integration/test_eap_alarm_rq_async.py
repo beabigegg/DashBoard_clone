@@ -186,12 +186,27 @@ class TestEapAlarmWorkerFn:
         import pandas as pd
         return pd.DataFrame({"EVENT_ID": [], "PARAMETER_NAME": [], "PARAMETER_VALUE": []})
 
-    def _sql_router(self, mock_df, detail_df=None):
-        """Return a mock read_sql_df_slow that discriminates events vs detail by SQL content."""
+    def _lot_product_df(self):
+        """Build a synthetic DW_MES_CONTAINER product-dim lookup result."""
+        import pandas as pd
+        return pd.DataFrame({
+            "LOT_ID": ["LOT001"],
+            "PJ_TYPE": ["TypeA"],
+            "PRODUCT_LINE": ["LineA"],
+            "PJ_BOP": ["BopA"],
+        })
+
+    def _sql_router(self, mock_df, detail_df=None, lot_product_df=None):
+        """Return a mock read_sql_df_slow that discriminates events vs detail vs lot-product by SQL content."""
         if detail_df is None:
             detail_df = self._empty_detail_df()
+        if lot_product_df is None:
+            lot_product_df = self._lot_product_df()
 
         def _mock(sql, params=None, timeout_seconds=None, caller="unknown"):
+            # Lot→product lookup targets DW_MES_CONTAINER (schema v4 enrichment)
+            if "DW_MES_CONTAINER" in sql:
+                return lot_product_df
             # Detail query always has PARAMETER_NAME column in SELECT
             if "PARAMETER_NAME" in sql or "EAP_EVENT_DETAIL" in sql:
                 return detail_df
@@ -250,14 +265,23 @@ class TestEapAlarmWorkerFn:
         table = pq.read_table(str(parquet_files[0]))
         cols = set(table.schema.names)
 
-        # Parquet schema matches _PAIR_SQL output (alias names)
+        # Parquet schema matches _PAIR_SQL output (alias names, schema v4)
         expected_cols = {
             "ALARM_ID", "EQP_ID", "EQP_TYPE", "LOT_ID",
             "ALARM_TEXT", "ALARM_CATEGORY_CODE",
             "ALARM_START", "ALARM_END", "DURATION_SECONDS",
-            "DETAIL_PARAMS", "eqp_types_filter",
+            "DETAIL_PARAMS", "PJ_TYPE", "PRODUCT_LINE", "PJ_BOP",
+            "eqp_types_filter",
         }
         assert expected_cols == cols, f"Column mismatch: {cols} vs {expected_cols}"
+
+        # Product enrichment: LOT001 rows must carry the looked-up product dims
+        df = table.to_pandas()
+        lot_rows = df[df["LOT_ID"] == "LOT001"]
+        assert not lot_rows.empty
+        assert set(lot_rows["PJ_TYPE"]) == {"TypeA"}
+        assert set(lot_rows["PRODUCT_LINE"]) == {"LineA"}
+        assert set(lot_rows["PJ_BOP"]) == {"BopA"}
 
     def test_worker_fn_decodes_alarm_category(self, tmp_path, monkeypatch):
         """AlarmCategory code 1 → '設備'; code 99 → '未知' via ALARM_CATEGORY_CODE in detail."""
@@ -413,7 +437,8 @@ def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
     """GET /detail reads DETAIL_PARAMS from spool only; no Oracle call (EA-04)."""
     # Create a minimal synthetic parquet spool matching _PAIR_SQL output column names:
     # ALARM_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE,
-    # ALARM_START, ALARM_END, DURATION_SECONDS, DETAIL_PARAMS, eqp_types_filter
+    # ALARM_START, ALARM_END, DURATION_SECONDS, DETAIL_PARAMS,
+    # PJ_TYPE, PRODUCT_LINE, PJ_BOP, eqp_types_filter (schema v4)
     import pyarrow as pa
     import pyarrow.parquet as pq
     from datetime import datetime
@@ -429,6 +454,9 @@ def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
         "ALARM_END": pa.array([None], type=pa.timestamp("us")),
         "DURATION_SECONDS": pa.array([None], type=pa.float64()),
         "DETAIL_PARAMS": pa.array(['{"extra_param": "value1"}'], type=pa.string()),
+        "PJ_TYPE": pa.array(["TypeA"], type=pa.string()),
+        "PRODUCT_LINE": pa.array(["LineA"], type=pa.string()),
+        "PJ_BOP": pa.array(["BopA"], type=pa.string()),
         "eqp_types_filter": pa.array(["abc12345"], type=pa.string()),
     })
     spool_file = tmp_path / "test_spool.parquet"

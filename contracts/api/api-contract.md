@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.36.0
-last-changed: 2026-07-02
+schema-version: 1.37.0
+last-changed: 2026-07-04
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -246,10 +246,10 @@ breaking-change-policy: deprecate-2-minors
 | POST | /api/eap-alarm/spool | required | JSON body {date_from, date_to, eqp_types[] (opt), lot_ids[] (opt, max 200), pj_types[] (opt), product_lines[] (opt), pj_bops[] (opt); at-least-one-of-three: eqp_types/lot_ids/product_dims} | EapAlarmSpoolJobAccepted | 202/400/500 | route tests |
 | GET | /api/eap-alarm/spool/status | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/eap-alarm/filter-options | required | ?query_id= | GenericSuccessResponse | 400/410 | route tests |
-| GET | /api/eap-alarm/summary | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
-| GET | /api/eap-alarm/pareto | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
-| GET | /api/eap-alarm/trend | required | ?query_id=&granularity=(day or hour, default day)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
-| GET | /api/eap-alarm/detail | required | ?query_id=&page=&per_page=(max 200)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/summary | required | ?query_id=&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt)&lot_id[]=(opt)&pj_type[]=(opt)&product_line[]=(opt)&pj_bop[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/pareto | required | ?query_id=&dim=(alarm_text/eqp_id/eqp_type/lot_id/pj_type/product_line/pj_bop, default alarm_text; 400 on unknown)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt)&lot_id[]=(opt)&pj_type[]=(opt)&product_line[]=(opt)&pj_bop[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/trend | required | ?query_id=&granularity=(day or hour, default day)&group_by=(same enum as pareto dim, default alarm_text; 400 on unknown)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt)&lot_id[]=(opt)&pj_type[]=(opt)&product_line[]=(opt)&pj_bop[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
+| GET | /api/eap-alarm/detail | required | ?query_id=&page=&per_page=(max 200)&alarm_text[]=&alarm_category[]=(opt)&equipment_id[]=(opt)&lot_id[]=(opt)&pj_type[]=(opt)&product_line[]=(opt)&pj_bop[]=(opt) | GenericSuccessResponse | 400/410 | route tests |
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
