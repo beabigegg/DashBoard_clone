@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.43.0] — 2026-07-04
+### Added
+- ai-leader-subagent: AI-01 adds `AI_MODE=leader`（leader/subagent 分層 pipeline：planning → dispatch → synthesis）。New AI-10 documents leader orchestration behavior — planning output schema（respond/delegate）、3-task cap、malformed-planning degradation（整題委派單一子任務）、subagent failure isolation、all-failed short-circuit、synthesis fallback concatenation、additive `subtasks` response field、`subagent<N>.<function>` tool_trace naming。AI-02 documents leader-mode clarification semantics（respond path only）；AI-08 extends history injection to the leader planning call（subagent loop 與 synthesis 不注入）。Agent system prompt 新增 function-first 規則（常駐工具與 search_tools 均無合適函式時才用 `query_database`）。Additive; existing text2sql/function/agent pipelines unchanged.
+
+## [env 1.0.24] — 2026-07-04
+### Changed
+- ai-leader-subagent: `AI_MODE` validation values expand `text2sql, function, or agent` → `text2sql, function, agent, or leader`. Default and failure behavior unchanged (fallback to text2sql).
+
+## [api-inventory 1.5.0] — 2026-07-04
+### Changed
+- ai-leader-subagent: `ai_routes.py` row — leader mode response includes additive `subtasks: [{goal, answer, success}]` field. Route surface unchanged.
+
 ## [business 1.42.0] — 2026-07-02
 ### Added
 - production-achievement-kanban: Added `## Production-Achievement Rules` section (PA-01..PA-07) — two-shift/three-shift SHIFT_CODE classification (re-implements `PJ_GET_CLASSCODE_F`), output_date cross-night attribution (re-implements `PJ_GET_OUTPUTDATE_F`; three-shift C-band explicitly flagged as an UNVERIFIED ASSUMPTION), effective-output station/process qualifying predicate (SPECNAME + processtypename/WORKFLOWNAME 雙晶/三晶 combinations, preserved verbatim), achievement-rate grouping/formula reusing `filter_cache.get_spec_workcenter_mapping()`, and division-by-zero/missing-target null semantics. Fifteen new Decision Table rows. Additive; no existing rules changed.

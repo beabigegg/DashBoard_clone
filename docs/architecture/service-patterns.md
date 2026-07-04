@@ -97,6 +97,20 @@ Pin with a dispatch adapter test (pattern: `TestProductionHistoryQueryDispatchAd
 
 Evidence: `ai-pipeline-upgrade`.
 
+## AI Pipeline — Leader/Subagent Mode (AI_MODE=leader)
+
+**`ai_leader_orchestrator.process_leader_turn` is a thin orchestration layer over the existing agent loop — it must never grow its own tool-execution logic.** The leader does three LLM interactions only: planning (respond vs delegate, ≤3 self-contained subtask goals), dispatch (each goal to `ai_agent_loop.process_agent_turn`, which owns function-first routing and the `query_database` text2sql fallback), and synthesis (original question + all subtask answers → final reply).
+
+Key invariants:
+- Subtask goals must be self-contained text — the subagent never sees the original question or chat history, so the planning prompt instructs the leader to inline dates/stations/IDs into each goal.
+- Failure isolation: one subagent raising must not kill the turn; all-failed short-circuits synthesis; a failed synthesis LLM call falls back to concatenating subagent answers (data is never lost).
+- Malformed planning JSON (`_call_llm` RuntimeError) degrades to delegating the whole question as a single subtask — not an error response.
+- `tool_trace` entries from subagents are re-numbered and namespaced `subagent<N>.<function>` so the AI-03 response shape is preserved.
+
+Pin with orchestration tests that patch `_call_llm` / `process_agent_turn` / `call_llm_text` at the `ai_leader_orchestrator` module (pattern: `tests/test_ai_leader_orchestrator.py`).
+
+Evidence: `ai-leader-subagent`.
+
 ## AI Pipeline — advance_query_state Pops _SESSION_STORE
 
 **`advance_query_state` pops the full `_SESSION_STORE` entry on `ready_to_search`.** Any cross-turn state added to `_SESSION_STORE[conversation_id]` (e.g., `chat_history`) is silently lost on the first completed slot-filling query.
