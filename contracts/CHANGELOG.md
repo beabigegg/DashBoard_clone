@@ -10,7 +10,7 @@ a corresponding entry below.
 
 ## [business 1.43.0] — 2026-07-04
 ### Added
-- ai-leader-subagent: AI-01 adds `AI_MODE=leader`（leader/subagent 分層 pipeline：planning → dispatch → synthesis）。New AI-10 documents leader orchestration behavior — planning output schema（respond/delegate）、3-task cap、malformed-planning degradation（整題委派單一子任務）、subagent failure isolation、all-failed short-circuit、synthesis fallback concatenation、additive `subtasks` response field、`subagent<N>.<function>` tool_trace naming。AI-02 documents leader-mode clarification semantics（respond path only）；AI-08 extends history injection to the leader planning call（subagent loop 與 synthesis 不注入）。Agent system prompt 新增 function-first 規則（常駐工具與 search_tools 均無合適函式時才用 `query_database`）。Additive; existing text2sql/function/agent pipelines unchanged.
+- ai-leader-subagent: AI-01 adds `AI_MODE=leader`（leader/subagent 分層 pipeline：planning → dispatch → synthesis）。New AI-10 documents leader orchestration behavior — planning output schema（respond/delegate）、3-task cap、malformed-planning degradation（整題委派單一子任務）、subagent failure isolation、all-failed short-circuit、synthesis fallback concatenation、additive `subtasks` response field（前端 AiChatMessage 折疊區塊顯示）、`query_used` 傳遞產圖子任務實際工具名稱（無圖表 `"leader"`）供 AiChartRenderer 後綴判型、`subagent<N>.<function>` tool_trace naming。AI-02 documents leader-mode clarification semantics（respond path only）；AI-08 extends history injection to the leader planning call（subagent loop 與 synthesis 不注入）。Agent system prompt 新增 function-first 規則（常駐工具與 search_tools 均無合適函式時才用 `query_database`）。Additive; existing text2sql/function/agent pipelines unchanged.
 
 ## [env 1.0.24] — 2026-07-04
 ### Changed

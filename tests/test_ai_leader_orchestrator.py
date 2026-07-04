@@ -8,11 +8,11 @@ import requests
 from mes_dashboard.services import ai_leader_orchestrator as leader
 
 
-def _agent_result(answer="子任務回答", chart_data=None, tool_trace=None):
+def _agent_result(answer="子任務回答", chart_data=None, tool_trace=None, query_used=None):
     return {
         "answer": answer,
         "chart_data": chart_data,
-        "query_used": None,
+        "query_used": query_used,
         "params_used": None,
         "suggestions": [],
         "needs_clarification": False,
@@ -75,11 +75,13 @@ class TestDelegatePath(unittest.TestCase):
                 answer="不良率 2.1%，趨勢平穩。",
                 chart_data=[{"date": "2026-07-01", "reject_rate": 2.1}],
                 tool_trace=[{"step": 1, "function": "reject_trend", "summary": "ok"}],
+                query_used="reject_trend",
             ),
             _agent_result(
                 answer="目前 Hold 12 批。",
                 chart_data=[{"label": "Hold 批次", "value": 12}],
                 tool_trace=[{"step": 1, "function": "wip_hold_summary", "summary": "ok"}],
+                query_used="wip_hold_summary",
             ),
         ]
         mock_text.return_value = "近 7 天 DB 站不良率 2.1% 且平穩；目前 Hold 12 批。"
@@ -87,7 +89,9 @@ class TestDelegatePath(unittest.TestCase):
         result = leader.process_leader_turn("DB 站不良率趨勢和 Hold 狀況")
 
         self.assertEqual(result["answer"], "近 7 天 DB 站不良率 2.1% 且平穩；目前 Hold 12 批。")
-        self.assertEqual(result["query_used"], "leader")
+        # query_used propagates the last chart-producing subagent's tool name
+        # so AiChartRenderer picks the chart type by name suffix
+        self.assertEqual(result["query_used"], "wip_hold_summary")
         # chart_data is the last non-null subagent chart
         self.assertEqual(result["chart_data"], [{"label": "Hold 批次", "value": 12}])
         self.assertEqual(mock_agent.call_count, 2)
@@ -101,6 +105,20 @@ class TestDelegatePath(unittest.TestCase):
         self.assertIn("subagent1.reject_trend", functions)
         self.assertIn("subagent2.wip_hold_summary", functions)
         self.assertEqual(functions[-1], "leader_synthesize")
+
+    @patch("mes_dashboard.services.ai_leader_orchestrator.call_llm_text")
+    @patch("mes_dashboard.services.ai_leader_orchestrator.process_agent_turn")
+    @patch("mes_dashboard.services.ai_leader_orchestrator._call_llm")
+    def test_query_used_falls_back_to_leader_without_chart(self, mock_llm, mock_agent, mock_text):
+        """No subagent produced a chart → query_used falls back to 'leader'."""
+        mock_llm.return_value = {"action": "delegate", "tasks": ["查 A"]}
+        mock_agent.return_value = _agent_result(answer="純文字結果", chart_data=None)
+        mock_text.return_value = "答案"
+
+        result = leader.process_leader_turn("查 A")
+
+        self.assertEqual(result["query_used"], "leader")
+        self.assertIsNone(result["chart_data"])
 
     @patch("mes_dashboard.services.ai_leader_orchestrator.call_llm_text")
     @patch("mes_dashboard.services.ai_leader_orchestrator.process_agent_turn")

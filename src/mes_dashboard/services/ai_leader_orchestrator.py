@@ -129,7 +129,8 @@ def process_leader_turn(
         {
             "answer": str,
             "chart_data": Any,
-            "query_used": "leader" | None,
+            "query_used": str | None,   # 產圖子任務的實際工具名稱；無圖表時 "leader"；
+                                        # respond path 為 None（前端以此決定圖表型態）
             "params_used": None,
             "suggestions": list[str],
             "needs_clarification": bool,
@@ -204,6 +205,7 @@ def process_leader_turn(
     # ── Phase 2: Dispatch to query subagents ────────────────────────────────
     subtasks: list[dict[str, Any]] = []
     last_chart_data: Any = None
+    last_query_used: str | None = None
 
     for idx, goal in enumerate(tasks, 1):
         try:
@@ -211,12 +213,14 @@ def process_leader_turn(
             success = True
             sub_answer = result.get("answer") or "（無結果）"
             sub_chart = result.get("chart_data")
+            sub_query_used = result.get("query_used")
             sub_trace = result.get("tool_trace") or []
         except Exception as exc:  # noqa: BLE001 — isolate subagent failures
             logger.warning("Subagent %d failed for goal %r: %s", idx, goal, exc)
             success = False
             sub_answer = f"（子任務執行失敗：{exc}）"
             sub_chart = None
+            sub_query_used = None
             sub_trace = []
 
         for entry in sub_trace:
@@ -229,6 +233,10 @@ def process_leader_turn(
 
         if sub_chart is not None:
             last_chart_data = sub_chart
+            # Propagate the subagent's chart-producing tool name so the
+            # frontend AiChartRenderer can pick the chart type by suffix
+            # (_pareto/_trend/_summary/_matrix)，而不是退化成形狀偵測。
+            last_query_used = sub_query_used or last_query_used
 
         subtasks.append({"goal": goal, "answer": sub_answer, "success": success})
 
@@ -270,7 +278,7 @@ def process_leader_turn(
     return {
         "answer": answer,
         "chart_data": last_chart_data,
-        "query_used": "leader",
+        "query_used": last_query_used or "leader",
         "params_used": None,
         "suggestions": [],
         "needs_clarification": False,
