@@ -104,6 +104,12 @@ class TestBuildAgentSystemPrompt(unittest.TestCase):
         today = date.today().isoformat()
         self.assertIn(today, prompt)
 
+    def test_function_first_sql_fallback_rule(self):
+        """Prompt must instruct: prefer function tools, query_database only as fallback."""
+        prompt = build_agent_system_prompt()
+        self.assertIn("優先使用函式工具", prompt)
+        self.assertIn("才使用 query_database", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

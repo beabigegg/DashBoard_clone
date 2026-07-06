@@ -1416,11 +1416,12 @@ def process_query_function(
 # ---------------------------------------------------------------------------
 
 def process_query(question: str, conversation_id: str | None = None) -> dict[str, Any]:
-    """Route to clarification/text2sql/function/agent pipeline based on AI_MODE.
+    """Route to clarification/text2sql/function/agent/leader pipeline based on AI_MODE.
 
     AI_MODE=text2sql (default) → process_query_text2sql()
     AI_MODE=function            → process_query_function()
     AI_MODE=agent               → process_agent_turn()
+    AI_MODE=leader              → process_leader_turn()（leader/subagent 分層）
     """
     state = advance_query_state(
         conversation_id=conversation_id,
@@ -1442,6 +1443,13 @@ def process_query(question: str, conversation_id: str | None = None) -> dict[str
 
     search_question = state.get("search_question") or question
     mode = os.getenv("AI_MODE", "text2sql").strip().lower()
+    if mode == "leader":
+        from mes_dashboard.services.ai_leader_orchestrator import process_leader_turn
+        result = process_leader_turn(search_question, conversation_id=conversation_id)
+        result.setdefault("needs_clarification", False)
+        result.setdefault("missing_slots", [])
+        result.setdefault("query_state", state.get("query_state") or {})
+        return result
     if mode == "agent":
         from mes_dashboard.services.ai_agent_loop import process_agent_turn
         result = process_agent_turn(search_question)

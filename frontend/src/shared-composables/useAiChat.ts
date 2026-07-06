@@ -3,6 +3,13 @@ import type { Ref, ComputedRef } from 'vue';
 
 export type MessageRole = 'user' | 'ai' | 'error' | 'clarification';
 
+/** Leader-mode (AI_MODE=leader) subtask result — additive backend field. */
+export interface AiSubtask {
+  goal: string;
+  answer: string;
+  success: boolean;
+}
+
 export interface AiMessage {
   role: MessageRole;
   content: string;
@@ -14,6 +21,7 @@ export interface AiMessage {
   toolTrace?: unknown[];
   missingSlots?: string[];
   queryState?: unknown | null;
+  subtasks?: AiSubtask[];
 }
 
 export interface AiChatComposable {
@@ -127,6 +135,7 @@ export function useAiChat(): AiChatComposable {
           tool_trace?: unknown[];
           missing_slots?: string[];
           query_state?: unknown;
+          subtasks?: AiSubtask[];
         };
         [key: string]: unknown;
       };
@@ -150,6 +159,7 @@ export function useAiChat(): AiChatComposable {
         toolTrace: Array.isArray(data?.tool_trace) ? (data.tool_trace as unknown[]) : [],
         missingSlots: Array.isArray(data?.missing_slots) ? (data.missing_slots as string[]) : [],
         queryState: data?.query_state ?? null,
+        subtasks: Array.isArray(data?.subtasks) ? (data.subtasks as AiSubtask[]) : [],
       };
 
       messages.value = [...messages.value, aiMessage];

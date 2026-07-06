@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.23
-last-changed: 2026-07-02
+schema-version: 1.0.24
+last-changed: 2026-07-04
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -93,7 +93,7 @@ breaking-change-policy: deprecate-2-minors
 | name | scope | environments | required | secret | default | example | owner | validation | restart required | failure behavior |
 |---|---|---|---:|---:|---|---|---|---|---:|---|
 | AI_QUERY_ENABLED | feature | all | no | no | — | true | application-team | true or false | yes | AI 端點返回 404 |
-| AI_MODE | feature | all | no | no | text2sql | text2sql | application-team | text2sql, function, or agent | yes | fallback to text2sql |
+| AI_MODE | feature | all | no | no | text2sql | text2sql | application-team | text2sql, function, agent, or leader | yes | fallback to text2sql |
 | ANALYTICS_ANOMALY_DETECTION_ENABLED | feature | all | no | no | — | true | application-team | true or false | yes | anomaly 端點 404 |
 | PROD_HISTORY_ENABLED | feature | all | no | no | — | true | application-team | true or false | yes | production-history 端點 404 |
 | REGISTER_INTERNAL_METRICS | feature | dev | no | no | False | False | platform-team | True or False — production MUST NOT set True | yes | internal metrics blueprint 掛載 |
