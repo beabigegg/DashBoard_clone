@@ -18,6 +18,16 @@
   @apply flex flex-wrap gap-3 items-end;
 }
 
+/* `.ui-filter-group` (shared base) has no intrinsic width, so in a flex-wrap
+ * row each field collapses to its content — MultiSelect shrinks to the
+ * placeholder width. Give fields a usable width, same convention as
+ * production-history's filter-field min-widths. */
+.theme-production-achievement .pa-app__filter-row .ui-filter-group {
+  flex: 1 1 200px;
+  min-width: 200px;
+  max-width: 320px;
+}
+
 .theme-production-achievement .pa-app__required {
   @apply text-red-500;
 }
