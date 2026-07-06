@@ -160,6 +160,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - AI pipeline `raw_params` callables require `dispatch: raw_params` in `ai_functions.yaml`
 - AI pipeline `advance_query_state` pops the entire `_SESSION_STORE` — extract/restore cross-turn state around it
 - `_AI_SESSION` is a module-level `requests.Session` — patch `ai_query_service._AI_SESSION`, not `requests.post`
+- `AI_MODE=leader`: leader 只做 planning/dispatch/synthesis，工具執行一律委派 `process_agent_turn`（函式優先、query_database SQL fallback）— see docs/architecture/service-patterns.md §AI Pipeline — Leader/Subagent Mode
 - Every `execute_*_job` worker must wire `acquire_heavy_query_slot` before its `*_USE_RQ` flag ships — see docs/architecture/service-patterns.md §RQ Worker Concurrency Gate
 - COUNT(*) fail-open pre-check for domains without a date range must fail open to sync, never 503 — see docs/architecture/service-patterns.md §Async Routing Pre-Check Pattern
 - `DW_MES_WIP` has no `CONTAINERID` index (`CONTAINERNAME`/`TXNDATE` only, 95M+ rows) — bridge `CONTAINERID`→`CONTAINERNAME` via indexed `DW_MES_CONTAINER` before joining — see docs/architecture/service-patterns.md

@@ -3,8 +3,8 @@ contract: api-inventory
 summary: Endpoint inventory categories and ownership map for non-standard API surfaces.
 owner: application-team
 surface: api
-schema-version: 1.4.0
-last-changed: 2026-07-02
+schema-version: 1.5.0
+last-changed: 2026-07-04
 ---
 
 # API Inventory
@@ -43,7 +43,7 @@ last-changed: 2026-07-02
 | `downtime_analysis_routes.py` | All JSON API endpoints — **Type A raw-spool** (flag ON) / **Type A enriched-spool** (flag OFF); `GET /api/downtime-analysis/options` → `{workcenter_groups[], families[], resources[], package_groups[], big_categories[], reasons[]}`; `POST /api/downtime-analysis/query` → Oracle or DuckDB prewarm → (flag ON) `{base_spool_url, jobs_spool_url, query_id, taxonomy}` (browser-DuckDB path; spool namespaces `downtime_analysis_base_events`, `downtime_analysis_job_bridge`; `SCHEMA_VERSION` in cache key) / (flag OFF) `{query_id, summary: DowntimeKpiShape, daily_trend[], big_category[], top_reasons[]}` (legacy enriched-spool path; spool namespace `downtime_analysis_events`; cache key includes `DOWNTIME_BRIDGE_VERSION`); `GET /api/downtime-analysis/view` → **[DEPRECATED: removal target api 1.17.0]** DuckDB regroup (no Oracle; 410 on spool miss); `GET /api/downtime-analysis/equipment-detail` → **[DEPRECATED: removal target api 1.17.0]** `{equipment_detail: EquipmentDetailRow[]}`; `GET /api/downtime-analysis/event-detail` → **[DEPRECATED: removal target api 1.17.0]** `{events: paginated EventDetailRow[]}`. DA-01..DA-08 apply. Feature flag: `DOWNTIME_BROWSER_DUCKDB` (default false). |
 | `analytics_routes.py` | `GET /api/analytics/yield-anomalies`, `/reject-spikes`, `/hold-outliers`, `/equipment-deviation`, `/anomaly-summary` 及各 `/drilldown`；gated by `ANALYTICS_ANOMALY_DETECTION_ENABLED`；`anomaly-summary` 注入 `meta.cache_state` |
 | `user_auth_routes.py` | `POST /api/auth/login` (public, rate-limited 5/5min, JSON `{username, password}`)、`POST /api/auth/logout`、`GET /api/auth/me`（null if not logged in）、`PATCH /api/auth/heartbeat` (login_required) |
-| `ai_routes.py` | `POST /api/ai/query` — NL query；`AI_MODE` 決定 pipeline；function mode 使用 combined call（select+fill 合一），text2sql mode 注入 chat_history 至 Stage 1；response: `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}`；新增三個 AI 函式（production_history_query、resource_history_summary、qc_gate_status）；route surface 不變；gated by `AI_QUERY_ENABLED` |
+| `ai_routes.py` | `POST /api/ai/query` — NL query；`AI_MODE` 決定 pipeline；function mode 使用 combined call（select+fill 合一），text2sql mode 注入 chat_history 至 Stage 1；leader mode（leader/subagent 分層）response 額外含 additive `subtasks: [{goal, answer, success}]`；response: `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}`；新增三個 AI 函式（production_history_query、resource_history_summary、qc_gate_status）；route surface 不變；gated by `AI_QUERY_ENABLED` |
 | `job_routes.py` | `GET /api/job/<job_id>?prefix=<p>` — async 狀態；`POST /api/job/<job_id>/abandon` — idempotent，rate-limited 30/60s |
 
 ## Admin Page Routes（非 API）

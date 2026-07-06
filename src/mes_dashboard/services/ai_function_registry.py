@@ -631,6 +631,7 @@ def build_agent_system_prompt() -> str:
         "- tool_call 標記外可以寫自然語言說明你的推理過程",
         "- 呼叫工具後，系統會自動執行並將結果注入下一輪 user message",
         "- 如果常駐工具無法滿足需求，先用 search_tools 搜尋更多工具",
+        "- 優先使用函式工具；只有當常駐工具與 search_tools 都沒有合適函式時，才使用 query_database 讓系統生成 SQL 查詢",
         "- 不要重複呼叫相同工具（相同名稱+相同參數）",
         "",
         "## Clarification 指引",

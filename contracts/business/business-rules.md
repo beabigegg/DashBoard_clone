@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.42.0
-last-changed: 2026-07-02
+schema-version: 1.43.0
+last-changed: 2026-07-04
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -79,15 +79,16 @@ breaking-change-policy: deprecate-2-minors
 
 | rule id | name | current behavior |
 |---|---|---|
-| AI-01 | Pipeline selection | `AI_MODE` env 決定：`text2sql`（分類→SQL→執行→摘要）、`function`（combined-call function pipeline）、`agent`（多工具 agentic loop） |
-| AI-02 | Clarification flag | `needs_clarification: true` 表示 AI 需要更多資訊，而非最終答案；`text2sql` / `function` mode 永遠為 `false` |
+| AI-01 | Pipeline selection | `AI_MODE` env 決定：`text2sql`（分類→SQL→執行→摘要）、`function`（combined-call function pipeline）、`agent`（多工具 agentic loop）、`leader`（leader/subagent 分層：規劃→委派→彙整） |
+| AI-02 | Clarification flag | `needs_clarification: true` 表示 AI 需要更多資訊，而非最終答案；`text2sql` / `function` mode 永遠為 `false`；`leader` mode 僅在 respond path（未委派任何子任務）且回覆含問號時為 `true` |
 | AI-03 | Response fields | `{answer, chart_data, query_used, params_used, suggestions, sql_used, tool_trace, needs_clarification}` |
 | AI-04 | Combined-prompt output schema | function mode 的 LLM call 輸出 schema：`{"function": "<name>|null", "params": {...}, "explanation": "<string>"}`；null function → null-intent path（`query_used=null`，`chart_data=null`） |
 | AI-05 | Malformed JSON fallback | combined call 發生 malformed JSON（`_call_llm` 拋出 `RuntimeError` 或結果無 `function` key）→ 安全降級為 null-intent 回應；不拋出例外（AC-7）；`requests.Timeout`/`ConnectionError` 仍正常拋出 |
 | AI-06 | chat_history append policy | 成功回答（含空結果）後 append `(user question, assistant answer)` 至 session chat_history；`TimeoutError`/`ConnectionError`/`ValueError` 時不 append |
 | AI-07 | chat_history cap and eviction | 每個 conversation_id 最多保存 8 對/16 訊息；超過上限時以 FIFO 刪除最舊的一對（2 訊息） |
-| AI-08 | History injection ordering | messages = `[system(combined prompt), ...chat_history..., user(current question)]`；history 僅注入 combined call 與 text2sql Stage 1；不注入 text2sql Stage 2（SQL 生成）或 Round 3（摘要） |
+| AI-08 | History injection ordering | messages = `[system(combined prompt), ...chat_history..., user(current question)]`；history 僅注入 combined call、text2sql Stage 1 與 leader planning call；不注入 text2sql Stage 2（SQL 生成）、Round 3（摘要）、subagent loop 或 leader synthesis |
 | AI-09 | Three new function behaviors | `production_history_query`：oracle/spool 同步呼叫，寬查詢可能超過 `AI_REQUEST_TIMEOUT`，建議 YAML 參數說明限制範圍不超過 7 天；`resource_history_summary`：暴露 start_date/end_date/granularity/workcenter_groups，不暴露 families/resource_ids/is_*；`qc_gate_status`：無參數，normalize_chart_data 回傳 `raw.get("stations", [])` |
+| AI-10 | Leader orchestration | leader mode 流程：planning LLM call 輸出 `{"action": "respond", "answer"}` 或 `{"action": "delegate", "tasks": [...]}`；tasks 上限 3（超過截斷）；每個子任務交給一個 query subagent（`process_agent_turn`，函式優先、`query_database` SQL fallback），子任務失敗互相隔離；planning JSON 無法解析 → 降級為以原始問題委派單一子任務；全部子任務失敗 → 直接回報失敗（不呼叫 synthesis LLM）；synthesis LLM 失敗 → fallback 串接各子任務回答；回應額外含 additive `subtasks: [{goal, answer, success}]` 欄位（前端以折疊區塊顯示每個子任務的 goal/成敗/回答）；`query_used` = 最後一個產圖子任務的實際工具名稱（無任何圖表時為 `"leader"`，respond path 為 `null`），供前端 AiChartRenderer 以名稱後綴決定圖表型態；tool_trace 子任務項目以 `subagent<N>.<function>` 命名 |
 
 ## WIP Rules
 

@@ -10,6 +10,7 @@ interface AiMessage {
   sqlUsed?: string;
   toolTrace?: Array<{ step: number; function: string; summary: string; error?: string }>;
   suggestions?: string[];
+  subtasks?: Array<{ goal: string; answer: string; success: boolean }>;
 }
 
 interface Props {
@@ -51,6 +52,23 @@ const emit = defineEmits<{
       <details v-if="message.sqlUsed" class="ai-sql-details">
         <summary class="ai-sql-summary">查看 SQL</summary>
         <pre class="ai-sql-pre">{{ message.sqlUsed }}</pre>
+      </details>
+
+      <!-- Leader-mode subtask results (AI_MODE=leader) -->
+      <details v-if="message.subtasks && message.subtasks.length > 0" class="ai-sql-details">
+        <summary class="ai-sql-summary">子任務結果 ({{ message.subtasks.length }})</summary>
+        <ol class="ai-subtask-list">
+          <li v-for="(subtask, idx) in message.subtasks" :key="idx" class="ai-subtask-item">
+            <div class="ai-subtask-header">
+              <StatusBadge
+                :tone="subtask.success ? 'success' : 'danger'"
+                :text="subtask.success ? '成功' : '失敗'"
+              />
+              <span class="ai-subtask-goal">{{ subtask.goal }}</span>
+            </div>
+            <p class="ai-subtask-answer">{{ subtask.answer }}</p>
+          </li>
+        </ol>
       </details>
 
       <details v-if="message.toolTrace && message.toolTrace.length > 1" class="ai-sql-details">
@@ -260,5 +278,48 @@ const emit = defineEmits<{
   color: theme('colors.red.600');
   font-family: monospace;
   font-size: 11px;
+}
+
+.ai-subtask-list {
+  margin: 0;
+  padding: theme('spacing.token.p8');
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p8');
+}
+
+.ai-subtask-item {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p4');
+  padding-bottom: theme('spacing.token.p8');
+  border-bottom: 1px solid theme('colors.stroke.soft');
+}
+
+.ai-subtask-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.ai-subtask-header {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+}
+
+.ai-subtask-goal {
+  font-size: 12px;
+  font-weight: 500;
+  color: theme('colors.text.primary');
+  word-break: break-word;
+}
+
+.ai-subtask-answer {
+  margin: 0;
+  font-size: 12px;
+  color: theme('colors.text.secondary');
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

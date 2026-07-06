@@ -419,6 +419,18 @@ class TestFeatureFlag(unittest.TestCase):
         called_question = mock_t2s.call_args.args[0] if mock_t2s.call_args.args else mock_t2s.call_args.kwargs.get("question")
         self.assertEqual(called_question, "test question")
 
+    @patch("mes_dashboard.services.ai_leader_orchestrator.process_leader_turn")
+    def test_leader_mode_routes_to_leader_pipeline(self, mock_leader):
+        mock_leader.return_value = {"answer": "ok", "query_used": "leader"}
+        with patch.dict("os.environ", {"AI_MODE": "leader"}):
+            result = svc.process_query("test question")
+        mock_leader.assert_called_once()
+        called_question = mock_leader.call_args.args[0] if mock_leader.call_args.args else mock_leader.call_args.kwargs.get("question")
+        self.assertEqual(called_question, "test question")
+        # Dispatcher must backfill clarification defaults
+        self.assertFalse(result["needs_clarification"])
+        self.assertEqual(result["missing_slots"], [])
+
     @patch("mes_dashboard.services.ai_query_service.process_query_text2sql")
     def test_default_mode_is_text2sql(self, mock_t2s):
         mock_t2s.return_value = {"answer": "ok", "query_used": "text2sql"}
