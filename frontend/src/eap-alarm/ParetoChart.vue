@@ -12,26 +12,45 @@ import VChart from 'vue-echarts';
 use([CanvasRenderer, BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent]);
 
 interface ParetoItem {
-  alarm_text: string;
+  // `name` is the generic dim value; `alarm_text` is the legacy alias kept in
+  // the API for backward compatibility — read name first, fall back to alias.
+  name?: string;
+  alarm_text?: string;
   count: number;
   cumulative_pct: number;
 }
 
+// Selectable pareto dimensions (must match backend GROUP_DIMENSIONS keys)
+const DIM_OPTIONS = Object.freeze([
+  { value: 'alarm_text', label: 'ALARM 訊息' },
+  { value: 'eqp_id', label: '機台' },
+  { value: 'lot_id', label: 'LOT' },
+  { value: 'pj_type', label: 'PJ 類型' },
+  { value: 'product_line', label: 'Package' },
+  { value: 'pj_bop', label: 'BOP' },
+]);
+
 const props = defineProps<{
   items?: ParetoItem[];
   total?: number;
+  dim?: string;
   loading?: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: 'bar-click', alarmText: string): void;
+  (e: 'bar-click', name: string): void;
+  (e: 'dim-change', dim: string): void;
 }>();
 
 const hasData = computed(() => Array.isArray(props.items) && (props.items?.length ?? 0) > 0);
 
+function itemName(i: ParetoItem): string {
+  return i.name ?? i.alarm_text ?? '(未知)';
+}
+
 const chartOption = computed(() => {
   const items = props.items ?? [];
-  const labels = items.map((i) => i.alarm_text || '(未知)');
+  const labels = items.map((i) => itemName(i));
   const counts = items.map((i) => Number(i.count || 0));
   const cumPcts = items.map((i) => Number((i.cumulative_pct ?? 0).toFixed(1)));
 
@@ -111,8 +130,9 @@ const chartOption = computed(() => {
 function handleChartClick(params: { componentType?: string; dataIndex: number }): void {
   if (params?.componentType !== 'series') return;
   const item = props.items?.[params.dataIndex];
-  if (item?.alarm_text) {
-    emit('bar-click', item.alarm_text);
+  const name = item ? (item.name ?? item.alarm_text) : undefined;
+  if (name) {
+    emit('bar-click', name);
   }
 }
 </script>
@@ -123,6 +143,17 @@ function handleChartClick(params: { componentType?: string; dataIndex: number })
       <div class="card-title ui-card-title">
         ALARM Pareto 分析
         <span v-if="total" class="pareto-total-badge">共 {{ total }} 次</span>
+      </div>
+      <div class="trend-granularity-toggle" data-testid="pareto-dim-toggle">
+        <button
+          v-for="opt in DIM_OPTIONS"
+          :key="opt.value"
+          type="button"
+          :class="['ui-btn ui-btn--sm', (dim ?? 'alarm_text') === opt.value ? 'ui-btn--primary' : 'ui-btn--ghost']"
+          @click="emit('dim-change', opt.value)"
+        >
+          {{ opt.label }}
+        </button>
       </div>
     </div>
     <div class="card-body ui-card-body pareto-chart-body">

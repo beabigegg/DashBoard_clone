@@ -26,6 +26,8 @@ export function useEapAlarmViews() {
   const summary = reactive({
     total_alarm_count: 0,
     affected_equipment_count: 0,
+    affected_lot_count: 0,
+    affected_product_line_count: 0,
     unresolved_count: 0,
     avg_duration_minutes: null,
   });
@@ -36,6 +38,10 @@ export function useEapAlarmViews() {
     total: 0,
   });
 
+  // Pareto group dimension (backend closed enum: alarm_text/eqp_id/eqp_type/
+  // lot_id/pj_type/product_line/pj_bop)
+  const paretoDim = ref('alarm_text');
+
   // ── Trend ──────────────────────────────────────────────────────────────────
   const trend = reactive({
     labels: [],
@@ -43,6 +49,8 @@ export function useEapAlarmViews() {
   });
 
   const trendGranularity = ref('day');
+  // Trend stack dimension (same closed enum as paretoDim)
+  const trendGroupBy = ref('alarm_text');
 
   // ── Detail ─────────────────────────────────────────────────────────────────
   const detail = reactive({
@@ -86,6 +94,8 @@ export function useEapAlarmViews() {
   function resetAll() {
     summary.total_alarm_count = 0;
     summary.affected_equipment_count = 0;
+    summary.affected_lot_count = 0;
+    summary.affected_product_line_count = 0;
     summary.unresolved_count = 0;
     summary.avg_duration_minutes = null;
     pareto.items = [];
@@ -133,6 +143,8 @@ export function useEapAlarmViews() {
       if (data) {
         summary.total_alarm_count = data.total_alarm_count ?? 0;
         summary.affected_equipment_count = data.affected_equipment_count ?? 0;
+        summary.affected_lot_count = data.affected_lot_count ?? 0;
+        summary.affected_product_line_count = data.affected_product_line_count ?? 0;
         summary.unresolved_count = data.unresolved_count ?? 0;
         summary.avg_duration_minutes = data.avg_duration_minutes ?? null;
       }
@@ -147,12 +159,12 @@ export function useEapAlarmViews() {
 
   // ── Fetch pareto ───────────────────────────────────────────────────────────
 
-  async function fetchPareto(queryId, fineParams) {
+  async function fetchPareto(queryId, fineParams, dim = paretoDim.value) {
     if (!queryId) return;
     loading.pareto = true;
     const requestId = nextRequestId('pareto');
     try {
-      const params = { query_id: queryId, ...fineParams };
+      const params = { query_id: queryId, dim, ...fineParams };
       const qs = buildQueryParams(params);
       const resp = await apiGet(`/api/eap-alarm/pareto${qs}`);
       if (isStale('pareto', requestId)) return;
@@ -171,12 +183,12 @@ export function useEapAlarmViews() {
 
   // ── Fetch trend ────────────────────────────────────────────────────────────
 
-  async function fetchTrend(queryId, fineParams, granularity = 'day') {
+  async function fetchTrend(queryId, fineParams, granularity = 'day', groupBy = trendGroupBy.value) {
     if (!queryId) return;
     loading.trend = true;
     const requestId = nextRequestId('trend');
     try {
-      const params = { query_id: queryId, granularity, ...fineParams };
+      const params = { query_id: queryId, granularity, group_by: groupBy, ...fineParams };
       const qs = buildQueryParams(params);
       const resp = await apiGet(`/api/eap-alarm/trend${qs}`);
       if (isStale('trend', requestId)) return;
@@ -222,8 +234,8 @@ export function useEapAlarmViews() {
     error.value = '';
     await Promise.all([
       fetchSummary(queryId, fineParams),
-      fetchPareto(queryId, fineParams),
-      fetchTrend(queryId, fineParams, trendGranularity.value),
+      fetchPareto(queryId, fineParams, paretoDim.value),
+      fetchTrend(queryId, fineParams, trendGranularity.value, trendGroupBy.value),
       fetchDetail(queryId, fineParams, detailPage.value, detailPerPage.value),
     ]);
   }
@@ -233,8 +245,10 @@ export function useEapAlarmViews() {
     error,
     summary,
     pareto,
+    paretoDim,
     trend,
     trendGranularity,
+    trendGroupBy,
     detail,
     detailPage,
     detailPerPage,

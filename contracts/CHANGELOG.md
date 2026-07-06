@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [data 1.35.0] — 2026-07-04
+### Changed
+- eap-alarm-product-dims: §3.17 updated — schema_version 3→4; parquet gains `PJ_TYPE`/`PRODUCT_LINE`/`PJ_BOP` columns via spool-write-time chunked `DW_MES_CONTAINER` lookup (≤999 binds/chunk, deduped on LOT_ID, `NVL(TRIM(col),'(NA)')` mirrors coarse EXISTS semantics, fail-open to NULL columns). Fine-filter axes extended with exact-match `lot_id[]`/`pj_type[]`/`product_line[]`/`pj_bop[]`. filter-options gains 4 option lists; summary gains `affected_lot_count`/`affected_product_line_count`; pareto gains `dim` closed enum + generic `name` item key (`alarm_text` kept as back-compat alias); trend gains `group_by` closed enum + generic `name` series key (same alias rule); detail rows gain `pj_type`/`product_line`/`pj_bop`. v3 spool auto-invalidated via key version; rollback to v3 code requires `rm -f tmp/query_spool/eap_alarm/*.parquet`.
+
+## [api 1.37.0] — 2026-07-04 (eap-alarm-product-dims)
+### Changed
+- `/api/eap-alarm/{summary,pareto,trend,detail}` accept new optional exact-match fine-filter params `lot_id[]`/`pj_type[]`/`product_line[]`/`pj_bop[]`. `/api/eap-alarm/pareto` accepts `dim` and `/api/eap-alarm/trend` accepts `group_by` (closed enum alarm_text/eqp_id/eqp_type/lot_id/pj_type/product_line/pj_bop; default alarm_text; 400 VALIDATION_ERROR on unknown value). All additive; response envelope unchanged.
+
 ## [business 1.43.0] — 2026-07-04
 ### Added
 - ai-leader-subagent: AI-01 adds `AI_MODE=leader`（leader/subagent 分層 pipeline：planning → dispatch → synthesis）。New AI-10 documents leader orchestration behavior — planning output schema（respond/delegate）、3-task cap、malformed-planning degradation（整題委派單一子任務）、subagent failure isolation、all-failed short-circuit、synthesis fallback concatenation、additive `subtasks` response field（前端 AiChatMessage 折疊區塊顯示）、`query_used` 傳遞產圖子任務實際工具名稱（無圖表 `"leader"`）供 AiChartRenderer 後綴判型、`subagent<N>.<function>` tool_trace naming。AI-02 documents leader-mode clarification semantics（respond path only）；AI-08 extends history injection to the leader planning call（subagent loop 與 synthesis 不注入）。Agent system prompt 新增 function-first 規則（常駐工具與 search_tools 均無合適函式時才用 `query_database`）。Additive; existing text2sql/function/agent pipelines unchanged.

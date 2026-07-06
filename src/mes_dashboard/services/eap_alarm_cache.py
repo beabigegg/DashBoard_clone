@@ -19,7 +19,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # ── EA-06: schema version — bump on any parquet column add/remove/rename ──────
-_SCHEMA_VERSION: int = 3
+# v4: added product-dim columns PJ_TYPE / PRODUCT_LINE / PJ_BOP
+#     (LOT_ID → DWH.DW_MES_CONTAINER lookup at spool-write time)
+_SCHEMA_VERSION: int = 4
 
 # ── Environment configuration ─────────────────────────────────────────────────
 EAP_ALARM_SPOOL_DIR: str = os.getenv(
