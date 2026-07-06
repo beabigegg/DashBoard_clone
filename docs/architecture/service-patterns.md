@@ -77,6 +77,12 @@ Evidence: `add-package-detail-tables` — omitting `PRODUCTLINENAME` would have 
 
 Evidence: `add-package-detail-tables` — `hold_history/list.sql`, `lot_history.sql`, and `equipment_lots.sql` all required two-location edits (CTE + outer SELECT).
 
+## Shared CTE Builder for Cross-Function Parity
+
+**When two functions must produce results provably reconcilable with each other** (e.g. a KPI total and the detail-list/CSV export it must sum to), factor the shared filter/CTE-building SQL into ONE builder function both call, rather than maintaining two independently-written WHERE/CTE chains — two parallel implementations of "the same" predicate will drift the first time either is edited alone. Pin with a structural test asserting both functions call the shared builder (e.g. `inspect.getsource`), not just a value-equality test.
+
+Evidence: `yield-alert-kpi-csv-parity` — `design.md` Decision 1; `_build_alerts_filtered_cte()` in `yield_alert_sql_runtime.py`; `test_summary_and_alerts_share_the_same_cte_builder`.
+
 ## SQL-Frontend Column Gap
 
 **SQL returning a column the frontend never renders is invisible to backend-only audits.** When auditing which columns a table surface is missing, cross-check SQL `SELECT` output against frontend template rendering — not just the backend route response. A column already present in SQL but absent from the Vue template produces no error and passes all backend tests.
