@@ -1,7 +1,8 @@
 /* EAP ALARM Analysis — all rules scoped under .theme-eap-alarm (css-contract Rule 6) */
 
-.theme-eap-alarm .eap-alarm-header {
-  background: linear-gradient(135deg, theme('colors.brand.800') 0%, theme('colors.brand.500') 100%);
+/* Override resource-shared's max-width: 1800px — fill the full shell-content area (same as downtime-analysis, resource-status) */
+.theme-eap-alarm .dashboard {
+  max-width: none;
 }
 
 /* ── Filter panel ─────────────────────────────────────────────────────────── */
