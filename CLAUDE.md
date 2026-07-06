@@ -110,7 +110,8 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `pip install jsonschema` required before `cdd-kit validate --contracts` (CI and local)
 - Inert concurrency code (zero callers, or all flags default-off): add `tier-floor-override` to `tasks.yml` (≥20 chars); expires on first real caller / first flag flip-on; keyword-scan false positives get a permanent override
 - Concurrent backend+frontend agents both calling `cdd-kit test run` race on `test-evidence.yml` — last agent must re-run combining both stacks' commands
-- Two uncommitted changes bumping the same contract's schema-version: `validate --versions` diffs working tree vs git HEAD, not changelog prose — wait for the other to commit, or `--no-verify` only if it's the sole failure
+- Two uncommitted changes bumping the same contract's schema-version: `validate --versions` diffs working tree vs git HEAD, not changelog prose — wait for the other to commit, `--no-verify` only if it's the sole failure, or stage just your hunks via `git update-index` against a HEAD-reconstructed blob to commit a clean bump without waiting — see docs/cdd-kit-patterns.md
+- `cdd-kit contract endpoint set` only mutates table cells (auth/request/response/errors/tests), never prose sections (Compatibility Notes/CHANGELOG) — a hook-blocked prose-only note is a legitimate deferral if documented elsewhere (e.g. business-rules.md), not a corner cut — see docs/cdd-kit-patterns.md
 - Stage only the specific `specs/changes/<id>/`, never all of `specs/changes/` — sibling scaffolds fail the pre-commit hook
 - `gate --strict` only runs the changed-area test ladder; before pushing a removal or shape change, grep the full test tree and run full pytest locally
 - Full pytest run regenerates ~160 contract samples; `git checkout tests/contract/samples/` then re-stage only your change's samples
@@ -155,7 +156,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `rq_monitor_service`: patch at `get_rq_monitor_summary`, not `redis_client`
 - `QueryBuilder`: two independent `IN`-list builders need counter-forwarding between them
 - `_PARTIAL_NONKEY_COLS_LOT`: add new non-key columns atomically with the SQL change, pin with a membership test
-- SQL CTE changes: update both the CTE SELECT list and the outer SELECT
+- SQL CTE changes: update both the CTE SELECT list and the outer SELECT; when two functions must reconcile results, extract one shared CTE-builder function rather than maintaining parallel WHERE clauses (pin with a structural same-builder test) — see docs/architecture/service-patterns.md
 - SQL-frontend column gap: cross-check SQL output against the Vue template, not just the route response
 - AI pipeline `raw_params` callables require `dispatch: raw_params` in `ai_functions.yaml`
 - AI pipeline `advance_query_state` pops the entire `_SESSION_STORE` — extract/restore cross-turn state around it

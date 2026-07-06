@@ -112,9 +112,15 @@ Evidence: `yield-alert-filter-expansion` — `agent-log/backend-engineer.yml` `k
 
 ## Version-Skip Gate Compares Working Tree Against git HEAD, Not Changelog Prose
 
-**When two concurrent, uncommitted CDD changes both bump the same contract file's schema-version** (both against the same git HEAD baseline), renumbering one change's entry to sit after the other's does NOT clear `cdd-kit validate --versions` on its own while both remain uncommitted — the gate diffs the working tree against last commit, not changelog prose. Resolve by (a) waiting for the other session to commit first so the bump becomes a clean +1, or (b) committing with `--no-verify` only after confirming the version-skip check is the SOLE gate failure (all other checks green) and documenting why in the commit body.
+**When two concurrent, uncommitted CDD changes both bump the same contract file's schema-version** (both against the same git HEAD baseline), renumbering one change's entry to sit after the other's does NOT clear `cdd-kit validate --versions` on its own while both remain uncommitted — the gate diffs the working tree against last commit, not changelog prose. Resolve by (a) waiting for the other session to commit first so the bump becomes a clean +1, (b) committing with `--no-verify` only after confirming the version-skip check is the SOLE gate failure (all other checks green) and documenting why in the commit body, or (c) reconstructing a blob containing only your own edits (`git show HEAD:<path>` as base + your hunks applied), `git hash-object -w`, then `git update-index --cacheinfo 100644,<sha>,<path>` to stage that clean bump directly — bypassing the shared, still-mixed working-tree file without waiting or `--no-verify`.
 
-Evidence: `eap-alarm-coarse-filter` — hit twice on `contracts/business/business-rules.md` (vs `mid-section-defect`, then vs `yield-alert-kpi-csv-parity`); resolved via re-sequencing + `--no-verify` both times after confirming isolated failure.
+Evidence: `eap-alarm-coarse-filter` — hit twice on `contracts/business/business-rules.md` (vs `mid-section-defect`, then vs `yield-alert-kpi-csv-parity`); resolved via re-sequencing + `--no-verify` both times after confirming isolated failure. `yield-alert-kpi-csv-parity` — `tasks.yml` task 6.1 note, used option (c) to stage `business-rules.md`/`CHANGELOG.md` in isolation against the same concurrent `eap-alarm-coarse-filter` change.
+
+## `cdd-kit contract endpoint set` — Table Cells Only, Not Prose Sections
+
+**`cdd-kit contract endpoint set` only mutates endpoint table row cells** (auth/request/response/errors/tests) in `api-contract.md` — it has no equivalent for prose sections (Compatibility Notes, CHANGELOG). When a value-semantics-only change needs a prose note and the contract-write hook (`CDD_CONTRACT_WRITE_STRICT=1`) blocks a direct Edit, deferring that doc addition is legitimate — not a corner cut — provided the endpoint's table cells are genuinely unchanged and the value-semantics change is documented elsewhere (e.g. `business-rules.md`).
+
+Evidence: `yield-alert-kpi-csv-parity` — `tasks.yml` task 2.1; `archive.md` Final Contracts Updated. Follow-up: ADR 0004 SS7 will extend `set` to prose sections.
 
 ## Git Staging Scope for `specs/changes/`
 

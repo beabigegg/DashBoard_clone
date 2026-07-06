@@ -80,3 +80,4 @@
 | yield-alert-csv-fallback-400 | 2026 | 2026-07-01 | specs/archive/2026/yield-alert-csv-fallback-400/ |
 | eap-alarm-coarse-filter | 2026 | 2026-07-01 | specs/archive/2026/eap-alarm-coarse-filter/ |
 | production-achievement-kanban | 2026 | 2026-07-02 | specs/archive/2026/production-achievement-kanban/ |
+| yield-alert-kpi-csv-parity | 2026 | 2026-07-06 | specs/archive/2026/yield-alert-kpi-csv-parity/ |
