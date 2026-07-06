@@ -303,94 +303,86 @@ async function handleParetoClick(alarmText: string): Promise<void> {
       @cancel="cancelAsyncJob"
     />
 
-    <div class="resource-page">
-      <div class="header-gradient dashboard">
-        <div class="dashboard-inner">
-          <h1>EAP ALARM 分析</h1>
+    <div class="dashboard page-content">
+      <!-- Error banner -->
+      <ErrorBanner
+        v-if="errorMessage || viewError"
+        :message="errorMessage || viewError"
+        data-testid="error-banner"
+      />
+
+      <!-- Coarse filter bar -->
+      <FilterBar
+        :filters="coarseFilter"
+        :resource-options="resourceOptions"
+        :product-filter-options="productFilterOptions"
+        :product-options-loading="productOptionsLoading"
+        :loading="{ querying: queryLoading }"
+        @update:filters="(val) => Object.assign(coarseFilter, val)"
+        @submit="handleSubmit"
+        @clear="handleClear"
+      />
+
+      <!-- Results (only after spool complete and queryId set) -->
+      <template v-if="spoolReady && queryId">
+        <!-- Fine filter bar -->
+        <FineFilterBar
+          :fine-filter="fineFilter"
+          :filter-options="filterOptions"
+          data-testid="fine-filter-panel"
+          @change="handleFineFilterChange"
+        />
+
+        <!-- Summary cards -->
+        <SummaryCards
+          :summary="summary"
+          :loading="viewLoading.summary"
+          data-testid="summary-cards"
+        />
+
+        <!-- Charts row -->
+        <div class="charts-row">
+          <ParetoChart
+            :items="pareto.items"
+            :total="pareto.total"
+            :loading="viewLoading.pareto"
+            data-testid="pareto-chart"
+            @bar-click="handleParetoClick"
+          />
+          <TrendChart
+            :labels="trend.labels"
+            :series="trend.series"
+            :granularity="trendGranularity"
+            :loading="viewLoading.trend"
+            @granularity-change="handleGranularityChange"
+          />
         </div>
-      </div>
 
-      <div class="dashboard dashboard-inner page-content">
-        <!-- Error banner -->
-        <ErrorBanner
-          v-if="errorMessage || viewError"
-          :message="errorMessage || viewError"
-          data-testid="error-banner"
+        <!-- Detail table -->
+        <DetailTable
+          :rows="detail.rows"
+          :meta="detail.meta"
+          :loading="viewLoading.detail"
+          data-testid="detail-table"
+          @go-to-page="handleDetailPageChange"
         />
 
-        <!-- Coarse filter bar -->
-        <FilterBar
-          :filters="coarseFilter"
-          :resource-options="resourceOptions"
-          :product-filter-options="productFilterOptions"
-          :product-options-loading="productOptionsLoading"
-          :loading="{ querying: queryLoading }"
-          @update:filters="(val) => Object.assign(coarseFilter, val)"
-          @submit="handleSubmit"
-          @clear="handleClear"
-        />
-
-        <!-- Results (only after spool complete and queryId set) -->
-        <template v-if="spoolReady && queryId">
-          <!-- Fine filter bar -->
-          <FineFilterBar
-            :fine-filter="fineFilter"
-            :filter-options="filterOptions"
-            data-testid="fine-filter-panel"
-            @change="handleFineFilterChange"
-          />
-
-          <!-- Summary cards -->
-          <SummaryCards
-            :summary="summary"
-            :loading="viewLoading.summary"
-            data-testid="summary-cards"
-          />
-
-          <!-- Charts row -->
-          <div class="charts-row">
-            <ParetoChart
-              :items="pareto.items"
-              :total="pareto.total"
-              :loading="viewLoading.pareto"
-              data-testid="pareto-chart"
-              @bar-click="handleParetoClick"
-            />
-            <TrendChart
-              :labels="trend.labels"
-              :series="trend.series"
-              :granularity="trendGranularity"
-              :loading="viewLoading.trend"
-              @granularity-change="handleGranularityChange"
-            />
-          </div>
-
-          <!-- Detail table -->
-          <DetailTable
-            :rows="detail.rows"
-            :meta="detail.meta"
-            :loading="viewLoading.detail"
-            data-testid="detail-table"
-            @go-to-page="handleDetailPageChange"
-          />
-
-          <!-- Zero-results state after spool returns empty -->
-          <EmptyState
-            v-if="hasNoResults"
-            type="no-results"
-            message="目前篩選條件無 ALARM 資料，請調整細部篩選或擴大日期範圍"
-            data-testid="empty-state"
-          />
-        </template>
-
-        <!-- Empty state before first query -->
+        <!-- Zero-results state after spool returns empty -->
         <EmptyState
-          v-else-if="!queryLoading && !jobProgress.active && !spoolReady"
-          type="default"
-          message="請選擇查詢條件後按「查詢」以開始分析"
+          v-if="hasNoResults"
+          type="no-results"
+          message="目前篩選條件無 ALARM 資料，請調整細部篩選或擴大日期範圍"
           data-testid="empty-state"
         />
-      </div>
+      </template>
+
+      <!-- Empty state before first query -->
+      <EmptyState
+        v-else-if="!queryLoading && !jobProgress.active && !spoolReady"
+        type="default"
+        message="請選擇查詢條件後按「查詢」以開始分析"
+        data-testid="empty-state"
+      />
     </div>
   </div>
 </template>
