@@ -1165,6 +1165,8 @@ Index relied upon: `DW_C_CONTAINERNAME` on `DWH.DW_MES_CONTAINER.CONTAINERNAME`.
 
 `ProcessAlarm` and `AlarmNeedCountIntoStatistics(MTBA/MTBF)` are deliberately excluded (see EA-EVT). The driving predicate remains `LAST_UPDATE_TIME BETWEEN` (EA-03); the event-type clause is a filter, not an access path.
 
+**Cross-channel dedup (EA-EVT):** dual-channel equipment report most physical alarms on BOTH channels (production-measured 2026-07-07, GDBA 2-day window: 70.43% of Shape B `AlarmDetected` had a Shape A counterpart within ±60s). At spool-write time, after per-shape SET/CLEAR pairing, a Shape B occurrence is dropped when a Shape A occurrence exists with the same `(EQP_ID, ALARM_ID)` (string equality) and `ALARM_START` within ±60s (`_SHAPE_B_DEDUP_TOLERANCE_SECONDS`). Shape A wins — including when unpaired. Text-`EVENT_NAME` families (GWBA-style) are outside this rule's reach (identity spaces don't compare); their overlap is unmeasured. Dedup happens in DuckDB on the already-fetched window, never in Oracle.
+
 #### Spool product-dim enrichment (schema_version 4)
 
 At spool-write time the worker runs one chunked lookup (`CONTAINERNAME IN (...)`, ≤999 binds/chunk, deduped on LOT_ID) over `DWH.DW_MES_CONTAINER` for the distinct LOT_IDs in the result set and LEFT JOINs it into the parquet as `PJ_TYPE` / `PRODUCT_LINE` / `PJ_BOP`. Lookup values are `NVL(TRIM(col), '(NA)')` — mirroring the coarse EXISTS semantics — so a lot whose container row has a NULL dim reads back `'(NA)'`; events with no LOT_ID (or no container row) carry NULL product dims. Lookup failure degrades to NULL product columns and never fails the job.
@@ -1595,7 +1597,7 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ## CHANGELOG
 ## [data 1.36.0] — 2026-07-07
 ### Changed
-- eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
+- eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded); cross-channel dedup at spool-write drops Shape B occurrences duplicating a Shape A occurrence on `(EQP_ID, ALARM_ID)` within ±60s (measured 70.43% GDBA overlap). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
 
 ## [data 1.34.0] — 2026-07-02
 ### Added

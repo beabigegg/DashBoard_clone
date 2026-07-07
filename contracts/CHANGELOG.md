@@ -10,31 +10,11 @@ a corresponding entry below.
 
 ## [business 1.44.0] — 2026-07-07
 ### Changed
-- eap-event-alarm-semantics: EA-ALCD rewritten and scoped to Shape A (`EVENT_TYPE='EQP_SECS_ALARM'`; ALCD sign bit lives in the detail `AlarmCode` param, not a top-level ALCD column; pairing key documented as `(EQP_ID, ALARM_ID, ALARM_SOURCE)`). EA-01 `_SCHEMA_VERSION` 4→5 (v4 Shape-A-only parquet auto-invalidated by key-miss; EA-01's stale "= 3" mention also corrected). New EA-EVT rule: worker queries also include `EVENT_TYPE='EQP_SECS_EVENT'` alarm-alias rows (`AlarmDetected`/`AlarmCleared`) — identity from detail `AlarmID`, SET/CLEAR from `EVENT_NAME`, category NULL→"未知", cross-shape pairing forbidden, `ProcessAlarm`/`AlarmNeedCountIntoStatistics(MTBA/MTBF)` explicitly excluded. Fixes the ~52-equipment full blind spot and ~15-17% undercount recorded in docs/architecture/eap-event-alarm-semantics-investigation.md (ADR-0015).
+- eap-event-alarm-semantics: EA-ALCD rewritten and scoped to Shape A (`EVENT_TYPE='EQP_SECS_ALARM'`; ALCD sign bit lives in the detail `AlarmCode` param, not a top-level ALCD column; pairing key documented as `(EQP_ID, ALARM_ID, ALARM_SOURCE)`). EA-01 `_SCHEMA_VERSION` 4→5 (v4 Shape-A-only parquet auto-invalidated by key-miss; EA-01's stale "= 3" mention also corrected). New EA-EVT rule: worker queries also include `EVENT_TYPE='EQP_SECS_EVENT'` alarm-alias rows (`AlarmDetected`/`AlarmCleared`) — identity from detail `AlarmID`, SET/CLEAR from `EVENT_NAME`, category NULL→"未知", cross-shape pairing forbidden, `ProcessAlarm`/`AlarmNeedCountIntoStatistics(MTBA/MTBF)` explicitly excluded; cross-channel dedup drops a Shape B occurrence when a Shape A occurrence matches on `(EQP_ID, ALARM_ID)` within ±60s (production-measured 70.43% GDBA dual-channel overlap, 2079/2952; Shape A wins; text-EVENT_NAME families not covered — see ADR-0015). Fixes the ~52-equipment full blind spot and ~15-17% undercount recorded in docs/architecture/eap-event-alarm-semantics-investigation.md (ADR-0015).
 
 ## [data 1.36.0] — 2026-07-07
 ### Changed
-- eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
-
-## [data 1.35.0] — 2026-07-04
-### Changed
-- eap-alarm-product-dims: §3.17 updated — schema_version 3→4; parquet gains `PJ_TYPE`/`PRODUCT_LINE`/`PJ_BOP` columns via spool-write-time chunked `DW_MES_CONTAINER` lookup (≤999 binds/chunk, deduped on LOT_ID, `NVL(TRIM(col),'(NA)')` mirrors coarse EXISTS semantics, fail-open to NULL columns). Fine-filter axes extended with exact-match `lot_id[]`/`pj_type[]`/`product_line[]`/`pj_bop[]`. filter-options gains 4 option lists; summary gains `affected_lot_count`/`affected_product_line_count`; pareto gains `dim` closed enum + generic `name` item key (`alarm_text` kept as back-compat alias); trend gains `group_by` closed enum + generic `name` series key (same alias rule); detail rows gain `pj_type`/`product_line`/`pj_bop`. v3 spool auto-invalidated via key version; rollback to v3 code requires `rm -f tmp/query_spool/eap_alarm/*.parquet`.
-
-## [api 1.37.0] — 2026-07-04 (eap-alarm-product-dims)
-### Changed
-- `/api/eap-alarm/{summary,pareto,trend,detail}` accept new optional exact-match fine-filter params `lot_id[]`/`pj_type[]`/`product_line[]`/`pj_bop[]`. `/api/eap-alarm/pareto` accepts `dim` and `/api/eap-alarm/trend` accepts `group_by` (closed enum alarm_text/eqp_id/eqp_type/lot_id/pj_type/product_line/pj_bop; default alarm_text; 400 VALIDATION_ERROR on unknown value). All additive; response envelope unchanged.
-
-## [business 1.43.0] — 2026-07-04
-### Added
-- ai-leader-subagent: AI-01 adds `AI_MODE=leader`（leader/subagent 分層 pipeline：planning → dispatch → synthesis）。New AI-10 documents leader orchestration behavior — planning output schema（respond/delegate）、3-task cap、malformed-planning degradation（整題委派單一子任務）、subagent failure isolation、all-failed short-circuit、synthesis fallback concatenation、additive `subtasks` response field（前端 AiChatMessage 折疊區塊顯示）、`query_used` 傳遞產圖子任務實際工具名稱（無圖表 `"leader"`）供 AiChartRenderer 後綴判型、`subagent<N>.<function>` tool_trace naming。AI-02 documents leader-mode clarification semantics（respond path only）；AI-08 extends history injection to the leader planning call（subagent loop 與 synthesis 不注入）。Agent system prompt 新增 function-first 規則（常駐工具與 search_tools 均無合適函式時才用 `query_database`）。Additive; existing text2sql/function/agent pipelines unchanged.
-
-## [env 1.0.24] — 2026-07-04
-### Changed
-- ai-leader-subagent: `AI_MODE` validation values expand `text2sql, function, or agent` → `text2sql, function, agent, or leader`. Default and failure behavior unchanged (fallback to text2sql).
-
-## [api-inventory 1.5.0] — 2026-07-04
-### Changed
-- ai-leader-subagent: `ai_routes.py` row — leader mode response includes additive `subtasks: [{goal, answer, success}]` field. Route surface unchanged.
+- eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded); cross-channel dedup at spool-write drops Shape B occurrences duplicating a Shape A occurrence on `(EQP_ID, ALARM_ID)` within ±60s (measured 70.43% GDBA overlap). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
 
 ## [business 1.42.0] — 2026-07-02
 ### Added

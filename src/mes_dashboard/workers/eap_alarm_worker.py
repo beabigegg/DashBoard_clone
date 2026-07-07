@@ -30,6 +30,15 @@ Design:
     Shape B events with no AlarmID in detail → identity falls back to raw
     EVENT_NAME (Detected/Cleared can then never match → degrades to
     unpaired SET / dropped CLEAR, mirroring the Shape A degradation).
+  - Cross-channel dedup (EA-EVT): dual-channel equipment report ~70% of the
+    same physical alarms on BOTH channels (GDBA 2-day production measurement,
+    2026-07-07: 2079/2952 AlarmDetected matched a Shape A event within ±60s).
+    After per-shape pairing, a Shape B occurrence is dropped when a Shape A
+    occurrence exists with the same (EQP_ID, ALARM_ID) and ALARM_START within
+    _SHAPE_B_DEDUP_TOLERANCE_SECONDS — Shape A wins (carries the ALCD
+    category byte; continuity with the historical report). Identity match is
+    string equality, so text-EVENT_NAME families (GWBA-style) are not
+    deduped by this rule — see ADR-0015.
 
 Module-level register_job_type() fires at import time (job-registry-central).
 """
@@ -65,6 +74,12 @@ _JOB_PREFIX = "eap-alarm"
 _ALARM_EVENT_PREDICATE = """(e.EVENT_TYPE = 'EQP_SECS_ALARM'
        OR (e.EVENT_TYPE = 'EQP_SECS_EVENT'
            AND e.EVENT_NAME IN ('AlarmDetected', 'AlarmCleared')))"""
+
+# EA-EVT cross-channel dedup tolerance. ±60s is the window the production
+# overlap was measured at (GDBA, 2-day LAST_UPDATE_TIME window, 2026-07-07:
+# 70.43% of Shape B AlarmDetected had a Shape A counterpart) — widening or
+# narrowing it needs a new measurement, not a hunch.
+_SHAPE_B_DEDUP_TOLERANCE_SECONDS: int = 60
 
 _EAP_EVENT_SQL_TEMPLATE = f"""\
 SELECT
@@ -110,6 +125,9 @@ WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
 #     NULL (decodes to "未知" per EA-05).
 # ALARM_SOURCE carries the raw EVENT_TYPE and is part of the pairing key so a
 # CLEAR from one shape can never close a SET from the other.
+# The trailing `deduped` CTE applies the EA-EVT cross-channel rule: drop a
+# Shape B occurrence when a Shape A occurrence exists on the same
+# (EQP_ID, ALARM_ID) with ALARM_START within {dedup_tolerance_seconds}s.
 _PAIR_SQL = """\
 WITH events AS (
     SELECT
@@ -175,6 +193,20 @@ paired AS (
         s.EVENT_ID, s.ALARM_ID, s.EQP_ID, s.EQP_TYPE, s.LOT_ID,
         s.ALARM_TEXT, s.ALARM_CATEGORY_CODE, s.ALARM_SOURCE, s.ALARM_TIME, s.DETAIL_PARAMS,
         s.PJ_TYPE, s.PRODUCT_LINE, s.PJ_BOP
+),
+deduped AS (
+    SELECT p.*
+    FROM paired p
+    WHERE p.ALARM_SOURCE <> 'EQP_SECS_EVENT'
+       OR NOT EXISTS (
+            SELECT 1
+            FROM paired a
+            WHERE a.ALARM_SOURCE = 'EQP_SECS_ALARM'
+              AND a.EQP_ID   = p.EQP_ID
+              AND a.ALARM_ID = p.ALARM_ID
+              AND ABS(epoch(CAST(a.ALARM_START AS TIMESTAMP))
+                    - epoch(CAST(p.ALARM_START AS TIMESTAMP))) <= {dedup_tolerance_seconds}
+          )
 )
 SELECT
     ALARM_ID,
@@ -194,7 +226,7 @@ SELECT
     PJ_BOP,
     ALARM_SOURCE,
     '{machines_hash}'               AS eqp_types_filter
-FROM paired
+FROM deduped
 ORDER BY ALARM_START DESC
 """
 
@@ -486,9 +518,16 @@ def run_eap_alarm_query_job(
 
             if events_df.empty:
                 row_count = 0
-                con.execute(f"COPY (SELECT * FROM ({_PAIR_SQL.format(machines_hash=machines_hash)}) t WHERE FALSE) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
+                empty_sql = _PAIR_SQL.format(
+                    machines_hash=machines_hash,
+                    dedup_tolerance_seconds=_SHAPE_B_DEDUP_TOLERANCE_SECONDS,
+                )
+                con.execute(f"COPY (SELECT * FROM ({empty_sql}) t WHERE FALSE) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
             else:
-                pair_sql = _PAIR_SQL.format(machines_hash=machines_hash)
+                pair_sql = _PAIR_SQL.format(
+                    machines_hash=machines_hash,
+                    dedup_tolerance_seconds=_SHAPE_B_DEDUP_TOLERANCE_SECONDS,
+                )
                 update_job_progress(_JOB_PREFIX, job_id, status="running", progress="writing parquet", pct="90")
                 con.execute(f"COPY ({pair_sql}) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
                 row_count = con.execute(f"SELECT COUNT(*) FROM read_parquet('{spool_path}')").fetchone()[0]
@@ -699,7 +738,10 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
             con.register("detail_pivot", detail_pivot_df)
             con.register("lot_product", lot_product_df)
 
-            pair_sql = _PAIR_SQL.format(machines_hash=self._machines_hash)
+            pair_sql = _PAIR_SQL.format(
+                machines_hash=self._machines_hash,
+                dedup_tolerance_seconds=_SHAPE_B_DEDUP_TOLERANCE_SECONDS,
+            )
 
             if events_df.empty:
                 con.execute(

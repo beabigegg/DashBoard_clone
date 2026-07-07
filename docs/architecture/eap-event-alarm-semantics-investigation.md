@@ -1,6 +1,6 @@
 # Investigation: `DWH.EAP_EVENT` alarm semantics (`EVENT_TYPE` vs `EVENT_NAME`)
 
-**Status:** Implemented by change `eap-event-alarm-semantics` (2026-07-07) — see ADR-0015 and business rule EA-EVT. Scope: `AlarmDetected`/`AlarmCleared` included with `EVENT_NAME`-based pairing keyed on `AlarmID`; `ProcessAlarm` and `AlarmNeedCountIntoStatistics(MTBA/MTBF)` remain excluded per Finding 3; dual-channel overlap measurement (Finding 2's ~156 both-shape equipment) deferred — see ADR-0015 §Decision 5.
+**Status:** Implemented by change `eap-event-alarm-semantics` (2026-07-07) — see ADR-0015 and business rule EA-EVT. Scope: `AlarmDetected`/`AlarmCleared` included with `EVENT_NAME`-based pairing keyed on `AlarmID`; `ProcessAlarm` and `AlarmNeedCountIntoStatistics(MTBA/MTBF)` remain excluded per Finding 3. Follow-up dual-channel overlap measurement (GDBA, 2-day window, same-day): **70.43%** of Shape B `AlarmDetected` (2079/2952) had a Shape A counterpart within ±60s → cross-channel dedup shipped in the same change (Shape B occurrence dropped when a Shape A occurrence matches on `(EQP_ID, ALARM_ID)` within ±60s; Shape A wins). Text-EVENT_NAME families (GWBA-style) remain unmeasured/un-deduped — see ADR-0015 §Consequences.
 
 **Date:** 2026-07-07
 

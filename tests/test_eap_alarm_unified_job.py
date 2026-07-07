@@ -172,6 +172,60 @@ class TestEapAlarmJobPostAggregate:
         assert Path(result).exists()
 
 
+def _run_shapeb_post_aggregate(tmp_path, monkeypatch, events_by_chunk, detail_rows):
+    """Write per-chunk events parquets + one detail parquet, run post_aggregate.
+
+    Shared by TestEapAlarmShapeBPairing / TestEapAlarmCrossChannelDedup —
+    runs the real _PAIR_SQL (pairing + EA-EVT dedup) in DuckDB.
+    """
+    from mes_dashboard.workers.eap_alarm_worker import EapAlarmJob
+    monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+
+    job = EapAlarmJob("test-shapeb-001", params={
+        "date_from": "2025-01-01", "date_to": "2025-01-02",
+    })
+    chunks = []
+    for i in range(len(events_by_chunk)):
+        chunks.append({"kind": "events", "base_params": {}})
+    chunks.append({"kind": "detail", "base_params": {}})
+    job._chunks = chunks
+    job._spool_key = "shapebkey"
+    job._spool_path = str(tmp_path / "shapeb.parquet")
+    job._machines_hash = "beefcafe"
+
+    chunk_dir = job._make_chunk_parquet_dir("test-shapeb-001")
+    for i, tbl in enumerate(events_by_chunk):
+        pq.write_table(tbl, chunk_dir / f"chunk-{i:04d}-0000.parquet")
+    detail_tbl = pa.table({
+        "EVENT_ID": [r[0] for r in detail_rows],
+        "PARAMETER_NAME": [r[1] for r in detail_rows],
+        "PARAMETER_VALUE": [r[2] for r in detail_rows],
+    })
+    pq.write_table(detail_tbl, chunk_dir / f"chunk-{len(events_by_chunk):04d}-0000.parquet")
+
+    with patch("mes_dashboard.core.query_spool_store.register_spool_file"), \
+         patch("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_TTL", 3600):
+        result = job.post_aggregate(None)
+
+    import duckdb
+    return duckdb.execute(
+        f"SELECT * FROM read_parquet('{result}') ORDER BY ALARM_START"
+    ).fetchdf()
+
+
+def _shapeb_events_table(rows):
+    """rows: (EVENT_ID, EQP_ID, EVENT_TYPE, ALARM_ID/EVENT_NAME, ALARM_TIME)."""
+    return pa.table({
+        "EVENT_ID": [r[0] for r in rows],
+        "EQP_ID": [r[1] for r in rows],
+        "EQP_TYPE": [r[1][:4] for r in rows],
+        "LOT_ID": [None for _ in rows],
+        "EVENT_TYPE": [r[2] for r in rows],
+        "ALARM_ID": [r[3] for r in rows],
+        "ALARM_TIME": [r[4] for r in rows],
+    })
+
+
 class TestEapAlarmShapeBPairing:
     """EA-EVT: Shape B (EQP_SECS_EVENT alarm-alias) pairing via post_aggregate.
 
@@ -181,52 +235,10 @@ class TestEapAlarmShapeBPairing:
     """
 
     def _run_post_aggregate(self, tmp_path, monkeypatch, events_by_chunk, detail_rows):
-        """Write per-chunk events parquets + one detail parquet, run post_aggregate."""
-        from mes_dashboard.workers.eap_alarm_worker import EapAlarmJob
-        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
-
-        job = EapAlarmJob("test-shapeb-001", params={
-            "date_from": "2025-01-01", "date_to": "2025-01-02",
-        })
-        chunks = []
-        for i in range(len(events_by_chunk)):
-            chunks.append({"kind": "events", "base_params": {}})
-        chunks.append({"kind": "detail", "base_params": {}})
-        job._chunks = chunks
-        job._spool_key = "shapebkey"
-        job._spool_path = str(tmp_path / "shapeb.parquet")
-        job._machines_hash = "beefcafe"
-
-        chunk_dir = job._make_chunk_parquet_dir("test-shapeb-001")
-        for i, tbl in enumerate(events_by_chunk):
-            pq.write_table(tbl, chunk_dir / f"chunk-{i:04d}-0000.parquet")
-        detail_tbl = pa.table({
-            "EVENT_ID": [r[0] for r in detail_rows],
-            "PARAMETER_NAME": [r[1] for r in detail_rows],
-            "PARAMETER_VALUE": [r[2] for r in detail_rows],
-        })
-        pq.write_table(detail_tbl, chunk_dir / f"chunk-{len(events_by_chunk):04d}-0000.parquet")
-
-        with patch("mes_dashboard.core.query_spool_store.register_spool_file"), \
-             patch("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_TTL", 3600):
-            result = job.post_aggregate(None)
-
-        import duckdb
-        return duckdb.execute(
-            f"SELECT * FROM read_parquet('{result}') ORDER BY ALARM_START"
-        ).fetchdf()
+        return _run_shapeb_post_aggregate(tmp_path, monkeypatch, events_by_chunk, detail_rows)
 
     def _events_table(self, rows):
-        """rows: (EVENT_ID, EQP_ID, EVENT_TYPE, ALARM_ID/EVENT_NAME, ALARM_TIME)."""
-        return pa.table({
-            "EVENT_ID": [r[0] for r in rows],
-            "EQP_ID": [r[1] for r in rows],
-            "EQP_TYPE": [r[1][:4] for r in rows],
-            "LOT_ID": [None for _ in rows],
-            "EVENT_TYPE": [r[2] for r in rows],
-            "ALARM_ID": [r[3] for r in rows],
-            "ALARM_TIME": [r[4] for r in rows],
-        })
+        return _shapeb_events_table(rows)
 
     def test_shape_b_pairs_detected_cleared_by_alarm_id_across_chunks(self, tmp_path, monkeypatch):
         """AlarmDetected (day 1 chunk) pairs with AlarmCleared (day 2 chunk) on AlarmID."""
@@ -311,6 +323,111 @@ class TestEapAlarmShapeBPairing:
         assert by_source["EQP_SECS_ALARM"]["ALARM_CATEGORY_CODE"] == 3  # ABS(-3) & 127
         assert by_source["EQP_SECS_EVENT"]["ALARM_ID"] == "77"
         assert by_source["EQP_SECS_EVENT"]["DURATION_SECONDS"] == 1200.0
+
+
+class TestEapAlarmCrossChannelDedup:
+    """EA-EVT cross-channel dedup: Shape B occurrence dropped when a Shape A
+    occurrence matches on (EQP_ID, ALARM_ID) within ±60s; Shape A wins.
+
+    Rule shipped after production measurement (GDBA, 2-day window, 2026-07-07):
+    70.43% of Shape B AlarmDetected had a Shape A counterpart within ±60s.
+    """
+
+    def _dual_channel_detail(self):
+        return [
+            ("A1", "AlarmCode", "-4"),
+            ("A2", "AlarmCode", "4"),
+            ("B1", "AlarmID", "6052"),
+            ("B2", "AlarmID", "6052"),
+        ]
+
+    def test_duplicate_within_tolerance_dropped_shape_a_wins(self, tmp_path, monkeypatch):
+        """Same (EQP_ID, ALARM_ID), B 30s after A → only the Shape A occurrence survives."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 10:00:00"),
+            ("A2", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 10:05:00"),
+            ("B1", "GDBA-001", "EQP_SECS_EVENT", "AlarmDetected", "2025-01-01 10:00:30"),
+            ("B2", "GDBA-001", "EQP_SECS_EVENT", "AlarmCleared", "2025-01-01 10:05:30"),
+        ])
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], self._dual_channel_detail())
+
+        assert len(df) == 1, df
+        assert df.iloc[0]["ALARM_SOURCE"] == "EQP_SECS_ALARM"
+        assert df.iloc[0]["DURATION_SECONDS"] == 300.0  # A's own pair, not B's
+
+    def test_same_id_outside_tolerance_both_kept(self, tmp_path, monkeypatch):
+        """B 61s after A → outside ±60s window → both occurrences kept."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 10:00:00"),
+            ("B1", "GDBA-001", "EQP_SECS_EVENT", "AlarmDetected", "2025-01-01 10:01:01"),
+        ])
+        detail = [("A1", "AlarmCode", "-4"), ("B1", "AlarmID", "6052")]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], detail)
+
+        assert len(df) == 2, df
+        assert set(df["ALARM_SOURCE"]) == {"EQP_SECS_ALARM", "EQP_SECS_EVENT"}
+
+    def test_unmatched_alarm_id_on_dual_channel_kept(self, tmp_path, monkeypatch):
+        """Dual-channel equipment, B carries a different AlarmID → kept (the ~30% share)."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 10:00:00"),
+            ("B1", "GDBA-001", "EQP_SECS_EVENT", "AlarmDetected", "2025-01-01 10:00:10"),
+        ])
+        detail = [("A1", "AlarmCode", "-4"), ("B1", "AlarmID", "9999")]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], detail)
+
+        assert len(df) == 2, df
+
+    def test_same_id_different_equipment_not_deduped(self, tmp_path, monkeypatch):
+        """Same AlarmID and window but on another machine → not a duplicate."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 10:00:00"),
+            ("B1", "GDBA-002", "EQP_SECS_EVENT", "AlarmDetected", "2025-01-01 10:00:10"),
+        ])
+        detail = [("A1", "AlarmCode", "-4"), ("B1", "AlarmID", "6052")]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], detail)
+
+        assert len(df) == 2, df
+
+    def test_unpaired_shape_a_still_wins(self, tmp_path, monkeypatch):
+        """A open (no CLEAR) + duplicated B pair → deterministic A-wins: the
+        surviving row is the OPEN Shape A occurrence (B's duration is discarded)."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 10:00:00"),
+            ("B1", "GDBA-001", "EQP_SECS_EVENT", "AlarmDetected", "2025-01-01 10:00:05"),
+            ("B2", "GDBA-001", "EQP_SECS_EVENT", "AlarmCleared", "2025-01-01 10:03:00"),
+        ])
+        detail = [
+            ("A1", "AlarmCode", "-4"),
+            ("B1", "AlarmID", "6052"),
+            ("B2", "AlarmID", "6052"),
+        ]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], detail)
+
+        assert len(df) == 1, df
+        assert df.iloc[0]["ALARM_SOURCE"] == "EQP_SECS_ALARM"
+        assert pd.isna(df.iloc[0]["ALARM_END"])
+
+    def test_dedup_applies_across_chunk_seam(self, tmp_path, monkeypatch):
+        """A occurrence in day-1 chunk dedups a B occurrence at the day-2 seam
+        edge — dedup runs in post_aggregate over ALL chunks (ADR-0009/ADR-0015)."""
+        day1 = _shapeb_events_table([
+            ("A1", "GDBA-001", "EQP_SECS_ALARM", "6052", "2025-01-01 23:59:40"),
+        ])
+        day2 = _shapeb_events_table([
+            ("B1", "GDBA-001", "EQP_SECS_EVENT", "AlarmDetected", "2025-01-02 00:00:10"),
+        ])
+        detail = [("A1", "AlarmCode", "-4"), ("B1", "AlarmID", "6052")]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [day1, day2], detail)
+
+        assert len(df) == 1, df
+        assert df.iloc[0]["ALARM_SOURCE"] == "EQP_SECS_ALARM"
+
+    def test_dedup_tolerance_constant_pinned(self):
+        """±60s is the production-measured window — changing it needs a new
+        measurement (EA-EVT), so pin it."""
+        from mes_dashboard.workers.eap_alarm_worker import _SHAPE_B_DEDUP_TOLERANCE_SECONDS
+        assert _SHAPE_B_DEDUP_TOLERANCE_SECONDS == 60
 
 
 class TestAlarmEventSqlTemplates:

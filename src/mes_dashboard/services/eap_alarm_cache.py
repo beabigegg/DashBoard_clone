@@ -22,8 +22,10 @@ logger = logging.getLogger(__name__)
 # v4: added product-dim columns PJ_TYPE / PRODUCT_LINE / PJ_BOP
 #     (LOT_ID → DWH.DW_MES_CONTAINER lookup at spool-write time)
 # v5: ALARM_SOURCE column added + Shape B (EQP_SECS_EVENT alarm-alias) rows
-#     included (EA-EVT, ADR-0015) — v4 spool is Shape-A-only and must not be
-#     served for v5 semantics.
+#     included, with cross-channel dedup (Shape B occurrence dropped when a
+#     Shape A occurrence matches on EQP_ID+ALARM_ID within ±60s) — EA-EVT,
+#     ADR-0015. v4 spool is Shape-A-only and must not be served for v5
+#     semantics.
 _SCHEMA_VERSION: int = 5
 
 # ── Environment configuration ─────────────────────────────────────────────────
