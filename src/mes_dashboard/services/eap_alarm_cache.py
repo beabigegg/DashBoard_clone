@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 # ── EA-06: schema version — bump on any parquet column add/remove/rename ──────
 # v4: added product-dim columns PJ_TYPE / PRODUCT_LINE / PJ_BOP
 #     (LOT_ID → DWH.DW_MES_CONTAINER lookup at spool-write time)
-_SCHEMA_VERSION: int = 4
+# v5: ALARM_SOURCE column added + Shape B (EQP_SECS_EVENT alarm-alias) rows
+#     included (EA-EVT, ADR-0015) — v4 spool is Shape-A-only and must not be
+#     served for v5 semantics.
+_SCHEMA_VERSION: int = 5
 
 # ── Environment configuration ─────────────────────────────────────────────────
 EAP_ALARM_SPOOL_DIR: str = os.getenv(

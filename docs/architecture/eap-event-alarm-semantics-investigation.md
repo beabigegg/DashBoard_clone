@@ -1,6 +1,6 @@
 # Investigation: `DWH.EAP_EVENT` alarm semantics (`EVENT_TYPE` vs `EVENT_NAME`)
 
-**Status:** Investigation only — no code change yet. Findings below should inform a future `/cdd-new` change to `eap_alarm_worker.py` / `eap_alarm_service.py`.
+**Status:** Implemented by change `eap-event-alarm-semantics` (2026-07-07) — see ADR-0015 and business rule EA-EVT. Scope: `AlarmDetected`/`AlarmCleared` included with `EVENT_NAME`-based pairing keyed on `AlarmID`; `ProcessAlarm` and `AlarmNeedCountIntoStatistics(MTBA/MTBF)` remain excluded per Finding 3; dual-channel overlap measurement (Finding 2's ~156 both-shape equipment) deferred — see ADR-0015 §Decision 5.
 
 **Date:** 2026-07-07
 

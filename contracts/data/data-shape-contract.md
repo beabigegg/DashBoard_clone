@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.35.0
-last-changed: 2026-07-04
+schema-version: 1.36.0
+last-changed: 2026-07-07
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1137,17 +1137,17 @@ Added by change `yield-alert-kpi-csv-parity`. Applies to the client-side CSV bui
 
 ### §3.17 EAP ALARM Spool Schema
 
-Added by change `eap-alarm-analysis`. Updated by `eap-alarm-coarse-filter` (schema_version 2→3) and `eap-alarm-product-dims` (schema_version 3→4: product-dim spool columns + product-dim fine filters + pareto `dim` / trend `group_by`). Spool namespace: `tmp/query_spool/eap_alarm/`. Governed by `_SCHEMA_VERSION` in `eap_alarm_cache.py`. All shapes wrapped in standard `success_response` envelope (§1.1).
+Added by change `eap-alarm-analysis`. Updated by `eap-alarm-coarse-filter` (schema_version 2→3), `eap-alarm-product-dims` (schema_version 3→4: product-dim spool columns + product-dim fine filters + pareto `dim` / trend `group_by`) and `eap-event-alarm-semantics` (schema_version 4→5: Shape B alarm-alias inclusion + `ALARM_SOURCE` column; the parquet column table below was also corrected — it had drifted, still describing the retired v1 event-level layout instead of the occurrence-level rows shipped since v2). Spool namespace: `tmp/query_spool/eap_alarm/`. Governed by `_SCHEMA_VERSION` in `eap_alarm_cache.py`. All shapes wrapped in standard `success_response` envelope (§1.1).
 
-#### Spool key dimensions (schema_version 4)
+#### Spool key dimensions (schema_version 5)
 
-`make_eap_alarm_spool_key()` canonical repr covers **all five** coarse dims (sorted): `eqp_types`, `lot_ids` (whitespace-stripped), `pj_types`, `product_lines`, `pj_bops`. Identical full parameter sets produce identical keys; any dimension change produces a different key. `_SCHEMA_VERSION = 4` participates in the key — all v3 spool parquet is auto-invalidated on first key-miss after deploy.
+`make_eap_alarm_spool_key()` canonical repr covers **all five** coarse dims (sorted): `eqp_types`, `lot_ids` (whitespace-stripped), `pj_types`, `product_lines`, `pj_bops`. Identical full parameter sets produce identical keys; any dimension change produces a different key. `_SCHEMA_VERSION = 5` participates in the key — all v4 (Shape-A-only) spool parquet is auto-invalidated on first key-miss after deploy.
 
 #### Oracle coarse-filter mapping
 
 | filter dim | Oracle predicate | source column | join |
 |---|---|---|---|
-| `eqp_types` | `EQP_TYPE IN (...)` | EAP_EVENT.EQP_TYPE | direct |
+| `eqp_types` | `EQUIPMENT_ID IN (...)` (full equipment-identifier strings per EA-07; `1=1` no-op when axis absent) | EAP_EVENT.EQUIPMENT_ID | direct |
 | `lot_ids` | `LOT_ID IN (...)` | EAP_EVENT.LOT_ID | direct |
 | `pj_types` | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PJ_TYPE),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join — no row explosion |
 | `product_lines` | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PRODUCTLINENAME),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join — no row explosion |
@@ -1155,29 +1155,41 @@ Added by change `eap-alarm-analysis`. Updated by `eap-alarm-coarse-filter` (sche
 
 Index relied upon: `DW_C_CONTAINERNAME` on `DWH.DW_MES_CONTAINER.CONTAINERNAME`. When multiple product_dims are supplied together, each produces a separate EXISTS clause (AND-semantics). Empty/whitespace `lot_ids` entries are stripped before key-build and Oracle bind.
 
+**Event-type predicate (EA-ALCD / EA-EVT):** every coarse query additionally filters
+
+```sql
+(e.EVENT_TYPE = 'EQP_SECS_ALARM'
+ OR (e.EVENT_TYPE = 'EQP_SECS_EVENT'
+     AND e.EVENT_NAME IN ('AlarmDetected', 'AlarmCleared')))
+```
+
+`ProcessAlarm` and `AlarmNeedCountIntoStatistics(MTBA/MTBF)` are deliberately excluded (see EA-EVT). The driving predicate remains `LAST_UPDATE_TIME BETWEEN` (EA-03); the event-type clause is a filter, not an access path.
+
 #### Spool product-dim enrichment (schema_version 4)
 
 At spool-write time the worker runs one chunked lookup (`CONTAINERNAME IN (...)`, ≤999 binds/chunk, deduped on LOT_ID) over `DWH.DW_MES_CONTAINER` for the distinct LOT_IDs in the result set and LEFT JOINs it into the parquet as `PJ_TYPE` / `PRODUCT_LINE` / `PJ_BOP`. Lookup values are `NVL(TRIM(col), '(NA)')` — mirroring the coarse EXISTS semantics — so a lot whose container row has a NULL dim reads back `'(NA)'`; events with no LOT_ID (or no container row) carry NULL product dims. Lookup failure degrades to NULL product columns and never fails the job.
 
-#### Parquet column schema
+#### Parquet column schema (schema_version 5 — one row = one alarm occurrence)
 
 | column | type | nullable | notes |
 |---|---|---|---|
-| EVENT_ID | VARCHAR | no | Primary key from DWH.EAP_EVENT |
+| ALARM_ID | VARCHAR | yes | Alarm identity. Shape A: raw `EVENT_NAME` (numeric code or descriptive text per equipment family). Shape B: `AlarmID` detail param (fallback raw `EVENT_NAME` when detail missing) |
 | EQP_ID | VARCHAR | no | Equipment ID (EQUIPMENT_ID from EAP_EVENT) |
-| EQP_TYPE | VARCHAR | no | Equipment type prefix (e.g. GDBA, GCBA) |
+| EQP_TYPE | VARCHAR | no | `SUBSTR(EQUIPMENT_ID, 1, 4)` prefix (e.g. GDBA, GCBA) |
 | LOT_ID | VARCHAR | yes | LOT_ID from EAP_EVENT; NULL if no lot in context |
-| ALARM_TEXT | VARCHAR | yes | AlarmText from EAP_EVENT_DETAIL (EAV param); NULL if not present |
-| ALARM_CATEGORY_CODE | INTEGER | yes | Raw category code from EAP_EVENT_DETAIL; NULL if not present |
-| ALARM_CATEGORY | VARCHAR | no | Decoded label per EA-05 decode table; unknown code → "未知" |
-| ALARM_TIME | TIMESTAMP | no | LAST_UPDATE_TIME from EAP_EVENT |
-| DETAIL_PARAMS | VARCHAR | yes | JSON string of remaining EAP_EVENT_DETAIL params (excluding AlarmText, AlarmCategory, AlarmCode used as columns); NULL if no extra params |
+| ALARM_TEXT | VARCHAR | yes | `AlarmText` detail param; fallback = alarm identity (Shape B falls back `AlarmText` → `AlarmID` → raw `EVENT_NAME`) |
+| ALARM_CATEGORY_CODE | INTEGER | yes | Shape A only: `ABS(AlarmCode) & 127`; always NULL for Shape B (no ALCD byte → "未知" per EA-05) |
+| ALARM_START | TIMESTAMP | no | SET event LAST_UPDATE_TIME |
+| ALARM_END | TIMESTAMP | yes | Earliest matching CLEAR after ALARM_START on `(EQP_ID, ALARM_ID, ALARM_SOURCE)`; NULL = unresolved in window |
+| DURATION_SECONDS | DOUBLE | yes | `epoch(ALARM_END) - epoch(ALARM_START)`; NULL when unresolved |
+| DETAIL_PARAMS | VARCHAR | yes | JSON string of ALL EAP_EVENT_DETAIL params of the SET event; NULL if no detail rows |
 | PJ_TYPE | VARCHAR | yes | Product dim from DW_MES_CONTAINER lookup by LOT_ID (v4); `'(NA)'` when container row has NULL dim; NULL when no lot / no container row |
 | PRODUCT_LINE | VARCHAR | yes | PRODUCTLINENAME from DW_MES_CONTAINER lookup (v4); same NULL/`'(NA)'` semantics as PJ_TYPE |
 | PJ_BOP | VARCHAR | yes | PJ_BOP from DW_MES_CONTAINER lookup (v4); same NULL/`'(NA)'` semantics as PJ_TYPE |
+| ALARM_SOURCE | VARCHAR | no | **v5** — raw `EVENT_TYPE`: `EQP_SECS_ALARM` (Shape A) or `EQP_SECS_EVENT` (Shape B alarm-alias). Part of the pairing key; lets dual-channel duplicates be told apart |
 | eqp_types_filter | VARCHAR | no | Coarse-filter hash covering all 5 dims (eqp_types, lot_ids, pj_types, product_lines, pj_bops); for partition reuse validation |
 
-**Breaking-change surface:** column add/remove/rename to `eap_alarm` parquet orphans existing files. `rm -f tmp/query_spool/eap_alarm/*.parquet` required on both deploy and rollback. Bump `_SCHEMA_VERSION` in the same commit. The schema_version 3→4 bump in this change auto-invalidates all v3 spool files; no manual `rm` needed on first deploy (rollback to v3 code requires `rm -f tmp/query_spool/eap_alarm/*.parquet`).
+**Breaking-change surface:** column add/remove/rename to `eap_alarm` parquet orphans existing files. Bump `_SCHEMA_VERSION` in the same commit. The schema_version 4→5 bump auto-invalidates all v4 spool files via key-miss; no manual `rm` needed on deploy, and on rollback the orphaned v5 files expire by TTL/cleanup daemon (v4 code never resolves their keys). `GET /api/eap-alarm/detail` DESCRIBE-detects `ALARM_SOURCE` so in-flight v4 query_ids keep working across the deploy window (`alarm_source: null`).
 
 #### Product-filter-options payload shape
 
@@ -1206,7 +1218,7 @@ Fine-filter axes (all views): `alarm_text[]` (ILIKE), plus exact-match `equipmen
 
 **Trend** (`GET /api/eap-alarm/trend`): `data` = `{labels: string[], series: [{name: string, alarm_text: string, data: int[]}], group_by: string}`. `labels` length matches `data` length per series; top-10 groups. `granularity` param: `day` (ISO date YYYY-MM-DD) or `hour` (ISO datetime YYYY-MM-DD HH:00). `group_by` param: same closed enum as pareto `dim` (default `alarm_text`, 400 on unknown). `series[].alarm_text` mirrors `series[].name` for backward compatibility.
 
-**Detail** (`GET /api/eap-alarm/detail`): `data` = `{rows: [{alarm_id: string, eqp_id: string, eqp_type: string, lot_id: string | null, pj_type: string | null, product_line: string | null, pj_bop: string | null, alarm_text: string | null, alarm_category_code: int | null, alarm_start: string (ISO 8601), alarm_end: string | null, duration_seconds: float | null, detail_params: object | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. `detail_params` is null or a JSON object of extra ALARM DETAIL parameters. Pagination: `per_page` max 200.
+**Detail** (`GET /api/eap-alarm/detail`): `data` = `{rows: [{alarm_id: string, eqp_id: string, eqp_type: string, lot_id: string | null, pj_type: string | null, product_line: string | null, pj_bop: string | null, alarm_text: string | null, alarm_category_code: int | null, alarm_start: string (ISO 8601), alarm_end: string | null, duration_seconds: float | null, detail_params: object | null, alarm_source: string | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. `detail_params` is null or a JSON object of extra ALARM DETAIL parameters. `alarm_source` (v5, additive) is the raw `EVENT_TYPE`; null when served from a pre-v5 spool (DESCRIBE fallback). Pagination: `per_page` max 200.
 
 
 ## Oracle → pyarrow RecordBatch → DuckDB/parquet Streaming Boundary
@@ -1581,6 +1593,10 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ---
 
 ## CHANGELOG
+## [data 1.36.0] — 2026-07-07
+### Changed
+- eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
+
 ## [data 1.34.0] — 2026-07-02
 ### Added
 - production-achievement-kanban: §3.25 Production-Achievement Rate Row (grouped by output_date + shift_code + workcenter_group; actual_output_qty, target_qty nullable, achievement_rate nullable-never-Infinity). §3.26 new MySQL target-value table `production_achievement_targets` (shift_code + workcenter_group keyed, no date dimension, direct mysql_client read/write, MYSQL_OPS_ENABLED=false degrades reads to null-target not 500, writes 503 when disabled). §3.27 new MySQL permission table `production_achievement_edit_permissions` (single-flag whitelist, absence = default-deny, fail-closed on MySQL unavailability). Additive; no existing schemas changed.

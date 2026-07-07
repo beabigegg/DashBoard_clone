@@ -4,11 +4,12 @@
 All DuckDB views operate solely on the spool parquet (EA-02/EA-04).
 No Oracle re-query after the spool is built.
 
-Spool schema (v4): one row = one alarm occurrence (SET event + optional CLEAR).
+Spool schema (v5): one row = one alarm occurrence (SET event + optional CLEAR).
   ALARM_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE,
   ALARM_START, ALARM_END (nullable), DURATION_SECONDS (nullable),
   DETAIL_PARAMS, PJ_TYPE (nullable), PRODUCT_LINE (nullable),
-  PJ_BOP (nullable), eqp_types_filter
+  PJ_BOP (nullable), ALARM_SOURCE (v5: raw EVENT_TYPE — 'EQP_SECS_ALARM'
+  Shape A / 'EQP_SECS_EVENT' Shape B alarm-alias, EA-EVT), eqp_types_filter
 
 Public API:
   validate_eap_alarm_params(date_from, date_to, machines)  → raises ValueError
@@ -438,7 +439,7 @@ def get_detail(
         {
           rows: [{alarm_id, eqp_id, eqp_type, lot_id, pj_type, product_line,
                   pj_bop, alarm_text, alarm_category_code, alarm_start,
-                  alarm_end, duration_seconds, detail_params}],
+                  alarm_end, duration_seconds, detail_params, alarm_source}],
           meta: {page, per_page, total_count, total_pages},
         }
     """
@@ -455,6 +456,19 @@ def get_detail(
         ).fetchone()[0] or 0)
         total_pages = max(1, math.ceil(total_count / per_page)) if total_count > 0 else 1
 
+        # ALARM_SOURCE exists from spool schema v5 (EA-EVT). In-flight query_ids
+        # minted before a deploy can still point at v4 parquet — DESCRIBE-detect
+        # the column instead of letting the binder fail on old files.
+        spool_cols = {
+            row[0]
+            for row in conn.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{spool_path}')"
+            ).fetchall()
+        }
+        alarm_source_col = (
+            "ALARM_SOURCE" if "ALARM_SOURCE" in spool_cols else "NULL AS ALARM_SOURCE"
+        )
+
         raw_rows = conn.execute(f"""
             SELECT
                 ALARM_ID,
@@ -469,7 +483,8 @@ def get_detail(
                 DETAIL_PARAMS,
                 PJ_TYPE,
                 PRODUCT_LINE,
-                PJ_BOP
+                PJ_BOP,
+                {alarm_source_col}
             FROM read_parquet('{spool_path}')
             {where_sql}
             ORDER BY ALARM_START DESC, ALARM_ID
@@ -511,6 +526,7 @@ def get_detail(
                 "pj_type":            str(r[10]) if r[10] is not None else None,
                 "product_line":       str(r[11]) if r[11] is not None else None,
                 "pj_bop":             str(r[12]) if r[12] is not None else None,
+                "alarm_source":       str(r[13]) if r[13] is not None else None,
             })
 
         return {

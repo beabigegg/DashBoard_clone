@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [business 1.44.0] — 2026-07-07
+### Changed
+- eap-event-alarm-semantics: EA-ALCD rewritten and scoped to Shape A (`EVENT_TYPE='EQP_SECS_ALARM'`; ALCD sign bit lives in the detail `AlarmCode` param, not a top-level ALCD column; pairing key documented as `(EQP_ID, ALARM_ID, ALARM_SOURCE)`). EA-01 `_SCHEMA_VERSION` 4→5 (v4 Shape-A-only parquet auto-invalidated by key-miss; EA-01's stale "= 3" mention also corrected). New EA-EVT rule: worker queries also include `EVENT_TYPE='EQP_SECS_EVENT'` alarm-alias rows (`AlarmDetected`/`AlarmCleared`) — identity from detail `AlarmID`, SET/CLEAR from `EVENT_NAME`, category NULL→"未知", cross-shape pairing forbidden, `ProcessAlarm`/`AlarmNeedCountIntoStatistics(MTBA/MTBF)` explicitly excluded. Fixes the ~52-equipment full blind spot and ~15-17% undercount recorded in docs/architecture/eap-event-alarm-semantics-investigation.md (ADR-0015).
+
+## [data 1.36.0] — 2026-07-07
+### Changed
+- eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
+
 ## [data 1.35.0] — 2026-07-04
 ### Changed
 - eap-alarm-product-dims: §3.17 updated — schema_version 3→4; parquet gains `PJ_TYPE`/`PRODUCT_LINE`/`PJ_BOP` columns via spool-write-time chunked `DW_MES_CONTAINER` lookup (≤999 binds/chunk, deduped on LOT_ID, `NVL(TRIM(col),'(NA)')` mirrors coarse EXISTS semantics, fail-open to NULL columns). Fine-filter axes extended with exact-match `lot_id[]`/`pj_type[]`/`product_line[]`/`pj_bop[]`. filter-options gains 4 option lists; summary gains `affected_lot_count`/`affected_product_line_count`; pareto gains `dim` closed enum + generic `name` item key (`alarm_text` kept as back-compat alias); trend gains `group_by` closed enum + generic `name` series key (same alias rule); detail rows gain `pj_type`/`product_line`/`pj_bop`. v3 spool auto-invalidated via key version; rollback to v3 code requires `rm -f tmp/query_spool/eap_alarm/*.parquet`.
