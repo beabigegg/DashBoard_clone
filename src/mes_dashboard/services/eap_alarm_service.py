@@ -4,11 +4,12 @@
 All DuckDB views operate solely on the spool parquet (EA-02/EA-04).
 No Oracle re-query after the spool is built.
 
-Spool schema (v4): one row = one alarm occurrence (SET event + optional CLEAR).
+Spool schema (v5): one row = one alarm occurrence (SET event + optional CLEAR).
   ALARM_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE,
   ALARM_START, ALARM_END (nullable), DURATION_SECONDS (nullable),
   DETAIL_PARAMS, PJ_TYPE (nullable), PRODUCT_LINE (nullable),
-  PJ_BOP (nullable), eqp_types_filter
+  PJ_BOP (nullable), ALARM_SOURCE (v5: raw EVENT_TYPE — 'EQP_SECS_ALARM'
+  Shape A / 'EQP_SECS_EVENT' Shape B alarm-alias, EA-EVT), eqp_types_filter
 
 Public API:
   validate_eap_alarm_params(date_from, date_to, machines)  → raises ValueError
@@ -98,10 +99,6 @@ def _get_duckdb_conn():
     return create_heavy_query_connection()
 
 
-def _escape_like(s: str) -> str:
-    return s.replace("'", "''")
-
-
 def _escape_sql(s: str) -> str:
     return s.replace("'", "''")
 
@@ -116,8 +113,12 @@ _EXACT_FILTER_COLUMNS: Dict[str, str] = {
 }
 
 
-def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> tuple[str, dict]:
+def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> tuple[str, list]:
     """Build WHERE clause from fine filters.
+
+    User-supplied values are NEVER inlined — the clause carries ``?``
+    placeholders and the values are returned as a bind-params list, in
+    placeholder order, for DuckDB prepared execution.
 
     Supported keys:
       alarm_text (list[str])    — ILIKE match on ALARM_TEXT
@@ -128,7 +129,8 @@ def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> t
       pj_bop (list[str])        — exact match on PJ_BOP (product dim)
     """
     prefix = f"{alias}." if alias else ""
-    clauses = []
+    clauses: List[str] = []
+    params: List[Any] = []
 
     if filters is None:
         filters = {}
@@ -136,20 +138,21 @@ def _build_filter_where(filters: Optional[Dict[str, Any]], alias: str = "") -> t
     alarm_texts = [str(t) for t in (filters.get("alarm_text") or []) if t is not None]
     if alarm_texts:
         like_parts = " OR ".join(
-            f"{prefix}ALARM_TEXT ILIKE '%' || '{_escape_like(t)}' || '%'"
-            for t in alarm_texts
+            f"{prefix}ALARM_TEXT ILIKE '%' || ? || '%'" for _ in alarm_texts
         )
         clauses.append(f"({like_parts})")
+        params.extend(alarm_texts)
 
     for key, column in _EXACT_FILTER_COLUMNS.items():
         values = [str(v) for v in (filters.get(key) or []) if v is not None]
         if values:
-            quoted = ", ".join(f"'{_escape_sql(v)}'" for v in values)
-            clauses.append(f"{prefix}{column} IN ({quoted})")
+            placeholders = ", ".join("?" for _ in values)
+            clauses.append(f"{prefix}{column} IN ({placeholders})")
+            params.extend(values)
 
     if clauses:
-        return "WHERE " + " AND ".join(clauses), {}
-    return "", {}
+        return "WHERE " + " AND ".join(clauses), params
+    return "", params
 
 
 # ── Filter options ────────────────────────────────────────────────────────────
@@ -169,17 +172,17 @@ def get_filter_options(spool_path: str, filters: Optional[Dict[str, Any]] = None
     """
     conn = _get_duckdb_conn()
     try:
-        where_sql, _ = _build_filter_where(filters)
+        where_sql, where_params = _build_filter_where(filters)
 
         def _distinct(column: str) -> List[str]:
             return [
                 row[0]
                 for row in conn.execute(f"""
                     SELECT DISTINCT {column}
-                    FROM read_parquet('{spool_path}')
+                    FROM read_parquet(?)
                     {where_sql}
                     ORDER BY {column}
-                """).fetchall()
+                """, [spool_path, *where_params]).fetchall()
                 if row[0] is not None
             ]
 
@@ -212,7 +215,7 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
     """
     conn = _get_duckdb_conn()
     try:
-        where_sql, _ = _build_filter_where(filters)
+        where_sql, where_params = _build_filter_where(filters)
 
         row = conn.execute(f"""
             SELECT
@@ -222,9 +225,9 @@ def get_summary(spool_path: str, filters: Optional[Dict[str, Any]] = None) -> di
                 COUNT(DISTINCT PRODUCT_LINE) AS affected_product_line_count,
                 SUM(CASE WHEN ALARM_END IS NULL THEN 1 ELSE 0 END) AS unresolved_count,
                 AVG(DURATION_SECONDS) AS avg_duration_seconds
-            FROM read_parquet('{spool_path}')
+            FROM read_parquet(?)
             {where_sql}
-        """).fetchone()
+        """, [spool_path, *where_params]).fetchone()
 
         total_alarm_count = int(row[0] or 0)
         affected_equipment_count = int(row[1] or 0)
@@ -292,10 +295,11 @@ def get_pareto(
 
     conn = _get_duckdb_conn()
     try:
-        where_sql, _ = _build_filter_where(filters)
+        where_sql, where_params = _build_filter_where(filters)
 
         total = int(conn.execute(
-            f"SELECT COUNT(*) FROM read_parquet('{spool_path}') {where_sql}"
+            f"SELECT COUNT(*) FROM read_parquet(?) {where_sql}",
+            [spool_path, *where_params],
         ).fetchone()[0] or 0)
 
         if total == 0:
@@ -305,12 +309,12 @@ def get_pareto(
             SELECT
                 {_group_expr(dim)} AS grp,
                 COUNT(*) AS cnt
-            FROM read_parquet('{spool_path}')
+            FROM read_parquet(?)
             {where_sql}
             GROUP BY grp
             ORDER BY cnt DESC
             LIMIT 50
-        """).fetchall()
+        """, [spool_path, *where_params]).fetchall()
 
         items = []
         cumulative = 0
@@ -355,7 +359,7 @@ def get_trend(
 
     conn = _get_duckdb_conn()
     try:
-        where_sql, _ = _build_filter_where(filters)
+        where_sql, where_params = _build_filter_where(filters)
         grp_expr = _group_expr(group_by)
 
         if granularity == "hour":
@@ -368,29 +372,29 @@ def get_trend(
             row[0]
             for row in conn.execute(f"""
                 SELECT {grp_expr} AS grp
-                FROM read_parquet('{spool_path}')
+                FROM read_parquet(?)
                 {where_sql}
                 GROUP BY grp
                 ORDER BY COUNT(*) DESC
                 LIMIT 10
-            """).fetchall()
+            """, [spool_path, *where_params]).fetchall()
         ]
 
         if not top_groups:
             return {"labels": [], "series": [], "group_by": group_by}
 
-        quoted = ", ".join(f"'{_escape_sql(t)}'" for t in top_groups)
+        group_placeholders = ", ".join("?" for _ in top_groups)
         rows = conn.execute(f"""
             SELECT
                 {ts_expr} AS label,
                 {grp_expr} AS grp,
                 COUNT(*) AS cnt
-            FROM read_parquet('{spool_path}')
+            FROM read_parquet(?)
             {where_sql}
-            {"AND" if where_sql else "WHERE"} {grp_expr} IN ({quoted})
+            {"AND" if where_sql else "WHERE"} {grp_expr} IN ({group_placeholders})
             GROUP BY label, grp
             ORDER BY label, grp
-        """).fetchall()
+        """, [spool_path, *where_params, *top_groups]).fetchall()
 
         if not rows:
             return {"labels": [], "series": [], "group_by": group_by}
@@ -438,7 +442,7 @@ def get_detail(
         {
           rows: [{alarm_id, eqp_id, eqp_type, lot_id, pj_type, product_line,
                   pj_bop, alarm_text, alarm_category_code, alarm_start,
-                  alarm_end, duration_seconds, detail_params}],
+                  alarm_end, duration_seconds, detail_params, alarm_source}],
           meta: {page, per_page, total_count, total_pages},
         }
     """
@@ -448,12 +452,26 @@ def get_detail(
 
     conn = _get_duckdb_conn()
     try:
-        where_sql, _ = _build_filter_where(filters)
+        where_sql, where_params = _build_filter_where(filters)
 
         total_count = int(conn.execute(
-            f"SELECT COUNT(*) FROM read_parquet('{spool_path}') {where_sql}"
+            f"SELECT COUNT(*) FROM read_parquet(?) {where_sql}",
+            [spool_path, *where_params],
         ).fetchone()[0] or 0)
         total_pages = max(1, math.ceil(total_count / per_page)) if total_count > 0 else 1
+
+        # ALARM_SOURCE exists from spool schema v5 (EA-EVT). In-flight query_ids
+        # minted before a deploy can still point at v4 parquet — DESCRIBE-detect
+        # the column instead of letting the binder fail on old files.
+        spool_cols = {
+            row[0]
+            for row in conn.execute(
+                "DESCRIBE SELECT * FROM read_parquet(?)", [spool_path]
+            ).fetchall()
+        }
+        alarm_source_col = (
+            "ALARM_SOURCE" if "ALARM_SOURCE" in spool_cols else "NULL AS ALARM_SOURCE"
+        )
 
         raw_rows = conn.execute(f"""
             SELECT
@@ -469,12 +487,13 @@ def get_detail(
                 DETAIL_PARAMS,
                 PJ_TYPE,
                 PRODUCT_LINE,
-                PJ_BOP
-            FROM read_parquet('{spool_path}')
+                PJ_BOP,
+                {alarm_source_col}
+            FROM read_parquet(?)
             {where_sql}
             ORDER BY ALARM_START DESC, ALARM_ID
-            LIMIT {per_page} OFFSET {offset}
-        """).fetchall()
+            LIMIT ? OFFSET ?
+        """, [spool_path, *where_params, per_page, offset]).fetchall()
 
         def _fmt_ts(v) -> Optional[str]:
             if v is None:
@@ -511,6 +530,7 @@ def get_detail(
                 "pj_type":            str(r[10]) if r[10] is not None else None,
                 "product_line":       str(r[11]) if r[11] is not None else None,
                 "pj_bop":             str(r[12]) if r[12] is not None else None,
+                "alarm_source":       str(r[13]) if r[13] is not None else None,
             })
 
         return {

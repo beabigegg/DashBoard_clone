@@ -5,17 +5,40 @@ Entry point: run_eap_alarm_query_job(job_id, date_from, date_to, machines)
 
 Design:
   - Oracle connections POST-FORK (ADR-0004).
-  - Fetches all EQP_SECS_ALARM events (SET + CLEAR) via read_sql_df_slow.
+  - Fetches alarm events of both reporting shapes (SET + CLEAR) via
+    read_sql_df_slow (EA-ALCD / EA-EVT; ADR-0015):
+      Shape A — EVENT_TYPE = 'EQP_SECS_ALARM' (alarm identity in EVENT_NAME,
+                SET/CLEAR from the ALCD sign bit in detail AlarmCode)
+      Shape B — EVENT_TYPE = 'EQP_SECS_EVENT' AND EVENT_NAME IN
+                ('AlarmDetected', 'AlarmCleared') (alarm identity in detail
+                AlarmID, SET/CLEAR encoded by EVENT_NAME itself)
+    ProcessAlarm and AlarmNeedCountIntoStatistics(MTBA/MTBF) are deliberately
+    excluded: the former is a process-state transition marker without an
+    AlarmID, the latter an auxiliary MTBA/MTBF tally that accompanies a real
+    Detected/Cleared pair (would double-count).
   - Registers Oracle results in DuckDB in-memory; all transformation
     (EAV pivot, SET/CLEAR pairing, DURATION) done in SQL — no pandas ops.
   - Writes parquet with DuckDB COPY TO.
-  - SECS/GEM ALCD signed-byte convention:
+  - SECS/GEM ALCD signed-byte convention (Shape A only):
       AlarmCode < 0  → bit7=1 → Alarm SET (start)
       AlarmCode >= 0 → bit7=0 → Alarm CLEAR (end)
-    Pairing key: (EQP_ID, ALARM_ID); each output row = one alarm occurrence.
+    Pairing key: (EQP_ID, ALARM_ID, ALARM_SOURCE) — shapes never pair with
+    each other; each output row = one alarm occurrence.
     Unpaired SET → ALARM_END=NULL, DURATION_SECONDS=NULL.
     CLEAR with no preceding SET in window → dropped.
-    Events with no AlarmCode in detail → treated as SET.
+    Shape A events with no AlarmCode in detail → treated as SET.
+    Shape B events with no AlarmID in detail → identity falls back to raw
+    EVENT_NAME (Detected/Cleared can then never match → degrades to
+    unpaired SET / dropped CLEAR, mirroring the Shape A degradation).
+  - Cross-channel dedup (EA-EVT): dual-channel equipment report ~70% of the
+    same physical alarms on BOTH channels (GDBA 2-day production measurement,
+    2026-07-07: 2079/2952 AlarmDetected matched a Shape A event within ±60s).
+    After per-shape pairing, a Shape B occurrence is dropped when a Shape A
+    occurrence exists with the same (EQP_ID, ALARM_ID) and ALARM_START within
+    _SHAPE_B_DEDUP_TOLERANCE_SECONDS — Shape A wins (carries the ALCD
+    category byte; continuity with the historical report). Identity match is
+    string equality, so text-EVENT_NAME families (GWBA-style) are not
+    deduped by this rule — see ADR-0015.
 
 Module-level register_job_type() fires at import time (job-registry-central).
 """
@@ -45,22 +68,36 @@ _JOB_PREFIX = "eap-alarm"
 
 # ── Oracle SQL templates ───────────────────────────────────────────────────────
 
-_EAP_EVENT_SQL_TEMPLATE = """\
+# EA-ALCD / EA-EVT: both alarm-reporting shapes. Shape B's 'ProcessAlarm' and
+# 'AlarmNeedCountIntoStatistics(MTBA/MTBF)' EVENT_NAMEs are NOT alarm
+# occurrences and must stay out of this predicate (ADR-0015).
+_ALARM_EVENT_PREDICATE = """(e.EVENT_TYPE = 'EQP_SECS_ALARM'
+       OR (e.EVENT_TYPE = 'EQP_SECS_EVENT'
+           AND e.EVENT_NAME IN ('AlarmDetected', 'AlarmCleared')))"""
+
+# EA-EVT cross-channel dedup tolerance. ±60s is the window the production
+# overlap was measured at (GDBA, 2-day LAST_UPDATE_TIME window, 2026-07-07:
+# 70.43% of Shape B AlarmDetected had a Shape A counterpart) — widening or
+# narrowing it needs a new measurement, not a hunch.
+_SHAPE_B_DEDUP_TOLERANCE_SECONDS: int = 60
+
+_EAP_EVENT_SQL_TEMPLATE = f"""\
 SELECT
     TO_CHAR(e.SEQ_ID)              AS EVENT_ID,
     e.EQUIPMENT_ID                 AS EQP_ID,
     SUBSTR(e.EQUIPMENT_ID, 1, 4)   AS EQP_TYPE,
     e.LOT_ID,
+    e.EVENT_TYPE,
     e.EVENT_NAME                   AS ALARM_ID,
     e.LAST_UPDATE_TIME             AS ALARM_TIME
 FROM DWH.EAP_EVENT e
 WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
                               AND TO_DATE(:date_to,   'YYYY-MM-DD') + 1
-  AND {equipment_filter}
-  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'{extra_filters}
+  AND {{equipment_filter}}
+  AND {_ALARM_EVENT_PREDICATE}{{extra_filters}}
 """
 
-_DETAIL_SQL_TEMPLATE = """\
+_DETAIL_SQL_TEMPLATE = f"""\
 SELECT TO_CHAR(e.SEQ_ID) AS EVENT_ID,
        d.PARAMETER_NAME,
        d.PARAMETER_VALUE
@@ -68,18 +105,29 @@ FROM DWH.EAP_EVENT e
 JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
 WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
                               AND TO_DATE(:date_to,   'YYYY-MM-DD') + 1
-  AND {equipment_filter}
-  AND e.EVENT_TYPE = 'EQP_SECS_ALARM'{extra_filters}
+  AND {{equipment_filter}}
+  AND {_ALARM_EVENT_PREDICATE}{{extra_filters}}
 """
 
 # ── DuckDB pairing query ───────────────────────────────────────────────────────
 # Registers three tables:
 #   events_raw   — from Oracle main query (EVENT_ID, EQP_ID, ...)
 #   detail_pivot — pre-pivoted in Python (EVENT_ID, ALARM_CODE_STR,
-#                  ALARM_TEXT_DETAIL, DETAIL_PARAMS)
+#                  ALARM_TEXT_DETAIL, ALARM_ID_DETAIL, DETAIL_PARAMS)
 #   lot_product  — LOT_ID → product dims lookup (LOT_ID, PJ_TYPE,
 #                  PRODUCT_LINE, PJ_BOP) from DWH.DW_MES_CONTAINER
 # Produces one row per alarm occurrence (SET + optional CLEAR pair).
+# Shape dispatch (EA-ALCD / EA-EVT): events_raw.ALARM_ID is the raw EVENT_NAME.
+#   Shape A (EVENT_TYPE='EQP_SECS_ALARM'): identity = EVENT_NAME; SET/CLEAR from
+#     the AlarmCode (ALCD) sign bit; category = ABS(AlarmCode) & 127.
+#   Shape B (EVENT_TYPE='EQP_SECS_EVENT'): identity = detail AlarmID; SET/CLEAR
+#     from EVENT_NAME ('AlarmDetected'/'AlarmCleared'); no ALCD byte → category
+#     NULL (decodes to "未知" per EA-05).
+# ALARM_SOURCE carries the raw EVENT_TYPE and is part of the pairing key so a
+# CLEAR from one shape can never close a SET from the other.
+# The trailing `deduped` CTE applies the EA-EVT cross-channel rule: drop a
+# Shape B occurrence when a Shape A occurrence exists on the same
+# (EQP_ID, ALARM_ID) with ALARM_START within {dedup_tolerance_seconds}s.
 _PAIR_SQL = """\
 WITH events AS (
     SELECT
@@ -87,14 +135,22 @@ WITH events AS (
         e.EQP_ID,
         e.EQP_TYPE,
         e.LOT_ID,
-        e.ALARM_ID,
-        COALESCE(d.ALARM_TEXT_DETAIL, e.ALARM_ID)       AS ALARM_TEXT,
+        CASE WHEN e.EVENT_TYPE = 'EQP_SECS_EVENT'
+             THEN COALESCE(d.ALARM_ID_DETAIL, e.ALARM_ID)
+             ELSE e.ALARM_ID END                         AS ALARM_ID,
+        CASE WHEN e.EVENT_TYPE = 'EQP_SECS_EVENT'
+             THEN COALESCE(d.ALARM_TEXT_DETAIL, d.ALARM_ID_DETAIL, e.ALARM_ID)
+             ELSE COALESCE(d.ALARM_TEXT_DETAIL, e.ALARM_ID) END AS ALARM_TEXT,
         TRY_CAST(d.ALARM_CODE_STR AS INTEGER)            AS ALARM_CODE,
-        CASE WHEN d.ALARM_CODE_STR IS NULL
+        CASE WHEN e.EVENT_TYPE = 'EQP_SECS_EVENT'
+             THEN e.ALARM_ID = 'AlarmDetected'
+             WHEN d.ALARM_CODE_STR IS NULL
                   OR TRY_CAST(d.ALARM_CODE_STR AS INTEGER) < 0
              THEN TRUE ELSE FALSE END                    AS IS_SET,
-        CASE WHEN d.ALARM_CODE_STR IS NOT NULL
+        CASE WHEN e.EVENT_TYPE = 'EQP_SECS_EVENT' THEN NULL
+             WHEN d.ALARM_CODE_STR IS NOT NULL
              THEN ABS(TRY_CAST(d.ALARM_CODE_STR AS INTEGER)) & 127 END AS ALARM_CATEGORY_CODE,
+        e.EVENT_TYPE                                     AS ALARM_SOURCE,
         d.DETAIL_PARAMS,
         e.ALARM_TIME,
         lp.PJ_TYPE,
@@ -108,7 +164,7 @@ set_events AS (
     SELECT * FROM events WHERE IS_SET
 ),
 clear_events AS (
-    SELECT EQP_ID, ALARM_ID, ALARM_TIME AS CLEAR_TIME
+    SELECT EQP_ID, ALARM_ID, ALARM_SOURCE, ALARM_TIME AS CLEAR_TIME
     FROM events WHERE NOT IS_SET
 ),
 paired AS (
@@ -119,6 +175,7 @@ paired AS (
         s.LOT_ID,
         s.ALARM_TEXT,
         s.ALARM_CATEGORY_CODE,
+        s.ALARM_SOURCE,
         s.ALARM_TIME                AS ALARM_START,
         MIN(c.CLEAR_TIME)           AS ALARM_END,
         s.DETAIL_PARAMS,
@@ -128,13 +185,28 @@ paired AS (
         s.EVENT_ID
     FROM set_events s
     LEFT JOIN clear_events c
-           ON c.EQP_ID    = s.EQP_ID
-          AND c.ALARM_ID  = s.ALARM_ID
+           ON c.EQP_ID       = s.EQP_ID
+          AND c.ALARM_ID     = s.ALARM_ID
+          AND c.ALARM_SOURCE = s.ALARM_SOURCE
           AND c.CLEAR_TIME > s.ALARM_TIME
     GROUP BY
         s.EVENT_ID, s.ALARM_ID, s.EQP_ID, s.EQP_TYPE, s.LOT_ID,
-        s.ALARM_TEXT, s.ALARM_CATEGORY_CODE, s.ALARM_TIME, s.DETAIL_PARAMS,
+        s.ALARM_TEXT, s.ALARM_CATEGORY_CODE, s.ALARM_SOURCE, s.ALARM_TIME, s.DETAIL_PARAMS,
         s.PJ_TYPE, s.PRODUCT_LINE, s.PJ_BOP
+),
+deduped AS (
+    SELECT p.*
+    FROM paired p
+    WHERE p.ALARM_SOURCE <> 'EQP_SECS_EVENT'
+       OR NOT EXISTS (
+            SELECT 1
+            FROM paired a
+            WHERE a.ALARM_SOURCE = 'EQP_SECS_ALARM'
+              AND a.EQP_ID   = p.EQP_ID
+              AND a.ALARM_ID = p.ALARM_ID
+              AND ABS(epoch(CAST(a.ALARM_START AS TIMESTAMP))
+                    - epoch(CAST(p.ALARM_START AS TIMESTAMP))) <= {dedup_tolerance_seconds}
+          )
 )
 SELECT
     ALARM_ID,
@@ -152,8 +224,9 @@ SELECT
     PJ_TYPE,
     PRODUCT_LINE,
     PJ_BOP,
+    ALARM_SOURCE,
     '{machines_hash}'               AS eqp_types_filter
-FROM paired
+FROM deduped
 ORDER BY ALARM_START DESC
 """
 
@@ -422,12 +495,13 @@ def run_eap_alarm_query_job(
                     "EVENT_ID":          str(eid),
                     "ALARM_CODE_STR":    d.get("AlarmCode"),
                     "ALARM_TEXT_DETAIL": d.get("AlarmText"),
+                    "ALARM_ID_DETAIL":   d.get("AlarmID"),
                     "DETAIL_PARAMS":     json.dumps(d, ensure_ascii=False),
                 })
             detail_pivot_df = pd.DataFrame(records)
         else:
             detail_pivot_df = pd.DataFrame(
-                columns=["EVENT_ID", "ALARM_CODE_STR", "ALARM_TEXT_DETAIL", "DETAIL_PARAMS"]
+                columns=["EVENT_ID", "ALARM_CODE_STR", "ALARM_TEXT_DETAIL", "ALARM_ID_DETAIL", "DETAIL_PARAMS"]
             )
 
         # ── DuckDB in-memory: register Oracle results, do all transformations ──
@@ -444,9 +518,16 @@ def run_eap_alarm_query_job(
 
             if events_df.empty:
                 row_count = 0
-                con.execute(f"COPY (SELECT * FROM ({_PAIR_SQL.format(machines_hash=machines_hash)}) t WHERE FALSE) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
+                empty_sql = _PAIR_SQL.format(
+                    machines_hash=machines_hash,
+                    dedup_tolerance_seconds=_SHAPE_B_DEDUP_TOLERANCE_SECONDS,
+                )
+                con.execute(f"COPY (SELECT * FROM ({empty_sql}) t WHERE FALSE) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
             else:
-                pair_sql = _PAIR_SQL.format(machines_hash=machines_hash)
+                pair_sql = _PAIR_SQL.format(
+                    machines_hash=machines_hash,
+                    dedup_tolerance_seconds=_SHAPE_B_DEDUP_TOLERANCE_SECONDS,
+                )
                 update_job_progress(_JOB_PREFIX, job_id, status="running", progress="writing parquet", pct="90")
                 con.execute(f"COPY ({pair_sql}) TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')")
                 row_count = con.execute(f"SELECT COUNT(*) FROM read_parquet('{spool_path}')").fetchone()[0]
@@ -615,7 +696,7 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
             events_df = events_combined.to_pandas()
         else:
             events_df = pd.DataFrame(
-                columns=["EVENT_ID", "EQP_ID", "EQP_TYPE", "LOT_ID", "ALARM_ID", "ALARM_TIME"]
+                columns=["EVENT_ID", "EQP_ID", "EQP_TYPE", "LOT_ID", "EVENT_TYPE", "ALARM_ID", "ALARM_TIME"]
             )
 
         # Read detail
@@ -637,12 +718,13 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
                     "EVENT_ID":          str(eid),
                     "ALARM_CODE_STR":    d.get("AlarmCode"),
                     "ALARM_TEXT_DETAIL": d.get("AlarmText"),
+                    "ALARM_ID_DETAIL":   d.get("AlarmID"),
                     "DETAIL_PARAMS":     json.dumps(d, ensure_ascii=False),
                 })
             detail_pivot_df = pd.DataFrame(records)
         else:
             detail_pivot_df = pd.DataFrame(
-                columns=["EVENT_ID", "ALARM_CODE_STR", "ALARM_TEXT_DETAIL", "DETAIL_PARAMS"]
+                columns=["EVENT_ID", "ALARM_CODE_STR", "ALARM_TEXT_DETAIL", "ALARM_ID_DETAIL", "DETAIL_PARAMS"]
             )
 
         # LOT_ID → product dims lookup (spool enrichment, schema v4)
@@ -656,7 +738,10 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
             con.register("detail_pivot", detail_pivot_df)
             con.register("lot_product", lot_product_df)
 
-            pair_sql = _PAIR_SQL.format(machines_hash=self._machines_hash)
+            pair_sql = _PAIR_SQL.format(
+                machines_hash=self._machines_hash,
+                dedup_tolerance_seconds=_SHAPE_B_DEDUP_TOLERANCE_SECONDS,
+            )
 
             if events_df.empty:
                 con.execute(

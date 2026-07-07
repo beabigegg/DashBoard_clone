@@ -130,8 +130,13 @@ class TestEapAlarmSpoolTrigger:
             )
         assert resp.status_code == 400
 
-    def test_post_spool_invalid_eqp_type_returns_400(self, monkeypatch):
-        """Invalid eqp_type → 400 VALIDATION_ERROR (EA-07)."""
+    def test_post_spool_blank_eqp_type_returns_400(self, monkeypatch):
+        """Blank-after-strip eqp_type entry → 400 VALIDATION_ERROR (EA-07).
+
+        EA-07's closed enum is retired — free-form strings like "INVALID_TYPE"
+        are legal equipment identifiers now; only non-string/blank entries 400.
+        (This test previously pinned the retired enum and was stale-red.)
+        """
         app = _make_app()
         with app.test_client() as client:
             resp = client.post(
@@ -139,7 +144,7 @@ class TestEapAlarmSpoolTrigger:
                 json={
                     "date_from": "2025-01-01",
                     "date_to": "2025-01-07",
-                    "eqp_types": ["INVALID_TYPE"],
+                    "eqp_types": ["   "],
                 },
                 content_type="application/json",
             )
@@ -177,6 +182,7 @@ class TestEapAlarmWorkerFn:
             "EQP_ID": ["GDBA-001", "GCBA-002"],
             "EQP_TYPE": ["GDBA", "GCBA"],
             "LOT_ID": ["LOT001", None],
+            "EVENT_TYPE": ["EQP_SECS_ALARM", "EQP_SECS_ALARM"],
             "ALARM_ID": ["AlarmA", "AlarmB"],
             "ALARM_TIME": [datetime(2025, 1, 3, 10, 0, 0), datetime(2025, 1, 4, 12, 30, 0)],
         })
@@ -271,7 +277,7 @@ class TestEapAlarmWorkerFn:
             "ALARM_TEXT", "ALARM_CATEGORY_CODE",
             "ALARM_START", "ALARM_END", "DURATION_SECONDS",
             "DETAIL_PARAMS", "PJ_TYPE", "PRODUCT_LINE", "PJ_BOP",
-            "eqp_types_filter",
+            "ALARM_SOURCE", "eqp_types_filter",
         }
         assert expected_cols == cols, f"Column mismatch: {cols} vs {expected_cols}"
 
@@ -347,6 +353,65 @@ class TestEapAlarmWorkerFn:
             assert pct_values[i] <= pct_values[i + 1], (
                 f"Progress must not decrease: {pct_values}"
             )
+
+    def test_worker_fn_includes_shape_b_and_pairs_by_event_name(self, tmp_path, monkeypatch):
+        """EA-EVT (legacy path): Shape B rows flow through run_eap_alarm_query_job —
+        AlarmDetected/AlarmCleared pair on detail AlarmID, tagged ALARM_SOURCE."""
+        import pandas as pd
+        from datetime import datetime
+
+        mock_df = pd.DataFrame({
+            "EVENT_ID": ["A1", "B1", "B2"],
+            "EQP_ID": ["GDBA-001", "GWBA-002", "GWBA-002"],
+            "EQP_TYPE": ["GDBA", "GWBA", "GWBA"],
+            "LOT_ID": ["LOT001", None, None],
+            "EVENT_TYPE": ["EQP_SECS_ALARM", "EQP_SECS_EVENT", "EQP_SECS_EVENT"],
+            "ALARM_ID": ["3047", "AlarmDetected", "AlarmCleared"],
+            "ALARM_TIME": [
+                datetime(2025, 1, 3, 9, 0, 0),
+                datetime(2025, 1, 3, 10, 0, 0),
+                datetime(2025, 1, 3, 10, 20, 0),
+            ],
+        })
+        detail_df = pd.DataFrame({
+            "EVENT_ID": ["A1", "B1", "B1", "B2"],
+            "PARAMETER_NAME": ["AlarmCode", "AlarmID", "AlarmText", "AlarmID"],
+            "PARAMETER_VALUE": ["-3", "6052", "MissingDieDetected", "6052"],
+        })
+
+        monkeypatch.setattr(
+            "mes_dashboard.core.database.read_sql_df_slow",
+            self._sql_router(mock_df, detail_df),
+        )
+        monkeypatch.setattr("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR", str(tmp_path))
+        monkeypatch.setattr("mes_dashboard.rq_worker_preload.ensure_rq_logging", lambda: None)
+        monkeypatch.setattr("mes_dashboard.services.async_query_job_service.update_job_progress", lambda *a, **kw: None)
+        monkeypatch.setattr("mes_dashboard.services.async_query_job_service.complete_job", lambda *a, **kw: None)
+        monkeypatch.setattr("mes_dashboard.core.query_spool_store.register_spool_file", lambda *a, **kw: True)
+
+        from mes_dashboard.workers.eap_alarm_worker import run_eap_alarm_query_job
+
+        run_eap_alarm_query_job("test-shapeb", "2025-01-01", "2025-01-07", eqp_types=["GDBA", "GWBA"])
+
+        import pyarrow.parquet as pq
+        df = pq.read_table(str(list(tmp_path.glob("*.parquet"))[0])).to_pandas()
+
+        # One occurrence per shape: A1 (open SET) + B1→B2 (paired)
+        assert len(df) == 2, df
+        by_source = {r["ALARM_SOURCE"]: r for _, r in df.iterrows()}
+        assert set(by_source) == {"EQP_SECS_ALARM", "EQP_SECS_EVENT"}
+
+        shape_b = by_source["EQP_SECS_EVENT"]
+        assert shape_b["ALARM_ID"] == "6052"          # identity from detail AlarmID
+        assert shape_b["ALARM_TEXT"] == "MissingDieDetected"
+        assert shape_b["DURATION_SECONDS"] == 1200.0  # paired via EVENT_NAME, not ALCD
+        assert pd.isna(shape_b["ALARM_CATEGORY_CODE"])  # no ALCD byte → NULL
+
+        shape_a = by_source["EQP_SECS_ALARM"]
+        assert shape_a["ALARM_ID"] == "3047"
+        assert pd.isna(shape_a["ALARM_END"])          # unpaired Shape A SET stays open
+        # Product-dim enrichment still applies to Shape A rows with a LOT_ID
+        assert shape_a["PJ_TYPE"] == "TypeA"
 
     def test_worker_fn_oracle_sql_contains_last_update_time_predicate(self, tmp_path, monkeypatch):
         """Oracle SQL must contain LAST_UPDATE_TIME BETWEEN predicate (EA-03)."""
@@ -438,7 +503,7 @@ def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
     # Create a minimal synthetic parquet spool matching _PAIR_SQL output column names:
     # ALARM_ID, EQP_ID, EQP_TYPE, LOT_ID, ALARM_TEXT, ALARM_CATEGORY_CODE,
     # ALARM_START, ALARM_END, DURATION_SECONDS, DETAIL_PARAMS,
-    # PJ_TYPE, PRODUCT_LINE, PJ_BOP, eqp_types_filter (schema v4)
+    # PJ_TYPE, PRODUCT_LINE, PJ_BOP, ALARM_SOURCE, eqp_types_filter (schema v5)
     import pyarrow as pa
     import pyarrow.parquet as pq
     from datetime import datetime
@@ -457,6 +522,7 @@ def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
         "PJ_TYPE": pa.array(["TypeA"], type=pa.string()),
         "PRODUCT_LINE": pa.array(["LineA"], type=pa.string()),
         "PJ_BOP": pa.array(["BopA"], type=pa.string()),
+        "ALARM_SOURCE": pa.array(["EQP_SECS_ALARM"], type=pa.string()),
         "eqp_types_filter": pa.array(["abc12345"], type=pa.string()),
     })
     spool_file = tmp_path / "test_spool.parquet"
@@ -485,6 +551,7 @@ def test_detail_no_extra_oracle_query(tmp_path, monkeypatch):
     assert data["success"] is True
     assert len(data["data"]["rows"]) == 1
     assert data["data"]["rows"][0]["detail_params"] == {"extra_param": "value1"}
+    assert data["data"]["rows"][0]["alarm_source"] == "EQP_SECS_ALARM"
 
     assert oracle_call_count[0] == 0, (
         f"GET /detail must not trigger any Oracle query (EA-04); "

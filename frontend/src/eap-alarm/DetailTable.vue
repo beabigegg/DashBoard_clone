@@ -17,6 +17,9 @@ interface DetailRow {
   alarm_end: string | null;
   duration_seconds: number | null;
   detail_params: Record<string, unknown> | null;
+  // v4 spool: raw EVENT_TYPE ('EQP_SECS_ALARM' | 'EQP_SECS_EVENT');
+  // null when the row comes from a pre-v4 spool
+  alarm_source: string | null;
 }
 
 interface DetailMeta {
@@ -106,6 +109,7 @@ const hasExpandable = computed(() =>
         <DataTableColumn column-key="eqp_type"        label="機台類型"     :sortable="false" />
         <DataTableColumn column-key="alarm_id"        label="ALARM ID"     :sortable="false" />
         <DataTableColumn column-key="alarm_text"      label="ALARM 訊息"   :sortable="false" />
+        <DataTableColumn column-key="alarm_source"    label="通報來源"     :sortable="false" />
         <DataTableColumn column-key="alarm_start"     label="發生時間"     :sortable="false" />
         <DataTableColumn column-key="alarm_end"       label="解除時間"     :sortable="false" />
         <DataTableColumn column-key="duration_seconds"label="排除時間"     :sortable="false" />
@@ -142,6 +146,9 @@ const hasExpandable = computed(() =>
             <span class="alarm-text-cell" :title="String(row.alarm_text ?? '')">
               {{ row.alarm_text ?? '—' }}
             </span>
+          </template>
+          <template v-else-if="columnKey === 'alarm_source'">
+            <span class="cell-nowrap">{{ row.alarm_source ?? '—' }}</span>
           </template>
         </template>
 

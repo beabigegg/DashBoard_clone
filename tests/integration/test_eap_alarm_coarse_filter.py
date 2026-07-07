@@ -46,7 +46,7 @@ class TestEapAlarmWorkerFnNewDims:
             captured_sql.append(sql)
             if params:
                 captured_params.append(dict(params))
-            return pd.DataFrame(columns=["EVENT_ID", "EQP_ID", "EQP_TYPE", "LOT_ID", "ALARM_ID", "ALARM_TIME"])
+            return pd.DataFrame(columns=["EVENT_ID", "EQP_ID", "EQP_TYPE", "LOT_ID", "EVENT_TYPE", "ALARM_ID", "ALARM_TIME"])
 
         monkeypatch.setattr("mes_dashboard.core.database.read_sql_df_slow", mock_read_sql)
         monkeypatch.setattr("mes_dashboard.services.eap_alarm_cache.EAP_ALARM_SPOOL_DIR", str(tmp_path))

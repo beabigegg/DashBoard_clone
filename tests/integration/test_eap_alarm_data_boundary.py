@@ -9,6 +9,8 @@ Tests:
   - test_null_lot_id: rows with null LOT_ID → lot_id=null in response
   - test_empty_alarm_text_rows: ALARM_TEXT=null rows included in parquet, alarm_text=null
   - test_large_alarm_text: AlarmText >500 chars → no truncation, stored as-is
+  - test_alarm_source_passthrough: ALARM_SOURCE (v5) → alarm_source in detail rows
+  - test_pre_v5_spool_without_alarm_source_column: v4 spool → alarm_source=null, no error
 
 pytestmark = pytest.mark.integration
 """
@@ -25,7 +27,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 _PARQUET_SCHEMA = pa.schema([
-    # Matches _PAIR_SQL output column aliases (§3.17 parquet schema, v4)
+    # Matches _PAIR_SQL output column aliases (§3.17 parquet schema, v5)
     pa.field("ALARM_ID", pa.string(), nullable=True),
     pa.field("EQP_ID", pa.string(), nullable=False),
     pa.field("EQP_TYPE", pa.string(), nullable=False),
@@ -39,6 +41,7 @@ _PARQUET_SCHEMA = pa.schema([
     pa.field("PJ_TYPE", pa.string(), nullable=True),
     pa.field("PRODUCT_LINE", pa.string(), nullable=True),
     pa.field("PJ_BOP", pa.string(), nullable=True),
+    pa.field("ALARM_SOURCE", pa.string(), nullable=False),
     pa.field("eqp_types_filter", pa.string(), nullable=False),
 ])
 
@@ -61,6 +64,8 @@ def _write_parquet(tmp_path, rows: list[dict]) -> str:
         for col in ("PJ_TYPE", "PRODUCT_LINE", "PJ_BOP"):
             if col not in df.columns:
                 df[col] = None
+        if "ALARM_SOURCE" not in df.columns:
+            df["ALARM_SOURCE"] = "EQP_SECS_ALARM"
         if "eqp_types_filter" not in df.columns:
             df["eqp_types_filter"] = "test1234"
         table = pa.Table.from_pandas(df, schema=_PARQUET_SCHEMA, safe=False)
@@ -81,6 +86,7 @@ def _write_parquet(tmp_path, rows: list[dict]) -> str:
                 "PJ_TYPE": pa.array([], type=pa.string()),
                 "PRODUCT_LINE": pa.array([], type=pa.string()),
                 "PJ_BOP": pa.array([], type=pa.string()),
+                "ALARM_SOURCE": pa.array([], type=pa.string()),
                 "eqp_types_filter": pa.array([], type=pa.string()),
             },
             schema=_PARQUET_SCHEMA,
@@ -105,6 +111,7 @@ def _base_row(**overrides) -> dict:
         "PJ_TYPE": "TypeA",
         "PRODUCT_LINE": "LineA",
         "PJ_BOP": "BopA",
+        "ALARM_SOURCE": "EQP_SECS_ALARM",
         "eqp_types_filter": "test1234",
     }
     base.update(overrides)
@@ -201,7 +208,51 @@ def test_large_alarm_text(tmp_path):
     )
 
 
-# ── test_zero_row_spool ───────────────────────────────────────────────────────
+# ── test_alarm_source_passthrough ─────────────────────────────────────────
+
+def test_alarm_source_passthrough(tmp_path):
+    """EA-EVT: ALARM_SOURCE column → alarm_source field in detail rows (v5)."""
+    spool_path = _write_parquet(tmp_path, [
+        _base_row(ALARM_ID="ROW-A", ALARM_SOURCE="EQP_SECS_ALARM"),
+        _base_row(ALARM_ID="ROW-B", ALARM_SOURCE="EQP_SECS_EVENT"),
+    ])
+
+    from mes_dashboard.services.eap_alarm_service import get_detail
+    result = get_detail(spool_path, filters=None, page=1, per_page=50)
+    sources = {r["alarm_id"]: r["alarm_source"] for r in result["rows"]}
+    assert sources == {"ROW-A": "EQP_SECS_ALARM", "ROW-B": "EQP_SECS_EVENT"}
+
+
+def test_pre_v5_spool_without_alarm_source_column(tmp_path):
+    """In-flight v4 query_id after deploy: spool lacks ALARM_SOURCE →
+    get_detail must not fail; alarm_source degrades to null (DESCRIBE fallback)."""
+    v4_table = pa.table({
+        "ALARM_ID": pa.array(["OLD001"], type=pa.string()),
+        "EQP_ID": pa.array(["GDBA-001"], type=pa.string()),
+        "EQP_TYPE": pa.array(["GDBA"], type=pa.string()),
+        "LOT_ID": pa.array([None], type=pa.string()),
+        "ALARM_TEXT": pa.array(["Legacy Alarm"], type=pa.string()),
+        "ALARM_CATEGORY_CODE": pa.array([1.0], type=pa.float64()),
+        "ALARM_START": pa.array([datetime(2025, 1, 3, 10, 0, 0)], type=pa.timestamp("us")),
+        "ALARM_END": pa.array([None], type=pa.timestamp("us")),
+        "DURATION_SECONDS": pa.array([None], type=pa.float64()),
+        "DETAIL_PARAMS": pa.array([None], type=pa.string()),
+        "PJ_TYPE": pa.array([None], type=pa.string()),
+        "PRODUCT_LINE": pa.array([None], type=pa.string()),
+        "PJ_BOP": pa.array([None], type=pa.string()),
+        "eqp_types_filter": pa.array(["test1234"], type=pa.string()),
+    })
+    path = tmp_path / "v4_spool.parquet"
+    pq.write_table(v4_table, str(path))
+
+    from mes_dashboard.services.eap_alarm_service import get_detail
+    result = get_detail(str(path), filters=None, page=1, per_page=50)
+    assert result["meta"]["total_count"] == 1
+    assert result["rows"][0]["alarm_id"] == "OLD001"
+    assert result["rows"][0]["alarm_source"] is None
+
+
+# ── test_zero_row_spool ─────────────────────────────────────────────────────────
 
 def test_zero_row_spool(tmp_path):
     """Zero-row spool → empty state (no 500 error, returns empty lists/dicts)."""

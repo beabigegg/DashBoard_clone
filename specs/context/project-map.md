@@ -2,11 +2,11 @@
 artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
-root: yield-achievement-kanban
-visible-dirs: 205
-visible-files: 931
-omitted-dirs: 67
-truncated-dirs: 3
+root: DashBoard_clone
+visible-dirs: 191
+visible-files: 1026
+omitted-dirs: 66
+truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -31,10 +31,8 @@ Use this deterministic map to choose candidate context paths before reading file
 ## Tree
 
 ```
-yield-achievement-kanban/
+DashBoard_clone/
 |-- .cdd/
-|   |-- code-graph.index.json
-|   |-- code-map.index.json
 |   |-- code-map.yml
 |   |-- conformance.json
 |   |-- context-policy.json
@@ -51,6 +49,64 @@ yield-achievement-kanban/
 |       |-- released-pages-hardening-gates.yml
 |       |-- soak-tests.yml
 |       \-- stress-tests.yml
+|-- .hypothesis/
+|   |-- constants/
+|   |   |-- 00731426b90af740
+|   |   |-- 00e4935d1440a2ca
+|   |   |-- 01cb19e636d04082
+|   |   |-- 02bca2c9d2f8566d
+|   |   |-- 039f8a28fa91d19f
+|   |   |-- 05224b1f50d4c8e2
+|   |   |-- 06e37be44b7c2558
+|   |   |-- 0860b7ce1f462945
+|   |   |-- 09af02b32eace3be
+|   |   |-- 0a24b457adbbced2
+|   |   |-- 0db51a1a0f9a9046
+|   |   |-- 0f3094f4c41337a3
+|   |   |-- 0f584482e7d3db29
+|   |   |-- 11326b1300e7c559
+|   |   |-- 122fc4d943da0a54
+|   |   |-- 1968d36e3319a49f
+|   |   |-- 1a701b0588e51868
+|   |   |-- 1b488e9c0e7c5031
+|   |   |-- 1c079de4646a8d8b
+|   |   |-- 1c2919ea2d0d7b6f
+|   |   |-- 21753c2266950be2
+|   |   |-- 236be33c19706e06
+|   |   |-- 2487e0dd67ee4005
+|   |   |-- 25db02c884e47e34
+|   |   |-- 263226a93d9fd720
+|   |   |-- 267688019eacc507
+|   |   |-- 284335a248b2d321
+|   |   |-- 28d9bc818b741a80
+|   |   |-- 2a82a499c11a5de8
+|   |   |-- 2b2923cb2e7b99f7
+|   |   |-- 2b39e13cddad788d
+|   |   |-- 2f2ae64af48e93fe
+|   |   |-- 2f46fe56abf81670
+|   |   |-- 327c52ae13744797
+|   |   |-- 345e5165f13cae58
+|   |   |-- 34f845ad3468bfeb
+|   |   |-- 35342e8dd172004d
+|   |   |-- 392d6328bece7db8
+|   |   |-- 397bc9bcb3adb4ac
+|   |   |-- 3b7bbdff8600e45e
+|   |   |-- 3d2b36835512d57e
+|   |   |-- 4093a4056e3ed640
+|   |   |-- 40bd549cffe1dc41
+|   |   |-- 41d662f99bd58f37
+|   |   |-- 432ffc6b1d3385af
+|   |   |-- 46b03a60678f44dd
+|   |   |-- 471dc2d32d0357fb
+|   |   |-- 47b65f8dbbcf8e4a
+|   |   |-- 4931c7f42526aede
+|   |   |-- 4ae095b17a1de95e
+|   |   \-- ... (109 more entries truncated; cap=50)
+|   |-- unicode_data/
+|   |   \-- 14.0.0/
+|   |       |-- charmap.json.gz
+|   |       \-- codec-utf-8.json.gz
+|   \-- .gitignore
 |-- ci/
 |   |-- gate-policy.md
 |   |-- playwright-nightly.md
@@ -146,54 +202,6 @@ yield-achievement-kanban/
 |-- frontend/
 |   |-- .cdd/
 |   |   \-- code-map.yml
-|   |-- playwright-report/
-|   |   |-- data/
-|   |   |   |-- 214be76945d583c20bb0046db5a8d37a8a582670.zip
-|   |   |   |-- 283821f7974a904efc8efff1ad5a76dda632102e.zip
-|   |   |   |-- 2860592cb4e227be9c76fd6888b75c17d2ae7e82.zip
-|   |   |   |-- 31009525fd0e52d2f3d070ebed9b8af1f8a3b34b.zip
-|   |   |   |-- 3837a250edceb034d479a4dd7b376702bc0dcbf9.zip
-|   |   |   |-- 476720430030f8be66210a13e0442571ce7ee70e.zip
-|   |   |   |-- 4d34c2732bd8b0995c24bcf8dcd885c4d5250d6f.zip
-|   |   |   |-- 562a3972667b6ad0c4500afbe7c074394498423a.zip
-|   |   |   |-- 59570001857fe3ac87aa9252066ed09ae62f9bac.zip
-|   |   |   |-- 6309795d6ee70f0701b50f261cfcd46498a53eba.zip
-|   |   |   |-- 63cf9da6d23008ddb605a79d78589d1cb15c02d9.zip
-|   |   |   |-- 70970c028df079abf2bd5d82fc828fb92877a533.zip
-|   |   |   |-- 71d0953e2373bb94402c4aafed6aed4cce4fbb9d.zip
-|   |   |   |-- 8aff59ad76396324ea4079fa55881bfc59ecaabb.zip
-|   |   |   |-- 96736f59938fc224cac9cc1f77300ff1d24e95de.zip
-|   |   |   |-- a177346cd8080d39045786fa7fe147e09c904525.zip
-|   |   |   |-- a21d5b0588fd500f6164b5744cc5e34b6f05a75e.zip
-|   |   |   |-- a3e4a85c201290cb51215c8606934b05ae0baecf.zip
-|   |   |   |-- ac4e1a7b1f0130eacc60125f2b02c0901468d96f.zip
-|   |   |   |-- b8f8d5a520f63e75f184c8c1f89007b6d54ba4ed.zip
-|   |   |   |-- b915ea7b659af1e8fd8b41836cd31d8ab55952c7.zip
-|   |   |   |-- d70273b34989ff1fe1be9ae4d30c7fc2492151f7.zip
-|   |   |   |-- e71da03115546c62d31c7e85a9aee4308631aa6e.zip
-|   |   |   |-- ef40fd9ee79e413ec9f093ce17c462ed0bac7826.zip
-|   |   |   |-- f216f1341e05b967d5f13d22f402c01299e0e6cf.zip
-|   |   |   |-- f81154645846ec5e0c36007fee612265ed7e4de8.zip
-|   |   |   |-- f85c7d6a062483ecc93e3fb10f7882ccc4deb9e1.zip
-|   |   |   \-- fb12fe91ba78f1103ed0d7259a9aee2e6e4c7a10.zip
-|   |   |-- trace/
-|   |   |   |-- assets/
-|   |   |   |   \-- ... (max depth)
-|   |   |   |-- codeMirrorModule.DYBRYzYX.css
-|   |   |   |-- codicon.DCmgc-ay.ttf
-|   |   |   |-- defaultSettingsView.7ch9cixO.css
-|   |   |   |-- index.BDwrLSGN.js
-|   |   |   |-- index.BVu7tZDe.css
-|   |   |   |-- index.html
-|   |   |   |-- manifest.webmanifest
-|   |   |   |-- playwright-logo.svg
-|   |   |   |-- snapshot.html
-|   |   |   |-- sw.bundle.js
-|   |   |   |-- uiMode.Btcz36p_.css
-|   |   |   |-- uiMode.CQJ9SCIQ.js
-|   |   |   |-- uiMode.html
-|   |   |   \-- xtermModule.DYP7pi_n.css
-|   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
 |   |   \-- ts-resolver-loader.mjs
@@ -501,64 +509,6 @@ yield-achievement-kanban/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
-|   |-- test-results/
-|   |   |-- admin-pages-test-api-error-shows-error-panel-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-api-error-shows-error-panel-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-drawer-management-panel-absent-AC-2-AC-3--chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-drawer-management-panel-absent-AC-2-AC-3--chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-no-get-admin-drawers-request-AC-3--chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-no-get-admin-drawers-request-AC-3--chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-page-header-with-title-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-page-header-with-title-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-page-loads-with-pages-panel-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-page-loads-with-pages-panel-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-page-status-badge-renders-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-page-status-badge-renders-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-pages-table-renders-rows-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-pages-table-renders-rows-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-status-to-02869-sed-to-dev-round-trip-AC-2--chromium/
-|   |   |   \-- trace.zip
-|   |   |-- admin-pages-test-status-to-02869-sed-to-dev-round-trip-AC-2--chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-au-d10da-ts-unauthenticated-to-login-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-au-d10da-ts-unauthenticated-to-login-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-bad-credentials-shows-error-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-bad-credentials-shows-error-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-empty-submit-shows-validation-error-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-empty-submit-shows-validation-error-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-login-page-renders-form-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-login-page-renders-form-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-no-8b66a-ebar-drawers-match-baseline-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-no-8b66a-ebar-drawers-match-baseline-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-su-b7f12-n-redirects-away-from-login-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- portal-shell-login-test-su-b7f12-n-redirects-away-from-login-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -700,9 +650,71 @@ yield-achievement-kanban/
 |   |-- vite.config.ts
 |   \-- vitest.config.js
 |-- logs/
+|   |-- archive/
+|   |   |-- access_20260702_124028.log
+|   |   |-- access_20260702_143629.log
+|   |   |-- access_20260706_090154.log
+|   |   |-- error_20260702_124028.log
+|   |   |-- error_20260702_125019.log
+|   |   |-- error_20260702_143629.log
+|   |   |-- error_20260706_090154.log
+|   |   |-- rq_downtime_worker_20260702_124028.log
+|   |   |-- rq_downtime_worker_20260702_143629.log
+|   |   |-- rq_downtime_worker_20260706_090154.log
+|   |   |-- rq_eap_alarm_worker_20260702_124028.log
+|   |   |-- rq_eap_alarm_worker_20260702_143629.log
+|   |   |-- rq_eap_alarm_worker_20260706_090154.log
+|   |   |-- rq_hold_hist_worker_20260702_124028.log
+|   |   |-- rq_hold_hist_worker_20260702_143629.log
+|   |   |-- rq_hold_hist_worker_20260706_090154.log
+|   |   |-- rq_msd_worker_20260702_124028.log
+|   |   |-- rq_msd_worker_20260702_143629.log
+|   |   |-- rq_msd_worker_20260706_090154.log
+|   |   |-- rq_prod_hist_worker_20260702_124028.log
+|   |   |-- rq_prod_hist_worker_20260702_143629.log
+|   |   |-- rq_prod_hist_worker_20260706_090154.log
+|   |   |-- rq_reject_worker_20260702_124028.log
+|   |   |-- rq_reject_worker_20260702_143629.log
+|   |   |-- rq_reject_worker_20260706_090154.log
+|   |   |-- rq_resource_worker_20260702_124028.log
+|   |   |-- rq_resource_worker_20260702_143629.log
+|   |   |-- rq_resource_worker_20260706_090154.log
+|   |   |-- rq_warmup_worker_20260702_124028.log
+|   |   |-- rq_warmup_worker_20260702_143629.log
+|   |   |-- rq_warmup_worker_20260706_090154.log
+|   |   |-- rq_worker_20260702_124028.log
+|   |   |-- rq_worker_20260702_143629.log
+|   |   |-- rq_worker_20260706_090154.log
+|   |   |-- rq_yield_alert_worker_20260702_124028.log
+|   |   |-- rq_yield_alert_worker_20260702_143629.log
+|   |   |-- rq_yield_alert_worker_20260706_090154.log
+|   |   |-- watchdog_20260702_124028.log
+|   |   |-- watchdog_20260702_143629.log
+|   |   \-- watchdog_20260706_090154.log
+|   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
+|   |-- error.log
 |   |-- login_sessions.sqlite
-|   \-- metrics_history.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
+|   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
+|   |-- rq_downtime_worker.log
+|   |-- rq_eap_alarm_worker.log
+|   |-- rq_hold_hist_worker.log
+|   |-- rq_msd_worker.log
+|   |-- rq_prod_hist_worker.log
+|   |-- rq_query_tool_worker.log
+|   |-- rq_reject_worker.log
+|   |-- rq_resource_worker.log
+|   |-- rq_warmup_worker.log
+|   |-- rq_worker.log
+|   |-- rq_yield_alert_worker.log
+|   |-- startup.log
+|   \-- watchdog.log
 |-- scripts/
 |   |-- sql/
 |   |   \-- production_achievement_tables.sql
@@ -1200,26 +1212,96 @@ yield-achievement-kanban/
 |   |-- test_core_exceptions.py
 |   \-- ... (195 more entries truncated; cap=50)
 |-- tmp/
+|   |-- duckdb_jobs/
+|   |   |-- eap_alarm/
+|   |   |-- production_history/
+|   |   |-- reject_dataset/
+|   |   \-- test_ns/
 |   |-- query_spool/
-|   |   |-- probe_515509.json
-|   |   |-- probe_578737.json
-|   |   |-- probe_580544.json
-|   |   |-- probe_582022.json
-|   |   |-- probe_583362.json
-|   |   |-- probe_584579.json
-|   |   |-- probe_586570.json
-|   |   |-- probe_587788.json
-|   |   |-- probe_589255.json
-|   |   |-- probe_590135.json
-|   |   |-- probe_590997.json
-|   |   |-- probe_592490.json
-|   |   |-- probe_593702.json
-|   |   |-- probe_594400.json
-|   |   |-- probe_595767.json
-|   |   \-- probe_596994.json
-|   \-- mes_dashboard_restart.flag
+|   |   |-- anomaly_hold_dataset/
+|   |   |   \-- 7c193f4e1ec6e300.parquet
+|   |   |-- anomaly_reject_dataset/
+|   |   |   \-- 858f092b53042f96.parquet
+|   |   |-- anomaly_resource_dataset/
+|   |   |   \-- daa76e309ed12ee6.parquet
+|   |   |-- anomaly_yield_dataset/
+|   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- 82641904d6697e31.parquet
+|   |   |-- reject_dataset/
+|   |   |   \-- 250a0b6f73fa8307.parquet
+|   |   |-- resource_dataset/
+|   |   |   |-- 078a84dc80d606bc.parquet
+|   |   |   \-- 5748bf29536c7fce.parquet
+|   |   |-- resource_oee/
+|   |   |   |-- 09fc08d427246217.parquet
+|   |   |   \-- 61768f9604660e04.parquet
+|   |   |-- yield_alert_dataset/
+|   |   |   \-- 58e7d3b631f8ec15.parquet
+|   |   |-- probe_103606.json
+|   |   |-- probe_104090.json
+|   |   |-- probe_104859.json
+|   |   |-- probe_105315.json
+|   |   |-- probe_106617.json
+|   |   |-- probe_106916.json
+|   |   |-- probe_107457.json
+|   |   |-- probe_108141.json
+|   |   |-- probe_108854.json
+|   |   |-- probe_109685.json
+|   |   |-- probe_109999.json
+|   |   |-- probe_111796.json
+|   |   |-- probe_112205.json
+|   |   |-- probe_112672.json
+|   |   |-- probe_113314.json
+|   |   |-- probe_113740.json
+|   |   |-- probe_113938.json
+|   |   |-- probe_114639.json
+|   |   |-- probe_12085.json
+|   |   |-- probe_127692.json
+|   |   |-- probe_128330.json
+|   |   |-- probe_156959.json
+|   |   |-- probe_168402.json
+|   |   |-- probe_172172.json
+|   |   |-- probe_173016.json
+|   |   |-- probe_181609.json
+|   |   |-- probe_181912.json
+|   |   |-- probe_181994.json
+|   |   |-- probe_191779.json
+|   |   |-- probe_191826.json
+|   |   |-- probe_199074.json
+|   |   |-- probe_199732.json
+|   |   |-- probe_205549.json
+|   |   |-- probe_205775.json
+|   |   |-- probe_205989.json
+|   |   |-- probe_206035.json
+|   |   |-- probe_215284.json
+|   |   |-- probe_215386.json
+|   |   |-- probe_236639.json
+|   |   |-- probe_267375.json
+|   |   |-- probe_267626.json
+|   |   \-- ... (18 more entries truncated; cap=50)
+|   |-- downtime_analysis.duckdb
+|   |-- gunicorn.pid
+|   |-- mes_dashboard_restart_state.json
+|   |-- resource_history.duckdb
+|   |-- rq_downtime_worker.pid
+|   |-- rq_eap_alarm_worker.pid
+|   |-- rq_hold_hist_worker.pid
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_query_tool_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_resource_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_warmup_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
+|-- .coverage
 |-- .dockerignore
+|-- .env
+|-- .env.dev
 |-- .env.example
+|-- .env.prd
 |-- .gitignore
 |-- Check.md
 |-- CLAUDE.md
