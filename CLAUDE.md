@@ -14,8 +14,8 @@ conda activate mes-dashboard          # 啟動環境
 conda run -n mes-dashboard <cmd>      # 單次執行
 
 # Backend
-flask run                             # 開發 server（需先 activate）
-gunicorn -c gunicorn.conf.py 'src.mes_dashboard.app:create_app()'  # production
+PYTHONPATH=src flask --app mes_dashboard.app:create_app run      # 開發 server（需先 activate）
+PYTHONPATH=src gunicorn -c gunicorn.conf.py 'mes_dashboard.app:create_app()'  # production
 
 # Frontend
 cd frontend && npm run dev            # Vite dev server（含 HMR）
@@ -40,7 +40,7 @@ cdd-kit detect-stack                  # 偵測專案技術棧
 ```
 src/mes_dashboard/
   app.py                  # Flask app factory；Blueprint 掛載；runtime-contract 驗證
-  routes/                 # 28 個 Blueprint 模組（每個功能模組一個檔案）
+  routes/                 # 29 個 Blueprint 模組（每個功能模組一個檔案）
   services/               # 業務邏輯層（routes 呼叫 services，禁止直接 DB）
   core/response.py        # success_response / error_response 統一回應輔助函式
   config/settings.py      # 環境設定（從 .env 載入）
@@ -114,13 +114,13 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `cdd-kit contract endpoint set` only mutates table cells (auth/request/response/errors/tests), never prose sections (Compatibility Notes/CHANGELOG) — a hook-blocked prose-only note is a legitimate deferral if documented elsewhere (e.g. business-rules.md), not a corner cut — see docs/cdd-kit-patterns.md
 - Stage only the specific `specs/changes/<id>/`, never all of `specs/changes/` — sibling scaffolds fail the pre-commit hook
 - `gate --strict` only runs the changed-area test ladder; before pushing a removal or shape change, grep the full test tree and run full pytest locally
-- Full pytest run regenerates ~160 contract samples; `git checkout tests/contract/samples/` then re-stage only your change's samples
+- Full pytest run regenerates the whole contract sample set (180+ files, currently 182); `git checkout tests/contract/samples/` then re-stage only your change's samples
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md`:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS
 - Node ≥22.6 required (`--experimental-strip-types` parity tests)
 - vue-echarts: bind `@click` on `<VChart>`, not imperative `.on()`
-- `MultiSelect.vue` shared by 12 apps — changes must be additive, grep consumers first
+- `MultiSelect.vue` shared by 16 apps — changes must be additive, grep consumers first
 - Snapshot-diff filter composables: re-sync `_lastCommitted` from `selection` after every `fetchFilterOptions`
 - Oracle DATE midnight UTC columns: inspect H/M/S via regex before `new Date()` (avoids ±8h TZ shift)
 - WAI-ARIA combobox close must `nextTick(() => triggerEl.focus())`
@@ -130,11 +130,11 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Feature CSS must be scoped under `.theme-<name>`; unscoped rules bleed permanently (`css:check` Rule 6)
 - Local Playwright/E2E runs serve pre-built `dist/`, not live source — `npm run build` before testing CSS/JS/Vue changes
 - `<Teleport to="body">` breaks descendant selectors — wrap content in a `.theme-<feature>` div (rule 4.4)
-- `resource-shared/styles.css` `:is()` groups must include every portal-shell page theme (rule 4.5)
+- `resource-shared/styles.css` `:is()` groups must include every page theme that reuses resource-shared component classes (rule 4.5) — a few themes (e.g. admin-pages, material-consumption) intentionally replicate rules locally instead of joining the group
 
 **Cache & spool patterns** — see `docs/architecture/cache-spool-patterns.md`:
 - Pre-warm namespace must exactly match the key pattern user queries read
-- Multi-worker gunicorn Oracle loads: file-based `O_CREAT|O_EXCL` exclusive lock
+- Multi-worker gunicorn Oracle loads: file-based exclusive lock (`container_filter_cache.py` uses `O_CREAT|O_EXCL`; `resource_history_duckdb_cache.py` moved to `flock(LOCK_EX|LOCK_NB)` to avoid a stale-sentinel deadlock)
 - Parquet schema breaks: add `rm` to rollback runbook AND bump `_SCHEMA_VERSION` in the same commit
 - Legacy vs. unified spool paths with different columns: document each path's columns separately — never a blanket "UNCHANGED"
 - query-tool has no persistent spool — skip parquet cleanup in its rollbacks
@@ -172,7 +172,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 **Modernization policy** — see `docs/architecture/modernization-policy.md`:
 - Page add/remove: update `asset_readiness_manifest.json` + `route_scope_matrix.json` (`docs/migration/`), `vite.config.ts` `INPUT_MAP`, and `portal-shell/routeContracts.js` `ROUTE_CONTRACTS` — omitting `INPUT_MAP` blocks boot, omitting `ROUTE_CONTRACTS` only warns
 - `data/page_status.json`: manually delete page entry on code removal (never auto-updated)
-- `drawer_id` change in `page_status.json`: update corresponding test assertion and rename method
+- `drawer_id` lives in `portal-shell/navigationManifest.js`, not `page_status.json` (which only stores route→status) — update the corresponding test assertion and rename method there
 
 **Test coverage discipline** — see `docs/architecture/test-discipline.md`:
 - Use `call_args.kwargs[key]` per-kwarg assertions, not `assert_called_once_with()` whitelist
