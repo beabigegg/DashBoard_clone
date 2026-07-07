@@ -430,6 +430,71 @@ class TestEapAlarmCrossChannelDedup:
         assert _SHAPE_B_DEDUP_TOLERANCE_SECONDS == 60
 
 
+class TestEapAlarmFlappingPairingArtifact:
+    """Regression coverage for the heavy-flapping mis-pairing artifact found in
+    the 2026-07-07 full-week production measurement (ADR-0015 follow-up):
+    GDBA-0121 AlarmID 3340 fired 3+ SETs in one window with no intervening
+    CLEAR, and every one of those SETs paired to the SAME distant CLEAR
+    (e.g. two real SETs at 07:51:58 and 07:55:20 both closed at 09:43:12,
+    ~1.75h and ~1.63h later respectively) because `_PAIR_SQL`'s pairing join
+
+        LEFT JOIN clear_events c ON ... c.CLEAR_TIME > s.ALARM_TIME
+        GROUP BY ... -- MIN(c.CLEAR_TIME) per SET
+
+    resolves each SET's end time independently: it is NOT a one-to-one
+    greedy match that consumes a CLEAR once assigned. When N SETs for the
+    same (EQP_ID, ALARM_ID) occur back-to-back with no CLEAR between them,
+    the next available CLEAR is shared by all N of them, producing N output
+    rows that each claim (wrongly, for N-1 of them) to have run until that
+    same far-future CLEAR. This is accepted current behavior (not fixed
+    here — the SQL is unchanged); this test exists to pin it so a future
+    change to the pairing rule is a deliberate, measured decision rather
+    than a silent side effect.
+    """
+
+    def test_multiple_sets_share_one_distant_clear(self, tmp_path, monkeypatch):
+        """3 SETs with no CLEAR in between all pair to the same later CLEAR,
+        producing 3 rows (not 1) with 3 different, all-inflated durations."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-0121", "EQP_SECS_ALARM", "3340", "2025-01-01 07:51:58"),
+            ("A2", "GDBA-0121", "EQP_SECS_ALARM", "3340", "2025-01-01 07:55:20"),
+            ("A3", "GDBA-0121", "EQP_SECS_ALARM", "3340", "2025-01-01 09:34:41"),
+            ("A4", "GDBA-0121", "EQP_SECS_ALARM", "3340", "2025-01-01 09:43:12"),
+        ])
+        detail = [
+            ("A1", "AlarmCode", "-4"),
+            ("A2", "AlarmCode", "-4"),
+            ("A3", "AlarmCode", "-4"),
+            ("A4", "AlarmCode", "4"),  # the only CLEAR in the window
+        ]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], detail)
+
+        # All 3 SETs survive as separate rows — the pairing SQL does not
+        # merge/consume them, so this is 3 rows, not 1.
+        assert len(df) == 3, df
+        ends = set(df["ALARM_END"])
+        assert len(ends) == 1, "all three SETs should share the one available CLEAR"
+        durations = sorted(df["DURATION_SECONDS"])
+        # Same CLEAR, different SET times -> different (and for two of the
+        # three, wrong) durations. Values below are exact for this fixture;
+        # a change here signals the pairing rule itself changed.
+        assert durations == [511.0, 6472.0, 6674.0], durations
+
+    def test_set_immediately_followed_by_its_own_clear_is_unaffected(self, tmp_path, monkeypatch):
+        """Sanity check: a clean SET/CLEAR pair with no flapping neighbors
+        still pairs correctly — the artifact above is specific to repeated
+        SETs sharing one CLEAR, not a general pairing regression."""
+        events = _shapeb_events_table([
+            ("A1", "GDBA-0121", "EQP_SECS_ALARM", "3340", "2025-01-01 07:51:58"),
+            ("A2", "GDBA-0121", "EQP_SECS_ALARM", "3340", "2025-01-01 07:52:08"),
+        ])
+        detail = [("A1", "AlarmCode", "-4"), ("A2", "AlarmCode", "4")]
+        df = _run_shapeb_post_aggregate(tmp_path, monkeypatch, [events], detail)
+
+        assert len(df) == 1, df
+        assert df.iloc[0]["DURATION_SECONDS"] == 10.0
+
+
 class TestAlarmEventSqlTemplates:
     """EA-EVT: Oracle templates include both shapes; non-alarm aliases stay excluded."""
 
