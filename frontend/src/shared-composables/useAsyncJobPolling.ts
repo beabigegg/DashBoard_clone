@@ -3,8 +3,29 @@ import { apiGet } from '../core/api.js';
 const JOB_POLL_INTERVAL_MS = 3000;
 const JOB_POLL_MAX_MS = 1800000; // 30 minutes
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function createAbortError(): DOMException {
+  return new DOMException('Aborted', 'AbortError');
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(createAbortError());
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    function onAbort(): void {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', onAbort);
+      reject(createAbortError());
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 export interface JobStatusResponse {
@@ -62,7 +83,7 @@ export async function pollJobUntilComplete(
 
   while (true) {
     if (signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError');
+      throw createAbortError();
     }
 
     const raw = await apiGet(statusUrl, { timeout: 15000, signal });
@@ -91,7 +112,7 @@ export async function pollJobUntilComplete(
       throw error;
     }
 
-    await sleep(pollIntervalMs);
+    await sleep(pollIntervalMs, signal);
   }
 }
 

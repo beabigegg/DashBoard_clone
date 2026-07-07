@@ -81,4 +81,39 @@ describe('useAiChat subtasks parsing', () => {
     const aiMsg = chat.messages.value[chat.messages.value.length - 1];
     expect(aiMsg.subtasks).toEqual([]);
   });
+
+  it('keeps the latest request loading state when a previous request is aborted', async () => {
+    vi.useRealTimers();
+    let resolveSecond: ((value: unknown) => void) | undefined;
+
+    const fetchMock = vi.fn()
+      .mockImplementationOnce((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        );
+      }))
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveSecond = resolve;
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const chat = useAiChat();
+    const first = chat.submitQuestion('第一個問題');
+    const second = chat.submitQuestion('第二個問題');
+
+    await first;
+    expect(chat.isLoading.value).toBe(true);
+
+    resolveSecond?.({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ data: { answer: '第二個回答' } }),
+    });
+    await second;
+
+    expect(chat.isLoading.value).toBe(false);
+    expect(chat.messages.value.at(-1)).toMatchObject({ role: 'ai', content: '第二個回答' });
+  });
 });

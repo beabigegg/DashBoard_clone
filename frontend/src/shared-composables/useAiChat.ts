@@ -52,6 +52,7 @@ export function useAiChat(): AiChatComposable {
   let rateLimitTimer: ReturnType<typeof setInterval> | null = null;
   let loadingStepTimer: ReturnType<typeof setInterval> | null = null;
   let abortController: AbortController | null = null;
+  let activeRequestId = 0;
 
   const canSubmit: ComputedRef<boolean> = computed(() => !isLoading.value && !isRateLimited.value);
 
@@ -62,6 +63,7 @@ export function useAiChat(): AiChatComposable {
   ];
 
   function _startLoadingSteps(): void {
+    _clearLoadingSteps();
     let step = 0;
     loadingStepText.value = _LOADING_STEPS[0];
     loadingStepTimer = setInterval(() => {
@@ -95,7 +97,9 @@ export function useAiChat(): AiChatComposable {
     if (abortController) {
       abortController.abort();
     }
-    abortController = new AbortController();
+    const requestId = ++activeRequestId;
+    const controller = new AbortController();
+    abortController = controller;
 
     messages.value = [...messages.value, { role: 'user', content: trimmed }];
     isLoading.value = true;
@@ -109,8 +113,10 @@ export function useAiChat(): AiChatComposable {
           question: trimmed,
           conversation_id: conversationId.value,
         }),
-        signal: abortController.signal,
+        signal: controller.signal,
       });
+
+      if (requestId !== activeRequestId) return;
 
       if (response.status === 429) {
         isRateLimited.value = true;
@@ -140,6 +146,8 @@ export function useAiChat(): AiChatComposable {
         [key: string]: unknown;
       };
 
+      if (requestId !== activeRequestId) return;
+
       if (!response.ok) {
         const errorMsg = payload?.error?.message || `伺服器錯誤 (${response.status})`;
         messages.value = [...messages.value, { role: 'error', content: errorMsg }];
@@ -162,17 +170,22 @@ export function useAiChat(): AiChatComposable {
         subtasks: Array.isArray(data?.subtasks) ? (data.subtasks as AiSubtask[]) : [],
       };
 
-      messages.value = [...messages.value, aiMessage];
+      if (requestId === activeRequestId) {
+        messages.value = [...messages.value, aiMessage];
+      }
     } catch (err: unknown) {
       if ((err as Error).name === 'AbortError') return;
+      if (requestId !== activeRequestId) return;
       messages.value = [
         ...messages.value,
         { role: 'error', content: (err as Error).message || '網路錯誤，請稍後再試。' },
       ];
     } finally {
-      isLoading.value = false;
-      _clearLoadingSteps();
-      abortController = null;
+      if (requestId === activeRequestId) {
+        isLoading.value = false;
+        _clearLoadingSteps();
+        abortController = null;
+      }
     }
   }
 

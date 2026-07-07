@@ -201,15 +201,17 @@ def _query_mysql(
 
         # Recent sessions (status from MySQL may lag behind SQLite;
         # cross-reference with authoritative SQLite active sessions by session_id)
-        recent_rows = conn.execute(text("""
+        recent_rows = conn.execute(text(f"""
             SELECT session_id, emp_id AS username, display_name, department,
                    login_time, duration_sec,
                    CASE WHEN logout_time IS NULL AND last_active >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
                         THEN 'active' ELSE 'ended' END AS status
             FROM dashboard_login_sessions
+            WHERE login_time >= :start_date AND login_time < :end_date
+            {dept_filter}
             ORDER BY login_time DESC
             LIMIT 20
-        """)).mappings().all()
+        """), params).mappings().all()
         active_sids = _get_sqlite_active_session_ids()
         recent_sessions = [
             {
@@ -370,14 +372,16 @@ def _query_sqlite(
         ]
 
         # Recent sessions
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT emp_id, display_name, department, login_time, duration_sec,
                    CASE WHEN logout_time IS NULL AND last_active >= datetime('now', '-30 minutes')
                         THEN 'active' ELSE 'ended' END AS status
             FROM login_sessions
+            WHERE login_time >= ? AND login_time < ?
+            {dept_filter}
             ORDER BY login_time DESC
             LIMIT 20
-        """)
+        """, base_params)
         recent_sessions = [
             {
                 "username": r[0],

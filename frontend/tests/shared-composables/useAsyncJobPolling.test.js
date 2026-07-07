@@ -195,6 +195,26 @@ describe('pollJobUntilComplete — abort signal', () => {
     expect(apiGet).not.toHaveBeenCalled();
   });
 
+  it('aborts immediately while waiting for the next poll interval', async () => {
+    const controller = new AbortController();
+    apiGet.mockResolvedValue({ data: { status: 'running', pct: 10 } });
+
+    const promise = pollJobUntilComplete('/api/job/abort-during-sleep', {
+      signal: controller.signal,
+      pollIntervalMs: 5000,
+      maxPollMs: 10000,
+    });
+    const resultPromise = promise.catch((e) => e);
+
+    await vi.advanceTimersByTimeAsync(1);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(1);
+
+    const err = await resultPromise;
+    expect(err.name).toBe('AbortError');
+    expect(apiGet).toHaveBeenCalledTimes(1);
+  });
+
   it('stops polling when signal is aborted mid-poll', async () => {
     const controller = new AbortController();
 

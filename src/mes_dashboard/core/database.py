@@ -795,12 +795,13 @@ def read_sql_df_slow(
         timeout_ms = runtime["slow_call_timeout_ms"]
     else:
         timeout_ms = timeout_seconds * 1000
+    acquire_timeout = max(float(runtime.get("slow_pool_timeout", 30)), 1.0)
 
     sem = _get_slow_query_semaphore()
     with _SLOW_QUERY_LOCK:
         _SLOW_QUERY_WAITING += 1
     try:
-        acquired = sem.acquire(timeout=60)
+        acquired = sem.acquire(timeout=acquire_timeout)
     finally:
         with _SLOW_QUERY_LOCK:
             _SLOW_QUERY_WAITING -= 1
@@ -816,6 +817,7 @@ def read_sql_df_slow(
     logger.info("Slow query starting (active=%s, timeout_ms=%s)", active, timeout_ms)
     start_time = time.time()
     conn = None
+    cursor = None
     pooled = False
     try:
         conn, pooled = _get_slow_query_connection(runtime, timeout_ms)
@@ -828,7 +830,6 @@ def read_sql_df_slow(
         cursor.execute(sql, params or {})
         columns = [desc[0].upper() for desc in cursor.description]
         rows = cursor.fetchall()
-        cursor.close()
 
         df = pd.DataFrame(rows, columns=columns)
 
@@ -856,6 +857,11 @@ def read_sql_df_slow(
     finally:
         elapsed = time.time() - start_time
         record_query_latency(elapsed)
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
         if conn:
             try:
                 conn.close()
@@ -886,6 +892,19 @@ def read_sql_df_slow_iter(
     """
     global _SLOW_QUERY_ACTIVE, _SLOW_QUERY_WAITING
     from mes_dashboard.core.metrics import record_query_latency
+    from mes_dashboard.core.circuit_breaker import (
+        get_database_circuit_breaker,
+        CIRCUIT_BREAKER_ENABLED,
+    )
+
+    circuit_breaker = get_database_circuit_breaker()
+    if not circuit_breaker.allow_request():
+        logger.warning("Circuit breaker OPEN - rejecting slow database iter query")
+        retry_after = max(int(getattr(circuit_breaker, "recovery_timeout", 30)), 1)
+        raise DatabaseCircuitOpenError(
+            "Database service is temporarily unavailable (circuit breaker open)",
+            retry_after_seconds=retry_after,
+        )
 
     runtime = get_db_runtime_config()
     if timeout_seconds is None:
@@ -895,12 +914,13 @@ def read_sql_df_slow_iter(
 
     if batch_size is None:
         batch_size = runtime["slow_fetchmany_size"]
+    acquire_timeout = max(float(runtime.get("slow_pool_timeout", 30)), 1.0)
 
     sem = _get_slow_query_semaphore()
     with _SLOW_QUERY_LOCK:
         _SLOW_QUERY_WAITING += 1
     try:
-        acquired = sem.acquire(timeout=60)
+        acquired = sem.acquire(timeout=acquire_timeout)
     finally:
         with _SLOW_QUERY_LOCK:
             _SLOW_QUERY_WAITING -= 1
@@ -916,6 +936,7 @@ def read_sql_df_slow_iter(
     logger.info("Slow query iter starting (active=%s, timeout_ms=%s, batch_size=%s)", active, timeout_ms, batch_size)
     start_time = time.time()
     conn = None
+    cursor = None
     pooled = False
     total_rows = 0
     try:
@@ -936,9 +957,9 @@ def read_sql_df_slow_iter(
             total_rows += len(rows)
             yield columns, rows
 
-        cursor.close()
-
         elapsed = time.time() - start_time
+        if CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker.record_success()
         if elapsed > 1.0:
             sql_preview = sql.strip().replace('\n', ' ')[:100]
             logger.warning(f"Slow query iter ({elapsed:.2f}s, rows={total_rows}): {sql_preview}...")
@@ -947,6 +968,8 @@ def read_sql_df_slow_iter(
 
     except Exception as exc:
         elapsed = time.time() - start_time
+        if CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker.record_failure()
         ora_code = _extract_ora_code(exc)
         sql_preview = sql.strip().replace('\n', ' ')[:100]
         logger.error(
@@ -956,6 +979,11 @@ def read_sql_df_slow_iter(
     finally:
         elapsed = time.time() - start_time
         record_query_latency(elapsed)
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
         if conn:
             try:
                 conn.close()

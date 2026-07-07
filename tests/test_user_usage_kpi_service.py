@@ -137,3 +137,51 @@ class TestGetUserUsageKpiRoutingLogic:
         ):
             get_user_usage_kpi("2026-03-01", "2026-03-31")
         assert captured["end"] == "2026-04-01"
+
+
+class TestRecentSessionsFilters:
+    """Recent session rows should respect the same date/department filters as KPI cards."""
+
+    def test_sqlite_recent_sessions_uses_period_and_department_filters(self):
+        from mes_dashboard.services.user_usage_kpi_service import _query_sqlite
+
+        executed = []
+
+        class Cursor:
+            def execute(self, sql, params=()):
+                executed.append((sql, tuple(params)))
+
+            def fetchone(self):
+                return (0, 0, None)
+
+            def fetchall(self):
+                return []
+
+        class Conn:
+            def cursor(self):
+                return Cursor()
+
+        class Store:
+            _initialized = True
+            def _get_connection(self):
+                class CM:
+                    def __enter__(self):
+                        return Conn()
+                    def __exit__(self, *_args):
+                        return False
+                return CM()
+            def get_online_count(self):
+                return 0
+            def get_active_count(self):
+                return 0
+
+        with patch(
+            "mes_dashboard.core.login_session_store.get_login_session_store",
+            return_value=Store(),
+        ):
+            _query_sqlite("2026-03-01", "2026-04-01", "QA")
+
+        recent_sql, recent_params = executed[-2]
+        assert "WHERE login_time >= ? AND login_time < ?" in recent_sql
+        assert "AND department = ?" in recent_sql
+        assert recent_params == ("2026-03-01", "2026-04-01", "QA")
