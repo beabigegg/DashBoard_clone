@@ -71,6 +71,12 @@ Pattern: `frontend/tests/playwright/resource-history-async.spec.ts` — AC-9 `pa
 
 Evidence: `resource-history-rq-async` — fix commit `f8b15d6`.
 
+## Playwright `page.route()` Ordering Is LIFO
+
+**Playwright matches the most-recently-registered `page.route()` handler first.** Register catch-all/base mocks (auth, generic API fallback) FIRST so they have the lowest match priority, then register specific per-test route overrides LAST so they win. Registering in the opposite order causes the catch-all to shadow the specific mock and the test asserts against the wrong (fallback) response.
+
+Pattern: `frontend/tests/playwright/db-scheduling.spec.ts` — catch-all + base routes registered first, specific queue route registered last with an explicit `// LIFO: higher priority` comment.
+
 ## Async-Gated Route Unit Tests — Mock `is_async_available()`, Not Spool-Hit
 
 **The `backend-tests` CI job has no Redis service.** `is_async_available()` returns `False` when Redis is unreachable, causing routes for async-only domains (production-history, reject-history) to fall through to a 503 degraded response. Tests that expected 200/202 fail with 503.
