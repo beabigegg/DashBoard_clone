@@ -9,6 +9,16 @@
  *     the frontend must surface this without crashing, distinct from the
  *     403 (FORBIDDEN) permission-denied path.
  *
+ * Updated by production-achievement-async-spool (ADR-0016): GET .../report
+ * is now an always-async spool-backed endpoint (data-shape-contract.md
+ * §3.28). The MySQL-degrade scenario now means: `targets_map` degrades to
+ * an EMPTY array (get_targets_map()'s documented MYSQL_OPS_ENABLED=false
+ * behavior, §3.28.3) while `spec_workcenter_map` stays populated (Oracle
+ * -backed, unaffected by MySQL) — the first test below mocks a 200
+ * spool-hit envelope with a real, schema-correct Parquet fixture and an
+ * empty targets_map, so every rolled-up row's target_qty/achievement_rate
+ * come out null via DuckDB-WASM's real LEFT JOIN, not a hand-authored row.
+ *
  * Network strategy: catch-all first, specific routes last (LIFO), per
  * ci-workflow.md. Uses page.goto(...).catch(()=>{}) + guard, NOT
  * page.request.post() (loginViaApi), which is not interceptable by
@@ -18,6 +28,11 @@
 import { test, expect } from '@playwright/test';
 
 const PAGE_URL = '/portal-shell/production-achievement';
+
+// Real 1-row Parquet (data-shape-contract.md §3.28.1 schema), generated via
+// the `duckdb` Python package: (2026-06-01, D, SPEC-A1, 500).
+const ONE_ROW_A1_500_PARQUET_B64 =
+  'UEFSMRUAFRQVGCwVAhUAFQYVBgAACiQCAAAAAgF9UAAAFQAVFhUaLBUCFQAVBhUGAAALKAIAAAACAQEAAABEFQAVIhUmLBUCFQAVBhUGAAARQAIAAAACAQcAAABTUEVDLUExFQAVHBUgLBUCFQAVBhUGAAAONAIAAAACAfQBAAAAAAAAFQIZXDUAGA1kdWNrZGJfc2NoZW1hFQgAFQIlAhgLb3V0cHV0X2RhdGUlDAAVDCUCGApzaGlmdF9jb2RlJQAAFQwlAhgIU1BFQ05BTUUlAAAVBCUCGBFhY3R1YWxfb3V0cHV0X3F0eSUkABYCGRwZTCYAHBUCGRUAGRgLb3V0cHV0X2RhdGUVAhYCFjYWOiYIPBgEfVAAABgEfVAAABYAKAR9UAAAGAR9UAAAEREAAAAmABwVDBkVABkYCnNoaWZ0X2NvZGUVAhYCFjgWPCZCPBgBRBgBRBYAKAFEGAFEEREAAAAmABwVDBkVABkYCFNQRUNOQU1FFQIWAhZEFkgmfjwYB1NQRUMtQTEYB1NQRUMtQTEWACgHU1BFQy1BMRgHU1BFQy1BMRERAAAAJgAcFQQZFQAZGBFhY3R1YWxfb3V0cHV0X3F0eRUCFgIWPhZCJsYBPBgI9AEAAAAAAAAYCPQBAAAAAAAAFgAoCPQBAAAAAAAAGAj0AQAAAAAAABERAAAAFvABFgImCBaAAgAoKER1Y2tEQiB2ZXJzaW9uIHYxLjUuNCAoYnVpbGQgMDhlMzRjNDQ3YikZTBwAABwAABwAABwAAADHAQAAUEFSMQ==';
 
 function envelope(data) {
   return JSON.stringify({ success: true, data, meta: { timestamp: new Date().toISOString(), app_version: 'test' } });
@@ -73,14 +88,28 @@ test.describe('production-achievement resilience — MySQL unavailable', () => {
         route.continue();
       }
     });
-    // Report degrades: target_qty/achievement_rate null for every row, actual_output_qty still populated.
+    // Report degrades: spec_workcenter_map stays populated (Oracle-backed,
+    // unaffected by MySQL) but targets_map is EMPTY (MySQL down ->
+    // get_targets_map() degradation, §3.28.3) -- DuckDB-WASM's real LEFT
+    // JOIN then yields target_qty/achievement_rate = null for every row,
+    // actual_output_qty still populated from the real spool.
     await page.route('**/api/production-achievement/report**', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: envelope([
-          { output_date: '2026-06-01', shift_code: 'D', workcenter_group: 'A1', actual_output_qty: 500, target_qty: null, achievement_rate: null },
-        ]),
+        body: envelope({
+          query_id: 'pa-mysql-down-001',
+          spool_download_url: '/api/spool/production_achievement/pa-mysql-down-001.parquet',
+          spec_workcenter_map: [{ SPECNAME: 'SPEC-A1', workcenter_group: 'A1' }],
+          targets_map: [],
+        }),
+      });
+    });
+    await page.route('**/api/spool/production_achievement/pa-mysql-down-001.parquet**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from(ONE_ROW_A1_500_PARQUET_B64, 'base64'),
       });
     });
 
@@ -106,6 +135,11 @@ test.describe('production-achievement resilience — MySQL unavailable', () => {
     const reportCard = page.locator('.ui-card', { has: page.locator('.ui-card-title', { hasText: '生產達成率明細' }) });
     const table = reportCard.locator('[data-testid="datatable"]');
     await expect(table).toBeVisible({ timeout: 15_000 });
+    // Web-first wait for the real DuckDB-WASM rollup+join to actually
+    // populate the row (not an immediate innerText() read, which would race
+    // the async fetch + parquet register + rollup against a merely-visible
+    // -but-still-loading table).
+    await expect(table.locator('[data-testid="datatable-row"]')).toHaveCount(1, { timeout: 20_000 });
 
     const text = await table.innerText();
     expect(text).toContain('—');

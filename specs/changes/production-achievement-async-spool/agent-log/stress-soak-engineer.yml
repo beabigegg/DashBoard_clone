@@ -1,0 +1,32 @@
+change-id: production-achievement-async-spool
+agent: stress-soak-engineer
+status: done
+verdict: sign-off-conditionally-granted
+summary: >
+  Reconstructed by main Claude from verified deliverables on disk (completion
+  notification not received; work products confirmed present + inspected).
+  Wrote tests/stress/test_production_achievement_stress.py (pytest.mark.stress —
+  excluded from Tier-1 pre-merge gate, weekly/manual): burst-peak bounded no-leak;
+  no-deadlock under mixed success/failure; PA + sibling worker types interleave with
+  no monopolization (verified on slot-ENTRY order); acquire_heavy_query_slot fail-open
+  + job.run() completes when Redis down. Wrote the REQUIRED stress-soak-report.md.
+findings:
+  - id: SS-1
+    severity: high
+    blocking: false
+    detail: >
+      heavy_query_slot in BaseChunkedDuckDBJob.run() is advisory/non-blocking by
+      existing design — run() proceeds regardless of slot outcome, so no lock-based
+      starvation is structurally possible and a live cap-enforcement (blocking) test
+      is not meaningful. Action item BEFORE scaling this worker's queue to 2+ concurrent
+      processes, NOT a Tier-1 merge blocker.
+verdict-detail: >
+  Semaphore-contention verdict: new worker does NOT starve siblings (no queueing at
+  the slot layer). Fail-open when Redis down: yes. No leak, deadlock, starvation, or
+  spool corruption under the current single-worker-process / single-concurrency topology.
+  Sign-off CONDITIONALLY GRANTED for the current deployment topology per ci-gates.md
+  (stress-soak sign-off required before first start of the worker unit).
+artifacts:
+  - { type: stress-test, pointer: "tests/stress/test_production_achievement_stress.py" }
+  - { type: stress-soak-report, pointer: "specs/changes/production-achievement-async-spool/stress-soak-report.md" }
+next-action: "qa-reviewer sign-off; SS-1 tracked as follow-up before multi-process queue scaling"

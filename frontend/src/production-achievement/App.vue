@@ -4,11 +4,16 @@
  *
  * Ordinary filterable report — NOT an auto-refresh/big-screen kanban
  * (explicit non-goal, implementation-plan.md IP-7). Modeled on
- * production-history's filter + DataTable/chart pattern, without the
- * async-job/spool machinery that page needs (this feature is a synchronous
- * Oracle read, api-contract.md rows 256-261).
+ * production-history's filter + DataTable/chart pattern.
+ *
+ * production-achievement-async-spool (ADR-0016): GET .../report is now an
+ * always-async spool-backed endpoint (api-contract.md rows 256-261,
+ * data-shape-contract.md §3.28) — a spool miss enqueues a background job and
+ * polls via the shared AsyncQueryProgress component; a spool hit computes
+ * PA-06/PA-07 client-side in DuckDB-WASM (useProductionAchievementDuckDB).
+ * The rendered row shape is unchanged — only the data path changed.
  */
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useProductionAchievement } from './composables/useProductionAchievement';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import DataTable from '../shared-ui/components/DataTable.vue';
@@ -17,6 +22,7 @@ import ErrorBanner from '../shared-ui/components/ErrorBanner.vue';
 import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
+import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 import AchievementChart from './components/AchievementChart.vue';
 import TargetEditPanel from './components/TargetEditPanel.vue';
 import { formatQty, formatAchievementRate } from './utils';
@@ -33,16 +39,35 @@ const {
   editForbidden,
   editError,
   editSaving,
+  asyncJobProgress,
   fetchFilterOptions,
   fetchTargets,
   runQuery,
   saveTarget,
   resetFilters,
+  cancelQuery,
 } = useProductionAchievement();
 
 onMounted(async () => {
   await Promise.all([fetchFilterOptions(), fetchTargets()]);
 });
+
+// Avoid a zombie poll/timer if the user navigates away mid-query.
+onUnmounted(() => {
+  void cancelQuery();
+});
+
+// Full-page overlay only for the pre-poll phase — once the async job is
+// enqueued, AsyncQueryProgress replaces it so the page stays interactive.
+const showPageLoading = computed(() => loading.value && !asyncJobProgress.active);
+
+// FIX 1 (UX-1): once a query has run, only render the summary/chart/table
+// when it actually SUCCEEDED (no error) — otherwise ErrorBanner above is the
+// sole message, instead of also showing a contradictory "no matching data"
+// empty table underneath a "service unavailable" banner. A genuine
+// zero-row *success* (hasQueried && !error && rows.length === 0) still
+// renders normally — DataTable's own empty-type="filter-empty" state.
+const showResults = computed(() => hasQueried.value && !error.value);
 
 async function handleQuery(): Promise<void> {
   if (loading.value) return;
@@ -142,6 +167,17 @@ const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionA
 
     <ErrorBanner :message="error || ''" :dismissible="false" />
 
+    <!-- RQ async job progress (202 spool-miss path) — replaces the generic
+         loading overlay while the worker fans out; data-shape-contract.md §3.28.4 -->
+    <AsyncQueryProgress
+      :active="asyncJobProgress.active"
+      :progress="asyncJobProgress.progress"
+      :pct="asyncJobProgress.pct"
+      :elapsed-seconds="asyncJobProgress.elapsedSeconds"
+      :status="asyncJobProgress.status"
+      @cancel="cancelQuery"
+    />
+
     <!-- Target-value management (always visible per api-contract.md row 258 — no permission gate on read) -->
     <TargetEditPanel
       :targets="targets"
@@ -153,8 +189,9 @@ const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionA
       @save="handleSaveTarget"
     />
 
-    <!-- Results -->
-    <template v-if="hasQueried">
+    <!-- Results — suppressed on error (FIX 1): ErrorBanner above is the sole
+         message then, instead of also showing a contradictory empty table. -->
+    <template v-if="showResults">
       <SummaryCardGroup :columns="4">
         <SummaryCard label="實際產出總量" :value="totalActual" format="number" accent="brand" />
         <SummaryCard label="整體達成率" :value="overallAchievementRate !== null ? overallAchievementRate * 100 : null" format="percent" accent="success" />
@@ -187,10 +224,10 @@ const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionA
       </div>
     </template>
 
-    <div v-else-if="!loading" class="pa-app__empty-state" data-testid="pa-empty-state">
+    <div v-else-if="!hasQueried && !loading" class="pa-app__empty-state" data-testid="pa-empty-state">
       請選擇日期區間後按「查詢」
     </div>
 
-    <LoadingOverlay v-if="loading" tier="page" />
+    <LoadingOverlay v-if="showPageLoading" tier="page" />
   </div>
 </template>

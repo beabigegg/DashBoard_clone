@@ -1,6 +1,6 @@
-# generated: 2026-07-01T13:11:16Z by cdd-kit 3.6.0
-# files: 976, src-lines: 303669, map-lines: 21711, compression: 14.0x
-# sources-digest: f334372a413f8cee3c13f7810aac53dadcb21c59481c1f49bcdc6191226da3e7
+# generated: 2026-07-08T01:41:26Z by cdd-kit 3.6.0
+# files: 1006, src-lines: 310106, map-lines: 22266, compression: 13.9x
+# sources-digest: e3bfb0ea57db21651ce51303321b2bd7e6153feb60e9ac2b7633e2ba9a75d38a
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -43,20 +43,19 @@ frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   functions:
     - { name: async resolve, lines: 16-50 }
 
-frontend/src/admin-dashboard/App.vue:  # 175 lines
+frontend/src/admin-dashboard/App.vue:  # 180 lines
   imports:
     - { module: vue, items: [computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch], line: 2 }
-    - { module: '../shared-ui/components/PageHeader.vue', items: ['default:PageHeader'], line: 12 }
-    - { module: '../shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 13 }
-    - { module: '../core/api', items: [apiGet], line: 14 }
+    - { module: '../shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 12 }
+    - { module: '../core/api', items: [apiGet], line: 13 }
   constants:
-    - { name: DEFAULT_POLL_INTERVAL_MS, line: 57 }
+    - { name: DEFAULT_POLL_INTERVAL_MS, line: 56 }
   functions:
-    - { name: async syncPollInterval, lines: 60-70 }
-    - { name: async refreshActiveTab, lines: 78-80 }
-    - { name: async refreshNow, lines: 82-90 }
-    - { name: setActiveTab, lines: 98-102 }
-    - { name: toggleAutoRefresh, lines: 104-110 }
+    - { name: async syncPollInterval, lines: 59-69 }
+    - { name: async refreshActiveTab, lines: 77-79 }
+    - { name: async refreshNow, lines: 81-89 }
+    - { name: setActiveTab, lines: 97-101 }
+    - { name: toggleAutoRefresh, lines: 103-109 }
 
 frontend/src/admin-dashboard/components/DauTrendChart.vue:  # 65 lines
   imports:
@@ -149,7 +148,7 @@ frontend/src/admin-dashboard/tabs/LogsTab.vue:  # 270 lines
     - { name: nextPage, lines: 111-115 }
     - { name: async refresh, lines: 123-126 }
 
-frontend/src/admin-dashboard/tabs/OverviewTab.vue:  # 264 lines
+frontend/src/admin-dashboard/tabs/OverviewTab.vue:  # 263 lines
   imports:
     - { module: vue, items: [computed, onMounted], line: 2 }
     - { module: '../../admin-shared/components/StatusDot.vue', items: ['default:StatusDot'], line: 4 }
@@ -288,7 +287,7 @@ frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
   functions:
     - { name: mountWorker, lines: 86-90 }
 
-frontend/src/admin-pages/App.vue:  # 139 lines
+frontend/src/admin-pages/App.vue:  # 202 lines
 
 frontend/src/admin-pages/__tests__/App.test.ts:  # 47 lines
   imports:
@@ -305,6 +304,14 @@ frontend/src/admin-pages/__tests__/PagesManagementPanel.test.ts:  # 28 lines
 
 frontend/src/admin-pages/components/PagesManagementPanel.vue:  # 60 lines
 
+frontend/src/admin-pages/components/TargetPermissionsPanel.vue:  # 97 lines
+
+frontend/src/admin-pages/components/__tests__/TargetPermissionsPanel.test.ts:  # 52 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: '../TargetPermissionsPanel.vue', items: ['default:TargetPermissionsPanel'], line: 4 }
+
 frontend/src/admin-pages/main.ts:  # 7 lines
   imports:
     - { module: vue, items: [createApp], line: 1 }
@@ -318,7 +325,7 @@ frontend/src/admin-shared/components/StatCard.vue:  # 24 lines
 
 frontend/src/admin-shared/components/StatusDot.vue:  # 13 lines
 
-frontend/src/admin-shared/components/TrendChart.vue:  # 113 lines
+frontend/src/admin-shared/components/TrendChart.vue:  # 117 lines
 
 frontend/src/admin-shared/components/__tests__/SummaryCard.test.ts:  # 43 lines
   imports:
@@ -961,28 +968,28 @@ frontend/src/downtime-analysis/types.ts:  # 143 lines
   types:
     - { name: MatchSource, lines: 76-76 }
 
-frontend/src/eap-alarm/App.vue:  # 396 lines
+frontend/src/eap-alarm/App.vue:  # 429 lines
 
-frontend/src/eap-alarm/DetailTable.vue:  # 142 lines
+frontend/src/eap-alarm/DetailTable.vue:  # 164 lines
 
 frontend/src/eap-alarm/FilterBar.vue:  # 294 lines
 
-frontend/src/eap-alarm/FineFilterBar.vue:  # 73 lines
+frontend/src/eap-alarm/FineFilterBar.vue:  # 128 lines
 
-frontend/src/eap-alarm/ParetoChart.vue:  # 140 lines
+frontend/src/eap-alarm/ParetoChart.vue:  # 171 lines
 
-frontend/src/eap-alarm/SummaryCards.vue:  # 44 lines
+frontend/src/eap-alarm/SummaryCards.vue:  # 58 lines
 
-frontend/src/eap-alarm/TrendChart.vue:  # 128 lines
+frontend/src/eap-alarm/TrendChart.vue:  # 158 lines
 
-frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 224 lines
+frontend/src/eap-alarm/composables/useEapAlarmFilter.js:  # 253 lines
   imports:
     - { module: vue, items: [reactive, ref, onMounted], line: 9 }
     - { module: '../../core/api', items: [apiGet], line: 10 }
   functions:
-    - { name: useEapAlarmFilter, lines: 12-224 }
+    - { name: useEapAlarmFilter, lines: 12-253 }
 
-frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 249 lines
+frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 263 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 7 }
     - { module: '../../core/api', items: [apiGet], line: 8 }
@@ -990,7 +997,7 @@ frontend/src/eap-alarm/composables/useEapAlarmViews.js:  # 249 lines
   constants:
     - { name: DEFAULT_PER_PAGE, line: 11 }
   functions:
-    - { name: useEapAlarmViews, lines: 13-249 }
+    - { name: useEapAlarmViews, lines: 13-263 }
 
 frontend/src/eap-alarm/main.js:  # 9 lines
   imports:
@@ -1344,7 +1351,7 @@ frontend/src/mid-section-defect/main.ts:  # 6 lines
     - { module: './App.vue', items: ['default:App'], line: 3 }
     - { module: './style.css', items: [], line: 4 }
 
-frontend/src/portal-shell/App.vue:  # 390 lines
+frontend/src/portal-shell/App.vue:  # 399 lines
   imports:
     - { module: './ai-chat.css', items: [], line: 2 }
     - { module: lucide-vue-next, items: [Activity, AlertCircle, BarChart2, Briefcase, ChevronRight, Circle, Clock, Cpu, GitBranch, Layers, LayoutDashboard, LogOut, Monitor, Package, Search, Settings, TrendingDown, User], line: 4 }
@@ -1369,7 +1376,7 @@ frontend/src/portal-shell/App.vue:  # 390 lines
     - { name: closeSidebar, lines: 120-122 }
     - { name: toggleSidebar, lines: 124-126 }
     - { name: handleGlobalKeydown, lines: 128-135 }
-    - { name: async loadNavigation, lines: 137-201 }
+    - { name: async loadNavigation, lines: 137-210 }
 
 frontend/src/portal-shell/__tests__/navigationManifest.test.ts:  # 111 lines
   imports:
@@ -1428,19 +1435,19 @@ frontend/src/portal-shell/main.js:  # 82 lines
   functions:
     - { name: shouldRecoverByReload, lines: 13-36 }
 
-frontend/src/portal-shell/nativeModuleRegistry.js:  # 113 lines
+frontend/src/portal-shell/nativeModuleRegistry.js:  # 117 lines
   constants:
     - { name: NATIVE_MODULE_LOADERS, line: 20 }
   functions:
     - { name: createNativeLoader, lines: 1-18 }
-    - { name: getNativeModuleLoader, lines: 111-113 }
+    - { name: getNativeModuleLoader, lines: 115-117 }
 
 frontend/src/portal-shell/navigationManifest.d.ts:  # 21 lines
   interfaces:
     - { name: ManifestDrawer, lines: 6-11 }
     - { name: ManifestRoute, lines: 13-18 }
 
-frontend/src/portal-shell/navigationManifest.js:  # 176 lines
+frontend/src/portal-shell/navigationManifest.js:  # 181 lines
 
 frontend/src/portal-shell/navigationState.js:  # 299 lines
   imports:
@@ -1455,26 +1462,26 @@ frontend/src/portal-shell/navigationState.js:  # 299 lines
     - { name: normalizeNavigationDrawers, lines: 51-172 }
     - { name: buildDynamicNavigationState, lines: 190-299 }
 
-frontend/src/portal-shell/routeContracts.js:  # 409 lines
+frontend/src/portal-shell/routeContracts.js:  # 420 lines
   constants:
     - { name: IN_SCOPE_REPORT_ROUTES, line: 1 }
     - { name: IN_SCOPE_ADMIN_ROUTES, line: 24 }
     - { name: DEFERRED_ROUTES, line: 30 }
     - { name: ALL_KNOWN_ROUTES, line: 32 }
     - { name: ROUTE_CONTRACTS, line: 63 }
-    - { name: REQUIRED_FIELDS, line: 330 }
-    - { name: VALID_RENDER_MODES, line: 343 }
-    - { name: VALID_VISIBILITY_POLICIES, line: 344 }
-    - { name: VALID_SCOPES, line: 345 }
+    - { name: REQUIRED_FIELDS, line: 341 }
+    - { name: VALID_RENDER_MODES, line: 354 }
+    - { name: VALID_VISIBILITY_POLICIES, line: 355 }
+    - { name: VALID_SCOPES, line: 356 }
   functions:
     - { name: buildContract, lines: 38-61 }
-    - { name: normalizeRoutePath, lines: 347-353 }
-    - { name: getRouteContract, lines: 355-357 }
-    - { name: getRouteContractMap, lines: 359-361 }
-    - { name: getInScopeRoutes, lines: 363-365 }
-    - { name: getDeferredRoutes, lines: 367-369 }
-    - { name: getKnownRoutes, lines: 371-373 }
-    - { name: validateRouteContractMap, lines: 375-409 }
+    - { name: normalizeRoutePath, lines: 358-364 }
+    - { name: getRouteContract, lines: 366-368 }
+    - { name: getRouteContractMap, lines: 370-372 }
+    - { name: getInScopeRoutes, lines: 374-376 }
+    - { name: getDeferredRoutes, lines: 378-380 }
+    - { name: getKnownRoutes, lines: 382-384 }
+    - { name: validateRouteContractMap, lines: 386-420 }
 
 frontend/src/portal-shell/routeQuery.js:  # 36 lines
   functions:
@@ -1547,6 +1554,68 @@ frontend/src/portal-shell/views/ShellHomeView.vue:  # 6 lines
 frontend/src/portal/main.js:  # 160 lines
   imports:
     - { module: './portal.css', items: [], line: 1 }
+
+frontend/src/production-achievement/App.vue:  # 196 lines
+
+frontend/src/production-achievement/__tests__/TargetEditPanel.test.ts:  # 68 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '@vue/test-utils', items: [mount, flushPromises], line: 3 }
+    - { module: '../components/TargetEditPanel.vue', items: ['default:TargetEditPanel'], line: 4 }
+  constants:
+    - { name: ROWS, line: 6 }
+  functions:
+    - { name: async mountAndFlush, lines: 14-19 }
+
+frontend/src/production-achievement/__tests__/useProductionAchievement.test.ts:  # 109 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '../composables/useProductionAchievement', items: [useProductionAchievement], line: 3 }
+  functions:
+    - { name: jsonResponse, lines: 5-12 }
+
+frontend/src/production-achievement/__tests__/utils.test.ts:  # 94 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 1 }
+    - { module: '../utils', items: [formatQty, formatAchievementRate, achievementRateForChart, validateTargetQtyInput], line: 2 }
+
+frontend/src/production-achievement/components/AchievementChart.vue:  # 93 lines
+
+frontend/src/production-achievement/components/TargetEditPanel.vue:  # 220 lines
+
+frontend/src/production-achievement/composables/useProductionAchievement.ts:  # 237 lines
+  imports:
+    - { module: vue, items: [reactive, ref], line: 15 }
+    - { module: '../../core/api', items: [apiGet], line: 16 }
+    - { module: '../../core/types', items: [ApiResponse], line: 17 }
+  constants:
+    - { name: DEFAULT_SHIFT_CODES, line: 43 }
+  functions:
+    - { name: getCsrfToken, lines: 45-47 }
+    - { name: async apiPut, lines: 59-79 }
+    - { name: defaultDateRange, lines: 81-87 }
+    - { name: useProductionAchievement, lines: 89-237 }
+  interfaces:
+    - { name: ProductionAchievementReportRow, lines: 19-26 }
+    - { name: ProductionAchievementTargetRow, lines: 28-34 }
+    - { name: FilterState, lines: 36-41 }
+    - { name: PutError, lines: 49-52 }  # local
+
+frontend/src/production-achievement/main.ts:  # 8 lines
+  imports:
+    - { module: vue, items: [createApp], line: 1 }
+    - { module: './App.vue', items: ['default:App'], line: 3 }
+    - { module: './style.css', items: [], line: 4 }
+    - { module: '../core/shell-navigation', items: [restoreUrlState], line: 5 }
+
+frontend/src/production-achievement/utils.ts:  # 56 lines
+  constants:
+    - { name: NULL_DISPLAY, line: 10 }
+  functions:
+    - { name: formatQty, lines: 13-18 }
+    - { name: formatAchievementRate, lines: 25-30 }
+    - { name: achievementRateForChart, lines: 33-38 }
+    - { name: validateTargetQtyInput, lines: 45-54 }
 
 frontend/src/production-history/App.vue:  # 570 lines
 
@@ -2036,6 +2105,13 @@ frontend/src/shared-composables/TraceProgressBar.vue:  # 166 lines
     - { name: hasStageError, lines: 27-30 }
     - { name: stageState, lines: 32-43 }
 
+frontend/src/shared-composables/__tests__/useAiChat.subtasks.test.ts:  # 84 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 9 }
+    - { module: '../useAiChat', items: [useAiChat], line: 10 }
+  functions:
+    - { name: mockFetchResponse, lines: 12-21 }
+
 frontend/src/shared-composables/__tests__/useAutoRefresh.interval.test.ts:  # 82 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
@@ -2052,16 +2128,17 @@ frontend/src/shared-composables/__tests__/useViewStaleness.test.ts:  # 57 lines
 
 frontend/src/shared-composables/index.ts:  # 10 lines
 
-frontend/src/shared-composables/useAiChat.ts:  # 202 lines
+frontend/src/shared-composables/useAiChat.ts:  # 212 lines
   imports:
     - { module: vue, items: [computed, ref], line: 1 }
     - { module: vue, items: [Ref, ComputedRef], line: 2 }
   functions:
-    - { name: useAiChat, lines: 36-198 }
-    - { name: createConversationId, lines: 200-202 }
+    - { name: useAiChat, lines: 44-208 }
+    - { name: createConversationId, lines: 210-212 }
   interfaces:
-    - { name: AiMessage, lines: 6-17 }
-    - { name: AiChatComposable, lines: 19-30 }
+    - { name: AiSubtask, lines: 7-11 }
+    - { name: AiMessage, lines: 13-25 }
+    - { name: AiChatComposable, lines: 27-38 }
   types:
     - { name: MessageRole, lines: 4-4 }
 
@@ -2214,7 +2291,7 @@ frontend/src/shared-composables/useViewStaleness.ts:  # 59 lines
 
 frontend/src/shared-ui/components/AiChartRenderer.vue:  # 423 lines
 
-frontend/src/shared-ui/components/AiChatMessage.vue:  # 264 lines
+frontend/src/shared-ui/components/AiChatMessage.vue:  # 325 lines
 
 frontend/src/shared-ui/components/AiChatPanel.vue:  # 410 lines
 
@@ -2259,6 +2336,17 @@ frontend/src/shared-ui/components/SummaryCard.vue:  # 276 lines
 frontend/src/shared-ui/components/SummaryCardGroup.vue:  # 43 lines
 
 frontend/src/shared-ui/components/TimelineChart.vue:  # 738 lines
+
+frontend/src/shared-ui/components/__tests__/AiChatMessage.subtasks.test.ts:  # 77 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi], line: 11 }
+    - { module: '@vue/test-utils', items: [mount], line: 12 }
+    - { module: vue, items: [defineComponent], line: 13 }
+    - { module: '../AiChatMessage.vue', items: ['default:AiChatMessage'], line: 14 }
+  functions:
+    - { name: mountAiMessage, lines: 30-32 }
+  interfaces:
+    - { name: TestMessage, lines: 24-28 }  # local
 
 frontend/src/shared-ui/components/__tests__/MultiSelect.test.ts:  # 199 lines
   imports:
@@ -2963,6 +3051,16 @@ frontend/tests/playwright/data-boundary/malformed-input.spec.js:  # 190 lines
   constants:
     - { name: MALICIOUS_INPUTS, line: 20 }
 
+frontend/tests/playwright/data-boundary/production-achievement-data-boundary.spec.js:  # 176 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 13 }
+  constants:
+    - { name: PAGE_URL, line: 15 }
+  functions:
+    - { name: envelope, lines: 17-19 }
+    - { name: async setupBaseRoutes, lines: 21-47 }
+    - { name: async isPageRendered, lines: 49-54 }
+
 frontend/tests/playwright/data-boundary/resource-history-progress-malformed.spec.js:  # 116 lines
   imports:
     - { module: '@playwright/test', items: [test, expect], line: 16 }
@@ -3235,6 +3333,19 @@ frontend/tests/playwright/portal-shell-login.spec.ts:  # 211 lines
   functions:
     - { name: async gotoLoginPageDirectly, lines: 26-31 }
 
+frontend/tests/playwright/production-achievement.spec.js:  # 359 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 17 }
+  constants:
+    - { name: PAGE_URL, line: 19 }
+    - { name: REPORT_ROWS, line: 21 }
+    - { name: TARGET_ROWS, line: 40 }
+    - { name: PERMISSION_ROWS, line: 44 }
+  functions:
+    - { name: envelope, lines: 48-50 }
+    - { name: async setupBaseRoutes, lines: 52-85 }
+    - { name: async isPageRendered, lines: 87-92 }
+
 frontend/tests/playwright/production-history-cross-filter.spec.ts:  # 414 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 14 }
@@ -3411,6 +3522,17 @@ frontend/tests/playwright/resilience/browser-history.spec.js:  # 240 lines
   functions:
     - { name: mockQueryToolApis, lines: 16-40 }
     - { name: mockRejectHistoryApis, lines: 42-52 }
+
+frontend/tests/playwright/resilience/production-achievement-resilience.spec.js:  # 163 lines
+  imports:
+    - { module: '@playwright/test', items: [test, expect], line: 18 }
+  constants:
+    - { name: PAGE_URL, line: 20 }
+  functions:
+    - { name: envelope, lines: 22-24 }
+    - { name: errorEnvelope, lines: 26-28 }
+    - { name: async setupBaseRoutes, lines: 30-53 }
+    - { name: async isPageRendered, lines: 55-60 }
 
 frontend/tests/playwright/resilience/rapid-interaction.spec.js:  # 182 lines
   imports:
@@ -3623,7 +3745,7 @@ frontend/tests/shared-composables/useRequestGuard.test.js:  # 155 lines
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 9 }
     - { module: '../../src/shared-composables/useRequestGuard.ts', items: [useRequestGuard], line: 10 }
 
-frontend/tests/unit/eap-alarm-filter.test.js:  # 446 lines
+frontend/tests/unit/eap-alarm-filter.test.js:  # 506 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, vi], line: 15 }
     - { module: vue, items: [defineComponent], line: 16 }
@@ -3721,7 +3843,7 @@ frontend/tests/yield-alert/useYieldAlertDuckDB.departments.test.js:  # 146 lines
   functions:
     - { name: buildMockClient, lines: 38-55 }
 
-frontend/vite.config.ts:  # 125 lines
+frontend/vite.config.ts:  # 126 lines
   imports:
     - { module: 'node:fs', items: [copyFileSync, existsSync], line: 1 }
     - { module: 'node:path', items: [join, relative, resolve], line: 2 }
@@ -3734,7 +3856,7 @@ frontend/vite.config.ts:  # 125 lines
     - { name: OUT_DIR, line: 9 }
     - { name: INPUT_MAP, line: 14 }
   functions:
-    - { name: copyHtmlPlugin, lines: 43-58 }
+    - { name: copyHtmlPlugin, lines: 44-59 }
 
 frontend/vitest.config.js:  # 24 lines
   imports:
@@ -3878,7 +4000,7 @@ scripts/worker_watchdog.py:  # 437 lines
     - { module: signal, items: [], line: 28 }
     - { module: sys, items: [], line: 29 }
     - { module: time, items: [], line: 30 }
-    - { module: datetime, items: [datetime], line: 31 }
+    - { module: datetime, items: [datetime, timezone], line: 31 }
     - { module: pathlib, items: [Path], line: 32 }
     - { module: mes_dashboard.core.runtime_contract, items: [build_runtime_contract_diagnostics, load_runtime_contract], line: 39 }
     - { module: mes_dashboard.core.watchdog_logging, items: [attach_sqlite_log_handler], line: 43 }
@@ -4408,7 +4530,7 @@ src/mes_dashboard/core/database.py:  # 1190 lines
     - { name: get_table_data, lines: 988-1072 }
     - { name: get_table_column_metadata, lines: 1075-1190 }
 
-src/mes_dashboard/core/duckdb_runtime.py:  # 181 lines
+src/mes_dashboard/core/duckdb_runtime.py:  # 211 lines
   imports:
     - { module: __future__, items: [annotations], line: 29 }
     - { module: logging, items: [], line: 31 }
@@ -4427,8 +4549,10 @@ src/mes_dashboard/core/duckdb_runtime.py:  # 181 lines
     - { name: _str_env, lines: 45-46 }
     - { name: _int_env, lines: 49-56 }
     - { name: create_heavy_query_connection, lines: 87-124 }
-    - { name: get_duckdb_telemetry, lines: 127-159 }
-    - { name: assert_spool_path, lines: 162-181 }
+    - { name: _resolve_temp_dir, lines: 127-147 }
+    - { name: _dir_size_bytes, lines: 150-166 }
+    - { name: get_duckdb_telemetry, lines: 169-189 }
+    - { name: assert_spool_path, lines: 192-211 }
 
 src/mes_dashboard/core/exceptions.py:  # 97 lines
   imports:
@@ -4770,7 +4894,7 @@ src/mes_dashboard/core/partial_failure_contract.py:  # 117 lines
     - { name: serialize_partial_failure_meta, lines: 77-94 }
     - { name: merge_partial_failure_meta, lines: 97-117 }
 
-src/mes_dashboard/core/permissions.py:  # 90 lines
+src/mes_dashboard/core/permissions.py:  # 147 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: functools, items: [wraps], line: 6 }
@@ -4786,6 +4910,8 @@ src/mes_dashboard/core/permissions.py:  # 90 lines
     - { name: _is_ajax_request, lines: 57-68 }
     - { name: login_required, lines: 71-78 }
     - { name: admin_required, lines: 81-90 }
+    - { name: can_edit_targets, lines: 93-129 }
+    - { name: targets_edit_required, lines: 132-147 }
 
 src/mes_dashboard/core/query_cost_policy.py:  # 165 lines
   imports:
@@ -5213,7 +5339,7 @@ src/mes_dashboard/core/watchdog_logging.py:  # 37 lines
   functions:
     - { name: attach_sqlite_log_handler, lines: 11-37 }
 
-src/mes_dashboard/core/worker_memory_guard.py:  # 512 lines
+src/mes_dashboard/core/worker_memory_guard.py:  # 549 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: gc, items: [], line: 13 }
@@ -5251,7 +5377,9 @@ src/mes_dashboard/core/worker_memory_guard.py:  # 512 lines
     - { name: get_service_memory_snapshot, lines: 113-149 }
     - { name: start_worker_memory_guard, lines: 473-491 }
     - { name: stop_worker_memory_guard, lines: 494-499 }
-    - { name: get_memory_guard_telemetry, lines: 502-512 }
+    - { name: _refresh_process_memory_on_demand, lines: 502-517 }
+    - { name: _refresh_system_memory_on_demand, lines: 520-529 }
+    - { name: get_memory_guard_telemetry, lines: 532-549 }
 
 src/mes_dashboard/core/worker_pool_manager.py:  # 295 lines
   imports:
@@ -5298,7 +5426,7 @@ src/mes_dashboard/core/worker_recovery_policy.py:  # 220 lines
     - { name: evaluate_worker_recovery_state, lines: 95-156 }
     - { name: decide_restart_request, lines: 159-219 }
 
-src/mes_dashboard/routes/__init__.py:  # 88 lines
+src/mes_dashboard/routes/__init__.py:  # 96 lines
   imports:
     - { module: '.wip_routes', items: [wip_bp], line: 7 }
     - { module: '.resource_routes', items: [resource_bp], line: 8 }
@@ -5325,8 +5453,9 @@ src/mes_dashboard/routes/__init__.py:  # 88 lines
     - { module: '.downtime_analysis_routes', items: [downtime_analysis_bp], line: 29 }
     - { module: '.eap_alarm_routes', items: [eap_alarm_bp], line: 30 }
     - { module: '.db_scheduling_routes', items: [db_scheduling_bp], line: 31 }
+    - { module: '.production_achievement_routes', items: [production_achievement_bp, production_achievement_admin_bp], line: 32 }
   functions:
-    - { name: register_routes, lines: 34-59 }
+    - { name: register_routes, lines: 38-65 }
 
 src/mes_dashboard/routes/admin_routes.py:  # 1425 lines
   imports:
@@ -5443,7 +5572,7 @@ src/mes_dashboard/routes/db_scheduling_routes.py:  # 77 lines
     - { name: get_queue, lines: 29-48 }  # @db_scheduling_bp.route('/queue', methods=['GET'])
     - { name: equipment_detail, lines: 52-77 }  # @db_scheduling_bp.route('/equipment-detail', methods=['GET'])
 
-src/mes_dashboard/routes/downtime_analysis_routes.py:  # 610 lines
+src/mes_dashboard/routes/downtime_analysis_routes.py:  # 611 lines
   imports:
     - { module: __future__, items: [annotations], line: 17 }
     - { module: os, items: [], line: 19 }
@@ -5455,21 +5584,21 @@ src/mes_dashboard/routes/downtime_analysis_routes.py:  # 610 lines
     - { module: mes_dashboard.services.async_query_job_service, items: [enqueue_job_dynamic, is_async_available], line: 40 }
     - { module: mes_dashboard.core.query_cost_policy, items: [_classify_query_cost], line: 44 }
     - { module: mes_dashboard.core.permissions, items: [get_owner_token], line: 45 }
-    - { module: mes_dashboard.core.feature_flags, items: [_resolve_bool_flag], line: 83 }
+    - { module: mes_dashboard.core.feature_flags, items: [_resolve_bool_flag], line: 84 }
   functions:
-    - { name: _validate_dates, lines: 94-109 }
-    - { name: _csv_param, lines: 112-117 }
-    - { name: api_downtime_meta, lines: 126-140 }  # @downtime_analysis_bp.route('/meta', methods=['GET'])
-    - { name: api_downtime_options, lines: 149-183 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
-    - { name: api_downtime_query, lines: 192-379 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
-    - { name: api_downtime_view, lines: 388-421 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
-    - { name: api_downtime_equipment_detail, lines: 430-474 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
-    - { name: api_downtime_event_detail, lines: 483-523 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
-    - { name: api_export_equipment_detail, lines: 532-557 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
-    - { name: api_export_event_detail, lines: 566-591 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
-    - { name: _get_resource_lookup_safe, lines: 599-610 }
+    - { name: _validate_dates, lines: 95-110 }
+    - { name: _csv_param, lines: 113-118 }
+    - { name: api_downtime_meta, lines: 127-141 }  # @downtime_analysis_bp.route('/meta', methods=['GET'])
+    - { name: api_downtime_options, lines: 150-184 }  # @downtime_analysis_bp.route('/options', methods=['GET'])
+    - { name: api_downtime_query, lines: 193-380 }  # @downtime_analysis_bp.route('/query', methods=['POST'])
+    - { name: api_downtime_view, lines: 389-422 }  # @downtime_analysis_bp.route('/view', methods=['GET'])
+    - { name: api_downtime_equipment_detail, lines: 431-475 }  # @downtime_analysis_bp.route('/equipment-detail', methods=['GET'])
+    - { name: api_downtime_event_detail, lines: 484-524 }  # @downtime_analysis_bp.route('/event-detail', methods=['GET'])
+    - { name: api_export_equipment_detail, lines: 533-558 }  # @downtime_analysis_bp.route('/export-equipment-detail', methods=['GET'])
+    - { name: api_export_event_detail, lines: 567-592 }  # @downtime_analysis_bp.route('/export-event-detail', methods=['GET'])
+    - { name: _get_resource_lookup_safe, lines: 600-611 }
 
-src/mes_dashboard/routes/eap_alarm_routes.py:  # 465 lines
+src/mes_dashboard/routes/eap_alarm_routes.py:  # 495 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
     - { module: logging, items: [], line: 20 }
@@ -5480,18 +5609,18 @@ src/mes_dashboard/routes/eap_alarm_routes.py:  # 465 lines
     - { module: mes_dashboard.core.response, items: [cache_expired_error, error_response, internal_error, success_response, validation_error, SERVICE_UNAVAILABLE], line: 27 }
   functions:
     - { name: _parse_list_param, lines: 50-62 }
-    - { name: _parse_fine_filters, lines: 65-82 }
-    - { name: _get_spool_path, lines: 85-99 }
-    - { name: _require_query_id, lines: 102-107 }
-    - { name: _require_spool, lines: 110-115 }
-    - { name: api_eap_alarm_spool, lines: 121-279 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
-    - { name: api_eap_alarm_spool_status, lines: 285-307 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
-    - { name: api_eap_alarm_filter_options, lines: 313-331 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
-    - { name: api_eap_alarm_summary, lines: 337-355 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
-    - { name: api_eap_alarm_pareto, lines: 361-379 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
-    - { name: api_eap_alarm_trend, lines: 385-406 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
-    - { name: api_eap_alarm_product_filter_options, lines: 412-432 }  # @eap_alarm_bp.route('/api/eap-alarm/product-filter-options', methods=['GET'])
-    - { name: api_eap_alarm_detail, lines: 438-465 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
+    - { name: _parse_fine_filters, lines: 65-90 }
+    - { name: _get_spool_path, lines: 93-107 }
+    - { name: _require_query_id, lines: 110-115 }
+    - { name: _require_spool, lines: 118-123 }
+    - { name: api_eap_alarm_spool, lines: 129-287 }  # @eap_alarm_bp.route('/api/eap-alarm/spool', methods=['POST'])
+    - { name: api_eap_alarm_spool_status, lines: 293-315 }  # @eap_alarm_bp.route('/api/eap-alarm/spool/status', methods=['GET'])
+    - { name: api_eap_alarm_filter_options, lines: 321-339 }  # @eap_alarm_bp.route('/api/eap-alarm/filter-options', methods=['GET'])
+    - { name: api_eap_alarm_summary, lines: 345-363 }  # @eap_alarm_bp.route('/api/eap-alarm/summary', methods=['GET'])
+    - { name: api_eap_alarm_pareto, lines: 369-398 }  # @eap_alarm_bp.route('/api/eap-alarm/pareto', methods=['GET'])
+    - { name: api_eap_alarm_trend, lines: 404-436 }  # @eap_alarm_bp.route('/api/eap-alarm/trend', methods=['GET'])
+    - { name: api_eap_alarm_product_filter_options, lines: 442-462 }  # @eap_alarm_bp.route('/api/eap-alarm/product-filter-options', methods=['GET'])
+    - { name: api_eap_alarm_detail, lines: 468-495 }  # @eap_alarm_bp.route('/api/eap-alarm/detail', methods=['GET'])
 
 src/mes_dashboard/routes/health_routes.py:  # 863 lines
   imports:
@@ -5713,6 +5842,24 @@ src/mes_dashboard/routes/mid_section_defect_routes.py:  # 376 lines
     - { name: api_analysis_detail, lines: 230-317 }  # @mid_section_defect_bp.route('/analysis/detail', methods=['GET'])
     - { name: api_loss_reasons, lines: 321-328 }  # @mid_section_defect_bp.route('/loss-reasons', methods=['GET'])
     - { name: api_export, lines: 333-376 }  # @mid_section_defect_bp.route('/export', methods=['GET'])
+
+src/mes_dashboard/routes/production_achievement_routes.py:  # 213 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: flask, items: [Blueprint, request], line: 20 }
+    - { module: mes_dashboard.core.mysql_client, items: [MYSQL_OPS_ENABLED], line: 22 }
+    - { module: mes_dashboard.core.permissions, items: [admin_required, can_edit_targets, get_owner_token, login_required, targets_edit_required], line: 23 }
+    - { module: mes_dashboard.core.response, items: [forbidden_error, internal_error, service_unavailable_error, success_response, validation_error], line: 30 }
+    - { module: mes_dashboard.services.production_achievement_permission_service, items: [PermissionMySQLUnavailableError, get_permissions, upsert_permission], line: 37 }
+    - { module: mes_dashboard.services.production_achievement_service, items: [ProductionAchievementValidationError, get_achievement_report, get_filter_options], line: 42 }
+    - { module: mes_dashboard.services.production_achievement_target_service, items: [TargetMySQLUnavailableError, TargetValidationError, get_targets, upsert_target, validate_target_qty], line: 47 }
+  functions:
+    - { name: api_get_report, lines: 75-93 }  # @production_achievement_bp.route('/report', methods=['GET'])
+    - { name: api_get_filter_options, lines: 103-108 }  # @production_achievement_bp.route('/filter-options', methods=['GET'])
+    - { name: api_get_targets, lines: 118-122 }  # @production_achievement_bp.route('/targets', methods=['GET'])
+    - { name: api_put_targets, lines: 132-164 }  # @production_achievement_bp.route('/targets', methods=['PUT'])
+    - { name: api_admin_get_permissions, lines: 174-181 }  # @production_achievement_admin_bp.route('/permissions', methods=['GET'])
+    - { name: api_admin_put_permission, lines: 193-213 }  # @production_achievement_admin_bp.route('/permissions/<user_identifier>', methods=...
 
 src/mes_dashboard/routes/production_history_routes.py:  # 537 lines
   imports:
@@ -6026,7 +6173,7 @@ src/mes_dashboard/routes/wip_routes.py:  # 566 lines
     - { name: api_meta_filter_options, lines: 462-498 }  # @wip_bp.route('/meta/filter-options', methods=['GET', 'POST'])
     - { name: api_meta_search, lines: 502-566 }  # @wip_bp.route('/meta/search')
 
-src/mes_dashboard/routes/yield_alert_routes.py:  # 655 lines
+src/mes_dashboard/routes/yield_alert_routes.py:  # 665 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: logging, items: [], line: 6 }
@@ -6040,25 +6187,25 @@ src/mes_dashboard/routes/yield_alert_routes.py:  # 655 lines
     - { module: mes_dashboard.core.rate_limit, items: [configured_rate_limit], line: 28 }
     - { module: mes_dashboard.core.request_validation, items: [parse_json_payload], line: 29 }
     - { module: mes_dashboard.services.yield_alert_dataset_cache, items: [SpoolWriteError, apply_cached_view, execute_linkage_query, execute_primary_query], line: 30 }
-    - { module: mes_dashboard.services.yield_alert_service, items: [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_QUERY_DAYS, VALID_SORT_FIELDS, build_drilldown_payload, build_query_cache_key, expand_workcenter_groups_to_departments, get_yield_workcenter_group_options, query_alert_candidates, query_reason_detail], line: 36 }
-    - { module: mes_dashboard.services.yield_alert_sql_runtime, items: [compute_cross_filter_options], line: 48 }
+    - { module: mes_dashboard.services.yield_alert_service, items: [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_QUERY_DAYS, VALID_SORT_FIELDS, build_drilldown_payload, build_query_cache_key, expand_workcenter_groups_to_departments, get_yield_workcenter_group_options, query_alert_candidates, query_reason_detail, validate_date_range], line: 36 }
+    - { module: mes_dashboard.services.yield_alert_sql_runtime, items: [compute_cross_filter_options], line: 49 }
   functions:
-    - { name: _default_date_range, lines: 72-75 }
-    - { name: _parse_date_range, lines: 78-93 }
-    - { name: _common_filters, lines: 101-114 }
-    - { name: _cache_response, lines: 117-133 }
-    - { name: api_yield_alert_query, lines: 138-259 }  # @yield_alert_bp.route('/api/yield-alert/query', methods=['POST'])
-    - { name: api_yield_alert_job_status, lines: 265-271 }  # @yield_alert_bp.route('/api/yield-alert/job/<job_id>', methods=['GET'])
-    - { name: api_yield_alert_analyze, lines: 276-295 }  # @yield_alert_bp.route('/api/yield-alert/analyze', methods=['POST'])
-    - { name: _inject_spool_info, lines: 302-320 }
-    - { name: api_yield_alert_view, lines: 325-399 }  # @yield_alert_bp.route('/api/yield-alert/view', methods=['GET'])
-    - { name: api_yield_alert_summary, lines: 404-448 }  # @yield_alert_bp.route('/api/yield-alert/summary', methods=['GET'])
-    - { name: api_yield_alert_trend, lines: 453-481 }  # @yield_alert_bp.route('/api/yield-alert/trend', methods=['GET'])
-    - { name: api_yield_alert_alerts, lines: 486-565 }  # @yield_alert_bp.route('/api/yield-alert/alerts', methods=['GET'])
-    - { name: api_yield_alert_reason_detail, lines: 570-593 }  # @yield_alert_bp.route('/api/yield-alert/reason-detail', methods=['GET'])
-    - { name: api_yield_alert_drilldown_context, lines: 598-618 }  # @yield_alert_bp.route('/api/yield-alert/drilldown-context', methods=['GET'])
-    - { name: api_yield_alert_filter_options, lines: 623-634 }  # @yield_alert_bp.route('/api/yield-alert/filter-options', methods=['GET'])
-    - { name: api_yield_alert_cross_filter_options, lines: 639-655 }  # @yield_alert_bp.route('/api/yield-alert/cross-filter-options', methods=['GET'])
+    - { name: _default_date_range, lines: 73-76 }
+    - { name: _parse_date_range, lines: 79-94 }
+    - { name: _common_filters, lines: 102-115 }
+    - { name: _cache_response, lines: 118-134 }
+    - { name: api_yield_alert_query, lines: 139-269 }  # @yield_alert_bp.route('/api/yield-alert/query', methods=['POST'])
+    - { name: api_yield_alert_job_status, lines: 275-281 }  # @yield_alert_bp.route('/api/yield-alert/job/<job_id>', methods=['GET'])
+    - { name: api_yield_alert_analyze, lines: 286-305 }  # @yield_alert_bp.route('/api/yield-alert/analyze', methods=['POST'])
+    - { name: _inject_spool_info, lines: 312-330 }
+    - { name: api_yield_alert_view, lines: 335-409 }  # @yield_alert_bp.route('/api/yield-alert/view', methods=['GET'])
+    - { name: api_yield_alert_summary, lines: 414-458 }  # @yield_alert_bp.route('/api/yield-alert/summary', methods=['GET'])
+    - { name: api_yield_alert_trend, lines: 463-491 }  # @yield_alert_bp.route('/api/yield-alert/trend', methods=['GET'])
+    - { name: api_yield_alert_alerts, lines: 496-575 }  # @yield_alert_bp.route('/api/yield-alert/alerts', methods=['GET'])
+    - { name: api_yield_alert_reason_detail, lines: 580-603 }  # @yield_alert_bp.route('/api/yield-alert/reason-detail', methods=['GET'])
+    - { name: api_yield_alert_drilldown_context, lines: 608-628 }  # @yield_alert_bp.route('/api/yield-alert/drilldown-context', methods=['GET'])
+    - { name: api_yield_alert_filter_options, lines: 633-644 }  # @yield_alert_bp.route('/api/yield-alert/filter-options', methods=['GET'])
+    - { name: api_yield_alert_cross_filter_options, lines: 649-665 }  # @yield_alert_bp.route('/api/yield-alert/cross-filter-options', methods=['GET'])
 
 src/mes_dashboard/rq_worker_preload.py:  # 55 lines
   imports:
@@ -6109,7 +6256,7 @@ src/mes_dashboard/services/ai_business_context.py:  # 353 lines
     - { name: get_equipment_statuses, lines: 319-326 }
     - { name: get_dynamic_metadata_block, lines: 329-353 }
 
-src/mes_dashboard/services/ai_function_registry.py:  # 648 lines
+src/mes_dashboard/services/ai_function_registry.py:  # 649 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: importlib, items: [], line: 11 }
@@ -6131,9 +6278,25 @@ src/mes_dashboard/services/ai_function_registry.py:  # 648 lines
     - { name: validate_intent, lines: 464-494 }
     - { name: get_service_function, lines: 501-514 }
     - { name: get_suggestions, lines: 521-588 }
-    - { name: build_agent_system_prompt, lines: 595-648 }
+    - { name: build_agent_system_prompt, lines: 595-649 }
 
-src/mes_dashboard/services/ai_query_service.py:  # 1462 lines
+src/mes_dashboard/services/ai_leader_orchestrator.py:  # 287 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: logging, items: [], line: 20 }
+    - { module: typing, items: [Any], line: 21 }
+    - { module: requests, items: [], line: 23 }
+    - { module: mes_dashboard.services.ai_agent_loop, items: [_generate_clarification_suggestions, process_agent_turn], line: 25 }
+    - { module: mes_dashboard.services.ai_query_service, items: [_call_llm, call_llm_text], line: 29 }
+    - { module: mes_dashboard.services.ai_query_understanding, items: [append_to_chat_history, get_chat_history], line: 30 }
+  constants:
+    - { name: MAX_TASKS, line: 37 }
+  functions:
+    - { name: build_leader_plan_prompt, lines: 44-97 }
+    - { name: build_leader_synthesis_prompt, lines: 100-115 }
+    - { name: process_leader_turn, lines: 122-287 }
+
+src/mes_dashboard/services/ai_query_service.py:  # 1470 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: json, items: [], line: 14 }
@@ -6171,7 +6334,7 @@ src/mes_dashboard/services/ai_query_service.py:  # 1462 lines
     - { name: _summarize_dataframe, lines: 974-991 }
     - { name: process_query_text2sql, lines: 998-1239 }
     - { name: process_query_function, lines: 1246-1411 }
-    - { name: process_query, lines: 1418-1462 }
+    - { name: process_query, lines: 1418-1470 }
 
 src/mes_dashboard/services/ai_query_understanding.py:  # 681 lines
   imports:
@@ -6604,7 +6767,7 @@ src/mes_dashboard/services/downtime_query_job_service.py:  # 138 lines
   functions:
     - { name: execute_downtime_query_job, lines: 58-124 }
 
-src/mes_dashboard/services/eap_alarm_cache.py:  # 114 lines
+src/mes_dashboard/services/eap_alarm_cache.py:  # 121 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: hashlib, items: [], line: 14 }
@@ -6612,32 +6775,34 @@ src/mes_dashboard/services/eap_alarm_cache.py:  # 114 lines
     - { module: os, items: [], line: 16 }
     - { module: typing, items: [Optional], line: 17 }
   constants:
-    - { name: EAP_ALARM_SPOOL_DIR, line: 25 }
-    - { name: EAP_ALARM_SPOOL_TTL, line: 28 }
+    - { name: EAP_ALARM_SPOOL_DIR, line: 32 }
+    - { name: EAP_ALARM_SPOOL_TTL, line: 35 }
   functions:
-    - { name: make_eap_alarm_spool_key, lines: 34-73 }
-    - { name: decode_alarm_category, lines: 93-104 }
-    - { name: get_eap_alarm_spool_path, lines: 109-114 }
+    - { name: make_eap_alarm_spool_key, lines: 41-80 }
+    - { name: decode_alarm_category, lines: 100-111 }
+    - { name: get_eap_alarm_spool_path, lines: 116-121 }
 
-src/mes_dashboard/services/eap_alarm_service.py:  # 452 lines
+src/mes_dashboard/services/eap_alarm_service.py:  # 546 lines
   imports:
-    - { module: __future__, items: [annotations], line: 21 }
-    - { module: json, items: [], line: 23 }
-    - { module: logging, items: [], line: 24 }
-    - { module: math, items: [], line: 25 }
-    - { module: typing, items: [Any, Dict, List, Optional], line: 26 }
-    - { module: mes_dashboard.services.eap_alarm_cache, items: [decode_alarm_category], line: 28 }
+    - { module: __future__, items: [annotations], line: 23 }
+    - { module: json, items: [], line: 25 }
+    - { module: logging, items: [], line: 26 }
+    - { module: math, items: [], line: 27 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 28 }
+    - { module: mes_dashboard.services.eap_alarm_cache, items: [decode_alarm_category], line: 30 }
+  constants:
+    - { name: GROUP_DIMENSIONS, line: 258 }
   functions:
-    - { name: validate_eap_alarm_params, lines: 40-90 }
-    - { name: _get_duckdb_conn, lines: 95-97 }
-    - { name: _escape_like, lines: 100-101 }
-    - { name: _escape_sql, lines: 104-105 }
-    - { name: _build_filter_where, lines: 108-136 }
-    - { name: get_filter_options, lines: 141-181 }
-    - { name: get_summary, lines: 186-226 }
-    - { name: get_pareto, lines: 231-275 }
-    - { name: get_trend, lines: 280-356 }
-    - { name: get_detail, lines: 361-452 }
+    - { name: validate_eap_alarm_params, lines: 42-92 }
+    - { name: _get_duckdb_conn, lines: 97-99 }
+    - { name: _escape_sql, lines: 102-103 }
+    - { name: _build_filter_where, lines: 116-155 }
+    - { name: get_filter_options, lines: 160-198 }
+    - { name: get_summary, lines: 203-251 }
+    - { name: _group_expr, lines: 269-272 }
+    - { name: get_pareto, lines: 275-333 }
+    - { name: get_trend, lines: 338-428 }
+    - { name: get_detail, lines: 433-546 }
 
 src/mes_dashboard/services/event_fetcher.py:  # 601 lines
   imports:
@@ -7386,6 +7551,65 @@ src/mes_dashboard/services/page_registry.py:  # 244 lines
     - { name: get_navigation_config, lines: 205-217 }
     - { name: is_api_public, lines: 220-234 }
     - { name: reload_cache, lines: 237-244 }
+
+src/mes_dashboard/services/production_achievement_permission_service.py:  # 140 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: logging, items: [], line: 17 }
+    - { module: typing, items: [Any, Dict, List], line: 18 }
+    - { module: mes_dashboard.core.mysql_client, items: [MYSQL_OPS_ENABLED, get_mysql_connection], line: 20 }
+  classes:
+    - name: MySQLUnavailableError
+      lines: 25-26
+  functions:
+    - { name: is_user_whitelisted, lines: 29-63 }
+    - { name: get_permissions, lines: 66-96 }
+    - { name: upsert_permission, lines: 99-140 }
+
+src/mes_dashboard/services/production_achievement_service.py:  # 245 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: logging, items: [], line: 20 }
+    - { module: datetime, items: [date, datetime, timedelta], line: 21 }
+    - { module: typing, items: [Any, Dict, List, Optional, Tuple], line: 22 }
+    - { module: pandas, items: [], line: 24 }
+    - { module: mes_dashboard.core.database, items: [read_sql_df], line: 26 }
+    - { module: mes_dashboard.services.filter_cache, items: [get_spec_workcenter_mapping], line: 27 }
+    - { module: mes_dashboard.services.production_achievement_target_service, items: [get_targets_map], line: 28 }
+    - { module: mes_dashboard.sql, items: [SQLLoader], line: 29 }
+  constants:
+    - { name: MAX_QUERY_DAYS, line: 33 }
+    - { name: PA05_PREDICATE_SQL, line: 38 }
+  classes:
+    - name: ProductionAchievementValidationError
+      lines: 58-59
+  functions:
+    - { name: _is_three_shift_regime, lines: 68-71 }
+    - { name: compute_shift_code, lines: 74-86 }
+    - { name: compute_output_date, lines: 89-104 }
+    - { name: build_achievement_rows, lines: 112-169 }
+    - { name: _compute_achievement_rate, lines: 172-180 }
+    - { name: _validate_date_range, lines: 188-196 }
+    - { name: get_achievement_report, lines: 199-230 }
+    - { name: get_filter_options, lines: 236-245 }
+
+src/mes_dashboard/services/production_achievement_target_service.py:  # 157 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 12 }
+    - { module: logging, items: [], line: 14 }
+    - { module: numbers, items: [Number], line: 15 }
+    - { module: typing, items: [Any, Dict, List, Optional], line: 16 }
+    - { module: mes_dashboard.core.mysql_client, items: [MYSQL_OPS_ENABLED, get_mysql_connection], line: 18 }
+  classes:
+    - name: TargetValidationError
+      lines: 23-24
+    - name: MySQLUnavailableError
+      lines: 27-28
+  functions:
+    - { name: validate_target_qty, lines: 31-47 }
+    - { name: get_targets, lines: 50-98 }
+    - { name: get_targets_map, lines: 101-110 }
+    - { name: upsert_target, lines: 113-157 }
 
 src/mes_dashboard/services/production_history_job_service.py:  # 151 lines
   imports:
@@ -8765,36 +8989,39 @@ src/mes_dashboard/workers/downtime_worker.py:  # 747 lines
     - { name: _build_in_filter, lines: 140-164 }
     - { name: execute_downtime_unified_job, lines: 700-732 }
 
-src/mes_dashboard/workers/eap_alarm_worker.py:  # 656 lines
+src/mes_dashboard/workers/eap_alarm_worker.py:  # 842 lines
   imports:
-    - { module: __future__, items: [annotations], line: 23 }
-    - { module: hashlib, items: [], line: 25 }
-    - { module: logging, items: [], line: 26 }
-    - { module: os, items: [], line: 27 }
-    - { module: datetime, items: [datetime, timedelta], line: 28 }
-    - { module: pathlib, items: [Path], line: 29 }
-    - { module: typing, items: [Any, Dict, List], line: 30 }
-    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 32 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 647 }
+    - { module: __future__, items: [annotations], line: 46 }
+    - { module: hashlib, items: [], line: 48 }
+    - { module: logging, items: [], line: 49 }
+    - { module: os, items: [], line: 50 }
+    - { module: datetime, items: [datetime, timedelta], line: 51 }
+    - { module: pathlib, items: [Path], line: 52 }
+    - { module: typing, items: [Any, Dict, List], line: 53 }
+    - { module: mes_dashboard.core.base_chunked_duckdb_job, items: [BaseChunkedDuckDBJob, ChunkStrategy], line: 55 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 833 }
   constants:
-    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 36 }
-    - { name: EAP_ALARM_WORKER_QUEUE, line: 39 }
-    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 40 }
+    - { name: EAP_ALARM_JOB_TIMEOUT_SECONDS, line: 59 }
+    - { name: EAP_ALARM_WORKER_QUEUE, line: 62 }
+    - { name: EAP_ALARM_JOB_TTL_SECONDS, line: 63 }
   classes:
     - name: EapAlarmJob
-      lines: 378-596
+      lines: 556-782
       methods:
-        - { name: __init__, lines: 391-403 }
-        - { name: pre_query, lines: 405-466 }
-        - { name: build_chunk_sql, lines: 468-485 }
-        - { name: post_aggregate, lines: 487-591 }
-        - { name: progress_report, lines: 593-596 }
+        - { name: __init__, lines: 569-581 }
+        - { name: pre_query, lines: 583-644 }
+        - { name: build_chunk_sql, lines: 646-663 }
+        - { name: post_aggregate, lines: 665-777 }
+        - { name: progress_report, lines: 779-782 }
   functions:
-    - { name: _build_lot_ids_filter, lines: 148-158 }
-    - { name: _build_product_dims_exists, lines: 161-198 }
-    - { name: _build_equipment_filter, lines: 201-221 }
-    - { name: run_eap_alarm_query_job, lines: 224-375 }
-    - { name: execute_eap_alarm_unified_job, lines: 599-643 }
+    - { name: _empty_lot_product_df, lines: 251-253 }
+    - { name: _fetch_lot_product_df, lines: 256-295 }
+    - { name: _safe_lot_product_df, lines: 298-311 }
+    - { name: _build_lot_ids_filter, lines: 314-324 }
+    - { name: _build_product_dims_exists, lines: 327-364 }
+    - { name: _build_equipment_filter, lines: 367-387 }
+    - { name: run_eap_alarm_query_job, lines: 390-553 }
+    - { name: execute_eap_alarm_unified_job, lines: 785-829 }
 
 src/mes_dashboard/workers/production_history_worker.py:  # 242 lines
   imports:
@@ -8927,7 +9154,7 @@ tests/conftest.py:  # 196 lines
     - { name: pytest_addoption, lines: 144-169 }
     - { name: pytest_collection_modifyitems, lines: 172-196 }
 
-tests/contract/capture_samples.py:  # 634 lines
+tests/contract/capture_samples.py:  # 650 lines
   imports:
     - { module: __future__, items: [annotations], line: 21 }
     - { module: json, items: [], line: 23 }
@@ -8935,18 +9162,18 @@ tests/contract/capture_samples.py:  # 634 lines
     - { module: pathlib, items: [], line: 25 }
     - { module: sys, items: [], line: 26 }
     - { module: mes_dashboard.app, items: [create_app], line: 50 }
-    - { module: re, items: [], line: 446 }
+    - { module: re, items: [], line: 461 }
   constants:
     - { name: REPO_ROOT, line: 29 }
     - { name: SAMPLES_DIR, line: 52 }
     - { name: MANIFEST_PATH, line: 53 }
     - { name: ENDPOINTS, line: 59 }
   functions:
-    - { name: _make_key, lines: 430-431 }
-    - { name: _need_admin, lines: 434-442 }
-    - { name: _canonical_manifest_key, lines: 449-460 }
-    - { name: capture, lines: 462-525 }
-    - { name: main, lines: 528-630 }
+    - { name: _make_key, lines: 445-446 }
+    - { name: _need_admin, lines: 449-457 }
+    - { name: _canonical_manifest_key, lines: 464-476 }
+    - { name: capture, lines: 478-541 }
+    - { name: main, lines: 544-646 }
 
 tests/contract/test_capture_samples.py:  # 147 lines
   imports:
@@ -9188,7 +9415,7 @@ tests/e2e/conftest.py:  # 86 lines
     - { name: health_url, lines: 77-79 }  # @pytest.fixture(scope='session')
     - { name: skip_local_only_on_external_target, lines: 83-86 }  # @pytest.fixture(autouse=True)
 
-tests/e2e/test_admin_auth_e2e.py:  # 383 lines
+tests/e2e/test_admin_auth_e2e.py:  # 387 lines
   imports:
     - { module: json, items: [], line: 8 }
     - { module: pytest, items: [], line: 9 }
@@ -9215,21 +9442,21 @@ tests/e2e/test_admin_auth_e2e.py:  # 383 lines
         - { name: test_admin_can_change_page_status, lines: 194-229 }
         - { name: test_release_dev_page_makes_it_public, lines: 233-262 }
     - name: TestPortalDynamicTabs
-      lines: 265-305
+      lines: 265-309
       methods:
-        - { name: test_portal_hides_dev_tabs_for_non_admin, lines: 268-280 }
-        - { name: test_portal_shows_all_tabs_for_admin, lines: 284-305 }
+        - { name: test_portal_hides_dev_tabs_for_non_admin, lines: 268-283 }
+        - { name: test_portal_shows_all_tabs_for_admin, lines: 287-309 }
     - name: TestSessionPersistence
-      lines: 308-331
+      lines: 312-335
       methods:
-        - { name: test_session_persists_across_requests, lines: 313-331 }
+        - { name: test_session_persists_across_requests, lines: 317-335 }
     - name: TestSecurityScenarios
-      lines: 334-379
+      lines: 338-383
       methods:
-        - { name: test_cannot_access_admin_api_without_login, lines: 337-350 }
-        - { name: test_login_with_wrong_credentials_fails, lines: 352-366 }
-        - { name: test_me_endpoint_returns_null_when_not_logged_in, lines: 368-374 }
-        - { name: test_heartbeat_requires_login, lines: 376-379 }
+        - { name: test_cannot_access_admin_api_without_login, lines: 341-354 }
+        - { name: test_login_with_wrong_credentials_fails, lines: 356-370 }
+        - { name: test_me_endpoint_returns_null_when_not_logged_in, lines: 372-378 }
+        - { name: test_heartbeat_requires_login, lines: 380-383 }
   functions:
     - { name: temp_page_status, lines: 25-39 }  # @pytest.fixture
     - { name: app, lines: 43-60 }  # @pytest.fixture
@@ -9348,7 +9575,7 @@ tests/e2e/test_cache_e2e.py:  # 281 lines
         - { name: test_wip_detail_with_workcenter, lines: 245-263 }
         - { name: test_wip_detail_pagination, lines: 265-281 }
 
-tests/e2e/test_downtime_analysis_e2e.py:  # 863 lines
+tests/e2e/test_downtime_analysis_e2e.py:  # 926 lines
   imports:
     - { module: __future__, items: [annotations], line: 10 }
     - { module: uuid, items: [], line: 12 }
@@ -9361,48 +9588,48 @@ tests/e2e/test_downtime_analysis_e2e.py:  # 863 lines
     - { module: mes_dashboard.app, items: [create_app], line: 21 }
   classes:
     - name: TestSummaryEndpointIntegration
-      lines: 129-216
+      lines: 140-249
       methods:
-        - { name: test_summary_endpoint_returns_merged_hours, lines: 136-180 }
-        - { name: test_summary_structure_matches_contract, lines: 186-216 }
+        - { name: test_summary_endpoint_returns_merged_hours, lines: 149-206 }
+        - { name: test_summary_structure_matches_contract, lines: 212-249 }
     - name: TestEventDetailMatchSourceNoneRowsPresent
-      lines: 219-294
+      lines: 252-352
       methods:
-        - { name: test_no_match_events_included_in_summary, lines: 226-264 }
-        - { name: test_event_detail_view_returns_no_match_rows, lines: 267-294 }
+        - { name: test_no_match_events_included_in_summary, lines: 261-322 }
+        - { name: test_event_detail_view_returns_no_match_rows, lines: 325-352 }
     - name: TestDowntimeQueryNewShape
-      lines: 302-521
+      lines: 360-579
       methods:
-        - { name: _patch_flag_on, lines: 306-309 }
-        - { name: test_query_returns_spool_urls, lines: 318-351 }
-        - { name: test_base_spool_url_points_to_correct_namespace, lines: 360-384 }
-        - { name: test_jobs_spool_url_points_to_correct_namespace, lines: 393-417 }
-        - { name: test_taxonomy_has_required_keys, lines: 426-453 }
-        - { name: test_ninety_day_range_accepted, lines: 462-486 }
-        - { name: test_legacy_keys_absent_when_flag_on, lines: 495-521 }
+        - { name: _patch_flag_on, lines: 364-367 }
+        - { name: test_query_returns_spool_urls, lines: 376-409 }
+        - { name: test_base_spool_url_points_to_correct_namespace, lines: 418-442 }
+        - { name: test_jobs_spool_url_points_to_correct_namespace, lines: 451-475 }
+        - { name: test_taxonomy_has_required_keys, lines: 484-511 }
+        - { name: test_ninety_day_range_accepted, lines: 520-544 }
+        - { name: test_legacy_keys_absent_when_flag_on, lines: 553-579 }
     - name: TestTwoParquetAtomicityRoute
-      lines: 529-554
+      lines: 587-612
       methods:
-        - { name: test_base_hit_job_miss_returns_500_via_route, lines: 534-554 }
+        - { name: test_base_hit_job_miss_returns_500_via_route, lines: 592-612 }
     - name: TestFeatureFlagFallback
-      lines: 562-607
+      lines: 620-670
       methods:
-        - { name: test_flag_off_returns_legacy_shape, lines: 571-607 }
+        - { name: test_flag_off_returns_legacy_shape, lines: 629-670 }
     - name: TestDowntimeAsyncResilience
-      lines: 615-863
+      lines: 678-926
       methods:
-        - { name: test_worker_startup_sentinel, lines: 627-674 }
-        - { name: test_job_timeout_handling, lines: 681-729 }
-        - { name: test_job_timeout_status_failed, lines: 731-764 }
-        - { name: test_cancel_mid_job_abandon, lines: 770-863 }
+        - { name: test_worker_startup_sentinel, lines: 690-737 }
+        - { name: test_job_timeout_handling, lines: 744-792 }
+        - { name: test_job_timeout_status_failed, lines: 794-827 }
+        - { name: test_cancel_mid_job_abandon, lines: 833-926 }
   functions:
     - { name: app, lines: 27-31 }  # @pytest.fixture
     - { name: client, lines: 35-36 }  # @pytest.fixture
-    - { name: redis_enabled, lines: 40-63 }  # @pytest.fixture
-    - { name: _make_oracle_rows, lines: 66-106 }
-    - { name: _make_job_rows, lines: 109-126 }
+    - { name: redis_enabled, lines: 40-74 }  # @pytest.fixture
+    - { name: _make_oracle_rows, lines: 77-117 }
+    - { name: _make_job_rows, lines: 120-137 }
 
-tests/e2e/test_eap_alarm_e2e.py:  # 318 lines
+tests/e2e/test_eap_alarm_e2e.py:  # 350 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: time, items: [], line: 18 }
@@ -9410,28 +9637,29 @@ tests/e2e/test_eap_alarm_e2e.py:  # 318 lines
     - { module: requests, items: [], line: 21 }
   classes:
     - name: TestEapAlarmSpoolE2E
-      lines: 103-318
+      lines: 110-350
       methods:
-        - { name: test_post_spool_missing_date_from_returns_400, lines: 106-117 }
-        - { name: test_post_spool_empty_eqp_types_returns_400, lines: 119-131 }
-        - { name: test_post_spool_invalid_eqp_type_returns_400, lines: 133-145 }
-        - { name: test_post_spool_returns_202_async, lines: 147-156 }
-        - { name: test_spool_miss_filter_options_returns_410, lines: 158-168 }
-        - { name: test_spool_miss_summary_returns_410, lines: 170-178 }
-        - { name: test_spool_miss_detail_returns_410, lines: 180-188 }
-        - { name: test_filter_options_returns_structured_options, lines: 190-209 }
-        - { name: test_summary_returns_totals, lines: 211-228 }
-        - { name: test_pareto_returns_items_list, lines: 230-246 }
-        - { name: test_trend_returns_series_data, lines: 248-265 }
-        - { name: test_detail_returns_paginated_rows, lines: 267-285 }
-        - { name: test_detail_per_page_capped_at_200, lines: 287-299 }
-        - { name: test_detail_rows_contain_expected_fields, lines: 301-318 }
+        - { name: shared_query_id, lines: 115-129 }
+        - { name: test_post_spool_missing_date_from_returns_400, lines: 131-142 }
+        - { name: test_post_spool_empty_eqp_types_returns_400, lines: 144-156 }
+        - { name: test_post_spool_blank_eqp_type_entry_returns_400, lines: 158-177 }
+        - { name: test_post_spool_returns_202_async, lines: 179-188 }
+        - { name: test_spool_miss_filter_options_returns_410, lines: 190-200 }
+        - { name: test_spool_miss_summary_returns_410, lines: 202-210 }
+        - { name: test_spool_miss_detail_returns_410, lines: 212-220 }
+        - { name: test_filter_options_returns_structured_options, lines: 222-241 }
+        - { name: test_summary_returns_totals, lines: 243-260 }
+        - { name: test_pareto_returns_items_list, lines: 262-278 }
+        - { name: test_trend_returns_series_data, lines: 280-297 }
+        - { name: test_detail_returns_paginated_rows, lines: 299-317 }
+        - { name: test_detail_per_page_capped_at_200, lines: 319-331 }
+        - { name: test_detail_rows_contain_expected_fields, lines: 333-350 }
   functions:
     - { name: _post_spool, lines: 28-46 }
-    - { name: _poll_job_to_completion, lines: 49-67 }
-    - { name: _spool_and_get_query_id, lines: 70-95 }
+    - { name: _poll_job_to_completion, lines: 49-74 }
+    - { name: _spool_and_get_query_id, lines: 77-102 }
 
-tests/e2e/test_global_connection.py:  # 155 lines
+tests/e2e/test_global_connection.py:  # 160 lines
   imports:
     - { module: pytest, items: [], line: 4 }
     - { module: re, items: [], line: 5 }
@@ -9439,29 +9667,29 @@ tests/e2e/test_global_connection.py:  # 155 lines
     - { module: tests.e2e.browser_helpers, items: [ensure_shell_admin, goto_shell_route], line: 8 }
   classes:
     - name: TestPortalPage
-      lines: 36-72
+      lines: 36-77
       methods:
         - { name: test_portal_loads_successfully, lines: 39-41 }
         - { name: test_portal_has_sidebar_routes, lines: 43-47 }
-        - { name: test_portal_sidebar_navigation_uses_direct_routes, lines: 49-59 }
-        - { name: test_portal_health_popup_clickable, lines: 61-72 }
+        - { name: test_portal_sidebar_navigation_uses_direct_routes, lines: 49-64 }
+        - { name: test_portal_health_popup_clickable, lines: 66-77 }
     - name: TestFrontendApiRuntime
-      lines: 76-107
+      lines: 81-112
       methods:
-        - { name: test_wip_overview_can_call_summary_api_via_fetch, lines: 79-84 }
-        - { name: test_wip_detail_can_call_workcenter_api_via_fetch, lines: 86-91 }
-        - { name: test_global_mesapi_bridge_is_optional, lines: 93-107 }
+        - { name: test_wip_overview_can_call_summary_api_via_fetch, lines: 84-89 }
+        - { name: test_wip_detail_can_call_workcenter_api_via_fetch, lines: 91-96 }
+        - { name: test_global_mesapi_bridge_is_optional, lines: 98-112 }
     - name: TestRoutePagesSmoke
-      lines: 111-127
+      lines: 116-132
       methods:
-        - { name: test_wip_overview_loads, lines: 114-117 }
-        - { name: test_wip_detail_loads, lines: 119-122 }
-        - { name: test_resource_page_loads, lines: 124-127 }
+        - { name: test_wip_overview_loads, lines: 119-122 }
+        - { name: test_wip_detail_loads, lines: 124-127 }
+        - { name: test_resource_page_loads, lines: 129-132 }
     - name: TestConsoleAndErrorSignals
-      lines: 130-155
+      lines: 135-160
       methods:
-        - { name: test_wip_overview_has_no_uncaught_page_errors, lines: 133-138 }
-        - { name: test_wip_overview_triggers_expected_api_requests, lines: 140-155 }
+        - { name: test_wip_overview_has_no_uncaught_page_errors, lines: 138-143 }
+        - { name: test_wip_overview_triggers_expected_api_requests, lines: 145-160 }
   functions:
     - { name: _sidebar_links, lines: 11-13 }
     - { name: _fetch_json_status, lines: 16-32 }
@@ -9540,7 +9768,7 @@ tests/e2e/test_hold_overview_e2e.py:  # 94 lines
         - { name: test_lots_with_age_range_filter, lines: 77-85 }
         - { name: test_lots_rejects_invalid_age_range, lines: 87-94 }
 
-tests/e2e/test_job_query_e2e.py:  # 143 lines
+tests/e2e/test_job_query_e2e.py:  # 144 lines
   imports:
     - { module: pytest, items: [], line: 12 }
     - { module: requests, items: [], line: 13 }
@@ -9556,9 +9784,9 @@ tests/e2e/test_job_query_e2e.py:  # 143 lines
         - { name: test_jobs_rejects_too_many_resources, lines: 77-88 }
         - { name: test_jobs_rejects_over_730_day_range, lines: 90-103 }
     - name: TestJobQueryBrowserE2E
-      lines: 107-143
+      lines: 107-144
       methods:
-        - { name: test_job_query_page_restores_url_and_runs_query, lines: 110-143 }
+        - { name: test_job_query_page_restores_url_and_runs_query, lines: 110-144 }
 
 tests/e2e/test_material_trace_e2e.py:  # 182 lines
   imports:
@@ -9680,7 +9908,7 @@ tests/e2e/test_production_history_e2e.py:  # 164 lines
       methods:
         - { name: test_production_history_page_runs_query, lines: 123-164 }
 
-tests/e2e/test_qc_gate_e2e.py:  # 34 lines
+tests/e2e/test_qc_gate_e2e.py:  # 35 lines
   imports:
     - { module: pytest, items: [], line: 4 }
     - { module: requests, items: [], line: 5 }
@@ -9688,9 +9916,9 @@ tests/e2e/test_qc_gate_e2e.py:  # 34 lines
     - { module: tests.e2e.browser_helpers, items: [goto_shell_route, wait_for_any_visible], line: 8 }
   classes:
     - name: TestQcGateBrowserE2E
-      lines: 12-34
+      lines: 12-35
       methods:
-        - { name: test_qc_gate_page_loads_summary_and_lot_table, lines: 15-34 }
+        - { name: test_qc_gate_page_loads_summary_and_lot_table, lines: 15-35 }
 
 tests/e2e/test_query_race_condition_e2e.py:  # 292 lines
   imports:
@@ -9718,7 +9946,7 @@ tests/e2e/test_query_race_condition_e2e.py:  # 292 lines
     - { name: _fulfill_job_running, lines: 27-35 }
     - { name: _fulfill_async_job_accepted, lines: 38-52 }
 
-tests/e2e/test_query_tool_e2e.py:  # 614 lines
+tests/e2e/test_query_tool_e2e.py:  # 616 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: json, items: [], line: 6 }
@@ -9740,20 +9968,20 @@ tests/e2e/test_query_tool_e2e.py:  # 614 lines
         - { name: test_lot_associations_materials, lines: 279-299 }
         - { name: test_lineage_for_resolved_container, lines: 301-326 }
     - name: TestQueryToolPageE2E
-      lines: 334-525
+      lines: 334-527
       methods:
         - { name: test_page_loads_with_tab_shell, lines: 337-349 }
-        - { name: test_lot_tab_resolve_work_order, lines: 351-398 }
-        - { name: test_lot_tab_url_state_sync, lines: 400-414 }
-        - { name: test_lot_detail_sub_tabs_render, lines: 416-439 }
-        - { name: test_equipment_tab_loads_filter_bar, lines: 441-459 }
-        - { name: test_tab_switching_preserves_state, lines: 461-482 }
-        - { name: test_lineage_tree_expand_collapse, lines: 484-507 }
-        - { name: test_export_button_present_when_data_loaded, lines: 509-525 }
+        - { name: test_lot_tab_resolve_work_order, lines: 351-400 }
+        - { name: test_lot_tab_url_state_sync, lines: 402-416 }
+        - { name: test_lot_detail_sub_tabs_render, lines: 418-441 }
+        - { name: test_equipment_tab_loads_filter_bar, lines: 443-461 }
+        - { name: test_tab_switching_preserves_state, lines: 463-484 }
+        - { name: test_lineage_tree_expand_collapse, lines: 486-509 }
+        - { name: test_export_button_present_when_data_loaded, lines: 511-527 }
     - name: TestQueryToolFullFlowE2E
-      lines: 533-614
+      lines: 535-616
       methods:
-        - { name: test_work_order_full_flow, lines: 536-614 }
+        - { name: test_work_order_full_flow, lines: 538-616 }
   functions:
     - { name: _intercept_navigation_as_admin, lines: 23-101 }
     - { name: _wait_for_api_response, lines: 104-117 }
@@ -9898,53 +10126,54 @@ tests/e2e/test_resource_history_browser_e2e.py:  # 32 lines
       methods:
         - { name: test_resource_history_page_loads_primary_dashboard, lines: 15-32 }
 
-tests/e2e/test_resource_history_e2e.py:  # 551 lines
+tests/e2e/test_resource_history_e2e.py:  # 563 lines
   imports:
     - { module: json, items: [], line: 8 }
     - { module: pytest, items: [], line: 9 }
-    - { module: unittest.mock, items: [patch], line: 10 }
-    - { module: pandas, items: [], line: 11 }
-    - { module: datetime, items: [datetime], line: 12 }
-    - { module: sys, items: [], line: 14 }
-    - { module: os, items: [], line: 15 }
-    - { module: mes_dashboard.core.database, items: [], line: 18 }
-    - { module: mes_dashboard.core.redis_client, items: [], line: 19 }
-    - { module: mes_dashboard.app, items: [create_app], line: 20 }
+    - { module: pathlib, items: [Path], line: 10 }
+    - { module: unittest.mock, items: [patch], line: 11 }
+    - { module: pandas, items: [], line: 12 }
+    - { module: datetime, items: [datetime], line: 13 }
+    - { module: sys, items: [], line: 15 }
+    - { module: os, items: [], line: 16 }
+    - { module: mes_dashboard.core.database, items: [], line: 19 }
+    - { module: mes_dashboard.core.redis_client, items: [], line: 20 }
+    - { module: mes_dashboard.app, items: [create_app], line: 21 }
   classes:
     - name: TestResourceHistoryPageAccess
-      lines: 74-112
+      lines: 75-113
       methods:
-        - { name: _load_resource_history_entry, lines: 78-84 }
-        - { name: test_page_loads_successfully, lines: 86-94 }
-        - { name: test_page_bootstrap_container_exists, lines: 96-101 }
-        - { name: test_page_references_vite_module, lines: 103-112 }
+        - { name: _load_resource_history_entry, lines: 79-85 }
+        - { name: test_page_loads_successfully, lines: 87-95 }
+        - { name: test_page_bootstrap_container_exists, lines: 97-102 }
+        - { name: test_page_references_vite_module, lines: 104-113 }
     - name: TestResourceHistoryAPIWorkflow
-      lines: 115-345
+      lines: 116-354
       methods:
-        - { name: test_filter_options_workflow, lines: 119-136 }
-        - { name: test_complete_query_workflow, lines: 142-229 }
-        - { name: test_detail_query_workflow, lines: 235-303 }
-        - { name: test_export_workflow, lines: 307-345 }
+        - { name: test_filter_options_workflow, lines: 120-137 }
+        - { name: test_complete_query_workflow, lines: 143-230 }
+        - { name: test_detail_query_workflow, lines: 236-304 }
+        - { name: test_export_workflow, lines: 308-354 }
     - name: TestResourceHistoryValidation
-      lines: 348-419
+      lines: 357-428
       methods:
-        - { name: test_date_range_validation, lines: 351-363 }
-        - { name: test_missing_required_params, lines: 365-374 }
-        - { name: test_granularity_options, lines: 380-419 }
+        - { name: test_date_range_validation, lines: 360-372 }
+        - { name: test_missing_required_params, lines: 374-383 }
+        - { name: test_granularity_options, lines: 389-428 }
     - name: TestResourceHistoryNavigation
-      lines: 422-443
+      lines: 431-455
       methods:
-        - { name: test_portal_includes_history_tab, lines: 425-443 }
+        - { name: test_portal_includes_history_tab, lines: 434-455 }
     - name: TestResourceHistorySpoolReuse
-      lines: 450-551
+      lines: 462-563
       methods:
-        - { name: _fake_oracle_df, lines: 454-462 }
-        - { name: test_two_identical_queries_oracle_called_once, lines: 464-518 }
-        - { name: test_canonical_spool_hit_skips_oracle, lines: 520-551 }
+        - { name: _fake_oracle_df, lines: 466-474 }
+        - { name: test_two_identical_queries_oracle_called_once, lines: 476-530 }
+        - { name: test_canonical_spool_hit_skips_oracle, lines: 532-563 }
   functions:
-    - { name: app, lines: 26-31 }  # @pytest.fixture
-    - { name: client, lines: 35-37 }  # @pytest.fixture
-    - { name: redis_enabled, lines: 41-71 }  # @pytest.fixture
+    - { name: app, lines: 27-32 }  # @pytest.fixture
+    - { name: client, lines: 36-38 }  # @pytest.fixture
+    - { name: redis_enabled, lines: 42-72 }  # @pytest.fixture
 
 tests/e2e/test_trace_pipeline_e2e.py:  # 811 lines
   imports:
@@ -10008,7 +10237,7 @@ tests/e2e/test_trace_pipeline_e2e.py:  # 811 lines
     - { name: real_cids, lines: 234-239 }  # @pytest.fixture(scope='module')
     - { name: rclient, lines: 243-250 }  # @pytest.fixture(scope='module')
 
-tests/e2e/test_unified_ux_verification_e2e.py:  # 798 lines
+tests/e2e/test_unified_ux_verification_e2e.py:  # 802 lines
   imports:
     - { module: __future__, items: [annotations], line: 11 }
     - { module: datetime, items: [datetime, timedelta], line: 13 }
@@ -10028,51 +10257,51 @@ tests/e2e/test_unified_ux_verification_e2e.py:  # 798 lines
         - { name: stop, lines: 118-121 }
         - { name: urls, lines: 123-124 }
     - name: TestFilterCrossImpactMatrix
-      lines: 153-397
+      lines: 153-401
       methods:
         - { name: test_hold_overview_holdtype_triggers_matrix_and_hold, lines: 156-178 }
         - { name: test_hold_detail_mutual_exclusive_toggles, lines: 180-202 }
         - { name: test_hold_history_date_apply_triggers_primary_query, lines: 204-229 }
-        - { name: test_hold_history_supplementary_triggers_view, lines: 231-256 }
-        - { name: test_wip_overview_status_toggle_triggers_matrix_only, lines: 258-274 }
-        - { name: test_wip_overview_panel_apply_triggers_full_reload, lines: 276-293 }
-        - { name: test_wip_detail_status_toggle_resets_page, lines: 295-313 }
-        - { name: test_resource_status_group_change_clears_downstream, lines: 315-330 }
-        - { name: test_reject_history_primary_unlocks_supplementary, lines: 332-346 }
-        - { name: test_yield_alert_date_apply_triggers_primary, lines: 348-364 }
-        - { name: test_mid_section_defect_filter_triggers_analysis, lines: 366-397 }
+        - { name: test_hold_history_supplementary_triggers_view, lines: 231-260 }
+        - { name: test_wip_overview_status_toggle_triggers_matrix_only, lines: 262-278 }
+        - { name: test_wip_overview_panel_apply_triggers_full_reload, lines: 280-297 }
+        - { name: test_wip_detail_status_toggle_resets_page, lines: 299-317 }
+        - { name: test_resource_status_group_change_clears_downstream, lines: 319-334 }
+        - { name: test_reject_history_primary_unlocks_supplementary, lines: 336-350 }
+        - { name: test_yield_alert_date_apply_triggers_primary, lines: 352-368 }
+        - { name: test_mid_section_defect_filter_triggers_analysis, lines: 370-401 }
     - name: TestUrlBookmarkRestoration
-      lines: 405-513
+      lines: 409-517
       methods:
-        - { name: test_wip_overview_restores_status_from_url, lines: 408-420 }
-        - { name: test_wip_detail_restores_filters_from_url, lines: 422-438 }
-        - { name: test_hold_detail_restores_reason_from_url, lines: 440-456 }
-        - { name: test_hold_overview_restores_hold_type_from_url, lines: 458-472 }
-        - { name: test_hold_history_restores_from_url, lines: 474-480 }
-        - { name: test_reject_history_page_loads_clean, lines: 482-493 }
-        - { name: test_resource_status_page_loads_clean, lines: 495-498 }
-        - { name: test_resource_history_page_loads_clean, lines: 500-503 }
-        - { name: test_mid_section_defect_page_loads_clean, lines: 505-508 }
-        - { name: test_yield_alert_page_loads_clean, lines: 510-513 }
+        - { name: test_wip_overview_restores_status_from_url, lines: 412-424 }
+        - { name: test_wip_detail_restores_filters_from_url, lines: 426-442 }
+        - { name: test_hold_detail_restores_reason_from_url, lines: 444-460 }
+        - { name: test_hold_overview_restores_hold_type_from_url, lines: 462-476 }
+        - { name: test_hold_history_restores_from_url, lines: 478-484 }
+        - { name: test_reject_history_page_loads_clean, lines: 486-497 }
+        - { name: test_resource_status_page_loads_clean, lines: 499-502 }
+        - { name: test_resource_history_page_loads_clean, lines: 504-507 }
+        - { name: test_mid_section_defect_page_loads_clean, lines: 509-512 }
+        - { name: test_yield_alert_page_loads_clean, lines: 514-517 }
     - name: TestRapidFilterNoRaceCondition
-      lines: 521-656
+      lines: 525-660
       methods:
-        - { name: test_wip_overview_rapid_status_toggle, lines: 524-547 }
-        - { name: test_wip_detail_rapid_status_toggle, lines: 549-575 }
-        - { name: test_hold_overview_rapid_apply, lines: 577-598 }
-        - { name: test_hold_history_rapid_supplementary_toggle, lines: 600-634 }
-        - { name: test_resource_status_rapid_flag_toggle, lines: 636-656 }
+        - { name: test_wip_overview_rapid_status_toggle, lines: 528-551 }
+        - { name: test_wip_detail_rapid_status_toggle, lines: 553-579 }
+        - { name: test_hold_overview_rapid_apply, lines: 581-602 }
+        - { name: test_hold_history_rapid_supplementary_toggle, lines: 604-638 }
+        - { name: test_resource_status_rapid_flag_toggle, lines: 640-660 }
     - name: TestVisualConsistency
-      lines: 664-798
+      lines: 668-802
       methods:
-        - { name: test_ui_btn_class_present_on_all_pages, lines: 674-690 }
-        - { name: test_motion_tokens_applied_no_hardcoded_transitions, lines: 692-706 }
-        - { name: test_loading_spinner_consistent_across_pages, lines: 708-730 }
-        - { name: test_empty_state_component_used, lines: 732-740 }
-        - { name: test_table_loading_animation_on_apply, lines: 742-763 }
-        - { name: test_hover_lift_on_interactive_elements, lines: 765-773 }
-        - { name: test_overlay_bg_variable_defined, lines: 775-782 }
-        - { name: test_no_console_errors_on_page_load, lines: 784-798 }
+        - { name: test_ui_btn_class_present_on_all_pages, lines: 678-694 }
+        - { name: test_motion_tokens_applied_no_hardcoded_transitions, lines: 696-710 }
+        - { name: test_loading_spinner_consistent_across_pages, lines: 712-734 }
+        - { name: test_empty_state_component_used, lines: 736-744 }
+        - { name: test_table_loading_animation_on_apply, lines: 746-767 }
+        - { name: test_hover_lift_on_interactive_elements, lines: 769-777 }
+        - { name: test_overlay_bg_variable_defined, lines: 779-786 }
+        - { name: test_no_console_errors_on_page_load, lines: 788-802 }
   functions:
     - { name: _api_get, lines: 27-29 }
     - { name: _ensure_shell_auth, lines: 32-67 }
@@ -10081,7 +10310,7 @@ tests/e2e/test_unified_ux_verification_e2e.py:  # 798 lines
     - { name: _wait_network_idle, lines: 137-139 }
     - { name: _wait_until_enabled, lines: 142-145 }
 
-tests/e2e/test_url_length_guard_e2e.py:  # 351 lines
+tests/e2e/test_url_length_guard_e2e.py:  # 352 lines
   imports:
     - { module: __future__, items: [annotations], line: 12 }
     - { module: time, items: [], line: 14 }
@@ -10097,22 +10326,22 @@ tests/e2e/test_url_length_guard_e2e.py:  # 351 lines
         - { name: test_wip_overview_restores_state_from_session_storage, lines: 89-124 }
         - { name: test_hold_overview_restores_state_from_session_storage, lines: 126-158 }
     - name: TestWipDrilldownBackE2E
-      lines: 165-230
+      lines: 165-231
       methods:
-        - { name: test_wip_detail_back_button_is_spa_button, lines: 168-189 }
-        - { name: test_wip_overview_drilldown_url_stays_short, lines: 191-230 }
+        - { name: test_wip_detail_back_button_is_spa_button, lines: 168-190 }
+        - { name: test_wip_overview_drilldown_url_stays_short, lines: 192-231 }
     - name: TestPostExportEndpointsE2E
-      lines: 280-351
+      lines: 281-352
       methods:
-        - { name: test_reject_history_export_cached_accepts_post, lines: 283-309 }
-        - { name: test_resource_history_export_accepts_post, lines: 311-334 }
-        - { name: test_production_history_export_accepts_post, lines: 336-351 }
+        - { name: test_reject_history_export_cached_accepts_post, lines: 284-310 }
+        - { name: test_resource_history_export_accepts_post, lines: 312-335 }
+        - { name: test_production_history_export_accepts_post, lines: 337-352 }
   functions:
     - { name: _big_filter_value, lines: 27-29 }
     - { name: _wait_for_response, lines: 32-46 }
     - { name: _pre_register_response_listener, lines: 49-67 }
     - { name: _pick_workcenter, lines: 70-79 }
-    - { name: _query_reject_and_get_id, lines: 236-276 }
+    - { name: _query_reject_and_get_id, lines: 237-277 }
 
 tests/e2e/test_wip_hold_pages_e2e.py:  # 340 lines
   imports:
@@ -10129,8 +10358,8 @@ tests/e2e/test_wip_hold_pages_e2e.py:  # 340 lines
       lines: 147-340
       methods:
         - { name: test_wip_overview_restores_status_from_url, lines: 150-165 }
-        - { name: test_wip_detail_reads_status_and_back_button_exists, lines: 167-191 }
-        - { name: test_hold_detail_without_reason_redirects_to_overview, lines: 193-203 }
+        - { name: test_wip_detail_reads_status_and_back_button_exists, lines: 167-192 }
+        - { name: test_hold_detail_without_reason_redirects_to_overview, lines: 194-203 }
         - { name: test_hold_detail_calls_summary_distribution_and_lots, lines: 205-245 }
         - { name: test_portal_shell_deep_links_keep_detail_routes, lines: 247-281 }
         - { name: test_wip_api_calls_use_post_method, lines: 283-313 }
@@ -10144,78 +10373,80 @@ tests/e2e/test_wip_hold_pages_e2e.py:  # 340 lines
     - { name: _pre_register_response_listener, lines: 98-117 }
     - { name: _pre_register_post_request_listener, lines: 120-143 }
 
-tests/e2e/test_yield_alert_e2e.py:  # 523 lines
+tests/e2e/test_yield_alert_e2e.py:  # 570 lines
   imports:
-    - { module: pytest, items: [], line: 16 }
-    - { module: requests, items: [], line: 17 }
-    - { module: playwright.sync_api, items: [Page, expect], line: 18 }
-    - { module: tests.e2e.browser_helpers, items: [goto_shell_route, wait_for_any_visible], line: 20 }
+    - { module: time, items: [], line: 16 }
+    - { module: pytest, items: [], line: 18 }
+    - { module: requests, items: [], line: 19 }
+    - { module: playwright.sync_api, items: [Page, expect], line: 20 }
+    - { module: tests.e2e.browser_helpers, items: [goto_shell_route, wait_for_any_visible], line: 22 }
   classes:
     - name: TestYieldAlertFilterOptions
-      lines: 24-38
+      lines: 26-40
       methods:
-        - { name: test_filter_options_returns_workcenter_groups, lines: 27-38 }
+        - { name: test_filter_options_returns_workcenter_groups, lines: 29-40 }
     - name: TestYieldAlertSummary
-      lines: 42-71
+      lines: 44-72
       methods:
-        - { name: test_summary_requires_dates, lines: 45-50 }
-        - { name: test_summary_returns_kpis, lines: 52-71 }
+        - { name: test_summary_requires_dates, lines: 47-52 }
+        - { name: test_summary_returns_kpis, lines: 54-72 }
     - name: TestYieldAlertAlerts
-      lines: 75-127
+      lines: 76-128
       methods:
-        - { name: test_alerts_rejects_invalid_sort_key, lines: 78-89 }
-        - { name: test_alerts_returns_paginated_list, lines: 91-110 }
-        - { name: test_alerts_respects_per_page_cap, lines: 112-127 }
+        - { name: test_alerts_rejects_invalid_sort_key, lines: 79-90 }
+        - { name: test_alerts_returns_paginated_list, lines: 92-111 }
+        - { name: test_alerts_respects_per_page_cap, lines: 113-128 }
     - name: TestYieldAlertTrend
-      lines: 131-145
+      lines: 132-147
       methods:
-        - { name: test_trend_returns_data, lines: 134-145 }
+        - { name: test_trend_returns_data, lines: 135-147 }
     - name: TestYieldAlertQuery
-      lines: 149-171
+      lines: 151-173
       methods:
-        - { name: test_query_requires_dates, lines: 152-157 }
-        - { name: test_query_returns_query_id, lines: 159-171 }
+        - { name: test_query_requires_dates, lines: 154-159 }
+        - { name: test_query_returns_query_id, lines: 161-173 }
     - name: TestYieldAlertView
-      lines: 175-190
+      lines: 177-192
       methods:
-        - { name: test_view_requires_query_id, lines: 178-181 }
-        - { name: test_view_expired_returns_410, lines: 183-190 }
+        - { name: test_view_requires_query_id, lines: 180-183 }
+        - { name: test_view_expired_returns_410, lines: 185-192 }
     - name: TestYieldAlertDrilldown
-      lines: 194-202
+      lines: 196-204
       methods:
-        - { name: test_drilldown_requires_params, lines: 197-202 }
+        - { name: test_drilldown_requires_params, lines: 199-204 }
     - name: TestYieldAlertDateRangeLimit
-      lines: 206-256
+      lines: 208-262
       methods:
-        - { name: _discover_max_days, lines: 214-224 }
-        - { name: test_summary_accepts_within_limit_range, lines: 226-240 }
-        - { name: test_summary_rejects_over_limit_range, lines: 242-256 }
+        - { name: _discover_max_days, lines: 216-230 }
+        - { name: test_summary_accepts_within_limit_range, lines: 232-246 }
+        - { name: test_summary_rejects_over_limit_range, lines: 248-262 }
     - name: TestYieldAlertProcessType
-      lines: 294-362
+      lines: 329-397
       methods:
-        - { name: test_process_type_defaults_to_ga_percent, lines: 297-316 }
-        - { name: test_process_type_gc_percent_query_accepted, lines: 318-341 }
-        - { name: test_process_type_invalid_returns_400, lines: 343-362 }
+        - { name: test_process_type_defaults_to_ga_percent, lines: 332-351 }
+        - { name: test_process_type_gc_percent_query_accepted, lines: 353-376 }
+        - { name: test_process_type_invalid_returns_400, lines: 378-397 }
     - name: TestYieldAlertSourceCodeField
-      lines: 366-401
+      lines: 401-448
       methods:
-        - { name: test_alerts_response_includes_source_code_field, lines: 369-401 }
+        - { name: test_alerts_response_includes_source_code_field, lines: 416-448 }
     - name: TestYieldAlertSpoolOnlyPaths
-      lines: 405-442
+      lines: 452-489
       methods:
-        - { name: test_trend_endpoint_uses_spool_only, lines: 408-442 }
+        - { name: test_trend_endpoint_uses_spool_only, lines: 455-489 }
     - name: TestYieldAlertSpoolMissResilience
-      lines: 446-489
+      lines: 493-536
       methods:
-        - { name: test_trend_with_expired_spool_returns_410, lines: 449-468 }
-        - { name: test_summary_with_expired_spool_returns_410, lines: 470-489 }
+        - { name: test_trend_with_expired_spool_returns_410, lines: 496-515 }
+        - { name: test_summary_with_expired_spool_returns_410, lines: 517-536 }
     - name: TestYieldAlertBrowserE2E
-      lines: 493-523
+      lines: 540-570
       methods:
-        - { name: test_yield_alert_page_builds_primary_query_cache, lines: 496-523 }
+        - { name: test_yield_alert_page_builds_primary_query_cache, lines: 543-570 }
   functions:
-    - { name: _post_query, lines: 267-273 }
-    - { name: _acquire_query_id, lines: 276-290 }
+    - { name: _post_query, lines: 273-279 }
+    - { name: _poll_yield_alert_job, lines: 282-296 }
+    - { name: _acquire_query_id, lines: 299-325 }
 
 tests/fixtures/route_contract_matrix.py:  # 223 lines
   imports:
@@ -10484,52 +10715,73 @@ tests/integration/test_downtime_rq_async.py:  # 1254 lines
     - { name: _reset_registry, lines: 36-39 }
     - { name: _reload_job_service, lines: 42-46 }
 
-tests/integration/test_eap_alarm_coarse_filter.py:  # 205 lines
+tests/integration/test_eap_alarm_coarse_filter.py:  # 312 lines
   imports:
-    - { module: __future__, items: [annotations], line: 13 }
-    - { module: uuid, items: [], line: 15 }
-    - { module: typing, items: [Any, Dict], line: 16 }
-    - { module: pytest, items: [], line: 18 }
+    - { module: __future__, items: [annotations], line: 15 }
+    - { module: uuid, items: [], line: 17 }
+    - { module: typing, items: [Any, Dict], line: 18 }
+    - { module: pytest, items: [], line: 20 }
   classes:
     - name: TestEapAlarmWorkerFnNewDims
-      lines: 36-205
+      lines: 38-207
       methods:
-        - { name: _base_monkeypatch, lines: 39-54 }
-        - { name: test_lot_ids_in_clause_present_in_sql, lines: 56-74 }
-        - { name: test_exists_clause_present_in_sql_for_pj_types, lines: 76-93 }
-        - { name: test_exists_clause_present_in_sql_for_product_lines, lines: 95-112 }
-        - { name: test_exists_clause_present_in_sql_for_pj_bops, lines: 114-131 }
-        - { name: test_multiple_dims_produce_multiple_exists_clauses, lines: 133-155 }
-        - { name: test_route_forwards_lot_ids_per_kwarg, lines: 157-205 }
+        - { name: _base_monkeypatch, lines: 41-56 }
+        - { name: test_lot_ids_in_clause_present_in_sql, lines: 58-76 }
+        - { name: test_exists_clause_present_in_sql_for_pj_types, lines: 78-95 }
+        - { name: test_exists_clause_present_in_sql_for_product_lines, lines: 97-114 }
+        - { name: test_exists_clause_present_in_sql_for_pj_bops, lines: 116-133 }
+        - { name: test_multiple_dims_produce_multiple_exists_clauses, lines: 135-157 }
+        - { name: test_route_forwards_lot_ids_per_kwarg, lines: 159-207 }
+    - name: TestEapAlarmFineFilterRouteParams
+      lines: 214-312
+      methods:
+        - { name: _spool_hit, lines: 217-221 }
+        - { name: test_summary_forwards_product_fine_filters, lines: 223-250 }
+        - { name: test_pareto_forwards_dim, lines: 252-271 }
+        - { name: test_pareto_invalid_dim_returns_400, lines: 273-279 }
+        - { name: test_trend_forwards_group_by, lines: 281-304 }
+        - { name: test_trend_invalid_group_by_returns_400, lines: 306-312 }
   functions:
-    - { name: _make_app, lines: 27-29 }
+    - { name: _make_app, lines: 29-31 }
 
-tests/integration/test_eap_alarm_data_boundary.py:  # 333 lines
+tests/integration/test_eap_alarm_data_boundary.py:  # 536 lines
   imports:
-    - { module: __future__, items: [annotations], line: 16 }
-    - { module: json, items: [], line: 18 }
-    - { module: datetime, items: [datetime], line: 19 }
-    - { module: pyarrow, items: [], line: 21 }
-    - { module: pyarrow.parquet, items: [], line: 22 }
-    - { module: pytest, items: [], line: 23 }
+    - { module: __future__, items: [annotations], line: 18 }
+    - { module: json, items: [], line: 20 }
+    - { module: datetime, items: [datetime], line: 21 }
+    - { module: pyarrow, items: [], line: 23 }
+    - { module: pyarrow.parquet, items: [], line: 24 }
+    - { module: pytest, items: [], line: 25 }
   functions:
-    - { name: _write_parquet, lines: 43-81 }
-    - { name: _base_row, lines: 84-99 }
-    - { name: test_unknown_alarm_category_code_fallback, lines: 104-116 }
-    - { name: test_null_detail_params, lines: 121-129 }
-    - { name: test_null_lot_id, lines: 134-142 }
-    - { name: test_empty_alarm_text_rows, lines: 147-159 }
-    - { name: test_null_alarm_text_excluded_from_filter_options, lines: 162-172 }
-    - { name: test_large_alarm_text, lines: 177-189 }
-    - { name: test_zero_row_spool, lines: 194-219 }
-    - { name: test_detail_params_json_object, lines: 224-233 }
-    - { name: test_summary_affected_equipment_count, lines: 238-249 }
-    - { name: test_per_page_capped_at_200, lines: 254-261 }
-    - { name: test_lot_ids_whitespace_stripped, lines: 266-279 }
-    - { name: test_lot_ids_deduped_before_oracle, lines: 282-302 }
-    - { name: test_lot_ids_max200_cap_exceeded, lines: 305-310 }
-    - { name: test_char_padded_containername_matches, lines: 313-325 }
-    - { name: test_empty_product_dims_no_exists_clause, lines: 328-333 }
+    - { name: _write_parquet, lines: 49-96 }
+    - { name: _base_row, lines: 99-118 }
+    - { name: test_unknown_alarm_category_code_fallback, lines: 123-135 }
+    - { name: test_null_detail_params, lines: 140-148 }
+    - { name: test_null_lot_id, lines: 153-161 }
+    - { name: test_empty_alarm_text_rows, lines: 166-178 }
+    - { name: test_null_alarm_text_excluded_from_filter_options, lines: 181-191 }
+    - { name: test_large_alarm_text, lines: 196-208 }
+    - { name: test_alarm_source_passthrough, lines: 213-223 }
+    - { name: test_pre_v5_spool_without_alarm_source_column, lines: 226-252 }
+    - { name: test_zero_row_spool, lines: 257-282 }
+    - { name: test_detail_params_json_object, lines: 287-296 }
+    - { name: test_summary_affected_equipment_count, lines: 301-312 }
+    - { name: test_per_page_capped_at_200, lines: 317-324 }
+    - { name: test_lot_ids_whitespace_stripped, lines: 329-342 }
+    - { name: test_lot_ids_deduped_before_oracle, lines: 345-365 }
+    - { name: test_lot_ids_max200_cap_exceeded, lines: 368-373 }
+    - { name: test_char_padded_containername_matches, lines: 376-388 }
+    - { name: test_empty_product_dims_no_exists_clause, lines: 391-396 }
+    - { name: _product_mix_rows, lines: 401-410 }
+    - { name: test_detail_product_dim_fine_filter, lines: 419-425 }  # @pytest.mark.parametrize('filter_key,filter_value,expected_alarm_ids', [('lot_id'...
+    - { name: test_detail_rows_include_product_columns, lines: 428-443 }
+    - { name: test_filter_options_include_product_dims, lines: 446-460 }
+    - { name: test_filter_options_cross_narrowing, lines: 463-470 }
+    - { name: test_summary_lot_and_product_line_counts, lines: 473-485 }
+    - { name: test_pareto_product_line_dim, lines: 488-503 }
+    - { name: test_pareto_invalid_dim_raises, lines: 506-511 }
+    - { name: test_trend_group_by_pj_type, lines: 514-528 }
+    - { name: test_trend_invalid_group_by_raises, lines: 531-536 }
 
 tests/integration/test_eap_alarm_resilience.py:  # 307 lines
   imports:
@@ -10548,7 +10800,7 @@ tests/integration/test_eap_alarm_resilience.py:  # 307 lines
     - { name: test_empty_eqp_types_with_product_dims_only_builds_valid_sql, lines: 221-257 }
     - { name: test_inflight_abort, lines: 262-307 }
 
-tests/integration/test_eap_alarm_rq_async.py:  # 469 lines
+tests/integration/test_eap_alarm_rq_async.py:  # 564 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: importlib, items: [], line: 17 }
@@ -10562,32 +10814,34 @@ tests/integration/test_eap_alarm_rq_async.py:  # 469 lines
     - { module: pytest, items: [], line: 26 }
   classes:
     - name: TestEapAlarmSpoolTrigger
-      lines: 57-161
+      lines: 57-166
       methods:
         - { name: test_enqueue_to_eap_alarm_queue, lines: 60-117 }
         - { name: test_post_spool_missing_date_returns_400, lines: 119-131 }
-        - { name: test_post_spool_invalid_eqp_type_returns_400, lines: 133-146 }
-        - { name: test_post_spool_empty_eqp_types_returns_400, lines: 148-161 }
+        - { name: test_post_spool_blank_eqp_type_returns_400, lines: 133-151 }
+        - { name: test_post_spool_empty_eqp_types_returns_400, lines: 153-166 }
     - name: TestEapAlarmWorkerFn
-      lines: 168-352
+      lines: 173-441
       methods:
-        - { name: _build_mock_df, lines: 171-182 }
-        - { name: _empty_detail_df, lines: 184-187 }
-        - { name: _sql_router, lines: 189-200 }
-        - { name: test_worker_fn_writes_parquet_with_correct_columns, lines: 202-260 }
-        - { name: test_worker_fn_decodes_alarm_category, lines: 262-291 }
-        - { name: test_worker_fn_progress_milestones, lines: 293-325 }
-        - { name: test_worker_fn_oracle_sql_contains_last_update_time_predicate, lines: 327-352 }
+        - { name: _build_mock_df, lines: 176-188 }
+        - { name: _empty_detail_df, lines: 190-193 }
+        - { name: _lot_product_df, lines: 195-203 }
+        - { name: _sql_router, lines: 205-221 }
+        - { name: test_worker_fn_writes_parquet_with_correct_columns, lines: 223-290 }
+        - { name: test_worker_fn_decodes_alarm_category, lines: 292-321 }
+        - { name: test_worker_fn_progress_milestones, lines: 323-355 }
+        - { name: test_worker_fn_includes_shape_b_and_pairs_by_event_name, lines: 357-414 }
+        - { name: test_worker_fn_oracle_sql_contains_last_update_time_predicate, lines: 416-441 }
     - name: TestEapAlarmSpoolCacheHit
-      lines: 359-385
+      lines: 448-474
       methods:
-        - { name: test_spool_cache_hit_returns_200, lines: 362-385 }
+        - { name: test_spool_cache_hit_returns_200, lines: 451-474 }
   functions:
     - { name: _reset_registry, lines: 35-38 }
     - { name: _reload_eap_alarm_worker, lines: 41-45 }
     - { name: _make_app, lines: 48-50 }
-    - { name: test_spool_miss_returns_410, lines: 392-405 }
-    - { name: test_detail_no_extra_oracle_query, lines: 412-464 }
+    - { name: test_spool_miss_returns_410, lines: 481-494 }
+    - { name: test_detail_no_extra_oracle_query, lines: 501-559 }
 
 tests/integration/test_fixtures_smoke.py:  # 44 lines
   imports:
@@ -10832,6 +11086,55 @@ tests/integration/test_preload_fork_safety.py:  # 535 lines
     - { name: test_no_duplicate_rq_enqueue_on_two_worker_start, lines: 423-444 }  # @pytest.mark.integration_real
     - { name: test_worker_crash_respawn_no_master_prewarm_retrigger, lines: 454-489 }  # @pytest.mark.integration_real
     - { name: test_worker_crash_respawn_fresh_connections, lines: 494-535 }  # @pytest.mark.integration_real
+
+tests/integration/test_production_achievement_filter_cache_reuse.py:  # 40 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 8 }
+    - { module: unittest.mock, items: [patch], line: 10 }
+    - { module: pandas, items: [], line: 12 }
+    - { module: pytest, items: [], line: 13 }
+  classes:
+    - name: TestFilterCacheReuse
+      lines: 18-40
+      methods:
+        - { name: test_service_calls_get_spec_workcenter_mapping_not_new_cache, lines: 20-31 }
+        - { name: test_service_module_imports_get_spec_workcenter_mapping_from_filter_cache, lines: 33-40 }
+
+tests/integration/test_production_achievement_mysql_roundtrip.py:  # 145 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 11 }
+    - { module: unittest.mock, items: [patch], line: 13 }
+    - { module: pytest, items: [], line: 15 }
+  classes:
+    - name: _FakeMySQLTable
+      lines: 20-31
+      methods:
+        - { name: __init__, lines: 24-25 }
+        - { name: upsert, lines: 27-28 }
+        - { name: all, lines: 30-31 }
+    - name: _FakeConn
+      lines: 34-65
+      methods:
+        - { name: __init__, lines: 35-38 }
+        - { name: execute, lines: 40-65 }
+    - name: _FakeConnCtx
+      lines: 68-76
+      methods:
+        - { name: __init__, lines: 69-70 }
+        - { name: __enter__, lines: 72-73 }
+        - { name: __exit__, lines: 75-76 }
+    - name: TestTargetTableRoundtrip
+      lines: 79-112
+      methods:
+        - { name: test_target_table_write_then_read_roundtrip, lines: 81-95 }
+        - { name: test_mysql_ops_disabled_read_degrades_to_null, lines: 98-103 }
+        - { name: test_mysql_ops_disabled_write_returns_503, lines: 106-112 }
+    - name: TestPermissionTableRoundtrip
+      lines: 115-145
+      methods:
+        - { name: test_permission_table_write_then_read_roundtrip, lines: 117-130 }
+        - { name: test_ops_disabled_write_returns_503, lines: 133-139 }
+        - { name: test_ops_disabled_is_user_whitelisted_fails_closed, lines: 142-145 }
 
 tests/integration/test_production_history_rq_async.py:  # 101 lines
   imports:
@@ -12638,7 +12941,50 @@ tests/test_ai_function_registry.py:  # 584 lines
         - { name: test_all_41_new_functions_present, lines: 572-576 }
         - { name: test_total_registry_size_is_at_least_41, lines: 578-580 }
 
-tests/test_ai_query_service.py:  # 851 lines
+tests/test_ai_leader_orchestrator.py:  # 292 lines
+  imports:
+    - { module: unittest, items: [], line: 3 }
+    - { module: unittest.mock, items: [patch], line: 4 }
+    - { module: requests, items: [], line: 6 }
+    - { module: mes_dashboard.services, items: [leader], line: 8 }
+  classes:
+    - name: TestRespondPath
+      lines: 23-60
+      methods:
+        - { name: test_respond_action_returns_directly, lines: 26-37 }
+        - { name: test_respond_with_question_mark_is_clarification, lines: 41-49 }
+        - { name: test_respond_empty_answer_uses_fallback_text, lines: 53-60 }
+    - name: TestDelegatePath
+      lines: 63-168
+      methods:
+        - { name: test_two_tasks_dispatched_and_synthesized, lines: 67-107 }
+        - { name: test_query_used_falls_back_to_leader_without_chart, lines: 112-121 }
+        - { name: test_synthesis_receives_question_and_subtask_results, lines: 126-137 }
+        - { name: test_task_count_capped_at_max_tasks, lines: 142-154 }
+        - { name: test_delegate_with_empty_tasks_uses_question, lines: 159-168 }
+    - name: TestDegradation
+      lines: 171-240
+      methods:
+        - { name: test_malformed_plan_degrades_to_single_task, lines: 175-185 }
+        - { name: test_planning_timeout_propagates, lines: 188-192 }
+        - { name: test_planning_connection_error_propagates, lines: 195-199 }
+        - { name: test_one_failed_subagent_does_not_kill_turn, lines: 204-214 }
+        - { name: test_all_subagents_failed_skips_synthesis, lines: 219-227 }
+        - { name: test_synthesis_failure_falls_back_to_concatenation, lines: 232-240 }
+    - name: TestChatHistory
+      lines: 243-277
+      methods:
+        - { name: test_history_injected_into_planning_and_appended, lines: 249-267 }
+        - { name: test_respond_path_does_not_append_history, lines: 271-277 }
+    - name: TestPromptContent
+      lines: 280-288
+      methods:
+        - { name: test_plan_prompt_mentions_capabilities_and_format, lines: 281-284 }
+        - { name: test_synthesis_prompt_forbids_fabrication, lines: 286-288 }
+  functions:
+    - { name: _agent_result, lines: 11-20 }
+
+tests/test_ai_query_service.py:  # 863 lines
   imports:
     - { module: unittest, items: [], line: 8 }
     - { module: unittest.mock, items: [MagicMock, patch], line: 9 }
@@ -12701,89 +13047,90 @@ tests/test_ai_query_service.py:  # 851 lines
       methods:
         - { name: test_no_domains_returns_thought, lines: 384-397 }
     - name: TestFeatureFlag
-      lines: 400-430
+      lines: 400-442
       methods:
         - { name: test_function_mode_routes_to_function_pipeline, lines: 404-411 }
         - { name: test_text2sql_mode_routes_to_text2sql_pipeline, lines: 414-420 }
-        - { name: test_default_mode_is_text2sql, lines: 423-430 }
+        - { name: test_leader_mode_routes_to_leader_pipeline, lines: 423-432 }
+        - { name: test_default_mode_is_text2sql, lines: 435-442 }
     - name: TestStructuredClarificationFlow
-      lines: 433-470
+      lines: 445-482
       methods:
-        - { name: test_process_query_returns_clarification_before_search, lines: 436-451 }
-        - { name: test_process_query_uses_enriched_search_question, lines: 455-470 }
+        - { name: test_process_query_returns_clarification_before_search, lines: 448-463 }
+        - { name: test_process_query_uses_enriched_search_question, lines: 467-482 }
     - name: TestText2SqlTimeoutError
-      lines: 473-495
+      lines: 485-507
       methods:
-        - { name: test_timeout_no_retry, lines: 477-495 }
+        - { name: test_timeout_no_retry, lines: 489-507 }
     - name: TestExtractOracleError
-      lines: 498-509
+      lines: 510-521
       methods:
-        - { name: test_extracts_ora_code, lines: 501-504 }
-        - { name: test_returns_full_message_if_no_ora, lines: 506-509 }
+        - { name: test_extracts_ora_code, lines: 513-516 }
+        - { name: test_returns_full_message_if_no_ora, lines: 518-521 }
     - name: TestSummarizeDataframe
-      lines: 512-532
+      lines: 524-544
       methods:
-        - { name: test_empty_df_returns_empty_message, lines: 515-518 }
-        - { name: test_large_df_truncated_to_10_rows, lines: 520-525 }
-        - { name: test_small_df_not_truncated, lines: 527-532 }
+        - { name: test_empty_df_returns_empty_message, lines: 527-530 }
+        - { name: test_large_df_truncated_to_10_rows, lines: 532-537 }
+        - { name: test_small_df_not_truncated, lines: 539-544 }
     - name: TestSanitizeSql
-      lines: 535-563
+      lines: 547-575
       methods:
-        - { name: test_auto_quotes_package, lines: 538-542 }
-        - { name: test_auto_quotes_function, lines: 544-547 }
-        - { name: test_does_not_double_quote, lines: 549-553 }
-        - { name: test_leaves_normal_columns_alone, lines: 555-558 }
-        - { name: test_package_in_where_clause, lines: 560-563 }
+        - { name: test_auto_quotes_package, lines: 550-554 }
+        - { name: test_auto_quotes_function, lines: 556-559 }
+        - { name: test_does_not_double_quote, lines: 561-565 }
+        - { name: test_leaves_normal_columns_alone, lines: 567-570 }
+        - { name: test_package_in_where_clause, lines: 572-575 }
     - name: TestCoerceDateParams
-      lines: 566-587
+      lines: 578-599
       methods:
-        - { name: test_sysdate, lines: 569-572 }
-        - { name: test_sysdate_minus_n, lines: 574-577 }
-        - { name: test_iso_date_string, lines: 579-582 }
-        - { name: test_non_date_untouched, lines: 584-587 }
+        - { name: test_sysdate, lines: 581-584 }
+        - { name: test_sysdate_minus_n, lines: 586-589 }
+        - { name: test_iso_date_string, lines: 591-594 }
+        - { name: test_non_date_untouched, lines: 596-599 }
     - name: TestDeterministicSqlReviewer
-      lines: 590-617
+      lines: 602-629
       methods:
-        - { name: test_rejects_station_rate_sql_without_group_aggregation, lines: 593-604 }
-        - { name: test_rejects_rate_sql_without_reject_exclusion_policy, lines: 606-617 }
+        - { name: test_rejects_station_rate_sql_without_group_aggregation, lines: 605-616 }
+        - { name: test_rejects_rate_sql_without_reject_exclusion_policy, lines: 618-629 }
     - name: TestCombinedCallOneCallOnly
-      lines: 624-647
+      lines: 636-659
       methods:
-        - { name: test_only_one_llm_call_for_select_and_fill, lines: 630-647 }
+        - { name: test_only_one_llm_call_for_select_and_fill, lines: 642-659 }
     - name: TestCombinedCallOutputSchema
-      lines: 650-674
+      lines: 662-686
       methods:
-        - { name: test_combined_call_result_uses_function_and_params_keys, lines: 656-674 }
+        - { name: test_combined_call_result_uses_function_and_params_keys, lines: 668-686 }
     - name: TestCombinedCallNullIntent
-      lines: 677-700
+      lines: 689-712
       methods:
-        - { name: test_null_function_returns_explanation_as_answer, lines: 681-690 }
-        - { name: test_missing_function_key_returns_fallback, lines: 693-700 }
+        - { name: test_null_function_returns_explanation_as_answer, lines: 693-702 }
+        - { name: test_missing_function_key_returns_fallback, lines: 705-712 }
     - name: TestCombinedCallMalformedJson
-      lines: 703-721
+      lines: 715-733
       methods:
-        - { name: test_call_llm_raises_runtime_error_returns_null_intent, lines: 707-713 }
-        - { name: test_empty_dict_from_call_llm_returns_null_intent, lines: 716-721 }
+        - { name: test_call_llm_raises_runtime_error_returns_null_intent, lines: 719-725 }
+        - { name: test_empty_dict_from_call_llm_returns_null_intent, lines: 728-733 }
     - name: TestCombinedCallPartialJson
-      lines: 724-744
+      lines: 736-756
       methods:
-        - { name: test_missing_params_key_defaults_to_empty_dict, lines: 730-744 }
+        - { name: test_missing_params_key_defaults_to_empty_dict, lines: 742-756 }
     - name: TestHistoryInjectedIntoCombinedCall
-      lines: 747-786
+      lines: 759-798
       methods:
-        - { name: test_history_injected_in_messages, lines: 753-786 }
+        - { name: test_history_injected_in_messages, lines: 765-798 }
     - name: TestProductionHistoryQueryDispatchAdapter
-      lines: 789-822
+      lines: 801-834
       methods:
-        - { name: test_raw_params_dispatch_passes_dict_not_kwargs, lines: 795-822 }
+        - { name: test_raw_params_dispatch_passes_dict_not_kwargs, lines: 807-834 }
     - name: TestNormalizeChartDataNewFunctions
-      lines: 825-851
+      lines: 837-863
       methods:
-        - { name: test_qc_gate_status_extracts_stations, lines: 828-831 }
-        - { name: test_qc_gate_status_non_dict_raw_passthrough, lines: 833-836 }
-        - { name: test_qc_gate_status_empty_dict_returns_empty_list, lines: 838-841 }
-        - { name: test_production_history_query_passthrough, lines: 843-846 }
-        - { name: test_resource_history_summary_passthrough, lines: 848-851 }
+        - { name: test_qc_gate_status_extracts_stations, lines: 840-843 }
+        - { name: test_qc_gate_status_non_dict_raw_passthrough, lines: 845-848 }
+        - { name: test_qc_gate_status_empty_dict_returns_empty_list, lines: 850-853 }
+        - { name: test_production_history_query_passthrough, lines: 855-858 }
+        - { name: test_resource_history_summary_passthrough, lines: 860-863 }
 
 tests/test_ai_query_understanding.py:  # 222 lines
   imports:
@@ -12918,7 +13265,7 @@ tests/test_ai_schema_context.py:  # 225 lines
         - { name: test_get_examples_for_domains_returns_string, lines: 214-217 }
         - { name: test_get_examples_for_unknown_domain_returns_empty, lines: 219-221 }
 
-tests/test_ai_tool_definitions.py:  # 109 lines
+tests/test_ai_tool_definitions.py:  # 115 lines
   imports:
     - { module: re, items: [], line: 3 }
     - { module: unittest, items: [], line: 4 }
@@ -12938,12 +13285,13 @@ tests/test_ai_tool_definitions.py:  # 109 lines
         - { name: test_special_tools_present, lines: 61-65 }
         - { name: test_token_length_reasonable, lines: 67-74 }
     - name: TestBuildAgentSystemPrompt
-      lines: 77-105
+      lines: 77-111
       methods:
         - { name: test_contains_required_sections, lines: 78-82 }
         - { name: test_contains_business_context, lines: 84-90 }
         - { name: test_token_length_within_4k, lines: 92-99 }
         - { name: test_contains_date, lines: 101-105 }
+        - { name: test_function_first_sql_fallback_rule, lines: 107-111 }
   functions:
     - { name: _estimate_tokens, lines: 14-22 }
 
@@ -14892,7 +15240,7 @@ tests/test_downtime_unified_job.py:  # 887 lines
     - { name: _make_base_batch, lines: 34-46 }
     - { name: _make_job_batch, lines: 49-63 }
 
-tests/test_duckdb_runtime.py:  # 115 lines
+tests/test_duckdb_runtime.py:  # 162 lines
   imports:
     - { module: pytest, items: [], line: 4 }
     - { module: mes_dashboard.core.duckdb_runtime, items: [SpoolMissError, DuckDBRuntimeError, assert_spool_path, DUCKDB_MEMORY_LIMIT, DUCKDB_THREADS], line: 6 }
@@ -14927,8 +15275,16 @@ tests/test_duckdb_runtime.py:  # 115 lines
         - { name: test_memory_limit_applied, lines: 79-88 }
         - { name: test_threads_applied, lines: 90-98 }
         - { name: test_can_read_parquet, lines: 100-115 }
+    - name: TestGetDuckDBTelemetry
+      lines: 118-162
+      methods:
+        - { name: test_temp_dir_bytes_is_numeric_not_none, lines: 123-131 }
+        - { name: test_memory_limit_state_reported, lines: 133-139 }
+        - { name: test_resolve_temp_dir_returns_absolute_path, lines: 141-147 }
+        - { name: test_dir_size_bytes_sums_files_recursively, lines: 149-157 }
+        - { name: test_dir_size_bytes_missing_dir_returns_zero, lines: 159-162 }
 
-tests/test_eap_alarm_service.py:  # 480 lines
+tests/test_eap_alarm_service.py:  # 482 lines
   imports:
     - { module: __future__, items: [annotations], line: 16 }
     - { module: hashlib, items: [], line: 18 }
@@ -14982,47 +15338,47 @@ tests/test_eap_alarm_service.py:  # 480 lines
         - { name: test_negative_code_returns_unknown, lines: 256-258 }
         - { name: test_service_decode_matches_cache_decode, lines: 260-264 }
     - name: TestSchemaVersionIsPinned
-      lines: 269-283
+      lines: 269-285
       methods:
         - { name: test_schema_version_is_integer, lines: 272-276 }
-        - { name: test_schema_version_equals_three, lines: 278-283 }
+        - { name: test_schema_version_equals_five, lines: 278-285 }
     - name: TestAtLeastOneFilterRequired
-      lines: 288-340
+      lines: 290-342
       methods:
-        - { name: test_all_empty_raises, lines: 291-294 }
-        - { name: test_all_none_raises, lines: 296-303 }
-        - { name: test_eqp_types_only_ok, lines: 305-308 }
-        - { name: test_lot_ids_only_ok, lines: 310-312 }
-        - { name: test_pj_types_only_ok, lines: 314-316 }
-        - { name: test_product_lines_only_ok, lines: 318-320 }
-        - { name: test_pj_bops_only_ok, lines: 322-324 }
-        - { name: test_mixed_ok, lines: 326-331 }
-        - { name: test_whitespace_only_lot_ids_treated_as_empty, lines: 333-340 }
+        - { name: test_all_empty_raises, lines: 293-296 }
+        - { name: test_all_none_raises, lines: 298-305 }
+        - { name: test_eqp_types_only_ok, lines: 307-310 }
+        - { name: test_lot_ids_only_ok, lines: 312-314 }
+        - { name: test_pj_types_only_ok, lines: 316-318 }
+        - { name: test_product_lines_only_ok, lines: 320-322 }
+        - { name: test_pj_bops_only_ok, lines: 324-326 }
+        - { name: test_mixed_ok, lines: 328-333 }
+        - { name: test_whitespace_only_lot_ids_treated_as_empty, lines: 335-342 }
     - name: TestLotIdNormalization
-      lines: 345-399
+      lines: 347-401
       methods:
-        - { name: test_whitespace_stripped_in_key, lines: 348-353 }
-        - { name: test_whitespace_only_strings_dropped, lines: 355-362 }
-        - { name: test_duplicates_deduped_by_validation_before_key, lines: 364-377 }
-        - { name: test_max_200_cap_exactly_200_ok, lines: 380-385 }
-        - { name: test_max_200_cap_exceeded_201_raises, lines: 387-392 }
-        - { name: test_char_padding_stripped_at_key_build, lines: 394-399 }
+        - { name: test_whitespace_stripped_in_key, lines: 350-355 }
+        - { name: test_whitespace_only_strings_dropped, lines: 357-364 }
+        - { name: test_duplicates_deduped_by_validation_before_key, lines: 366-379 }
+        - { name: test_max_200_cap_exactly_200_ok, lines: 382-387 }
+        - { name: test_max_200_cap_exceeded_201_raises, lines: 389-394 }
+        - { name: test_char_padding_stripped_at_key_build, lines: 396-401 }
     - name: TestProductDimsFilter
-      lines: 404-465
+      lines: 406-467
       methods:
-        - { name: test_no_dims_returns_empty, lines: 407-411 }
-        - { name: test_pj_types_generates_exists_clause, lines: 413-425 }
-        - { name: test_product_lines_generates_exists_clause, lines: 427-432 }
-        - { name: test_pj_bops_generates_exists_clause, lines: 434-439 }
-        - { name: test_multiple_dims_and_semantics, lines: 441-450 }
-        - { name: test_absent_dim_produces_no_clause, lines: 452-459 }
-        - { name: test_whitespace_stripped_from_values, lines: 461-465 }
+        - { name: test_no_dims_returns_empty, lines: 409-413 }
+        - { name: test_pj_types_generates_exists_clause, lines: 415-427 }
+        - { name: test_product_lines_generates_exists_clause, lines: 429-434 }
+        - { name: test_pj_bops_generates_exists_clause, lines: 436-441 }
+        - { name: test_multiple_dims_and_semantics, lines: 443-452 }
+        - { name: test_absent_dim_produces_no_clause, lines: 454-461 }
+        - { name: test_whitespace_stripped_from_values, lines: 463-467 }
     - name: TestEquipmentFilterEmptyNoOp
-      lines: 470-480
+      lines: 472-482
       methods:
-        - { name: test_empty_machines_returns_always_true_no_op, lines: 475-480 }
+        - { name: test_empty_machines_returns_always_true_no_op, lines: 477-482 }
 
-tests/test_eap_alarm_unified_job.py:  # 211 lines
+tests/test_eap_alarm_unified_job.py:  # 583 lines
   imports:
     - { module: __future__, items: [annotations], line: 3 }
     - { module: json, items: [], line: 5 }
@@ -15045,22 +15401,58 @@ tests/test_eap_alarm_unified_job.py:  # 211 lines
         - { name: test_events_sql, lines: 64-72 }
         - { name: test_detail_sql, lines: 74-81 }
     - name: TestEapAlarmJobPostAggregate
-      lines: 84-170
+      lines: 84-172
       methods:
-        - { name: _make_events_table, lines: 87-95 }
-        - { name: _make_detail_table, lines: 97-102 }
-        - { name: test_post_aggregate_pairs_set_clear, lines: 104-135 }
-        - { name: test_post_aggregate_empty_events, lines: 137-170 }
+        - { name: _make_events_table, lines: 87-96 }
+        - { name: _make_detail_table, lines: 98-103 }
+        - { name: test_post_aggregate_pairs_set_clear, lines: 105-136 }
+        - { name: test_post_aggregate_empty_events, lines: 138-172 }
+    - name: TestEapAlarmShapeBPairing
+      lines: 229-325
+      methods:
+        - { name: _run_post_aggregate, lines: 237-238 }
+        - { name: _events_table, lines: 240-241 }
+        - { name: test_shape_b_pairs_detected_cleared_by_alarm_id_across_chunks, lines: 243-266 }
+        - { name: test_shape_b_unpaired_detected_stays_open, lines: 268-279 }
+        - { name: test_cross_shape_pairing_forbidden, lines: 281-300 }
+        - { name: test_both_shapes_coexist_with_alarm_source, lines: 302-325 }
+    - name: TestEapAlarmCrossChannelDedup
+      lines: 328-430
+      methods:
+        - { name: _dual_channel_detail, lines: 336-342 }
+        - { name: test_duplicate_within_tolerance_dropped_shape_a_wins, lines: 344-356 }
+        - { name: test_same_id_outside_tolerance_both_kept, lines: 358-368 }
+        - { name: test_unmatched_alarm_id_on_dual_channel_kept, lines: 370-379 }
+        - { name: test_same_id_different_equipment_not_deduped, lines: 381-390 }
+        - { name: test_unpaired_shape_a_still_wins, lines: 392-409 }
+        - { name: test_dedup_applies_across_chunk_seam, lines: 411-424 }
+        - { name: test_dedup_tolerance_constant_pinned, lines: 426-430 }
+    - name: TestEapAlarmFlappingPairingArtifact
+      lines: 433-495
+      methods:
+        - { name: test_multiple_sets_share_one_distant_clear, lines: 455-481 }
+        - { name: test_set_immediately_followed_by_its_own_clear_is_unaffected, lines: 483-495 }
+    - name: TestAlarmEventSqlTemplates
+      lines: 498-542
+      methods:
+        - { name: test_both_templates_include_shape_b_aliases, lines: 501-509 }
+        - { name: test_non_alarm_aliases_excluded, lines: 511-518 }
+        - { name: test_events_template_selects_event_type, lines: 520-523 }
+        - { name: test_last_update_time_predicate_retained, lines: 525-531 }
+        - { name: test_templates_render_with_filters, lines: 533-542 }
     - name: TestEapAlarmRouteFlag
-      lines: 173-195
+      lines: 545-567
       methods:
-        - { name: test_flag_on_by_default, lines: 176-181 }
-        - { name: test_flag_on_via_env, lines: 183-188 }
-        - { name: test_flag_true_string, lines: 190-195 }
+        - { name: test_flag_on_by_default, lines: 548-553 }
+        - { name: test_flag_on_via_env, lines: 555-560 }
+        - { name: test_flag_true_string, lines: 562-567 }
     - name: TestEapAlarmJobProgressReport
-      lines: 198-211
+      lines: 570-583
       methods:
-        - { name: test_progress_report_uses_eap_alarm_prefix, lines: 201-211 }
+        - { name: test_progress_report_uses_eap_alarm_prefix, lines: 573-583 }
+  functions:
+    - { name: _run_shapeb_post_aggregate, lines: 175-213 }
+    - { name: _shapeb_events_table, lines: 216-226 }
 
 tests/test_env_contract.py:  # 296 lines
   imports:
@@ -17555,43 +17947,49 @@ tests/test_performance_integration.py:  # 395 lines
     - { name: client, lines: 25-27 }  # @pytest.fixture
     - { name: admin_client, lines: 31-35 }  # @pytest.fixture
 
-tests/test_permissions.py:  # 161 lines
+tests/test_permissions.py:  # 219 lines
   imports:
     - { module: pytest, items: [], line: 4 }
     - { module: flask, items: [Flask], line: 5 }
     - { module: sys, items: [], line: 7 }
     - { module: os, items: [], line: 8 }
-    - { module: mes_dashboard.core.permissions, items: [is_admin_logged_in, is_user_logged_in, get_current_user, admin_required, login_required], line: 11 }
+    - { module: mes_dashboard.core.permissions, items: [is_admin_logged_in, is_user_logged_in, get_current_user, admin_required, login_required, can_edit_targets, targets_edit_required], line: 11 }
   classes:
     - name: TestIsAdminLoggedIn
-      lines: 29-49
+      lines: 31-51
       methods:
-        - { name: test_admin_logged_in, lines: 32-37 }
-        - { name: test_non_admin_user_not_admin, lines: 39-44 }
-        - { name: test_admin_not_logged_in, lines: 46-49 }
+        - { name: test_admin_logged_in, lines: 34-39 }
+        - { name: test_non_admin_user_not_admin, lines: 41-46 }
+        - { name: test_admin_not_logged_in, lines: 48-51 }
     - name: TestIsUserLoggedIn
-      lines: 52-65
+      lines: 54-67
       methods:
-        - { name: test_user_logged_in, lines: 55-60 }
-        - { name: test_user_not_logged_in, lines: 62-65 }
+        - { name: test_user_logged_in, lines: 57-62 }
+        - { name: test_user_not_logged_in, lines: 64-67 }
     - name: TestGetCurrentUser
-      lines: 68-84
+      lines: 70-86
       methods:
-        - { name: test_get_user_when_logged_in, lines: 71-78 }
-        - { name: test_get_user_when_not_logged_in, lines: 80-84 }
+        - { name: test_get_user_when_logged_in, lines: 73-80 }
+        - { name: test_get_user_when_not_logged_in, lines: 82-86 }
     - name: TestAdminRequired
-      lines: 87-128
+      lines: 89-130
       methods:
-        - { name: test_admin_required_when_admin_logged_in, lines: 90-103 }
-        - { name: test_admin_required_when_not_logged_in, lines: 105-114 }
-        - { name: test_admin_required_when_regular_user, lines: 116-128 }
+        - { name: test_admin_required_when_admin_logged_in, lines: 92-105 }
+        - { name: test_admin_required_when_not_logged_in, lines: 107-116 }
+        - { name: test_admin_required_when_regular_user, lines: 118-130 }
     - name: TestLoginRequired
-      lines: 131-157
+      lines: 133-159
       methods:
-        - { name: test_login_required_when_logged_in, lines: 134-146 }
-        - { name: test_login_required_when_not_logged_in, lines: 148-157 }
+        - { name: test_login_required_when_logged_in, lines: 136-148 }
+        - { name: test_login_required_when_not_logged_in, lines: 150-159 }
+    - name: TestCanEditTargetsIndependentGate
+      lines: 162-215
+      methods:
+        - { name: test_can_edit_targets_denied_for_non_admin_non_whitelisted, lines: 170-179 }
+        - { name: test_targets_edit_required_returns_403_when_denied, lines: 181-196 }
+        - { name: test_targets_edit_required_distinct_from_admin_required, lines: 198-215 }
   functions:
-    - { name: app, lines: 21-26 }  # @pytest.fixture
+    - { name: app, lines: 23-28 }  # @pytest.fixture
 
 tests/test_portal_shell_routes.py:  # 415 lines
   imports:
@@ -17651,6 +18049,162 @@ tests/test_post_fork_reinit.py:  # 163 lines
     - { name: test_sqlite_handles_reopen_per_worker, lines: 89-139 }
     - { name: test_reinit_sqlite_handles_returns_early_in_test_mode, lines: 142-152 }
     - { name: test_start_per_worker_services_returns_early_in_test_mode, lines: 155-163 }
+
+tests/test_production_achievement_output_date.py:  # 56 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: datetime, items: [date, datetime], line: 15 }
+    - { module: mes_dashboard.services.production_achievement_service, items: [compute_output_date], line: 17 }
+  classes:
+    - name: TestTwoShiftOutputDate
+      lines: 20-56
+      methods:
+        - { name: test_two_shift_n_tail_attributes_prev_day, lines: 21-24 }
+        - { name: test_two_shift_d_and_late_n_attribute_same_day, lines: 26-31 }
+        - { name: test_confirmed_0426_0427_cross_midnight_case, lines: 33-45 }
+        - { name: test_three_shift_c_tail_assumption_documented, lines: 47-56 }
+
+tests/test_production_achievement_permissions.py:  # 85 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: unittest.mock, items: [patch], line: 11 }
+    - { module: pytest, items: [], line: 13 }
+    - { module: flask, items: [Flask, session], line: 14 }
+    - { module: mes_dashboard.core.permissions, items: [can_edit_targets, is_admin_logged_in], line: 16 }
+  classes:
+    - name: TestCanEditTargets
+      lines: 27-85
+      methods:
+        - { name: test_whitelisted_user_allowed, lines: 32-36 }
+        - { name: test_non_whitelisted_user_denied, lines: 42-45 }
+        - { name: test_mysql_unreachable_fails_closed_deny, lines: 51-54 }
+        - { name: test_ops_disabled_fails_closed_deny, lines: 60-65 }
+        - { name: test_explicit_identifier_bypasses_session, lines: 71-74 }
+        - { name: test_distinct_from_admin_required, lines: 80-85 }
+  functions:
+    - { name: app, lines: 20-24 }  # @pytest.fixture
+
+tests/test_production_achievement_routes.py:  # 264 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: unittest.mock, items: [patch], line: 11 }
+    - { module: pytest, items: [], line: 13 }
+    - { module: mes_dashboard.app, items: [create_app], line: 15 }
+  classes:
+    - name: TestReportRoute
+      lines: 50-99
+      methods:
+        - { name: test_report_requires_login, lines: 51-56 }
+        - { name: test_report_requires_date_range, lines: 58-62 }
+        - { name: test_report_rejects_over_730_day_range, lines: 64-69 }
+        - { name: test_report_forwards_kwargs_per_key, lines: 72-88 }
+        - { name: test_report_forwards_optional_filters_as_none_when_absent, lines: 91-99 }
+    - name: TestFilterOptionsRoute
+      lines: 106-117
+      methods:
+        - { name: test_filter_options_requires_login, lines: 107-109 }
+        - { name: test_filter_options_returns_success, lines: 112-117 }
+    - name: TestGetTargetsRoute
+      lines: 124-143
+      methods:
+        - { name: test_get_targets_no_permission_gate, lines: 125-132 }
+        - { name: test_get_targets_forwards_optional_filter_kwargs, lines: 135-143 }
+    - name: TestPutTargetsRoute
+      lines: 150-212
+      methods:
+        - { name: test_put_targets_requires_login, lines: 151-156 }
+        - { name: test_put_targets_403_when_not_whitelisted, lines: 159-166 }
+        - { name: test_put_targets_503_when_mysql_ops_disabled, lines: 170-177 }
+        - { name: test_put_targets_success_forwards_kwargs, lines: 182-192 }
+        - { name: test_put_targets_rejects_negative_qty, lines: 196-203 }
+        - { name: test_put_targets_rejects_non_numeric_qty, lines: 207-212 }
+    - name: TestAdminPermissionsRoutes
+      lines: 219-264
+      methods:
+        - { name: test_admin_get_permissions_requires_admin, lines: 220-226 }
+        - { name: test_admin_get_permissions_success, lines: 230-235 }
+        - { name: test_admin_permissions_put_requires_admin, lines: 237-242 }
+        - { name: test_admin_permissions_put_forwards_kwargs, lines: 246-255 }
+        - { name: test_admin_permissions_put_503_when_ops_disabled, lines: 259-264 }
+  functions:
+    - { name: app, lines: 19-22 }  # @pytest.fixture
+    - { name: client, lines: 26-27 }  # @pytest.fixture
+    - { name: auth_client, lines: 31-35 }  # @pytest.fixture
+    - { name: admin_client, lines: 39-43 }  # @pytest.fixture
+
+tests/test_production_achievement_service.py:  # 174 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 13 }
+    - { module: unittest.mock, items: [patch], line: 15 }
+    - { module: pandas, items: [], line: 17 }
+    - { module: pytest, items: [], line: 18 }
+    - { module: mes_dashboard.services.production_achievement_service, items: [build_achievement_rows, PA05_PREDICATE_SQL], line: 20 }
+  classes:
+    - name: TestPA05PredicateSQL
+      lines: 26-59
+      methods:
+        - { name: test_pa05_predicate_excludes_shuangjing_sanjing_rows, lines: 27-32 }
+        - { name: test_pa05_predicate_each_specname_processtype_pairing, lines: 58-59 }
+    - name: TestGroupingAndWorkcenterGroupResolution
+      lines: 62-130
+      methods:
+        - { name: test_grouping_by_output_date_shift_workcenter_group, lines: 64-90 }
+        - { name: test_workcenter_group_resolved_via_filter_cache_not_hardcoded, lines: 93-107 }
+        - { name: test_unmapped_specname_excluded_from_output, lines: 110-123 }
+        - { name: test_empty_qualifying_rows_yields_empty_result_not_error, lines: 126-130 }
+    - name: TestAchievementRateMath
+      lines: 133-174
+      methods:
+        - { name: test_achievement_rate_missing_target_is_null, lines: 135-142 }
+        - { name: test_achievement_rate_zero_target_is_null_not_infinity, lines: 145-153 }
+        - { name: test_achievement_rate_zero_output_nonzero_target_is_zero, lines: 156-164 }
+        - { name: test_achievement_rate_normal_division, lines: 167-174 }
+
+tests/test_production_achievement_shift_code.py:  # 80 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 14 }
+    - { module: datetime, items: [datetime], line: 16 }
+    - { module: pytest, items: [], line: 18 }
+    - { module: mes_dashboard.services.production_achievement_service, items: [compute_shift_code], line: 20 }
+  classes:
+    - name: TestTwoShiftBoundarySeconds
+      lines: 23-51
+      methods:
+        - { name: test_two_shift_boundary_seconds, lines: 37-38 }
+        - { name: test_two_shift_date_cutoff_inclusive_exclusive, lines: 48-51 }
+    - name: TestThreeShiftBoundarySeconds
+      lines: 54-80
+      methods:
+        - { name: test_three_shift_window_boundary_seconds, lines: 68-69 }
+        - { name: test_three_shift_date_window_edges_20200101_20200329, lines: 78-80 }
+
+tests/test_production_achievement_target_service.py:  # 120 lines
+  imports:
+    - { module: __future__, items: [annotations], line: 9 }
+    - { module: unittest.mock, items: [MagicMock, patch], line: 11 }
+    - { module: pytest, items: [], line: 13 }
+    - { module: mes_dashboard.services.production_achievement_target_service, items: [TargetValidationError, get_targets, upsert_target, validate_target_qty], line: 15 }
+  classes:
+    - name: TestValidateTargetQty
+      lines: 23-48
+      methods:
+        - { name: test_negative_target_qty_rejected, lines: 24-26 }
+        - { name: test_non_numeric_target_qty_rejected, lines: 28-30 }
+        - { name: test_zero_is_valid, lines: 32-33 }
+        - { name: test_positive_int_is_valid, lines: 35-36 }
+        - { name: test_float_with_integral_value_is_valid, lines: 38-39 }
+        - { name: test_float_with_fractional_value_rejected, lines: 41-43 }
+        - { name: test_bool_rejected, lines: 45-48 }
+    - name: TestUpsertTarget
+      lines: 51-73
+      methods:
+        - { name: test_upsert_target_unique_key_shift_workcenter_group, lines: 54-73 }
+    - name: TestTargetReadNoDateDimension
+      lines: 76-120
+      methods:
+        - { name: test_target_read_no_date_dimension, lines: 79-109 }
+        - { name: test_read_degrades_to_empty_when_ops_disabled, lines: 112-114 }
+        - { name: test_read_degrades_to_empty_on_mysql_exception, lines: 118-120 }
 
 tests/test_production_history_async_routes.py:  # 218 lines
   imports:
@@ -21286,7 +21840,7 @@ tests/test_workcenter_mapping.py:  # 364 lines
       methods:
         - { name: test_filter_cache_views_are_env_configurable, lines: 356-364 }
 
-tests/test_worker_memory_guard.py:  # 375 lines
+tests/test_worker_memory_guard.py:  # 406 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: itertools, items: [], line: 6 }
@@ -21323,17 +21877,18 @@ tests/test_worker_memory_guard.py:  # 375 lines
         - { name: test_disabled_guard_does_not_start, lines: 229-235 }
         - { name: test_stop_when_no_guard, lines: 237-241 }
     - name: TestTelemetry
-      lines: 248-335
+      lines: 248-366
       methods:
         - { name: test_telemetry_dict_structure, lines: 249-272 }
         - { name: test_telemetry_dict_includes_nested_system_memory_breakdown, lines: 274-290 }
         - { name: test_telemetry_dict_includes_service_memory_breakdown, lines: 292-312 }
         - { name: test_get_memory_guard_telemetry_returns_dict, lines: 314-335 }
+        - { name: test_process_and_system_memory_refreshed_on_demand, lines: 337-366 }
     - name: TestGuardLifecycle
-      lines: 342-375
+      lines: 373-406
       methods:
-        - { name: test_start_and_stop, lines: 343-358 }
-        - { name: test_double_start_is_idempotent, lines: 360-375 }
+        - { name: test_start_and_stop, lines: 374-389 }
+        - { name: test_double_start_is_idempotent, lines: 391-406 }
 
 tests/test_worker_memory_system.py:  # 359 lines
   imports:

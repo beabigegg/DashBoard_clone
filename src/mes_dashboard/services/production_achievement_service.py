@@ -17,16 +17,15 @@ Implements business-rules.md PA-01..PA-07:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.services.filter_cache import get_spec_workcenter_mapping
-from mes_dashboard.services.production_achievement_target_service import get_targets_map
-from mes_dashboard.sql import SQLLoader
 
 logger = logging.getLogger("mes_dashboard.production_achievement_service")
 
@@ -196,38 +195,46 @@ def _validate_date_range(start_date: str, end_date: str) -> None:
         raise ProductionAchievementValidationError(f"查詢範圍不可超過 {MAX_QUERY_DAYS} 天")
 
 
-def get_achievement_report(
-    *,
-    start_date: str,
-    end_date: str,
-    shift_code: Optional[str] = None,
-    workcenter_group: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """Query the achievement-rate report for the given date range + optional
-    filters. Reuses filter_cache for workcenter_group resolution; joins the
-    target-value table (degrades to null target/achievement_rate, never 500,
-    when MySQL OPS is off/unreachable — production_achievement_target_service
-    already degrades get_targets_map() to {} in that case).
+# ============================================================
+# Canonical async spool key (production-achievement-async-spool, ADR-0016)
+# ============================================================
+#
+# NOTE: get_achievement_report() (the synchronous Oracle-backed request-path
+# reader) has been REMOVED by production-achievement-async-spool. The route
+# no longer performs the Oracle read + PA-06/PA-07 rollup on the request
+# path -- see workers/production_achievement_worker.py (ProductionAchievementJob)
+# for the async equivalent. build_achievement_rows()/_compute_achievement_rate()
+# above are retained as the test-only golden reference for the dual-tier
+# parity gate (business-rules.md PA-06/PA-07) -- the frontend now performs
+# this rollup client-side in DuckDB-WASM from the SPECNAME-grain spool.
+
+_PA_SPOOL_SCHEMA_VERSION = 1
+"""Schema version for the SPECNAME-grain async spool (data-shape-contract.md
+§3.28). Participates in the canonical spool key so a schema-breaking bump
+orphans stale parquets by key (cache-spool-patterns.md)."""
+
+
+def make_canonical_pa_spool_id(start_date: str, end_date: str) -> str:
+    """Return the canonical spool key for the production-achievement async spool.
+
+    Date-range only (data-shape-contract.md §3.28 canonical-key rule):
+    ``shift_code``/``workcenter_group`` request params do NOT participate in
+    the spool key and do NOT filter the spooled dataset server-side -- the
+    full PA-05-qualifying dataset for the date range is always spooled, and
+    any shift_code/workcenter_group narrowing happens client-side after
+    download. Shared by the route (spool-hit check) and the worker
+    (pre_query spool-path resolution) so both resolve the identical key.
     """
-    _validate_date_range(start_date, end_date)
-
-    chunk_end_excl = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-
-    sql = SQLLoader.load_with_params(
-        "production_achievement", CONTAINERNAME_FILTER=""
+    canonical = json.dumps(
+        {
+            "schema_version": _PA_SPOOL_SCHEMA_VERSION,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
     )
-    params = {"start_date": start_date, "chunk_end_excl": chunk_end_excl}
-    df = read_sql_df(sql, params, caller="production_achievement_service")
-
-    targets = get_targets_map()
-    rows = build_achievement_rows(df, targets)
-
-    if shift_code:
-        rows = [r for r in rows if r["shift_code"] == shift_code]
-    if workcenter_group:
-        rows = [r for r in rows if r["workcenter_group"] == workcenter_group]
-
-    return rows
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 _SHIFT_CODE_ENUM = ["N", "D", "A", "B", "C"]

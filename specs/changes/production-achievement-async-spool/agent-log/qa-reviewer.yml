@@ -1,0 +1,27 @@
+change-id: production-achievement-async-spool
+agent: qa-reviewer
+status: done
+verdict: RELEASE-READY
+summary: >
+  Approved for merge. Independently verified (not on claim): test-evidence.yml all
+  4 required phases passed + final-status passed, changed-area stdout.log shows backend
+  213 passed/11 skipped (marker-gated; re-ran resilience with --run-integration → 9
+  passed) + frontend type-check clean + vitest 772 passed. cdd-kit validate
+  --contracts --env --ci passed, openapi mirror synced. Every AC-1..AC-9 has a passing
+  covering test. All blocking review findings FIXED (UX-1, UX-2, monkey-3, VIS-1, VIS-2);
+  CSS PASS. Stress/soak/Playwright correctly excluded from the local ladder (nightly/
+  manual/own CI gates) per ci-gates.md.
+gate-blocking: none
+accepted-follow-ups:
+  - "SS-1 (HIGH, non-blocking): advisory heavy_query_slot — action required before scaling worker queue to 2+ processes; stress-soak sign-off required before first worker start"
+  - "tsconfig.json omits production-achievement (pre-existing from kanban); type-check is informational (continue-on-error); frontend self-verified files clean"
+  - "UX-3 filter-only re-download efficiency; UX-4/UX-5 pre-existing"
+  - "ci-gates.md dual-tier-parity row describes old Node-subprocess test; actual is tests/test_frontend_production_achievement_parity.py (stronger) — doc drift only"
+  - "commit hygiene: exclude unrelated docs/architecture/eap-event-*.md from this change's commit"
+process-gates-before-merge:
+  - "high-risk two-reviewer sign-off: qa done; spec-architect co-sign per protocol"
+  - "run spec-drift-auditor before merge to main"
+artifacts:
+  - { type: decision, pointer: "approved (release-ready; worker start gated on stress-soak sign-off + SS-1)" }
+  - { type: gate-results, pointer: "specs/changes/production-achievement-async-spool/test-evidence.yml" }
+next-action: "cdd-kit gate; then commit staging only this change's paths"

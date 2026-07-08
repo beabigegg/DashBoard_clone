@@ -98,6 +98,7 @@ def test_valid_spool_streams_parquet(client, tmp_path):
     "downtime_analysis_base_events",
     "downtime_analysis_job_bridge",
     "wip_dataset",  # wip-rq-worker-chunks-cleanup
+    "production_achievement",  # production-achievement-async-spool
 ])
 def test_allowed_namespaces_pass_namespace_validation(client, ns):
     with patch(
@@ -150,4 +151,19 @@ def test_wip_dataset_in_allowed_namespaces():
     assert "wip_dataset" in spool_routes._ALLOWED_NAMESPACES, (
         "'wip_dataset' must be in spool_routes._ALLOWED_NAMESPACES "
         "(wip-rq-worker-chunks-cleanup adds this namespace; removal causes HTTP 400)"
+    )
+
+
+def test_production_achievement_in_allowed_namespaces():
+    """production_achievement namespace must be in spool_routes._ALLOWED_NAMESPACES.
+
+    Added by change production-achievement-async-spool. Required for
+    GET /api/spool/production_achievement/<query_id>.parquet to serve the
+    SPECNAME-grain async spool. Removal causes HTTP 400 for all
+    production-achievement parquet downloads (AC-3).
+    """
+    from mes_dashboard.routes import spool_routes
+    assert "production_achievement" in spool_routes._ALLOWED_NAMESPACES, (
+        "'production_achievement' must be in spool_routes._ALLOWED_NAMESPACES "
+        "(production-achievement-async-spool adds this namespace; removal causes HTTP 400)"
     )

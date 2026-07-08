@@ -7,12 +7,25 @@
  *   - non-numeric target_qty rejected client-side (no PUT call fires)
  *   - empty qualifying-row result set renders an empty state, not an error
  *
+ * Updated by production-achievement-async-spool (ADR-0016): GET .../report
+ * is now an always-async spool-backed endpoint (data-shape-contract.md
+ * §3.28) — the empty-result test below now mocks a 200 spool-hit envelope
+ * whose parquet has 0 rows (the actual §3.28.1 empty-result invariant),
+ * using a real, schema-correct, `duckdb`-Python-generated empty Parquet
+ * fixture rather than the old bare `[]` row-array shape.
+ *
  * Network strategy: catch-all first, specific routes last (LIFO).
  */
 
 import { test, expect } from '@playwright/test';
 
 const PAGE_URL = '/portal-shell/production-achievement';
+
+// Real 0-row Parquet matching data-shape-contract.md §3.28.1's exact schema
+// (output_date DATE, shift_code VARCHAR, SPECNAME VARCHAR, actual_output_qty
+// BIGINT) — generated via the `duckdb` Python package, not magic bytes.
+const EMPTY_PA_PARQUET_B64 =
+  'UEFSMRUCGVw1ABgNZHVja2RiX3NjaGVtYRUIABUCJQIYC291dHB1dF9kYXRlJQwAFQwlAhgKc2hpZnRfY29kZSUAABUMJQIYCFNQRUNOQU1FJQAAFQQlAhgRYWN0dWFsX291dHB1dF9xdHklJAAWABkMKChEdWNrREIgdmVyc2lvbiB2MS41LjQgKGJ1aWxkIDA4ZTM0YzQ0N2IpGUwcAAAcAAAcAAAcAAAApwAAAFBBUjE=';
 
 function envelope(data) {
   return JSON.stringify({ success: true, data, meta: { timestamp: new Date().toISOString(), app_version: 'test' } });
@@ -142,7 +155,24 @@ test.describe('production-achievement data-boundary — empty result set', () =>
       }
     });
     await page.route('**/api/production-achievement/report**', (route) => {
-      route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) });
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: envelope({
+          query_id: 'pa-empty-boundary-001',
+          spool_download_url: '/api/spool/production_achievement/pa-empty-boundary-001.parquet',
+          spec_workcenter_map: [],
+          targets_map: [],
+        }),
+      });
+    });
+    // Spool already warm, 0-row parquet — the §3.28.1 empty-result invariant.
+    await page.route('**/api/spool/production_achievement/pa-empty-boundary-001.parquet**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from(EMPTY_PA_PARQUET_B64, 'base64'),
+      });
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
@@ -168,7 +198,7 @@ test.describe('production-achievement data-boundary — empty result set', () =>
     const reportCard = page.locator('.ui-card', { has: page.locator('.ui-card-title', { hasText: '生產達成率明細' }) });
     const table = reportCard.locator('[data-testid="datatable"]');
     await expect(table).toBeVisible({ timeout: 15_000 });
-    await expect(table.locator('[data-testid="datatable-empty"]')).toBeVisible({ timeout: 10_000 });
+    await expect(table.locator('[data-testid="datatable-empty"]')).toBeVisible({ timeout: 20_000 });
 
     // No error banner should appear for a legitimately empty result set
     await expect(page.locator('[role="alert"]')).toHaveCount(0);

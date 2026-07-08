@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.35
-last-changed: 2026-07-02
+schema-version: 1.3.36
+last-changed: 2026-07-08
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -719,6 +719,42 @@ gate tier, command, or status changed.
 **No new gate tier, command, or workflow file** beyond the one explicit spec-list addition to `playwright-critical-journeys` above.
 
 **Schema-version bump to 1.3.35 (patch)**: deploy/rollback checklist + one gate command spec-list addition. No gate tier or status changed.
+
+## production-achievement-async-spool Gate Compatibility Note
+
+**New systemd worker unit + new spool namespace (mirrors `production-reject-history-migration`'s new-unit pattern, not the reuse pattern of `resource-history-migration`/`eap-alarm-analysis`). Owned/finalized by `ci-cd-gatekeeper`; full gate plan lives in `specs/changes/production-achievement-async-spool/ci-gates.md`.**
+
+**Tier-1 unit/contract coverage** (covered by existing `unit-mock-integration` gate):
+- New job module `src/mes_dashboard/workers/production_achievement_worker.py` (`ProductionAchievementJob(BaseChunkedDuckDBJob)`, `chunk_strategy=TIME`, `requires_cross_chunk_reduction=False` with re-aggregating `post_aggregate` — ADR-0016), once `tests/test_production_achievement_unified_job.py` and `tests/test_query_cost_policy.py::_APPROVED_CALLERS` land (AC-4).
+- New spool namespace `production_achievement` in `spool_routes._ALLOWED_NAMESPACES` — MUST be covered by the parametrized allowlist test in `tests/test_spool_routes.py` in the same PR (same rule as `eap_alarm`/`downtime_analysis_*`/`wip_dataset`) (AC-3).
+- Env default/enum pin for `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB` (default `on`), `PRODUCTION_ACHIEVEMENT_WORKER_QUEUE`, `PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS` (AC-5).
+
+**New required Tier-1 gate — `worker-env-parity-static`** (`backend-tests.yml`, `unit-and-integration-tests` job): a new grep step fails the build if any `deploy/*.service` unit hardcodes an `Environment="*_USE_UNIFIED_JOB=..."`/`"*_USE_RQ=..."` override. `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB` parity between gunicorn and `mes-dashboard-production-achievement-worker.service` is achieved structurally: both load the same `EnvironmentFile=-/opt/mes-dashboard/.env`, and the new worker unit deliberately does not set its own override line. This closes the "silent split-brain routing" risk called out for this change (env-contract §Worker Feature-Flag Env-Var Parity) with an automated check rather than a deploy-checklist-only item. `backend-tests.yml` PR/push triggers now also watch `deploy/**`.
+
+**Tier-1 Playwright coverage**:
+- New dedicated step `production-achievement-async-e2e` (`frontend-tests.yml`, mirrors `resource-history-async-e2e`): `npx playwright test tests/playwright/production-achievement-async.spec.ts` — long-range 202→poll→spool→render (AC-1, AC-2), DuckDB-WASM PA-06/PA-07 rollup+target-join+rate (AC-7), always-activate threshold (AC-8).
+- `tests/playwright/production-achievement.spec.js` (existing, in the `playwright-critical-journeys` command) MUST be updated in the same PR: report-render assertions move to the async job/poll/spool contract; filter, admin-permission, and target-edit assertions are unaffected (explicit non-goal).
+- Resilience (worker crash, Redis down, job timeout, missing spool — AC-9) and data-boundary (empty result, missing targets, malformed spool rows) specs are auto-discovered by the existing `playwright-resilience`/`playwright-data-boundary` gate commands — no workflow change.
+- Dual-tier parity (AC-7): existing Node-subprocess parity harness (`backend-tests.yml` already pins Node ≥22.6) diffs DuckDB-WASM output against the retained `build_achievement_rows()` golden via `tests/fixtures/frontend_compute_parity.json` — auto-discovered, no workflow change.
+
+**Tier-3 integration coverage** (covered by existing `nightly-integration` gate): `tests/integration/test_production_achievement_rq_async.py` (enqueue→job→spool round-trip), `tests/integration/test_production_achievement_filter_cache_reuse.py`, `tests/integration/test_production_achievement_mysql_roundtrip.py` — `integration_real` marker.
+
+**Tier-4 stress/soak gate** (covered by existing `stress-load` and `soak` gates, weekly schedule/manual dispatch — NOT PR-blocking, per tier semantics): extend the cross-worker semaphore stress fixture (`tests/stress/`) to include the PA worker as a 5th concurrent Oracle-bound worker type on `heavy_query_slot`; extend `tests/integration/test_soak_workload.py` with sustained PA job execution. **`stress-soak-report.md` sign-off is required before `mes-dashboard-production-achievement-worker.service` is started in any environment** — unlike sibling `*_USE_UNIFIED_JOB` flags (default `off`, gated on a later flag-flip), `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB` defaults `on` with no legacy path, so there is no separate "promote to on" step to gate on; the sign-off gate collapses onto first service start instead (mirrors `rq-semaphore-wiring`'s and `query-path-c-elimination-cleanup`'s "required before flag promotion" precedent, adapted for a default-on flag).
+
+**No new workflow file and no gate-tier change**: all new tests fall within existing `unit-mock-integration` (Tier 1), `nightly-integration` (Tier 3), `stress-load` (Tier 4), and `soak` (Tier 4) gate commands; the two additions above (`worker-env-parity-static` step, `production-achievement-async-e2e` step) are new steps inside the existing `backend-tests.yml`/`frontend-tests.yml` files, not new workflow files.
+
+**Deploy checklist:**
+1. Set `PRODUCTION_ACHIEVEMENT_WORKER_QUEUE`, `PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS` on the worker unit (already set in `deploy/mes-dashboard-production-achievement-worker.service`); `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB` comes from the shared `/opt/mes-dashboard/.env` — do not set it per-unit.
+2. Obtain `stress-soak-report.md` sign-off (see Tier-4 gate above), then start `mes-dashboard-production-achievement-worker.service`.
+3. Verify `production_achievement` in `spool_routes._ALLOWED_NAMESPACES` and in `tests/test_spool_routes.py`'s parametrize list.
+4. Verify Admin Dashboard / `rq_monitor_service._QUEUE_NAMES` shows `production-achievement-query` with ≥1 worker before enabling production traffic.
+
+**Rollback checklist** (pre-launch clean-replacement, no data migration to undo, per design.md):
+1. Zero-downtime: set `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB=off` in the shared `.env` (or stop the systemd unit) — spool-miss then returns 503; spool-hit still serves. Restart gunicorn/worker (module-level constant frozen at boot).
+2. Hard rollback: stop and disable `mes-dashboard-production-achievement-worker.service`; `rm -f tmp/query_spool/production_achievement/*.parquet`; unregister `_ALLOWED_NAMESPACES`/`_APPROVED_CALLERS` entries in a follow-up PR only if fully reverting.
+3. Safe because the page is pre-launch/unexposed — 503 has no live-user regression impact.
+
+**Schema-version bump to 1.3.36 (patch)**: gate-compatibility note finalized (new `worker-env-parity-static` Tier-1 gate, new `production-achievement-async-e2e` Playwright step, stress/soak-before-activation policy for a default-on flag) plus deploy/rollback checklist. No existing gate tier, command, or status changed.
 
 ## CHANGELOG
 

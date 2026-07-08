@@ -1,0 +1,55 @@
+change-id: production-achievement-async-spool
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+  - contract
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      python -m pytest --collect-only -q
+      tests/test_production_achievement_routes.py::TestReportRoute::test_report_spool_miss_enqueues_returns_202_with_job_id
+      tests/test_production_achievement_routes.py::TestReportRoute::test_report_route_never_calls_get_achievement_report_or_read_sql_df
+      tests/test_production_achievement_unified_job.py::TestProductionAchievementJob::test_pre_query_builds_time_chunks_no_direct_read_sql_df
+      tests/test_production_achievement_routes.py::TestReportRoute::test_spool_hit_response_shape_has_spool_download_url_spec_map_targets_map
+      tests/integration/test_production_achievement_rq_async.py::TestProductionAchievementSpoolDownload::test_authorized_client_streams_parquet
+      tests/contract/test_env_production_achievement_unified_flag.py::TestGunicornWorkerParity::test_gunicorn_conf_and_rq_worker_preload_reference_same_flag_names
+      tests/test_production_achievement_unified_job.py::TestChunkSeamReaggregation::test_post_aggregate_sum_merges_same_key_across_chunks
+      tests/test_production_achievement_routes.py::TestReportRoute::test_spool_hit_injects_download_url_unconditionally_not_row_count_gated
+      --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/production-achievement-async-spool/test-runs/20260708-112235/junit.xml'
+      --maxfail=1 --tb=short -ra
+    summary: specs/changes/production-achievement-async-spool/test-runs/20260708-112235/summary.json
+    junit: specs/changes/production-achievement-async-spool/test-runs/20260708-112235/junit.xml
+  - phase: targeted
+    status: passed
+    command: >-
+      python -m pytest
+      tests/test_production_achievement_routes.py::TestReportRoute::test_report_spool_miss_enqueues_returns_202_with_job_id
+      tests/test_production_achievement_routes.py::TestReportRoute::test_report_route_never_calls_get_achievement_report_or_read_sql_df
+      tests/test_production_achievement_unified_job.py::TestProductionAchievementJob::test_pre_query_builds_time_chunks_no_direct_read_sql_df
+      tests/test_production_achievement_routes.py::TestReportRoute::test_spool_hit_response_shape_has_spool_download_url_spec_map_targets_map
+      tests/integration/test_production_achievement_rq_async.py::TestProductionAchievementSpoolDownload::test_authorized_client_streams_parquet
+      tests/contract/test_env_production_achievement_unified_flag.py::TestGunicornWorkerParity::test_gunicorn_conf_and_rq_worker_preload_reference_same_flag_names
+      tests/test_production_achievement_unified_job.py::TestChunkSeamReaggregation::test_post_aggregate_sum_merges_same_key_across_chunks
+      tests/test_production_achievement_routes.py::TestReportRoute::test_spool_hit_injects_download_url_unconditionally_not_row_count_gated
+      -q --maxfail=1 --tb=short -ra
+      --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/production-achievement-async-spool/test-runs/20260708-112245/junit.xml'
+    summary: specs/changes/production-achievement-async-spool/test-runs/20260708-112245/summary.json
+    junit: specs/changes/production-achievement-async-spool/test-runs/20260708-112245/junit.xml
+  - phase: changed-area
+    status: passed
+    command: >-
+      conda run -n mes-dashboard env PYTHONPATH=src python -m pytest tests/test_production_achievement_routes.py
+      tests/test_production_achievement_unified_job.py tests/test_query_cost_policy.py tests/test_job_registry.py
+      tests/test_spool_routes.py tests/test_env_contract.py
+      tests/contract/test_env_production_achievement_unified_flag.py
+      tests/test_frontend_production_achievement_parity.py -q && cd frontend && npm run type-check && npm run test
+    summary: specs/changes/production-achievement-async-spool/test-runs/20260708-153535/summary.json
+  - phase: contract
+    status: passed
+    command: cdd-kit validate --contracts --env --ci
+    summary: specs/changes/production-achievement-async-spool/test-runs/20260708-112304/summary.json
+final-status: passed

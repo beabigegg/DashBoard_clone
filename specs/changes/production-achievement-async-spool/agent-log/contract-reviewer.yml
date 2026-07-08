@@ -1,0 +1,27 @@
+change-id: production-achievement-async-spool
+agent: contract-reviewer
+status: done
+summary: >
+  Specified apply-ready deltas for all five contracts; deltas applied by a
+  write-capable proxy and cdd-kit validate --contracts passed. api-contract:
+  /report becomes Type-B async (200 spool-hit with spool_download_url +
+  spec_workcenter_map + targets_map; 202 job_id; 503 always_async-no-worker;
+  400/500) — reuses generic GET /api/job/{id}?prefix=production-achievement for
+  polling; spool namespace enum gains production_achievement. data-shape: §3.28
+  SPECNAME-grain spool schema + injected map shapes + frontend row shape;
+  §3.25 compute-location note. env: PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB
+  (+ _WORKER_QUEUE, _JOB_TIMEOUT_SECONDS) with enum/default + parity section.
+  business-rules: PA-06/PA-07 locus note + new PA-08; PA-01..PA-05 unchanged.
+  CHANGELOG: 5 entries. openapi.json regenerated + root mirror in sync.
+artifacts:
+  - { type: contract, pointer: "contracts/api/api-contract.md" }
+  - { type: contract, pointer: "contracts/data/data-shape-contract.md" }
+  - { type: contract, pointer: "contracts/env/env-contract.md" }
+  - { type: contract, pointer: "contracts/business/business-rules.md" }
+  - { type: validation, pointer: "cdd-kit validate --contracts: all passed" }
+notes: >
+  Approved the reviewer's inferred poll-completion mechanic (frontend re-issues
+  GET /report after status=finished to hit the 200 spool-hit path). ci-gate-contract
+  got a DRAFT entry — flagged for ci-cd-gatekeeper to finalize/own (task 2.6 left
+  pending until then).
+next-action: "test-strategist + ci-cd-gatekeeper (parallel), then implementation-planner"

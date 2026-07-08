@@ -46,6 +46,9 @@ RQ_MSD_WORKER_QUEUE="${MSD_WORKER_QUEUE:-msd-analysis}"
 # RQ production-history worker configuration
 RQ_PRODUCTION_HISTORY_WORKER_ENABLED="${RQ_PRODUCTION_HISTORY_WORKER_ENABLED:-true}"
 RQ_PRODUCTION_HISTORY_WORKER_QUEUE="${PRODUCTION_HISTORY_WORKER_QUEUE:-production-history-query}"
+# RQ production-achievement worker configuration
+RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED="${RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED:-true}"
+RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE="${PRODUCTION_ACHIEVEMENT_WORKER_QUEUE:-production-achievement-query}"
 # RQ yield-alert worker configuration
 RQ_YIELD_ALERT_WORKER_ENABLED="${RQ_YIELD_ALERT_WORKER_ENABLED:-true}"
 RQ_YIELD_ALERT_WORKER_QUEUE="${YIELD_ALERT_WORKER_QUEUE:-yield-alert-query}"
@@ -126,6 +129,8 @@ resolve_runtime_paths() {
     RQ_MSD_WORKER_LOG="${LOG_DIR}/rq_msd_worker.log"
     RQ_PROD_HIST_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_prod_hist_worker.pid"
     RQ_PROD_HIST_WORKER_LOG="${LOG_DIR}/rq_prod_hist_worker.log"
+    RQ_PROD_ACH_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_prod_ach_worker.pid"
+    RQ_PROD_ACH_WORKER_LOG="${LOG_DIR}/rq_prod_ach_worker.log"
     RQ_YIELD_ALERT_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_yield_alert_worker.pid"
     RQ_YIELD_ALERT_WORKER_LOG="${LOG_DIR}/rq_yield_alert_worker.log"
     RQ_HOLD_HIST_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_hold_hist_worker.pid"
@@ -1255,6 +1260,112 @@ rq_prod_hist_worker_status() {
 }
 
 # ---------------------------------------------------------------------------
+# RQ Production Achievement Worker functions
+# ---------------------------------------------------------------------------
+get_rq_prod_ach_worker_pid() {
+    local saved_pid=""
+    if [ -f "${RQ_PROD_ACH_WORKER_PID_FILE:-}" ]; then
+        saved_pid=$(cat "${RQ_PROD_ACH_WORKER_PID_FILE}" 2>/dev/null || true)
+        if [ -n "$saved_pid" ] && kill -0 "$saved_pid" 2>/dev/null; then
+            echo "$saved_pid"
+            return 0
+        fi
+    fi
+    local discovered_pid
+    discovered_pid=$(pgrep -f "[r]q worker.*${RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE}" 2>/dev/null | head -1 || true)
+    if [ -n "$discovered_pid" ]; then
+        echo "$discovered_pid"
+        return 0
+    fi
+    return 1
+}
+
+is_rq_prod_ach_worker_running() {
+    get_rq_prod_ach_worker_pid &>/dev/null
+}
+
+start_rq_prod_ach_worker() {
+    if ! is_enabled "${RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED:-true}"; then
+        log_info "RQ production-achievement worker is disabled (RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED=${RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED:-true})"
+        return 0
+    fi
+
+    resolve_runtime_paths
+
+    if is_rq_prod_ach_worker_running; then
+        local pid
+        pid=$(get_rq_prod_ach_worker_pid)
+        log_info "RQ production-achievement worker already running (PID: ${pid})"
+        return 0
+    fi
+
+    local redis_url="redis://127.0.0.1:6379/0"
+    if [ -n "${REDIS_URL:-}" ]; then
+        redis_url="${REDIS_URL}"
+    fi
+
+    log_info "Starting RQ production-achievement worker (queue: ${RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE})..."
+
+    if command -v setsid &>/dev/null; then
+        setsid env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 rq worker "${RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_PROD_ACH_WORKER_LOG}" 2>&1 < /dev/null &
+    else
+        env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 nohup rq worker "${RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_PROD_ACH_WORKER_LOG}" 2>&1 < /dev/null &
+    fi
+    local worker_pid=$!
+    echo "$worker_pid" > "${RQ_PROD_ACH_WORKER_PID_FILE}"
+    sleep 1
+    if kill -0 "$worker_pid" 2>/dev/null; then
+        log_success "RQ production-achievement worker started (PID: ${worker_pid}, queue: ${RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE})"
+        return 0
+    else
+        log_error "RQ production-achievement worker failed to start"
+        return 1
+    fi
+}
+
+stop_rq_prod_ach_worker() {
+    if ! is_rq_prod_ach_worker_running; then
+        log_info "RQ production-achievement worker is not running"
+        return 0
+    fi
+
+    local pid
+    pid=$(get_rq_prod_ach_worker_pid)
+    log_info "Stopping RQ production-achievement worker (PID: ${pid})..."
+    if kill "$pid" 2>/dev/null; then
+        local wait=0
+        while kill -0 "$pid" 2>/dev/null && [ "$wait" -lt 10 ]; do
+            sleep 1
+            wait=$((wait+1))
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "${RQ_PROD_ACH_WORKER_PID_FILE:-}" 2>/dev/null || true
+        log_success "RQ production-achievement worker stopped"
+        return 0
+    else
+        log_error "Failed to stop RQ production-achievement worker"
+        return 1
+    fi
+}
+
+rq_prod_ach_worker_status() {
+    if ! is_enabled "${RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED:-true}"; then
+        echo -e "  RQ Prod-Ach Worker:${YELLOW} DISABLED${NC}"
+        return 0
+    fi
+
+    if is_rq_prod_ach_worker_running; then
+        local pid
+        pid=$(get_rq_prod_ach_worker_pid)
+        echo -e "  RQ Prod-Ach Worker:${GREEN} RUNNING${NC} (PID: ${pid}, queue: ${RQ_PRODUCTION_ACHIEVEMENT_WORKER_QUEUE})"
+    else
+        echo -e "  RQ Prod-Ach Worker:${RED} STOPPED${NC}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # RQ Yield Alert Worker functions
 # ---------------------------------------------------------------------------
 get_rq_yield_alert_worker_pid() {
@@ -2147,6 +2258,7 @@ do_start() {
             start_rq_reject_worker
             start_rq_msd_worker
             start_rq_prod_hist_worker
+            start_rq_prod_ach_worker
             start_rq_yield_alert_worker
             start_rq_hold_hist_worker
             start_rq_resource_worker
@@ -2222,6 +2334,7 @@ do_stop() {
     stop_rq_resource_worker
     stop_rq_hold_hist_worker
     stop_rq_yield_alert_worker
+    stop_rq_prod_ach_worker
     stop_rq_prod_hist_worker
     stop_rq_msd_worker
     stop_rq_reject_worker
@@ -2275,6 +2388,7 @@ do_status() {
     rq_reject_worker_status
     rq_msd_worker_status
     rq_prod_hist_worker_status
+    rq_prod_ach_worker_status
     rq_yield_alert_worker_status
     rq_hold_hist_worker_status
     rq_resource_worker_status

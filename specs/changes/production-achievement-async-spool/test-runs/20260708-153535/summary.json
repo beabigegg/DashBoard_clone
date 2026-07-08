@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-async-spool",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard env PYTHONPATH=src python -m pytest tests/test_production_achievement_routes.py tests/test_production_achievement_unified_job.py tests/test_query_cost_policy.py tests/test_job_registry.py tests/test_spool_routes.py tests/test_env_contract.py tests/contract/test_env_production_achievement_unified_flag.py tests/test_frontend_production_achievement_parity.py -q && cd frontend && npm run type-check && npm run test",
+  "duration_ms": 16848,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-async-spool/test-runs/20260708-153535/summary.json",
+    "stdout": "specs/changes/production-achievement-async-spool/test-runs/20260708-153535/stdout.log",
+    "stderr": "specs/changes/production-achievement-async-spool/test-runs/20260708-153535/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

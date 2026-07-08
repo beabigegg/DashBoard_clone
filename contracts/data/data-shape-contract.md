@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.36.0
-last-changed: 2026-07-07
+schema-version: 1.37.0
+last-changed: 2026-07-08
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1774,6 +1774,8 @@ Notes: `output_date` is `YYYY-MM-DD`, with business-rules.md PA-03/PA-04 cross-n
 
 Row-grain rule: one row per distinct `(output_date, shift_code, workcenter_group)` combination observed in the qualifying trackout set for the requested date range — NOT a dense cross-product with target rows that have no matching output (a `(shift_code, workcenter_group)` target with zero output in the date range does not synthesize a zero-output row; only groups with ≥1 qualifying trackout event in range appear). Sort order: `output_date ASC, shift_code ASC, workcenter_group ASC`.
 
+**Compute-location note (production-achievement-async-spool, ADR-0016):** As of this change, `GET /api/production-achievement/report` no longer returns this row shape directly — see §3.28 for the actual server response (async spool + inline maps). This section (`ProductionAchievementReportRow`) is retained as (a) the shape the frontend computes client-side in DuckDB-WASM from the §3.28 spool + maps, and (b) the test-only golden-reference shape produced by `build_achievement_rows()` for the dual-tier parity gate (business-rules.md PA-06/PA-07). Row-grain, nullability, and formula semantics are unchanged — only the computation LOCATION and the wire format changed.
+
 ### §3.26 Production-Achievement Target-Value Table (MySQL, `production_achievement_targets`)
 
 New independent MySQL table, read/written directly via `core/mysql_client.py` (NOT via the SQLite `core/sync_worker.py` dual-layer path — see the change's design.md for the immediate-consistency rationale). No date dimension: one row per `(shift_code, workcenter_group)`; the same target value is reused for every `output_date`.
@@ -1806,3 +1808,90 @@ New independent MySQL table, read/written directly via `core/mysql_client.py`. S
 Notes: `id` is the primary key (auto-increment). `user_identifier` is the account/username matching the auth session identity (e.g. LDAP username); unique. `can_edit_targets` is the single flag this table exists to hold. `granted_at` is when the whitelist entry was created (ISO-8601). `granted_by` is the admin account that granted the permission (audit trail).
 
 Constraints: unique constraint on `user_identifier`. Absence of a row for a user is the default-deny state — permission check MUST fail closed (deny) both when the table has no row for the user AND when MySQL is unreachable/`MYSQL_OPS_ENABLED=false` (never fail-open to allow). This table is managed exclusively via the new Admin permission-management endpoints (api-contract.md); no direct end-user-facing read of this table beyond "am I allowed" resolved server-side.
+
+### §3.28 Production-Achievement Async Spool Schema (`GET /api/production-achievement/report`, browser-DuckDB path)
+
+Added by change `production-achievement-async-spool` (ADR-0016). Replaces the synchronous Oracle-backed row response (§3.25 is retained as the frontend-computed / parity-golden-reference row shape only). The RQ worker (`ProductionAchievementJob`, `BaseChunkedDuckDBJob` subclass, `chunk_strategy=TIME`, `requires_cross_chunk_reduction=False` with a re-aggregating `post_aggregate`) writes one SPECNAME-grain parquet per canonical spool key. PA-06 (SPECNAME→workcenter_group rollup) and PA-07 (target join + achievement_rate) are computed entirely client-side in DuckDB-WASM from this spool plus the two inline maps below; no server-side Python performs this computation on the request path.
+
+**Canonical spool key**: `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` — **date-range only**. `shift_code`/`workcenter_group` request query params do NOT participate in the spool key and do NOT filter the spooled dataset server-side; the full PA-05-qualifying dataset for the date range is always spooled, and any shift_code/workcenter_group narrowing is applied client-side after download (ADR-0016), so changing these two filters never requires a new Oracle fetch or a new spool file.
+
+**`_PA_SPOOL_SCHEMA_VERSION`**: integer constant, participates in the spool key. Bumping it orphans stale parquets by key (no manual `rm` needed on ordinary bumps). Schema-breaking rollback additionally requires `rm -f tmp/query_spool/production_achievement/*.parquet` in the same commit as the version bump (cache-spool-patterns.md).
+
+#### §3.28.1 SPECNAME-grain Parquet Schema
+
+Source: `sql/production_achievement.sql` (PA-05 predicate preserved verbatim), fanned out per TIME chunk, re-aggregated in `post_aggregate` via `GROUP BY output_date, shift_code, SPECNAME` `SUM(actual_output_qty)` (seam-safe — ADR-0016).
+
+| column | DuckDB type | nullable | description |
+|---|---|---|---|
+| output_date | DATE | no | PA-03/PA-04 cross-night-attributed output date (already shifted) |
+| shift_code | VARCHAR | no | Closed enum `N \| D` (current) or `A \| B \| C` (historical 2020/01/01–2020/03/29 window) — PA-01/PA-02 |
+| SPECNAME | VARCHAR | no | Raw station spec name (`WC.SPECNAME`); NOT yet rolled up to `workcenter_group` — that join happens client-side via §3.28.2 |
+| actual_output_qty | BIGINT | no | `SUM(TRACKOUTQTY)` over PA-05-qualifying rows for this `(output_date, shift_code, SPECNAME)` group, re-aggregated across chunk seams |
+
+Row-grain: one row per distinct `(output_date, shift_code, SPECNAME)` combination with ≥1 PA-05-qualifying trackout event in range — same "no dense cross-product" rule as §3.25, one level finer (SPECNAME instead of workcenter_group, since the rollup has not yet happened). A `SPECNAME` with no entry in `spec_workcenter_map` (§3.28.2) is still present in this parquet — unmapped-SPECNAME exclusion (PA-06) happens client-side during the rollup join, not at spool-write time.
+
+**Empty-result invariant**: a date range with zero PA-05-qualifying rows (or all-unmapped SPECNAMEs) still writes a valid empty parquet with this schema (0 rows) — never omits the file or errors. The browser must render an empty table, never an error, for a 200 response whose parquet has 0 rows.
+
+#### §3.28.2 `spec_workcenter_map` (inline-injected, HTTP 200 spool-hit response)
+
+Array of rows, sourced from `services/filter_cache.get_spec_workcenter_mapping()` (same source as the retired server-side PA-06). Injected inline in the `GET /report` 200 response (§3.28.4) — not a separate endpoint (Q2 design decision).
+
+| field | type | required |
+|---|---|---|
+| SPECNAME | string | yes |
+| workcenter_group | string | yes |
+
+Notes: `workcenter_group` is `get_spec_workcenter_mapping()`'s `WORK_CENTER_GROUP` field, renamed for consistency with §3.25. Field name `SPECNAME` (uppercase) is deliberate — it must exactly match the §3.28.1 spool column name so the browser can `JOIN spool.SPECNAME = map.SPECNAME` without aliasing. This is the FULL current mapping (not scoped to SPECNAMEs present in this spool); a spool `SPECNAME` with no match is excluded from the client-computed rollup (PA-06 unmapped-SPECNAME exclusion, now applied client-side).
+
+#### §3.28.3 `targets_map` (inline-injected, HTTP 200 spool-hit response)
+
+Array of rows, sourced from `services/production_achievement_target_service.get_targets_map()` (same source as `GET /api/production-achievement/targets`). Injected inline alongside `spec_workcenter_map` (Q2 design decision, mirrors `resource_history`'s `resource_metadata` inline-injection pattern).
+
+| field | type | required |
+|---|---|---|
+| shift_code | string | yes |
+| workcenter_group | string | yes |
+| target_qty | integer \| null | yes |
+
+Notes: One row per `(shift_code, workcenter_group)` with a stored target row (§3.26) — a combination with NO target row is simply absent from this array; the browser's LEFT JOIN naturally yields `target_qty = null` for any rolled-up `(shift_code, workcenter_group)` absent from this array (PA-07 missing-target-row semantics unchanged). When `MYSQL_OPS_ENABLED=false`, `get_targets_map()` degrades to an empty array (never 500) — every client-computed row gets `target_qty = null` / `achievement_rate = null`, consistent with §3.26's flag-off degradation rule.
+
+#### §3.28.4 `GET /api/production-achievement/report` Envelope
+
+**HTTP 200 — spool-hit** (canonical spool for `(start_date, end_date)` already exists — including immediately after a poll-completion re-fetch, see api-contract.md Compatibility Notes):
+
+```json
+{
+  "success": true,
+  "data": {
+    "query_id": "<string>",
+    "spool_download_url": "/api/spool/production_achievement/<query_id>.parquet",
+    "spec_workcenter_map": [ { "SPECNAME": "...", "workcenter_group": "..." } ],
+    "targets_map": [ { "shift_code": "...", "workcenter_group": "...", "target_qty": 500 } ]
+  },
+  "meta": { "timestamp": "...", "app_version": "..." }
+}
+```
+
+Injection is unconditional whenever the canonical spool exists — NOT row-count-gated (unlike `resource_history`'s `total_row_count >= threshold` gate; Q1 overrides the local-compute activation threshold to 0 for this page).
+
+**HTTP 202 — spool-miss** (generic §1.3 async-job envelope):
+
+```json
+{
+  "success": true,
+  "data": {
+    "async": true,
+    "job_id": "<uuid string>",
+    "status_url": "/api/job/<job_id>?prefix=production-achievement"
+  },
+  "meta": { "timestamp": "...", "app_version": "..." }
+}
+```
+
+`status_url` reuses the generic `GET /api/job/<job_id>?prefix=<namespace>` endpoint (§1.4) — no domain-specific `/api/production-achievement/job/<job_id>` route, mirroring `resource-history-rq-async`/`downtime-rq-async`/`hold-history-rq-async`.
+
+On `status=finished`, the job `result` payload is `{"query_id": "<string>"}` only (mirrors §3.14.2's downtime pattern) — it does NOT carry `spool_download_url`/`spec_workcenter_map`/`targets_map` directly. The frontend must re-issue the identical `GET /api/production-achievement/report` request; the canonical spool now exists, so this second call takes the 200 spool-hit path above at zero Oracle cost. **Implementation must confirm this against the actual `useProductionAchievementDuckDB.ts` completion handler** — if the job result instead carries the injected fields directly, update this subsection to match.
+
+**HTTP 503 — worker unavailable** (spool miss + `always_async=True` + no RQ worker; `sync_fallback_allowed=False`): standard error envelope (§1.2), `error.code = "SERVICE_UNAVAILABLE"`.
+
+**HTTP 400 — validation** (missing/invalid `start_date`/`end_date`, range > 730d per SYS-04): standard error envelope (§1.2).

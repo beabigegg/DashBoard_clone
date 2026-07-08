@@ -7,6 +7,19 @@
  *   AC-1: page reachable from 生產輔助 drawer, manifests wired
  *   AC-7: permission-gated edit e2e (authorized edits, unauthorized blocked)
  *
+ * Updated by production-achievement-async-spool (ADR-0016): GET .../report
+ * is now an always-async spool-backed endpoint (data-shape-contract.md
+ * §3.28) — a bare row-array 200 response is no longer a valid mock shape.
+ * The "filter and render table/chart" test below now mocks a 200 spool-hit
+ * envelope ({query_id, spool_download_url, spec_workcenter_map,
+ * targets_map}) backed by a REAL, schema-correct Parquet fixture (generated
+ * via the actual `duckdb` Python package, not magic-bytes-only) so DuckDB
+ * -WASM's PA-06 rollup + PA-07 target-join genuinely execute — see
+ * frontend/tests/playwright/production-achievement-async.spec.ts for the
+ * dedicated async job/poll/progress mechanic coverage; this file keeps its
+ * original "warm spool" (direct 200, no 202/poll) shape to stay a minimal,
+ * focused critical-journey diff.
+ *
  * Network strategy (ci-workflow.md):
  *   - Catch-all route registered FIRST (lowest LIFO priority)
  *   - Specific API routes registered LAST (highest LIFO priority)
@@ -18,24 +31,23 @@ import { test, expect } from '@playwright/test';
 
 const PAGE_URL = '/portal-shell/production-achievement';
 
-const REPORT_ROWS = [
-  {
-    output_date: '2026-06-01',
-    shift_code: 'D',
-    workcenter_group: 'A1',
-    actual_output_qty: 950,
-    target_qty: 1000,
-    achievement_rate: 0.95,
-  },
-  {
-    output_date: '2026-06-01',
-    shift_code: 'N',
-    workcenter_group: 'A1',
-    actual_output_qty: 400,
-    target_qty: null,
-    achievement_rate: null,
-  },
-];
+// Real 2-row Parquet fixture (data-shape-contract.md §3.28.1 schema:
+// output_date DATE, shift_code VARCHAR, SPECNAME VARCHAR, actual_output_qty
+// BIGINT), generated via the `duckdb` Python package:
+//   (2026-06-01, D, SPEC-A1, 950)
+//   (2026-06-01, N, SPEC-A1, 400)
+// Rolls up (via spec_workcenter_map below) to the same two rendered rows the
+// original REPORT_ROWS fixture asserted: D/A1/950/target=1000/rate=0.95, and
+// N/A1/400/target=null/rate=null (no target row for the N shift).
+const TWO_ROW_A1_PARQUET_B64 =
+  'UEFSMRUAFRwVICwVBBUAFQYVBgAADjQCAAAABAF9UAAAfVAAABUAFSAVJCwVBBUAFQYVBgAAEDwCAAAABAEBAAAARAEAAABOFQAVOBU8LBUEFQAVBhUGAAAcbAIAAAAEAQcAAABTUEVDLUExBwAAAFNQRUMtQTEVABUsFTAsFQQVABUGFQYAABZUAgAAAAQBtgMAAAAAAACQAQAAAAAAABUCGVw1ABgNZHVja2RiX3NjaGVtYRUIABUCJQIYC291dHB1dF9kYXRlJQwAFQwlAhgKc2hpZnRfY29kZSUAABUMJQIYCFNQRUNOQU1FJQAAFQQlAhgRYWN0dWFsX291dHB1dF9xdHklJAAWBBkcGUwmABwVAhkVABkYC291dHB1dF9kYXRlFQIWBBY+FkImCDwYBH1QAAAYBH1QAAAWACgEfVAAABgEfVAAABERAAAAJgAcFQwZFQAZGApzaGlmdF9jb2RlFQIWBBZCFkYmSjwYAU4YAUQWACgBThgBRBERAAAAJgAcFQwZFQAZGAhTUEVDTkFNRRUCFgQWWhZeJpABPBgHU1BFQy1BMRgHU1BFQy1BMRYAKAdTUEVDLUExGAdTUEVDLUExEREAAAAmABwVBBkVABkYEWFjdHVhbF9vdXRwdXRfcXR5FQIWBBZOFlIm7gE8GAi2AwAAAAAAABgIkAEAAAAAAAAWACgItgMAAAAAAAAYCJABAAAAAAAAEREAAAAWqAIWBCYIFrgCACgoRHVja0RCIHZlcnNpb24gdjEuNS40IChidWlsZCAwOGUzNGM0NDdiKRlMHAAAHAAAHAAAHAAAAMgBAABQQVIx';
+
+const REPORT_SPOOL_HIT = {
+  query_id: 'pa-critical-journey-001',
+  spool_download_url: '/api/spool/production_achievement/pa-critical-journey-001.parquet',
+  spec_workcenter_map: [{ SPECNAME: 'SPEC-A1', workcenter_group: 'A1' }],
+  targets_map: [{ shift_code: 'D', workcenter_group: 'A1', target_qty: 1000 }],
+};
 
 const TARGET_ROWS = [
   { shift_code: 'D', workcenter_group: 'A1', target_qty: 1000, updated_at: '2026-05-01T00:00:00Z', updated_by: 'admin' },
@@ -139,7 +151,16 @@ test.describe('production-achievement — filter and render table/chart', () => 
       }
     });
     await page.route('**/api/production-achievement/report**', (route) => {
-      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(REPORT_ROWS) });
+      route.fulfill({ status: 200, contentType: 'application/json', body: envelope(REPORT_SPOOL_HIT) });
+    });
+    // Spool already warm (direct 200, no 202/poll) — real Parquet bytes so
+    // DuckDB-WASM's PA-06/PA-07 rollup+join genuinely runs.
+    await page.route('**/api/spool/production_achievement/pa-critical-journey-001.parquet**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from(TWO_ROW_A1_PARQUET_B64, 'base64'),
+      });
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
@@ -171,7 +192,9 @@ test.describe('production-achievement — filter and render table/chart', () => 
     const reportCard = page.locator('.ui-card', { has: page.locator('.ui-card-title', { hasText: '生產達成率明細' }) });
     const table = reportCard.locator('[data-testid="datatable"]');
     await expect(table).toBeVisible({ timeout: 15_000 });
-    await expect(table.locator('[data-testid="datatable-row"]')).toHaveCount(2, { timeout: 10_000 });
+    // Generous timeout: real DuckDB-WASM init + parquet register + rollup
+    // (not a network-only mock) needs a moment beyond a plain fetch.
+    await expect(table.locator('[data-testid="datatable-row"]')).toHaveCount(2, { timeout: 20_000 });
 
     // Null target_qty/achievement_rate must render "—", never "Infinity"/"NaN"/blank
     const bodyText = await table.innerText();

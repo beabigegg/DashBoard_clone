@@ -1,0 +1,33 @@
+change-id: production-achievement-async-spool
+agent: test-strategist
+status: done
+summary: >
+  Wrote test-plan.md mapping AC-1..AC-9 to concrete test families/files, grounded
+  in .cdd/code-map.yml reads of resource_history/eap_alarm sibling migrations
+  (BaseChunkedDuckDBJob precedent) and the already-drafted env/data-shape/business
+  contracts. Key design: chunk-seam re-aggregation KEY test in
+  tests/test_production_achievement_unified_job.py (calendar-midnight seam group
+  must collapse to one row via post_aggregate SUM, not duplicate keys — PA-03/PA-04
+  previous-day tail); dual-tier parity split into mock chunk-seam unit +
+  tests/test_frontend_production_achievement_parity.py (real-path DuckDB business-key
+  diff vs retained build_achievement_rows() golden) + a scalar achievement_rate
+  formula check extending tests/test_frontend_duckdb_parity.py +
+  tests/fixtures/frontend_compute_parity.json. Job-registry count-test nuance
+  documented explicitly (add TestAlwaysAsyncField method, do not bump the 12-count).
+  tests/integration/test_production_achievement_rq_async.py kept
+  pytest.mark.integration_real per every sibling *_rq_async.py file in the repo;
+  CI-blocking 202/200/503 route coverage redirected to
+  tests/test_production_achievement_routes.py per the ci-workflow no-Redis-in-CI rule.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/production-achievement-async-spool/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_unified_job.py → src/mes_dashboard/workers/production_achievement_worker.py" }
+  - { type: tdd-pairs, pointer: "tests/test_frontend_production_achievement_parity.py → frontend/src/production-achievement/useProductionAchievementDuckDB.ts" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_production_achievement_rq_async.py → src/mes_dashboard/routes/production_achievement_routes.py" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, e2e, data-boundary, resilience, monkey, stress, soak" }
+  - { type: mapping-completeness, pointer: "AC-1..AC-9 all mapped to >=1 concrete test file/name" }
+notes: >
+  AC-9's systemd-unit convention check has no confirmed existing test file (no
+  tests/deploy/ suite found in this read scope); flagged as a NEW-or-extend
+  decision for ci-cd-gatekeeper rather than invented a path. Deploy/systemd and
+  ci-gate-contract ownership stays with ci-cd-gatekeeper per context-manifest.
+next-action: "implementation-planner"

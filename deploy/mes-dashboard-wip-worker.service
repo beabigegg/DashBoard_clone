@@ -12,7 +12,9 @@ WorkingDirectory=/opt/mes-dashboard
 EnvironmentFile=-/opt/mes-dashboard/.env
 Environment="PYTHONPATH=/opt/mes-dashboard/src"
 
-ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${WIP_WORKER_QUEUE:-wip-detail-query}" --url "${REDIS_URL:-redis://localhost:6379/0}" --job-execution-timeout "${WIP_JOB_TIMEOUT_SECONDS:-1800}"'
+# RQ is pinned rq>=1.16.0,<2.0.0 which has NO `rq worker --job-execution-timeout`
+# flag; per-job timeout is enforced at enqueue via job_timeout. Removed the invalid flag.
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${WIP_WORKER_QUEUE:-wip-detail-query}" --url "${REDIS_URL:-redis://localhost:6379/0}"'
 
 KillSignal=SIGTERM
 TimeoutStopSec=60

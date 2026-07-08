@@ -294,3 +294,67 @@ class TestDuckdbPrewarmTtlDefaults:
             "RESOURCE_ASYNC_DAY_THRESHOLD was removed in IP-7 but is still present in a "
             "table row in env-contract.md. Remove the table row."
         )
+
+    def test_production_achievement_async_env_vars_pinned_defaults(self):
+        """All three PRODUCTION_ACHIEVEMENT_* async env vars must have exact
+        contract-pinned defaults (production-achievement-async-spool, AC-5).
+
+        Tests PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB=on (route module),
+        PRODUCTION_ACHIEVEMENT_WORKER_QUEUE='production-achievement-query',
+        PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS=1800 (worker module).
+
+        Module-level constants are frozen at import; tests must use
+        monkeypatch.setattr(), not monkeypatch.setenv() -- here we reload the
+        module with env cleared to verify defaults (mirrors
+        test_resource_async_env_vars_pinned_defaults).
+        """
+        import importlib
+        import os
+
+        # PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB default=True (route module)
+        _old_flag = os.environ.pop("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", None)
+        try:
+            from mes_dashboard.routes import production_achievement_routes as _routes
+            importlib.reload(_routes)
+            assert _routes._PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB is True, (
+                "PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB must default True, got "
+                f"{_routes._PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB!r}"
+            )
+        finally:
+            if _old_flag is not None:
+                os.environ["PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB"] = _old_flag
+            else:
+                from mes_dashboard.routes import production_achievement_routes as _routes
+                importlib.reload(_routes)
+
+        # PRODUCTION_ACHIEVEMENT_WORKER_QUEUE default='production-achievement-query' (worker module)
+        _old_queue = os.environ.pop("PRODUCTION_ACHIEVEMENT_WORKER_QUEUE", None)
+        try:
+            from mes_dashboard.workers import production_achievement_worker as _worker
+            importlib.reload(_worker)
+            assert _worker.PRODUCTION_ACHIEVEMENT_WORKER_QUEUE == "production-achievement-query", (
+                "PRODUCTION_ACHIEVEMENT_WORKER_QUEUE must default "
+                f"'production-achievement-query', got {_worker.PRODUCTION_ACHIEVEMENT_WORKER_QUEUE!r}"
+            )
+        finally:
+            if _old_queue is not None:
+                os.environ["PRODUCTION_ACHIEVEMENT_WORKER_QUEUE"] = _old_queue
+            else:
+                from mes_dashboard.workers import production_achievement_worker as _worker
+                importlib.reload(_worker)
+
+        # PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS default=1800 (worker module)
+        _old_timeout = os.environ.pop("PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS", None)
+        try:
+            from mes_dashboard.workers import production_achievement_worker as _worker
+            importlib.reload(_worker)
+            assert _worker.PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS == 1800, (
+                "PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS must default 1800, got "
+                f"{_worker.PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS!r}"
+            )
+        finally:
+            if _old_timeout is not None:
+                os.environ["PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS"] = _old_timeout
+            else:
+                from mes_dashboard.workers import production_achievement_worker as _worker
+                importlib.reload(_worker)

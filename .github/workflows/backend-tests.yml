@@ -15,6 +15,7 @@ on:
       - "tests/**"
       - "!tests/e2e/**"
       - "!tests/stress/**"
+      - "deploy/**"
       - ".github/workflows/backend-tests.yml"
   push:
     branches: [ main ]
@@ -27,6 +28,7 @@ on:
       - "tests/**"
       - "!tests/e2e/**"
       - "!tests/stress/**"
+      - "deploy/**"
       - "pyproject.toml"
       - ".github/workflows/backend-tests.yml"
 
@@ -44,6 +46,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Verify worker systemd units do not hardcode routing-flag overrides (worker-env-parity-static, Tier 1)
+        # env-contract.md §Worker Feature-Flag Env-Var Parity: every `*_USE_UNIFIED_JOB` /
+        # `*_USE_RQ` flag must resolve identically in gunicorn and its RQ worker via the
+        # SHARED EnvironmentFile=-/opt/mes-dashboard/.env — no deploy/*.service unit may
+        # hardcode its own Environment="*_USE_UNIFIED_JOB=..." / "*_USE_RQ=..." override,
+        # or the two processes can silently split-brain on a stale value.
+        # ci-gates.md gate: worker-env-parity-static (production-achievement-async-spool AC-5).
+        run: |
+          if grep -rlE 'Environment="[A-Z_]+_USE_(UNIFIED_JOB|RQ)=' deploy/*.service; then
+            echo "ERROR: a deploy/*.service unit above hardcodes a routing-flag override." >&2
+            echo "Routing flags (*_USE_UNIFIED_JOB / *_USE_RQ) must come only from the" >&2
+            echo "shared EnvironmentFile=-/opt/mes-dashboard/.env so gunicorn and the RQ" >&2
+            echo "worker always resolve the same value." >&2
+            exit 1
+          fi
+          echo "OK: no worker unit hardcodes a routing-flag override."
 
       - name: Install dependencies
         run: |
