@@ -225,8 +225,12 @@ onMounted(() => {
       偵測到 RQ worker 可能離線（queue_depth={{ queueDepth }} / workers={{ workersTotal }}）
     </section>
 
-    <SectionCard>
-      <template #header><h2 class="panel-title">30 分鐘趨勢</h2></template>
+    <!-- Rendered as a bare section (NOT inside SectionCard): every other tab
+         renders its trend charts bare and they work; the Overview was the only
+         place these were nested inside a SectionCard, which is what made them
+         blank on hover. -->
+    <section class="overview-trend-section" aria-label="30 分鐘趨勢">
+      <h2 class="panel-title overview-trend-heading">30 分鐘趨勢</h2>
       <div class="overview-mini-grid">
         <TrendChart
           :snapshots="historyData"
@@ -259,6 +263,6 @@ onMounted(() => {
           height="180px"
         />
       </div>
-    </SectionCard>
+    </section>
   </div>
 </template>

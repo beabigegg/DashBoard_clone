@@ -113,3 +113,50 @@ class TestCreateHeavyQueryConnection:
             assert result[0] == 3
         finally:
             conn.close()
+
+
+class TestGetDuckDBTelemetry:
+    """Regression: temp_dir_bytes must be a real number (never the old N/A),
+    resolved from the connection's actual temp_directory, not the (usually
+    empty) DUCKDB_TEMP_DIR env var."""
+
+    def test_temp_dir_bytes_is_numeric_not_none(self):
+        from mes_dashboard.core.duckdb_runtime import get_duckdb_telemetry
+
+        telemetry = get_duckdb_telemetry()
+        # The connection probe always resolves a temp directory (e.g. ".tmp"),
+        # so bytes is measurable (0 when no spill has occurred) — never None.
+        assert telemetry["temp_dir_bytes"] is not None
+        assert isinstance(telemetry["temp_dir_bytes"], int)
+        assert telemetry["temp_dir_bytes"] >= 0
+
+    def test_memory_limit_state_reported(self):
+        from mes_dashboard.core.duckdb_runtime import (
+            get_duckdb_telemetry,
+            DUCKDB_MEMORY_LIMIT,
+        )
+
+        assert get_duckdb_telemetry()["memory_limit_state"] == DUCKDB_MEMORY_LIMIT
+
+    def test_resolve_temp_dir_returns_absolute_path(self):
+        from mes_dashboard.core.duckdb_runtime import _resolve_temp_dir
+        import os
+
+        temp_dir = _resolve_temp_dir()
+        assert temp_dir is not None
+        assert os.path.isabs(temp_dir)
+
+    def test_dir_size_bytes_sums_files_recursively(self, tmp_path):
+        from mes_dashboard.core.duckdb_runtime import _dir_size_bytes
+
+        (tmp_path / "a.tmp").write_bytes(b"x" * 100)
+        nested = tmp_path / "sub"
+        nested.mkdir()
+        (nested / "b.tmp").write_bytes(b"y" * 250)
+
+        assert _dir_size_bytes(str(tmp_path)) == 350
+
+    def test_dir_size_bytes_missing_dir_returns_zero(self, tmp_path):
+        from mes_dashboard.core.duckdb_runtime import _dir_size_bytes
+
+        assert _dir_size_bytes(str(tmp_path / "does-not-exist")) == 0

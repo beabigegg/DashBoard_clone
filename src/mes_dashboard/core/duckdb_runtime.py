@@ -124,6 +124,48 @@ def create_heavy_query_connection() -> "duckdb.DuckDBPyConnection":
     return conn
 
 
+def _resolve_temp_dir() -> str | None:
+    """Return the absolute temp-spill directory DuckDB actually uses.
+
+    ``DUCKDB_TEMP_DIR`` is empty by default, so an env-only lookup reports
+    nothing. But an in-memory connection still spills to a default directory
+    (``.tmp`` relative to CWD in current DuckDB). Probe the live connection's
+    ``temp_directory`` setting so telemetry reflects the real spill location;
+    fall back to the configured env path if the probe fails.
+    """
+    try:
+        conn = create_heavy_query_connection()
+        try:
+            row = conn.execute("SELECT current_setting('temp_directory')").fetchone()
+        finally:
+            conn.close()
+        probed = (row[0] if row else "") or ""
+        if probed:
+            return os.path.abspath(probed)
+    except Exception:
+        pass
+    return os.path.abspath(DUCKDB_TEMP_DIR) if DUCKDB_TEMP_DIR else None
+
+
+def _dir_size_bytes(path: str) -> int:
+    """Recursively sum file sizes under *path*; 0 if the dir is absent/unreadable.
+
+    DuckDB may nest spill files in sub-directories, so this walks the tree
+    rather than a single ``scandir`` level.
+    """
+    total = 0
+    try:
+        for root, _dirs, files in os.walk(path):
+            for name in files:
+                try:
+                    total += os.stat(os.path.join(root, name)).st_size
+                except OSError:
+                    continue
+    except OSError:
+        return 0
+    return total
+
+
 def get_duckdb_telemetry() -> dict:
     """Return DuckDB runtime telemetry for admin performance-detail endpoint.
 
@@ -132,26 +174,14 @@ def get_duckdb_telemetry() -> dict:
 
     Returns:
         Dict with keys:
-          - ``temp_dir_bytes``: total bytes of files in DUCKDB_TEMP_DIR, or None.
-          - ``memory_limit_state``: dict of configured limits and connection probe result.
+          - ``temp_dir_bytes``: total bytes spilled under the active temp
+            directory. ``0`` when the directory exists-but-empty or has not
+            been created yet (no spill); ``None`` only when the temp directory
+            cannot be resolved at all.
+          - ``memory_limit_state``: configured per-connection memory limit.
     """
-    temp_dir_bytes = None
-    if DUCKDB_TEMP_DIR and os.path.isdir(DUCKDB_TEMP_DIR):
-        try:
-            temp_dir_bytes = sum(
-                e.stat().st_size
-                for e in os.scandir(DUCKDB_TEMP_DIR)
-                if e.is_file()
-            )
-        except OSError:
-            pass
-
-    try:
-        conn = create_heavy_query_connection()
-        conn.close()
-
-    except Exception:
-        pass
+    temp_dir = _resolve_temp_dir()
+    temp_dir_bytes = _dir_size_bytes(temp_dir) if temp_dir else None
 
     return {
         "temp_dir_bytes": temp_dir_bytes,

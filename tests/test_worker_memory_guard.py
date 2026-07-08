@@ -334,6 +334,37 @@ class TestTelemetry:
         assert t["service_memory"]["rss_mb"] == pytest.approx(2000.0, abs=0.1)
         assert t["service_memory"]["process_count"] == 4
 
+    def test_process_and_system_memory_refreshed_on_demand(self):
+        """Regression: rss_pct / system used_pct must be computed live in
+        get_memory_guard_telemetry(), not left at the guard-thread's stale
+        init value (0.0). Otherwise the admin dashboard shows 0.0% on any
+        worker whose background guard has not ticked."""
+        from mes_dashboard.core import worker_memory_guard as wmg
+
+        # Simulate a worker whose background guard thread never ran: telemetry
+        # still at its initial zeros.
+        wmg._telemetry.limit_mb = 1000
+        wmg._telemetry.last_rss_mb = 0.0
+        wmg._telemetry.rss_pct = 0.0
+        wmg._telemetry.system_mem_used_pct = 0.0
+
+        fake_vm = MagicMock(
+            percent=73.5,
+            available=4 * 1024 * 1024 * 1024,
+            total=16 * 1024 * 1024 * 1024,
+        )
+        with patch.object(wmg, "get_service_memory_snapshot", return_value={}), \
+                patch.object(wmg, "_current_rss_mb", return_value=250.0), \
+                patch("psutil.virtual_memory", return_value=fake_vm):
+            t = wmg.get_memory_guard_telemetry()
+
+        # Process: 250 MB of a 1000 MB limit == 25.0%, not the stale 0.0%.
+        assert t["process_memory"]["rss_mb"] == pytest.approx(250.0, abs=0.1)
+        assert t["process_memory"]["rss_pct"] == pytest.approx(25.0, abs=0.1)
+        # System: live psutil percent, not the stale 0.0%.
+        assert t["system_memory"]["used_pct"] == pytest.approx(73.5, abs=0.1)
+        assert t["system_memory"]["total_mb"] == pytest.approx(16384.0, abs=1.0)
+
 
 # ============================================================
 # Test: Guard lifecycle (start/stop)

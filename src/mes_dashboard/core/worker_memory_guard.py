@@ -499,8 +499,43 @@ def stop_worker_memory_guard() -> None:
         _guard = None
 
 
+def _refresh_process_memory_on_demand() -> None:
+    """Recompute process RSS % on demand so telemetry is live even when the
+    background guard thread is disabled or has not ticked yet.
+
+    Without this, ``rss_pct``/``last_rss_mb`` stay at their init value (0.0)
+    until the guard thread's first check — so the admin dashboard shows 0.0%
+    on any worker whose guard has not run (e.g. ``flask run`` startup paths
+    or the first ``_CHECK_INTERVAL`` after boot).
+    """
+    rss_mb = _current_rss_mb()
+    if rss_mb is None:
+        return
+    limit = _telemetry.limit_mb or _resolve_limit_mb()
+    _telemetry.limit_mb = limit
+    _telemetry.last_rss_mb = rss_mb
+    _telemetry.rss_pct = (rss_mb / limit * 100) if limit > 0 else 0.0
+
+
+def _refresh_system_memory_on_demand() -> None:
+    """Recompute host memory usage on demand (see ``_refresh_process_memory_on_demand``)."""
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        _telemetry.system_mem_used_pct = vm.percent
+        _telemetry.system_mem_available_mb = vm.available / (1024 * 1024)
+        _telemetry.system_mem_total_mb = vm.total / (1024 * 1024)
+    except Exception as exc:
+        logger.debug("On-demand system memory read error: %s", exc)
+
+
 def get_memory_guard_telemetry() -> Dict[str, Any]:
-    """Return current guard state for admin telemetry and health checks."""
+    """Return current guard state for admin telemetry and health checks.
+
+    Process RSS, system memory and service memory are all refreshed on demand
+    here so the reported values never depend on whether the background guard
+    thread has run in this worker.
+    """
     snapshot = get_service_memory_snapshot()
     _telemetry.service_rss_bytes = int(snapshot.get("total_rss_bytes", 0) or 0)
     _telemetry.service_rss_mb = float(snapshot.get("total_rss_mb", 0.0) or 0.0)
@@ -509,4 +544,6 @@ def get_memory_guard_telemetry() -> Dict[str, Any]:
     _telemetry.service_gunicorn_process_count = int(snapshot.get("gunicorn_process_count", 0) or 0)
     _telemetry.service_rq_rss_mb = float(snapshot.get("rq_rss_mb", 0.0) or 0.0)
     _telemetry.service_rq_process_count = int(snapshot.get("rq_process_count", 0) or 0)
+    _refresh_process_memory_on_demand()
+    _refresh_system_memory_on_demand()
     return _telemetry.to_dict()

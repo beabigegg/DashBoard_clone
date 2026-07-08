@@ -9,7 +9,6 @@ import {
   watch,
 } from 'vue';
 
-import PageHeader from '../shared-ui/components/PageHeader.vue';
 import { useAutoRefresh } from '../shared-composables/useAutoRefresh.js';
 import { apiGet } from '../core/api';
 
@@ -130,12 +129,22 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="theme-admin-dashboard dashboard-root" data-testid="admin-dashboard-app">
-    <PageHeader
-      title="Admin Dashboard"
-      :refreshing="refreshing"
-      @refresh="refreshNow"
-    >
-      <template #subtitle>
+    <nav class="dashboard-tabs" aria-label="Admin dashboard tabs">
+      <div class="dashboard-tabs__list">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          type="button"
+          class="dashboard-tab"
+          :class="{ 'is-active': tab.key === activeTabKey }"
+          :data-testid="`tab-${tab.key}`"
+          @click="setActiveTab(tab.key)"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <div class="dashboard-toolbar">
         <label class="auto-refresh-toggle">
           <input
             type="checkbox"
@@ -145,21 +154,17 @@ onBeforeUnmount(() => {
           />
           自動更新 (30s)
         </label>
-      </template>
-    </PageHeader>
-
-    <nav class="dashboard-tabs" aria-label="Admin dashboard tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        type="button"
-        class="dashboard-tab"
-        :class="{ 'is-active': tab.key === activeTabKey }"
-        :data-testid="`tab-${tab.key}`"
-        @click="setActiveTab(tab.key)"
-      >
-        {{ tab.label }}
-      </button>
+        <button
+          type="button"
+          class="dashboard-refresh-btn"
+          :disabled="refreshing"
+          data-testid="dashboard-refresh"
+          @click="refreshNow"
+        >
+          <span v-if="refreshing" class="dashboard-refresh-btn__spinner" aria-hidden="true"></span>
+          {{ refreshing ? '更新中…' : '重新整理' }}
+        </button>
+      </div>
     </nav>
 
     <main class="dashboard-main">
