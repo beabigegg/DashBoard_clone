@@ -115,6 +115,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Stage only the specific `specs/changes/<id>/`, never all of `specs/changes/` — sibling scaffolds fail the pre-commit hook
 - `gate --strict` only runs the changed-area test ladder; before pushing a removal or shape change, grep the full test tree and run full pytest locally
 - Full pytest run regenerates the whole contract sample set (180+ files, currently 182); `git checkout tests/contract/samples/` then re-stage only your change's samples
+- Any `schema-version` bump to `contracts/api/api-contract.md` — even prose-only — requires re-running `cdd-kit openapi export` for both `contracts/openapi.json` and `contracts/api/openapi.json` before pushing, or the `openapi-sync` gate fails — see docs/cdd-kit-patterns.md
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md`:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS
@@ -131,6 +132,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Local Playwright/E2E runs serve pre-built `dist/`, not live source — `npm run build` before testing CSS/JS/Vue changes
 - `<Teleport to="body">` breaks descendant selectors — wrap content in a `.theme-<feature>` div (rule 4.4)
 - `resource-shared/styles.css` `:is()` groups must include every page theme that reuses resource-shared component classes (rule 4.5) — a few themes (e.g. admin-pages, material-consumption) intentionally replicate rules locally instead of joining the group
+- Relocating a component's classes into a different `.theme-X` scope with its own component library: grep the target theme's `style.css` for name collisions first (`css:check` catches unscoped, not colliding-but-scoped duplicates) — see contracts/css/css-contract.md §Known Global Rule Interactions
 
 **Cache & spool patterns** — see `docs/architecture/cache-spool-patterns.md`:
 - Pre-warm namespace must exactly match the key pattern user queries read

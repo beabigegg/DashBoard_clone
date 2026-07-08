@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.13.0
-last-changed: 2026-07-08
+schema-version: 1.14.0
+last-changed: 2026-07-09
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -129,6 +129,7 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 ## Known Global Rule Interactions
 
 - **`.ui-card { overflow: hidden }` (defined in `frontend/src/styles/tailwind.css`) clips any `position: absolute` dropdown (MultiSelect, custom select) nested inside it.** When a card must contain such a dropdown, add a scoped modifier class to the card (e.g., `filter-query-card`, `type-filter-card`) and override `overflow: visible` in the feature's scoped `style.css` — never change the global rule. The pattern has been applied in 7+ feature CSS files and is established as the correct override contract. Evidence: `material-part-consumption` — filter panel MultiSelect clipped by `.ui-card { overflow: hidden }` until scoped override was added.
+- **Relocating a component's rendered classes into a different `.theme-X` scope that already has its own component library**: `npm run css:check` Rule 6 only flags *unscoped* rules — it does not detect two components sharing one theme scope that define the *same* class name (e.g. `.status-badge`, bare `table`) with conflicting rules. Before reusing a source component's generic class names in the target scope, grep the target theme's `style.css` for those exact selectors; rename to a component-exclusive prefix on any collision (e.g. `.pa-perm-*`). Evidence: `move-target-permissions-panel` — `.theme-admin-dashboard .status-badge`/bare `table` pre-existed for `RecentSessionsTable.vue`.
 
 ## Forbidden Practices
 
@@ -139,6 +140,7 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 - 未審查的 z-index 添加
 - 多種 loading 表現並存於同一區塊
 - **直接修改全域 `.ui-card` 的 overflow 屬性**：若需卡片內的彈出下拉，使用 scoped 修飾類別加上 `overflow: visible` override（見 Known Global Rule Interactions）
+- **跨元件搬移時沿用來源元件的通用 class 名稱，未先檢查目標 theme scope 是否已有同名但定義不同的規則**（見 Known Global Rule Interactions）
 
 
 **eap-alarm-analysis (2026-06-18)**: `frontend/src/eap-alarm/style.css` 全部 CSS 規則必須以 `.theme-eap-alarm` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行。Rule 4.5: `.theme-eap-alarm` must be batch-added to all `:is(.theme-X, …)` groups in `resource-shared/styles.css` via `sed` in the same PR. Rule 4.4: any `<Teleport to="body">` usage must wrap teleported content in `<div class="theme-eap-alarm">`.

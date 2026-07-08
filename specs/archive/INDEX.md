@@ -82,3 +82,4 @@
 | production-achievement-kanban | 2026 | 2026-07-02 | specs/archive/2026/production-achievement-kanban/ |
 | yield-alert-kpi-csv-parity | 2026 | 2026-07-06 | specs/archive/2026/yield-alert-kpi-csv-parity/ |
 | production-achievement-async-spool | 2026 | 2026-07-08 | specs/archive/2026/production-achievement-async-spool/ |
+| move-target-permissions-panel | 2026 | 2026-07-08 | specs/archive/2026/move-target-permissions-panel/ |

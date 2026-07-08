@@ -157,4 +157,16 @@ git checkout tests/contract/samples/
 git add tests/contract/samples/get_admin_pages.json tests/contract/samples/get_portal_navigation.json
 ```
 
+## openapi-sync Gate Fires on Any api-contract.md schema-version Bump
+
+**`openapi-sync` (Tier 1 CI) checks that `contracts/openapi.json` and `contracts/api/openapi.json` are byte-in-sync with `contracts/api/api-contract.md` — it does not distinguish a prose-only Compatibility-Notes/CHANGELOG edit from an endpoint/schema edit.** Any `schema-version` bump to `api-contract.md`, even one with zero endpoint/request/response/auth changes, must be followed by regenerating both output paths before pushing:
+
+```bash
+cdd-kit openapi export --out contracts/openapi.json
+cdd-kit openapi export --out contracts/api/openapi.json
+cdd-kit openapi export --check --out contracts/openapi.json  # verify
+```
+
+Evidence: `move-target-permissions-panel` — CI run 28982636955 failed "OpenAPI artifact contracts/openapi.json is OUT OF SYNC with contracts/api/api-contract.md" on a prose-only 1.38.0→1.38.1 bump (consumer-note only, no endpoint change); fixed in commit `11df6bc4`.
+
 Evidence: `nav-config-to-code` — hit twice; reverted ~166 then ~160 sample files to keep the diff tight and avoid polluting contract sample history.

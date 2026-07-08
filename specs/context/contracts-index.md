@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: bd0421aa5aae210c3d2a5163d7161ca1e2a6dc062f8525dd0352db9ed7794d3b
+inputs-digest: c047d90696ffe282e3d5abc2b2c10a99b4025a4b31a0b07266c00f651ac02ffb
 ---
 
 # Contracts Index
@@ -35,7 +35,7 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.38.0
+- schema-version: 1.38.1
 - last-changed: 2026-07-08
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
@@ -98,8 +98,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CSS / UI Contract — MES Dashboard
 - owner: application-team
 - surface: ui
-- schema-version: 1.12.0
-- last-changed: 2026-07-02
+- schema-version: 1.14.0
+- last-changed: 2026-07-09
 - breaking-change-policy: deprecate-2-minors
 - summary: UI token policy, component styling rules, and visual review constraints.
 
@@ -109,10 +109,10 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - type: css-inventory
 - directory: contracts/css
 - title: CSS Inventory (Governed Source List)
-- schema-version: 1.2.9
+- schema-version: 1.2.10
 - owner: application-team
 - surface: ui
-- last-changed: 2026-07-02
+- last-changed: 2026-07-08
 - summary: Governed inventory of authored CSS source files under frontend/src/.
 
 

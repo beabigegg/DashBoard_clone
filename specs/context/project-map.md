@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 197
-visible-files: 1038
+visible-dirs: 195
+visible-files: 1042
 omitted-dirs: 67
 truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -541,6 +541,7 @@ DashBoard_clone/
 |   |   |-- hold-overview/
 |   |   |   \-- csv-export.test.js
 |   |   |-- legacy/
+|   |   |   |-- admin-dashboard-permissions-css-scope.test.js
 |   |   |   |-- admin-dashboard.test.js
 |   |   |   |-- anomaly-overview.test.js
 |   |   |   |-- AUDIT.md
@@ -668,6 +669,7 @@ DashBoard_clone/
 |   |   |-- access_20260708_150458.log
 |   |   |-- access_20260708_154029.log
 |   |   |-- access_20260708_155601.log
+|   |   |-- access_20260708_201416.log
 |   |   |-- error_20260708_072105.log
 |   |   |-- error_20260708_073540.log
 |   |   |-- error_20260708_074557.log
@@ -676,6 +678,7 @@ DashBoard_clone/
 |   |   |-- error_20260708_150458.log
 |   |   |-- error_20260708_154029.log
 |   |   |-- error_20260708_155601.log
+|   |   |-- error_20260708_201416.log
 |   |   |-- rq_downtime_worker_20260708_072105.log
 |   |   |-- rq_downtime_worker_20260708_073540.log
 |   |   |-- rq_downtime_worker_20260708_074557.log
@@ -684,6 +687,7 @@ DashBoard_clone/
 |   |   |-- rq_downtime_worker_20260708_150458.log
 |   |   |-- rq_downtime_worker_20260708_154029.log
 |   |   |-- rq_downtime_worker_20260708_155601.log
+|   |   |-- rq_downtime_worker_20260708_201416.log
 |   |   |-- rq_eap_alarm_worker_20260708_072105.log
 |   |   |-- rq_eap_alarm_worker_20260708_073540.log
 |   |   |-- rq_eap_alarm_worker_20260708_074557.log
@@ -692,6 +696,7 @@ DashBoard_clone/
 |   |   |-- rq_eap_alarm_worker_20260708_150458.log
 |   |   |-- rq_eap_alarm_worker_20260708_154029.log
 |   |   |-- rq_eap_alarm_worker_20260708_155601.log
+|   |   |-- rq_eap_alarm_worker_20260708_201416.log
 |   |   |-- rq_hold_hist_worker_20260708_072105.log
 |   |   |-- rq_hold_hist_worker_20260708_073540.log
 |   |   |-- rq_hold_hist_worker_20260708_074557.log
@@ -700,24 +705,24 @@ DashBoard_clone/
 |   |   |-- rq_hold_hist_worker_20260708_150458.log
 |   |   |-- rq_hold_hist_worker_20260708_154029.log
 |   |   |-- rq_hold_hist_worker_20260708_155601.log
+|   |   |-- rq_hold_hist_worker_20260708_201416.log
 |   |   |-- rq_msd_worker_20260708_072105.log
 |   |   |-- rq_msd_worker_20260708_073540.log
 |   |   |-- rq_msd_worker_20260708_074557.log
 |   |   |-- rq_msd_worker_20260708_075940.log
 |   |   |-- rq_msd_worker_20260708_082120.log
-|   |   |-- rq_msd_worker_20260708_150458.log
-|   |   |-- rq_msd_worker_20260708_154029.log
-|   |   |-- rq_msd_worker_20260708_155601.log
-|   |   |-- rq_prod_hist_worker_20260708_072105.log
-|   |   |-- rq_prod_hist_worker_20260708_073540.log
-|   |   \-- ... (54 more entries truncated; cap=50)
+|   |   \-- ... (67 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
 |   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
+|   |-- metrics_history.sqlite-shm
+|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
 |   |-- rq_eap_alarm_worker.log
 |   |-- rq_hold_hist_worker.log
@@ -1257,23 +1262,18 @@ DashBoard_clone/
 |   |   |   \-- ce1debbbb5da2e5b.parquet
 |   |   |-- downtime_analysis_job_bridge/
 |   |   |   \-- ce1debbbb5da2e5b.parquet
-|   |   |-- eap_alarm/
-|   |   |   \-- eap_alarm_2026-06-30_2026-07-06_f927a85a_v5.parquet
 |   |   |-- hold_dataset/
-|   |   |   \-- 94a1e6b15e41bad9.parquet
-|   |   |-- production_achievement/
-|   |   |   |-- 59bd78c4225bec4a.parquet
-|   |   |   \-- bd9112fc7e31bbf6.parquet
+|   |   |   \-- c125b5de22268fb6.parquet
 |   |   |-- reject_dataset/
-|   |   |   \-- 3bd7a65c547f115f.parquet
+|   |   |   \-- ab2164b57726d1aa.parquet
 |   |   |-- resource_dataset/
-|   |   |   |-- 72c9cd4897ff2f48.parquet
-|   |   |   \-- 88ea49a6af816ff1.parquet
+|   |   |   |-- 2c755a071eb865dd.parquet
+|   |   |   \-- 72c9cd4897ff2f48.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- 4d0593acf290396f.parquet
+|   |   |   |-- c186447492fb51f4.parquet
 |   |   |   \-- d9245009c9c8cb73.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- acffa1d722aeda74.parquet
+|   |   |   \-- 6ad768c74a6a1782.parquet
 |   |   |-- probe_1006070.json
 |   |   |-- probe_1024367.json
 |   |   |-- probe_103606.json
@@ -1294,6 +1294,7 @@ DashBoard_clone/
 |   |   |-- probe_113740.json
 |   |   |-- probe_113938.json
 |   |   |-- probe_114639.json
+|   |   |-- probe_1192488.json
 |   |   |-- probe_12085.json
 |   |   |-- probe_127692.json
 |   |   |-- probe_128330.json
@@ -1311,7 +1312,8 @@ DashBoard_clone/
 |   |   |-- probe_181912.json
 |   |   |-- probe_181994.json
 |   |   |-- probe_191779.json
-|   |   \-- ... (85 more entries truncated; cap=50)
+|   |   |-- probe_191826.json
+|   |   \-- ... (84 more entries truncated; cap=50)
 |   |-- container_filter_cache.loading
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json

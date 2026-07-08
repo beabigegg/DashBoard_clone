@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [css 1.14.0] — 2026-07-09
+### Added
+- move-target-permissions-panel (durable-learning promotion, /cdd-close): new `## Known Global Rule Interactions` / `## Forbidden Practices` rule — relocating a component's rendered classes into a different `.theme-X` scope that already has its own component library requires grepping the target theme's `style.css` for class-name collisions first; `npm run css:check` Rule 6 only flags unscoped rules, not same-scope name collisions with conflicting definitions. Evidence: `.theme-admin-dashboard .status-badge`/bare `table` pre-existed for `RecentSessionsTable.vue`; resolved via `.pa-perm-*` rename.
+
 ## [api 1.38.1] — 2026-07-08
 ### Changed
 - move-target-permissions-panel: No endpoint/schema/auth change. Consumer-only note: `GET/PUT /admin/api/production-achievement/permissions[/{user_identifier}]`'s frontend consumer moves from `admin-pages` (permission block, removed) to `admin-dashboard` (new tab); supersedes the consumer note in the `production-achievement-kanban (2026-07-02)` Compatibility Note, left as historical record.

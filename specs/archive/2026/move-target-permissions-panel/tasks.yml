@@ -38,5 +38,5 @@ tasks:
   - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI green on main: frontend-tests (Tier-1 Playwright, run 28982636960) success; contract-driven-gates success." }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "openapi-sync-gate initially failed (contracts/openapi.json + contracts/api/openapi.json stale after api-contract.md 1.38.1 bump) — fixed via cdd-kit openapi export in commit 11df6bc4, re-run green." }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates defined for this surface." }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done, note: "2 lessons promoted: openapi-sync-gate (CLAUDE.md + docs/cdd-kit-patterns.md), CSS cross-app class collision (contracts/css/css-contract.md 1.13.0->1.14.0 + CLAUDE.md). See archive.md." }
