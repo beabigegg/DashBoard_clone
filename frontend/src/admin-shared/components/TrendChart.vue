@@ -64,6 +64,10 @@ const chartOption = computed(() => {
     lineStyle: { width: 2 },
     itemStyle: { color: s.color },
     yAxisIndex: s.yAxisIndex ?? 0,
+    // Hovering must not put the series into an emphasis/blur state: on some
+    // hardware-accelerated browsers that re-composite blanks the whole series
+    // (only the crosshair/tooltip survive). The axis tooltip still works.
+    emphasis: { disabled: true },
     data: data.map((row) => extractValue(row, s.key)),
   }));
 

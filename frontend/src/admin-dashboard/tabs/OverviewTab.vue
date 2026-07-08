@@ -225,44 +225,39 @@ onMounted(() => {
       偵測到 RQ worker 可能離線（queue_depth={{ queueDepth }} / workers={{ workersTotal }}）
     </section>
 
-    <!-- Rendered as a bare section (NOT inside SectionCard): every other tab
-         renders its trend charts bare and they work; the Overview was the only
-         place these were nested inside a SectionCard, which is what made them
-         blank on hover. -->
+    <!-- Rendered as full-width bare TrendCharts (single column), identical to
+         how the Performance/Worker tabs render their working trend charts.
+         The 2-column mini-grid (narrow ~620px cells) was the last remaining
+         difference from the working "查詢延遲趨勢" chart and is what made these
+         blank on hover in some browsers. -->
     <section class="overview-trend-section" aria-label="30 分鐘趨勢">
       <h2 class="panel-title overview-trend-heading">30 分鐘趨勢</h2>
-      <div class="overview-mini-grid">
-        <TrendChart
-          :snapshots="historyData"
-          :series="latencyMiniSeries"
-          title="查詢延遲 P95"
-          yAxisLabel="ms"
-          height="180px"
-        />
-        <TrendChart
-          :snapshots="historyData"
-          :series="poolMiniSeries"
-          title="連線池飽和度"
-          yAxisLabel="%"
-          :yMax="1"
-          height="180px"
-        />
-        <TrendChart
-          :snapshots="historyData"
-          :series="workerMiniSeries"
-          title="Worker 記憶體"
-          yAxisLabel="MB"
-          height="180px"
-        />
-        <TrendChart
-          :snapshots="historyData"
-          :series="cacheMiniSeries"
-          title="Cache 命中率"
-          yAxisLabel="%"
-          :yMax="1"
-          height="180px"
-        />
-      </div>
+      <TrendChart
+        :snapshots="historyData"
+        :series="latencyMiniSeries"
+        title="查詢延遲 P95"
+        yAxisLabel="ms"
+      />
+      <TrendChart
+        :snapshots="historyData"
+        :series="poolMiniSeries"
+        title="連線池飽和度"
+        yAxisLabel="%"
+        :yMax="1"
+      />
+      <TrendChart
+        :snapshots="historyData"
+        :series="workerMiniSeries"
+        title="Worker 記憶體"
+        yAxisLabel="MB"
+      />
+      <TrendChart
+        :snapshots="historyData"
+        :series="cacheMiniSeries"
+        title="Cache 命中率"
+        yAxisLabel="%"
+        :yMax="1"
+      />
     </section>
   </div>
 </template>
