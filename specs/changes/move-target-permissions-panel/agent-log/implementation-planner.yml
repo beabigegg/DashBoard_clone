@@ -1,0 +1,17 @@
+change-id: move-target-permissions-panel
+timestamp: 2026-07-08T00:00:00Z
+agent: implementation-planner
+status: complete
+summary: >
+  Wrote implementation-plan.md. Decisions: (1) REMOVE panel from /admin/pages
+  (no coexist); (2) new tab key `permissions` label `目標值權限`; (3) rename panel
+  classes to panel-exclusive `.pa-perm-*` — the existing `.theme-admin-dashboard
+  .status-badge` (style.css:595) plus bare <table> are live in RecentSessionsTable
+  (usage tab), so a bare copy would regress it; (4) no route/manifest edits,
+  CER-001 stays not-needed. Flagged: AC-4 css-scope test must assert `.pa-perm-*`
+  names, not the original class list in test-plan.md line 38.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/move-target-permissions-panel/implementation-plan.md" }
+  - { type: owner-map, pointer: "frontend-engineer (IP-1..IP-7), contract-reviewer/main (IP-8)" }
+  - { type: scope-summary, pointer: "6 in scope, 4 out of scope; remove-from-admin-pages decided" }
+next-action: frontend-engineer

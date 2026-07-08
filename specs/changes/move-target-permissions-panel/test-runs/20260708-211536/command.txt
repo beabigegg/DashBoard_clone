@@ -1,0 +1,1 @@
+cd frontend && npm run type-check 2>&1 | tail -20 && npm run css:check 2>&1 | tail -10 && npm run build 2>&1 | tail -10

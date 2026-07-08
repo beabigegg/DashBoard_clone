@@ -1,0 +1,14 @@
+change-id: move-target-permissions-panel
+timestamp: 2026-07-08T00:10:00Z
+agent: visual-reviewer
+status: approved
+summary: >
+  All .pa-perm-* classes have matching .theme-admin-dashboard rules; zero
+  collision with existing .status-badge/bare-table selectors used by
+  RecentSessionsTable.vue; no unscoped rules introduced (Rule 4.2/4.3/6);
+  rename-only, value-for-value identical to the original admin-pages rules.
+  admin-pages cleanup confirmed complete (no orphaned pa-perm references).
+artifacts:
+  - { type: state-coverage, pointer: "frontend/tests/legacy/admin-dashboard-permissions-css-scope.test.js: 10/10 pass" }
+  - { type: diff-percentage, pointer: ".pa-perm-* rules vs git show HEAD:frontend/src/admin-pages/style.css:128-222 — value-for-value identical, rename-only" }
+next-action: none

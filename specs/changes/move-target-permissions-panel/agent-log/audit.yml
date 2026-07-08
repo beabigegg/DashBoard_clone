@@ -1,0 +1,17 @@
+- type: tier-floor-override
+  change-id: move-target-permissions-panel
+  timestamp: '2026-07-08T13:05:43.798Z'
+  declared-tier: 3
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - cache
+    - endpoint
+    - permissions
+    - route
+    - worker
+  reason: >-
+    Keyword-scan false positive: cache/worker/route/endpoint hits are pre-existing admin-dashboard
+    tab names and the unchanged, already-shipped permissions endpoint being relocated in the UI
+    only; no new auth, concurrency, migration, or secrets logic is introduced (admin_required and
+    can_edit_targets semantics untouched, per contract-reviewer confirmation).

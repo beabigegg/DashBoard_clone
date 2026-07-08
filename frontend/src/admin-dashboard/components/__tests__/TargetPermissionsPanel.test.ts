@@ -7,6 +7,7 @@ describe('TargetPermissionsPanel — renders whitelist and toggles', () => {
   it('renders empty state when no permissions granted', () => {
     const wrapper = mount(TargetPermissionsPanel, { props: { permissions: [] } })
     expect(wrapper.find('[data-testid="pa-permissions-empty"]').exists()).toBe(true)
+    expect(wrapper.find('.pa-perm-empty').exists()).toBe(true)
   })
 
   it('renders a row per permission with aria-pressed reflecting can_edit_targets', () => {
@@ -48,5 +49,22 @@ describe('TargetPermissionsPanel — renders whitelist and toggles', () => {
     const wrapper = mount(TargetPermissionsPanel, { props: { permissions: [] } })
     await wrapper.find('[data-testid="pa-permissions-new-user-btn"]').trigger('click')
     expect(wrapper.emitted('grantNew')).toBeUndefined()
+  })
+
+  it('renders panel-exclusive .pa-perm-* classes (not the shared admin-pages generic classes)', () => {
+    const wrapper = mount(TargetPermissionsPanel, {
+      props: {
+        permissions: [
+          { user_identifier: 'alice', can_edit_targets: true, granted_at: '2026-01-01', granted_by: 'admin' },
+        ],
+      },
+    })
+    expect(wrapper.find('.pa-perm-table-container').exists()).toBe(true)
+    expect(wrapper.find('.pa-perm-table').exists()).toBe(true)
+    expect(wrapper.find('.pa-perm-user-cell').exists()).toBe(true)
+    expect(wrapper.find('.pa-perm-badge').exists()).toBe(true)
+    expect(wrapper.find('.pa-perm-badge--granted').exists()).toBe(true)
+    expect(wrapper.find('.table-container').exists()).toBe(false)
+    expect(wrapper.find('.status-badge').exists()).toBe(false)
   })
 })

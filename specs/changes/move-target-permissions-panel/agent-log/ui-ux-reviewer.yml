@@ -1,0 +1,14 @@
+change-id: move-target-permissions-panel
+timestamp: 2026-07-08T00:20:00Z
+agent: ui-ux-reviewer
+status: approved
+summary: >
+  Clean pattern fidelity with sibling tabs (defineExpose/refresh, ErrorBanner,
+  aria-pressed toggle). admin-pages removal verified clean, no orphaned refs.
+  One non-blocking finding: PermissionsTab.vue conflated loading and empty
+  states (false "no permissions" message during initial fetch) — fixed in the
+  same change as a fast-follow (see agent-log/frontend-engineer.yml).
+artifacts:
+  - { type: journeys-reviewed, pointer: "admin-dashboard permissions tab open/toggle/grant; admin-pages panel removal" }
+  - { type: finding, pointer: "frontend/src/admin-dashboard/tabs/PermissionsTab.vue loading/empty conflation — fixed" }
+next-action: qa-reviewer

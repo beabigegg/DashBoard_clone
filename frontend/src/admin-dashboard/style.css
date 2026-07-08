@@ -642,6 +642,98 @@
   white-space: nowrap;
 }
 
+/* ── Production-achievement target-edit permission tab (move-target-permissions-panel) ── */
+/* Panel-exclusive `.pa-perm-*` names — NOT the generic `.status-badge`/bare `table` rules
+   above, which are already used by RecentSessionsTable.vue (usage tab) with a different
+   definition. A same-name copy would silently regress that tab. */
+
+.theme-admin-dashboard .pa-perm-table-container {
+  overflow-x: auto;
+}
+
+.theme-admin-dashboard .pa-perm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.theme-admin-dashboard .pa-perm-table th,
+.theme-admin-dashboard .pa-perm-table td {
+  padding: theme('spacing.token.p14') theme('spacing.token.p16');
+  text-align: left;
+  border-bottom: 1px solid theme('colors.stroke.soft');
+  vertical-align: middle;
+}
+
+.theme-admin-dashboard .pa-perm-table th {
+  background: theme('colors.token.hf8f9fa');
+  font-weight: 600;
+  font-size: theme('fontSize.base[0]');
+  color: theme('colors.token.h666666');
+}
+
+.theme-admin-dashboard .pa-perm-table td {
+  font-size: theme('fontSize.base[0]');
+}
+
+.theme-admin-dashboard .pa-perm-table tr:hover {
+  background: theme('colors.token.hfafbfc');
+}
+
+.theme-admin-dashboard .pa-perm-user-cell {
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: theme('colors.token.h666666');
+}
+
+.theme-admin-dashboard .pa-perm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: theme('spacing.token.p6');
+  padding: theme('spacing.token.p6') theme('spacing.token.p12');
+  border-radius: theme('borderRadius.pill');
+  font-size: theme('fontSize.sm[0]');
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.theme-admin-dashboard .pa-perm-badge--granted {
+  background: theme('colors.token.hdcfce7');
+  color: theme('colors.token.h166534');
+}
+
+.theme-admin-dashboard .pa-perm-badge--revoked {
+  background: theme('colors.token.hfef9c3');
+  color: theme('colors.token.h854d0e');
+}
+
+.theme-admin-dashboard .pa-perm-badge:hover {
+  transform: scale(1.05);
+}
+
+.theme-admin-dashboard .pa-perm-empty {
+  text-align: center;
+  padding: theme('spacing.token.p40');
+  color: theme('colors.token.h666666');
+}
+
+.theme-admin-dashboard .pa-perm-add-row {
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.token.p8');
+  padding: theme('spacing.token.p12') theme('spacing.token.p16');
+  border-bottom: 1px solid theme('colors.stroke.soft');
+}
+
+.theme-admin-dashboard .pa-perm-add-input {
+  flex: 1;
+  max-width: 320px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+  border: 1px solid theme('colors.token.hdbe4ef');
+  border-radius: 6px;
+  font-size: 13px;
+}
+
 @media (max-width: 900px) {
   .theme-admin-dashboard .charts-grid,
   .theme-admin-dashboard .tables-grid,

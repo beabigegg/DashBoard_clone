@@ -201,22 +201,3 @@
   color: theme('colors.token.hb91c1c');
   background: theme('colors.token.hfef2f2');
 }
-
-/* ── Production-achievement target-edit permission block ─────────────────── */
-
-.theme-admin-pages .pa-perm-add-row {
-  display: flex;
-  align-items: center;
-  gap: theme('spacing.token.p8');
-  padding: theme('spacing.token.p12') theme('spacing.token.p16');
-  border-bottom: 1px solid theme('colors.stroke.soft');
-}
-
-.theme-admin-pages .pa-perm-add-input {
-  flex: 1;
-  max-width: 320px;
-  padding: theme('spacing.token.p8') theme('spacing.token.p10');
-  border: 1px solid theme('colors.token.hdbe4ef');
-  border-radius: 6px;
-  font-size: 13px;
-}

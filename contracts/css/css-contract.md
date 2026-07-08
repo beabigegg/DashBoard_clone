@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.12.0
-last-changed: 2026-07-02
+schema-version: 1.13.0
+last-changed: 2026-07-08
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -148,6 +148,10 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.13.0] — 2026-07-08
+### Changed
+- move-target-permissions-panel: supersedes the `[css 1.12.0]` note below — the admin permission-management block no longer lives in `admin-pages`. It relocated to the existing `admin-dashboard` app (`.theme-admin-dashboard` scope, already governed — no new theme class), as its own tab. Its rendered classes were renamed to panel-exclusive `.pa-perm-*` names (`.pa-perm-table-container`, `.pa-perm-table`, `.pa-perm-user-cell`, `.pa-perm-badge`, `.pa-perm-badge--granted`, `.pa-perm-badge--revoked`, `.pa-perm-empty`, `.pa-perm-add-row`, `.pa-perm-add-input`) rather than reusing generic names, because `.theme-admin-dashboard .status-badge` and a bare `table` already exist for `RecentSessionsTable.vue` (usage tab) with different definitions — a same-name copy would have silently regressed that tab. Rule 4.2/4.3 (scoped, zero unscoped top-level rules) applies to the new `.pa-perm-*` rules in `admin-dashboard/style.css`.
 
 ## [css 1.12.0] — 2026-07-02
 ### Added

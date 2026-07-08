@@ -1,0 +1,42 @@
+change-id: move-target-permissions-panel
+status: in-progress
+tier: 3
+tier-floor-override: "Keyword-scan false positive: cache/worker/route/endpoint hits are pre-existing admin-dashboard tab names and the unchanged, already-shipped permissions endpoint being relocated in the UI only; no new auth, concurrency, migration, or secrets logic is introduced (admin_required and can_edit_targets semantics untouched, per contract-reviewer confirmation)."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "contract-reviewer identified api-contract.md consumer note + css-contract.md/css-inventory.md re-scope updates; applied after implementation-planner's remove-vs-coexist decision." }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "Architecture Review not required per classifier; target pattern already prescribed (existing tabs array/defineAsyncComponent)." }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "No endpoint/schema/auth change; applied prose-only consumer-note update, api-contract.md 1.38.0->1.38.1." }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done, note: "css-contract.md 1.12.0->1.13.0, css-inventory.md 1.2.9->1.2.10 applied by main Claude per contract-reviewer/implementation-planner." }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "No env surface touched." }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "No data shape change; can_edit_targets table/schema unchanged." }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "No business-rule change; UI relocation only." }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "No new CI/CD contract entries; existing frontend build/test/css:check gates already cover this surface." }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "PermissionsTab.test.ts, relocated TargetPermissionsPanel.test.ts, admin-dashboard.test.js fixture, css-scope static test — all written and green." }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: skipped, note: "No backend/integration surface touched." }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done, note: "admin-dashboard.spec.ts + admin-pages.spec.ts updated; not executable locally (no browser in sandbox), CI must run before merge." }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "No new interaction complexity or data-boundary surface." }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "No load/refresh/queue/long-running behavior touched." }
+  - { id: "4.1", section: Implementation, title: "Backend", status: skipped, note: "No backend change; endpoints reused as-is." }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "No env/deploy surface touched." }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "No CI workflow file changes needed; existing gates suffice." }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done }
+  - { id: "5.2", section: Review, title: "Visual review", status: done }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer's changes-required items (api-contract.md consumer note, css-contract.md/css-inventory.md re-scope) applied and re-validated (cdd-kit validate --contracts/--versions pass)." }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk; qa-report.md written. Residual risk: Tier-1 Playwright not run locally (no browser in sandbox), must go green in CI before merge." }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check/css:check/build/unit/contract all green locally." }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "Tier-1 admin-dashboard.spec.ts/admin-pages.spec.ts must pass in CI (not executable locally) before this is done." }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: pending, note: "Same CI dependency as 6.2." }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates defined for this surface." }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

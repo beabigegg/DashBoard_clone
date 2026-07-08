@@ -1,0 +1,69 @@
+change-id: move-target-permissions-panel
+timestamp: "2026-07-08T21:15:40Z"
+agent: frontend-engineer
+status: complete
+summary: >
+  Implemented IP-1..IP-7 exactly per implementation-plan.md. Moved
+  TargetPermissionsPanel.vue admin-pages -> admin-dashboard with all rendered
+  classes renamed to panel-exclusive .pa-perm-* names (DECISION-3, avoiding the
+  live .theme-admin-dashboard .status-badge / bare <table> collision used by
+  RecentSessionsTable.vue). Created PermissionsTab.vue under admin-dashboard/tabs/
+  following the CacheTab.vue/LogsTab.vue tab convention (defineExpose({refresh}),
+  onMounted -> refresh(), admin-tab__last-updated, ErrorBanner, SectionCard);
+  ported putJson/getCsrfToken/loadPermissions/toggle/grantNew from
+  admin-pages/App.vue verbatim (duplicated per Known Risks, admin-pages keeps its
+  own copy for handleUpdatePage). Registered the `permissions` tab (label
+  目標值權限) after `logs` in admin-dashboard/App.vue. Appended
+  .theme-admin-dashboard-scoped .pa-perm-* rules to admin-dashboard/style.css
+  (zero bare table/.status-badge redefinition). Removed the permission block +
+  its state/functions/import from admin-pages/App.vue (kept putJson/getCsrfToken
+  for handleUpdatePage) and the two dead .pa-perm-add-row/.pa-perm-add-input
+  rules from admin-pages/style.css (shared table/badge rules kept for
+  PagesManagementPanel). IP-8 (contract prose bumps: api 1.38.1, css-contract
+  1.13.0, css-inventory 1.2.10) was already applied by contract-reviewer/main
+  before this run — confirmed byte-consistent, no further edit needed.
+
+  Fast-follow (this run): per ui-ux-reviewer non-blocking finding,
+  PermissionsTab.vue had no loading state, so TargetPermissionsPanel.vue's
+  "尚無授權名單" empty-state rendered during the initial in-flight GET
+  (permissions.value starts as []), falsely claiming no permissions were
+  granted before the first fetch resolved. Added a `loading` ref (true
+  before the initial refresh(), set false in a `finally` so it clears on
+  both success and error paths) and gated the panel render in the template
+  with `BlockLoadingState` (v-if="loading") / `TargetPermissionsPanel`
+  (v-else), following the UsageTab.vue BlockLoadingState convention
+  (already imported in this app) rather than CacheTab.vue's
+  v-if="perfDetail" pattern, since permissions is an array (empty is a
+  valid post-load state, not an absent object). ErrorBanner/refresh()/
+  defineExpose behavior left untouched. Added a unit test asserting the
+  loading indicator (not the false empty-state) renders while the initial
+  fetch is pending, and resolves to the real empty-state after. The extra
+  `finally` hop added one more microtask before the DOM settles, so
+  pre-existing double-$nextTick() waits in this test file became flaky;
+  replaced them with @vue/test-utils' flushPromises() (verified against
+  original suite: the apparent failures were solely the extra async hop,
+  not stale pre-existing breakage — confirmed by reverting the source-side
+  loading gate as a control and seeing only the new-loading-test
+  assertions fail).
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/components/TargetPermissionsPanel.vue (new, moved+renamed)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/PermissionsTab.vue (loading ref + BlockLoadingState gate)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/App.vue:15-46 (permissions tab registered after logs)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/style.css (appended .pa-perm-* rules before the 900px media query)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/App.vue (removed permission state/functions/import/template block; putJson/getCsrfToken/PagesManagementPanel untouched)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/style.css (removed .pa-perm-add-row/.pa-perm-add-input block)" }
+  - { type: files-changed, pointer: "frontend/src/admin-pages/components/TargetPermissionsPanel.vue (deleted)" }
+  - { type: components-affected, pointer: "TargetPermissionsPanel, PermissionsTab, BlockLoadingState (reused), admin-dashboard App tabs, admin-pages App" }
+  - { type: tests-added, pointer: "frontend/src/admin-dashboard/components/__tests__/TargetPermissionsPanel.test.ts (moved+extended, 6 cases)" }
+  - { type: tests-added, pointer: "frontend/src/admin-dashboard/tabs/__tests__/PermissionsTab.test.ts (10 cases: fetch/render/toggle/grantNew/error-banner/refresh-expose/loading-state)" }
+  - { type: tests-added, pointer: "frontend/tests/legacy/admin-dashboard-permissions-css-scope.test.js (new, AC-4 static data-boundary guard, 10 assertions)" }
+  - { type: tests-updated, pointer: "frontend/tests/legacy/admin-dashboard.test.js (7-tab fixture + ordering assertion)" }
+  - { type: tests-updated, pointer: "frontend/tests/playwright/admin-dashboard.spec.ts (permissions mock route, tab-switch/data-load/toggle-round-trip/computed-style tests)" }
+  - { type: tests-updated, pointer: "frontend/tests/playwright/admin-pages.spec.ts (test_target_permissions_panel_absent)" }
+  - { type: tests-deleted, pointer: "frontend/src/admin-pages/components/__tests__/TargetPermissionsPanel.test.ts (deleted after new-path test green)" }
+  - { type: test-evidence, pointer: "specs/changes/move-target-permissions-panel/test-evidence.yml — collect/targeted/changed-area/contract/quality all passed (targeted/changed-area/quality re-run after loading-state fix: runs 20260708-211524, 20260708-211530, 20260708-211536); vitest src/admin-dashboard: 46/46 passed; vue-tsc --noEmit: 0 errors" }
+  - { type: accessibility-audit, pointer: "n/a (BlockLoadingState already used elsewhere in this app with LoadingSpinner text content; no new interactive element introduced; same data-testids/aria-pressed toggle pattern carried over verbatim)" }
+known-risks:
+  - "Playwright specs (admin-dashboard.spec.ts, admin-pages.spec.ts) could not be executed locally: this sandbox's Ubuntu version is unsupported by `npx playwright install` (chromium binary unavailable). Verified via vue-tsc type-check (0 errors) and full manual code review instead; CI must run the Tier-1 Playwright job per ci-gates.md before merge — this fix touches no Playwright-covered surface beyond what was already reviewed, but CI should still confirm no visual regression on tab-open."
+  - "10 tasks.yml items remain pending per gate warning (non-strict) — outside frontend-engineer scope; likely owned by qa-reviewer/visual-reviewer/ui-ux-reviewer per Required Agents."
+next-action: qa-reviewer

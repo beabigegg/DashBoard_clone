@@ -7,8 +7,9 @@
  *   GET /admin/api/production-achievement/permissions
  *   PUT /admin/api/production-achievement/permissions/{user_identifier}
  *
- * Lives inside the existing admin-pages app (.theme-admin-pages scope) — no
- * new theme class per implementation-plan.md IP-8 / css-contract.md.
+ * Lives inside the admin-dashboard app (.theme-admin-dashboard scope) as the
+ * `permissions` tab — moved from admin-pages per
+ * specs/changes/move-target-permissions-panel/implementation-plan.md.
  */
 import { ref } from 'vue';
 
@@ -41,7 +42,7 @@ function handleGrantNew(): void {
 </script>
 
 <template>
-  <div class="table-container" data-testid="pa-permissions-panel">
+  <div class="pa-perm-table-container" data-testid="pa-permissions-panel">
     <div class="pa-perm-add-row">
       <input
         v-model="newUserIdentifier"
@@ -61,7 +62,7 @@ function handleGrantNew(): void {
       </button>
     </div>
 
-    <table>
+    <table class="pa-perm-table">
       <thead>
         <tr>
           <th>使用者帳號</th>
@@ -72,15 +73,15 @@ function handleGrantNew(): void {
       </thead>
       <tbody>
         <tr v-if="props.permissions.length === 0">
-          <td colspan="4" class="empty-state" data-testid="pa-permissions-empty">尚無授權名單</td>
+          <td colspan="4" class="pa-perm-empty" data-testid="pa-permissions-empty">尚無授權名單</td>
         </tr>
         <tr v-for="row in props.permissions" :key="row.user_identifier">
-          <td class="route-cell">{{ row.user_identifier }}</td>
+          <td class="pa-perm-user-cell">{{ row.user_identifier }}</td>
           <td>
             <button
               type="button"
-              class="status-badge"
-              :class="row.can_edit_targets ? 'status-released' : 'status-dev'"
+              class="pa-perm-badge"
+              :class="row.can_edit_targets ? 'pa-perm-badge--granted' : 'pa-perm-badge--revoked'"
               :aria-pressed="row.can_edit_targets"
               data-testid="pa-permissions-toggle"
               @click="handleToggle(row)"

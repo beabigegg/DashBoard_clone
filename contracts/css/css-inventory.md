@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.9
+schema-version: 1.2.10
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-07-02
+last-changed: 2026-07-08
 ---
 
 # CSS Inventory (Governed Source List)
@@ -55,8 +55,8 @@ last-changed: 2026-07-02
 
 | File | Primary Theme Root | Route / Feature |
 |---|---|---|
-| `frontend/src/admin-dashboard/style.css` | `theme-admin-dashboard` | admin-dashboard |
-| `frontend/src/admin-pages/style.css` | `theme-admin-pages` | admin-pages |
+| `frontend/src/admin-dashboard/style.css` | `theme-admin-dashboard` | admin-dashboard | move-target-permissions-panel: gained `.pa-perm-*` rules for the relocated target-edit permission whitelist tab; panel-exclusive names used (not the pre-existing generic `.status-badge`/bare `table` rules already used by `RecentSessionsTable.vue`) to avoid a same-name collision |
+| `frontend/src/admin-pages/style.css` | `theme-admin-pages` | admin-pages | move-target-permissions-panel: lost the two `.pa-perm-add-row`/`.pa-perm-add-input` rules (panel relocated to admin-dashboard); shared `.table-container`/`.status-badge`/etc. rules kept — still used by `PagesManagementPanel` |
 | `frontend/src/anomaly-overview/style.css` | `theme-anomaly-overview` | anomaly-overview |
 | `frontend/src/eap-alarm/style.css` | `theme-eap-alarm` | eap-alarm |
 | `frontend/src/db-scheduling/style.css` | `theme-db-scheduling` | db-scheduling |
@@ -86,6 +86,10 @@ last-changed: 2026-07-02
 任何新增/刪除/重新命名/搬移 `frontend/src/**/*.css` 的 PR 必須在同一變更同步更新此清單。
 
 ## CHANGELOG
+
+## [css-inventory 1.2.10] — 2026-07-08
+### Changed
+- move-target-permissions-panel: `admin-dashboard/style.css` row note updated (gained `.pa-perm-*` rules for the relocated target-edit permission whitelist tab); `admin-pages/style.css` row note updated (lost the two panel-exclusive `.pa-perm-add-row`/`.pa-perm-add-input` rules; shared table/badge rules kept for `PagesManagementPanel`). No file added/removed from the Route-Local Feature Layers table.
 
 ## [css-inventory 1.2.9] — 2026-07-02
 ### Added

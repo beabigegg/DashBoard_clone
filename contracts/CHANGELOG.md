@@ -8,6 +8,18 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.38.1] — 2026-07-08
+### Changed
+- move-target-permissions-panel: No endpoint/schema/auth change. Consumer-only note: `GET/PUT /admin/api/production-achievement/permissions[/{user_identifier}]`'s frontend consumer moves from `admin-pages` (permission block, removed) to `admin-dashboard` (new tab); supersedes the consumer note in the `production-achievement-kanban (2026-07-02)` Compatibility Note, left as historical record.
+
+## [css-inventory 1.2.10] — 2026-07-08
+### Changed
+- move-target-permissions-panel: `admin-dashboard/style.css` row note updated (gained `.pa-perm-*` rules for the relocated target-edit permission whitelist tab); `admin-pages/style.css` row note updated (lost the two panel-exclusive `.pa-perm-add-row`/`.pa-perm-add-input` rules; shared table/badge rules kept for `PagesManagementPanel`). No file added/removed.
+
+## [css 1.13.0] — 2026-07-08
+### Changed
+- move-target-permissions-panel: Admin permission-management block relocated from `admin-pages` (`.theme-admin-pages`) to a new tab in the existing `admin-dashboard` app (`.theme-admin-dashboard`, already governed — no new theme class). Rendered classes renamed to panel-exclusive `.pa-perm-*` names rather than reusing generic `.table-container`/`.status-badge`/etc., because `.theme-admin-dashboard .status-badge` and a bare `table` already exist for `RecentSessionsTable.vue` (usage tab) with different definitions — a same-name copy would have silently regressed that tab. Supersedes the `[css 1.12.0]` note that the permission block "lives inside admin-pages".
+
 ## [ci 1.3.37] — 2026-07-08
 ### Added
 - durable-learning promotion (production-achievement-async-spool cdd-close): new cross-cutting rule — every new RQ worker must be wired into both `deploy/*.service` and `scripts/start_server.sh` in the same PR, and `rq worker` CLI must never carry `--job-execution-timeout` (invalid under pinned rq<2.0.0). Evidence: PV-1/PV-3.

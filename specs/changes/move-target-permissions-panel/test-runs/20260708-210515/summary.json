@@ -1,0 +1,15 @@
+{
+  "change_id": "move-target-permissions-panel",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cdd-kit validate --contracts 2>&1 | tail -80",
+  "duration_ms": 1288,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/move-target-permissions-panel/test-runs/20260708-210515/summary.json",
+    "stdout": "specs/changes/move-target-permissions-panel/test-runs/20260708-210515/stdout.log",
+    "stderr": "specs/changes/move-target-permissions-panel/test-runs/20260708-210515/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

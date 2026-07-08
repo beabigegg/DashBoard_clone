@@ -1,0 +1,14 @@
+change-id: move-target-permissions-panel
+timestamp: 2026-07-08T00:30:00Z
+agent: qa-reviewer
+status: approved-with-risk
+summary: >
+  All local gates green (type-check, css:check, build, unit, contract,
+  data-boundary). Tier-1 Playwright (admin-dashboard.spec.ts,
+  admin-pages.spec.ts) could not run locally (no browser in sandbox) — must
+  go green in CI before merge; this is the change's sole residual risk.
+  Full detail in qa-report.md.
+artifacts:
+  - { type: decision, pointer: "approved-with-risk" }
+  - { type: gate-results, pointer: "specs/changes/move-target-permissions-panel/qa-report.md#gate-results" }
+next-action: "CI Tier-1 Playwright run before merge"

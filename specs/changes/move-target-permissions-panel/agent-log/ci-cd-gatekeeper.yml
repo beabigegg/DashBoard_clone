@@ -1,0 +1,14 @@
+agent: ci-cd-gatekeeper
+change-id: move-target-permissions-panel
+summary: >
+  Filled ci-gates.md for a pure frontend relocation (Tier 3, medium risk).
+  No new workflow files or Makefile targets added; existing frontend
+  build/test/type-check/css:check gates and the already-named Tier-1
+  admin-dashboard.spec.ts/admin-pages.spec.ts Playwright targets cover this
+  change. Documented rollback as a plain git revert (no data/schema/deploy
+  surface touched).
+artifacts:
+  - { type: tiers-modified, pointer: "none (existing tier-0 and tier-1 gates reused as-is)" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: "n/a (no .github/workflows or Makefile edits required)" }
+  - { type: required-status-checks, pointer: "type-check, css-governance, unit, build, e2e-critical (admin-dashboard.spec.ts + admin-pages.spec.ts), contract (confirmation-only)" }

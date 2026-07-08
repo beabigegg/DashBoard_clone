@@ -1,0 +1,1 @@
+cd frontend && npx vitest run src/admin-dashboard/tabs/__tests__/PermissionsTab.test.ts src/admin-dashboard/components/__tests__/TargetPermissionsPanel.test.ts --reporter=verbose 2>&1 | tail -60

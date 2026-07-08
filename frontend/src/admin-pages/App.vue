@@ -12,7 +12,6 @@
 import { computed, onMounted, ref } from 'vue';
 import PageHeader from '../shared-ui/components/PageHeader.vue';
 import PagesManagementPanel from './components/PagesManagementPanel.vue';
-import TargetPermissionsPanel from './components/TargetPermissionsPanel.vue';
 import { apiGet } from '../core/api';
 import { routes as manifestRoutes, drawers as manifestDrawers } from '../portal-shell/navigationManifest.js';
 
@@ -27,21 +26,10 @@ interface PageDisplay {
   status: 'released' | 'dev';
 }
 
-interface ProductionAchievementPermissionRow {
-  user_identifier: string;
-  can_edit_targets: boolean;
-  granted_at: string;
-  granted_by: string;
-}
-
 const pages = ref<PageDisplay[]>([]);
 const loading = ref(false);
 const refreshing = ref(false);
 const errorMessage = ref('');
-
-// ── Production-achievement target-edit permission whitelist ────────────────
-const permissions = ref<ProductionAchievementPermissionRow[]>([]);
-const permissionsError = ref('');
 
 function getCsrfToken(): string {
   return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
@@ -109,44 +97,12 @@ async function handleUpdatePage(route: string, payload: { status: 'released' | '
   }
 }
 
-// ── Production-achievement target-edit permission whitelist ────────────────
-async function loadPermissions(): Promise<void> {
-  const res = await apiGet<ProductionAchievementPermissionRow[]>('/admin/api/production-achievement/permissions');
-  permissions.value = ('data' in res ? res.data : null) ?? [];
-}
-
-async function refreshPermissions(): Promise<void> {
-  permissionsError.value = '';
-  try {
-    await loadPermissions();
-  } catch (err: unknown) {
-    permissionsError.value = err instanceof Error ? err.message : '載入授權名單失敗';
-  }
-}
-
-async function handleTogglePermission(userIdentifier: string, nextValue: boolean): Promise<void> {
-  try {
-    await putJson(`/admin/api/production-achievement/permissions/${encodeURIComponent(userIdentifier)}`, {
-      can_edit_targets: nextValue,
-    });
-    await loadPermissions();
-  } catch (err: unknown) {
-    window.alert(`更新授權失敗: ${err instanceof Error ? err.message : ''}`);
-    await loadPermissions();
-  }
-}
-
-async function handleGrantNewPermission(userIdentifier: string): Promise<void> {
-  await handleTogglePermission(userIdentifier, true);
-}
-
 const isInitialLoading = computed(() => loading.value);
 
 onMounted(async () => {
   loading.value = true;
   try {
     await refreshAll();
-    await refreshPermissions();
   } finally {
     loading.value = false;
   }
@@ -177,25 +133,6 @@ onMounted(async () => {
         v-else
         :pages="pages"
         @update="handleUpdatePage"
-      />
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <div>
-          <div class="panel-title">生產達成率 — 目標值編輯權限</div>
-          <div class="panel-subtitle">管理可編輯「生產達成率」目標值的使用者白名單（can_edit_targets）</div>
-        </div>
-      </div>
-      <div v-if="permissionsError" class="panel error-panel" role="alert">
-        {{ permissionsError }}
-      </div>
-      <div v-if="isInitialLoading" class="empty-state">載入中...</div>
-      <TargetPermissionsPanel
-        v-else
-        :permissions="permissions"
-        @toggle="handleTogglePermission"
-        @grant-new="handleGrantNewPermission"
       />
     </div>
   </div>

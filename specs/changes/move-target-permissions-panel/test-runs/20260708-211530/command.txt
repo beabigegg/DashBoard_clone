@@ -1,0 +1,1 @@
+cd frontend && npx vitest run src/admin-dashboard src/admin-pages --reporter=verbose 2>&1 | tail -60 && node --experimental-strip-types --experimental-loader ./scripts/ts-resolver-loader.mjs --test tests/legacy/admin-dashboard.test.js tests/legacy/admin-dashboard-permissions-css-scope.test.js tests/legacy/portal-shell-wave-a-smoke.test.js 2>&1 | tail -40

@@ -2,11 +2,14 @@
  * E2E + resilience tests: admin-dashboard page (管理儀表板)
  *
  * Scenarios covered:
- *   happy path  — all 6 tabs visible, overview panel active by default
- *   tab switch  — performance, cache, worker tabs render their panels
+ *   happy path  — all 7 tabs visible, overview panel active by default
+ *   tab switch  — performance, cache, worker, permissions tabs render their panels
  *   controls    — auto-refresh toggle present and toggleable
  *   data        — overview panel renders data from mocked /health + admin/api endpoints
  *   resilience  — 500 from overview API → error-banner visible in the active tab
+ *   permissions — target-value edit permission whitelist tab loads data, toggles
+ *                 round-trip via PUT, and its .pa-perm-* classes are actually styled
+ *                 (getComputedStyle, not just DOM presence — move-target-permissions-panel)
  *
  * Network strategy:
  *   Admin dashboard requires is_admin: true in /api/auth/me.
@@ -92,6 +95,15 @@ const MOCK_USAGE_KPI = {
 const MOCK_LOGS = {
   success: true,
   data: { logs: [], total: 0 },
+  meta: { timestamp: new Date().toISOString(), app_version: 'test' },
+};
+
+const MOCK_PERMISSIONS = {
+  success: true,
+  data: [
+    { user_identifier: 'alice', can_edit_targets: true, granted_at: '2026-01-01 00:00:00', granted_by: 'admin' },
+    { user_identifier: 'bob', can_edit_targets: false, granted_at: '2026-01-02 00:00:00', granted_by: 'admin' },
+  ],
   meta: { timestamp: new Date().toISOString(), app_version: 'test' },
 };
 
@@ -201,6 +213,21 @@ async function installBaseRoutes(page: Page): Promise<void> {
       body: JSON.stringify(MOCK_LOGS),
     }),
   );
+
+  await page.route('**/admin/api/production-achievement/permissions**', (route) => {
+    if (route.request().method() === 'PUT') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { user_identifier: 'alice', can_edit_targets: false } }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_PERMISSIONS),
+    });
+  });
 }
 
 /**
@@ -229,8 +256,8 @@ test('test_page_loads_with_tabs', async ({ page }) => {
     return;
   }
 
-  // All 6 tab buttons must be present and visible
-  for (const tabKey of ['overview', 'performance', 'cache', 'worker', 'usage', 'logs']) {
+  // All 7 tab buttons must be present and visible
+  for (const tabKey of ['overview', 'performance', 'cache', 'worker', 'usage', 'logs', 'permissions']) {
     await expect(page.locator(`[data-testid="tab-${tabKey}"]`)).toBeVisible();
   }
 });
@@ -379,4 +406,93 @@ test('test_api_error_shows_banner', async ({ page }) => {
   // The error-banner data-testid is on the ErrorBanner component inside the active tab panel.
   await page.waitForSelector('[data-testid="error-banner"]', { timeout: 20_000 });
   await expect(page.locator('[data-testid="error-banner"]').first()).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Permissions tab (move-target-permissions-panel)
+// ---------------------------------------------------------------------------
+
+test('test_tab_switch_permissions', async ({ page }) => {
+  await installBaseRoutes(page);
+  const rendered = await gotoAdminDashboard(page);
+  if (!rendered) {
+    test.skip();
+    return;
+  }
+
+  await page.locator('[data-testid="tab-permissions"]').click();
+
+  await expect(page.locator('[data-testid="tab-overview"]')).not.toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="tab-permissions"]')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="panel-permissions"]')).toBeVisible();
+});
+
+test('test_permissions_data_loads', async ({ page }) => {
+  await installBaseRoutes(page);
+  const rendered = await gotoAdminDashboard(page);
+  if (!rendered) {
+    test.skip();
+    return;
+  }
+
+  await page.locator('[data-testid="tab-permissions"]').click();
+  await page.waitForSelector('[data-testid="pa-permissions-panel"]', { timeout: 20_000 });
+
+  // Two rows from MOCK_PERMISSIONS must render as toggle buttons.
+  await expect(page.locator('[data-testid="pa-permissions-toggle"]')).toHaveCount(2);
+
+  const panelText = await page.locator('[data-testid="pa-permissions-panel"]').textContent();
+  expect(panelText).toContain('alice');
+  expect(panelText).toContain('bob');
+});
+
+test('test_permissions_toggle_round_trip', async ({ page }) => {
+  await installBaseRoutes(page);
+  const rendered = await gotoAdminDashboard(page);
+  if (!rendered) {
+    test.skip();
+    return;
+  }
+
+  await page.locator('[data-testid="tab-permissions"]').click();
+  await page.waitForSelector('[data-testid="pa-permissions-panel"]', { timeout: 20_000 });
+
+  const putRequest = page.waitForRequest(
+    (req) => req.url().includes('/admin/api/production-achievement/permissions/alice') && req.method() === 'PUT',
+  );
+
+  await page.locator('[data-testid="pa-permissions-toggle"]').first().click();
+
+  const req = await putRequest;
+  const body = req.postDataJSON();
+  expect(body).toEqual({ can_edit_targets: false });
+});
+
+test('test_permissions_tab_styled', async ({ page }) => {
+  await installBaseRoutes(page);
+  const rendered = await gotoAdminDashboard(page);
+  if (!rendered) {
+    test.skip();
+    return;
+  }
+
+  await page.locator('[data-testid="tab-permissions"]').click();
+  await page.waitForSelector('[data-testid="pa-permissions-panel"]', { timeout: 20_000 });
+
+  // Computed-style assertions — prove the .pa-perm-* rules actually apply
+  // (not just that the elements exist in the DOM).
+  const tableContainer = page.locator('.pa-perm-table-container');
+  await expect(tableContainer).toBeVisible();
+  const overflowX = await tableContainer.evaluate((el) => getComputedStyle(el).overflowX);
+  expect(overflowX).toBe('auto');
+
+  const badge = page.locator('.pa-perm-badge').first();
+  await expect(badge).toBeVisible();
+  const badgeStyle = await badge.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { display: cs.display, borderRadius: cs.borderRadius };
+  });
+  expect(badgeStyle.display).toBe('inline-flex');
+  // borderRadius.pill resolves to a fully-rounded (large px) value, never "0px".
+  expect(badgeStyle.borderRadius).not.toBe('0px');
 });

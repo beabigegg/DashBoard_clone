@@ -1,0 +1,24 @@
+change-id: move-target-permissions-panel
+timestamp: 2026-07-08T00:00:00Z
+agent: contract-reviewer
+status: changes-required
+summary: >
+  API contract endpoints unchanged (no edit needed). CSS/inventory contracts need
+  prose updates (consumer note, re-scope CHANGELOG, inventory notes) once
+  implementation-planner decides remove-vs-coexist. Critical finding: the panel
+  has no scoped <style> of its own — its classes live in admin-pages/style.css
+  shared with the sibling "所有頁面" panel — so relocation requires new
+  .theme-admin-dashboard-scoped copies of .table-container/.status-badge/etc.,
+  not a plain cut-paste; admin-pages/style.css must keep the shared classes for
+  the panel that stays behind.
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/api/api-contract.md:260-261,483" }
+  - { type: contracts-reviewed, pointer: "contracts/css/css-contract.md:152-154" }
+  - { type: contracts-reviewed, pointer: "contracts/css/css-inventory.md:56-92" }
+  - { type: finding, pointer: "frontend/src/admin-pages/style.css:128-222 shared classes with sibling panel" }
+next-action: implementation-planner
+notes: >
+  Full findings in the change transcript; version bumps pending: api-contract
+  1.38.0->1.38.x (consumer note), css-contract 1.12.0->1.13.0 (re-scope note),
+  css-inventory 1.2.9->1.2.10 (notes update). Main Claude applies these edits
+  after implementation-planner's remove-vs-coexist decision.

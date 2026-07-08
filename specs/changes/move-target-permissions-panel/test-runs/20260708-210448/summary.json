@@ -1,0 +1,15 @@
+{
+  "change_id": "move-target-permissions-panel",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npm run test -- --run 2>&1 | tail -20",
+  "duration_ms": 5244,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/move-target-permissions-panel/test-runs/20260708-210448/summary.json",
+    "stdout": "specs/changes/move-target-permissions-panel/test-runs/20260708-210448/stdout.log",
+    "stderr": "specs/changes/move-target-permissions-panel/test-runs/20260708-210448/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

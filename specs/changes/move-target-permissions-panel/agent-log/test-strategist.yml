@@ -1,0 +1,13 @@
+agent: test-strategist
+change-id: move-target-permissions-panel
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/move-target-permissions-panel/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/src/admin-dashboard/tabs/__tests__/PermissionsTab.test.ts → frontend/src/admin-dashboard/tabs/PermissionsTab.vue (name illustrative, tab wrapper TBD by frontend-engineer)" }
+  - { type: tdd-pairs, pointer: "frontend/tests/legacy/admin-dashboard-permissions-css-scope.test.js → frontend/src/admin-dashboard/style.css" }
+  - { type: coverage-tiers, pointer: "unit (tier 0), contract confirmation-only (tier 0), e2e (tier 1), data-boundary css-scope-static (tier 0), visual computed-style (tier 1)" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-7 all mapped; AC-4 additionally covered by a new static css-scope test to catch the missed-class-copy silent-failure mode the contract-reviewer flagged (DOM present, unstyled)" }
+notes: |
+  AC-7 is written for the removal-of-old-panel path (classifier's stated default).
+  If implementation-planner instead keeps both, the admin-pages.spec.ts row in
+  test-plan.md changes from an absence assertion to a presence-parity check —
+  flagged inline in test-plan.md Notes so it isn't missed.

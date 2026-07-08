@@ -1,0 +1,39 @@
+change-id: move-target-permissions-panel
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+  - contract
+  - quality
+runs:
+  - phase: collect
+    status: passed
+    command: cd frontend && npm run test -- --run 2>&1 | tail -20
+    summary: specs/changes/move-target-permissions-panel/test-runs/20260708-210448/summary.json
+  - phase: targeted
+    status: passed
+    command: >-
+      cd frontend && npx vitest run src/admin-dashboard/tabs/__tests__/PermissionsTab.test.ts
+      src/admin-dashboard/components/__tests__/TargetPermissionsPanel.test.ts --reporter=verbose 2>&1 | tail -60
+    summary: specs/changes/move-target-permissions-panel/test-runs/20260708-211524/summary.json
+  - phase: changed-area
+    status: passed
+    command: >-
+      cd frontend && npx vitest run src/admin-dashboard src/admin-pages --reporter=verbose 2>&1 | tail -60 && node
+      --experimental-strip-types --experimental-loader ./scripts/ts-resolver-loader.mjs --test
+      tests/legacy/admin-dashboard.test.js tests/legacy/admin-dashboard-permissions-css-scope.test.js
+      tests/legacy/portal-shell-wave-a-smoke.test.js 2>&1 | tail -40
+    summary: specs/changes/move-target-permissions-panel/test-runs/20260708-211530/summary.json
+  - phase: contract
+    status: passed
+    command: cdd-kit validate --contracts 2>&1 | tail -80
+    summary: specs/changes/move-target-permissions-panel/test-runs/20260708-210515/summary.json
+  - phase: quality
+    status: passed
+    command: >-
+      cd frontend && npm run type-check 2>&1 | tail -20 && npm run css:check 2>&1 | tail -10 && npm run build 2>&1 |
+      tail -10
+    summary: specs/changes/move-target-permissions-panel/test-runs/20260708-211536/summary.json
+final-status: passed

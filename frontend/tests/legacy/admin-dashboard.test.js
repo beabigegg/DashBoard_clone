@@ -17,10 +17,11 @@ const ADMIN_DASHBOARD_TABS = [
   { key: 'worker',       label: 'Worker' },
   { key: 'usage',        label: '用戶' },
   { key: 'logs',         label: '日誌' },
+  { key: 'permissions',  label: '目標值權限' },
 ];
 
-test('admin dashboard has six tabs', () => {
-  assert.equal(ADMIN_DASHBOARD_TABS.length, 6);
+test('admin dashboard has seven tabs', () => {
+  assert.equal(ADMIN_DASHBOARD_TABS.length, 7);
 });
 
 test('each tab has a unique key', () => {
@@ -39,8 +40,14 @@ test('overview tab is first', () => {
   assert.equal(ADMIN_DASHBOARD_TABS[0].key, 'overview');
 });
 
+test('permissions tab is appended after logs (last)', () => {
+  assert.equal(ADMIN_DASHBOARD_TABS.at(-1).key, 'permissions');
+  const keys = ADMIN_DASHBOARD_TABS.map(t => t.key);
+  assert.ok(keys.indexOf('logs') < keys.indexOf('permissions'));
+});
+
 test('all expected tab keys are present', () => {
-  const expectedKeys = ['overview', 'performance', 'cache', 'worker', 'usage', 'logs'];
+  const expectedKeys = ['overview', 'performance', 'cache', 'worker', 'usage', 'logs', 'permissions'];
   const actualKeys = ADMIN_DASHBOARD_TABS.map(t => t.key);
   for (const key of expectedKeys) {
     assert.ok(actualKeys.includes(key), `Missing tab key: ${key}`);

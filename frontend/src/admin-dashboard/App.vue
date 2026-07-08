@@ -43,6 +43,11 @@ const tabs = [
     label: '日誌',
     component: defineAsyncComponent(() => import('./tabs/LogsTab.vue')),
   },
+  {
+    key: 'permissions',
+    label: '目標值權限',
+    component: defineAsyncComponent(() => import('./tabs/PermissionsTab.vue')),
+  },
 ];
 
 const activeTabKey = ref(tabs[0].key);

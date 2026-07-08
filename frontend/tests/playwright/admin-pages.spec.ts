@@ -119,6 +119,17 @@ test('test_drawer_management_panel_absent (AC-2/AC-3)', async ({ page }) => {
   expect(await page.locator('[data-testid="create-drawer-name"]').count()).toBe(0);
 });
 
+test('test_target_permissions_panel_absent (AC-7, move-target-permissions-panel)', async ({ page }) => {
+  await setupMocks(page);
+  await gotoAdminPagesPage(page);
+  // The "生產達成率 — 目標值編輯權限" panel relocated to admin-dashboard's
+  // `permissions` tab and must no longer render on /admin/pages.
+  const panelTitles = await page.locator('.panel-title').allTextContents();
+  expect(panelTitles.some((t) => t.includes('生產達成率') || t.includes('目標值編輯權限'))).toBe(false);
+  expect(await page.locator('[data-testid="pa-permissions-panel"]').count()).toBe(0);
+  expect(await page.locator('[data-testid="pa-permissions-toggle"]').count()).toBe(0);
+});
+
 test('test_no_get_admin_drawers_request (AC-3)', async ({ page }) => {
   await setupMocks(page);
   const drawerRequests: string[] = [];

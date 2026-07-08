@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.38.0
+schema-version: 1.38.1
 last-changed: 2026-07-08
 breaking-change-policy: deprecate-2-minors
 ---
@@ -463,6 +463,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## Compatibility Notes
 
+- **move-target-permissions-panel (2026-07-08):** UI-only relocation, no endpoint/schema/auth change. `GET /admin/api/production-achievement/permissions` and `PUT /admin/api/production-achievement/permissions/{user_identifier}` are unchanged (still `admin_required`, same request/response shapes). The consumer of these two endpoints moves from `frontend/src/admin-pages/` (permission block, removed) to `frontend/src/admin-dashboard/` (new tab) — this supersedes the consumer note in the `production-achievement-kanban (2026-07-02)` entry below, which is left as historical record and not edited in place.
 - **production-achievement-async-spool (2026-07-08):** `GET /api/production-achievement/report` changes from a synchronous Oracle-backed aggregate-row response to the async RQ → DuckDB parquet spool pattern (mirrors `resource-history-rq-async`; ADR-0016). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (feature is pre-launch, sole consumer `frontend/src/production-achievement/` ships in the same atomic PR; same precedent as `equipment-rejects-by-lots`/`nav-config-to-code`):
   - Request params unchanged: `start_date`, `end_date` (both required, 730-day cap SYS-04), `shift_code` (opt), `workcenter_group` (opt). **Behavior change**: `shift_code`/`workcenter_group` no longer affect the server-side response or the canonical spool key — the canonical spool key is `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` only (date-range only, ADR-0016). The unfiltered SPECNAME-grain dataset for the full date range is always spooled; `shift_code`/`workcenter_group` filtering (PA-06/PA-07) is now applied client-side in DuckDB-WASM, not server-side.
   - **Spool-hit (HTTP 200)**: `data = {query_id, spool_download_url, spec_workcenter_map, targets_map}` (data-shape-contract.md §3.28). `spool_download_url = /api/spool/production_achievement/<query_id>.parquet` — namespace added to `spool_routes._ALLOWED_NAMESPACES` (AC-3). Injection is unconditional (Q1 resolved: local-compute activation threshold overridden to 0 for this page — no `total_row_count` gate, unlike `resource_history`'s `>= threshold` gate).
@@ -492,6 +493,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.38.1] — 2026-07-08 (move-target-permissions-panel):** No endpoint/schema/auth change. Consumer-only note: the two admin permission endpoints' frontend consumer moves from `admin-pages` to `admin-dashboard` (see Compatibility Notes above).
 - **[api 1.38.0] — 2026-07-08 (production-achievement-async-spool):** `GET /api/production-achievement/report` migrated from a synchronous Oracle-aggregated-row response to the async RQ → DuckDB parquet spool pattern (ADR-0016). Spool-hit → HTTP 200 `{query_id, spool_download_url, spec_workcenter_map, targets_map}` (`ProductionAchievementReportResponse` redefined in place); spool-miss + worker available → HTTP 202 (new `ProductionAchievementJobAccepted`, reuses generic `/api/job/<id>?prefix=production-achievement`); spool-miss + worker unavailable → HTTP 503. `shift_code`/`workcenter_group` no longer affect the server response or spool key. `production_achievement` added to the spool-namespace enum. No deprecation window (pre-launch, atomic-PR consumer). Other 5 endpoints in this family unchanged.
 - **[api 1.36.0] — 2026-07-02 (production-achievement-kanban):** New endpoint family `/api/production-achievement/*` (4 endpoints: report, filter-options, targets GET/PUT) + `/admin/api/production-achievement/permissions*` (2 endpoints). New schemas: `ProductionAchievementReportResponse`, `ProductionAchievementTargetsResponse`, `ProductionAchievementPermissionsResponse`. `PUT /api/production-achievement/targets` is permission-gated by a new independent `can_edit_targets` check (not `admin_required`); 403 on unauthorized write. All additive; no existing endpoints changed.
 - **[api 1.35.0] — 2026-07-01 (yield-alert-filter-expansion):** `POST /api/yield-alert/query` `process_type` enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. `GET /api/yield-alert/view` + `GET /api/yield-alert/cross-filter-options` `workcenter_groups` value source changes from global `filter_cache`/`DW_MES_SPEC_WORKCENTER_V` to per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME` (breaking shape semantics; JSON key unchanged). `GET /api/yield-alert/filter-options` unchanged.
