@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 194
-visible-files: 1036
-omitted-dirs: 66
+visible-dirs: 197
+visible-files: 1038
+omitted-dirs: 67
 truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -33,6 +33,8 @@ Use this deterministic map to choose candidate context paths before reading file
 ```
 DashBoard_clone/
 |-- .cdd/
+|   |-- code-graph.index.json
+|   |-- code-map.index.json
 |   |-- code-map.yml
 |   |-- conformance.json
 |   |-- context-policy.json
@@ -154,6 +156,7 @@ DashBoard_clone/
 |   |-- mes-dashboard-hold-history-worker.service
 |   |-- mes-dashboard-material-consumption-worker.service
 |   |-- mes-dashboard-msd-worker.service
+|   |-- mes-dashboard-production-achievement-worker.service
 |   |-- mes-dashboard-production-history-worker.service
 |   |-- mes-dashboard-reject-worker.service
 |   |-- mes-dashboard-trace-worker.service
@@ -176,7 +179,8 @@ DashBoard_clone/
 |   |   |-- 0012-navigation-source-of-truth-code-manifest.md
 |   |   |-- 0013-db-scheduling-reuse-wip-cache-no-dedicated-query.md
 |   |   |-- 0014-msd-forward-lineage-seed-anchor.md
-|   |   \-- 0015-eap-alarm-dual-shape-event-inclusion.md
+|   |   |-- 0015-eap-alarm-dual-shape-event-inclusion.md
+|   |   \-- 0016-production-achievement-async-spool-seam-reduction.md
 |   |-- architecture/
 |   |   |-- base-job-semaphore-wiring-stress-soak-report.md
 |   |   |-- cache-spool-patterns.md
@@ -512,18 +516,6 @@ DashBoard_clone/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
-|   |-- test-results/
-|   |   |-- mid-section-defect-test-ty-741ab-ion-narrows-package-options-chromium/
-|   |   |   |-- error-context.md
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   |-- mid-section-defect-test-ty-741ab-ion-narrows-package-options-chromium-retry1/
-|   |   |   |-- error-context.md
-|   |   |   |-- test-failed-1.png
-|   |   |   |-- trace.zip
-|   |   |   \-- video.webm
-|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -608,6 +600,8 @@ DashBoard_clone/
 |   |   |   |-- material-trace.spec.ts
 |   |   |   |-- mid-section-defect.spec.ts
 |   |   |   |-- portal-shell-login.spec.ts
+|   |   |   |-- production-achievement-async.spec.ts
+|   |   |   |-- production-achievement-monkey.spec.ts
 |   |   |   |-- production-achievement.spec.js
 |   |   |   |-- production-history-cross-filter.spec.ts
 |   |   |   |-- production-history-filter-options-error.spec.ts
@@ -671,67 +665,66 @@ DashBoard_clone/
 |   |   |-- access_20260708_074557.log
 |   |   |-- access_20260708_075940.log
 |   |   |-- access_20260708_082120.log
+|   |   |-- access_20260708_150458.log
+|   |   |-- access_20260708_154029.log
+|   |   |-- access_20260708_155601.log
 |   |   |-- error_20260708_072105.log
 |   |   |-- error_20260708_073540.log
 |   |   |-- error_20260708_074557.log
 |   |   |-- error_20260708_075940.log
 |   |   |-- error_20260708_082120.log
+|   |   |-- error_20260708_150458.log
+|   |   |-- error_20260708_154029.log
+|   |   |-- error_20260708_155601.log
 |   |   |-- rq_downtime_worker_20260708_072105.log
 |   |   |-- rq_downtime_worker_20260708_073540.log
 |   |   |-- rq_downtime_worker_20260708_074557.log
 |   |   |-- rq_downtime_worker_20260708_075940.log
 |   |   |-- rq_downtime_worker_20260708_082120.log
+|   |   |-- rq_downtime_worker_20260708_150458.log
+|   |   |-- rq_downtime_worker_20260708_154029.log
+|   |   |-- rq_downtime_worker_20260708_155601.log
 |   |   |-- rq_eap_alarm_worker_20260708_072105.log
 |   |   |-- rq_eap_alarm_worker_20260708_073540.log
 |   |   |-- rq_eap_alarm_worker_20260708_074557.log
 |   |   |-- rq_eap_alarm_worker_20260708_075940.log
 |   |   |-- rq_eap_alarm_worker_20260708_082120.log
+|   |   |-- rq_eap_alarm_worker_20260708_150458.log
+|   |   |-- rq_eap_alarm_worker_20260708_154029.log
+|   |   |-- rq_eap_alarm_worker_20260708_155601.log
 |   |   |-- rq_hold_hist_worker_20260708_072105.log
 |   |   |-- rq_hold_hist_worker_20260708_073540.log
 |   |   |-- rq_hold_hist_worker_20260708_074557.log
 |   |   |-- rq_hold_hist_worker_20260708_075940.log
 |   |   |-- rq_hold_hist_worker_20260708_082120.log
+|   |   |-- rq_hold_hist_worker_20260708_150458.log
+|   |   |-- rq_hold_hist_worker_20260708_154029.log
+|   |   |-- rq_hold_hist_worker_20260708_155601.log
 |   |   |-- rq_msd_worker_20260708_072105.log
 |   |   |-- rq_msd_worker_20260708_073540.log
 |   |   |-- rq_msd_worker_20260708_074557.log
 |   |   |-- rq_msd_worker_20260708_075940.log
 |   |   |-- rq_msd_worker_20260708_082120.log
+|   |   |-- rq_msd_worker_20260708_150458.log
+|   |   |-- rq_msd_worker_20260708_154029.log
+|   |   |-- rq_msd_worker_20260708_155601.log
 |   |   |-- rq_prod_hist_worker_20260708_072105.log
 |   |   |-- rq_prod_hist_worker_20260708_073540.log
-|   |   |-- rq_prod_hist_worker_20260708_074557.log
-|   |   |-- rq_prod_hist_worker_20260708_075940.log
-|   |   |-- rq_prod_hist_worker_20260708_082120.log
-|   |   |-- rq_reject_worker_20260708_072105.log
-|   |   |-- rq_reject_worker_20260708_073540.log
-|   |   |-- rq_reject_worker_20260708_074557.log
-|   |   |-- rq_reject_worker_20260708_075940.log
-|   |   |-- rq_reject_worker_20260708_082120.log
-|   |   |-- rq_resource_worker_20260708_072105.log
-|   |   |-- rq_resource_worker_20260708_073540.log
-|   |   |-- rq_resource_worker_20260708_074557.log
-|   |   |-- rq_resource_worker_20260708_075940.log
-|   |   |-- rq_resource_worker_20260708_082120.log
-|   |   |-- rq_warmup_worker_20260708_072105.log
-|   |   |-- rq_warmup_worker_20260708_073540.log
-|   |   |-- rq_warmup_worker_20260708_074557.log
-|   |   |-- rq_warmup_worker_20260708_075940.log
-|   |   |-- rq_warmup_worker_20260708_082120.log
-|   |   \-- ... (15 more entries truncated; cap=50)
+|   |   \-- ... (54 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
 |   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
-|   |-- metrics_history.sqlite-shm
-|   |-- metrics_history.sqlite-wal
 |   |-- rq_downtime_worker.log
 |   |-- rq_eap_alarm_worker.log
 |   |-- rq_hold_hist_worker.log
 |   |-- rq_msd_worker.log
+|   |-- rq_prod_ach_verify.log
+|   |-- rq_prod_ach_verify2.log
+|   |-- rq_prod_ach_worker.log
 |   |-- rq_prod_hist_worker.log
 |   |-- rq_query_tool_worker.log
 |   |-- rq_reject_worker.log
@@ -977,6 +970,7 @@ DashBoard_clone/
 |       |   |-- __init__.py
 |       |   |-- downtime_worker.py
 |       |   |-- eap_alarm_worker.py
+|       |   |-- production_achievement_worker.py
 |       |   |-- production_history_worker.py
 |       |   |-- reject_history_worker.py
 |       |   |-- resource_history_base_worker.py
@@ -1049,6 +1043,7 @@ DashBoard_clone/
 |   |   |-- test_env_downtime_unified_flag.py
 |   |   |-- test_env_duckdb_job_dir.py
 |   |   |-- test_env_material_trace_flag.py
+|   |   |-- test_env_production_achievement_unified_flag.py
 |   |   |-- test_gate_wiring.py
 |   |   |-- test_manifest_completeness.py
 |   |   |-- test_openapi_schema_resolution.py
@@ -1112,6 +1107,8 @@ DashBoard_clone/
 |   |   |-- test_preload_fork_safety.py
 |   |   |-- test_production_achievement_filter_cache_reuse.py
 |   |   |-- test_production_achievement_mysql_roundtrip.py
+|   |   |-- test_production_achievement_resilience.py
+|   |   |-- test_production_achievement_rq_async.py
 |   |   |-- test_production_history_rq_async.py
 |   |   |-- test_query_tool_rq_async.py
 |   |   |-- test_race_conditions.py
@@ -1170,6 +1167,7 @@ DashBoard_clone/
 |   |   |-- test_material_consumption_stress.py
 |   |   |-- test_material_trace_stress.py
 |   |   |-- test_mid_section_defect_stress.py
+|   |   |-- test_production_achievement_stress.py
 |   |   |-- test_production_history_stress.py
 |   |   |-- test_query_tool_stress.py
 |   |   |-- test_reject_history_stress.py
@@ -1236,10 +1234,13 @@ DashBoard_clone/
 |   |-- test_common_filters.py
 |   |-- test_container_filter_cache.py
 |   |-- test_container_resolution_policy.py
-|   \-- ... (196 more entries truncated; cap=50)
+|   \-- ... (198 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
+|   |   |-- production_achievement/
+|   |   |   \-- production-achievement-36dd782bc31c/
+|   |   |       \-- ... (max depth)
 |   |   |-- production_history/
 |   |   |-- reject_dataset/
 |   |   \-- test_ns/
@@ -1252,8 +1253,17 @@ DashBoard_clone/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
+|   |   |-- downtime_analysis_base_events/
+|   |   |   \-- ce1debbbb5da2e5b.parquet
+|   |   |-- downtime_analysis_job_bridge/
+|   |   |   \-- ce1debbbb5da2e5b.parquet
 |   |   |-- eap_alarm/
 |   |   |   \-- eap_alarm_2026-06-30_2026-07-06_f927a85a_v5.parquet
+|   |   |-- hold_dataset/
+|   |   |   \-- 94a1e6b15e41bad9.parquet
+|   |   |-- production_achievement/
+|   |   |   |-- 59bd78c4225bec4a.parquet
+|   |   |   \-- bd9112fc7e31bbf6.parquet
 |   |   |-- reject_dataset/
 |   |   |   \-- 3bd7a65c547f115f.parquet
 |   |   |-- resource_dataset/
@@ -1264,6 +1274,8 @@ DashBoard_clone/
 |   |   |   \-- d9245009c9c8cb73.parquet
 |   |   |-- yield_alert_dataset/
 |   |   |   \-- acffa1d722aeda74.parquet
+|   |   |-- probe_1006070.json
+|   |   |-- probe_1024367.json
 |   |   |-- probe_103606.json
 |   |   |-- probe_104090.json
 |   |   |-- probe_104859.json
@@ -1299,13 +1311,7 @@ DashBoard_clone/
 |   |   |-- probe_181912.json
 |   |   |-- probe_181994.json
 |   |   |-- probe_191779.json
-|   |   |-- probe_191826.json
-|   |   |-- probe_199074.json
-|   |   |-- probe_199732.json
-|   |   |-- probe_205549.json
-|   |   |-- probe_205775.json
-|   |   |-- probe_205989.json
-|   |   \-- ... (55 more entries truncated; cap=50)
+|   |   \-- ... (85 more entries truncated; cap=50)
 |   |-- container_filter_cache.loading
 |   |-- downtime_analysis.duckdb
 |   |-- mes_dashboard_restart_state.json

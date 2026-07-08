@@ -63,6 +63,10 @@ Pattern: `frontend/tests/playwright/downtime-analysis.spec.js` (reference — ne
 
 Evidence: `resource-history-rq-async` — CI run failed (all 3 tests ECONNREFUSED at `_auth.js:55`); fixed by removing `loginViaApi` and replacing with direct `page.goto`.
 
+**New specs must front-load a FAST no-server pre-check before any `waitForFunction`.** Read `body` text with a short timeout (~5s) and bail immediately if it's near-empty (`< 50` chars) — never let every test burn the full `waitForFunction` timeout waiting for a theme root that will never mount. N tests × timeout × retries turns a no-dev-server CI run into a multi-minute stall. Pattern: `frontend/tests/playwright/resource-history-async.spec.ts` (`< 50`-char body check before the `networkidle` goto returns).
+
+Evidence: `production-achievement-async-spool` — `production-achievement-async.spec.ts`'s `gotoAndWaitForApp` initially skipped this pre-check (went straight to a 20s `waitForFunction` per test) → ~25 min CI slow-fail; mirroring the fast check (commit `a83e7331`) dropped it to 5.8s.
+
 ## Playwright `pageRendered` Guard — Use App-Specific Content, Not `bodyText.length`
 
 **Chrome's ECONNREFUSED error page body can exceed 100 chars.** A guard like `pageRendered = bodyText.length > 100` will incorrectly report the Vue app as mounted on the browser error page, causing assertions to run against error-page DOM and fail unexpectedly. Use app-specific content detection instead: `bodyText.includes('<feature-keyword>') || (await page.locator('.theme-<name>, #<app-id>').count()) > 0`.

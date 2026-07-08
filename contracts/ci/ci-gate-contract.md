@@ -3,7 +3,7 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.36
+schema-version: 1.3.37
 last-changed: 2026-07-08
 breaking-change-policy: deprecate-2-minors
 ---
@@ -534,6 +534,16 @@ Verify the following before serving traffic:
 ## Contract Change Policy
 
 新增、移除或修改 CI gate 時，必須同步更新此契約（同一 PR），並在 PR 描述說明影響的 tier 和原因。
+
+## New RQ Worker Deploy Checklist (Cross-Cutting Rule)
+
+Every new `execute_*_job` worker MUST be wired into BOTH `deploy/*.service` (systemd)
+AND the dev launcher `scripts/start_server.sh` (config/PID/log vars + start/stop/status
+functions + orchestration call sites) in the same PR — a systemd-only unit leaves the
+queue enqueued but never consumed in dev (no RQ log, silent). Never pass
+`--job-execution-timeout` to `rq worker` on any unit or launcher line — invalid under
+the pinned `rq>=1.16.0,<2.0.0`; per-job timeout is enforced at enqueue via
+`job_timeout=JobTypeConfig.timeout_seconds`. Evidence: production-achievement-async-spool PV-1/PV-3.
 
 ## response-shape-adr0007 Gate Compatibility Note
 

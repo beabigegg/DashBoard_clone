@@ -140,6 +140,20 @@ Every domain migrated onto `BaseChunkedDuckDBJob` must reproduce two test tiers:
 
 Evidence: `eap-alarm-unified-job-poc` design.md §D6; `tests/test_eap_alarm_unified_job.py` (5 test classes); change-classifier findings "AC-1/AC-8 establish the parity-testing template for all P2+ migrations".
 
+## Async Route↔Worker Signature Contract — Bind-Test Required
+
+**A route unit test that mocks `enqueue_query_job`/`enqueue_job_dynamic` must ALSO assert the enqueued kwargs bind to the worker entry function's signature** — mocking the enqueue call only proves the route calls it, never that the shape is consumable by the worker. `enqueue_job_dynamic` builds `kwargs={"job_id": ..., **params}`; if the worker signature is `(job_id, params)`, the route must nest `params={"params": {...}}` — a flat `params={start_date, end_date}` spreads into unexpected top-level kwargs, raising `TypeError` only at worker runtime.
+
+```python
+route_params = mock_enqueue.call_args.kwargs["params"]
+rq_kwargs = {"job_id": "test-id", **route_params}
+inspect.signature(worker_fn).bind(**rq_kwargs).apply_defaults()  # TypeError if shape mismatches
+```
+
+Pattern: `tests/test_production_achievement_routes.py::test_report_enqueue_params_bind_to_worker_signature`.
+
+Evidence: `production-achievement-async-spool` PV-2 — found only by driving the real enqueue→worker flow; the mocked route tests had passed CI with the wrong (flat) shape.
+
 ## _APPROVED_CALLERS — New Controlled-Module Callers Must Be Explicitly Approved
 
 `tests/test_query_cost_policy.py::TestNoPandasAndNoCallers::test_no_caller_outside_tests` enforces a zero-caller policy for controlled internal modules (`oracle_arrow_reader`, `query_cost_policy`, `base_chunked_duckdb_job`). Any source file that **intentionally** imports from one of these must be added to the `_APPROVED_CALLERS` dict **in the same PR**:

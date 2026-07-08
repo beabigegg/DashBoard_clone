@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.37] — 2026-07-08
+### Added
+- durable-learning promotion (production-achievement-async-spool cdd-close): new cross-cutting rule — every new RQ worker must be wired into both `deploy/*.service` and `scripts/start_server.sh` in the same PR, and `rq worker` CLI must never carry `--job-execution-timeout` (invalid under pinned rq<2.0.0). Evidence: PV-1/PV-3.
+
 ## [api 1.38.0] — 2026-07-08
 ### Changed (BREAKING)
 - production-achievement-async-spool: `GET /api/production-achievement/report` migrated from a synchronous Oracle-aggregated-row response to the async RQ → DuckDB parquet spool pattern (ADR-0016, mirrors `resource-history-rq-async`). Spool-hit → HTTP 200 `{query_id, spool_download_url, spec_workcenter_map, targets_map}` (schema `ProductionAchievementReportResponse` redefined in place); spool-miss + worker available → HTTP 202 (new schema `ProductionAchievementJobAccepted`, `status_url=/api/job/<id>?prefix=production-achievement`, reuses the generic job endpoint); spool-miss + worker unavailable → HTTP 503 (`always_async=True`, no sync fallback). `shift_code`/`workcenter_group` request params no longer affect the server response or spool key (canonical key is date-range only, ADR-0016); PA-06/PA-07 filtering/rollup/target-join now applied client-side in DuckDB-WASM. `production_achievement` added to the `GET /api/spool/{namespace}/...` allowed-namespace enum. No deprecate-2-minors window — feature is pre-launch, sole consumer ships in the same atomic PR (same precedent as `equipment-rejects-by-lots`/`nav-config-to-code`). `GET /filter-options`, `GET`/`PUT /targets`, admin permission endpoints unchanged.

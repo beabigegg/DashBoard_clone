@@ -163,6 +163,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `_AI_SESSION` is a module-level `requests.Session` — patch `ai_query_service._AI_SESSION`, not `requests.post`
 - `AI_MODE=leader`: leader 只做 planning/dispatch/synthesis，工具執行一律委派 `process_agent_turn`（函式優先、query_database SQL fallback）— see docs/architecture/service-patterns.md §AI Pipeline — Leader/Subagent Mode
 - Every `execute_*_job` worker must wire `acquire_heavy_query_slot` before its `*_USE_RQ` flag ships — see docs/architecture/service-patterns.md §RQ Worker Concurrency Gate
+- Every new `execute_*_job` worker must wire BOTH `deploy/*.service` AND the dev launcher `scripts/start_server.sh`, and never pass `rq worker --job-execution-timeout` (invalid under pinned rq<2.0.0; timeout is set at enqueue) — see contracts/ci/ci-gate-contract.md §New RQ Worker Deploy Checklist
 - COUNT(*) fail-open pre-check for domains without a date range must fail open to sync, never 503 — see docs/architecture/service-patterns.md §Async Routing Pre-Check Pattern
 - `DW_MES_WIP` has no `CONTAINERID` index (`CONTAINERNAME`/`TXNDATE` only, 95M+ rows) — bridge `CONTAINERID`→`CONTAINERNAME` via indexed `DW_MES_CONTAINER` before joining — see docs/architecture/service-patterns.md
 
@@ -192,6 +193,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - New `oracle_arrow_reader`/`base_chunked_duckdb_job` callers: add to `_APPROVED_CALLERS` and update the job-registry count test, same PR
 - `BaseChunkedDuckDBJob` domain migrations need a dual-tier parity test (mock chunk-seam unit + real-path parquet diff on business key)
 - Over-limit boundary tests must strictly exceed the cap, not equal it
+- Route tests mocking `enqueue_query_job`/`enqueue_job_dynamic` must also `inspect.signature(worker_fn).bind(**kwargs)` — a mocked-enqueue shape mismatch only fails at worker runtime, see docs/architecture/test-discipline.md §Async Route↔Worker Signature Contract
 
 **CI workflow & GunicornHarness** — see `docs/architecture/ci-workflow.md`:
 - New Playwright specs: add `npx playwright install --with-deps chromium` in CI before running tests
@@ -202,7 +204,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Playwright `page.route()` is LIFO: register catch-all routes first, specific routes last
 - reject-history/reject-material specs: click submit in `beforeEach` before asserting `DetailTable` content
 - Resilience specs: use `page.goto(...).catch(()=>{})`, not `page.request.post()` (`loginViaApi`) — not interceptable, throws ECONNREFUSED in CI
-- `pageRendered` guard: check app-specific content, not `bodyText.length > 100` — Chrome's ECONNREFUSED error page exceeds 100 chars
+- Playwright no-server skip: FAST `<50`-char body pre-check (~5s) before any `waitForFunction`, not per-test full-timeout waits (N tests × timeout × retries stalls CI for tens of minutes); `pageRendered` itself must check app-specific content, not `bodyText.length > 100` — see docs/architecture/ci-workflow.md §Playwright CI-Safe Specs
 - Async-gated route unit tests: mock `is_async_available()=True` + enqueue fn, not spool-hit mocks — CI has no Redis
 
 <!-- cdd-kit:learnings:end -->
