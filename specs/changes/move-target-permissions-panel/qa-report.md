@@ -18,7 +18,18 @@ risk, no high/critical trigger requiring a second sign-off).
 | e2e-critical (Tier-1 Playwright) | **scheduled in CI, not run locally** | no browser available in this sandbox (`npx playwright install` unsupported OS) |
 | `cdd-kit gate` | pass | tier-floor-override recorded and justified (keyword-scan false positive) |
 
-## Residual Risk
+## Residual Risk — RESOLVED (2026-07-08)
+
+CI ran on push to `main`: `openapi-sync-gate` initially failed (`contracts/openapi.json`
+and `contracts/api/openapi.json` were stale after the `api-contract.md` 1.38.1
+version bump — `cdd-kit openapi export` was not re-run before the original commit).
+Fixed in commit `11df6bc4` (`cdd-kit openapi export --out contracts/openapi.json`
++ `contracts/api/openapi.json`). Re-run green. `frontend-tests` (Tier-1 Playwright,
+`admin-dashboard.spec.ts`/`admin-pages.spec.ts`, run `28982636960`) passed on the
+first push — no relocation-specific E2E failures. All CI checks on `main` are
+green as of this note; the risk below is retained for the record.
+
+## Residual Risk (as recorded pre-CI)
 
 - **Risk:** Browser-rendered confirmation of the relocated tab (actual
   layout, computed-style, tab-switch interaction) has not executed — only

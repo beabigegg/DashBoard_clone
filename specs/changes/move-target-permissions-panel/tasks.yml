@@ -35,8 +35,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer's changes-required items (api-contract.md consumer note, css-contract.md/css-inventory.md re-scope) applied and re-validated (cdd-kit validate --contracts/--versions pass)." }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk; qa-report.md written. Residual risk: Tier-1 Playwright not run locally (no browser in sandbox), must go green in CI before merge." }
   - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "type-check/css:check/build/unit/contract all green locally." }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: pending, note: "Tier-1 admin-dashboard.spec.ts/admin-pages.spec.ts must pass in CI (not executable locally) before this is done." }
-  - { id: "6.3", section: Verification, title: "Informational gates", status: pending, note: "Same CI dependency as 6.2." }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "CI green on main: frontend-tests (Tier-1 Playwright, run 28982636960) success; contract-driven-gates success." }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "openapi-sync-gate initially failed (contracts/openapi.json + contracts/api/openapi.json stale after api-contract.md 1.38.1 bump) — fixed via cdd-kit openapi export in commit 11df6bc4, re-run green." }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: skipped, note: "No nightly/weekly gates defined for this surface." }
   - { id: "7.1", section: Archive, title: "Archive change", status: pending }
   - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
