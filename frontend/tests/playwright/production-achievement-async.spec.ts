@@ -148,11 +148,19 @@ async function registerCatchAllRoutes(page: Page): Promise<void> {
 
 async function gotoAndWaitForApp(page: Page): Promise<boolean> {
   await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+  // FAST no-dev-server detection (mirrors resource-history-async.spec.ts). When no
+  // server is serving the app (the default in CI — these e2e specs run without a
+  // dev server and skip), the page body is effectively empty; bail out in well under
+  // a second instead of burning the full waitForFunction timeout on EVERY test. That
+  // 20s x ~20-tests x retries stall is what made this step run ~25 min in CI.
+  const bodyText = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+  if ((bodyText?.trim().length ?? 0) < 50) return false;
+  // Server present: wait (bounded) for the app-specific theme root to mount, then
+  // confirm it is actually visible. pageRendered guard checks app-specific content
+  // (the page's own theme root), never a generic bodyText.length check for readiness.
   await page
-    .waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 })
+    .waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 10_000 })
     .catch(() => {});
-  // pageRendered guard checks app-specific content (the page's own theme root),
-  // never a generic bodyText.length check (CLAUDE.md ci-workflow.md).
   return page.evaluate(() => {
     const el = document.querySelector('.theme-production-achievement');
     return el !== null && (el as HTMLElement).offsetParent !== null;

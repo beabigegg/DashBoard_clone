@@ -68,6 +68,9 @@ jobs:
 
       - name: Run production-achievement-async e2e spec (production-achievement-async-e2e, Tier 1)
         working-directory: frontend
+        # Defense-in-depth cap: the spec skips fast when no dev server is present, but
+        # bound the step so a future regression can never stall the job for ~25 min again.
+        timeout-minutes: 8
         # ci-gates.md gate: production-achievement-async-e2e (Tier 1, required)
         # Covers: AC-1 (202+job_id, no sync Oracle call on the request thread),
         # AC-2 (poll -> spool_download_url render), AC-7 (DuckDB-WASM PA-06/PA-07
