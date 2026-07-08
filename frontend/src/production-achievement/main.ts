@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 
 import App from './App.vue';
+import '../resource-shared/styles.css';
 import './style.css';
 import { restoreUrlState } from '../core/shell-navigation';
 

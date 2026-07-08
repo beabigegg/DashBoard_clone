@@ -108,7 +108,7 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/production-achievement': createNativeLoader(
     () => import('../production-achievement/App.vue'),
-    [() => import('../styles/tailwind.css'), () => import('../production-achievement/style.css')],
+    [() => import('../resource-shared/styles.css'), () => import('../styles/tailwind.css'), () => import('../production-achievement/style.css')],
   ),
 });
 

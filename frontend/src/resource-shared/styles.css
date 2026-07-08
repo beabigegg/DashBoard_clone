@@ -489,7 +489,7 @@
 
 /* ---- MultiSelect component ---- */
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis, .theme-eap-alarm) .multi-select-trigger {
+:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis, .theme-eap-alarm, .theme-production-achievement) .multi-select-trigger {
   width: 100%;
   display: flex;
   align-items: center;
@@ -504,7 +504,7 @@
   cursor: pointer;
 }
 
-:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis, .theme-eap-alarm) .multi-select-arrow {
+:is(.theme-resource, .theme-resource-history, .theme-hold-overview, .theme-job-query, .theme-wip-overview, .theme-wip-detail, .theme-hold-detail, .theme-hold-history, .theme-reject-history, .theme-yield-alert-center, .theme-qc-gate, .theme-query-tool, .theme-material-trace, .theme-mid-section-defect, .theme-production-history, .theme-admin-dashboard, .theme-admin-performance, .theme-downtime-analysis, .theme-eap-alarm, .theme-production-achievement) .multi-select-arrow {
   color: theme('colors.token.h64748b');
   font-size: 11px;
 }
