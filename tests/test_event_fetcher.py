@@ -21,8 +21,15 @@ def _iter_result(columns, rows):
 
 
 def _iter_empty(*args, **kwargs):
-    """Helper: generator that yields nothing (empty result)."""
-    return iter([])
+    """Helper: real generator that yields nothing.
+
+    Mirrors ``read_sql_df_slow_iter``'s contract — it is a generator, so it has
+    a ``.close()`` method. EventFetcher now wraps the iterator in
+    ``contextlib.closing`` (to release the slow-query semaphore/connection on
+    early break), which requires a closeable object; a bare ``iter([])`` lacks
+    ``.close()`` and would break that.
+    """
+    yield from ()
 
 
 def test_cache_key_is_stable_for_sorted_ids():
@@ -225,7 +232,7 @@ def test_fetch_events_raises_when_parallel_batch_fails_and_partial_disabled(
     def _side_effect(sql, params, timeout_seconds=60):
         if "CID-1000" in params.values():
             raise RuntimeError("chunk fail")
-        return iter([])
+        return _iter_empty()
 
     mock_iter.side_effect = _side_effect
     cids = [f"CID-{i}" for i in range(1001)]  # force >1 batch
@@ -235,6 +242,55 @@ def test_fetch_events_raises_when_parallel_batch_fails_and_partial_disabled(
         assert False, "expected RuntimeError"
     except RuntimeError as exc:
         assert "chunk failed" in str(exc)
+
+
+def test_early_truncation_closes_slow_iter_generator(monkeypatch):
+    """Regression: breaking out on the total-row guard must deterministically
+    close the slow-query generator so its semaphore permit + slow-pool Oracle
+    connection release immediately.
+
+    The test holds an external reference to the generator, which prevents
+    CPython refcounting from finalizing it for us on ``break``. Only an explicit
+    ``closing()``/``.close()`` will run the generator's ``finally`` — so this
+    fails on the pre-fix code (leaks until GC → "卡住 after N queries") and
+    passes once the loop wraps the generator in ``contextlib.closing``.
+    """
+    monkeypatch.setattr(
+        "mes_dashboard.services.event_fetcher.EVENT_FETCHER_MAX_TOTAL_ROWS", 2
+    )
+
+    closed = {"value": False}
+
+    def _make_gen(*_args, **_kwargs):
+        try:
+            yield ["CONTAINERID"], [("CID-1",), ("CID-2",), ("CID-3",)]
+            yield ["CONTAINERID"], [("CID-4",)]
+        finally:
+            closed["value"] = True
+
+    gen = _make_gen()  # external ref defeats refcount-based finalization
+
+    with patch(
+        "mes_dashboard.services.event_fetcher.read_sql_df_slow_iter",
+        return_value=gen,
+    ), patch(
+        "mes_dashboard.services.event_fetcher.cache_get", return_value=None
+    ), patch(
+        "mes_dashboard.services.event_fetcher.cache_set"
+    ), patch(
+        "mes_dashboard.services.event_fetcher.SQLLoader.load",
+        return_value="SELECT * FROM t WHERE h.CONTAINERID = :container_id",
+    ):
+        result = EventFetcher.fetch_events(["CID-1", "CID-2", "CID-3"], "history")
+
+    assert result["quality_meta"]["status"] == QUALITY_STATUS_TRUNCATED
+    assert closed["value"] is True, (
+        "slow-query generator was not closed on early truncation — "
+        "its semaphore permit and Oracle connection would leak until GC"
+    )
+    # Keep gen referenced until after the assertion so the result reflects
+    # closing(), not incidental garbage collection.
+    assert gen is not None
 
 
 @patch("mes_dashboard.services.event_fetcher.cache_set")
@@ -255,7 +311,7 @@ def test_fetch_events_allows_partial_when_enabled(
     def _side_effect(sql, params, timeout_seconds=60):
         if "CID-1000" in params.values():
             raise RuntimeError("chunk fail")
-        return iter([])
+        return _iter_empty()
 
     mock_iter.side_effect = _side_effect
     cids = [f"CID-{i}" for i in range(1001)]
@@ -401,7 +457,7 @@ def test_fetch_events_to_parquet_partial_failure_quality_meta(
     def _side_effect(sql, params, timeout_seconds=60):
         if "CID-1000" in params.values():
             raise RuntimeError("batch fail")
-        return iter([])
+        return _iter_empty()
 
     mock_iter.side_effect = _side_effect
     cids = [f"CID-{i}" for i in range(1001)]  # force >1 batch

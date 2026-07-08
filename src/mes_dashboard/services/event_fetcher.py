@@ -10,6 +10,7 @@ import os
 import re
 import threading
 from collections import defaultdict
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Tuple
@@ -284,21 +285,40 @@ class EventFetcher:
                 builder.add_in_condition(filter_column, batch_ids)
             sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
 
-            for columns, rows in read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60):
-                if truncated[0]:
-                    break
-                for row in rows:
-                    record = {k: _sanitize_value(v) for k, v in zip(columns, row)}
-                    if domain == "jobs":
-                        containers = record.get("CONTAINERIDS")
-                        if not isinstance(containers, str) or not containers:
+            # closing() guarantees the generator's finally block runs (releasing
+            # the slow-query semaphore permit + slow-pool Oracle connection) even
+            # when we break out early on the total-row guard. Without it those
+            # resources only release at GC, progressively draining the slow pool
+            # across consecutive queries and wedging query-tool ("卡住 after N queries").
+            with closing(read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60)) as row_iter:
+                for columns, rows in row_iter:
+                    if truncated[0]:
+                        break
+                    for row in rows:
+                        record = {k: _sanitize_value(v) for k, v in zip(columns, row)}
+                        if domain == "jobs":
+                            containers = record.get("CONTAINERIDS")
+                            if not isinstance(containers, str) or not containers:
+                                continue
+                            for cid in batch_ids:
+                                if cid in containers:
+                                    enriched = dict(record)
+                                    enriched["CONTAINERID"] = cid
+                                    grouped[cid].append(enriched)  # noqa: F821
+                                    total_row_count[0] += 1
+                            if total_row_count[0] >= max_total_rows:
+                                logger.warning(
+                                    "EventFetcher total-row guard triggered domain=%s rows=%s limit=%s — truncating",
+                                    domain, total_row_count[0], max_total_rows,
+                                )
+                                truncated[0] = True
+                                break
                             continue
-                        for cid in batch_ids:
-                            if cid in containers:
-                                enriched = dict(record)
-                                enriched["CONTAINERID"] = cid
-                                grouped[cid].append(enriched)  # noqa: F821
-                                total_row_count[0] += 1
+                        cid = record.get("CONTAINERID")
+                        if not isinstance(cid, str) or not cid:
+                            continue
+                        grouped[cid].append(record)  # noqa: F821
+                        total_row_count[0] += 1
                         if total_row_count[0] >= max_total_rows:
                             logger.warning(
                                 "EventFetcher total-row guard triggered domain=%s rows=%s limit=%s — truncating",
@@ -306,19 +326,6 @@ class EventFetcher:
                             )
                             truncated[0] = True
                             break
-                        continue
-                    cid = record.get("CONTAINERID")
-                    if not isinstance(cid, str) or not cid:
-                        continue
-                    grouped[cid].append(record)  # noqa: F821
-                    total_row_count[0] += 1
-                    if total_row_count[0] >= max_total_rows:
-                        logger.warning(
-                            "EventFetcher total-row guard triggered domain=%s rows=%s limit=%s — truncating",
-                            domain, total_row_count[0], max_total_rows,
-                        )
-                        truncated[0] = True
-                        break
 
         batches = [
             normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
@@ -435,36 +442,39 @@ class EventFetcher:
                 builder.add_in_condition(filter_column, batch_ids)
             sql = EventFetcher._build_domain_sql(domain, builder.get_conditions_sql())
 
-            for columns, rows in read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60):
-                if not rows:
-                    continue
-
-                if domain == "jobs":
-                    try:
-                        cids_idx = columns.index("CONTAINERIDS")
-                        cid_idx = columns.index("CONTAINERID")
-                    except ValueError:
-                        row_callback(columns, list(rows))
-                        total_row_count[0] += len(rows)
+            # closing() ensures the slow-query permit + Oracle connection release
+            # deterministically even if row_callback raises mid-stream.
+            with closing(read_sql_df_slow_iter(sql, builder.params, timeout_seconds=60)) as row_iter:
+                for columns, rows in row_iter:
+                    if not rows:
                         continue
 
-                    expanded: List[tuple] = []
-                    for row in rows:
-                        containers_val = row[cids_idx]
-                        if not isinstance(containers_val, str) or not containers_val:
+                    if domain == "jobs":
+                        try:
+                            cids_idx = columns.index("CONTAINERIDS")
+                            cid_idx = columns.index("CONTAINERID")
+                        except ValueError:
+                            row_callback(columns, list(rows))
+                            total_row_count[0] += len(rows)
                             continue
-                        for cid in batch_ids:
-                            if cid in containers_val:
-                                row_list = list(row)
-                                row_list[cid_idx] = cid
-                                expanded.append(tuple(row_list))
 
-                    if expanded:
-                        row_callback(columns, expanded)
-                        total_row_count[0] += len(expanded)
-                else:
-                    row_callback(columns, list(rows))
-                    total_row_count[0] += len(rows)
+                        expanded: List[tuple] = []
+                        for row in rows:
+                            containers_val = row[cids_idx]
+                            if not isinstance(containers_val, str) or not containers_val:
+                                continue
+                            for cid in batch_ids:
+                                if cid in containers_val:
+                                    row_list = list(row)
+                                    row_list[cid_idx] = cid
+                                    expanded.append(tuple(row_list))
+
+                        if expanded:
+                            row_callback(columns, expanded)
+                            total_row_count[0] += len(expanded)
+                    else:
+                        row_callback(columns, list(rows))
+                        total_row_count[0] += len(rows)
 
         batches = [
             normalized_ids[i:i + ORACLE_IN_BATCH_SIZE]
