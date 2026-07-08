@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0016-production-achievement-async-spool-seam-reduction.md" }
+  - { type: affected-areas, pointer: "production-achievement worker/route/service, spool_routes allowlist, query_cost_policy, frontend DuckDB-WASM composable, env parity, deploy systemd" }
+  - { type: decision-summary, pointer: "Q1 override threshold=0 (always-activate WASM); Q2 inline spec+targets maps; Q3 option A parquet download; seam: cross_chunk_reduction=False + re-aggregating post_aggregate (NOT concat)" }
+  - { type: risks-noted, pointer: "0 high, 3 medium (empty-parquet schema, inline-map cardinality, plain-concat seam trap)" }

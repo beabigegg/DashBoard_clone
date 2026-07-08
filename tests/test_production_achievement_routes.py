@@ -48,6 +48,14 @@ def admin_client(app):
 # ---------------------------------------------------------------------------
 
 class TestReportRoute:
+    """202/200-spool-hit/503 async branches (production-achievement-async-spool).
+
+    Mocks is_async_available() + enqueue_query_job (CI has no Redis) for the
+    202/503 branches, and get_spool_file_path + the two inline-map source
+    functions for the 200 spool-hit branch -- never spool-hit mocks that
+    would require real Redis (test-plan.md Notes).
+    """
+
     def test_report_requires_login(self, client):
         resp = client.get(
             "/api/production-achievement/report",
@@ -68,35 +76,194 @@ class TestReportRoute:
         )
         assert resp.status_code == 400
 
-    @patch("mes_dashboard.routes.production_achievement_routes.get_achievement_report")
-    def test_report_forwards_kwargs_per_key(self, mock_report, auth_client):
-        mock_report.return_value = []
-        auth_client.get(
-            "/api/production-achievement/report",
-            query_string={
-                "start_date": "2026-04-01",
-                "end_date": "2026-04-02",
-                "shift_code": "D",
-                "workcenter_group": "焊接_DB",
-            },
-        )
-        assert mock_report.called
-        kwargs = mock_report.call_args.kwargs
-        assert kwargs["start_date"] == "2026-04-01"
-        assert kwargs["end_date"] == "2026-04-02"
-        assert kwargs["shift_code"] == "D"
-        assert kwargs["workcenter_group"] == "焊接_DB"
+    # ── AC-1: spool miss + worker available -> 202 ──────────────────────────
 
-    @patch("mes_dashboard.routes.production_achievement_routes.get_achievement_report")
-    def test_report_forwards_optional_filters_as_none_when_absent(self, mock_report, auth_client):
-        mock_report.return_value = []
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_report_spool_miss_enqueues_returns_202_with_job_id(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        mock_enqueue.return_value = ("production-achievement-abc123", None, None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 202
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["data"]["async"] is True
+        assert payload["data"]["job_id"] == "production-achievement-abc123"
+        assert payload["data"]["status_url"] == (
+            "/api/job/production-achievement-abc123?prefix=production-achievement"
+        )
+
+        # Per-kwarg assertion of the enqueue call (test-discipline.md).
+        # params must be NESTED under a "params" key so enqueue_job_dynamic's
+        # kwargs={"job_id": ..., **params} yields the worker's (job_id, params)
+        # signature -- a flat dict here raises TypeError in the worker at runtime.
+        call_kwargs = mock_enqueue.call_args.kwargs
+        assert call_kwargs["params"] == {
+            "params": {"start_date": "2026-04-01", "end_date": "2026-04-02"}
+        }
+        assert call_kwargs["sync_fallback_allowed"] is False
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_report_enqueue_params_bind_to_worker_signature(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        """Regression (real end-to-end bug): the params the route hands to
+        enqueue_query_job must, once enqueue_job_dynamic spreads them into
+        kwargs={"job_id": ..., **params}, bind cleanly to the RQ worker entry
+        function execute_production_achievement_unified_job(job_id, params).
+
+        The mocked-enqueue tests above never invoke the real worker, so a
+        shape mismatch (flat params -> start_date/end_date spread as unexpected
+        top-level kwargs) slips past them and only fails at worker runtime with
+        `TypeError: got an unexpected keyword argument 'start_date'`.
+        """
+        import inspect
+
+        from mes_dashboard.workers.production_achievement_worker import (
+            execute_production_achievement_unified_job as worker_fn,
+        )
+
+        mock_enqueue.return_value = ("production-achievement-abc123", None, None)
         auth_client.get(
             "/api/production-achievement/report",
             query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
         )
-        kwargs = mock_report.call_args.kwargs
-        assert kwargs["shift_code"] is None
-        assert kwargs["workcenter_group"] is None
+        # The exact params dict the route passed:
+        route_params = mock_enqueue.call_args.kwargs["params"]
+        # enqueue_job_dynamic builds the RQ call kwargs like this:
+        rq_kwargs = {"job_id": "production-achievement-abc123", **route_params}
+        # Must bind to the worker signature without TypeError:
+        bound = inspect.signature(worker_fn).bind(**rq_kwargs)
+        bound.apply_defaults()
+        assert bound.arguments["job_id"] == "production-achievement-abc123"
+        assert bound.arguments["params"] == {
+            "start_date": "2026-04-01",
+            "end_date": "2026-04-02",
+        }
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_report_route_never_calls_get_achievement_report_or_read_sql_df(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        """AC-1: the request path must not import get_achievement_report --
+        it was removed by production-achievement-async-spool."""
+        import mes_dashboard.routes.production_achievement_routes as _routes
+        assert not hasattr(_routes, "get_achievement_report")
+
+        mock_enqueue.return_value = ("job-1", None, None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 202
+
+    # ── AC-2/AC-8: spool hit -> 200, unconditional map injection ────────────
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_targets_map",
+        return_value={("D", "焊接_DB"): 500, ("N", "焊接_WB"): None},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping",
+        return_value={"EPOXY D/B": {"workcenter": "WC1", "group": "焊接_DB", "sequence": 1}},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_spool_hit_response_shape_has_spool_download_url_spec_map_targets_map(
+        self, mock_spool, mock_spec_map, mock_targets_map, auth_client
+    ):
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        data = payload["data"]
+        assert "query_id" in data
+        assert data["spool_download_url"] == (
+            f"/api/spool/production_achievement/{data['query_id']}.parquet"
+        )
+        assert data["spec_workcenter_map"] == [
+            {"SPECNAME": "EPOXY D/B", "workcenter_group": "焊接_DB"}
+        ]
+        assert {"shift_code": "D", "workcenter_group": "焊接_DB", "target_qty": 500} in data["targets_map"]
+        assert {"shift_code": "N", "workcenter_group": "焊接_WB", "target_qty": None} in data["targets_map"]
+        # Enqueue must never be reached on a spool hit.
+        mock_spool.assert_called_once()
+
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_targets_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_spool_hit_injects_download_url_unconditionally_not_row_count_gated(
+        self, mock_spool, mock_spec_map, mock_targets_map, auth_client
+    ):
+        """AC-8: injection is unconditional -- even with empty maps (which
+        would correspond to a tiny/empty spool), spool_download_url must
+        still be present (unlike resource_history's row-count threshold)."""
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["spool_download_url"].startswith("/api/spool/production_achievement/")
+        assert data["spec_workcenter_map"] == []
+        assert data["targets_map"] == []
+
+    # ── AC-1/AC-8: spool miss + no worker -> 503, no sync fallback ──────────
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=False)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_report_503_when_worker_unavailable(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 503
+        payload = resp.get_json()
+        assert payload["error"]["code"] == "SERVICE_UNAVAILABLE"
+        mock_enqueue.assert_not_called()
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_report_503_when_enqueue_returns_none(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        """Kill-switch equivalent: unregistered job type / enqueue failure
+        also surfaces as 503 (env-contract.md PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB=off)."""
+        mock_enqueue.return_value = (None, "Unknown job type: 'production-achievement'", None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 503
+        payload = resp.get_json()
+        assert payload["error"]["code"] == "SERVICE_UNAVAILABLE"
 
 
 # ---------------------------------------------------------------------------

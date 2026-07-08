@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.37.0
-last-changed: 2026-07-04
+schema-version: 1.38.0
+last-changed: 2026-07-08
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -76,7 +76,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /health/deep | none | — | HealthPayload | — | smoke tests |
 | GET | /api/job/{job_id} | required | ?prefix= | JobStatusResponse | 400/404 | route tests |
 | POST | /api/job/{job_id}/abandon | required | JSON body | AckResponse | 403/404/409 | route tests |
-| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm, wip_dataset} | application/octet-stream (parquet) | 400/410 | route tests |
+| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm, wip_dataset, production_achievement} | application/octet-stream (parquet) | 400/410 | route tests |
 | GET | /api/wip/overview/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/summary | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
@@ -253,7 +253,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
-| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementReportResponse | 400/500 | route tests |
+| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementReportResponse | 202/400/500/503 | route tests |
 | GET | /api/production-achievement/filter-options | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/production-achievement/targets | required | ?shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementTargetsResponse | 500 | route tests |
 | PUT | /api/production-achievement/targets | required | body {shift_code, workcenter_group, target_qty}; also gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
@@ -277,7 +277,7 @@ breaking-change-policy: deprecate-2-minors
 
 **Type A — 同步 re-query on 410：** view miss → 410 `cache_expired` → client 同步重新觸發 `execute_primary_query()`。適用：`hold_history_routes.py`、`resource_history_routes.py`。
 
-**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `RESOURCE_ASYNC_ENABLED=true`）、`eap_alarm_routes.py`（all date ranges; always async when worker available; no threshold — Type B only, no sync fallback path）、`query_tool_routes.py`（`POST /api/query-tool/equipment-period`; when `QUERY_TOOL_USE_RQ=on` + date range ≥ CostPolicy.day_threshold + worker available → 202+job_id; else sync 200; query-path-c-elimination-cleanup AC-1）。
+**Type B — async 202 polling：** query miss + RQ available → 202 `{async: true, job_id, status_url}` → client polling `GET /api/job/<job_id>?prefix=<p>`。RQ 不可用時 fallback sync 200。適用：`reject_history_routes.py`、`yield_alert_routes.py`、`production_history_routes.py`、`trace_routes.py`、`material_trace_routes.py`、`downtime_analysis_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `DOWNTIME_ASYNC_ENABLED=true`）、`hold_history_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `HOLD_ASYNC_ENABLED=true`）、`resource_history_routes.py`（date range ≥ CostPolicy.day_threshold=30 when `RESOURCE_ASYNC_ENABLED=true`）、`eap_alarm_routes.py`（all date ranges; always async when worker available; no threshold — Type B only, no sync fallback path）、`query_tool_routes.py`（`POST /api/query-tool/equipment-period`; when `QUERY_TOOL_USE_RQ=on` + date range ≥ CostPolicy.day_threshold + worker available → 202+job_id; else sync 200; query-path-c-elimination-cleanup AC-1）、`production_achievement_routes.py`（`GET /api/production-achievement/report`；all date ranges；spool miss + worker available → always async，no day-range threshold；worker unavailable → 503，no sync fallback path；canonical spool key is date-range only（`shift_code`/`workcenter_group` do not affect routing or the spool key）；gated by `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB`；production-achievement-async-spool）。
 
 ## 8. API Inventory Governance
 
@@ -463,6 +463,16 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## Compatibility Notes
 
+- **production-achievement-async-spool (2026-07-08):** `GET /api/production-achievement/report` changes from a synchronous Oracle-backed aggregate-row response to the async RQ → DuckDB parquet spool pattern (mirrors `resource-history-rq-async`; ADR-0016). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (feature is pre-launch, sole consumer `frontend/src/production-achievement/` ships in the same atomic PR; same precedent as `equipment-rejects-by-lots`/`nav-config-to-code`):
+  - Request params unchanged: `start_date`, `end_date` (both required, 730-day cap SYS-04), `shift_code` (opt), `workcenter_group` (opt). **Behavior change**: `shift_code`/`workcenter_group` no longer affect the server-side response or the canonical spool key — the canonical spool key is `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` only (date-range only, ADR-0016). The unfiltered SPECNAME-grain dataset for the full date range is always spooled; `shift_code`/`workcenter_group` filtering (PA-06/PA-07) is now applied client-side in DuckDB-WASM, not server-side.
+  - **Spool-hit (HTTP 200)**: `data = {query_id, spool_download_url, spec_workcenter_map, targets_map}` (data-shape-contract.md §3.28). `spool_download_url = /api/spool/production_achievement/<query_id>.parquet` — namespace added to `spool_routes._ALLOWED_NAMESPACES` (AC-3). Injection is unconditional (Q1 resolved: local-compute activation threshold overridden to 0 for this page — no `total_row_count` gate, unlike `resource_history`'s `>= threshold` gate).
+  - **Spool-miss (HTTP 202)**: `data = {async: true, job_id, status_url}`, `status_url = /api/job/<job_id>?prefix=production-achievement` — REUSES the generic job-status endpoint (§7 Type B), the same mechanism as `resource-history-rq-async`/`downtime-rq-async`/`hold-history-rq-async`, NOT a new domain-specific `/api/production-achievement/job/{job_id}` route (unlike the older `production-history`/`reject-history`/`material-trace`/`yield-alert`/`trace` per-domain job routes). New schema `ProductionAchievementJobAccepted`.
+  - **Poll-completion flow**: the job `result` payload is `{query_id}` only (mirrors data-shape-contract.md §3.14.2's downtime pattern) — it does NOT itself carry `spool_download_url`/`spec_workcenter_map`/`targets_map`. After `status=finished`, the frontend re-issues the identical `GET /api/production-achievement/report` request; the canonical spool now exists, so this second call takes the 200 spool-hit path above at zero Oracle cost. **Confirm this against the actual `useProductionAchievementDuckDB.ts` completion handler during implementation** — if the job result instead carries the injected fields directly, update this note and data-shape-contract.md §3.28.4 to match.
+  - **Worker-unavailable (HTTP 503)**: `always_async=True`, `sync_fallback_allowed=False` — spool-miss + no RQ worker → 503 `SERVICE_UNAVAILABLE` (no silent sync fallback; same decision tree as `eap-alarm`/`material-trace`/`downtime`).
+  - New env vars: `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB` (env-contract.md §Worker Feature-Flag Env-Var Parity), `PRODUCTION_ACHIEVEMENT_WORKER_QUEUE`/`PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS` (§Async Worker — Production Achievement Query).
+  - `GET /filter-options`, `GET`/`PUT /targets`, and the admin permission endpoints are unchanged (non-goal, change-request.md).
+  - New schemas: `ProductionAchievementJobAccepted` (202). `ProductionAchievementReportResponse` (existing schema, same name) is REWRITTEN in place to describe the new 200 spool-hit shape — see data-shape-contract.md §3.28.
+  - Sole consumer: `frontend/src/production-achievement/`. No external partners or mobile consumers known.
 - **production-achievement-kanban (2026-07-02):** New endpoint family `/api/production-achievement/*` (4 endpoints) + `/admin/api/production-achievement/permissions*` (2 endpoints), all additive — new page, no existing endpoints changed.
   - `GET /api/production-achievement/report` — filters: `start_date`, `end_date` (both required, 730-day cap per SYS-04), `shift_code` (opt, enum `N|D|A|B|C`), `workcenter_group` (opt). Response: array of rows per data-shape-contract.md §3.25. Reuses `filter_cache.get_spec_workcenter_mapping()` for station grouping (business-rules.md PA-06) — no new SPECNAME→station mapping.
   - `GET /api/production-achievement/filter-options` — returns available `shift_code` and `workcenter_group` values for the FilterBar; sourced from `filter_cache` + the shift-code enum, not a new cache namespace.
@@ -482,6 +492,7 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## CHANGELOG
 
+- **[api 1.38.0] — 2026-07-08 (production-achievement-async-spool):** `GET /api/production-achievement/report` migrated from a synchronous Oracle-aggregated-row response to the async RQ → DuckDB parquet spool pattern (ADR-0016). Spool-hit → HTTP 200 `{query_id, spool_download_url, spec_workcenter_map, targets_map}` (`ProductionAchievementReportResponse` redefined in place); spool-miss + worker available → HTTP 202 (new `ProductionAchievementJobAccepted`, reuses generic `/api/job/<id>?prefix=production-achievement`); spool-miss + worker unavailable → HTTP 503. `shift_code`/`workcenter_group` no longer affect the server response or spool key. `production_achievement` added to the spool-namespace enum. No deprecation window (pre-launch, atomic-PR consumer). Other 5 endpoints in this family unchanged.
 - **[api 1.36.0] — 2026-07-02 (production-achievement-kanban):** New endpoint family `/api/production-achievement/*` (4 endpoints: report, filter-options, targets GET/PUT) + `/admin/api/production-achievement/permissions*` (2 endpoints). New schemas: `ProductionAchievementReportResponse`, `ProductionAchievementTargetsResponse`, `ProductionAchievementPermissionsResponse`. `PUT /api/production-achievement/targets` is permission-gated by a new independent `can_edit_targets` check (not `admin_required`); 403 on unauthorized write. All additive; no existing endpoints changed.
 - **[api 1.35.0] — 2026-07-01 (yield-alert-filter-expansion):** `POST /api/yield-alert/query` `process_type` enum expands `{GA%,GC%}` → `{GA%,GC%,GD%,F%,W%,D%}`. `GET /api/yield-alert/view` + `GET /api/yield-alert/cross-filter-options` `workcenter_groups` value source changes from global `filter_cache`/`DW_MES_SPEC_WORKCENTER_V` to per-query_id spool `SELECT DISTINCT DEPARTMENT_NAME` (breaking shape semantics; JSON key unchanged). `GET /api/yield-alert/filter-options` unchanged.
 - **[api 1.34.0] — 2026-06-30 (eap-alarm-coarse-filter):** `POST /api/eap-alarm/spool` gains `lot_ids[]`, `pj_types[]`, `product_lines[]`, `pj_bops[]` (all optional); `eqp_types[]` now optional; at-least-one-of-three validation (EA-08). New `GET /api/eap-alarm/product-filter-options` — reads `container_filter_cache`, maps `packages→product_lines` and `bops→pj_bops`; cold-cache = empty arrays (not 500). Spool key hash extended to all 5 dims; `_SCHEMA_VERSION` 2→3. New schema `EapAlarmProductFilterOptionsResponse`. Additive for clients that always supply `eqp_types`.
@@ -1156,11 +1167,11 @@ Tier-B — response for `GET /api/db-scheduling/queue`. Array of lot-equipment r
 | target_qty | integer | yes |
 | achievement_rate | number | yes |
 
-See data-shape-contract.md §3.25 for field semantics (nullable `target_qty`/`achievement_rate`, PA-01..PA-07 business rules).
+See data-shape-contract.md §3.25 for field semantics (nullable `target_qty`/`achievement_rate`, PA-01..PA-07 business rules). **As of `production-achievement-async-spool`, this row shape is no longer the server response** — it is (a) the shape the frontend computes client-side in DuckDB-WASM from the §3.28 spool + maps, and (b) the test-only golden-reference shape from `build_achievement_rows()` for the dual-tier parity gate.
 
 ### ProductionAchievementReportResponse
 
-Tier-B — `GET /api/production-achievement/report`; row shape per `ProductionAchievementReportRow` above. Contract error codes `400/500` mean an error-envelope capture (`success:false`, no `data`) is a valid sample — only `success` is required, matching `AnomalySummaryResponse`'s pattern for endpoints whose upstream (Oracle) dependency can genuinely fail.
+Tier-B — `GET /api/production-achievement/report`. **Redefined by `production-achievement-async-spool`** (previously an already-aggregated row array; now the async spool-hit envelope — see data-shape-contract.md §3.28 and the Compatibility Notes entry above). Describes the HTTP 200 spool-hit shape only; the HTTP 202 spool-miss shape is `ProductionAchievementJobAccepted`. Contract error codes `400/500/503` mean an error-envelope capture (`success:false`, no `data`) is a valid sample.
 
 ```json-schema
 {
@@ -1168,8 +1179,37 @@ Tier-B — `GET /api/production-achievement/report`; row shape per `ProductionAc
   "required": ["success"],
   "properties": {
     "success": { "type": "boolean" },
-    "data":    {},
-    "error":   {},
+    "data": {
+      "type": ["object", "null"],
+      "properties": {
+        "query_id": { "type": "string" },
+        "spool_download_url": { "type": "string", "pattern": "^/api/spool/production_achievement/.+\\.parquet$" },
+        "spec_workcenter_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["SPECNAME", "workcenter_group"],
+            "properties": {
+              "SPECNAME": { "type": "string" },
+              "workcenter_group": { "type": "string" }
+            }
+          }
+        },
+        "targets_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["shift_code", "workcenter_group", "target_qty"],
+            "properties": {
+              "shift_code": { "type": "string" },
+              "workcenter_group": { "type": "string" },
+              "target_qty": { "type": ["integer", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "error": {},
     "meta": {
       "type": "object",
       "properties": {
@@ -1177,6 +1217,22 @@ Tier-B — `GET /api/production-achievement/report`; row shape per `ProductionAc
         "app_version": { "type": "string" }
       }
     }
+  }
+}
+```
+
+### ProductionAchievementJobAccepted
+
+Tier-B — 202 async branch for `GET /api/production-achievement/report` (spool miss). `always_async=True`; worker unavailable → HTTP 503 (no sync fallback) rather than this shape.
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data", "meta"],
+  "properties": {
+    "success": { "type": "boolean", "enum": [true] },
+    "data": { "type": "object", "required": ["async", "job_id", "status_url"], "properties": { "async": { "type": "boolean", "enum": [true] }, "job_id": { "type": "string" }, "status_url": { "type": "string" } } },
+    "meta": { "type": "object", "required": ["timestamp"], "properties": { "timestamp": { "type": "string" }, "app_version": { "type": "string" } } }
   }
 }
 ```

@@ -1,0 +1,25 @@
+change-id: production-achievement-async-spool
+agent: e2e-resilience-engineer
+status: done
+summary: >
+  Reconstructed by main Claude from verified deliverables on disk (completion
+  notification not received; work products confirmed present + inspected).
+  Wrote frontend/tests/playwright/production-achievement-async.spec.ts (20 tests,
+  mirrors resource-history-async.spec.ts) — enqueue 202 → poll generic
+  /api/job/<id>?prefix=production-achievement → re-issue GET /report → 200 spool-hit
+  → DuckDB-WASM render, using REAL duckdb-python-generated Parquet fixtures (base64)
+  matching data-shape §3.28.1; plus empty/error/503 states. Wrote
+  tests/integration/test_production_achievement_resilience.py (pytest.mark.integration,
+  mock-based/CI-safe): oracle failure during chunk fanout → job failed; RQ timeout →
+  failed not stuck; route 503 when Redis drops post-healthcheck; enqueue returns
+  none+error when Redis unreachable; spool miss/removed → 410; heavy_query_slot
+  fail-open at capacity + acquire/release symmetry. Also UPDATED the 3 pre-existing
+  stale Playwright specs (production-achievement.spec.js, resilience/, data-boundary/)
+  from the old sync /report shape to the new 202/200-spool-hit envelope (resolves
+  visual-reviewer VIS-2).
+artifacts:
+  - { type: e2e-spec, pointer: "frontend/tests/playwright/production-achievement-async.spec.ts" }
+  - { type: resilience-test, pointer: "tests/integration/test_production_achievement_resilience.py" }
+  - { type: stale-spec-fix, pointer: "frontend/tests/playwright/production-achievement.spec.js" }
+notes: "Playwright specs run in CI (built dist + chromium); resilience pytest is mock-based, no Redis needed."
+next-action: "covered by qa-reviewer sign-off"

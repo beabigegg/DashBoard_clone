@@ -1,0 +1,20 @@
+change-id: production-achievement-async-spool
+agent: ci-cd-gatekeeper
+status: done
+summary: >
+  Wrote ci-gates.md (14 gate rows; required headers present). New Tier-1 required
+  gate worker-env-parity-static (grep check failing the build if any deploy/*.service
+  hardcodes a *_USE_UNIFIED_JOB/*_USE_RQ Environment= override — prevents split-brain
+  routing). Stress/soak stays weekly/manual (not PR-blocking) but stress-soak-report.md
+  sign-off required BEFORE first start of the worker unit (flag defaults on, pure kill
+  switch, no gradual flip). Created deploy/mes-dashboard-production-achievement-worker.service
+  mirroring production-history unit + --job-execution-timeout. Edited backend-tests.yml
+  (deploy/** triggers + parity step) and frontend-tests.yml (production-achievement-async-e2e).
+  Finalized contracts/ci/ci-gate-contract.md draft (kept schema-version 1.3.36) + CHANGELOG.
+artifacts:
+  - { type: ci-gates, pointer: "specs/changes/production-achievement-async-spool/ci-gates.md" }
+  - { type: deploy-unit, pointer: "deploy/mes-dashboard-production-achievement-worker.service" }
+  - { type: workflow, pointer: ".github/workflows/backend-tests.yml" }
+  - { type: workflow, pointer: ".github/workflows/frontend-tests.yml" }
+  - { type: contract, pointer: "contracts/ci/ci-gate-contract.md" }
+next-action: "implementation-planner writes implementation-plan.md"

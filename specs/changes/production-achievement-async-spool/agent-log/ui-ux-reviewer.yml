@@ -1,0 +1,49 @@
+change-id: production-achievement-async-spool
+agent: ui-ux-reviewer
+status: done
+verdict: PASS-WITH-NOTES
+summary: >
+  New async states (pre-poll overlay / poll progress card / empty / error / 503 /
+  WASM-unsupported) are mostly well-handled and consistent with resource-history.
+  Two MEDIUM issues introduced by this migration are being routed back to
+  frontend-engineer for fix before gate; issues 3-5 are low/pre-existing follow-ups.
+findings:
+  - id: UX-1
+    severity: medium
+    introduced-by-change: true
+    status: fix-routed
+    detail: >
+      hasQueried stays true on failure/cancel so App.vue still renders the
+      filter-empty DataTable ("找不到符合條件的資料") + zero SummaryCards under the
+      ErrorBanner — contradictory messaging on 503/JOB_FAILED/timeout/cancel.
+      Fix: :empty-type switch to 'error' when error set; hide summary/chart on error.
+      (useProductionAchievement.ts ~333; App.vue ~185-216)
+  - id: UX-2
+    severity: medium
+    introduced-by-change: true
+    status: fix-routed
+    detail: >
+      _resetAsyncProgress() clears the cancelable progress card BEFORE the re-issued
+      GET /report + duckdb.activate()/computeView(), so the blank full-page
+      LoadingOverlay reappears for the final multi-second client-compute leg and the
+      cancel affordance is lost. Fix: keep progress-card UI (relabel "正在載入結果…",
+      pct=100) through _activateAndRender(). (useProductionAchievement.ts ~300-327)
+  - id: UX-3
+    severity: low
+    introduced-by-change: true
+    status: follow-up
+    detail: >
+      runQuery() unconditionally deactivates DuckDB + re-downloads the spool even when
+      only shift_code/workcenter_group (date-range-independent, PA-08) changed — missed
+      computeView()-only fast path (saveTarget already demonstrates it). Efficiency/perceived-speed only.
+  - id: UX-4
+    severity: low
+    introduced-by-change: false
+    status: backlog
+    detail: PA-06 INNER JOIN silently drops unmapped-SPECNAME volume; unchanged semantic (business-rules.md). Consider an "N筆未對應" hint.
+  - id: UX-5
+    severity: low
+    introduced-by-change: false
+    status: backlog
+    detail: shared AsyncQueryProgress.vue lacks role=progressbar/aria-valuenow + 1s aria-live churn (pre-existing shared component).
+next-action: "batch UX-1 + UX-2 fixes to frontend-engineer after all reviews collected"

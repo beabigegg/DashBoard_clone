@@ -503,12 +503,6 @@
   padding: theme('spacing.token.p16');
 }
 
-/* Inside a grid the row/column gap handles separation, so drop the
-   stacked-chart top margin to keep the top row flush. */
-.theme-admin-dashboard .overview-mini-grid .trend-chart-card {
-  margin-top: 0;
-}
-
 .theme-admin-dashboard .trend-chart-title {
   font-size: 0.9rem;
   font-weight: 600;

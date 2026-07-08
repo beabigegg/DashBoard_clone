@@ -1,0 +1,51 @@
+[Unit]
+Description=MES Dashboard Production Achievement Query Worker (RQ, Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/opt/mes-dashboard/.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+
+# Production achievement worker env-var parity (env-contract §Async Worker — Production Achievement Query)
+Environment="PRODUCTION_ACHIEVEMENT_WORKER_QUEUE=production-achievement-query"
+Environment="PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS=1800"
+# Deliberately NOT set here: PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB. That flag is
+# read from the shared EnvironmentFile above (same /opt/mes-dashboard/.env gunicorn
+# loads) so this worker and gunicorn always resolve the identical value. Do not add
+# an override line here — it would silently split-brain job-type routing (env-contract
+# §Worker Feature-Flag Env-Var Parity; ci-gates.md production-achievement-async-spool
+# worker-env-parity-static gate greps for exactly this mistake).
+
+# NOTE: RQ is pinned rq>=1.16.0,<2.0.0 (pyproject.toml); `rq worker` in that range has
+# NO --job-execution-timeout flag. The per-job timeout is enforced at ENQUEUE time via
+# job_timeout=JobTypeConfig.timeout_seconds (from PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS,
+# resolved on the gunicorn enqueue side), so no CLI timeout flag is needed here.
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${PRODUCTION_ACHIEVEMENT_WORKER_QUEUE:-production-achievement-query}" --url "${REDIS_URL:-redis://localhost:6379/0}"'
+
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-dashboard-production-achievement-worker
+
+# Memory protection: production-achievement worker fans Oracle out in TIME chunks
+# (BaseChunkedDuckDBJob) and writes SPECNAME-grain parquet spools.
+MemoryHigh=3G
+MemoryMax=4G
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/mes-dashboard/logs /opt/mes-dashboard/tmp
+
+[Install]
+WantedBy=multi-user.target

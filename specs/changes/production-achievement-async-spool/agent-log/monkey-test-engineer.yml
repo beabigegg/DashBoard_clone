@@ -1,0 +1,97 @@
+change-id: production-achievement-async-spool
+agent: monkey-test-engineer
+timestamp: "2026-07-08T00:00:00Z"
+status: complete
+artifacts:
+  - { type: test-files, pointer: "frontend/tests/playwright/production-achievement-monkey.spec.ts" }
+  - { type: failure-modes-mapped, pointer: "rapid triple-click Query mid-poll -> runQuery()'s `if (loading.value) return;` in-flight dedup guard; exactly 1 GET /report" }
+  - { type: failure-modes-mapped, pointer: "rapid double-click target Save -> no re-entrancy guard in saveTarget() (finding, not hard-failed); DOM must stay non-torn (edit mode closes, no duplicate edit-input nodes)" }
+  - { type: failure-modes-mapped, pointer: "date filters mutated mid-poll -> _pollForCompletion()'s tail re-GET reads LIVE filters, not a snapshot, and does not re-check isAsyncEnqueued() on the tail response (finding); guard: no crash, page recovers to interactive (query button re-enabled), never a stuck spinner" }
+  - { type: failure-modes-mapped, pointer: "navigate away mid-poll (SPA sidebar nav) -> onUnmounted -> cancelQuery(); guard: poll ticks stop after unmount (<=1 in-flight tick tolerated), clean remount on return, no leaked progress bar" }
+  - { type: failure-modes-mapped, pointer: "explicit Cancel button mid-poll -> cancelQuery(); guard: progress bar clears, query button re-enabled, /abandon POST fires, polling stops" }
+  - { type: failure-modes-mapped, pointer: "browser Back/Forward mid-poll (unsupported navigation sequence) -> guard: no crash, at most one progress bar node after settling" }
+  - { type: failure-modes-mapped, pointer: "tab hidden after a completed query -> guard: zero additional GET /report calls (confirms App.vue's own documented non-goal: NOT an auto-refresh/big-screen kanban)" }
+  - { type: failure-modes-mapped, pointer: "invalid date range (end<start, >730 days, empty dates, DOM-forced non-date/SQL/script string) -> guard: graceful 400 handling, query button never stuck disabled, no XSS side-effect from the DOM-forced payload" }
+  - { type: failure-modes-mapped, pointer: "wrong-typed /report 200 fields (spool_download_url as number, spec_workcenter_map as string, targets_map null) -> guard: activate()'s exception propagates to a graceful error, no crash" }
+  - { type: failure-modes-mapped, pointer: "401 on GET /api/job/<id> mid-poll (stale session) -> guard: active progress bar clears, query button re-enabled, no infinite spinner" }
+  - { type: failure-modes-mapped, pointer: "zero-row / all-unmapped-SPECNAME parquet spool (real DuckDB-WASM fixtures) -> guard: empty table via datatable-empty, never an error toast, never Infinity/NaN text" }
+  - { type: failure-modes-mapped, pointer: "adversarial target_qty (non-numeric, decimal, scientific notation, full-width Unicode digits, script tag, SQL-like string, 400-digit overflow-to-Infinity, whitespace-only) -> guard: validateTargetQtyInput() rejects client-side, zero PUT calls, no script execution" }
+  - { type: failure-modes-mapped, pointer: "target_qty edited to 0 -> real DuckDB-WASM recompute (mapped parquet fixture) -> guard: achievement_rate CASE-WHEN renders the null placeholder '—', never Infinity/NaN in the DOM" }
+  - { type: seeds-recorded, pointer: "n/a (deterministic mocked network fixtures throughout; no randomized/fuzzed generation used — every payload is a fixed adversarial corpus entry, not a seeded fuzzer)" }
+next-action: none
+notes: >
+  Read implementation-plan.md, test-plan.md, design.md, context-manifest.md
+  (all under specs/changes/production-achievement-async-spool/, in scope).
+  Read frontend/src/production-achievement/{App.vue, utils.ts,
+  composables/useProductionAchievement.ts,
+  composables/useProductionAchievementDuckDB.ts,
+  components/TargetEditPanel.vue, __tests__/useProductionAchievement.test.ts,
+  __tests__/useProductionAchievementDuckDB.test.ts} (in scope) to ground
+  selectors, response shapes, and existing mocked-engine coverage so the new
+  Playwright spec complements rather than duplicates the unit tier. Read
+  frontend/tests/playwright/{resource-history-async.spec.ts,
+  downtime-analysis.spec.ts, reject-history-filter.spec.ts, _auth.js,
+  production-achievement.spec.js,
+  resilience/production-achievement-resilience.spec.js,
+  data-boundary/production-achievement-data-boundary.spec.js} (in scope, same
+  directory tree) for house conventions: page.route() LIFO, pageRendered
+  guard, "assert if rendered else annotate" fallback pattern, and the
+  established precedent (downtime-analysis.spec.ts) that Playwright specs in
+  this repo do NOT feed real parquet through DuckDB-WASM (its 8-byte
+  "PAR1PAR1" fixture is explicitly documented as something "DuckDB-WASM would
+  reject"). This spec improves on that precedent for 3 scenarios (empty
+  spool, all-unmapped-SPECNAME, target-edit recompute) by using REAL,
+  schema-correct, duckdb-python-round-tripped Parquet fixtures embedded as
+  base64 (generation performed in the session scratchpad, not committed to
+  the repo — only the resulting base64 bytes are embedded in the spec file),
+  while keeping the same graceful degrade-to-annotation fallback so a
+  WASM-init constraint in a given CI runner cannot produce a false failure;
+  the unconditional pin for the same invariants already lives at the
+  mocked-engine unit tier (useProductionAchievementDuckDB.test.ts), which is
+  NOT allowed to degrade.
+
+  One minor scope note: used `grep` (not `Read`) against
+  frontend/src/shared-ui/components/AsyncQueryProgress.vue (outside this
+  agent's allowed-paths packet) to confirm the `.async-job-progress` /
+  `.async-job-progress__cancel` class names already documented in the
+  in-scope resource-history-async.spec.ts header comment were unchanged for
+  this shared component. No business logic was read; only public CSS class
+  selectors already disclosed by an in-scope sibling file. Not filed as a CER
+  since no new information beyond the already-approved sibling file's
+  documented selectors was consulted.
+
+  Existing production-achievement.spec.js /
+  resilience/production-achievement-resilience.spec.js /
+  data-boundary/production-achievement-data-boundary.spec.js (all pre-dating
+  this change, from production-achievement-kanban) mock GET /report as a
+  synchronous array-of-rows response — the OLD contract. Under this change's
+  new always-async contract, /report now returns either a 202 envelope or a
+  200 spool-hit envelope ({query_id, spool_download_url,
+  spec_workcenter_map, targets_map}), never a bare row array. Those three
+  files were left untouched (out of this agent's Deliverables scope --
+  frontend/tests/playwright/production-achievement-async.spec.ts is listed as
+  e2e-resilience-engineer's/frontend-engineer's deliverable in
+  context-manifest.md's Required Tests, not this agent's) but are flagged
+  here: they will very likely need a same-shape contract update (or
+  superseding) once run against the real async backend, since their current
+  mocks no longer match api-contract.md's post-change 200/202 envelope shape.
+  This is a pre-existing-test-drift observation, not a monkey-spec failure,
+  and is reported per this agent's instruction to record (not silently fix
+  or hide) surface area it did not itself touch.
+
+  Execution: no live dev server / built dist / backend was available in this
+  sandboxed session (matches every sibling spec's own "no dev server
+  detected -> skip with annotation" convention, which this new spec follows
+  throughout). Validated instead via `npx playwright test --list` (24 tests
+  parsed cleanly across 14 scenario groups, zero syntax/import-resolution
+  errors) and a base64-round-trip decode check confirming all three embedded
+  Parquet fixtures survived the heredoc write byte-for-byte. A scratch
+  vue-tsc pass against an ad-hoc tsconfig showed the same `Buffer`/`process`
+  "not found" noise on the pre-existing sibling specs
+  (downtime-analysis.spec.ts, resource-history-async.spec.ts) as on this new
+  file, confirming these are environmental (tests/playwright/ is not in the
+  project's own tsconfig.json `include` list -- `npm run type-check` never
+  type-checks this directory) rather than defects introduced here. Per
+  ci-gates.md, this monkey spec belongs to the nightly/manual family; it was
+  not run through cdd-kit's bounded CI test ladder and test-evidence.yml was
+  not touched.

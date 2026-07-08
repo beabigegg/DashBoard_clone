@@ -1,0 +1,16 @@
+change-id: production-achievement-async-spool
+agent: implementation-planner
+status: done
+summary: >
+  Wrote implementation-plan.md as an execution packet: backend-engineer packet
+  (8 rows) + frontend-engineer packet (4 rows) + TDD sequence + gotchas. Load-bearing
+  correction: core/query_cost_policy.py needs NO code edit — the _APPROVED_CALLERS
+  whitelist is in tests/test_query_cost_policy.py (design.md's Affected-Components row
+  was slightly imprecise). Chunk-seam re-aggregating post_aggregate flagged as the
+  highest-value unit test. Confirmed: heavy_query_slot inherited from run() (no manual
+  acquire, but worker must join _APPROVED_CALLERS); job-registry 12-count must NOT be
+  bumped (worker-registered type); hyphen job prefix (production-achievement) vs
+  underscore spool namespace (production_achievement).
+artifacts:
+  - { type: implementation-plan, pointer: "specs/changes/production-achievement-async-spool/implementation-plan.md" }
+next-action: "backend-engineer (TDD, bounded ladder) then frontend-engineer"

@@ -294,3 +294,24 @@ class TestAlwaysAsyncField:
         assert config.always_async is True, (
             f"Expected always_async=True, got {config.always_async}"
         )
+
+    def test_production_achievement_registered_with_always_async_true(self):
+        """production-achievement registration must have always_async=True
+        (production-achievement-async-spool, AC-4).
+
+        Does NOT bump the 12-count in TestJobServiceRegistrations --
+        worker-registered types (this one included) are excluded from that
+        count, per eap-alarm/resource-history precedent.
+        """
+        import importlib
+        import mes_dashboard.services.job_registry as jr
+        import mes_dashboard.workers.production_achievement_worker as w
+
+        # Re-register against the currently-cleared registry
+        importlib.reload(w)
+
+        config = jr.get_job_type_config("production-achievement")
+        assert config is not None, "production-achievement job type not registered"
+        assert config.always_async is True, (
+            f"Expected always_async=True, got {config.always_async}"
+        )

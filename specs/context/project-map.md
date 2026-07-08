@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 191
-visible-files: 1026
+visible-dirs: 194
+visible-files: 1036
 omitted-dirs: 66
-truncated-dirs: 5
+truncated-dirs: 6
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -59,6 +59,7 @@ DashBoard_clone/
 |   |   |-- 05224b1f50d4c8e2
 |   |   |-- 06e37be44b7c2558
 |   |   |-- 0860b7ce1f462945
+|   |   |-- 096794da29b0a5fe
 |   |   |-- 09af02b32eace3be
 |   |   |-- 0a24b457adbbced2
 |   |   |-- 0db51a1a0f9a9046
@@ -79,6 +80,7 @@ DashBoard_clone/
 |   |   |-- 267688019eacc507
 |   |   |-- 284335a248b2d321
 |   |   |-- 28d9bc818b741a80
+|   |   |-- 2a2e79adea51da33
 |   |   |-- 2a82a499c11a5de8
 |   |   |-- 2b2923cb2e7b99f7
 |   |   |-- 2b39e13cddad788d
@@ -99,9 +101,7 @@ DashBoard_clone/
 |   |   |-- 46b03a60678f44dd
 |   |   |-- 471dc2d32d0357fb
 |   |   |-- 47b65f8dbbcf8e4a
-|   |   |-- 4931c7f42526aede
-|   |   |-- 4ae095b17a1de95e
-|   |   \-- ... (109 more entries truncated; cap=50)
+|   |   \-- ... (121 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -175,12 +175,15 @@ DashBoard_clone/
 |   |   |-- 0011-global-concurrency-semaphore-rq-oracle-bound.md
 |   |   |-- 0012-navigation-source-of-truth-code-manifest.md
 |   |   |-- 0013-db-scheduling-reuse-wip-cache-no-dedicated-query.md
-|   |   \-- 0014-msd-forward-lineage-seed-anchor.md
+|   |   |-- 0014-msd-forward-lineage-seed-anchor.md
+|   |   \-- 0015-eap-alarm-dual-shape-event-inclusion.md
 |   |-- architecture/
 |   |   |-- base-job-semaphore-wiring-stress-soak-report.md
 |   |   |-- cache-spool-patterns.md
 |   |   |-- ci-workflow.md
 |   |   |-- css-patterns.md
+|   |   |-- eap-event-alarm-semantics-investigation.md
+|   |   |-- eap-event-uph-collection-investigation.md
 |   |   |-- filter-convergence-plan.md
 |   |   |-- frontend-patterns.md
 |   |   |-- modernization-policy.md
@@ -509,6 +512,18 @@ DashBoard_clone/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
+|   |-- test-results/
+|   |   |-- mid-section-defect-test-ty-741ab-ion-narrows-package-options-chromium/
+|   |   |   |-- error-context.md
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   |-- mid-section-defect-test-ty-741ab-ion-narrows-package-options-chromium-retry1/
+|   |   |   |-- error-context.md
+|   |   |   |-- test-failed-1.png
+|   |   |   |-- trace.zip
+|   |   |   \-- video.webm
+|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -651,46 +666,57 @@ DashBoard_clone/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260702_124028.log
-|   |   |-- access_20260702_143629.log
-|   |   |-- access_20260706_090154.log
-|   |   |-- error_20260702_124028.log
-|   |   |-- error_20260702_125019.log
-|   |   |-- error_20260702_143629.log
-|   |   |-- error_20260706_090154.log
-|   |   |-- rq_downtime_worker_20260702_124028.log
-|   |   |-- rq_downtime_worker_20260702_143629.log
-|   |   |-- rq_downtime_worker_20260706_090154.log
-|   |   |-- rq_eap_alarm_worker_20260702_124028.log
-|   |   |-- rq_eap_alarm_worker_20260702_143629.log
-|   |   |-- rq_eap_alarm_worker_20260706_090154.log
-|   |   |-- rq_hold_hist_worker_20260702_124028.log
-|   |   |-- rq_hold_hist_worker_20260702_143629.log
-|   |   |-- rq_hold_hist_worker_20260706_090154.log
-|   |   |-- rq_msd_worker_20260702_124028.log
-|   |   |-- rq_msd_worker_20260702_143629.log
-|   |   |-- rq_msd_worker_20260706_090154.log
-|   |   |-- rq_prod_hist_worker_20260702_124028.log
-|   |   |-- rq_prod_hist_worker_20260702_143629.log
-|   |   |-- rq_prod_hist_worker_20260706_090154.log
-|   |   |-- rq_reject_worker_20260702_124028.log
-|   |   |-- rq_reject_worker_20260702_143629.log
-|   |   |-- rq_reject_worker_20260706_090154.log
-|   |   |-- rq_resource_worker_20260702_124028.log
-|   |   |-- rq_resource_worker_20260702_143629.log
-|   |   |-- rq_resource_worker_20260706_090154.log
-|   |   |-- rq_warmup_worker_20260702_124028.log
-|   |   |-- rq_warmup_worker_20260702_143629.log
-|   |   |-- rq_warmup_worker_20260706_090154.log
-|   |   |-- rq_worker_20260702_124028.log
-|   |   |-- rq_worker_20260702_143629.log
-|   |   |-- rq_worker_20260706_090154.log
-|   |   |-- rq_yield_alert_worker_20260702_124028.log
-|   |   |-- rq_yield_alert_worker_20260702_143629.log
-|   |   |-- rq_yield_alert_worker_20260706_090154.log
-|   |   |-- watchdog_20260702_124028.log
-|   |   |-- watchdog_20260702_143629.log
-|   |   \-- watchdog_20260706_090154.log
+|   |   |-- access_20260708_072105.log
+|   |   |-- access_20260708_073540.log
+|   |   |-- access_20260708_074557.log
+|   |   |-- access_20260708_075940.log
+|   |   |-- access_20260708_082120.log
+|   |   |-- error_20260708_072105.log
+|   |   |-- error_20260708_073540.log
+|   |   |-- error_20260708_074557.log
+|   |   |-- error_20260708_075940.log
+|   |   |-- error_20260708_082120.log
+|   |   |-- rq_downtime_worker_20260708_072105.log
+|   |   |-- rq_downtime_worker_20260708_073540.log
+|   |   |-- rq_downtime_worker_20260708_074557.log
+|   |   |-- rq_downtime_worker_20260708_075940.log
+|   |   |-- rq_downtime_worker_20260708_082120.log
+|   |   |-- rq_eap_alarm_worker_20260708_072105.log
+|   |   |-- rq_eap_alarm_worker_20260708_073540.log
+|   |   |-- rq_eap_alarm_worker_20260708_074557.log
+|   |   |-- rq_eap_alarm_worker_20260708_075940.log
+|   |   |-- rq_eap_alarm_worker_20260708_082120.log
+|   |   |-- rq_hold_hist_worker_20260708_072105.log
+|   |   |-- rq_hold_hist_worker_20260708_073540.log
+|   |   |-- rq_hold_hist_worker_20260708_074557.log
+|   |   |-- rq_hold_hist_worker_20260708_075940.log
+|   |   |-- rq_hold_hist_worker_20260708_082120.log
+|   |   |-- rq_msd_worker_20260708_072105.log
+|   |   |-- rq_msd_worker_20260708_073540.log
+|   |   |-- rq_msd_worker_20260708_074557.log
+|   |   |-- rq_msd_worker_20260708_075940.log
+|   |   |-- rq_msd_worker_20260708_082120.log
+|   |   |-- rq_prod_hist_worker_20260708_072105.log
+|   |   |-- rq_prod_hist_worker_20260708_073540.log
+|   |   |-- rq_prod_hist_worker_20260708_074557.log
+|   |   |-- rq_prod_hist_worker_20260708_075940.log
+|   |   |-- rq_prod_hist_worker_20260708_082120.log
+|   |   |-- rq_reject_worker_20260708_072105.log
+|   |   |-- rq_reject_worker_20260708_073540.log
+|   |   |-- rq_reject_worker_20260708_074557.log
+|   |   |-- rq_reject_worker_20260708_075940.log
+|   |   |-- rq_reject_worker_20260708_082120.log
+|   |   |-- rq_resource_worker_20260708_072105.log
+|   |   |-- rq_resource_worker_20260708_073540.log
+|   |   |-- rq_resource_worker_20260708_074557.log
+|   |   |-- rq_resource_worker_20260708_075940.log
+|   |   |-- rq_resource_worker_20260708_082120.log
+|   |   |-- rq_warmup_worker_20260708_072105.log
+|   |   |-- rq_warmup_worker_20260708_073540.log
+|   |   |-- rq_warmup_worker_20260708_074557.log
+|   |   |-- rq_warmup_worker_20260708_075940.log
+|   |   |-- rq_warmup_worker_20260708_082120.log
+|   |   \-- ... (15 more entries truncated; cap=50)
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -847,6 +873,7 @@ DashBoard_clone/
 |       |   |-- ai_business_context.py
 |       |   |-- ai_function_registry.py
 |       |   |-- ai_functions.yaml
+|       |   |-- ai_leader_orchestrator.py
 |       |   |-- ai_query_service.py
 |       |   |-- ai_query_understanding.py
 |       |   |-- ai_schema_context.py
@@ -891,8 +918,7 @@ DashBoard_clone/
 |       |   |-- production_achievement_permission_service.py
 |       |   |-- production_achievement_service.py
 |       |   |-- production_achievement_target_service.py
-|       |   |-- production_history_job_service.py
-|       |   \-- ... (32 more entries truncated; cap=50)
+|       |   \-- ... (33 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -1178,6 +1204,7 @@ DashBoard_clone/
 |   |-- test_ai_agent_loop.py
 |   |-- test_ai_business_context.py
 |   |-- test_ai_function_registry.py
+|   |-- test_ai_leader_orchestrator.py
 |   |-- test_ai_query_service.py
 |   |-- test_ai_query_understanding.py
 |   |-- test_ai_routes.py
@@ -1209,8 +1236,7 @@ DashBoard_clone/
 |   |-- test_common_filters.py
 |   |-- test_container_filter_cache.py
 |   |-- test_container_resolution_policy.py
-|   |-- test_core_exceptions.py
-|   \-- ... (195 more entries truncated; cap=50)
+|   \-- ... (196 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
@@ -1226,18 +1252,18 @@ DashBoard_clone/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- hold_dataset/
-|   |   |   \-- 82641904d6697e31.parquet
+|   |   |-- eap_alarm/
+|   |   |   \-- eap_alarm_2026-06-30_2026-07-06_f927a85a_v5.parquet
 |   |   |-- reject_dataset/
-|   |   |   \-- 250a0b6f73fa8307.parquet
+|   |   |   \-- 3bd7a65c547f115f.parquet
 |   |   |-- resource_dataset/
-|   |   |   |-- 078a84dc80d606bc.parquet
-|   |   |   \-- 5748bf29536c7fce.parquet
+|   |   |   |-- 72c9cd4897ff2f48.parquet
+|   |   |   \-- 88ea49a6af816ff1.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- 09fc08d427246217.parquet
-|   |   |   \-- 61768f9604660e04.parquet
+|   |   |   |-- 4d0593acf290396f.parquet
+|   |   |   \-- d9245009c9c8cb73.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- 58e7d3b631f8ec15.parquet
+|   |   |   \-- acffa1d722aeda74.parquet
 |   |   |-- probe_103606.json
 |   |   |-- probe_104090.json
 |   |   |-- probe_104859.json
@@ -1259,10 +1285,16 @@ DashBoard_clone/
 |   |   |-- probe_12085.json
 |   |   |-- probe_127692.json
 |   |   |-- probe_128330.json
+|   |   |-- probe_154932.json
+|   |   |-- probe_154979.json
 |   |   |-- probe_156959.json
+|   |   |-- probe_165073.json
+|   |   |-- probe_165147.json
+|   |   |-- probe_165168.json
 |   |   |-- probe_168402.json
 |   |   |-- probe_172172.json
 |   |   |-- probe_173016.json
+|   |   |-- probe_176174.json
 |   |   |-- probe_181609.json
 |   |   |-- probe_181912.json
 |   |   |-- probe_181994.json
@@ -1273,29 +1305,11 @@ DashBoard_clone/
 |   |   |-- probe_205549.json
 |   |   |-- probe_205775.json
 |   |   |-- probe_205989.json
-|   |   |-- probe_206035.json
-|   |   |-- probe_215284.json
-|   |   |-- probe_215386.json
-|   |   |-- probe_236639.json
-|   |   |-- probe_267375.json
-|   |   |-- probe_267626.json
-|   |   \-- ... (18 more entries truncated; cap=50)
+|   |   \-- ... (55 more entries truncated; cap=50)
+|   |-- container_filter_cache.loading
 |   |-- downtime_analysis.duckdb
-|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_downtime_worker.pid
-|   |-- rq_eap_alarm_worker.pid
-|   |-- rq_hold_hist_worker.pid
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_query_tool_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_resource_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_warmup_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   \-- resource_history.duckdb
 |-- .coverage
 |-- .dockerignore
 |-- .env

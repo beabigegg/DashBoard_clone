@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.37.0"
+    "version": "1.38.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -5748,10 +5748,16 @@
               }
             }
           },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
           "400": {
             "description": "Error response (see contract error format)"
           },
           "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
             "description": "Error response (see contract error format)"
           }
         },
@@ -5760,7 +5766,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cdd-errors": "400/500"
+        "x-cdd-errors": "202/400/500/503"
       }
     },
     "/api/production-achievement/filter-options": {
@@ -7413,10 +7419,119 @@
           "success": {
             "type": "boolean"
           },
-          "data": {},
+          "data": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "query_id": {
+                "type": "string"
+              },
+              "spool_download_url": {
+                "type": "string",
+                "pattern": "^/api/spool/production_achievement/.+\\.parquet$"
+              },
+              "spec_workcenter_map": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "SPECNAME",
+                    "workcenter_group"
+                  ],
+                  "properties": {
+                    "SPECNAME": {
+                      "type": "string"
+                    },
+                    "workcenter_group": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "targets_map": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "shift_code",
+                    "workcenter_group",
+                    "target_qty"
+                  ],
+                  "properties": {
+                    "shift_code": {
+                      "type": "string"
+                    },
+                    "workcenter_group": {
+                      "type": "string"
+                    },
+                    "target_qty": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
           "error": {},
           "meta": {
             "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string"
+              },
+              "app_version": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ProductionAchievementJobAccepted": {
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "async",
+              "job_id",
+              "status_url"
+            ],
+            "properties": {
+              "async": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "status_url": {
+                "type": "string"
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "timestamp"
+            ],
             "properties": {
               "timestamp": {
                 "type": "string"

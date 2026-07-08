@@ -1,0 +1,128 @@
+change-id: production-achievement-async-spool
+agent: frontend-engineer
+timestamp: "2026-07-08T14:55:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/production-achievement/composables/useProductionAchievementDuckDB.ts:1-311" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/composables/useProductionAchievement.ts:1-479" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/App.vue:1-232" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/__tests__/useProductionAchievementDuckDB.test.ts:1-320" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/__tests__/useProductionAchievement.test.ts:1-425" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/__tests__/App.test.ts:1-155" }
+  - { type: files-changed, pointer: "tests/test_frontend_production_achievement_parity.py:1-360" }
+  - { type: files-changed, pointer: "specs/changes/production-achievement-async-spool/context-manifest.md#Context Expansion Requests" }
+  - { type: components-affected, pointer: "useProductionAchievementDuckDB, useProductionAchievement, production-achievement/App.vue" }
+  - { type: tests-added, pointer: "frontend/src/production-achievement/__tests__/useProductionAchievementDuckDB.test.ts (19 tests: PA-06 rollup, PA-07 rate guards, activation threshold=0, error/unsupported states)" }
+  - { type: tests-added, pointer: "frontend/src/production-achievement/__tests__/useProductionAchievement.test.ts (15 tests: 200 spool-hit, 202 poll-to-completion, 503, network failure, empty spool, FIX 2 progress-stays-active-through-render, FIX 3 mid-poll snapshot + tail-202-reenqueue + reenqueue-cap, saveTarget in-place recompute vs full-requery fallback, resetFilters, cancelQuery)" }
+  - { type: tests-added, pointer: "frontend/src/production-achievement/__tests__/App.test.ts (3 tests, NEW: FIX 1 error-hides-results vs success-shows-results vs empty-result-still-shows-results, real App.vue mount)" }
+  - { type: tests-added, pointer: "tests/test_frontend_production_achievement_parity.py (10 tests: dual-tier SQL-vs-golden business-key diff over build_achievement_rows())" }
+  - { type: test-evidence, pointer: "specs/changes/production-achievement-async-spool/test-evidence.yml#changed-area (combined backend pytest 213 passed/11 skipped + frontend type-check + vitest 772 passed/2 skipped, includes the new resilience.py + parity.py files)" }
+  - { type: accessibility-audit, pointer: "n/a (no new interactive elements beyond the existing shared AsyncQueryProgress component's cancel button, which already carries its own aria-live/role=status wiring)" }
+next-action: none
+notes: >
+  IP-6/IP-7 implemented, then three coordinator-relayed UI/UX + monkey-review
+  follow-up fixes applied to useProductionAchievement.ts + App.vue.
+
+  Original implementation: useProductionAchievementDuckDB.ts mirrors
+  useResourceHistoryDuckDB.ts's activate/computeView/deactivate lifecycle;
+  activate() calls checkLocalComputeEligibility with threshold=0 (Q1,
+  always-activate) and throws an explicit unsupported-browser error with no
+  hidden server fallback when WASM is unavailable. computeView() SQL: INNER
+  JOIN spool.SPECNAME to an in-memory VALUES-table spec_workcenter_map via
+  UPPER(TRIM(SPECNAME)) on both sides (matches backend
+  str(specname).strip().upper()), GROUP BY output_date/shift_code/
+  workcenter_group SUM(actual_output_qty) (PA-06), then LEFT JOIN a second
+  VALUES-table targets_map on (shift_code, workcenter_group) with a CASE WHEN
+  guard producing null on missing/zero target and 0.0 on
+  zero-actual+non-null-target (PA-07, never Infinity).
+
+  FIX 1 (UX-1, contradictory error+empty messaging): App.vue's results block
+  now gates on `showResults = hasQueried && !error` (was just `hasQueried`) --
+  on a failed query the SummaryCardGroup/AchievementChart/detail DataTable no
+  longer render alongside ErrorBanner; a genuine zero-row success still
+  renders the results section as-is. Added App.test.ts (new file, real
+  App.vue mount via @vue/test-utils shallow mode) asserting presence/absence
+  of the SummaryCardGroup/AchievementChart/DataTable components by module
+  reference across the 503-error / success / empty-success cases; also
+  strengthened the existing 503 unit test in useProductionAchievement.test.ts
+  to assert the hasQueried=true+error!=='' precondition explicitly.
+
+  FIX 2 (UX-2, tail-end flicker + lost cancel): _pollForCompletion() no
+  longer resets asyncJobProgress in its success path -- it relabels the
+  card ("正在載入結果…", pct=100, status='finished') and leaves
+  `active=true` through the tail re-GET; runQuery()'s `finally` is now the
+  ONLY place that resets it, after _activateAndRender() (parquet fetch +
+  DuckDB activate + computeView) has also settled, success or failure. Added
+  a unit test that snapshots asyncJobProgress state via a mockImplementationOnce
+  hook on the final computeView sendQuery call, proving active/status/progress/
+  pct are still in the "loading result" state at that point, not reset back to
+  a blank full-page overlay.
+
+  FIX 3 (monkey scenario 3, mid-poll stale-filter correctness bug): runQuery()
+  now snapshots {start_date, end_date, shift_code, workcenter_group} into a
+  local QuerySnapshot once at enqueue time; _fetchReportOnce/_pollForCompletion/
+  _activateAndRender all thread that snapshot through instead of reading live
+  `filters` -- a user editing the date range mid-poll no longer causes the
+  tail re-GET to target a different (not-yet-spooled) range. Additionally,
+  the tail re-GET can itself come back 202 again (e.g. spool TTL/eviction
+  race); _pollForCompletion now recurses to re-poll the new job against the
+  SAME snapshot (bounded by MAX_TAIL_REENQUEUE_ATTEMPTS=2, after which it
+  surfaces a clean error instead of feeding an undefined spool_download_url
+  into activate() or looping forever). Three new unit tests: live-filter
+  mutation during poll does not leak into the tail-GET URL (asserted via the
+  captured fetch call args) while the user's live edit is still preserved for
+  their next query; a single 202-on-retry is handled by transparently
+  re-polling and rendering; repeated 202-on-retry beyond the cap surfaces
+  error.value without an infinite loop.
+
+  Dual-tier parity: tests/test_frontend_production_achievement_parity.py
+  executes the LITERAL SQL text (buildValuesTableSql/rollup/computeView,
+  transcribed verbatim into Python) via the real `duckdb` package against
+  build_achievement_rows() as golden -- 10/10 passed, including a
+  case-variant-SPECNAME collapse case and an all-unmapped-SPECNAME
+  empty-result case (the join-key risk implementation-plan.md flagged as
+  highest-value). Filed CER-003 in context-manifest.md for this Python test
+  file (not listed in the frontend-engineer sub-packet nor top-level Allowed
+  Paths) per the harness prompt's explicit "note it and proceed"
+  authorization, mirroring the already-approved CER-002 precedent; the CER
+  also documents why tests/test_frontend_duckdb_parity.py +
+  tests/fixtures/frontend_compute_parity.json were NOT extended (that fixture
+  is single-purpose for a KPI-hours shaped consumer unrelated to
+  achievement_rate, and the formula here lives entirely in SQL, not an
+  importable pure JS function).
+
+  Discovered (pre-existing, out of scope): frontend/tsconfig.json's `include`
+  never added src/production-achievement/**/* (a gap from the prior
+  production-achievement-kanban change), so the officially-wired `npm run
+  type-check` does not check this page at all and passes trivially;
+  self-verified all new/edited files (including the new App.test.ts) with an
+  ad-hoc vue-tsc invocation against a scratch tsconfig -- zero errors in my
+  files; the only errors surfaced were 6 pre-existing ones in the untouched
+  TargetEditPanel.vue. Did not touch frontend/tsconfig.json (not in my
+  Allowed Paths) -- still flagging for qa-reviewer/ci-cd-gatekeeper
+  visibility.
+
+  Post-fix verification: `npm run type-check` clean; `npm run test` 772
+  passed / 2 skipped (up from 765/2 -- 4 new composable tests + 3 new
+  App.test.ts tests). Refreshed the combined changed-area ladder evidence per
+  the coordinator's request: `cdd-kit test select` picked up the OTHER
+  engineers' new files (tests/integration/test_production_achievement_resilience.py,
+  tests/stress/test_production_achievement_stress.py,
+  tests/integration/test_soak_workload.py) alongside the existing domain
+  suite; stress/soak were deliberately EXCLUDED from the combined command per
+  the explicit "do NOT touch stress/soak/e2e/monkey specs" instruction (they
+  are Tier-4 nightly families, not part of the collect/targeted/changed-area/
+  contract ladder) -- resilience.py WAS included (Tier-1, fully-mocked,
+  CI-safe per its own docstring) and its 9 cases collected+skipped cleanly
+  ("need --run-integration option to run", matching cdd-kit test select's own
+  generated command with no extra flag, so this is expected/unchanged
+  behavior, not something I gated differently). Final combined command: 15
+  backend pytest files (213 passed / 11 skipped, all skips gated behind
+  --run-integration / --run-integration-real flags outside the bounded
+  ladder's scope) chained via && with `cd frontend && npm run type-check &&
+  npm run test` (772 passed / 2 skipped). cdd-kit's hasShellControl() detects
+  the `&&` and correctly skips its pytest-flag auto-injection for compound
+  commands, so bounded flags (-q --maxfail=1 --tb=short -ra) were supplied
+  explicitly. Contract phase left fully intact (untouched by this packet,
+  still cdd-kit validate --contracts --env --ci, passed). Did not run the
+  full phase.

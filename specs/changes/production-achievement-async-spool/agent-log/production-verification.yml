@@ -1,0 +1,61 @@
+change-id: production-achievement-async-spool
+agent: main-claude (live end-to-end verification)
+status: done
+summary: >
+  Post-gate live run against real Redis + Oracle surfaced TWO bugs the mocked
+  test suite missed (both only reproducible by driving the actual enqueue→worker
+  flow). Both fixed, regression-tested, and re-verified end-to-end (fresh job →
+  worker → chunked Oracle → parquet spool written rows=113 → job finished).
+findings:
+  - id: PV-1
+    severity: high
+    introduced-by-change: true
+    status: fixed
+    detail: >
+      Dev launcher gap: scripts/start_server.sh starts one RQ worker per queue but
+      had no block for production-achievement-query, so in dev nothing consumed the
+      queue (job enqueued, no RQ log). We shipped the prod systemd unit
+      (deploy/mes-dashboard-production-achievement-worker.service) but missed the dev
+      launcher. Fix: added full worker wiring (config vars, PID/log vars, start/stop/
+      status functions, 3 orchestration call sites) mirroring production-history, plus
+      --job-execution-timeout. bash -n clean.
+  - id: PV-2
+    severity: high
+    introduced-by-change: true
+    status: fixed
+    detail: >
+      Enqueue↔worker signature mismatch. async_query_job_service.enqueue_job_dynamic
+      builds kwargs={"job_id": ..., **params}; worker entry is
+      execute_production_achievement_unified_job(job_id, params). The route passed
+      FLAT params={"start_date","end_date"} → spread as unexpected top-level kwargs →
+      "TypeError: got an unexpected keyword argument 'start_date'" at worker runtime.
+      Reference production_history route nests as params={"params": body}. Fix: route
+      now passes params={"params": {"start_date","end_date"}}. Root cause of the blind
+      spot: route unit tests mocked enqueue_query_job and asserted whatever shape the
+      route passed, never that the shape is consumable by the worker.
+  - id: PV-3
+    severity: high
+    introduced-by-change: true
+    status: fixed
+    detail: >
+      Invalid RQ CLI flag. Both the dev launcher (scripts/start_server.sh) and our
+      deploy systemd unit passed `rq worker ... --job-execution-timeout <n>`, but RQ is
+      pinned rq>=1.16.0,<2.0.0 and 1.16.2 has NO such flag → worker failed to start with
+      "Error: No such option '--job-execution-timeout'". My delegation prompt wrongly
+      instructed keeping it (copied from the deploy-unit shape). Fix: removed the flag
+      from both start_server.sh lines and our deploy unit ExecStart; per-job timeout is
+      already enforced at enqueue via job_timeout=JobTypeConfig.timeout_seconds. Verified:
+      corrected `rq worker ... --log-format ... --date-format ...` burst run starts + exits
+      clean (exit 0, "Listening on production-achievement-query"). PRE-EXISTING follow-up:
+      deploy/mes-dashboard-{downtime,wip,hold-history}-worker.service carry the same invalid
+      flag (out of this change's scope; would fail under the pinned RQ if launched via systemd).
+regression-tests-added:
+  - "tests/test_production_achievement_routes.py::test_report_enqueue_params_bind_to_worker_signature — reproduces enqueue kwargs and binds to the real worker signature (fails on flat params)"
+  - "corrected test_report_spool_miss_enqueues_returns_202_with_job_id to assert the nested params shape"
+verification:
+  - "enqueue_job_dynamic('production-achievement', params={'params':{...}}) → burst worker → job OK"
+  - "OracleArrowReader chunked fanout → post_aggregate parquet written rows=113 → FinishedJobRegistry has the job → tmp/query_spool/production_achievement/<key>.parquet on disk"
+gate: "cdd-kit gate --strict re-run after fixes: passed"
+followups-for-cdd-close:
+  - "New RQ worker → wire BOTH deploy/*.service AND scripts/start_server.sh (dev launcher)"
+  - "Async route↔worker contract: unit tests that mock enqueue must also assert the enqueued kwargs bind to the worker function signature (add a signature-bind test), else shape mismatches pass CI and fail only at worker runtime"

@@ -1,0 +1,16 @@
+change-id: production-achievement-async-spool
+agent: change-classifier
+status: done
+summary: >
+  Classified as Tier 1, lane=feature. Sync→async re-architecture of the
+  production-achievement report (RQ + DuckDB spool + frontend DuckDB-WASM).
+  High risk via shared heavy_query_slot semaphore + browser-served spool
+  namespace + cross-process env parity; multi-contract (api/data/env/business/ci).
+  Architecture review required (design.md yes) to resolve Q1 activation
+  threshold, Q2 targets/mapping carrier, Q3 spool delivery A/B. 9 acceptance
+  criteria (AC-1..AC-9). No atomic split (single coherent pre-launch migration).
+artifacts:
+  - { type: tier, pointer: "Tier 1" }
+  - { type: classification, pointer: "specs/changes/production-achievement-async-spool/change-classification.md" }
+  - { type: context-manifest-draft, pointer: "specs/changes/production-achievement-async-spool/context-manifest.md" }
+next-action: "spec-architect writes design.md (resolve Q1/Q2/Q3) before implementation-planner"

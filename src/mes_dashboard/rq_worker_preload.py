@@ -53,3 +53,10 @@ def ensure_rq_logging() -> None:
 
 # Auto-configure on import (covers ``rq worker -c`` preload path).
 ensure_rq_logging()
+
+# Import job-type-registering worker modules so ``rq worker <queue>
+# -c mes_dashboard.rq_worker_preload`` (see start_server.sh) fires their
+# module-level register_job_type() side effect before any job is dequeued
+# (production-achievement-async-spool, env-contract.md §Worker Feature-Flag
+# Env-Var Parity).
+import mes_dashboard.workers.production_achievement_worker  # noqa: E402,F401

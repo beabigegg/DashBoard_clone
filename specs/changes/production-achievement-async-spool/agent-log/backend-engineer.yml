@@ -1,0 +1,77 @@
+change-id: production-achievement-async-spool
+agent: backend-engineer
+status: done
+summary: >
+  Migrated GET /api/production-achievement/report from a synchronous Oracle
+  request-path read to the async BaseChunkedDuckDBJob pattern, mirroring
+  resource_history_base_worker.py/production_history_worker.py. New worker
+  ProductionAchievementJob (namespace=production_achievement, TIME chunks,
+  requires_cross_chunk_reduction=False) fans sql/production_achievement.sql
+  out per-day and re-aggregates all chunk parquets via GROUP BY output_date,
+  shift_code, SPECNAME SUM(actual_output_qty) in post_aggregate -- the
+  chunk-seam re-aggregation tripwire test (TestChunkSeamReaggregation) passed
+  on first implementation, proving PA-03/PA-04's previous-day shift-tail rows
+  straddling a calendar-midnight TIME-chunk boundary collapse to exactly one
+  row per key instead of duplicating. Route rewritten to spool-hit 200 (query_id
+  + spool_download_url + inline spec_workcenter_map + targets_map, injected
+  unconditionally) / spool-miss+worker 202 (job_id + status_url) / spool-miss+
+  no-worker 503 (always_async=True, no sync fallback). get_achievement_report()
+  removed from the service (retained build_achievement_rows() as test-only
+  golden); added _PA_SPOOL_SCHEMA_VERSION + make_canonical_pa_spool_id()
+  (date-range-only key) shared by route + worker. Added production_achievement
+  to spool_routes._ALLOWED_NAMESPACES and to
+  tests/test_query_cost_policy.py's _APPROVED_CALLERS["base_chunked_duckdb_job"].
+  Wired PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB (route module, default on,
+  pure kill switch -- no legacy path), PRODUCTION_ACHIEVEMENT_WORKER_QUEUE /
+  _JOB_TIMEOUT_SECONDS (worker module) as os.getenv module constants,
+  following the established sibling-domain pattern (no *_USE_UNIFIED_JOB flag
+  in config/settings.py exists anywhere in the codebase, so none was added
+  there -- see Deviations). Added an rq_worker_preload.py import so
+  register_job_type() fires for `rq worker -c mes_dashboard.rq_worker_preload`
+  (start_server.sh dev path). Deploy systemd unit + CI workflow steps were
+  already authored by ci-cd-gatekeeper; not touched here.
+followup:
+  - "Live-testing bug found post-implementation: scripts/start_server.sh (dev launcher) starts one RQ worker per queue explicitly wired per domain, and the production-achievement-query queue block was never added when the worker shipped, so queries enqueued but no dev-mode worker consumed them (deploy/mes-dashboard-production-achievement-worker.service was correct; only the dev launcher was missing). Fixed by mirroring the existing production-history worker wiring at all 4 site categories: (1) config vars RQ_PRODUCTION_ACHIEVEMENT_WORKER_ENABLED/_QUEUE near line 49-51; (2) RQ_PROD_ACH_WORKER_PID_FILE + RQ_PROD_ACH_WORKER_LOG in resolve_runtime_paths() near line 132-133 (PID file var added in addition to the requested log var -- required by the start/stop functions' pgrep/kill-0 pattern, same as every sibling worker); (3) get_rq_prod_ach_worker_pid/is_rq_prod_ach_worker_running/start_rq_prod_ach_worker/stop_rq_prod_ach_worker/rq_prod_ach_worker_status functions at lines 1262-1367 (structure mirrors start_rq_prod_hist_worker exactly, but the rq worker invocation additionally carries --job-execution-timeout \"${PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS:-1800}\" -- verified this exact flag already exists in deploy/mes-dashboard-production-achievement-worker.service's ExecStart, so the dev launcher now matches prod; note this flag is NOT present in ANY other worker's dev-launcher function today, including downtime/hold-history/resource-history (BaseChunkedDuckDBJob siblings) -- it exists only in their systemd units, so production-achievement is the first dev-launcher worker to carry it, by design per the task spec, not a copy-paste of an existing dev-launcher pattern); (4) 3 orchestration call sites -- start_rq_prod_ach_worker added to do_start() immediately after start_rq_prod_hist_worker (line 2261), stop_rq_prod_ach_worker added to do_stop() immediately BEFORE stop_rq_prod_hist_worker (line 2337, preserving the file's exact reverse-of-start stop ordering), rq_prod_ach_worker_status added to do_status() immediately after rq_prod_hist_worker_status (line 2391). Did NOT touch rotate_logs()/log-archive-cleanup (lines ~613-696): grepped and confirmed the most recently added sibling worker (query-tool) is also absent from that function, so omission is consistent existing precedent, not a gap introduced here -- kept the fix strictly to the 4 site categories the task specified. bash -n scripts/start_server.sh passed clean; grep -c for prod_ach/PRODUCTION_ACHIEVEMENT/production-achievement returned 35 hits across all sites. No worker was started; no other file touched."
+deviations:
+  - "config/settings.py was NOT edited. implementation-plan.md's IP-5 row hedged with \"if centralized here\"; grepping every sibling *_USE_UNIFIED_JOB/*_WORKER_QUEUE/*_JOB_TIMEOUT_SECONDS flag in the repo (resource_history, production_history, eap_alarm, downtime) confirmed NONE live in config/settings.py's Config class -- all are os.getenv() module constants in the specific routes.py/worker.py files. Followed that established precedent instead, to avoid introducing a one-off inconsistent pattern. tests/contract/test_env_downtime_unified_flag.py (the mirrored precedent) only asserts contract-doc presence, not settings.py wiring, confirming this is safe."
+  - "context-manifest.md's ### backend-engineer packet lists zero test file paths and omits 4 root-level test files (tests/test_production_achievement_routes.py, tests/test_production_achievement_service.py, tests/test_spool_routes.py, tests/test_env_contract.py) that implementation-plan.md's File-Level Plan/TDD Sequence explicitly assign to backend-engineer. Logged as CER-002 (status: approved, self-documented per the already-approved implementation-plan.md's explicit authorization) in context-manifest.md rather than blocking the whole Tier-1 change over a scaffold enumeration gap; flagged here for reviewer visibility."
+  - "PRODUCTION_ACHIEVEMENT_JOB_TTL_SECONDS was NOT introduced (unlike resource_history_base_worker.py's RESOURCE_BASE_JOB_TTL_SECONDS) -- env-contract.md documents only 3 PRODUCTION_ACHIEVEMENT_* vars; JobTypeConfig.ttl_seconds default (3600s) is used instead to avoid an undocumented 4th env knob."
+tests-run:
+  ladder: "cdd-kit test select/run production-achievement-async-spool"
+  phases:
+    - { phase: collect, status: passed, run: specs/changes/production-achievement-async-spool/test-runs/20260708-112235 }
+    - { phase: targeted, status: passed, run: specs/changes/production-achievement-async-spool/test-runs/20260708-112245 }
+    - { phase: changed-area, status: passed, run: specs/changes/production-achievement-async-spool/test-runs/20260708-112254 }
+    - { phase: contract, status: passed, run: specs/changes/production-achievement-async-spool/test-runs/20260708-112304, command: "cdd-kit validate --contracts --env --ci" }
+  note: >
+    full phase intentionally NOT run here (final/CI smoke per harness policy,
+    not each implementer's responsibility; also avoids regenerating the
+    180+ file contract sample set mid-change while other agents are still
+    working). Full production-achievement test surface (routes, service,
+    unified_job, output_date, shift_code, permissions, target_service,
+    query_cost_policy, job_registry, spool_routes, env_contract, env
+    contract flag file, base_chunked_duckdb_job, resource_history_unified_job,
+    resource_history_rq_async_route, async_query_job_service) re-verified
+    green in one combined run outside the ladder (307 passed, 2 skipped
+    [integration_real stubs]).
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/workers/production_achievement_worker.py (new, 270 lines)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/production_achievement_service.py (removed get_achievement_report; added _PA_SPOOL_SCHEMA_VERSION + make_canonical_pa_spool_id, lines 198-238)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/production_achievement_routes.py (api_get_report rewritten, lines 87-234)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/spool_routes.py:29 (_ALLOWED_NAMESPACES += production_achievement)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/rq_worker_preload.py (worker import for register_job_type side-effect)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_unified_job.py::TestChunkSeamReaggregation::test_midnight_seam_group_produces_one_row_not_duplicate_keys (KEY test, passed)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_unified_job.py (12 tests: TestProductionAchievementJob, TestChunkSeamReaggregation, TestSpoolSchema)" }
+  - { type: tests-added, pointer: "tests/test_production_achievement_routes.py::TestReportRoute (rewritten: 202/200-spool-hit/503 branches, 8 tests)" }
+  - { type: tests-added, pointer: "tests/test_query_cost_policy.py::TestNoPandasAndNoCallers (production_achievement_worker added to _APPROVED_CALLERS)" }
+  - { type: tests-added, pointer: "tests/test_job_registry.py::TestAlwaysAsyncField::test_production_achievement_registered_with_always_async_true (12-count NOT bumped)" }
+  - { type: tests-added, pointer: "tests/test_spool_routes.py::test_production_achievement_in_allowed_namespaces" }
+  - { type: tests-added, pointer: "tests/test_env_contract.py::test_production_achievement_async_env_vars_pinned_defaults" }
+  - { type: tests-added, pointer: "tests/contract/test_env_production_achievement_unified_flag.py (new, 4 classes incl. TestGunicornWorkerParity)" }
+  - { type: tests-added, pointer: "tests/integration/test_production_achievement_rq_async.py (new, pytest.mark.integration_real stubs)" }
+  - { type: test-output, pointer: "307 passed, 2 skipped in 2.21s (combined production-achievement + shared-module re-verification run)" }
+  - { type: contracts-touched, pointer: "none (api-contract.md/data-shape-contract.md/env-contract.md/business-rules.md already authored by contract-reviewer; contract phase re-validated cdd-kit validate --contracts --env --ci passed with zero edits)" }
+  - { type: files-changed, pointer: "scripts/start_server.sh (dev launcher hotfix: RQ production-achievement worker wiring, lines 49-51, 132-133, 1262-1367, 2261, 2337, 2391)" }
+  - { type: test-output, pointer: "n/a (dev-script wiring fix, no Python test surface per task scope; bash -n scripts/start_server.sh passed clean)" }
+  - { type: contracts-touched, pointer: "none (dev launcher script only; deploy/mes-dashboard-production-achievement-worker.service ExecStart already correct, verified matching --job-execution-timeout flag)" }
+next-action: "frontend-engineer: useProductionAchievementDuckDB.ts + useProductionAchievement.ts + App.vue async wiring (IP-6/IP-7). Dev launcher hotfix complete -- production-achievement RQ worker now starts with the rest of the fleet via ./scripts/start_server.sh start."
