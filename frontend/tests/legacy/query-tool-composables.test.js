@@ -214,14 +214,13 @@ test('useEquipmentQuery performs timeline multi-query and keeps validation error
 
 test('useLotDetail single-item mode captures quality_meta from response and clears on complete status', async () => {
   let callCount = 0;
+  // lot-history / lot-associations are POSTed; the composable reads payload?.data
+  // as the inner object containing data/pagination/quality_meta.
   const restore = setupWindowMesApi({
-    get: async (url) => {
-      const parsed = new URL(url, 'http://local.test');
-      if (parsed.pathname === '/api/query-tool/lot-history') {
+    post: async (url) => {
+      if (url === '/api/query-tool/lot-history') {
         callCount++;
         const status = callCount === 1 ? 'partial' : 'complete';
-        // apiGet returns window.MesApi.get result directly;
-        // composable reads payload?.data as the inner object containing data/pagination/quality_meta
         return {
           data: {
             data: [{ CONTAINERID: 'CID-001', EQUIPMENTID: 'EQ-01' }],
@@ -230,7 +229,7 @@ test('useLotDetail single-item mode captures quality_meta from response and clea
           },
         };
       }
-      if (parsed.pathname === '/api/query-tool/lot-associations') {
+      if (url === '/api/query-tool/lot-associations') {
         return {
           data: {
             data: [],
@@ -266,9 +265,8 @@ test('useLotDetail single-item mode captures quality_meta from response and clea
 
 test('useLotDetail single-item association captures quality_meta for paged tabs', async () => {
   const restore = setupWindowMesApi({
-    get: async (url) => {
-      const parsed = new URL(url, 'http://local.test');
-      if (parsed.pathname === '/api/query-tool/lot-history') {
+    post: async (url, payload) => {
+      if (url === '/api/query-tool/lot-history') {
         return {
           data: {
             data: [{ CONTAINERID: 'CID-001', EQUIPMENTID: 'EQ-01' }],
@@ -277,8 +275,8 @@ test('useLotDetail single-item association captures quality_meta for paged tabs'
           },
         };
       }
-      if (parsed.pathname === '/api/query-tool/lot-associations') {
-        const assocType = parsed.searchParams.get('type');
+      if (url === '/api/query-tool/lot-associations') {
+        const assocType = payload?.type;
         return {
           data: {
             data: [{ TYPE: assocType }],
@@ -310,14 +308,20 @@ test('useLotDetail single-item association captures quality_meta for paged tabs'
 
 
 test('useLotDetail batches selected container ids and preserves workcenter filters in follow-up query', async () => {
-  const getCalls = [];
+  const historyPosts = [];
   const restore = setupWindowMesApi({
     get: async (url) => {
-      getCalls.push(url);
       const parsed = new URL(url, 'http://local.test');
-      if (parsed.pathname === '/api/query-tool/lot-history') {
-        const page = Number(parsed.searchParams.get('page') || 1);
-        const perPage = Number(parsed.searchParams.get('per_page') || 200);
+      if (parsed.pathname === '/api/query-tool/workcenter-groups') {
+        return { data: { data: [{ name: 'WB', sequence: 1 }] } };
+      }
+      throw new Error(`unexpected GET url: ${url}`);
+    },
+    post: async (url, payload) => {
+      if (url === '/api/query-tool/lot-history') {
+        historyPosts.push(payload);
+        const page = Number(payload?.page || 1);
+        const perPage = Number(payload?.per_page || 200);
         return {
           data: {
             data: page === 1
@@ -345,10 +349,10 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
           },
         };
       }
-      if (parsed.pathname === '/api/query-tool/lot-associations') {
-        const assocType = parsed.searchParams.get('type');
-        const page = Number(parsed.searchParams.get('page') || 1);
-        const perPage = Number(parsed.searchParams.get('per_page') || 200);
+      if (url === '/api/query-tool/lot-associations') {
+        const assocType = payload?.type;
+        const page = Number(payload?.page || 1);
+        const perPage = Number(payload?.per_page || 200);
         return {
           data: {
             data: [{ TYPE: assocType, CONTAINERID: 'CID-001' }],
@@ -360,10 +364,7 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
           },
         };
       }
-      if (parsed.pathname === '/api/query-tool/workcenter-groups') {
-        return { data: { data: [{ name: 'WB', sequence: 1 }] } };
-      }
-      throw new Error(`unexpected GET url: ${url}`);
+      throw new Error(`unexpected POST url: ${url}`);
     },
   });
 
@@ -378,26 +379,24 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
     assert.equal(detail.qualityMeta.history?.status, 'truncated');
     assert.equal(detail.qualityMeta.materials?.status, 'partial');
 
-    const historyCall = getCalls.find((url) => url.startsWith('/api/query-tool/lot-history?'));
+    const historyCall = historyPosts[0];
     assert.ok(historyCall, 'lot-history API should be called');
-    const historyParams = new URL(historyCall, 'http://local.test').searchParams;
-    assert.equal(historyParams.get('container_ids'), 'CID-001,CID-002');
-    assert.equal(historyParams.get('page'), '1');
-    assert.equal(historyParams.get('per_page'), '200');
+    // container_ids batch travels in the POST body as an array — never a URL.
+    assert.deepEqual(historyCall.container_ids, ['CID-001', 'CID-002']);
+    assert.equal(historyCall.page, 1);
+    assert.equal(historyCall.per_page, 200);
 
     const page2 = await detail.setSubTabPage('history', 2);
     assert.equal(page2, true);
     assert.equal(detail.pagination.history.page, 2);
     assert.equal(detail.qualityMeta.history?.status, 'complete');
-    const page2Call = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
-    const page2Params = new URL(page2Call, 'http://local.test').searchParams;
-    assert.equal(page2Params.get('page'), '2');
-    assert.equal(page2Params.get('per_page'), '200');
+    const page2Call = historyPosts.at(-1);
+    assert.equal(page2Call.page, 2);
+    assert.equal(page2Call.per_page, 200);
 
     await detail.setSelectedWorkcenterGroups(['WB']);
-    const latestHistoryCall = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
-    const latestParams = new URL(latestHistoryCall, 'http://local.test').searchParams;
-    assert.equal(latestParams.get('workcenter_groups'), 'WB');
+    const latestCall = historyPosts.at(-1);
+    assert.deepEqual(latestCall.workcenter_groups, ['WB']);
   } finally {
     restore();
   }
@@ -405,14 +404,13 @@ test('useLotDetail batches selected container ids and preserves workcenter filte
 
 
 test('useLotDetail changing per-page resets current page to 1 for paged tabs', async () => {
-  const getCalls = [];
+  const postCalls = [];
   const restore = setupWindowMesApi({
-    get: async (url) => {
-      getCalls.push(url);
-      const parsed = new URL(url, 'http://local.test');
-      if (parsed.pathname === '/api/query-tool/lot-history') {
-        const page = Number(parsed.searchParams.get('page') || 1);
-        const perPage = Number(parsed.searchParams.get('per_page') || 25);
+    post: async (url, payload) => {
+      postCalls.push({ url, payload });
+      if (url === '/api/query-tool/lot-history') {
+        const page = Number(payload?.page || 1);
+        const perPage = Number(payload?.per_page || 25);
         return {
           data: {
             data: [{ CONTAINERID: `CID-H-${page}`, EQUIPMENTID: 'EQ-01' }],
@@ -421,10 +419,10 @@ test('useLotDetail changing per-page resets current page to 1 for paged tabs', a
           },
         };
       }
-      if (parsed.pathname === '/api/query-tool/lot-associations') {
-        const assocType = parsed.searchParams.get('type');
-        const page = Number(parsed.searchParams.get('page') || 1);
-        const perPage = Number(parsed.searchParams.get('per_page') || 25);
+      if (url === '/api/query-tool/lot-associations') {
+        const assocType = payload?.type;
+        const page = Number(payload?.page || 1);
+        const perPage = Number(payload?.per_page || 25);
         return {
           data: {
             data: [{ TYPE: assocType, PAGE: page }],
@@ -447,10 +445,9 @@ test('useLotDetail changing per-page resets current page to 1 for paged tabs', a
     await detail.setSubTabPerPage('history', 50);
     assert.equal(detail.pagination.history.page, 1);
     assert.equal(detail.pagination.history.per_page, 50);
-    const latestHistoryCall = getCalls.filter((url) => url.startsWith('/api/query-tool/lot-history?')).at(-1);
-    const historyParams = new URL(latestHistoryCall, 'http://local.test').searchParams;
-    assert.equal(historyParams.get('page'), '1');
-    assert.equal(historyParams.get('per_page'), '50');
+    const latestHistoryCall = postCalls.filter((c) => c.url === '/api/query-tool/lot-history').at(-1);
+    assert.equal(latestHistoryCall.payload.page, 1);
+    assert.equal(latestHistoryCall.payload.per_page, 50);
 
     await detail.setActiveSubTab('materials');
     await detail.setSubTabPage('materials', 3);
@@ -459,12 +456,11 @@ test('useLotDetail changing per-page resets current page to 1 for paged tabs', a
     await detail.setSubTabPerPage('materials', 100);
     assert.equal(detail.pagination.materials.page, 1);
     assert.equal(detail.pagination.materials.per_page, 100);
-    const latestMaterialsCall = getCalls
-      .filter((url) => url.includes('/api/query-tool/lot-associations?') && url.includes('type=materials'))
+    const latestMaterialsCall = postCalls
+      .filter((c) => c.url === '/api/query-tool/lot-associations' && c.payload?.type === 'materials')
       .at(-1);
-    const materialParams = new URL(latestMaterialsCall, 'http://local.test').searchParams;
-    assert.equal(materialParams.get('page'), '1');
-    assert.equal(materialParams.get('per_page'), '100');
+    assert.equal(latestMaterialsCall.payload.page, 1);
+    assert.equal(latestMaterialsCall.payload.per_page, 100);
   } finally {
     restore();
   }

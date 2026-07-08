@@ -1,6 +1,6 @@
 import { reactive, ref } from 'vue';
 
-import { apiGet, ensureMesApiAvailable } from '../../core/api';
+import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
 import { exportCsv } from '../utils/csv';
 import { normalizeText, parseDateTime, uniqueValues, formatDateTime } from '../utils/values';
 
@@ -257,21 +257,23 @@ export function useLotDetail(initial: LotDetailInitial = {}) {
     errors.history = '';
 
     try {
-      const params = new URLSearchParams();
-      // Batch mode: send all CIDs in one request
-      if (cids.length > 1) {
-        params.set('container_ids', cids.join(','));
-      } else {
-        params.set('container_id', cids[0]);
-      }
       const targetPage = Number(page || pagination.history.page || 1);
-      params.set('page', String(targetPage));
-      params.set('per_page', String(pagination.history.per_page || DEFAULT_PER_PAGE));
+      // POST so a large container_ids batch travels in the body, never an
+      // over-long URL (gunicorn caps the request line at limit_request_line).
+      const body: Record<string, unknown> = {
+        page: targetPage,
+        per_page: pagination.history.per_page || DEFAULT_PER_PAGE,
+      };
+      if (cids.length > 1) {
+        body.container_ids = cids;
+      } else {
+        body.container_id = cids[0];
+      }
       if (selectedWorkcenterGroups.value.length > 0) {
-        params.set('workcenter_groups', selectedWorkcenterGroups.value.join(','));
+        body.workcenter_groups = selectedWorkcenterGroups.value;
       }
 
-      const payload = await apiGet(`/api/query-tool/lot-history?${params.toString()}`, {
+      const payload = await apiPost('/api/query-tool/lot-history', body, {
         timeout: 360000,
         silent: true,
       });
@@ -356,22 +358,25 @@ export function useLotDetail(initial: LotDetailInitial = {}) {
         paginationMap[associationType] = emptyPagination(0);
         qualityMap[associationType] = null;
       } else {
-        // Non-jobs tabs: batch all CIDs into a single request
-        const params = new URLSearchParams();
-        if (cids.length > 1) {
-          params.set('container_ids', cids.join(','));
-        } else {
-          params.set('container_id', cids[0]);
-        }
-        params.set('type', associationType);
+        // Non-jobs tabs: batch all CIDs into a single request.
+        // POST so a large container_ids batch travels in the body, never an
+        // over-long URL (gunicorn caps the request line at limit_request_line).
         const pagRow = paginationMap[associationType] as Pagination;
         const targetPage = Number(page || pagRow?.page || 1);
+        const body: Record<string, unknown> = {
+          type: associationType,
+        };
+        if (cids.length > 1) {
+          body.container_ids = cids;
+        } else {
+          body.container_id = cids[0];
+        }
         if (PAGED_SUB_TABS.has(associationType)) {
-          params.set('page', String(targetPage));
-          params.set('per_page', String(pagRow?.per_page || DEFAULT_PER_PAGE));
+          body.page = targetPage;
+          body.per_page = pagRow?.per_page || DEFAULT_PER_PAGE;
         }
 
-        const payload = await apiGet(`/api/query-tool/lot-associations?${params.toString()}`, {
+        const payload = await apiPost('/api/query-tool/lot-associations', body, {
           timeout: 360000,
           silent: true,
         });

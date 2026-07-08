@@ -1528,3 +1528,104 @@ class TestEquipmentPeriodRejectsDetailSchema:
         payload = response.get_json()
         assert payload['success'] is False
         assert 'error' in payload
+
+
+class TestBatchDetailPostPath:
+    """lot-history / lot-associations accept POST so a large container_ids batch
+    travels in the JSON body instead of an over-long URL that gunicorn's
+    limit_request_line would reject with a 414. GET remains for small reads."""
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_lot_history_post_batch_reads_container_ids_array(self, mock_batch, client):
+        mock_batch.return_value = {
+            'data': [{'CONTAINERID': 'A'}],
+            'total': 1,
+            'pagination': {'page': 2, 'per_page': 5, 'total': 1, 'total_pages': 1},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+        }
+
+        response = client.post(
+            '/api/query-tool/lot-history',
+            json={
+                'container_ids': ['A', 'B', 'C'],
+                'workcenter_groups': ['WB', 'DB'],
+                'page': 2,
+                'per_page': 5,
+            },
+        )
+
+        assert response.status_code == 200
+        mock_batch.assert_called_once()
+        args = mock_batch.call_args
+        # First positional arg is the parsed container_ids list
+        assert args.args[0] == ['A', 'B', 'C']
+        assert args.kwargs['workcenter_groups'] == ['WB', 'DB']
+        assert args.kwargs['page'] == 2
+        assert args.kwargs['per_page'] == 5
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_lot_history_post_large_batch_that_would_overflow_a_get_url(self, mock_batch, client):
+        """A 200-ID batch of long IDs exceeds gunicorn's 4094-byte request line
+        as a GET; via POST it rides in the body and reaches the service fine."""
+        mock_batch.return_value = {
+            'data': [],
+            'total': 0,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 0, 'total_pages': 1},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+        }
+        big_batch = [f"CONTAINERID-{i:04d}-{'X' * 24}" for i in range(200)]
+        # Sanity: the equivalent GET query string alone blows past 4094 bytes.
+        assert len("container_ids=" + ",".join(big_batch)) > 4094
+
+        response = client.post(
+            '/api/query-tool/lot-history',
+            json={'container_ids': big_batch, 'page': 1, 'per_page': 200},
+        )
+
+        assert response.status_code == 200
+        mock_batch.assert_called_once()
+        assert mock_batch.call_args.args[0] == big_batch
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_associations_batch')
+    def test_lot_associations_post_batch_reads_container_ids_array(self, mock_batch, client):
+        mock_batch.return_value = {
+            'data': [{'TYPE': 'materials'}],
+            'total': 1,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 1, 'total_pages': 1},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+        }
+
+        response = client.post(
+            '/api/query-tool/lot-associations',
+            json={'container_ids': ['A', 'B'], 'type': 'materials', 'page': 1, 'per_page': 200},
+        )
+
+        assert response.status_code == 200
+        mock_batch.assert_called_once()
+        args = mock_batch.call_args
+        assert args.args[0] == ['A', 'B']
+        assert args.args[1] == 'materials'
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_lot_history_post_over_limit_returns_413(self, mock_batch, client):
+        client.application.config['QUERY_TOOL_MAX_CONTAINER_IDS'] = 2
+        response = client.post(
+            '/api/query-tool/lot-history',
+            json={'container_ids': ['A', 'B', 'C']},
+        )
+        assert response.status_code == 413
+        mock_batch.assert_not_called()
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_lot_history_batch')
+    def test_lot_history_get_batch_still_supported(self, mock_batch, client):
+        """Backward compat: the comma-separated GET path keeps working."""
+        mock_batch.return_value = {
+            'data': [{'CONTAINERID': 'A'}],
+            'total': 1,
+            'pagination': {'page': 1, 'per_page': 200, 'total': 1, 'total_pages': 1},
+            'quality_meta': {'status': 'complete', 'reasons': []},
+        }
+        response = client.get('/api/query-tool/lot-history?container_ids=A,B')
+        assert response.status_code == 200
+        mock_batch.assert_called_once()
+        assert mock_batch.call_args.args[0] == ['A', 'B']
