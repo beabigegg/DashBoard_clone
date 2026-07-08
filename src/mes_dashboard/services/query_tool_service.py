@@ -45,6 +45,7 @@ from mes_dashboard.core.exceptions import (
     QueryTimeoutError,
     DataContractError,
     InternalQueryError,
+    is_query_timeout,
 )
 from mes_dashboard.core.query_quality_contract import unpack_event_fetch_result
 from mes_dashboard.services.event_fetcher import EventFetcher
@@ -584,6 +585,8 @@ def resolve_lots(input_type: str, values: List[str]) -> Dict[str, Any]:
         raise
     except Exception as exc:
         logger.error(f"LOT resolution failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('解析失敗', cause=exc)
 
 
@@ -1133,6 +1136,8 @@ def get_lot_history(
         raise
     except Exception as exc:
         logger.error(f"LOT history query failed for {container_id}: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1195,6 +1200,8 @@ def get_adjacent_lots(
         raise
     except Exception as exc:
         logger.error(f"Adjacent lots query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1322,6 +1329,8 @@ def get_lot_history_batch(
         raise
     except Exception as exc:
         logger.error(f"LOT history batch query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1430,6 +1439,8 @@ def get_lot_associations_batch(
         raise
     except Exception as exc:
         logger.error(f"LOT {assoc_type} batch query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1476,6 +1487,8 @@ def get_lot_materials(container_id: str, *, page: int = 1, per_page: int = 0) ->
         raise
     except Exception as exc:
         logger.error(f"LOT materials query failed for {container_id}: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1519,6 +1532,8 @@ def get_lot_rejects(container_id: str, *, page: int = 1, per_page: int = 0) -> D
         raise
     except Exception as exc:
         logger.error(f"LOT rejects query failed for {container_id}: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1560,6 +1575,8 @@ def get_lot_holds(container_id: str, *, page: int = 1, per_page: int = 0) -> Dic
         raise
     except Exception as exc:
         logger.error(f"LOT holds query failed for {container_id}: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1661,13 +1678,9 @@ def get_lot_split_merge_history(
     except (UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError):
         raise
     except Exception as exc:
-        error_str = str(exc)
         logger.error(f"Split/merge history query failed for MFGORDERNAME={work_order}: {exc}")
-
-        # Check for timeout error (DPY-4024, ORA-01013, or TimeoutError from read_sql_df_slow)
-        if 'timeout' in error_str.lower() or 'DPY-4024' in error_str or 'ORA-01013' in error_str:
-            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc)
-
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1891,6 +1904,8 @@ def get_lot_jobs(
         raise
     except Exception as exc:
         logger.error(f"LOT jobs query failed for {equipment_id}: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -1953,6 +1968,8 @@ def get_lot_jobs_with_history(
         logger.error(
             f"LOT jobs with txn history query failed for {equipment_id}: {exc}"
         )
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -2303,6 +2320,8 @@ def resolve_lot_equipment(
         raise
     except Exception as exc:
         logger.error(f"Lot equipment lookup failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -2403,6 +2422,8 @@ def get_equipment_status_hours(
         raise
     except Exception as exc:
         logger.error(f"Equipment status hours query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -2474,6 +2495,8 @@ def get_equipment_lots(
         raise
     except Exception as exc:
         logger.error(f"Equipment lots query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -2529,6 +2552,8 @@ def get_equipment_materials(
         raise
     except Exception as exc:
         logger.error(f"Equipment materials query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -2603,6 +2628,8 @@ def get_equipment_rejects(
         raise
     except Exception as exc:
         logger.error(f"Equipment lot rejects query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 
@@ -2657,6 +2684,8 @@ def get_equipment_jobs(
         raise
     except Exception as exc:
         logger.error(f"Equipment jobs query failed: {exc}")
+        if is_query_timeout(exc):
+            raise QueryTimeoutError('查詢逾時，請縮小查詢範圍', cause=exc) from exc
         raise InternalQueryError('查詢失敗', cause=exc)
 
 

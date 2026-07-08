@@ -11,6 +11,7 @@ from mes_dashboard.core.exceptions import (
     DataContractError,
     InternalQueryError,
     LockUnavailableError,
+    is_query_timeout,
 )
 
 _ALL_SUBCLASSES = [
@@ -110,3 +111,37 @@ class TestLockUnavailableError:
     def test_str_returns_message(self):
         exc = LockUnavailableError("lock unavailable")
         assert str(exc) == "lock unavailable"
+
+
+class TestIsQueryTimeout:
+    """is_query_timeout() distinguishes DB timeouts from generic failures so the
+    service layer can map them to HTTP 504 instead of a misleading 500."""
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "DPY-1080: call timeout of 60000 ms exceeded",
+            "DPY-4024: call timeout of 55000 ms exceeded",
+            "DPY-4011: the database or network closed the connection",
+            "ORA-01013: user requested cancel of current operation",
+            "ORA-12170: TNS:Connect timeout occurred",
+            "Some driver Timeout waiting for result",  # generic 'timeout' substring, case-insensitive
+        ],
+    )
+    def test_detects_timeout_error_strings(self, message):
+        assert is_query_timeout(Exception(message)) is True
+
+    def test_detects_builtin_timeout_error(self):
+        assert is_query_timeout(TimeoutError("deadline exceeded")) is True
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "ORA-00942: table or view does not exist",
+            "DPY-3010: connections to this database server version are not supported",
+            "Slow-query concurrency limit reached; try again later",
+            "some unrelated internal failure",
+        ],
+    )
+    def test_ignores_non_timeout_errors(self, message):
+        assert is_query_timeout(Exception(message)) is False

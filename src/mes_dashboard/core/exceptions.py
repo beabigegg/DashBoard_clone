@@ -95,3 +95,42 @@ class LockUnavailableError(MesServiceError):
     ``cause`` holds the original Redis exception when acquisition failed due to
     a connection error (may be ``None`` when the Redis client was ``None``).
     """
+
+
+# ---------------------------------------------------------------------------
+# Timeout classification
+# ---------------------------------------------------------------------------
+
+# Oracle / python-oracledb error codes that indicate a query exceeded its
+# time budget rather than failing for a logic/connection reason. These surface
+# as substrings of ``str(exc)`` (oracledb formats them as ``DPY-xxxx``/``ORA-xxxxx``).
+_TIMEOUT_ERROR_CODES = (
+    "DPY-1080",  # python-oracledb: call timeout (connection.call_timeout exceeded)
+    "DPY-4011",  # python-oracledb: the database or network closed the connection (often after a call timeout)
+    "DPY-4024",  # python-oracledb: call timeout of N ms exceeded
+    "ORA-01013",  # user requested cancel of current operation (statement timeout)
+    "ORA-12170",  # TNS: connect timeout occurred
+)
+
+
+def is_query_timeout(exc: BaseException) -> bool:
+    """Return True when *exc* looks like a query/DB timeout rather than a
+    generic failure.
+
+    Query-tool service functions wrap unexpected errors from the slow-query
+    channel (which enforces ``connection.call_timeout``) into
+    :class:`InternalQueryError` (HTTP 500). A DB call-timeout is not an
+    internal server fault — it is an actionable "縮小查詢範圍" condition that
+    should surface as HTTP 504. Use this to branch to :class:`QueryTimeoutError`
+    before falling back to :class:`InternalQueryError`.
+
+    Detection is by error string because the timeout can arrive as an
+    ``oracledb.DatabaseError`` (``DPY-``/``ORA-`` code) or a plain
+    ``TimeoutError`` raised inside the slow-query iterator.
+    """
+    if isinstance(exc, TimeoutError):
+        return True
+    error_str = str(exc)
+    if "timeout" in error_str.lower():
+        return True
+    return any(code in error_str for code in _TIMEOUT_ERROR_CODES)
