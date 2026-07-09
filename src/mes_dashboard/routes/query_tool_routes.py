@@ -210,6 +210,47 @@ def _reject_if_batch_too_large(container_ids: list[str]):
     return error_response(VALIDATION_ERROR, f'container_ids 數量不可超過 {max_ids} 筆', status_code=413)
 
 
+def _detail_request_values():
+    """Read detail-route params from the JSON body (POST) or query string (GET).
+
+    The batch detail routes (lot-history, lot-associations) accept POST so a
+    large ``container_ids`` list travels in the request body instead of an
+    unbounded URL query string. gunicorn caps the request line at
+    ``limit_request_line`` and rejects an over-long GET with a bare 414 before
+    the app runs — POST removes that ceiling entirely. GET remains supported for
+    single-CID / small reads and external callers.
+
+    Returns ``(values, error)`` where *values* is a mapping exposing ``.get()``
+    (Flask ``request.args`` for GET, the parsed JSON dict for POST) and *error*
+    is a ready-to-return response tuple, or ``None`` when parsing succeeded.
+    """
+    if request.method == 'POST':
+        body, payload_error = parse_json_payload(require_non_empty_object=True)
+        if payload_error is not None:
+            return None, error_response(
+                VALIDATION_ERROR,
+                payload_error.message,
+                status_code=payload_error.status_code,
+            )
+        return body, None
+    return request.args, None
+
+
+def _extract_id_list(values, key: str):
+    """Extract trimmed tokens from ``values[key]``.
+
+    Accepts either a JSON array (POST body) or a comma-separated string (GET
+    query string). Returns ``None`` when the key is absent, else a list (which
+    may be empty when the value held only blanks/separators).
+    """
+    raw = values.get(key)
+    if raw is None:
+        return None
+    if isinstance(raw, (list, tuple)):
+        return [str(item).strip() for item in raw if str(item).strip()]
+    return [tok.strip() for tok in str(raw).split(',') if tok.strip()]
+
+
 def _sanitize_page(value: str | int | None) -> int:
     try:
         return max(int(value or 1), 1)
@@ -423,36 +464,39 @@ def resolve_lot_input():
 # LOT History API
 # ============================================================
 
-@query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
+@query_tool_bp.route('/api/query-tool/lot-history', methods=['GET', 'POST'])
 @_QUERY_TOOL_HISTORY_RATE_LIMIT
 @map_service_errors
 def query_lot_history():
     """Query production history for one or more LOTs.
 
-    Query params:
+    Accepts GET (query string) or POST (JSON body). The frontend uses POST for
+    the batch path so a large container_ids list is not concatenated into an
+    over-long URL (see _detail_request_values).
+
+    Params (query string for GET / JSON keys for POST):
         container_id: Single CONTAINERID (16-char hex)
-        container_ids: Comma-separated CONTAINERIDs (batch mode)
-        workcenter_groups: Optional comma-separated list of WORKCENTER_GROUP names
+        container_ids: CONTAINERIDs — comma-separated string or JSON array (batch mode)
+        workcenter_groups: Optional WORKCENTER_GROUP names — comma-string or array
 
     When container_ids is provided, uses batch query (single EventFetcher call).
     Falls back to container_id for single-CID requests.
     """
-    container_ids_param = request.args.get('container_ids')
-    container_id = request.args.get('container_id')
-    workcenter_groups_param = request.args.get('workcenter_groups')
+    values, req_error = _detail_request_values()
+    if req_error is not None:
+        return req_error
 
-    # Parse workcenter_groups if provided
-    workcenter_groups = None
-    if workcenter_groups_param:
-        workcenter_groups = [
-            g.strip() for g in workcenter_groups_param.split(',') if g.strip()
-        ]
-    page = _sanitize_page(request.args.get('page'))
-    per_page = _sanitize_per_page(request.args.get('per_page'))
+    container_ids_present = values.get('container_ids') not in (None, '')
+    cids = _extract_id_list(values, 'container_ids') or []
+    container_id = values.get('container_id')
+    # Empty workcenter_groups means "no filter" → None, not an empty list.
+    workcenter_groups = _extract_id_list(values, 'workcenter_groups') or None
+
+    page = _sanitize_page(values.get('page'))
+    per_page = _sanitize_per_page(values.get('per_page'))
 
     # Batch mode: container_ids takes precedence
-    if container_ids_param:
-        cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
+    if container_ids_present:
         if not cids:
             return validation_error('請指定 CONTAINERID')
         too_large = _reject_if_batch_too_large(cids)
@@ -523,15 +567,19 @@ def query_adjacent_lots():
 # LOT Associations API
 # ============================================================
 
-@query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
+@query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET', 'POST'])
 @_QUERY_TOOL_ASSOC_RATE_LIMIT
 @map_service_errors
 def query_lot_associations():
     """Query association data for one or more LOTs.
 
-    Query params:
+    Accepts GET (query string) or POST (JSON body). The frontend uses POST for
+    the batch path so a large container_ids list is not concatenated into an
+    over-long URL (see _detail_request_values).
+
+    Params (query string for GET / JSON keys for POST):
         container_id: Single CONTAINERID (16-char hex)
-        container_ids: Comma-separated CONTAINERIDs (batch mode)
+        container_ids: CONTAINERIDs — comma-separated string or JSON array (batch mode)
         type: Association type ('materials', 'rejects', 'holds', 'jobs')
         equipment_id: Equipment ID (required for 'jobs' type)
         time_start: Start time (required for 'jobs' type)
@@ -539,11 +587,16 @@ def query_lot_associations():
 
     When container_ids is provided for materials/rejects/holds, uses batch query.
     """
-    container_ids_param = request.args.get('container_ids')
-    container_id = request.args.get('container_id')
-    assoc_type = request.args.get('type')
-    page = _sanitize_page(request.args.get('page'))
-    per_page = _sanitize_per_page(request.args.get('per_page'))
+    values, req_error = _detail_request_values()
+    if req_error is not None:
+        return req_error
+
+    container_ids_present = values.get('container_ids') not in (None, '')
+    cids = _extract_id_list(values, 'container_ids') or []
+    container_id = values.get('container_id')
+    assoc_type = values.get('type')
+    page = _sanitize_page(values.get('page'))
+    per_page = _sanitize_per_page(values.get('per_page'))
 
     valid_types = ['materials', 'rejects', 'holds', 'splits', 'jobs']
     if assoc_type not in valid_types:
@@ -551,8 +604,7 @@ def query_lot_associations():
 
     # Batch mode for materials/rejects/holds
     batch_types = {'materials', 'rejects', 'holds'}
-    if container_ids_param and assoc_type in batch_types:
-        cids = [c.strip() for c in container_ids_param.split(',') if c.strip()]
+    if container_ids_present and assoc_type in batch_types:
         if not cids:
             return validation_error('請指定 CONTAINERID')
         too_large = _reject_if_batch_too_large(cids)
@@ -578,12 +630,12 @@ def query_lot_associations():
         elif assoc_type == 'holds':
             result = get_lot_holds(container_id, page=page, per_page=per_page)
         elif assoc_type == 'splits':
-            full_history = str(request.args.get('full_history', '')).strip().lower() in {'1', 'true', 'yes'}
+            full_history = str(values.get('full_history', '')).strip().lower() in {'1', 'true', 'yes'}
             result = get_lot_splits(container_id, full_history=full_history)
         elif assoc_type == 'jobs':
-            equipment_id = request.args.get('equipment_id')
-            time_start = request.args.get('time_start')
-            time_end = request.args.get('time_end')
+            equipment_id = values.get('equipment_id')
+            time_start = values.get('time_start')
+            time_end = values.get('time_end')
 
             if not all([equipment_id, time_start, time_end]):
                 return validation_error('查詢 JOB 需指定設備和時間範圍')

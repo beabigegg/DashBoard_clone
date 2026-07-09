@@ -19,6 +19,24 @@ keepalive = 5         # Keep-alive connections timeout
 max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "5000"))
 max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "1000"))
 
+# Request-line / header size limits — bound the URL length that reaches a worker.
+# The query-tool GET batch routes (lot-history, lot-associations) put up to
+# QUERY_TOOL_MAX_CONTAINER_IDS comma-joined container IDs in the query string.
+# gunicorn's default limit_request_line is only 4094 bytes, which a full batch
+# of long container IDs can exceed — the request would then be rejected with a
+# bare 414 *before* the app's clean 413 batch-size guard ever runs. Set it
+# explicitly (to gunicorn's max, 8190) so legitimate batches are not silently
+# truncated, while still bounding abusive/unbounded URLs. The invariant that a
+# worst-case batch fits within this limit is pinned by
+# tests/test_query_tool_url_length_guard.py; if the container-id cap or ID
+# length outgrows this ceiling, move those routes to POST (see
+# frontend/src/core/post-export.ts).
+#
+# gunicorn requires 0 <= value <= 8190 (0 = unlimited); keep GUNICORN_* overrides
+# within that range.
+limit_request_line = int(os.getenv("GUNICORN_LIMIT_REQUEST_LINE", "8190"))
+limit_request_field_size = int(os.getenv("GUNICORN_LIMIT_REQUEST_FIELD_SIZE", "8190"))
+
 # preload_app=True: gunicorn runs create_app() once in the master process before
 # forking workers.  Single-run prewarm tasks (DuckDB, downtime_analysis,
 # material_consumption, resource_cache init) execute once in the master and their

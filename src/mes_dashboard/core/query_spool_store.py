@@ -399,6 +399,7 @@ def read_spool_records(namespace: str, query_id: str) -> Optional[list[dict[str,
     if spool_path is None:
         return None
 
+    conn = None
     try:
         from mes_dashboard.core.duckdb_runtime import create_heavy_query_connection
 
@@ -407,7 +408,6 @@ def read_spool_records(namespace: str, query_id: str) -> Optional[list[dict[str,
         columns = rel.columns
         types = rel.types
         rows = rel.fetchall()
-        conn.close()
 
         # Identify timestamp columns for formatting
         ts_indices = {
@@ -430,6 +430,14 @@ def read_spool_records(namespace: str, query_id: str) -> Optional[list[dict[str,
     except Exception as exc:
         logger.warning("read_spool_records failed (ns=%s, id=%s): %s", namespace, query_id, exc)
         return None
+    finally:
+        # Close in finally so a read_parquet/fetchall failure cannot leak the
+        # DuckDB connection (it previously closed only on the success path).
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def get_spool_file_path(namespace: str, query_id: str) -> Optional[str]:

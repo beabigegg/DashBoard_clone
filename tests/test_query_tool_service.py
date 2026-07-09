@@ -13,6 +13,7 @@ from mes_dashboard.services.query_tool_service import (
     validate_date_range,
     validate_lot_input,
     validate_equipment_input,
+    resolve_lots,
     _resolve_by_lot_id,
     _resolve_by_wafer_lot,
     _resolve_by_serial_number,
@@ -687,3 +688,36 @@ class TestGetEquipmentRejects:
                 # LOTREJECTHISTORY query must NOT have been invoked
                 mock_read.assert_not_called()
                 mock_load.assert_not_called()
+
+
+class TestTimeoutClassification:
+    """A raw DB call-timeout must surface as QueryTimeoutError (HTTP 504),
+    not the generic InternalQueryError (HTTP 500), so the user sees an
+    actionable '縮小查詢範圍' message instead of an opaque server error."""
+
+    def test_resolve_lots_maps_call_timeout_to_query_timeout(self):
+        from unittest.mock import patch
+        from mes_dashboard.core.exceptions import QueryTimeoutError
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                # oracledb raises this when connection.call_timeout is exceeded
+                mock_read.side_effect = Exception(
+                    "DPY-1080: call timeout of 55000 ms exceeded"
+                )
+
+                with pytest.raises(QueryTimeoutError):
+                    resolve_lots('lot_id', ['LOT-1'])
+
+    def test_resolve_lots_non_timeout_stays_internal_error(self):
+        from unittest.mock import patch
+        from mes_dashboard.core.exceptions import InternalQueryError
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT * FROM DUAL"
+                mock_read.side_effect = Exception("ORA-00942: table or view does not exist")
+
+                with pytest.raises(InternalQueryError):
+                    resolve_lots('lot_id', ['LOT-1'])

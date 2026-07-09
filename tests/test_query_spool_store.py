@@ -153,3 +153,65 @@ def test_cleanup_expired_and_orphan_files(monkeypatch, tmp_path):
     assert not orphan_path.exists()
     assert not expired_path.exists()
     assert spool.get_spool_metadata("reject_dataset", "qid-valid-1") is not None
+
+
+def test_read_spool_records_closes_connection_on_read_error(monkeypatch):
+    """Regression: a read_parquet/fetchall failure must not leak the DuckDB
+    connection. Previously conn.close() ran only on the success path, so an
+    error left the connection open — a slow drain across queries."""
+    import mes_dashboard.core.duckdb_runtime as duckdb_runtime
+
+    closed = {"value": False}
+
+    class _FailingConn:
+        def read_parquet(self, path):
+            raise RuntimeError("parquet corrupt")
+
+        def close(self):
+            closed["value"] = True
+
+    monkeypatch.setattr(
+        spool, "get_spool_file_path", lambda ns, qid: "/tmp/does-not-matter.parquet"
+    )
+    monkeypatch.setattr(
+        duckdb_runtime, "create_heavy_query_connection", lambda: _FailingConn()
+    )
+
+    result = spool.read_spool_records("reject_dataset", "qid-read-error")
+
+    assert result is None
+    assert closed["value"] is True, (
+        "DuckDB connection must be closed even when read_parquet fails"
+    )
+
+
+def test_read_spool_records_closes_connection_on_success(monkeypatch):
+    import mes_dashboard.core.duckdb_runtime as duckdb_runtime
+
+    closed = {"value": False}
+
+    class _Rel:
+        columns = ["CONTAINERID"]
+        types = ["VARCHAR"]
+
+        def fetchall(self):
+            return [("C1",)]
+
+    class _OkConn:
+        def read_parquet(self, path):
+            return _Rel()
+
+        def close(self):
+            closed["value"] = True
+
+    monkeypatch.setattr(
+        spool, "get_spool_file_path", lambda ns, qid: "/tmp/x.parquet"
+    )
+    monkeypatch.setattr(
+        duckdb_runtime, "create_heavy_query_connection", lambda: _OkConn()
+    )
+
+    result = spool.read_spool_records("reject_dataset", "qid-ok")
+
+    assert result == [{"CONTAINERID": "C1"}]
+    assert closed["value"] is True
