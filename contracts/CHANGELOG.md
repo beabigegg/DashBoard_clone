@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.38.2] — 2026-07-09
+### Added
+- query-tool-url-timeout (PR #32, post-merge CI conformance fixback): `POST /api/query-tool/lot-history` and `POST /api/query-tool/lot-associations` added alongside the existing `GET` routes (backend already shipped both methods; contract was missing the POST rows, failing `cdd-kit validate` API conformance). Frontend batch path now sends `container_ids`/`workcenter_groups` in a JSON body instead of a comma-joined query string, eliminating the gunicorn `limit_request_line` risk for large batches. `GET` unchanged, still supported for single-CID reads. See Compatibility Notes in `contracts/api/api-contract.md`.
+
 ## [css 1.14.0] — 2026-07-09
 ### Added
 - move-target-permissions-panel (durable-learning promotion, /cdd-close): new `## Known Global Rule Interactions` / `## Forbidden Practices` rule — relocating a component's rendered classes into a different `.theme-X` scope that already has its own component library requires grepping the target theme's `style.css` for class-name collisions first; `npm run css:check` Rule 6 only flags unscoped rules, not same-scope name collisions with conflicting definitions. Evidence: `.theme-admin-dashboard .status-badge`/bare `table` pre-existed for `RecentSessionsTable.vue`; resolved via `.pa-perm-*` rename.
