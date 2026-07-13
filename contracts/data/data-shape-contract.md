@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.37.0
-last-changed: 2026-07-08
+schema-version: 1.38.0
+last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -593,13 +593,26 @@ One row per reject event for `POST /api/query-tool/equipment-period` (`query_typ
 
 ---
 
-## 4. Invalid Data Behavior
+## Invalid Data Behavior
+
+<!--
+Heading MUST be exactly "## Invalid Data Behavior" (no numeric prefix) --
+cdd-kit gate's ADR 0012 §2 data-shape citation resolver
+(`data-shape: <condition>`) matches this heading text verbatim
+(`sectionBody(body, "Invalid Data Behavior")`); a numbered heading like
+"## 4. Invalid Data Behavior" silently resolves zero rows from this table,
+failing every `data-shape:` citation project-wide with "no matching row"
+even though the table itself is populated. Previously numbered "4." in the
+surrounding §1-§7 sequence; found and fixed 2026-07-13 while unblocking
+fix-equipment-lots-trim/query-tool-subtab-cache archival (ADR 0012 gate).
+-->
 
 | condition | expected behavior | error code / UI state | test |
 |---|---|---|---|
 | missing required column | service raises ValueError → 500 INTERNAL_ERROR | INTERNAL_ERROR | `tests/test_field_contracts.py` |
 | wrong type (e.g. string qty) | type coercion or 400 VALIDATION_ERROR | VALIDATION_ERROR | `tests/test_field_contracts.py` |
 | empty dataset | returns empty list `[]`; UI shows EmptyState | — | `frontend/tests/playwright/data-boundary/empty-result.spec.js` |
+| non-empty dataset | returns ≥1 row; UI renders the populated row set | — | `tests/acceptance/test_fix_equipment_lots_trim_acceptance.py` |
 | over max row limit | truncated; adds `_meta.truncated=true` to payload | — | `tests/test_interactive_memory_guard.py` |
 | unexpected enum value | 400 VALIDATION_ERROR | VALIDATION_ERROR | `tests/routes/test_fuzz_routes.py` |
 | malicious input (SQL/XSS/100k) | 400 VALIDATION_ERROR (never 500) | VALIDATION_ERROR | `tests/routes/test_fuzz_routes.py` |

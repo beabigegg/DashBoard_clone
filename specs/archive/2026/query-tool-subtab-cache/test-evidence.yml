@@ -20,4 +20,8 @@ runs:
     status: passed
     command: cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js && npx vue-tsc --noEmit
     summary: specs/changes/query-tool-subtab-cache/test-runs/20260709-110649/summary.json
+  - phase: acceptance
+    status: passed
+    command: cd frontend && npx vitest run tests/acceptance/query-tool-subtab-cache.test.js
+    summary: specs/changes/query-tool-subtab-cache/test-runs/20260713-131046/summary.json
 final-status: passed

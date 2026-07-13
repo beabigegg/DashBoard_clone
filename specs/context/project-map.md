@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 194
-visible-files: 1036
+visible-dirs: 196
+visible-files: 1032
 omitted-dirs: 67
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -33,6 +33,7 @@ Use this deterministic map to choose candidate context paths before reading file
 ```
 DashBoard_clone/
 |-- .cdd/
+|   |-- acceptance-lock.json
 |   |-- approval-policy.yml
 |   |-- asset-manifest.json
 |   |-- code-graph.index.json
@@ -40,6 +41,7 @@ DashBoard_clone/
 |   |-- code-map.yml
 |   |-- conformance.json
 |   |-- context-policy.json
+|   |-- design-lock.json
 |   |-- model-policy.json
 |   |-- policy.yml
 |   \-- tier-policy.json
@@ -525,6 +527,9 @@ DashBoard_clone/
 |   |   |   |-- query-tool-abort.test.js
 |   |   |   |-- reject-history-abort.test.js
 |   |   |   \-- yield-alert-abort.test.js
+|   |   |-- acceptance/
+|   |   |   |-- acceptance.loader.ts
+|   |   |   \-- query-tool-subtab-cache.test.js
 |   |   |-- components/
 |   |   |   |-- ActionButton.test.js
 |   |   |   |-- AsyncQueryProgress.test.js
@@ -666,36 +671,27 @@ DashBoard_clone/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260709_104124.log
-|   |   |-- access_20260709_113337.log
-|   |   |-- error_20260709_104124.log
-|   |   |-- error_20260709_113337.log
-|   |   |-- rq_downtime_worker_20260709_104124.log
-|   |   |-- rq_downtime_worker_20260709_113337.log
-|   |   |-- rq_eap_alarm_worker_20260709_104124.log
-|   |   |-- rq_eap_alarm_worker_20260709_113337.log
-|   |   |-- rq_hold_hist_worker_20260709_104124.log
-|   |   |-- rq_hold_hist_worker_20260709_113337.log
-|   |   |-- rq_msd_worker_20260709_104124.log
-|   |   |-- rq_msd_worker_20260709_113337.log
-|   |   |-- rq_prod_hist_worker_20260709_104124.log
-|   |   |-- rq_prod_hist_worker_20260709_113337.log
-|   |   |-- rq_reject_worker_20260709_104124.log
-|   |   |-- rq_reject_worker_20260709_113337.log
-|   |   |-- rq_resource_worker_20260709_104124.log
-|   |   |-- rq_resource_worker_20260709_113337.log
-|   |   |-- rq_warmup_worker_20260709_104124.log
-|   |   |-- rq_warmup_worker_20260709_113337.log
-|   |   |-- rq_worker_20260709_104124.log
-|   |   |-- rq_worker_20260709_113337.log
-|   |   |-- rq_yield_alert_worker_20260709_104124.log
-|   |   |-- rq_yield_alert_worker_20260709_113337.log
-|   |   |-- watchdog_20260709_104124.log
-|   |   \-- watchdog_20260709_113337.log
+|   |   |-- access_20260713_140321.log
+|   |   |-- error_20260713_140321.log
+|   |   |-- rq_downtime_worker_20260713_140321.log
+|   |   |-- rq_eap_alarm_worker_20260713_140321.log
+|   |   |-- rq_hold_hist_worker_20260713_140321.log
+|   |   |-- rq_msd_worker_20260713_140321.log
+|   |   |-- rq_prod_hist_worker_20260713_140321.log
+|   |   |-- rq_reject_worker_20260713_140321.log
+|   |   |-- rq_resource_worker_20260713_140321.log
+|   |   |-- rq_warmup_worker_20260713_140321.log
+|   |   |-- rq_worker_20260713_140321.log
+|   |   |-- rq_yield_alert_worker_20260713_140321.log
+|   |   \-- watchdog_20260713_140321.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
+|   |-- login_sessions.sqlite-shm
+|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
 |   |-- metrics_history.sqlite-shm
 |   |-- metrics_history.sqlite-wal
@@ -967,6 +963,9 @@ DashBoard_clone/
 |       |-- app.py
 |       \-- rq_worker_preload.py
 |-- tests/
+|   |-- acceptance/
+|   |   |-- acceptance_loader.py
+|   |   \-- test_fix_equipment_lots_trim_acceptance.py
 |   |-- contract/
 |   |   |-- samples/
 |   |   |   |-- .gitkeep
@@ -1220,8 +1219,7 @@ DashBoard_clone/
 |   |-- test_circuit_breaker.py
 |   |-- test_common_filters.py
 |   |-- test_container_filter_cache.py
-|   |-- test_container_resolution_policy.py
-|   \-- ... (199 more entries truncated; cap=50)
+|   \-- ... (200 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
@@ -1241,15 +1239,15 @@ DashBoard_clone/
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- hold_dataset/
-|   |   |   \-- c125b5de22268fb6.parquet
+|   |   |   \-- 3ed2a3bf053e3498.parquet
 |   |   |-- reject_dataset/
-|   |   |   \-- ab2164b57726d1aa.parquet
+|   |   |   \-- 9975277864b191f1.parquet
 |   |   |-- resource_dataset/
-|   |   |   \-- 2c755a071eb865dd.parquet
+|   |   |   \-- 8148de3c0fd2fd4a.parquet
 |   |   |-- resource_oee/
-|   |   |   \-- c186447492fb51f4.parquet
+|   |   |   \-- e1fa3f8893b58037.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- 6ad768c74a6a1782.parquet
+|   |   |   \-- 1bca5650d534c79e.parquet
 |   |   |-- probe_1006070.json
 |   |   |-- probe_1024367.json
 |   |   |-- probe_103606.json
@@ -1291,7 +1289,7 @@ DashBoard_clone/
 |   |   |-- probe_1557236.json
 |   |   |-- probe_1564989.json
 |   |   |-- probe_1565010.json
-|   |   \-- ... (108 more entries truncated; cap=50)
+|   |   \-- ... (110 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json

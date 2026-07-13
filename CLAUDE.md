@@ -116,6 +116,8 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `gate --strict` only runs the changed-area test ladder; before pushing a removal or shape change, grep the full test tree and run full pytest locally
 - Full pytest run regenerates the whole contract sample set (180+ files, currently 182); `git checkout tests/contract/samples/` then re-stage only your change's samples
 - Any `schema-version` bump to `contracts/api/api-contract.md` — even prose-only — requires re-running `cdd-kit openapi export` for both `contracts/openapi.json` and `contracts/api/openapi.json` before pushing, or the `openapi-sync` gate fails — see docs/cdd-kit-patterns.md
+- ADR 0012 `data-shape: <condition>` citation resolver requires exact heading text `## Invalid Data Behavior` (no numeric prefix) — see `contracts/data/data-shape-contract.md` heading comment
+- ADR 0012 Form-1 field citations can't traverse `type: array` items — cite the array field itself (e.g. `data.data`), put per-column type/nullability in the rationale text pointing at `data-shape-contract.md` instead
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md`:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS
@@ -160,6 +162,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - `_PARTIAL_NONKEY_COLS_LOT`: add new non-key columns atomically with the SQL change, pin with a membership test
 - SQL CTE changes: update both the CTE SELECT list and the outer SELECT; when two functions must reconcile results, extract one shared CTE-builder function rather than maintaining parallel WHERE clauses (pin with a structural same-builder test) — see docs/architecture/service-patterns.md
 - SQL-frontend column gap: cross-check SQL output against the Vue template, not just the route response
+- New SQL SELECT columns from Oracle CHAR fields: `TRIM()` each one explicitly — don't assume it follows an adjacent already-trimmed sibling column (`equipment_lots.sql` lacked `TRIM(CONTAINERNAME)` next to `TRIM(PRODUCTLINENAME)`)
 - AI pipeline `raw_params` callables require `dispatch: raw_params` in `ai_functions.yaml`
 - AI pipeline `advance_query_state` pops the entire `_SESSION_STORE` — extract/restore cross-turn state around it
 - `_AI_SESSION` is a module-level `requests.Session` — patch `ai_query_service._AI_SESSION`, not `requests.post`

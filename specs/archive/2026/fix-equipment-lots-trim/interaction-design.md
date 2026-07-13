@@ -1,5 +1,5 @@
 ---
-change-id: query-tool-subtab-cache
+change-id: fix-equipment-lots-trim
 schema-version: 0.1.0
 last-changed: 2026-07-13
 # ADR 0011 skip escape -- leave the two lines below commented out for any
@@ -14,7 +14,7 @@ last-changed: 2026-07-13
 # applicability-reason: <why this change genuinely has no UI surface>
 ---
 
-# Interaction Design: query-tool-subtab-cache
+# Interaction Design: fix-equipment-lots-trim
 
 <!--
 WHAT THIS FILE IS FOR (read this before touching anything below).
@@ -40,7 +40,7 @@ WHO WRITES WHAT (the roles are strict; do not blur them):
          cdd-kit design confirm <this-change-id>
      Until step 4 happens, `cdd-kit gate` will keep failing this change on
      purpose -- that is not a bug, it is the whole point (mirrors how
-     `specs/changes/query-tool-subtab-cache/acceptance.yml` works for behavior, ADR 0010).
+     `specs/changes/fix-equipment-lots-trim/acceptance.yml` works for behavior, ADR 0010).
 
 HOW TO FILL THIS IN, IN PLAIN LANGUAGE (no code-reading required):
   - Every row you add should answer a real question a real user has. If you
@@ -119,7 +119,7 @@ Example (delete or replace with your own):
 
 | screen | who is here | what they are deciding | what they fear | what would make them abandon | what must not be shown |
 |---|---|---|---|---|---|
-| query-tool 批次追蹤生產設備/設備生產批次追蹤 — 生產紀錄/維修紀錄/報廢紀錄 sub-tabs | a fab engineer switching between sub-tabs to compare production/repair/reject history for the same resolved batch/equipment set | whether the row set now showing is current for the tab they clicked, or a leftover from before | switching back to a sub-tab and seeing rows from before they changed their filters (stale data silently reused past the point it should have been invalidated) | a tab switch that used to be instant now waiting on a query it already ran once | a spinner/loading flicker on a revisit that already has fresh, cached rows to show instantly |
+| query-tool 批次追蹤生產設備 — 生產紀錄/維修紀錄/報廢紀錄 sub-tabs | a fab engineer who resolved a batch of LOT IDs/work orders to their processing equipment and now needs each equipment's production/repair/reject history for a date range | whether the equipment history shown is complete and current enough to act on (e.g. trace a defect, confirm a repair) | acting on a row set that looks complete but silently isn't (the pre-fix bug: real rows existed but the table rendered empty) | seeing "目前沒有資料" after a query that took a long time, with no way to tell whether that means "genuinely no data" or "the query is broken" | a stale row set left over from a previous, now-superseded filter selection |
 
 ## Presented Information
 
@@ -133,9 +133,26 @@ Example (delete or replace with your own):
 | order total | "how much am I actually being charged?" | POST /orders → total_amount |
 -->
 
+<!--
+CONTAINERNAME/EQUIPMENTNAME/timestamp/qty/work-order columns below all cite
+the same `data.data` field: this citation resolver (ADR 0012 §2) cannot
+express per-array-item fields (`resolveDottedField` requires `type: object`
+at every path segment, and `data.data` is a `type: array`), so a per-column
+Form-1 citation is not expressible for any row-shape response in this
+project, not just this one. The authoritative per-column type/nullability
+source is `contracts/data/data-shape-contract.md` §3.6 (named in each
+row's rationale below); `data.data`'s existence as a real, contract-typed
+response field is what each citation here actually proves.
+-->
+
 | item | rationale | provenance |
 |---|---|---|
-| resolved equipment/lot row set (per sub-tab) | "is what I'm looking at right now for this sub-tab?" | POST /api/query-tool/equipment-period → data.data |
+| CONTAINERNAME (LOT ID) | "which batch does this row belong to?" (type/nullability: data-shape-contract.md §3.6 CONTAINERNAME) | POST /api/query-tool/equipment-period → data.data |
+| EQUIPMENTNAME | "which machine processed this batch?" (type/nullability: data-shape-contract.md §3.6 EQUIPMENTNAME) | POST /api/query-tool/equipment-period → data.data |
+| TRACKINTIMESTAMP / TRACKOUTTIMESTAMP | "when did this batch enter/leave this equipment?" (type/nullability: data-shape-contract.md §3.6 TRACKINTIMESTAMP / TRACKOUTTIMESTAMP) | POST /api/query-tool/equipment-period → data.data |
+| TRACKINQTY / TRACKOUTQTY | "how many units went in vs. came out?" (type/nullability: data-shape-contract.md §3.6 TRACKINQTY / TRACKOUTQTY) | POST /api/query-tool/equipment-period → data.data |
+| WORKORDER / PJ_TYPE / PJ_BOP / PACKAGE (PRODUCTLINENAME) / SPECNAME | "which work order/product spec is this batch running?" (type/nullability: data-shape-contract.md §3.6 PJ_WORKORDER, PJ_TYPE, PJ_BOP, PRODUCTLINENAME, SPECNAME) | POST /api/query-tool/equipment-period → data.data |
+| row count found ("找到 N 台設備") | "did the equipment lookup actually find anything before I wait for the detail query?" | POST /api/query-tool/lot-equipment-lookup → data.equipment_ids |
 
 ## User Intents
 
@@ -151,7 +168,9 @@ Example (delete or replace with your own):
 
 | id | intent | frequency | path |
 |---|---|---|---|
-| intent-compare-subtabs | switch back and forth between 生產紀錄/維修紀錄/報廢紀錄 to cross-reference the same resolved batch/equipment set | common, every multi-aspect investigation | resolve batches → view lots → switch to jobs → switch to rejects → switch back to lots |
+| intent-view-lots | see which pieces of equipment processed a resolved batch, and when | every visit to this tab | resolve batches → lookupEquipment() → 生產紀錄 sub-tab (default) |
+| intent-view-jobs | check equipment repair/job history for the same resolved batch set | occasional, when investigating a defect | resolve batches → switch to 維修紀錄 sub-tab |
+| intent-view-rejects | check reject events tied to the same resolved batch set | occasional, when investigating yield | resolve batches → switch to 報廢紀錄 sub-tab |
 
 ## Controls
 
@@ -167,7 +186,9 @@ Example (delete or replace with your own):
 
 | id | control | intent |
 |---|---|---|
-| ctrl-subtab-switch | 生產紀錄/維修紀錄/報廢紀錄 sub-tab buttons | intent-compare-subtabs |
+| ctrl-subtab-lots | "生產紀錄" sub-tab button | intent-view-lots |
+| ctrl-subtab-jobs | "維修紀錄" sub-tab button | intent-view-jobs |
+| ctrl-subtab-rejects | "報廢紀錄" sub-tab button | intent-view-rejects |
 
 ### Deleted Controls
 
@@ -185,7 +206,6 @@ Example (delete or replace with your own):
 
 | control | reason |
 |---|---|
-| manual "refresh this sub-tab" button | not built by this change — an explicit-refresh path already exists via re-running the batch/equipment lookup (which invalidates and re-queries every sub-tab), so a second, narrower per-tab refresh control was not needed to satisfy AC-5 (explicit refresh always re-queries) |
 
 ## States
 
@@ -208,27 +228,31 @@ Example (delete or replace with your own):
 
 | id | meaning | discriminator |
 |---|---|---|
-| state-populated | the sub-tab (fresh or cache-redisplayed) shows at least one row for the resolved batch/equipment set | POST /api/query-tool/equipment-period → data.data |
-| state-empty-genuine | the sub-tab's query completed successfully and there really are zero matching rows | data-shape: empty dataset |
+| state-async-pending | the query was classified async and is queued/running as an RQ job; the driver is polling for completion | POST /api/query-tool/equipment-period → 202 |
+| state-populated | the query completed and matched at least one row for the resolved batch/equipment set | data-shape: non-empty dataset |
+| state-empty-genuine | the query completed successfully and there really are zero matching rows for the resolved batch/equipment set in the given date range | data-shape: empty dataset |
+| state-error | the query failed (timeout, validation, or server error) rather than genuinely finding zero rows | POST /api/query-tool/equipment-period → 500 |
 
 <!--
-This change's own client-side cache-hit/cache-miss/invalidated distinction has
-NO backend-contract discriminator by design -- whether a tab switch skips the
-query entirely is pure client bookkeeping (the `queried.<tab>` flag), never
-observable on the wire, and correctly so: this is not a gap in the API/data
-contract that needs a new field, it's an in-memory reuse decision the client
-makes entirely on its own. Documented in prose below (Reversibility /
-Consistency Commitments) rather than forced into this contract-discriminated
-table.
+state-loading (query dispatched, sync or async, result not yet available)
+has NO backend-contract discriminator by design: before any response
+arrives there is, by definition, no field or status code to point at --
+this is pure client bookkeeping (a request-in-flight flag), never
+observable on the wire. Documented here in prose rather than forced into
+the table above, mirroring query-tool-subtab-cache's interaction-design.md
+treatment of its own client-only cache-hit/cache-miss distinction. Per the
+Consistency Commitment below, state-loading must render identically
+whether the underlying request is still sync-pending or has already
+transitioned to state-async-pending.
 -->
 
 ## Reversibility
 
-Switching sub-tabs is always reversible in both directions — switching away from and back to a sub-tab never discards its previously-loaded rows, and re-running the lookup with changed filters never leaves a stale row set reachable; every sub-tab is guaranteed a fresh query the next time it's entered after a filter change.
+All three sub-tabs (生產紀錄/維修紀錄/報廢紀錄) are read-only views — switching between them is always reversible, and re-entering a sub-tab after leaving it does not lose or alter its previously-loaded rows. Re-running the batch/equipment lookup with a changed filter set (different LOT IDs/work orders, workcenter groups) replaces the resolved equipment set and clears each sub-tab's rows, so the user cannot end up looking at rows from a stale, now-superseded filter selection.
 
 ## Consistency Commitments
 
-A cache-hit tab revisit (rows redisplayed from the client's own already-fetched data, no new request) must never show any loading indicator — the whole point is that redisplaying already-loaded rows is visually instantaneous, so a spinner here would misrepresent "no work needed" as "work in progress." Conversely, a cache-miss (fresh query dispatched, whether because the tab was never loaded or because filters changed and invalidated the cache) must always show the same loading indication as any other fresh query (per fix-equipment-lots-trim's Consistency Commitments for state-loading/state-async-pending) — a user must never be left unable to tell whether a slow tab switch is "still loading" or "silently stuck."
+The loading state (`state-loading`) must look identical to the user regardless of whether the underlying query resolves synchronously or is dispatched as an async RQ job (`state-async-pending`) — this is the exact distinction the pre-fix bug got wrong: a query dispatched async silently ended up looking like `state-empty-genuine` (目前沒有資料) instead of staying in a visibly-loading state through to `state-populated`. `state-empty-genuine` and `state-error` must never share the same visible form — a failed/timed-out query must never look like "we searched and there is genuinely nothing here."
 
 
 ## Open Decisions
@@ -242,12 +266,14 @@ Confirmed section below; an unresolved `- [ ]` item fails `cdd-kit gate` on
 purpose, so a question can never be silently skipped.
 -->
 
-(none — the cache-hit/cache-miss/invalidation behavior above is fully determined by this change's already-established acceptance criteria AC-1 through AC-7, with no remaining UX ambiguity a human needs to arbitrate)
+- [x] For a wide-date-range query that gets dispatched as an async RQ job (can take from a few seconds up to the poller's 30-minute cap), should `state-loading`/`state-async-pending` show anything beyond a generic spinner (e.g. an elapsed-time counter or a "large date ranges can take longer" hint), or is a plain spinner sufficient? Option A: plain spinner only (matches what actually shipped — no new UI element was added by this change). Option B: add a hint/elapsed-time indicator for long-running async waits (a real UI addition beyond what this bug-fix change implemented).
 
 ## Confirmed
 
 <!-- AGENT-FORBIDDEN. No agent -- not interaction-designer, not main Claude acting on its own judgment, not any other role -- may invent, paraphrase, or "fill in" an answer here. -->
 <!-- Only a real, transcribed human answer belongs in this section, one per resolved Open Decisions item above, dated. -->
+
+- Open Decision (state-loading/state-async-pending beyond generic spinner): **Option A — plain spinner only**, matching what actually shipped; no new UI element added. Confirmed by user on 2026-07-13.
 <!-- Once every Open Decisions item above has a real transcribed answer here, lock this file against later tampering by running: cdd-kit design confirm <this-change-id> -->
 <!-- That command is the ONLY sanctioned writer of .cdd/design-lock.json. A pre-tool-use-design-write.sh hook additionally blocks any agent from writing that lock file directly. -->
 <!-- If this section is edited after locking, cdd-kit gate fails with: "interaction design modified after confirmation -- human must re-confirm." That is intentional: re-confirm, never silently trust an unreviewed edit. -->

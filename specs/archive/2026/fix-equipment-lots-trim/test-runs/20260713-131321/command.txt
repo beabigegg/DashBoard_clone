@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/acceptance/test_fix_equipment_lots_trim_acceptance.py -v

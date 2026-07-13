@@ -1,6 +1,6 @@
-# generated: 2026-07-13T04:27:59Z by cdd-kit 3.13.1
-# files: 1024, src-lines: 318395, map-lines: 22763, compression: 14.0x
-# sources-digest: 902c760cc912657f801514a4f49551a1fc6cbb748f2f04b468329317af164354
+# generated: 2026-07-13T06:18:00Z by cdd-kit 3.13.1
+# files: 1028, src-lines: 318796, map-lines: 22811, compression: 14.0x
+# sources-digest: 33197e80c8201c3bd9539280e431b5f3b3da0fc87ad2d3836d56f19476331df2
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -2641,6 +2641,32 @@ frontend/tests/abort/yield-alert-abort.test.js:  # 179 lines
   imports:
     - { module: vitest, items: [describe, it, expect, beforeEach, afterEach, vi], line: 15 }
 
+frontend/tests/acceptance/acceptance.loader.ts:  # 81 lines
+  imports:
+    - { module: fs, items: [existsSync, readFileSync, readdirSync], line: 24 }
+    - { module: path, items: [dirname, join], line: 25 }
+    - { module: url, items: [fileURLToPath], line: 26 }
+    - { module: js-yaml, items: ['load:parseYaml'], line: 27 }
+  functions:
+    - { name: resolveAcceptancePath, lines: 48-65 }
+    - { name: loadAllCases, lines: 67-74 }
+    - { name: loadCase, lines: 76-81 }
+  interfaces:
+    - { name: AcceptanceCaseValue, lines: 31-34 }
+    - { name: AcceptanceCaseRow, lines: 36-40 }  # local
+
+frontend/tests/acceptance/query-tool-subtab-cache.test.js:  # 134 lines
+  imports:
+    - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
+    - { module: './acceptance.loader.ts', items: [loadCase], line: 3 }
+    - { module: '../../src/query-tool/composables/useEquipmentQuery.ts', items: [useEquipmentQuery], line: 10 }
+  constants:
+    - { name: EQUIPMENT_PERIOD_URL, line: 30 }
+  functions:
+    - { name: setupWindowMesApi, lines: 16-28 }
+    - { name: makeEquipmentPeriodHandler, lines: 32-45 }
+    - { name: countByType, lines: 47-51 }
+
 frontend/tests/components/ActionButton.test.js:  # 98 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi], line: 18 }
@@ -5032,7 +5058,7 @@ src/mes_dashboard/core/modernization_policy.py:  # 167 lines
     - { name: get_missing_in_scope_assets, lines: 150-160 }
     - { name: missing_in_scope_asset_response, lines: 163-167 }
 
-src/mes_dashboard/core/mysql_client.py:  # 101 lines
+src/mes_dashboard/core/mysql_client.py:  # 108 lines
   imports:
     - { module: __future__, items: [annotations], line: 8 }
     - { module: logging, items: [], line: 10 }
@@ -5042,11 +5068,11 @@ src/mes_dashboard/core/mysql_client.py:  # 101 lines
   constants:
     - { name: MYSQL_OPS_ENABLED, line: 21 }
   functions:
-    - { name: create_mysql_engine, lines: 36-51 }
-    - { name: get_mysql_engine, lines: 54-62 }
-    - { name: get_mysql_connection, lines: 66-77 }  # @contextmanager
-    - { name: check_mysql_health, lines: 80-89 }
-    - { name: dispose_mysql_engine, lines: 92-101 }
+    - { name: create_mysql_engine, lines: 39-54 }
+    - { name: get_mysql_engine, lines: 57-69 }
+    - { name: get_mysql_connection, lines: 73-84 }  # @contextmanager
+    - { name: check_mysql_health, lines: 87-96 }
+    - { name: dispose_mysql_engine, lines: 99-108 }
 
 src/mes_dashboard/core/oracle_arrow_reader.py:  # 140 lines
   imports:
@@ -9347,6 +9373,28 @@ src/mes_dashboard/workers/resource_history_oee_worker.py:  # 263 lines
     - { name: execute_resource_history_oee_job, lines: 222-250 }
 
 tests/__init__.py:  # 0 lines
+
+tests/acceptance/acceptance_loader.py:  # 63 lines
+  imports:
+    - { module: pathlib, items: [Path], line: 22 }
+    - { module: yaml, items: [], line: 23 }
+  functions:
+    - { name: resolve_acceptance_path, lines: 26-47 }
+    - { name: load_all_cases, lines: 50-55 }
+    - { name: load_case, lines: 58-63 }
+
+tests/acceptance/test_fix_equipment_lots_trim_acceptance.py:  # 116 lines
+  imports:
+    - { module: os, items: [], line: 25 }
+    - { module: sys, items: [], line: 26 }
+    - { module: unittest.mock, items: [patch], line: 27 }
+    - { module: pandas, items: [], line: 29 }
+    - { module: acceptance_loader, items: [load_case], line: 32 }
+    - { module: mes_dashboard.services.query_tool_service, items: [get_equipment_lots], line: 34 }
+  functions:
+    - { name: _post_trim_row, lines: 42-62 }
+    - { name: test_rule_containername_always_trimmed_in_sql, lines: 65-72 }
+    - { name: test_production_records_nonempty_after_trim_fix, lines: 75-116 }
 
 tests/conftest.py:  # 196 lines
   imports:

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.38.4"
+    "version": "1.39.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -3869,11 +3869,11 @@
         "summary": "POST /api/query-tool/equipment-period",
         "responses": {
           "201": {
-            "description": "Contract response: GenericSuccessResponse",
+            "description": "Contract response: EquipmentPeriodResponse",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                  "$ref": "#/components/schemas/EquipmentPeriodResponse"
                 }
               }
             }
@@ -3958,11 +3958,11 @@
         "summary": "POST /api/query-tool/lot-equipment-lookup",
         "responses": {
           "201": {
-            "description": "Contract response: GenericSuccessResponse",
+            "description": "Contract response: LotEquipmentLookupResponse",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericSuccessResponse"
+                  "$ref": "#/components/schemas/LotEquipmentLookupResponse"
                 }
               }
             }
@@ -7127,6 +7127,136 @@
           "async",
           "job_id",
           "status_url"
+        ]
+      },
+      "EquipmentPeriodResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "total": {
+                "type": "integer"
+              },
+              "date_range": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  }
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer"
+                  },
+                  "per_page": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  },
+                  "total_pages": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "async": {
+                "type": "boolean"
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "status_url": {
+                "type": "string"
+              },
+              "result_url": {
+                "type": "string"
+              }
+            }
+          },
+          "error": {},
+          "meta": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "LotEquipmentLookupResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "equipment_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "equipment_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "date_range": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  }
+                }
+              },
+              "trace_map": {
+                "type": "object"
+              },
+              "lot_names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "not_found_hint": {
+                "type": "string"
+              }
+            }
+          },
+          "error": {},
+          "meta": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "success"
         ]
       },
       "WipDetailJobAccepted": {

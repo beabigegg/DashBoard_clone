@@ -41,4 +41,8 @@ runs:
       --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/junit.xml'
     summary: specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/summary.json
     junit: specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/junit.xml
+  - phase: acceptance
+    status: passed
+    command: conda run -n mes-dashboard python -m pytest tests/acceptance/test_fix_equipment_lots_trim_acceptance.py -v
+    summary: specs/changes/fix-equipment-lots-trim/test-runs/20260713-131321/summary.json
 final-status: passed

@@ -1,0 +1,44 @@
+# Acceptance oracle for this change (ADR 0010).
+#
+# HUMAN-AUTHORED. Case below transcribed verbatim from the user's real,
+# already-verified production scenario (see change-request.md "Original
+# Request" and "Addendum (2026-07-09, post-fix real-world retest)").
+
+oracle-version: 0.1.0
+authored-by: human
+
+cases:
+  - id: production-records-nonempty-after-trim-fix
+    given: >
+      a query-tool "批次追蹤生產設備" (Equipment Lot Tracking) lookup for 21 work
+      orders across 6 workcenter groups, date range 2025-01-19 ~ 2026-01-10;
+      equipment resolution succeeds and finds 25 equipment (unaffected by the
+      CONTAINERNAME TRIM bug, since Oracle CHAR blank-padding comparison
+      neutralizes it at that step)
+    when: >
+      the user opens the 生產紀錄 (production records) sub-tab for this same
+      query (query_type=lots)
+    then: >
+      before the fix: the sub-tab renders the correct columns but 0 rows
+      ("目前沒有資料"), because untrimmed CONTAINERNAME from
+      DWH.DW_MES_CONTAINER never matches the already-trimmed resolved lot
+      names in the frontend's exact-match filter, and because the async RQ
+      job envelope (wide date range) was not handled by fetchEquipmentPeriod().
+      after the fix: the sub-tab renders the 1249 equipment-lot records found
+      by the backend (per logs/rq_query_tool_worker.log: "Equipment lots: 1249
+      records"), non-empty, matching what the backend already computed.
+    input:
+      work_order_count: 21
+      workcenter_group_count: 6
+      date_range: { start: "2025-01-19", end: "2026-01-10" }
+      equipment_found: 25
+      query_type: lots
+    expect:
+      production_records_sub_tab_row_count: 1249
+      row_count_status: non-empty
+
+rules:
+  - id: containername-always-trimmed
+    statement: "CONTAINERNAME comparisons between DWH.DW_MES_CONTAINER and resolved lot names must always be TRIM()'d on both sides before an exact match is attempted (backend SQL and frontend client-side filter alike)."
+  - id: async-envelope-always-polled
+    statement: "An async (202) query-tool response must always be polled to completion and its final result rendered — a 202 envelope must never be treated as the final row payload."

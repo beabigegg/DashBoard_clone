@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.38.4
+schema-version: 1.39.0
 last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -192,10 +192,10 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/query-tool/lot-history | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/query-tool/adjacent-lots | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
 | GET | /api/query-tool/lot-associations | required | ?lot_id= | GenericSuccessResponse | 400/500 | route tests |
-| POST | /api/query-tool/equipment-period | required | JSON body | GenericSuccessResponse | 202/400/500 | route tests |
+| POST | /api/query-tool/equipment-period | required | JSON body | EquipmentPeriodResponse | 202/400/500 | route tests |
 | GET | /api/query-tool/equipment-list | required | — | GenericSuccessResponse | 500 | route tests |
 | GET | /api/query-tool/workcenter-groups | required | — | GenericSuccessResponse | 500 | route tests |
-| POST | /api/query-tool/lot-equipment-lookup | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/query-tool/lot-equipment-lookup | required | JSON body | LotEquipmentLookupResponse | 400/500 | route tests |
 | GET | /api/query-tool/equipment-recent-jobs/{equipment_id} | required | — | GenericSuccessResponse | 404/500 | route tests |
 | POST | /api/query-tool/export-csv | required | JSON body | GenericSuccessResponse | 400/500 | e2e tests |
 | GET | /api/job-query/resources | required | — | GenericSuccessResponse | 500 | route tests |
@@ -1033,6 +1033,94 @@ Tier-B — every `4xx`/`5xx` error envelope; see `contracts/api/error-format.md 
 | job_id | string | yes |  | RQ job identifier |
 | status_url | string | yes |  | polling URL |
 | status | string | no |  | job status hint |
+
+### EquipmentPeriodResponse
+
+Tier-B — `POST /api/query-tool/equipment-period`. Sync 200 branch populates
+`data.data`/`data.total`/`data.date_range`/`data.pagination`; async 202
+branch (wide date range + RQ worker available) populates
+`data.async`/`data.job_id`/`data.status_url`/`data.result_url` instead
+(mirrors `QueryToolJobAccepted`, plus `result_url`). `data.data[]` row shape
+varies by `query_type` (lots/jobs/rejects/status_hours) — see
+`contracts/data/data-shape-contract.md` §3.6/§3.7 for the per-`query_type`
+column set; left as a generic object here since this citation resolver
+cannot express per-array-item fields (see interaction-design.md notes on
+Presented Information for `query-tool-subtab-cache`/
+`fix-equipment-lots-trim`, which cite `data.data` itself, not row columns).
+
+```json-schema
+{
+  "type": "object",
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "properties": {
+        "data": {"type": "array", "items": {"type": "object"}},
+        "total": {"type": "integer"},
+        "date_range": {
+          "type": ["object", "null"],
+          "properties": {
+            "start": {"type": "string"},
+            "end": {"type": "string"}
+          }
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "page": {"type": "integer"},
+            "per_page": {"type": "integer"},
+            "total": {"type": "integer"},
+            "total_pages": {"type": "integer"}
+          }
+        },
+        "async": {"type": "boolean"},
+        "job_id": {"type": "string"},
+        "status_url": {"type": "string"},
+        "result_url": {"type": "string"}
+      }
+    },
+    "error": {},
+    "meta": {"type": "object"}
+  },
+  "required": ["success"]
+}
+```
+
+### LotEquipmentLookupResponse
+
+Tier-B — `POST /api/query-tool/lot-equipment-lookup`. `date_range` is
+`null` when no records matched (`not_found_hint` populated instead, and
+`trace_map` may hold parent-lot trace results).
+
+```json-schema
+{
+  "type": "object",
+  "properties": {
+    "success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "properties": {
+        "equipment_ids": {"type": "array", "items": {"type": "string"}},
+        "equipment_names": {"type": "array", "items": {"type": "string"}},
+        "date_range": {
+          "type": ["object", "null"],
+          "properties": {
+            "start": {"type": "string"},
+            "end": {"type": "string"}
+          }
+        },
+        "trace_map": {"type": "object"},
+        "lot_names": {"type": "array", "items": {"type": "string"}},
+        "not_found_hint": {"type": "string"}
+      }
+    },
+    "error": {},
+    "meta": {"type": "object"}
+  },
+  "required": ["success"]
+}
+```
 
 ### WipDetailJobAccepted
 | field | type | required | format | notes |

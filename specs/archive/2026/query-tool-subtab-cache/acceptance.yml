@@ -1,0 +1,56 @@
+# Acceptance oracle for this change (ADR 0010).
+#
+# HUMAN-AUTHORED. Case below transcribed from the user's confirmed behavior
+# ("修之後: 正確顯示資料與快取") and this change's approved acceptance
+# criteria (change-classification.md AC-1/AC-2).
+
+oracle-version: 0.1.0
+authored-by: human
+
+cases:
+  - id: revisit-same-filters-no-requery
+    given: >
+      a fab engineer resolves a batch/equipment set under one unchanged
+      filter set (same equipment_ids/container_ids/workcenter_groups/date
+      range throughout), then enters the 生產紀錄 sub-tab (first entry: 1
+      Oracle query fires, queried.lots becomes true), then switches to the
+      維修紀錄 sub-tab (first entry: 1 Oracle query fires, queried.jobs
+      becomes true)
+    when: >
+      the engineer switches back to the 生產紀錄 sub-tab, with filters still
+      unchanged since the first visit
+    then: >
+      no new HTTP request / RQ job is issued for 生產紀錄 — the previously
+      fetched rows are redisplayed instantly from the client's own cached
+      result (queried.lots stays true, no loading spinner shown)
+    input:
+      subtab_visit_sequence: [lots, jobs, lots]
+      filters_changed_between_visits: false
+    expect:
+      oracle_query_call_count: { lots: 1, jobs: 1 }
+      second_lots_entry_issued_new_request: false
+      second_lots_entry_shows_loading_indicator: false
+
+  - id: filter_change_invalidates_cache
+    given: >
+      the same session as above, with 生產紀錄 already cached (queried.lots
+      true, rows displayed)
+    when: >
+      the engineer changes one filter axis (e.g. the date range) and then
+      re-enters the 生產紀錄 sub-tab
+    then: >
+      the cache is invalidated (queried.lots reset to false) and a fresh
+      Oracle query fires for 生產紀錄 — the previously cached rows from the
+      old filter set are never displayed after the filter change
+    input:
+      subtab_visit_sequence: [lots]
+      filter_changed_before_revisit: true
+    expect:
+      oracle_query_call_count_after_filter_change: { lots: 1 }
+      stale_pre_change_rows_displayed: false
+
+rules:
+  - id: queried-flags-source-of-truth
+    statement: "queried.<tab> is the single source of truth for the cache-hit decision and must be reset in lockstep with any filter-invalidation event across all three sub-tabs (lots/jobs/rejects)."
+  - id: explicit-refresh-always-requeries
+    statement: "An explicit user refresh action always re-queries the active sub-tab, even when filters are unchanged."

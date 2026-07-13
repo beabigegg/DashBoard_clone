@@ -1,0 +1,18 @@
+{
+  "fix-equipment-lots-trim": {
+    "hash": "cca77a1ffca79d269b1232b98ddf1b9806366f787d3ba2e1f9a63a66f0104ff0",
+    "locked-at": "2026-07-13T05:00:36.170Z",
+    "tty": false,
+    "timestamp": "2026-07-13T05:00:36.170Z",
+    "git-author": "egg <lin4637lin4637@gmail.com>",
+    "mode": "human"
+  },
+  "query-tool-subtab-cache": {
+    "hash": "1443f846e2f9f3703a85efd7f60022bb6e0bcc0e16daa01bd87e4f86446d8a86",
+    "locked-at": "2026-07-13T05:00:36.397Z",
+    "tty": false,
+    "timestamp": "2026-07-13T05:00:36.397Z",
+    "git-author": "egg <lin4637lin4637@gmail.com>",
+    "mode": "human"
+  }
+}

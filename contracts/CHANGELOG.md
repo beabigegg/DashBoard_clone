@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.39.0] — 2026-07-13
+### Added
+- fix-equipment-lots-trim / query-tool-subtab-cache (interaction-design.md ADR 0012 unblock): typed `POST /api/query-tool/equipment-period`'s response as `EquipmentPeriodResponse` (was `GenericSuccessResponse`) — sync 200 shape (`data.data`/`data.total`/`data.date_range`/`data.pagination`) and async 202 shape (`data.async`/`data.job_id`/`data.status_url`/`data.result_url`) modeled together as optional properties; `data.data[]` row shape intentionally left generic (see `contracts/data/data-shape-contract.md` §3.6/§3.7 — this citation resolver cannot express per-array-item fields). Typed `POST /api/query-tool/lot-equipment-lookup`'s response as `LotEquipmentLookupResponse` (`equipment_ids`, `equipment_names`, `date_range`, `trace_map`, `lot_names`, `not_found_hint`). No behavior change — documentation-only; existing consumers unaffected (`GenericSuccessResponse` was already a superset-permissive envelope).
+
 ## [api 1.38.4] — 2026-07-13
 ### Fixed
 - CI cdd-kit upgrade fixback (3.6.0 -> 3.13.1, unpinned in CI per `npm install -g contract-driven-delivery`): the newer exporter adds `additionalProperties: false` to generated response schemas, which unmasked a pre-existing gap — `ProductionAchievementTargetsResponse` didn't declare the `meta` envelope key that `success_response()` adds to every response, so `openapi-sync-gate`/response-shape validation failed against a real captured sample. Converted the schema from the plain field table to a `json-schema` block (matching `GenericSuccessResponse`/`ProductionAchievementPermissionsResponse`) declaring `meta` as optional. No behavior change — documentation-only fix of an existing endpoint's contract schema.
@@ -46,9 +50,19 @@ a corresponding entry below.
 ### Changed (BREAKING)
 - production-achievement-async-spool: `GET /api/production-achievement/report` migrated from a synchronous Oracle-aggregated-row response to the async RQ → DuckDB parquet spool pattern (ADR-0016, mirrors `resource-history-rq-async`). Spool-hit → HTTP 200 `{query_id, spool_download_url, spec_workcenter_map, targets_map}` (schema `ProductionAchievementReportResponse` redefined in place); spool-miss + worker available → HTTP 202 (new schema `ProductionAchievementJobAccepted`, `status_url=/api/job/<id>?prefix=production-achievement`, reuses the generic job endpoint); spool-miss + worker unavailable → HTTP 503 (`always_async=True`, no sync fallback). `shift_code`/`workcenter_group` request params no longer affect the server response or spool key (canonical key is date-range only, ADR-0016); PA-06/PA-07 filtering/rollup/target-join now applied client-side in DuckDB-WASM. `production_achievement` added to the `GET /api/spool/{namespace}/...` allowed-namespace enum. No deprecate-2-minors window — feature is pre-launch, sole consumer ships in the same atomic PR (same precedent as `equipment-rejects-by-lots`/`nav-config-to-code`). `GET /filter-options`, `GET`/`PUT /targets`, admin permission endpoints unchanged.
 
+## [data 1.38.0] — 2026-07-13
+### Fixed
+- `## Invalid Data Behavior` heading was numbered (`## 4. Invalid Data Behavior`), which made cdd-kit gate's ADR 0012 `data-shape: <condition>` citation resolver silently resolve zero rows from the table (exact-heading-text match) — every `data-shape:` citation project-wide failed with "no matching row" even though the table was populated. Found and fixed while unblocking `fix-equipment-lots-trim`/`query-tool-subtab-cache` archival.
+### Added
+- `non-empty dataset` condition row in `## Invalid Data Behavior`, paired with the existing `empty dataset` row for state-populated/non-empty discriminators.
+
 ## [data 1.37.0] — 2026-07-08
 ### Added
 - production-achievement-async-spool: §3.28 Production-Achievement Async Spool Schema (SPECNAME-grain parquet `(output_date, shift_code, SPECNAME, actual_output_qty)` + `_PA_SPOOL_SCHEMA_VERSION`; inline `spec_workcenter_map`/`targets_map` array shapes; 200/202/503/400 response envelopes for `GET /api/production-achievement/report`). Canonical spool key is `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` — date-range only. §3.25 (`ProductionAchievementReportRow`) retained as the frontend-computed / dual-tier-parity-golden row shape, no longer the direct server response shape (note appended). Schema-breaking rollback requires `rm -f tmp/query_spool/production_achievement/*.parquet` (cache-spool-patterns.md).
+
+## [env 1.0.26] — 2026-07-13
+### Added
+- mysql-ops-pool-sizing-fix: `MYSQL_OPS_POOL_SIZE` (default `8`) / `MYSQL_OPS_MAX_OVERFLOW` (default `4`) — new env vars making `core/mysql_client.py`'s `QueuePool` capacity configurable. Previously hardcoded `pool_size=3, max_overflow=2` (5-connection capacity), which saturated under concurrent load from admin log/metrics UI + `sync_worker` background cycle + per-request permission checks + target/KPI services sharing one engine, producing `sqlalchemy.exc.TimeoutError: QueuePool limit ... connection timed out, timeout 30.00`. New defaults raise capacity to 12 connections; both are restart-required, additive, no existing var default or runtime semantics changed.
 
 ## [env 1.0.25] — 2026-07-08
 ### Added

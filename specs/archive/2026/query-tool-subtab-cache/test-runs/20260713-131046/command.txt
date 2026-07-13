@@ -1,0 +1,1 @@
+cd frontend && npx vitest run tests/acceptance/query-tool-subtab-cache.test.js
