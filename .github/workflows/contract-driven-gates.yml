@@ -97,10 +97,17 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Boundary Guard (PR diff)
+        # `cdd-kit boundary check` does not read a CDD_BASE_SHA env var -- it
+        # only accepts --base as a real CLI flag. Without --base it silently
+        # checks EVERY contracted operation, not just this push's diff, which
+        # is why this step previously flagged ~200 untouched endpoints on
+        # every run regardless of what actually changed. Pass --base
+        # explicitly so this step checks only the operations this push/PR
+        # actually touched.
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
           CDD_BASE_SHA: ${{ steps.changed.outputs.base_sha }}
-        run: cdd-kit boundary check --verify-generated --verify-captures --json
+        run: cdd-kit boundary check --base "$CDD_BASE_SHA" --verify-generated --verify-captures --json
 
       - name: cdd-kit gate (changed specs)
         # Zero changed spec dirs is a no-op success, not a failure (this step
