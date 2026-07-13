@@ -33,9 +33,9 @@ Rejected alternatives:
 
 Evidence: `resource-status-cross-filter` — design.md D4.
 
-## MultiSelect.vue — Shared by 12 Apps
+## MultiSelect.vue — Shared by 16 Apps
 
-`frontend/src/shared-ui/components/MultiSelect.vue` is shared by: hold-overview, job-query, mid-section-defect, production-history, query-tool, reject-history, resource-history, resource-shared, resource-status, wip-detail, wip-overview, yield-alert-center.
+`frontend/src/shared-ui/components/MultiSelect.vue` is shared across 16 feature apps. Consumer count changes as apps are added/removed — grep `frontend/src/*/` for `MultiSelect` usage to get the current list rather than trusting a hardcoded name list here.
 
 **Any change to its emit/prop surface must be additive** (optional events/props that unmounted consumers ignore). Before modifying any `frontend/src/shared-ui/components/` file, grep all consumer apps for usage.
 
