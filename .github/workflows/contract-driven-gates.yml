@@ -37,10 +37,19 @@ jobs:
         run: python -m pip install jsonschema pyyaml
 
       - name: Install cdd-kit
-        run: npm install -g contract-driven-delivery@{{cdd-kit-version}}
+        # No version pin: this project's CLAUDE.md documents "No CI version
+        # pin; upgrade local cdd-kit after any spec traceability failure" as
+        # deliberate policy. `@{{cdd-kit-version}}` (the kit's own generic
+        # template placeholder) is an unresolved substitution and fails
+        # `npm install` outright (EINVALIDTAGNAME) -- do not reintroduce it.
+        run: npm install -g contract-driven-delivery
 
-      - name: Validate contracts and gates
-        run: cdd-kit validate
+      - name: Validate contracts (explicit subset)
+        # tests/contract/test_gate_wiring.py asserts this literal command
+        # string is present as its own step -- keep the explicit `--contracts`
+        # flag rather than the bare `cdd-kit validate` the kit's generic
+        # template ships (broader coverage, but doesn't satisfy that check).
+        run: cdd-kit validate --contracts
 
       # ── enforceInteractionDesign / enforceAcceptanceOracle / every other
       #    required cdd-kit gate check, actually invoked in CI (ci-gates.md
