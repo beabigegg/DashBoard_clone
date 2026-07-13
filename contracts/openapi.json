@@ -7095,6 +7095,7 @@
             "description": "spool key"
           }
         },
+        "additionalProperties": false,
         "required": [
           "async",
           "job_id",
@@ -7121,6 +7122,7 @@
             "description": "job status hint"
           }
         },
+        "additionalProperties": false,
         "required": [
           "async",
           "job_id",
@@ -7143,6 +7145,7 @@
             "description": "polling URL; prefix=wip-detail"
           }
         },
+        "additionalProperties": false,
         "required": [
           "async",
           "job_id",
@@ -7438,6 +7441,7 @@
             "description": "workflow name"
           }
         },
+        "additionalProperties": false,
         "required": [
           "success",
           "equipment"
@@ -7465,6 +7469,7 @@
             "type": "number"
           }
         },
+        "additionalProperties": false,
         "required": [
           "output_date",
           "shift_code",
@@ -7626,6 +7631,7 @@
             "type": "string"
           }
         },
+        "additionalProperties": false,
         "required": [
           "shift_code",
           "workcenter_group",
@@ -7636,21 +7642,29 @@
       },
       "ProductionAchievementTargetsResponse": {
         "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
         "properties": {
           "success": {
             "type": "boolean"
           },
           "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductionAchievementTargetRow"
+            "type": "array"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string"
+              },
+              "app_version": {
+                "type": "string"
+              }
             }
           }
-        },
-        "required": [
-          "success",
-          "data"
-        ]
+        }
       },
       "ProductionAchievementPermissionRow": {
         "type": "object",
@@ -7668,6 +7682,7 @@
             "type": "string"
           }
         },
+        "additionalProperties": false,
         "required": [
           "user_identifier",
           "can_edit_targets",
@@ -8011,6 +8026,7 @@
             "format": "ISO-8601 cache refresh timestamp; null if cache never populated"
           }
         },
+        "additionalProperties": false,
         "required": [
           "pj_types",
           "product_lines",

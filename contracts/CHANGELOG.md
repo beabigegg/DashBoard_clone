@@ -8,6 +8,10 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.38.4] — 2026-07-13
+### Fixed
+- CI cdd-kit upgrade fixback (3.6.0 -> 3.13.1, unpinned in CI per `npm install -g contract-driven-delivery`): the newer exporter adds `additionalProperties: false` to generated response schemas, which unmasked a pre-existing gap — `ProductionAchievementTargetsResponse` didn't declare the `meta` envelope key that `success_response()` adds to every response, so `openapi-sync-gate`/response-shape validation failed against a real captured sample. Converted the schema from the plain field table to a `json-schema` block (matching `GenericSuccessResponse`/`ProductionAchievementPermissionsResponse`) declaring `meta` as optional. No behavior change — documentation-only fix of an existing endpoint's contract schema.
+
 ## [api 1.38.3] — 2026-07-09
 ### Fixed
 - fix-equipment-lots-trim: `equipment_lots.sql` CONTAINERNAME missing TRIM() fixed (Oracle CHAR-padding caused the 生產紀錄 sub-tab to render zero rows after equipment resolution succeeded). Value-only fix.

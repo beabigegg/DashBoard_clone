@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.38.3
-last-changed: 2026-07-09
+schema-version: 1.38.4
+last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1258,10 +1258,26 @@ Tier-B — 202 async branch for `GET /api/production-achievement/report` (spool 
 See data-shape-contract.md §3.26 for field semantics.
 
 ### ProductionAchievementTargetsResponse
-| field | type | required |
-|---|---|---|
-| success | boolean | yes |
-| data | ProductionAchievementTargetRow[] | yes |
+
+Row shape per `ProductionAchievementTargetRow` above (`data` is an array of that row shape).
+
+```json-schema
+{
+  "type": "object",
+  "required": ["success", "data"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "data":    { "type": "array" },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "timestamp":   { "type": "string" },
+        "app_version": { "type": "string" }
+      }
+    }
+  }
+}
+```
 
 ### ProductionAchievementPermissionRow
 | field | type | required |
