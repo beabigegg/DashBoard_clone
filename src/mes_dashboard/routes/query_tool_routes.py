@@ -673,6 +673,7 @@ def query_equipment_period():
     equipment_ids = data.get('equipment_ids', [])
     equipment_names = data.get('equipment_names', [])
     workcenter_groups = data.get('workcenter_groups') or []
+    container_names = data.get('container_names') or []
     start_date = data.get('start_date')
     end_date = data.get('end_date')
     query_type = data.get('query_type')
@@ -713,6 +714,7 @@ def query_equipment_period():
                 start_date=start_date,
                 end_date=end_date,
                 workcenter_groups=workcenter_groups,
+                container_names=container_names,
                 page=page,
                 per_page=per_page,
             )
@@ -750,6 +752,7 @@ def query_equipment_period():
                 end_date,
                 page=page,
                 per_page=per_page,
+                container_names=container_names,
             )
 
         elif query_type == 'materials':

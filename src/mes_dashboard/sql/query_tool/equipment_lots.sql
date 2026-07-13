@@ -7,6 +7,7 @@
 --
 -- Dynamic placeholders:
 --   EQUIPMENT_FILTER - Equipment filter condition (on EQUIPMENTID)
+--   CONTAINER_FILTER - Optional container name filter (on UPPER(TRIM(CONTAINERNAME)))
 --
 -- Note: Uses EQUIPMENTID/EQUIPMENTNAME (NOT RESOURCEID/RESOURCENAME)
 --       JOIN CONTAINER to get CONTAINERNAME, PJ_TYPE, PJ_BOP, WAFER_LOT_ID
@@ -28,7 +29,7 @@ WITH ranked_lots AS (
         h.TRACKOUTQTY,
         h.FINISHEDRUNCARD,
         h.PJ_WORKORDER,
-        c.CONTAINERNAME,
+        TRIM(c.CONTAINERNAME) AS CONTAINERNAME,
         c.PJ_TYPE,
         c.PJ_BOP,
         c.FIRSTNAME AS WAFER_LOT_ID,
@@ -40,6 +41,7 @@ WITH ranked_lots AS (
       AND h.EQUIPMENTID IS NOT NULL
       AND h.TRACKINTIMESTAMP IS NOT NULL
       AND {{ EQUIPMENT_FILTER }}
+      AND {{ CONTAINER_FILTER }}
 )
 SELECT
     CONTAINERID,

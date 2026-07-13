@@ -1,0 +1,41 @@
+change-id: fix-equipment-lots-trim
+status: in-progress
+tier: 2
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "no architecture review required per classifier" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written; existing Tier-1 gates (backend-tests, frontend-tests, contract-driven-gates, openapi-sync) fully cover this change's surface, no new workflow needed; openapi-sync-gate confirmed triggered (api-contract.md path match) and currently would fail — openapi.json mirrors need regen to 1.38.3 before merge" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done, note: "schema-version 1.38.2->1.38.3, Compatibility Notes + CHANGELOG entry applied per contract-reviewer approval" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no CSS/UI contract affected" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no env contract affected" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "TRIM only cleans an existing column's value; no schema/row-shape change" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "business-rules.md QT-05/QT-06 read-only reference only, no rule change" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no CI/CD contract affected" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "test_query_tool_service.py::TestGetEquipmentLots (6 tests) + test_query_tool_routes.py container_names forwarding test; all green" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done, note: "tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity, incl. inspect.signature(...).bind() check; green" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "not required per classifier" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "frontend + backend CHAR-padded/case-variant CONTAINERNAME regression tests all green; async-job-polling regression test to be added under 3.2/4.2 reopen" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "no new load surface" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done, note: "equipment_lots.sql TRIM + CONTAINER_FILTER, get_equipment_lots() container_names kwarg, sync route + async RQ job wiring; openapi.json mirrors regenerated to 1.38.3; cdd-kit validate green" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "fetchEquipmentPeriod() now handles async 202 job envelope via pollJobUntilComplete, matching sibling useEquipmentQuery.ts pattern; regression test added to useLotEquipmentQuery.test.js (mocked polling, proves rows populate after poll); vitest (15/15) + vue-tsc green" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env/deploy change" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no CI/CD workflow change" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI/visual change, data-only fix" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI/visual change, data-only fix" }
+  - { id: "5.3", section: Review, title: "Contract review", status: done, note: "contract-reviewer approved, see agent-log/contract-reviewer.yml" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "Re-APPROVED after async-polling fix, see agent-log/qa-reviewer.yml" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate fix-equipment-lots-trim passed (re-run after async-polling fix)" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: pending }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

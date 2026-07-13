@@ -1,0 +1,15 @@
+{
+  "change_id": "fix-equipment-lots-trim",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/query-tool/useLotEquipmentQuery.test.js --reporter=verbose",
+  "duration_ms": 755,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-090907/summary.json",
+    "stdout": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-090907/stdout.log",
+    "stderr": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-090907/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

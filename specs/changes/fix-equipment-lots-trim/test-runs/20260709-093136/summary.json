@@ -1,0 +1,16 @@
+{
+  "change_id": "fix-equipment-lots-trim",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest -q --maxfail=1 --tb=short -ra --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/junit.xml'",
+  "duration_ms": 246085,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/summary.json",
+    "stdout": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/stdout.log",
+    "stderr": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/stderr.log",
+    "junit": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093136/junit.xml"
+  },
+  "next_action": "all phases green"
+}

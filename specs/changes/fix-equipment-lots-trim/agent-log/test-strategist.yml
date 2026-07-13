@@ -1,0 +1,8 @@
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/fix-equipment-lots-trim/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_service.py::TestGetEquipmentLots (pending) → src/mes_dashboard/sql/query_tool/equipment_lots.sql + src/mes_dashboard/services/query_tool_service.py::get_equipment_lots" }
+  - { type: tdd-pairs, pointer: "tests/test_query_tool_routes.py::TestEquipmentPeriodEndpoint (pending) → src/mes_dashboard/routes/query_tool_routes.py::query_equipment_period" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity (pending) → src/mes_dashboard/services/query_tool_service.py::execute_query_tool_job" }
+  - { type: tdd-pairs, pointer: "frontend/tests/query-tool/useLotEquipmentQuery.test.js (DONE) → frontend/src/query-tool/composables/useLotEquipmentQuery.ts" }
+  - { type: coverage-tiers, pointer: "unit (tier 0), contract (tier 1), integration (tier 1), data-boundary (tier 0/1) — no e2e/resilience/stress/soak per classification" }
+  - { type: mapping-completeness, pointer: "AC-1..AC-7 all mapped; AC-3/AC-7 already implemented and verified by frontend-engineer, AC-1/AC-2/AC-4/AC-5/AC-6 and sync/async parity pending backend-engineer" }

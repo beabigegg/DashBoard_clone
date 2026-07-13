@@ -1,0 +1,24 @@
+change-id: fix-equipment-lots-trim
+agent: contract-reviewer
+status: approved
+summary: >
+  Confirmed additive/backward-compatible change. data-shape-contract.md and
+  business-rules.md QT-05/QT-06/QT-07 unaffected (value-only TRIM fix, no
+  shape/schema/grouping-semantics change). api-contract.md table row for
+  POST /api/query-tool/equipment-period needs no edit (request fields not
+  itemized there); Compatibility Notes + schema-version bump (1.38.2 ->
+  1.38.3) applied by main Claude per the read-only-agent write-responsibility
+  rule. contracts/CHANGELOG.md entry added.
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/api/api-contract.md:6,195,466-469" }
+  - { type: contracts-reviewed, pointer: "contracts/data/data-shape-contract.md:475-502 (confirmed unaffected)" }
+  - { type: contracts-reviewed, pointer: "contracts/business/business-rules.md:228-230 (confirmed unaffected)" }
+  - { type: version-bumps, pointer: "contracts/api/api-contract.md schema-version 1.38.2 -> 1.38.3 (applied)" }
+  - { type: breaking-changes, pointer: "none" }
+notes: >
+  Advisory, non-blocking suggestion: optionally add a QT-08 row to
+  business-rules.md documenting the new container_names push-down filter
+  semantics (UPPER(TRIM(CONTAINERNAME)) IN (...), applied before pagination).
+  Deferred to backend-engineer/qa-reviewer discretion; not required to unblock
+  this change since AC-4/AC-5 are already directly testable against code.
+next-action: proceed-to-test-strategist-and-ci-cd-gatekeeper

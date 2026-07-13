@@ -1,0 +1,89 @@
+change-id: fix-equipment-lots-trim
+timestamp: "2026-07-09T09:40:00Z"
+agent: bug-fix-engineer
+status: complete
+files-read:
+  - specs/changes/fix-equipment-lots-trim/change-request.md
+  - specs/changes/fix-equipment-lots-trim/change-classification.md
+  - specs/changes/fix-equipment-lots-trim/agent-log/backend-engineer.yml
+  - specs/changes/fix-equipment-lots-trim/agent-log/frontend-engineer.yml
+  - specs/changes/fix-equipment-lots-trim/agent-log/qa-reviewer.yml
+  - specs/changes/fix-equipment-lots-trim/test-evidence.yml
+  - src/mes_dashboard/sql/query_tool/equipment_lots.sql
+  - src/mes_dashboard/services/query_tool_service.py
+  - frontend/src/query-tool/composables/useLotEquipmentQuery.ts
+  - tests/test_query_tool_service.py
+artifacts:
+  - { type: symptom, pointer: "query-tool 批次追蹤生產設備 tab: equipment resolution succeeds (\"找到 25 台設備 (資料區間 2025-01-19 ~ 2026-01-10)\") but the 生產紀錄 (production-records) sub-tab renders correct columns with zero rows for 21 work orders across 6 workcenter groups" }
+  - { type: root-cause, pointer: "src/mes_dashboard/sql/query_tool/equipment_lots.sql:32 (pre-fix: bare c.CONTAINERNAME, no TRIM) selected an Oracle CHAR-padded DW_MES_CONTAINER.CONTAINERNAME value while the sibling column on the very next line already did TRIM(c.PRODUCTLINENAME); frontend/src/query-tool/composables/useLotEquipmentQuery.ts queryLots()/queryRejects() then did an exact-match Set.has() comparison of that untrimmed value against already-trimmed resolved lot names, so every row failed the match deterministically. Equipment resolution itself worked because that comparison happens inside Oracle, where CHAR blank-padding semantics neutralize the same missing-TRIM defect -- masking the bug at that step and only exposing it at the production-records step." }
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/query_tool/equipment_lots.sql:8-10,32,44 (TRIM(c.CONTAINERNAME) + optional CONTAINER_FILTER placeholder)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/query_tool_service.py:2430-2517 (get_equipment_lots container_names kwarg, same-QueryBuilder CONTAINER_FILTER via UPPER(TRIM(c.CONTAINERNAME)) IN (...))" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/query_tool_service.py:2910-2917 (execute_query_tool_job lots branch forwards container_names for async/sync parity)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/query_tool_routes.py:676,714,749-756 (parse + forward container_names on sync route and async _params)" }
+  - { type: files-changed, pointer: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts:237-240,265-268,327-330 (.trim() before .toUpperCase() in queryLots()/queryRejects(); buildQueryPayload() sends container_names for query_type==='lots')" }
+  - { type: files-changed, pointer: "tests/test_query_tool_service.py::TestGetEquipmentLots (6 tests), tests/test_query_tool_routes.py::TestEquipmentPeriodEndpoint (2 tests), tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity (2 tests), frontend/tests/query-tool/useLotEquipmentQuery.test.js (new file)" }
+  - { type: contracts-touched, pointer: "contracts/api/api-contract.md, contracts/openapi.json, contracts/api/openapi.json (info.version 1.38.3, additive optional container_names field)" }
+  - { type: regression-evidence, pointer: "specs/changes/fix-equipment-lots-trim/test-evidence.yml final-status: passed (collect/targeted/changed-area/contract/full all passed); tests/test_query_tool_service.py::TestGetEquipmentLots::test_equipment_lots_sql_trims_containername_like_productlinename, ::test_equipment_lots_containername_trimmed_char_padded, ::test_equipment_lots_char_padded_fixture_returns_nonempty_rows, ::test_equipment_lots_container_names_filters_via_upper_trim_in all pass post-fix" }
+  - { type: residual-risk, pointer: "none open -- qa-reviewer approved release-readiness (agent-log/qa-reviewer.yml: status approved, all AC-1..AC-7 verified, full pytest 5386 passed / 809 skipped / 1 pre-existing unrelated xfail); one non-blocking documentation follow-up (optional QT-08 business-rules.md note on container_names push-down semantics) already logged as deferred by contract-reviewer/qa-reviewer, not a code risk" }
+bug-fix:
+  schema-version: 0.1.0
+  symptom: "query-tool 批次追蹤生產設備 tab: equipment resolution succeeds (\"找到 25 台設備\") but the 生產紀錄 (production-records) sub-tab renders correct columns with zero rows, for a 21-work-order / 6-workcenter-group query."
+  expected_behavior: "Production records for the resolved equipment/containers render as non-empty rows in the 生產紀錄 sub-tab."
+  actual_behavior: "Every row is filtered out client-side; the sub-tab shows zero rows despite equipment resolving correctly and the API returning matching columns."
+  observed_surface: "query-tool Equipment Lot Tracking (批次追蹤生產設備) production-records (生產紀錄) sub-tab"
+  reproduction:
+    status: reproduced
+    command: "Controlled-input reproduction (no live Oracle/staging access in this session): read src/mes_dashboard/sql/query_tool/equipment_lots.sql pre-fix (bare c.CONTAINERNAME, no TRIM, vs. adjacent TRIM(c.PRODUCTLINENAME)) alongside frontend/src/query-tool/composables/useLotEquipmentQuery.ts's queryLots()/queryRejects() exact-match Set.has() filter, and ran tests/test_query_tool_service.py::TestGetEquipmentLots::test_equipment_lots_containername_trimmed_char_padded (pins Oracle CHAR blank-padding behavior for DW_MES_CONTAINER.CONTAINERNAME). The trace deterministically reproduces the reported symptom: an Oracle CHAR-padded CONTAINERNAME value compared with exact-match Set.has() against already-trimmed lot names fails every row, while the equipment-resolution step's in-Oracle comparison is unaffected by the same padding -- exactly matching \"25 equipment resolved, 0 production-record rows\"."
+  hypotheses:
+    - { id: H1, candidate: "src/mes_dashboard/sql/query_tool/equipment_lots.sql::ranked_lots CTE (c.CONTAINERNAME column)", reason: "9 other SQL files in the codebase already TRIM this same Oracle CHAR-padded DW_MES_CONTAINER.CONTAINERNAME column, and the adjacent line already TRIMs the sibling PRODUCTLINENAME column -- a strong sibling-inconsistency signal", result: confirmed }
+    - { id: H2, candidate: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts::queryLots()/queryRejects() exact-match Set.has() filter", reason: "client-side filter compares an untrimmed CONTAINERNAME against already-trimmed resolvedLotNames; confirmed as a compounding factor (defense-in-depth fix applied) rather than the sole root cause, since the SQL-level TRIM alone resolves the symptom", result: confirmed }
+    - { id: H3, candidate: "backend pagination clamp (QUERY_TOOL_DETAIL_MAX_PER_PAGE=500) silently dropping rows before the frontend's per_page=9999 request", reason: "a separate, previously-known limit that could independently cause missing rows for large result sets", result: unconfirmed }
+    - { id: H4, candidate: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts::queryJobs() CONTAINERNAMES substring filter", reason: "structurally similar filter pattern in the same composable; checked for the same CHAR-padding defect", result: rejected }
+  root_cause:
+    pointer: "src/mes_dashboard/sql/query_tool/equipment_lots.sql:32"
+    summary: "equipment_lots.sql selected c.CONTAINERNAME from the Oracle CHAR-padded DWH.DW_MES_CONTAINER table without TRIM(), unlike the adjacent TRIM(c.PRODUCTLINENAME) column; the resulting blank-padded value then failed the exact-match Set.has() comparison in useLotEquipmentQuery.ts's queryLots()/queryRejects() against already-trimmed resolved lot names, causing every production-record row to be filtered out even though the underlying equipment/container match was correct."
+  fix:
+    files_changed:
+      - src/mes_dashboard/sql/query_tool/equipment_lots.sql
+      - src/mes_dashboard/services/query_tool_service.py
+      - src/mes_dashboard/routes/query_tool_routes.py
+      - frontend/src/query-tool/composables/useLotEquipmentQuery.ts
+      - tests/test_query_tool_service.py
+      - tests/test_query_tool_routes.py
+      - tests/integration/test_query_tool_rq_async.py
+      - frontend/tests/query-tool/useLotEquipmentQuery.test.js
+      - contracts/api/api-contract.md
+      - contracts/CHANGELOG.md
+      - contracts/openapi.json
+      - contracts/api/openapi.json
+    summary: "Added TRIM(c.CONTAINERNAME) AS CONTAINERNAME in equipment_lots.sql (matching the sibling TRIM(c.PRODUCTLINENAME) treatment); added a defensive .trim() before .toUpperCase() in useLotEquipmentQuery.ts's queryLots()/queryRejects() exact-match filters; added an optional server-side container_names: List[str] push-down filter to get_equipment_lots() (UPPER(TRIM(c.CONTAINERNAME)) IN (...), built on the same QueryBuilder instance as the equipment filter to avoid bind-param collision), wired through both the sync route and the async RQ job path for parity, applied before the QUERY_TOOL_DETAIL_MAX_PER_PAGE pagination clamp; added regression tests on both stacks proving CHAR-padded/case-variant CONTAINERNAME values match correctly after the fix."
+  regression:
+    status: passed
+    command: >-
+      python -m pytest tests/integration/test_query_tool_rq_async.py tests/test_query_tool_routes.py
+      tests/test_query_tool_service.py -q --maxfail=1 --tb=short -ra
+    summary: specs/changes/fix-equipment-lots-trim/test-runs/20260709-093120/summary.json
+  residual_risk: none
+next-action: "cdd-kit gate fix-equipment-lots-trim"
+notes: >
+  Task scope for this log entry: the fix (backend-engineer, frontend-engineer)
+  and release-readiness review (qa-reviewer: status approved) were already
+  completed in this change before the gate flagged the missing bug-fix lane
+  evidence block. This entry formalizes the repair record required by
+  ADR 0006 Section 7 for lane: bug-fix, reconstructed from change-request.md's
+  already-confirmed root-cause investigation, change-classification.md's Bug
+  Evidence Required section, backend-engineer.yml, frontend-engineer.yml,
+  qa-reviewer.yml, and test-evidence.yml. No source, test, or contract files
+  were modified as part of writing this log. reproduction.status is recorded
+  as `reproduced` (a controlled-input code trace, not a live Oracle/staging
+  session -- none was available) rather than `test-reproduced`, because no
+  archived `cdd-kit test run` summary captures a FAILING pre-fix run: the
+  regression tests added by backend-engineer/frontend-engineer were only
+  captured post-fix (all passing, see test-evidence.yml), and
+  frontend-engineer's agent-log notes a manual git-stash pre-fix failure check
+  that was not persisted as a run artifact. The static trace nonetheless
+  deterministically reproduces the reported symptom's mechanism (H1/H2:
+  confirmed) by reading the actual pre-fix SQL/composable logic together with
+  the pre-existing CHAR-padding structural-pin test, and the fix is
+  behavior-changing, not diagnostic-only, per change-classification.md's
+  explicit "Diagnostic Only: no".

@@ -8,6 +8,12 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.38.3] — 2026-07-09
+### Fixed
+- fix-equipment-lots-trim: `equipment_lots.sql` CONTAINERNAME missing TRIM() fixed (Oracle CHAR-padding caused the 生產紀錄 sub-tab to render zero rows after equipment resolution succeeded). Value-only fix.
+### Added
+- fix-equipment-lots-trim: `POST /api/query-tool/equipment-period` (`query_type=lots`) gains optional request field `container_names: string[]` for server-side narrowing before the 500-row pagination clamp. Additive, backward-compatible.
+
 ## [api 1.38.2] — 2026-07-09
 ### Added
 - query-tool-url-timeout (PR #32, post-merge CI conformance fixback): `POST /api/query-tool/lot-history` and `POST /api/query-tool/lot-associations` added alongside the existing `GET` routes (backend already shipped both methods; contract was missing the POST rows, failing `cdd-kit validate` API conformance). Frontend batch path now sends `container_ids`/`workcenter_groups` in a JSON body instead of a comma-joined query string, eliminating the gunicorn `limit_request_line` risk for large batches. `GET` unchanged, still supported for single-CID reads. See Compatibility Notes in `contracts/api/api-contract.md`.

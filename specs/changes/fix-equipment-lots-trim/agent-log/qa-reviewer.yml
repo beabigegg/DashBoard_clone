@@ -1,0 +1,28 @@
+change-id: fix-equipment-lots-trim
+agent: qa-reviewer
+status: approved
+summary: >
+  Re-review after a second root cause was found and fixed (async 202 job
+  envelope not handled in useLotEquipmentQuery.ts's fetchEquipmentPeriod(),
+  discovered via real-world retest of the reported scenario). Verified the
+  fix matches the proven-correct sibling useEquipmentQuery.ts pattern exactly,
+  confirmed the new regression test genuinely tripwires (fails pre-fix, passes
+  post-fix), confirmed queryJobs()/queryRejects() inherit the fix automatically,
+  confirmed test-evidence.yml final-status: passed with all required phases
+  green, confirmed tasks.yml consistency, and assessed residual risk as low
+  (job-failure and poll-timeout error paths both surface clearly to the user;
+  result_url double-async is not a realistic failure mode for this endpoint).
+  Both root causes (CHAR-padding TRIM bug + missing async job polling) are now
+  fixed and covered by regression tests.
+artifacts:
+  - { type: gate-results, pointer: "collect: pass, targeted: pass, changed-area: pass, contract: pass, full: pass" }
+  - { type: evidence-quality, pointer: "linked-artifact-bundle" }
+  - { type: decision, pointer: "approved" }
+  - { type: failure-routing, pointer: "none" }
+notes: >
+  Non-blocking observation: a stray test-run directory (20260709-102803)
+  recorded a harness-invocation slip (ModuleNotFoundError: flask, conda env
+  not activated) that was immediately corrected and superseded by run 102810;
+  it is not referenced in test-evidence.yml and does not represent a real test
+  failure.
+next-action: run-gate

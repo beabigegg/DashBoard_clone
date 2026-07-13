@@ -7,6 +7,8 @@ Tests the core service functions without database dependencies:
 - Constants validation
 """
 
+import os
+
 import pytest
 
 from mes_dashboard.services.query_tool_service import (
@@ -20,6 +22,7 @@ from mes_dashboard.services.query_tool_service import (
     _resolve_by_work_order,
     get_lot_split_merge_history,
     get_equipment_rejects,
+    get_equipment_lots,
     BATCH_SIZE,
     MAX_DATE_RANGE_DAYS,
 )
@@ -721,3 +724,182 @@ class TestTimeoutClassification:
 
                 with pytest.raises(InternalQueryError):
                     resolve_lots('lot_id', ['LOT-1'])
+
+
+class TestGetEquipmentLots:
+    """Tests for get_equipment_lots() CONTAINERNAME trim + container_names filter
+    (fix-equipment-lots-trim AC-1, AC-2, AC-4, AC-5, AC-6)."""
+
+    _SQL_PATH = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "src", "mes_dashboard", "sql", "query_tool", "equipment_lots.sql",
+    )
+
+    def _base_row(self, **overrides):
+        row = {
+            'CONTAINERID': 'CID-1',
+            'WORKCENTERNAME': 'DB',
+            'EQUIPMENTID': 'EQ-1',
+            'EQUIPMENTNAME': 'Furnace-A',
+            'SPECNAME': 'SPEC-1',
+            'TRACKINTIMESTAMP': '2024-01-15 08:00:00',
+            'TRACKOUTTIMESTAMP': '2024-01-15 09:00:00',
+            'TRACKINQTY': 25,
+            'TRACKOUTQTY': 25,
+            'FINISHEDRUNCARD': 'RC-1',
+            'PJ_WORKORDER': 'WO-1',
+            'CONTAINERNAME': 'ga25081329-a01',
+            'PJ_TYPE': 'TYPE-A',
+            'PJ_BOP': 'BOP-1',
+            'WAFER_LOT_ID': 'WL-1',
+            'PRODUCTLINENAME': 'PL-1',
+        }
+        row.update(overrides)
+        return row
+
+    def test_equipment_lots_sql_trims_containername_like_productlinename(self):
+        """AC-1 (sibling structural pin): equipment_lots.sql TRIMs CONTAINERNAME
+        the same way it already TRIMs PRODUCTLINENAME."""
+        sql_text = open(self._SQL_PATH, encoding="utf-8").read()
+        assert "TRIM(c.CONTAINERNAME) AS CONTAINERNAME" in sql_text
+        assert "TRIM(c.PRODUCTLINENAME) AS PRODUCTLINENAME" in sql_text
+
+    def test_equipment_lots_containername_trimmed_char_padded(self):
+        """AC-1: a CHAR-padded, mixed-case CONTAINERNAME value flows through
+        get_equipment_lots() -> _df_to_records() without reintroducing padding."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        df = pd.DataFrame([self._base_row(CONTAINERNAME='ga25081329-a01')])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT 1"
+                mock_read.return_value = df
+
+                result = get_equipment_lots(['EQ-1'], '2024-01-01', '2024-01-31')
+
+        assert result['total'] == 1
+        containername = result['data'][0]['CONTAINERNAME']
+        assert containername == 'ga25081329-a01'
+        assert containername == containername.strip()
+
+    def test_equipment_lots_char_padded_fixture_returns_nonempty_rows(self):
+        """AC-2: production-records rows are non-empty for CHAR-padded/mixed-case
+        CONTAINERNAME fixtures once the SQL trim is applied."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        df = pd.DataFrame([
+            self._base_row(CONTAINERID='CID-1', CONTAINERNAME='ga25081329-a01'),
+            self._base_row(
+                CONTAINERID='CID-2',
+                CONTAINERNAME='GA25081330-A02',
+                TRACKINTIMESTAMP='2024-01-16 08:00:00',
+                TRACKOUTTIMESTAMP='2024-01-16 09:00:00',
+            ),
+        ])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT 1"
+                mock_read.return_value = df
+
+                result = get_equipment_lots(['EQ-1'], '2024-01-01', '2024-01-31')
+
+        assert result['total'] == 2
+        assert len(result['data']) == 2
+
+    def test_equipment_lots_container_names_filters_via_upper_trim_in(self):
+        """AC-4: container_names, when provided, narrows via
+        UPPER(TRIM(c.CONTAINERNAME)) IN (...) on the SAME QueryBuilder instance
+        used for the EQUIPMENT_FILTER (no bind-param name collision)."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        df = pd.DataFrame([self._base_row()])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT 1"
+                mock_read.return_value = df
+
+                get_equipment_lots(
+                    ['EQ-1'],
+                    '2024-01-01',
+                    '2024-01-31',
+                    container_names=['ga25081329-a01', ' GA25081330-A02 '],
+                )
+
+        call_kwargs = mock_load.call_args.kwargs
+        assert 'UPPER(TRIM(c.CONTAINERNAME))' in call_kwargs['CONTAINER_FILTER']
+        assert 'IN (' in call_kwargs['CONTAINER_FILTER']
+        assert call_kwargs['EQUIPMENT_FILTER'] != call_kwargs['CONTAINER_FILTER']
+
+        bound_params = mock_read.call_args.args[1]
+        param_values = set(bound_params.values())
+        assert 'GA25081329-A01' in param_values
+        assert 'GA25081330-A02' in param_values
+
+    def test_equipment_lots_container_names_applied_in_sql_where_not_python_postfilter(self):
+        """AC-5: narrowing is carried in the SQL WHERE/bind-params (via
+        mock_load.call_args.kwargs), not applied as a Python post-filter on
+        already-fetched records — rows the mocked DB "returns" are never
+        dropped in Python even if they wouldn't match container_names."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        df = pd.DataFrame([
+            self._base_row(CONTAINERID='CID-1', CONTAINERNAME='ga25081329-a01'),
+            self._base_row(
+                CONTAINERID='CID-2',
+                CONTAINERNAME='UNRELATED-LOT-999',
+                TRACKINTIMESTAMP='2024-01-16 08:00:00',
+                TRACKOUTTIMESTAMP='2024-01-16 09:00:00',
+            ),
+        ])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT 1"
+                mock_read.return_value = df
+
+                result = get_equipment_lots(
+                    ['EQ-1'],
+                    '2024-01-01',
+                    '2024-01-31',
+                    container_names=['ga25081329-a01'],
+                )
+
+        # Filter is carried via SQL bind params, not a Python post-filter:
+        # both mocked rows (including the "UNRELATED" one the real Oracle
+        # WHERE clause would have excluded) still come back from
+        # get_equipment_lots(), proving the service does not re-filter
+        # `records` after _df_to_records().
+        assert result['total'] == 2
+        assert mock_load.call_args.kwargs['CONTAINER_FILTER'] != "1=1"
+        assert 'UPPER(TRIM(c.CONTAINERNAME))' in mock_load.call_args.kwargs['CONTAINER_FILTER']
+
+    def test_equipment_lots_omitted_container_names_unchanged_behavior(self):
+        """AC-6: omitting container_names yields identical behavior to before
+        this change (CONTAINER_FILTER='1=1', no extra bind params)."""
+        from unittest.mock import patch
+        import pandas as pd
+
+        df = pd.DataFrame([self._base_row()])
+
+        with patch('mes_dashboard.services.query_tool_service.SQLLoader.load_with_params') as mock_load:
+            with patch('mes_dashboard.services.query_tool_service.read_sql_df_slow') as mock_read:
+                mock_load.return_value = "SELECT 1"
+                mock_read.return_value = df
+
+                result = get_equipment_lots(['EQ-1'], '2024-01-01', '2024-01-31')
+
+        assert result['total'] == 1
+        assert mock_load.call_args.kwargs['CONTAINER_FILTER'] == "1=1"
+
+        # Only the equipment_ids IN-clause bind param + start/end date — no
+        # CONTAINERNAME-derived params leak in when container_names is omitted.
+        bound_params = mock_read.call_args.args[1]
+        expected_params = {'start_date': '2024-01-01', 'end_date': '2024-01-31', 'p0': 'EQ-1'}
+        assert bound_params == expected_params

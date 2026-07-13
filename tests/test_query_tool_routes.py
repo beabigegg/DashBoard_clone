@@ -901,6 +901,36 @@ class TestEquipmentPeriodEndpoint:
         kwargs = mock_lots.call_args.kwargs
         assert kwargs['page'] == 2
         assert kwargs['per_page'] == 1
+        # AC-6 (route omitted-field regression): container_names omitted from
+        # the request body forwards as an empty list — identical behavior
+        # to before container_names existed.
+        assert kwargs['container_names'] == []
+
+    @patch('mes_dashboard.routes.query_tool_routes.get_equipment_lots')
+    def test_equipment_lots_forwards_container_names_kwarg(self, mock_lots, client):
+        """AC-4 (route forwarding): container_names in the request body is
+        forwarded to get_equipment_lots() as a per-kwarg, non-default value."""
+        mock_lots.return_value = {
+            'data': [{'CONTAINERID': 'CID-1'}],
+            'total': 1,
+            'pagination': {'page': 1, 'per_page': 500, 'total': 1, 'total_pages': 1},
+        }
+
+        response = client.post(
+            '/api/query-tool/equipment-period',
+            json={
+                'equipment_ids': ['EQ001'],
+                'start_date': '2024-01-01',
+                'end_date': '2024-01-31',
+                'query_type': 'lots',
+                'container_names': ['ga25081329-a01', 'GA25081330-A02'],
+            }
+        )
+
+        assert response.status_code == 200
+        mock_lots.assert_called_once()
+        kwargs = mock_lots.call_args.kwargs
+        assert kwargs['container_names'] == ['ga25081329-a01', 'GA25081330-A02']
 
 
 class TestExportCsvEndpoint:

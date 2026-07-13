@@ -1,0 +1,18 @@
+{
+  "change_id": "fix-equipment-lots-trim",
+  "phase": "collect",
+  "status": "failed",
+  "exit_code": 4,
+  "command": "python -m pytest --collect-only -q tests/test_query_tool_service.py::TestGetEquipmentLots tests/test_query_tool_routes.py::TestEquipmentPeriodEndpoint::test_equipment_lots_forwards_container_names_kwarg tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity && cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js",
+  "duration_ms": 235,
+  "first_failure": {
+    "kind": "import-error",
+    "message": "E   ModuleNotFoundError: No module named 'flask'"
+  },
+  "artifacts": {
+    "summary": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-102803/summary.json",
+    "stdout": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-102803/stdout.log",
+    "stderr": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-102803/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

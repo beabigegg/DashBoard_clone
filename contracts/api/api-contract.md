@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.38.2
+schema-version: 1.38.3
 last-changed: 2026-07-09
 breaking-change-policy: deprecate-2-minors
 ---
@@ -465,6 +465,10 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
 
 ## Compatibility Notes
 
+- **fix-equipment-lots-trim (2026-07-09):** Two changes, both backward-compatible:
+  - Bug fix: `equipment_lots.sql` now selects `TRIM(c.CONTAINERNAME) AS CONTAINERNAME` (previously untrimmed Oracle CHAR-padded value), matching the sibling `TRIM(c.PRODUCTLINENAME)` treatment already present. Value-only fix — no column added/removed, no row-shape change (data-shape-contract.md §3.6 unaffected). Fixes a client-side exact-match filter defect that silently zeroed out the 生產紀錄 sub-tab.
+  - Additive: `POST /api/query-tool/equipment-period` (`query_type=lots`) gains an optional JSON body field `container_names: string[]`. When provided, narrows results server-side via `UPPER(TRIM(c.CONTAINERNAME)) IN (...)` before the `QUERY_TOOL_DETAIL_MAX_PER_PAGE` (500) pagination clamp, applied identically on the sync route and the async RQ job path. Absent/empty array → unchanged behavior (existing callers unaffected). No new error codes.
+  - Consumer: `frontend/src/query-tool/composables/useLotEquipmentQuery.ts` (`queryLots()`/`queryRejects()`) — also gains a defensive `.trim()` before `.toUpperCase()` in its own exact-match filter; no other known consumers (internal jobs/mobile/partners).
 - **query-tool-url-timeout (2026-07-09, PR #32):** Additive — `POST /api/query-tool/lot-history` and `POST /api/query-tool/lot-associations` added alongside the existing `GET` routes. The frontend batch path (`useLotDetail.ts`) now sends `container_ids`/`workcenter_groups` as a JSON body instead of a comma-joined query-string param, so a large batch (up to `QUERY_TOOL_MAX_CONTAINER_IDS`) can no longer produce a request line long enough to be rejected by gunicorn's `limit_request_line` before the app's own 413 batch-size guard runs. `GET` remains supported (same params, query string) for single-CID reads and external callers. Request/response shapes and error codes are otherwise unchanged.
 - **move-target-permissions-panel (2026-07-08):** UI-only relocation, no endpoint/schema/auth change. `GET /admin/api/production-achievement/permissions` and `PUT /admin/api/production-achievement/permissions/{user_identifier}` are unchanged (still `admin_required`, same request/response shapes). The consumer of these two endpoints moves from `frontend/src/admin-pages/` (permission block, removed) to `frontend/src/admin-dashboard/` (new tab) — this supersedes the consumer note in the `production-achievement-kanban (2026-07-02)` entry below, which is left as historical record and not edited in place.
 - **production-achievement-async-spool (2026-07-08):** `GET /api/production-achievement/report` changes from a synchronous Oracle-backed aggregate-row response to the async RQ → DuckDB parquet spool pattern (mirrors `resource-history-rq-async`; ADR-0016). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (feature is pre-launch, sole consumer `frontend/src/production-achievement/` ships in the same atomic PR; same precedent as `equipment-rejects-by-lots`/`nav-config-to-code`):

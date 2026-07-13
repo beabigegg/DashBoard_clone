@@ -2434,6 +2434,7 @@ def get_equipment_lots(
     *,
     page: int = 1,
     per_page: int = 0,
+    container_names: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Get lots processed by equipment in a time period.
 
@@ -2441,6 +2442,8 @@ def get_equipment_lots(
         equipment_ids: List of equipment IDs
         start_date: Start date (YYYY-MM-DD)
         end_date: End date (YYYY-MM-DD)
+        container_names: Optional CONTAINERNAME narrowing filter (CHAR-padded,
+            case-insensitive match via UPPER(TRIM(...)))
 
     Returns:
         Dict with 'data' (lot records) and 'total'.
@@ -2456,11 +2459,25 @@ def get_equipment_lots(
 
     try:
         _check_rss_guard("設備批次 LOT 查詢")
+        # Single QueryBuilder shared by both IN-conditions: a second QueryBuilder()
+        # would restart its bind-param counter and clobber the first condition's
+        # params (see _build_two_filters pattern, ~line 2009).
         builder = QueryBuilder()
         builder.add_in_condition("h.EQUIPMENTID", equipment_ids)
+        equipment_filter = builder.conditions[0] if builder.conditions else "1=1"
+
+        container_filter = "1=1"
+        normalized_container_names = [
+            str(v).strip().upper() for v in (container_names or []) if str(v).strip()
+        ]
+        if normalized_container_names:
+            builder.add_in_condition("UPPER(TRIM(c.CONTAINERNAME))", normalized_container_names)
+            container_filter = builder.conditions[-1]
+
         sql = SQLLoader.load_with_params(
             "query_tool/equipment_lots",
-            EQUIPMENT_FILTER=builder.get_conditions_sql(),
+            EQUIPMENT_FILTER=equipment_filter,
+            CONTAINER_FILTER=container_filter,
         )
 
         params = {'start_date': start_date, 'end_date': end_date}
@@ -2891,7 +2908,15 @@ def execute_query_tool_job(*, job_id: str, owner: str, **query_params) -> None:
                 if query_sub_type == "status_hours":
                     result = get_equipment_status_hours(equipment_ids, start_date, end_date)
                 elif query_sub_type == "lots":
-                    result = get_equipment_lots(equipment_ids, start_date, end_date, page=page, per_page=per_page)
+                    container_names = query_params.get("container_names") or []
+                    result = get_equipment_lots(
+                        equipment_ids,
+                        start_date,
+                        end_date,
+                        page=page,
+                        per_page=per_page,
+                        container_names=container_names,
+                    )
                 elif query_sub_type == "materials":
                     result = get_equipment_materials(equipment_names, start_date, end_date)
                 elif query_sub_type == "rejects":

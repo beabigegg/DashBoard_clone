@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/integration/test_query_tool_rq_async.py tests/test_query_tool_routes.py tests/test_query_tool_service.py -q --maxfail=1 --tb=short -ra && cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js && npx vue-tsc --noEmit

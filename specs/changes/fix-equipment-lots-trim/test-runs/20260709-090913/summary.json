@@ -1,0 +1,15 @@
+{
+  "change_id": "fix-equipment-lots-trim",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js",
+  "duration_ms": 1645,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-090913/summary.json",
+    "stdout": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-090913/stdout.log",
+    "stderr": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-090913/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

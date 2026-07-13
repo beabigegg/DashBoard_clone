@@ -1,6 +1,6 @@
-# generated: 2026-07-08T12:27:35Z by cdd-kit 3.6.0
-# files: 1018, src-lines: 316442, map-lines: 22643, compression: 14.0x
-# sources-digest: 759b66fce5eb9b80b12651c7b107a2741febf516a2178247d6f87ba781efc12e
+# generated: 2026-07-09T02:48:50Z by cdd-kit 3.6.0
+# files: 1023, src-lines: 317998, map-lines: 22752, compression: 14.0x
+# sources-digest: 3ba9db45cded2c13afb06023499772b0462872c4f86beb869e74036cf96c8e1f
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -43,19 +43,19 @@ frontend/scripts/ts-resolver-loader.mjs:  # 50 lines
   functions:
     - { name: async resolve, lines: 16-50 }
 
-frontend/src/admin-dashboard/App.vue:  # 180 lines
+frontend/src/admin-dashboard/App.vue:  # 185 lines
   imports:
     - { module: vue, items: [computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch], line: 2 }
     - { module: '../shared-composables/useAutoRefresh.js', items: [useAutoRefresh], line: 12 }
     - { module: '../core/api', items: [apiGet], line: 13 }
   constants:
-    - { name: DEFAULT_POLL_INTERVAL_MS, line: 56 }
+    - { name: DEFAULT_POLL_INTERVAL_MS, line: 61 }
   functions:
-    - { name: async syncPollInterval, lines: 59-69 }
-    - { name: async refreshActiveTab, lines: 77-79 }
-    - { name: async refreshNow, lines: 81-89 }
-    - { name: setActiveTab, lines: 97-101 }
-    - { name: toggleAutoRefresh, lines: 103-109 }
+    - { name: async syncPollInterval, lines: 64-74 }
+    - { name: async refreshActiveTab, lines: 82-84 }
+    - { name: async refreshNow, lines: 86-94 }
+    - { name: setActiveTab, lines: 102-106 }
+    - { name: toggleAutoRefresh, lines: 108-114 }
 
 frontend/src/admin-dashboard/components/DauTrendChart.vue:  # 65 lines
   imports:
@@ -95,9 +95,17 @@ frontend/src/admin-dashboard/components/RecentSessionsTable.vue:  # 47 lines
     - { name: formatTime, lines: 6-9 }
     - { name: formatDuration, lines: 11-16 }
 
+frontend/src/admin-dashboard/components/TargetPermissionsPanel.vue:  # 98 lines
+
 frontend/src/admin-dashboard/components/TopUsersTable.vue:  # 36 lines
   functions:
     - { name: formatDuration, lines: 6-11 }
+
+frontend/src/admin-dashboard/components/__tests__/TargetPermissionsPanel.test.ts:  # 70 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect], line: 2 }
+    - { module: '@vue/test-utils', items: [mount], line: 3 }
+    - { module: '../TargetPermissionsPanel.vue', items: ['default:TargetPermissionsPanel'], line: 4 }
 
 frontend/src/admin-dashboard/main.ts:  # 8 lines
   imports:
@@ -184,6 +192,23 @@ frontend/src/admin-dashboard/tabs/PerformanceTab.vue:  # 220 lines
     - { name: updateLatencyChart, lines: 69-113 }
     - { name: async refresh, lines: 115-123 }
     - { name: formatBytes, lines: 138-148 }
+
+frontend/src/admin-dashboard/tabs/PermissionsTab.vue:  # 106 lines
+  imports:
+    - { module: vue, items: [onMounted, ref], line: 11 }
+    - { module: '../components/TargetPermissionsPanel.vue', items: ['default:TargetPermissionsPanel'], line: 13 }
+    - { module: '../../shared-ui/components/BlockLoadingState.vue', items: ['default:BlockLoadingState'], line: 14 }
+    - { module: '../../shared-ui/components/ErrorBanner.vue', items: ['default:ErrorBanner'], line: 15 }
+    - { module: '../../shared-ui/components/SectionCard.vue', items: ['default:SectionCard'], line: 16 }
+    - { module: '../../core/api.js', items: [apiGet], line: 17 }
+    - { module: '../../admin-shared/composables/useLastUpdated', items: [useLastUpdated], line: 18 }
+  functions:
+    - { name: getCsrfToken, lines: 25-27 }
+    - { name: async putJson, lines: 29-43 }
+    - { name: async loadPermissions, lines: 45-48 }
+    - { name: async refresh, lines: 50-60 }
+    - { name: async handleTogglePermission, lines: 62-72 }
+    - { name: async handleGrantNewPermission, lines: 74-76 }
 
 frontend/src/admin-dashboard/tabs/UsageTab.vue:  # 160 lines
   imports:
@@ -276,6 +301,17 @@ frontend/src/admin-dashboard/tabs/__tests__/PerfDetail.test.ts:  # 279 lines
     - { name: mountCache, lines: 155-158 }
     - { name: mountPerf, lines: 161-164 }
 
+frontend/src/admin-dashboard/tabs/__tests__/PermissionsTab.test.ts:  # 166 lines
+  imports:
+    - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
+    - { module: '@vue/test-utils', items: [mount, flushPromises], line: 3 }
+    - { module: '../PermissionsTab.vue', items: ['default:PermissionsTab'], line: 22 }
+  constants:
+    - { name: ROW_ALICE, line: 31 }
+    - { name: ROW_BOB, line: 32 }
+  functions:
+    - { name: mountTab, lines: 24-29 }
+
 frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
   imports:
     - { module: vitest, items: [describe, it, expect, vi, beforeEach, afterEach], line: 2 }
@@ -287,7 +323,7 @@ frontend/src/admin-dashboard/tabs/__tests__/WorkerTab.test.ts:  # 140 lines
   functions:
     - { name: mountWorker, lines: 86-90 }
 
-frontend/src/admin-pages/App.vue:  # 202 lines
+frontend/src/admin-pages/App.vue:  # 139 lines
 
 frontend/src/admin-pages/__tests__/App.test.ts:  # 47 lines
   imports:
@@ -303,14 +339,6 @@ frontend/src/admin-pages/__tests__/PagesManagementPanel.test.ts:  # 28 lines
     - { module: '../components/PagesManagementPanel.vue', items: ['default:PagesManagementPanel'], line: 4 }
 
 frontend/src/admin-pages/components/PagesManagementPanel.vue:  # 60 lines
-
-frontend/src/admin-pages/components/TargetPermissionsPanel.vue:  # 97 lines
-
-frontend/src/admin-pages/components/__tests__/TargetPermissionsPanel.test.ts:  # 52 lines
-  imports:
-    - { module: vitest, items: [describe, it, expect], line: 2 }
-    - { module: '@vue/test-utils', items: [mount], line: 3 }
-    - { module: '../TargetPermissionsPanel.vue', items: ['default:TargetPermissionsPanel'], line: 4 }
 
 frontend/src/admin-pages/main.ts:  # 7 lines
   imports:
@@ -1844,10 +1872,10 @@ frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 422 lines
     - { name: Pagination, lines: 13-18 }  # local
     - { name: EquipmentQueryInitial, lines: 20-25 }  # local
 
-frontend/src/query-tool/composables/useLotDetail.ts:  # 589 lines
+frontend/src/query-tool/composables/useLotDetail.ts:  # 594 lines
   imports:
     - { module: vue, items: [reactive, ref], line: 1 }
-    - { module: '../../core/api', items: [apiGet, ensureMesApiAvailable], line: 3 }
+    - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
     - { module: '../utils/csv', items: [exportCsv], line: 4 }
     - { module: '../utils/values', items: [normalizeText, parseDateTime, uniqueValues, formatDateTime], line: 5 }
   constants:
@@ -1867,30 +1895,31 @@ frontend/src/query-tool/composables/useLotDetail.ts:  # 589 lines
     - { name: normalizeSubTab, lines: 105-108 }
     - { name: resolveTimeRangeFromHistory, lines: 110-143 }
     - { name: resolveEquipmentIdFromHistory, lines: 145-158 }
-    - { name: useLotDetail, lines: 160-589 }
+    - { name: useLotDetail, lines: 160-594 }
   interfaces:
     - { name: Pagination, lines: 7-12 }  # local
     - { name: QualityMeta, lines: 14-17 }  # local
     - { name: LotDetailInitial, lines: 19-23 }  # local
 
-frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 452 lines
+frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 469 lines
   imports:
     - { module: vue, items: [computed, reactive, ref], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
-    - { module: '../utils/csv', items: [exportCsv], line: 4 }
-    - { module: '../utils/values', items: [normalizeText, parseInputValues], line: 5 }
+    - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 4 }
+    - { module: '../utils/csv', items: [exportCsv], line: 5 }
+    - { module: '../utils/values', items: [normalizeText, parseInputValues], line: 6 }
   constants:
-    - { name: EQUIPMENT_SUB_TABS, line: 14 }
-    - { name: DEFAULT_LOTS_PER_PAGE, line: 15 }
-    - { name: PAGE_SIZE_OPTIONS, line: 16 }
-    - { name: MAX_INPUT, line: 17 }
-    - { name: INPUT_TYPE_OPTIONS, line: 19 }
+    - { name: EQUIPMENT_SUB_TABS, line: 15 }
+    - { name: DEFAULT_LOTS_PER_PAGE, line: 16 }
+    - { name: PAGE_SIZE_OPTIONS, line: 17 }
+    - { name: MAX_INPUT, line: 18 }
+    - { name: INPUT_TYPE_OPTIONS, line: 20 }
   functions:
-    - { name: normalizeSubTab, lines: 24-27 }
-    - { name: normalizeInputType, lines: 29-32 }
-    - { name: useLotEquipmentQuery, lines: 34-452 }
+    - { name: normalizeSubTab, lines: 25-28 }
+    - { name: normalizeInputType, lines: 30-33 }
+    - { name: useLotEquipmentQuery, lines: 35-469 }
   interfaces:
-    - { name: LotEquipmentQueryInitial, lines: 7-12 }  # local
+    - { name: LotEquipmentQueryInitial, lines: 8-13 }  # local
 
 frontend/src/query-tool/composables/useLotLineage.ts:  # 582 lines
   imports:
@@ -2713,15 +2742,24 @@ frontend/tests/hold-overview/csv-export.test.js:  # 190 lines
     - { name: EXPECTED_HEADERS, line: 18 }
     - { name: SAMPLE_LOT, line: 35 }
 
-frontend/tests/legacy/admin-dashboard.test.js:  # 89 lines
+frontend/tests/legacy/admin-dashboard-permissions-css-scope.test.js:  # 56 lines
+  imports:
+    - { module: 'node:test', items: ['default:test'], line: 14 }
+    - { module: 'node:assert/strict', items: ['default:assert'], line: 15 }
+    - { module: 'node:fs', items: [readFileSync], line: 16 }
+    - { module: 'node:path', items: [resolve], line: 17 }
+  constants:
+    - { name: EXPECTED_PA_PERM_CLASSES, line: 22 }
+
+frontend/tests/legacy/admin-dashboard.test.js:  # 96 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 7 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 8 }
   constants:
     - { name: ADMIN_DASHBOARD_TABS, line: 13 }
-    - { name: AUTO_REFRESH_INTERVAL_MS, line: 57 }
+    - { name: AUTO_REFRESH_INTERVAL_MS, line: 64 }
   functions:
-    - { name: findTabByKey, lines: 71-73 }
+    - { name: findTabByKey, lines: 78-80 }
 
 frontend/tests/legacy/anomaly-overview.test.js:  # 121 lines
   imports:
@@ -2909,7 +2947,7 @@ frontend/tests/legacy/production-history.test.js:  # 440 lines
     - { name: shouldRenderBadge, lines: 407-409 }
     - { name: badgeText, lines: 412-414 }
 
-frontend/tests/legacy/query-tool-composables.test.js:  # 471 lines
+frontend/tests/legacy/query-tool-composables.test.js:  # 467 lines
   imports:
     - { module: 'node:test', items: ['default:test'], line: 1 }
     - { module: 'node:assert/strict', items: ['default:assert'], line: 2 }
@@ -3020,25 +3058,26 @@ frontend/tests/playwright/_auth.js:  # 207 lines
     - { name: async waitForIdleUi, lines: 132-146 }
     - { name: async navigateViaSidebar, lines: 161-207 }
 
-frontend/tests/playwright/admin-dashboard.spec.ts:  # 382 lines
+frontend/tests/playwright/admin-dashboard.spec.ts:  # 498 lines
   imports:
-    - { module: '@playwright/test', items: [test, expect, Page], line: 20 }
+    - { module: '@playwright/test', items: [test, expect, Page], line: 23 }
   constants:
-    - { name: BASE_URL, line: 26 }
-    - { name: PAGE_URL, line: 27 }
-    - { name: MOCK_HEALTH, line: 33 }
-    - { name: MOCK_PERF_HISTORY, line: 48 }
-    - { name: MOCK_METRICS, line: 52 }
-    - { name: MOCK_PERF_DETAIL, line: 66 }
-    - { name: MOCK_STORAGE, line: 80 }
-    - { name: MOCK_USAGE_KPI, line: 86 }
-    - { name: MOCK_LOGS, line: 92 }
-    - { name: MOCK_PORTAL_NAV_ADMIN, line: 98 }
+    - { name: BASE_URL, line: 29 }
+    - { name: PAGE_URL, line: 30 }
+    - { name: MOCK_HEALTH, line: 36 }
+    - { name: MOCK_PERF_HISTORY, line: 51 }
+    - { name: MOCK_METRICS, line: 55 }
+    - { name: MOCK_PERF_DETAIL, line: 69 }
+    - { name: MOCK_STORAGE, line: 83 }
+    - { name: MOCK_USAGE_KPI, line: 89 }
+    - { name: MOCK_LOGS, line: 95 }
+    - { name: MOCK_PERMISSIONS, line: 101 }
+    - { name: MOCK_PORTAL_NAV_ADMIN, line: 110 }
   functions:
-    - { name: async installBaseRoutes, lines: 117-204 }
-    - { name: async gotoAdminDashboard, lines: 210-218 }
+    - { name: async installBaseRoutes, lines: 129-231 }
+    - { name: async gotoAdminDashboard, lines: 237-245 }
 
-frontend/tests/playwright/admin-pages.spec.ts:  # 229 lines
+frontend/tests/playwright/admin-pages.spec.ts:  # 240 lines
   imports:
     - { module: '@playwright/test', items: [test, expect, Page], line: 24 }
   constants:
@@ -3801,12 +3840,23 @@ frontend/tests/query-tool/EquipmentRejectsTable.test.js:  # 129 lines
     - { module: '@vue/test-utils', items: [shallowMount], line: 15 }
     - { module: '../../src/query-tool/components/EquipmentRejectsTable.vue', items: ['default:EquipmentRejectsTable'], line: 38 }
 
-frontend/tests/query-tool/useLotDetail.pagination.test.js:  # 90 lines
+frontend/tests/query-tool/useLotDetail.pagination.test.js:  # 92 lines
   imports:
     - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
     - { module: '../../src/query-tool/composables/useLotDetail.js', items: [useLotDetail], line: 3 }
   functions:
-    - { name: setupWindowMesApi, lines: 5-16 }
+    - { name: setupWindowMesApi, lines: 7-19 }
+
+frontend/tests/query-tool/useLotEquipmentQuery.test.js:  # 236 lines
+  imports:
+    - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
+    - { module: '../../src/query-tool/composables/useLotEquipmentQuery.ts', items: [useLotEquipmentQuery], line: 8 }
+  constants:
+    - { name: LOOKUP_URL, line: 27 }
+    - { name: EQUIPMENT_PERIOD_URL, line: 28 }
+  functions:
+    - { name: setupWindowMesApi, lines: 13-25 }
+    - { name: makeLookupResponse, lines: 30-41 }
 
 frontend/tests/resource-status/App.cross-filter.test.ts:  # 450 lines
   imports:
@@ -3985,14 +4035,14 @@ frontend/vitest.config.js:  # 24 lines
     - { module: 'node:path', items: [resolve], line: 2 }
     - { module: '@vitejs/plugin-vue', items: ['default:vue'], line: 3 }
 
-gunicorn.conf.py:  # 155 lines
+gunicorn.conf.py:  # 173 lines
   imports:
     - { module: logging, items: [], line: 1 }
     - { module: os, items: [], line: 2 }
   functions:
-    - { name: post_fork, lines: 37-89 }
-    - { name: on_starting, lines: 92-117 }
-    - { name: worker_exit, lines: 120-155 }
+    - { name: post_fork, lines: 55-107 }
+    - { name: on_starting, lines: 110-135 }
+    - { name: worker_exit, lines: 138-173 }
 
 scripts/capture_spool_snapshot.py:  # 204 lines
   imports:
@@ -4675,7 +4725,7 @@ src/mes_dashboard/core/duckdb_runtime.py:  # 211 lines
     - { name: get_duckdb_telemetry, lines: 169-189 }
     - { name: assert_spool_path, lines: 192-211 }
 
-src/mes_dashboard/core/exceptions.py:  # 97 lines
+src/mes_dashboard/core/exceptions.py:  # 136 lines
   imports:
     - { module: __future__, items: [annotations], line: 18 }
     - { module: typing, items: [Any, Dict, Optional], line: 20 }
@@ -4697,6 +4747,8 @@ src/mes_dashboard/core/exceptions.py:  # 97 lines
       lines: 78-84
     - name: LockUnavailableError
       lines: 87-97
+  functions:
+    - { name: is_query_timeout, lines: 116-136 }
 
 src/mes_dashboard/core/feature_flags.py:  # 49 lines
   imports:
@@ -5072,7 +5124,7 @@ src/mes_dashboard/core/query_quality_contract.py:  # 337 lines
     - { name: adapt_legacy_event_map, lines: 266-304 }
     - { name: unpack_event_fetch_result, lines: 307-336 }
 
-src/mes_dashboard/core/query_spool_store.py:  # 1000 lines
+src/mes_dashboard/core/query_spool_store.py:  # 1008 lines
   imports:
     - { module: __future__, items: [annotations], line: 9 }
     - { module: hashlib, items: [], line: 11 }
@@ -5121,25 +5173,25 @@ src/mes_dashboard/core/query_spool_store.py:  # 1000 lines
     - { name: get_spool_metadata, lines: 260-279 }
     - { name: store_spooled_df, lines: 282-344 }
     - { name: load_spooled_df, lines: 347-388 }
-    - { name: read_spool_records, lines: 391-432 }
-    - { name: get_spool_file_path, lines: 435-457 }
-    - { name: register_spool_file, lines: 460-522 }
-    - { name: register_stage_spool_file, lines: 525-596 }
-    - { name: get_stage_spool_metadata, lines: 599-616 }
-    - { name: get_stage_spool_path, lines: 619-635 }
-    - { name: list_namespace_stages, lines: 638-651 }
-    - { name: list_namespace_spool_paths, lines: 654-662 }
-    - { name: clear_spooled_df, lines: 665-686 }
-    - { name: cleanup_expired_spool, lines: 689-800 }
-    - { name: _worker_loop, lines: 803-819 }
-    - { name: init_query_spool_cleanup, lines: 822-839 }
-    - { name: stop_query_spool_cleanup_worker, lines: 842-848 }
-    - { name: make_canonical_query_id, lines: 858-875 }
-    - { name: _inflight_key, lines: 885-887 }
-    - { name: set_inflight_state, lines: 890-924 }
-    - { name: get_inflight_state, lines: 927-944 }
-    - { name: clear_inflight_state, lines: 947-959 }
-    - { name: update_spool_status, lines: 966-1000 }
+    - { name: read_spool_records, lines: 391-440 }
+    - { name: get_spool_file_path, lines: 443-465 }
+    - { name: register_spool_file, lines: 468-530 }
+    - { name: register_stage_spool_file, lines: 533-604 }
+    - { name: get_stage_spool_metadata, lines: 607-624 }
+    - { name: get_stage_spool_path, lines: 627-643 }
+    - { name: list_namespace_stages, lines: 646-659 }
+    - { name: list_namespace_spool_paths, lines: 662-670 }
+    - { name: clear_spooled_df, lines: 673-694 }
+    - { name: cleanup_expired_spool, lines: 697-808 }
+    - { name: _worker_loop, lines: 811-827 }
+    - { name: init_query_spool_cleanup, lines: 830-847 }
+    - { name: stop_query_spool_cleanup_worker, lines: 850-856 }
+    - { name: make_canonical_query_id, lines: 866-883 }
+    - { name: _inflight_key, lines: 893-895 }
+    - { name: set_inflight_state, lines: 898-932 }
+    - { name: get_inflight_state, lines: 935-952 }
+    - { name: clear_inflight_state, lines: 955-967 }
+    - { name: update_spool_status, lines: 974-1008 }
 
 src/mes_dashboard/core/rate_limit.py:  # 210 lines
   imports:
@@ -6022,7 +6074,7 @@ src/mes_dashboard/routes/qc_gate_routes.py:  # 20 lines
   functions:
     - { name: api_qc_gate_summary, lines: 15-20 }  # @qc_gate_bp.route('/summary')
 
-src/mes_dashboard/routes/query_tool_routes.py:  # 1044 lines
+src/mes_dashboard/routes/query_tool_routes.py:  # 1099 lines
   imports:
     - { module: gc, items: [], line: 12 }
     - { module: hashlib, items: [], line: 13 }
@@ -6049,25 +6101,27 @@ src/mes_dashboard/routes/query_tool_routes.py:  # 1044 lines
     - { name: _memory_error_response, lines: 138-140 }
     - { name: _query_tool_max_container_ids, lines: 198-203 }
     - { name: _reject_if_batch_too_large, lines: 206-210 }
-    - { name: _sanitize_page, lines: 213-217 }
-    - { name: _sanitize_per_page, lines: 220-225 }
-    - { name: _format_lot_materials_export_rows, lines: 228-243 }
-    - { name: _format_lot_holds_export_rows, lines: 246-266 }
-    - { name: _format_equipment_lots_export_rows, lines: 269-288 }
-    - { name: _format_lot_history_export_rows, lines: 301-312 }
-    - { name: _format_lot_rejects_export_rows, lines: 315-328 }
-    - { name: _format_lot_jobs_export_rows, lines: 331-342 }
-    - { name: query_tool_page, lines: 350-355 }  # @query_tool_bp.route('/query-tool')
-    - { name: resolve_lot_input, lines: 365-419 }  # @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
-    - { name: query_lot_history, lines: 429-487 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET'])
-    - { name: query_adjacent_lots, lines: 497-519 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
-    - { name: query_lot_associations, lines: 529-593 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET'])
-    - { name: query_equipment_period, lines: 603-729 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
-    - { name: get_equipment_list, lines: 737-768 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
-    - { name: get_workcenter_groups_list, lines: 776-795 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
-    - { name: lookup_lot_equipment, lines: 805-840 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
-    - { name: get_equipment_recent_jobs_route, lines: 848-861 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
-    - { name: export_csv, lines: 871-1044 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
+    - { name: _detail_request_values, lines: 213-236 }
+    - { name: _extract_id_list, lines: 239-251 }
+    - { name: _sanitize_page, lines: 254-258 }
+    - { name: _sanitize_per_page, lines: 261-266 }
+    - { name: _format_lot_materials_export_rows, lines: 269-284 }
+    - { name: _format_lot_holds_export_rows, lines: 287-307 }
+    - { name: _format_equipment_lots_export_rows, lines: 310-329 }
+    - { name: _format_lot_history_export_rows, lines: 342-353 }
+    - { name: _format_lot_rejects_export_rows, lines: 356-369 }
+    - { name: _format_lot_jobs_export_rows, lines: 372-383 }
+    - { name: query_tool_page, lines: 391-396 }  # @query_tool_bp.route('/query-tool')
+    - { name: resolve_lot_input, lines: 406-460 }  # @query_tool_bp.route('/api/query-tool/resolve', methods=['POST'])
+    - { name: query_lot_history, lines: 470-531 }  # @query_tool_bp.route('/api/query-tool/lot-history', methods=['GET', 'POST'])
+    - { name: query_adjacent_lots, lines: 541-563 }  # @query_tool_bp.route('/api/query-tool/adjacent-lots', methods=['GET'])
+    - { name: query_lot_associations, lines: 573-645 }  # @query_tool_bp.route('/api/query-tool/lot-associations', methods=['GET', 'POST'])
+    - { name: query_equipment_period, lines: 655-784 }  # @query_tool_bp.route('/api/query-tool/equipment-period', methods=['POST'])
+    - { name: get_equipment_list, lines: 792-823 }  # @query_tool_bp.route('/api/query-tool/equipment-list', methods=['GET'])
+    - { name: get_workcenter_groups_list, lines: 831-850 }  # @query_tool_bp.route('/api/query-tool/workcenter-groups', methods=['GET'])
+    - { name: lookup_lot_equipment, lines: 860-895 }  # @query_tool_bp.route('/api/query-tool/lot-equipment-lookup', methods=['POST'])
+    - { name: get_equipment_recent_jobs_route, lines: 903-916 }  # @query_tool_bp.route('/api/query-tool/equipment-recent-jobs/<equipment_id>', meth...
+    - { name: export_csv, lines: 926-1099 }  # @query_tool_bp.route('/api/query-tool/export-csv', methods=['POST'])
 
 src/mes_dashboard/routes/reject_history_routes.py:  # 1038 lines
   imports:
@@ -6931,7 +6985,7 @@ src/mes_dashboard/services/eap_alarm_service.py:  # 546 lines
     - { name: get_trend, lines: 338-428 }
     - { name: get_detail, lines: 433-546 }
 
-src/mes_dashboard/services/event_fetcher.py:  # 601 lines
+src/mes_dashboard/services/event_fetcher.py:  # 611 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: hashlib, items: [], line: 6 }
@@ -6941,34 +6995,35 @@ src/mes_dashboard/services/event_fetcher.py:  # 601 lines
     - { module: re, items: [], line: 10 }
     - { module: threading, items: [], line: 11 }
     - { module: collections, items: [defaultdict], line: 12 }
-    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 13 }
-    - { module: decimal, items: [Decimal], line: 14 }
-    - { module: typing, items: [Any, Callable, Dict, List, Tuple], line: 15 }
-    - { module: mes_dashboard.core.cache, items: [cache_get, cache_set], line: 17 }
-    - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta], line: 18 }
-    - { module: mes_dashboard.core.query_quality_contract, items: [QUALITY_SCOPE_DOMAIN, QUALITY_STATUS_COMPLETE, QUALITY_STATUS_PARTIAL, QUALITY_STATUS_TRUNCATED, build_event_fetch_result, build_quality_meta, unpack_event_fetch_result], line: 19 }
-    - { module: mes_dashboard.core.database, items: [read_sql_df_slow_iter], line: 28 }
-    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 29 }
+    - { module: contextlib, items: [closing], line: 13 }
+    - { module: concurrent.futures, items: [ThreadPoolExecutor, as_completed], line: 14 }
+    - { module: decimal, items: [Decimal], line: 15 }
+    - { module: typing, items: [Any, Callable, Dict, List, Tuple], line: 16 }
+    - { module: mes_dashboard.core.cache, items: [cache_get, cache_set], line: 18 }
+    - { module: mes_dashboard.core.partial_failure_contract, items: [build_partial_failure_meta], line: 19 }
+    - { module: mes_dashboard.core.query_quality_contract, items: [QUALITY_SCOPE_DOMAIN, QUALITY_STATUS_COMPLETE, QUALITY_STATUS_PARTIAL, QUALITY_STATUS_TRUNCATED, build_event_fetch_result, build_quality_meta, unpack_event_fetch_result], line: 20 }
+    - { module: mes_dashboard.core.database, items: [read_sql_df_slow_iter], line: 29 }
+    - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 30 }
   constants:
-    - { name: ORACLE_IN_BATCH_SIZE, line: 33 }
-    - { name: EVENT_FETCHER_MAX_WORKERS, line: 34 }
-    - { name: CACHE_SKIP_CID_THRESHOLD, line: 35 }
-    - { name: EVENT_FETCHER_MAX_TOTAL_ROWS, line: 36 }
-    - { name: EVENT_FETCHER_ALLOW_PARTIAL_RESULTS, line: 37 }
+    - { name: ORACLE_IN_BATCH_SIZE, line: 34 }
+    - { name: EVENT_FETCHER_MAX_WORKERS, line: 35 }
+    - { name: CACHE_SKIP_CID_THRESHOLD, line: 36 }
+    - { name: EVENT_FETCHER_MAX_TOTAL_ROWS, line: 37 }
+    - { name: EVENT_FETCHER_ALLOW_PARTIAL_RESULTS, line: 38 }
   classes:
     - name: EventFetcher
-      lines: 140-601
+      lines: 141-611
       methods:
-        - { name: _cache_key, lines: 149-153 }
-        - { name: _replace_container_filter, lines: 156-167 }
-        - { name: _get_rate_limit_config, lines: 170-178 }
-        - { name: _build_domain_sql, lines: 181-233 }
-        - { name: fetch_events, lines: 236-407 }
-        - { name: _stream_batches_to_writer, lines: 410-492 }
-        - { name: fetch_events_to_parquet, lines: 495-601 }
+        - { name: _cache_key, lines: 150-154 }
+        - { name: _replace_container_filter, lines: 157-168 }
+        - { name: _get_rate_limit_config, lines: 171-179 }
+        - { name: _build_domain_sql, lines: 182-234 }
+        - { name: fetch_events, lines: 237-414 }
+        - { name: _stream_batches_to_writer, lines: 417-502 }
+        - { name: fetch_events_to_parquet, lines: 505-611 }
   functions:
-    - { name: _env_int, lines: 113-121 }
-    - { name: _normalize_ids, lines: 124-137 }
+    - { name: _env_int, lines: 114-122 }
+    - { name: _normalize_ids, lines: 125-138 }
 
 src/mes_dashboard/services/filter_cache.py:  # 637 lines
   imports:
@@ -7844,7 +7899,7 @@ src/mes_dashboard/services/qc_gate_service.py:  # 248 lines
     - { name: _build_lot_payload, lines: 139-171 }
     - { name: get_qc_gate_summary, lines: 174-248 }
 
-src/mes_dashboard/services/query_tool_service.py:  # 2922 lines
+src/mes_dashboard/services/query_tool_service.py:  # 2976 lines
   imports:
     - { module: csv, items: [], line: 18 }
     - { module: hashlib, items: [], line: 19 }
@@ -7862,89 +7917,89 @@ src/mes_dashboard/services/query_tool_service.py:  # 2922 lines
     - { module: mes_dashboard.sql, items: [QueryBuilder, SQLLoader], line: 34 }
     - { module: mes_dashboard.services.container_resolution_policy, items: [assess_resolution_result, normalize_input_values, validate_resolution_request, validate_resolution_result], line: 35 }
     - { module: mes_dashboard.core.interactive_memory_guard, items: [process_rss_mb], line: 41 }
-    - { module: mes_dashboard.core.exceptions, items: [UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError], line: 42 }
-    - { module: mes_dashboard.core.query_quality_contract, items: [unpack_event_fetch_result], line: 49 }
-    - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 50 }
-    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 51 }
-    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 2913 }
+    - { module: mes_dashboard.core.exceptions, items: [UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError, is_query_timeout], line: 42 }
+    - { module: mes_dashboard.core.query_quality_contract, items: [unpack_event_fetch_result], line: 50 }
+    - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 51 }
+    - { module: mes_dashboard.services.query_tool_sql_runtime, items: [aggregate_partial_trackouts, _PARTIAL_KEY_COLS_4, _PARTIAL_KEY_COLS_3, _PARTIAL_NONKEY_COLS_LOT, _PARTIAL_NONKEY_COLS_ADJACENT], line: 52 }
+    - { module: mes_dashboard.services.job_registry, items: [JobTypeConfig, register_job_type], line: 2967 }
   constants:
-    - { name: BATCH_SIZE, line: 69 }
-    - { name: MAX_DATE_RANGE_DAYS, line: 70 }
-    - { name: DEFAULT_TIME_WINDOW_HOURS, line: 71 }
-    - { name: ADJACENT_LOTS_COUNT, line: 72 }
-    - { name: QUERY_TOOL_RSS_REJECT_MB, line: 80 }
-    - { name: QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, line: 81 }
-    - { name: QUERY_TOOL_DETAIL_MAX_PER_PAGE, line: 82 }
-    - { name: QUERY_TOOL_SPOOL_TTL_SECONDS, line: 83 }
-    - { name: QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP, line: 91 }
-    - { name: QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP, line: 95 }
-    - { name: QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE, line: 99 }
-    - { name: QUERY_TOOL_SPOOL_NS_HISTORY_BATCH, line: 103 }
-    - { name: QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX, line: 104 }
-    - { name: MAX_LOT_EQUIPMENT_INPUT, line: 1963 }
-    - { name: MAX_PARENT_TRACE_DEPTH, line: 1964 }
+    - { name: BATCH_SIZE, line: 70 }
+    - { name: MAX_DATE_RANGE_DAYS, line: 71 }
+    - { name: DEFAULT_TIME_WINDOW_HOURS, line: 72 }
+    - { name: ADJACENT_LOTS_COUNT, line: 73 }
+    - { name: QUERY_TOOL_RSS_REJECT_MB, line: 81 }
+    - { name: QUERY_TOOL_DETAIL_DEFAULT_PER_PAGE, line: 82 }
+    - { name: QUERY_TOOL_DETAIL_MAX_PER_PAGE, line: 83 }
+    - { name: QUERY_TOOL_SPOOL_TTL_SECONDS, line: 84 }
+    - { name: QUERY_TOOL_REJECT_INCLUDE_EXCLUDED_SCRAP, line: 92 }
+    - { name: QUERY_TOOL_REJECT_EXCLUDE_MATERIAL_SCRAP, line: 96 }
+    - { name: QUERY_TOOL_REJECT_EXCLUDE_PB_DIODE, line: 100 }
+    - { name: QUERY_TOOL_SPOOL_NS_HISTORY_BATCH, line: 104 }
+    - { name: QUERY_TOOL_SPOOL_NS_ASSOC_BATCH_PREFIX, line: 105 }
+    - { name: MAX_LOT_EQUIPMENT_INPUT, line: 1980 }
+    - { name: MAX_PARENT_TRACE_DEPTH, line: 1981 }
   functions:
-    - { name: _env_bool, lines: 75-77 }
-    - { name: _fetch_domain_records, lines: 107-109 }
-    - { name: _sanitize_page, lines: 112-116 }
-    - { name: _sanitize_per_page, lines: 119-128 }
-    - { name: _paginate_rows, lines: 131-152 }
-    - { name: _check_rss_guard, lines: 155-172 }
-    - { name: _max_batch_container_ids, lines: 175-179 }
-    - { name: _build_query_tool_batch_query_id, lines: 182-193 }
-    - { name: _query_tool_batch_namespace, lines: 196-200 }
-    - { name: _query_tool_reject_policy, lines: 203-208 }
-    - { name: _store_query_tool_batch_spool, lines: 211-239 }
-    - { name: _try_query_tool_spool_page, lines: 242-270 }
-    - { name: validate_date_range, lines: 277-301 }
-    - { name: validate_lot_input, lines: 304-314 }
-    - { name: validate_equipment_input, lines: 317-329 }
-    - { name: _df_to_records, lines: 332-361 }
-    - { name: _normalize_search_tokens, lines: 364-374 }
-    - { name: _normalize_wildcard_token, lines: 377-382 }
-    - { name: _is_pattern_token, lines: 385-387 }
-    - { name: _to_like_regex, lines: 390-413 }
-    - { name: _add_exact_or_pattern_condition, lines: 416-449 }
-    - { name: _match_rows_by_tokens, lines: 452-512 }
-    - { name: resolve_lots, lines: 519-587 }
-    - { name: _resolve_by_lot_id, lines: 590-632 }
-    - { name: _resolve_by_wafer_lot, lines: 635-673 }
-    - { name: _is_gd_like, lines: 676-678 }
-    - { name: _literal_prefix_before_wildcard, lines: 681-686 }
-    - { name: _resolve_by_gd_lot_id, lines: 689-729 }
-    - { name: _resolve_by_serial_number, lines: 732-855 }
-    - { name: _resolve_by_work_order, lines: 858-907 }
-    - { name: _resolve_by_gd_work_order, lines: 910-952 }
-    - { name: _get_workcenters_for_groups, lines: 959-969 }
-    - { name: _enrich_workcenter_group, lines: 972-1006 }
-    - { name: _apply_query_tool_reject_policy, lines: 1009-1057 }
-    - { name: get_lot_history, lines: 1060-1136 }
-    - { name: get_adjacent_lots, lines: 1139-1198 }
-    - { name: get_lot_history_batch, lines: 1205-1325 }
-    - { name: get_lot_associations_batch, lines: 1328-1433 }
-    - { name: get_lot_materials, lines: 1440-1479 }
-    - { name: get_lot_rejects, lines: 1482-1522 }
-    - { name: get_lot_holds, lines: 1525-1563 }
-    - { name: get_lot_split_merge_history, lines: 1566-1671 }
-    - { name: _get_mfg_order_for_lot, lines: 1674-1699 }
-    - { name: get_lot_splits, lines: 1702-1836 }
-    - { name: get_lot_jobs, lines: 1839-1894 }
-    - { name: get_lot_jobs_with_history, lines: 1897-1956 }
-    - { name: _resolve_container_ids_by_names, lines: 1967-1989 }
-    - { name: _build_two_filters, lines: 1992-2006 }
-    - { name: _check_names_with_equipment, lines: 2009-2036 }
-    - { name: _lookup_equipment_by_names, lines: 2039-2066 }
-    - { name: _trace_parents_for_equipment, lines: 2069-2161 }
-    - { name: resolve_lot_equipment, lines: 2164-2306 }
-    - { name: get_equipment_status_hours, lines: 2313-2406 }
-    - { name: get_equipment_lots, lines: 2409-2477 }
-    - { name: get_equipment_materials, lines: 2480-2532 }
-    - { name: get_equipment_rejects, lines: 2535-2606 }
-    - { name: get_equipment_jobs, lines: 2609-2660 }
-    - { name: export_to_csv, lines: 2667-2703 }
-    - { name: generate_csv_stream, lines: 2706-2748 }
-    - { name: get_equipment_recent_jobs, lines: 2755-2786 }
-    - { name: execute_query_tool_job, lines: 2793-2907 }
+    - { name: _env_bool, lines: 76-78 }
+    - { name: _fetch_domain_records, lines: 108-110 }
+    - { name: _sanitize_page, lines: 113-117 }
+    - { name: _sanitize_per_page, lines: 120-129 }
+    - { name: _paginate_rows, lines: 132-153 }
+    - { name: _check_rss_guard, lines: 156-173 }
+    - { name: _max_batch_container_ids, lines: 176-180 }
+    - { name: _build_query_tool_batch_query_id, lines: 183-194 }
+    - { name: _query_tool_batch_namespace, lines: 197-201 }
+    - { name: _query_tool_reject_policy, lines: 204-209 }
+    - { name: _store_query_tool_batch_spool, lines: 212-240 }
+    - { name: _try_query_tool_spool_page, lines: 243-271 }
+    - { name: validate_date_range, lines: 278-302 }
+    - { name: validate_lot_input, lines: 305-315 }
+    - { name: validate_equipment_input, lines: 318-330 }
+    - { name: _df_to_records, lines: 333-362 }
+    - { name: _normalize_search_tokens, lines: 365-375 }
+    - { name: _normalize_wildcard_token, lines: 378-383 }
+    - { name: _is_pattern_token, lines: 386-388 }
+    - { name: _to_like_regex, lines: 391-414 }
+    - { name: _add_exact_or_pattern_condition, lines: 417-450 }
+    - { name: _match_rows_by_tokens, lines: 453-513 }
+    - { name: resolve_lots, lines: 520-590 }
+    - { name: _resolve_by_lot_id, lines: 593-635 }
+    - { name: _resolve_by_wafer_lot, lines: 638-676 }
+    - { name: _is_gd_like, lines: 679-681 }
+    - { name: _literal_prefix_before_wildcard, lines: 684-689 }
+    - { name: _resolve_by_gd_lot_id, lines: 692-732 }
+    - { name: _resolve_by_serial_number, lines: 735-858 }
+    - { name: _resolve_by_work_order, lines: 861-910 }
+    - { name: _resolve_by_gd_work_order, lines: 913-955 }
+    - { name: _get_workcenters_for_groups, lines: 962-972 }
+    - { name: _enrich_workcenter_group, lines: 975-1009 }
+    - { name: _apply_query_tool_reject_policy, lines: 1012-1060 }
+    - { name: get_lot_history, lines: 1063-1141 }
+    - { name: get_adjacent_lots, lines: 1144-1205 }
+    - { name: get_lot_history_batch, lines: 1212-1334 }
+    - { name: get_lot_associations_batch, lines: 1337-1444 }
+    - { name: get_lot_materials, lines: 1451-1492 }
+    - { name: get_lot_rejects, lines: 1495-1537 }
+    - { name: get_lot_holds, lines: 1540-1580 }
+    - { name: get_lot_split_merge_history, lines: 1583-1684 }
+    - { name: _get_mfg_order_for_lot, lines: 1687-1712 }
+    - { name: get_lot_splits, lines: 1715-1849 }
+    - { name: get_lot_jobs, lines: 1852-1909 }
+    - { name: get_lot_jobs_with_history, lines: 1912-1973 }
+    - { name: _resolve_container_ids_by_names, lines: 1984-2006 }
+    - { name: _build_two_filters, lines: 2009-2023 }
+    - { name: _check_names_with_equipment, lines: 2026-2053 }
+    - { name: _lookup_equipment_by_names, lines: 2056-2083 }
+    - { name: _trace_parents_for_equipment, lines: 2086-2178 }
+    - { name: resolve_lot_equipment, lines: 2181-2325 }
+    - { name: get_equipment_status_hours, lines: 2332-2427 }
+    - { name: get_equipment_lots, lines: 2430-2517 }
+    - { name: get_equipment_materials, lines: 2520-2574 }
+    - { name: get_equipment_rejects, lines: 2577-2650 }
+    - { name: get_equipment_jobs, lines: 2653-2706 }
+    - { name: export_to_csv, lines: 2713-2749 }
+    - { name: generate_csv_stream, lines: 2752-2794 }
+    - { name: get_equipment_recent_jobs, lines: 2801-2832 }
+    - { name: execute_query_tool_job, lines: 2839-2961 }
 
 src/mes_dashboard/services/query_tool_sql_runtime.py:  # 404 lines
   imports:
@@ -11389,7 +11444,7 @@ tests/integration/test_production_history_rq_async.py:  # 101 lines
       methods:
         - { name: test_flag_off_spool_matches_flag_on_spool, lines: 94-101 }
 
-tests/integration/test_query_tool_rq_async.py:  # 168 lines
+tests/integration/test_query_tool_rq_async.py:  # 256 lines
   imports:
     - { module: __future__, items: [annotations], line: 15 }
     - { module: pytest, items: [], line: 17 }
@@ -11406,6 +11461,11 @@ tests/integration/test_query_tool_rq_async.py:  # 168 lines
       methods:
         - { name: test_flag_off_oversized_query_returns_inline_as_before, lines: 112-140 }
         - { name: test_flag_off_small_query_identical_to_pre_change, lines: 142-168 }
+    - name: TestEquipmentPeriodLotsParity
+      lines: 178-256
+      methods:
+        - { name: test_async_job_forwards_container_names_same_as_sync_route, lines: 182-219 }
+        - { name: test_execute_query_tool_job_lots_branch_binds_container_names_kwarg, lines: 221-256 }
   functions:
     - { name: qt_app, lines: 24-28 }  # @pytest.fixture
 
@@ -14801,38 +14861,44 @@ tests/test_container_resolution_policy.py:  # 73 lines
     - { name: test_validate_resolution_result_non_strict_allows_overflow, lines: 52-63 }
     - { name: test_extract_container_ids_deduplicates_and_preserves_order, lines: 66-73 }
 
-tests/test_core_exceptions.py:  # 112 lines
+tests/test_core_exceptions.py:  # 147 lines
   imports:
     - { module: pytest, items: [], line: 4 }
-    - { module: mes_dashboard.core.exceptions, items: [MesServiceError, UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError, LockUnavailableError], line: 6 }
+    - { module: mes_dashboard.core.exceptions, items: [MesServiceError, UserInputError, ResourceNotFoundError, QueryTimeoutError, DataContractError, InternalQueryError, LockUnavailableError, is_query_timeout], line: 6 }
   classes:
     - name: TestSubclassInstantiation
-      lines: 25-52
+      lines: 26-53
       methods:
-        - { name: test_message_only, lines: 29-33 }
-        - { name: test_with_details, lines: 36-38 }
-        - { name: test_with_cause, lines: 41-44 }
-        - { name: test_all_three_kwargs, lines: 47-52 }
+        - { name: test_message_only, lines: 30-34 }
+        - { name: test_with_details, lines: 37-39 }
+        - { name: test_with_cause, lines: 42-45 }
+        - { name: test_all_three_kwargs, lines: 48-53 }
     - name: TestStrRepresentation
-      lines: 55-61
+      lines: 56-62
       methods:
-        - { name: test_str_returns_message, lines: 59-61 }
+        - { name: test_str_returns_message, lines: 60-62 }
     - name: TestInheritance
-      lines: 64-73
+      lines: 65-74
       methods:
-        - { name: test_is_mes_service_error, lines: 68-69 }
-        - { name: test_is_exception, lines: 72-73 }
+        - { name: test_is_mes_service_error, lines: 69-70 }
+        - { name: test_is_exception, lines: 73-74 }
     - name: TestCauseChaining
-      lines: 76-90
+      lines: 77-91
       methods:
-        - { name: test_cause_accessible_after_reraise, lines: 79-86 }
-        - { name: test_cause_none_by_default, lines: 88-90 }
+        - { name: test_cause_accessible_after_reraise, lines: 80-87 }
+        - { name: test_cause_none_by_default, lines: 89-91 }
     - name: TestLockUnavailableError
-      lines: 93-112
+      lines: 94-113
       methods:
-        - { name: test_with_lock_name_details_and_cause, lines: 96-105 }
-        - { name: test_is_mes_service_error, lines: 107-108 }
-        - { name: test_str_returns_message, lines: 110-112 }
+        - { name: test_with_lock_name_details_and_cause, lines: 97-106 }
+        - { name: test_is_mes_service_error, lines: 108-109 }
+        - { name: test_str_returns_message, lines: 111-113 }
+    - name: TestIsQueryTimeout
+      lines: 116-147
+      methods:
+        - { name: test_detects_timeout_error_strings, lines: 131-132 }
+        - { name: test_detects_builtin_timeout_error, lines: 134-135 }
+        - { name: test_ignores_non_timeout_errors, lines: 146-147 }
 
 tests/test_cross_worker_result_sharing.py:  # 264 lines
   imports:
@@ -15788,7 +15854,7 @@ tests/test_env_contract.py:  # 360 lines
         - { name: test_resource_async_vars_documented_in_env_contract, lines: 274-296 }
         - { name: test_production_achievement_async_env_vars_pinned_defaults, lines: 298-360 }
 
-tests/test_event_fetcher.py:  # 413 lines
+tests/test_event_fetcher.py:  # 469 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: unittest.mock, items: [patch], line: 6 }
@@ -15796,25 +15862,26 @@ tests/test_event_fetcher.py:  # 413 lines
     - { module: mes_dashboard.services.event_fetcher, items: [EventFetcher], line: 13 }
   functions:
     - { name: _iter_result, lines: 16-20 }
-    - { name: _iter_empty, lines: 23-25 }
-    - { name: test_cache_key_is_stable_for_sorted_ids, lines: 28-33 }
-    - { name: test_get_rate_limit_config_supports_env_override, lines: 36-44 }
-    - { name: test_fetch_events_cache_hit_skips_db, lines: 49-56 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
-    - { name: test_fetch_events_upstream_history_branch, lines: 63-83 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_history_branch_replaces_container_filter, lines: 90-106 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_materials_branch_replaces_aliased_container_filter, lines: 113-129 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_rejects_branch_replaces_aliased_container_filter, lines: 136-153 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_holds_branch_replaces_aliased_container_filter, lines: 160-177 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_event_fetcher_uses_slow_iter_connection, lines: 180-185 }
-    - { name: test_fetch_events_sanitizes_nan_values, lines: 192-207 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_raises_when_parallel_batch_fails_and_partial_disabled, lines: 214-237 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_allows_partial_when_enabled, lines: 244-268 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_cache_hit_legacy_meta_is_adapted, lines: 272-286 }  # @patch('mes_dashboard.services.event_fetcher.cache_get')
-    - { name: test_fetch_events_truncation_meta_contains_row_limit_context, lines: 293-315 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
-    - { name: test_fetch_events_to_parquet_returns_tuple, lines: 324-342 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
-    - { name: test_fetch_events_to_parquet_no_row_guard, lines: 347-364 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
-    - { name: test_fetch_events_to_parquet_jobs_domain_expands_containerids, lines: 368-389 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
-    - { name: test_fetch_events_to_parquet_partial_failure_quality_meta, lines: 394-413 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
+    - { name: _iter_empty, lines: 23-32 }
+    - { name: test_cache_key_is_stable_for_sorted_ids, lines: 35-40 }
+    - { name: test_get_rate_limit_config_supports_env_override, lines: 43-51 }
+    - { name: test_fetch_events_cache_hit_skips_db, lines: 56-63 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
+    - { name: test_fetch_events_upstream_history_branch, lines: 70-90 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_history_branch_replaces_container_filter, lines: 97-113 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_materials_branch_replaces_aliased_container_filter, lines: 120-136 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_rejects_branch_replaces_aliased_container_filter, lines: 143-160 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_holds_branch_replaces_aliased_container_filter, lines: 167-184 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_event_fetcher_uses_slow_iter_connection, lines: 187-192 }
+    - { name: test_fetch_events_sanitizes_nan_values, lines: 199-214 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_raises_when_parallel_batch_fails_and_partial_disabled, lines: 221-244 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_early_truncation_closes_slow_iter_generator, lines: 247-293 }
+    - { name: test_fetch_events_allows_partial_when_enabled, lines: 300-324 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_cache_hit_legacy_meta_is_adapted, lines: 328-342 }  # @patch('mes_dashboard.services.event_fetcher.cache_get')
+    - { name: test_fetch_events_truncation_meta_contains_row_limit_context, lines: 349-371 }  # @patch('mes_dashboard.services.event_fetcher.cache_set')
+    - { name: test_fetch_events_to_parquet_returns_tuple, lines: 380-398 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
+    - { name: test_fetch_events_to_parquet_no_row_guard, lines: 403-420 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
+    - { name: test_fetch_events_to_parquet_jobs_domain_expands_containerids, lines: 424-445 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
+    - { name: test_fetch_events_to_parquet_partial_failure_quality_meta, lines: 450-469 }  # @patch('mes_dashboard.services.event_fetcher.read_sql_df_slow_iter')
 
 tests/test_fallback_and_benchmark.py:  # 391 lines
   imports:
@@ -19000,7 +19067,7 @@ tests/test_query_quality_contract.py:  # 103 lines
     - { name: test_unpack_event_fetch_result_supports_new_shape, lines: 79-92 }
     - { name: test_unpack_event_fetch_result_legacy_without_meta_defaults_complete, lines: 95-103 }
 
-tests/test_query_spool_store.py:  # 155 lines
+tests/test_query_spool_store.py:  # 217 lines
   imports:
     - { module: __future__, items: [annotations], line: 4 }
     - { module: fnmatch, items: [], line: 6 }
@@ -19026,6 +19093,8 @@ tests/test_query_spool_store.py:  # 155 lines
     - { name: test_spool_load_returns_none_when_metadata_hash_mismatch, lines: 87-101 }
     - { name: test_spool_load_returns_none_when_file_missing, lines: 104-119 }
     - { name: test_cleanup_expired_and_orphan_files, lines: 122-155 }
+    - { name: test_read_spool_records_closes_connection_on_read_error, lines: 158-185 }
+    - { name: test_read_spool_records_closes_connection_on_success, lines: 188-217 }
 
 tests/test_query_timeout_helper.py:  # 39 lines
   imports:
@@ -19265,7 +19334,7 @@ tests/test_query_tool_partial_trackout.py:  # 495 lines
     - { name: _lot_row, lines: 36-70 }
     - { name: _adj_row, lines: 73-107 }
 
-tests/test_query_tool_routes.py:  # 1530 lines
+tests/test_query_tool_routes.py:  # 1661 lines
   imports:
     - { module: pytest, items: [], line: 10 }
     - { module: json, items: [], line: 11 }
@@ -19334,7 +19403,7 @@ tests/test_query_tool_routes.py:  # 1530 lines
         - { name: test_equipment_period_rate_limited_returns_429, lines: 685-705 }
         - { name: test_export_rate_limited_returns_429, lines: 709-722 }
     - name: TestEquipmentPeriodEndpoint
-      lines: 725-903
+      lines: 725-933
       methods:
         - { name: test_non_json_payload_returns_415, lines: 729-738 }
         - { name: test_malformed_json_returns_400, lines: 741-750 }
@@ -19346,132 +19415,157 @@ tests/test_query_tool_routes.py:  # 1530 lines
         - { name: test_date_range_exceeds_limit, lines: 826-840 }
         - { name: test_invalid_query_type, lines: 842-856 }
         - { name: test_equipment_status_hours_success, lines: 859-874 }
-        - { name: test_equipment_lots_forwards_pagination, lines: 877-903 }
+        - { name: test_equipment_lots_forwards_pagination, lines: 877-907 }
+        - { name: test_equipment_lots_forwards_container_names_kwarg, lines: 910-933 }
     - name: TestExportCsvEndpoint
-      lines: 906-1060
+      lines: 936-1090
       methods:
-        - { name: test_non_json_payload_returns_415, lines: 910-919 }
-        - { name: test_malformed_json_returns_400, lines: 922-931 }
-        - { name: test_missing_export_type, lines: 933-943 }
-        - { name: test_invalid_export_type, lines: 945-957 }
-        - { name: test_export_lot_history_success, lines: 960-981 }
-        - { name: test_export_lot_materials_uses_container_name_as_lot_id, lines: 984-1018 }
-        - { name: test_export_lot_holds_uses_container_name_as_lot_id, lines: 1021-1060 }
+        - { name: test_non_json_payload_returns_415, lines: 940-949 }
+        - { name: test_malformed_json_returns_400, lines: 952-961 }
+        - { name: test_missing_export_type, lines: 963-973 }
+        - { name: test_invalid_export_type, lines: 975-987 }
+        - { name: test_export_lot_history_success, lines: 990-1011 }
+        - { name: test_export_lot_materials_uses_container_name_as_lot_id, lines: 1014-1048 }
+        - { name: test_export_lot_holds_uses_container_name_as_lot_id, lines: 1051-1090 }
     - name: TestExportCsvBatchEndpoint
-      lines: 1063-1236
+      lines: 1093-1266
       methods:
-        - { name: test_export_lot_history_batch, lines: 1067-1087 }
-        - { name: test_export_lot_history_single_cid_in_array, lines: 1090-1106 }
-        - { name: test_export_lot_materials_batch, lines: 1109-1128 }
-        - { name: test_export_lot_rejects_batch, lines: 1131-1149 }
-        - { name: test_export_lot_holds_batch, lines: 1152-1170 }
-        - { name: test_export_backward_compat_container_id, lines: 1173-1189 }
-        - { name: test_export_lot_history_no_cids_returns_400, lines: 1191-1203 }
-        - { name: test_export_lot_jobs_calls_with_history, lines: 1206-1236 }
+        - { name: test_export_lot_history_batch, lines: 1097-1117 }
+        - { name: test_export_lot_history_single_cid_in_array, lines: 1120-1136 }
+        - { name: test_export_lot_materials_batch, lines: 1139-1158 }
+        - { name: test_export_lot_rejects_batch, lines: 1161-1179 }
+        - { name: test_export_lot_holds_batch, lines: 1182-1200 }
+        - { name: test_export_backward_compat_container_id, lines: 1203-1219 }
+        - { name: test_export_lot_history_no_cids_returns_400, lines: 1221-1233 }
+        - { name: test_export_lot_jobs_calls_with_history, lines: 1236-1266 }
     - name: TestEquipmentListEndpoint
-      lines: 1239-1285
+      lines: 1269-1315
       methods:
-        - { name: test_get_equipment_list_success, lines: 1243-1265 }
-        - { name: test_get_equipment_list_empty, lines: 1268-1275 }
-        - { name: test_get_equipment_list_exception, lines: 1278-1285 }
+        - { name: test_get_equipment_list_success, lines: 1273-1295 }
+        - { name: test_get_equipment_list_empty, lines: 1298-1305 }
+        - { name: test_get_equipment_list_exception, lines: 1308-1315 }
     - name: TestWorkcenterGroupsEndpoint
-      lines: 1288-1327
+      lines: 1318-1357
       methods:
-        - { name: test_returns_groups_list, lines: 1292-1305 }
-        - { name: test_handles_cache_failure, lines: 1308-1316 }
-        - { name: test_handles_exception, lines: 1319-1327 }
+        - { name: test_returns_groups_list, lines: 1322-1335 }
+        - { name: test_handles_cache_failure, lines: 1338-1346 }
+        - { name: test_handles_exception, lines: 1349-1357 }
     - name: TestEquipmentRecentJobsEndpoint
-      lines: 1330-1383
+      lines: 1360-1413
       methods:
-        - { name: test_returns_recent_jobs, lines: 1335-1357 }
-        - { name: test_returns_empty_when_no_jobs, lines: 1361-1371 }
-        - { name: test_handles_db_error, lines: 1375-1383 }
+        - { name: test_returns_recent_jobs, lines: 1365-1387 }
+        - { name: test_returns_empty_when_no_jobs, lines: 1391-1401 }
+        - { name: test_handles_db_error, lines: 1405-1413 }
     - name: TestLotHistoryWithWorkcenterFilter
-      lines: 1386-1443
+      lines: 1416-1473
       methods:
-        - { name: test_accepts_workcenter_groups_param, lines: 1390-1406 }
-        - { name: test_empty_workcenter_groups_ignored, lines: 1409-1425 }
-        - { name: test_returns_filtered_by_groups_in_response, lines: 1428-1443 }
+        - { name: test_accepts_workcenter_groups_param, lines: 1420-1436 }
+        - { name: test_empty_workcenter_groups_ignored, lines: 1439-1455 }
+        - { name: test_returns_filtered_by_groups_in_response, lines: 1458-1473 }
     - name: TestEquipmentPeriodRejectsDetailSchema
-      lines: 1446-1530
+      lines: 1476-1560
       methods:
-        - { name: test_equipment_period_rejects_detail_schema, lines: 1455-1509 }
-        - { name: test_equipment_period_rejects_empty_equipment_ids_returns_error, lines: 1511-1530 }
+        - { name: test_equipment_period_rejects_detail_schema, lines: 1485-1539 }
+        - { name: test_equipment_period_rejects_empty_equipment_ids_returns_error, lines: 1541-1560 }
+    - name: TestBatchDetailPostPath
+      lines: 1563-1661
+      methods:
+        - { name: test_lot_history_post_batch_reads_container_ids_array, lines: 1569-1594 }
+        - { name: test_lot_history_post_large_batch_that_would_overflow_a_get_url, lines: 1597-1617 }
+        - { name: test_lot_associations_post_batch_reads_container_ids_array, lines: 1620-1637 }
+        - { name: test_lot_history_post_over_limit_returns_413, lines: 1640-1647 }
+        - { name: test_lot_history_get_batch_still_supported, lines: 1650-1661 }
   functions:
     - { name: app, lines: 21-26 }  # @pytest.fixture
     - { name: client, lines: 30-32 }  # @pytest.fixture
     - { name: _reset_rate_limits, lines: 36-39 }  # @pytest.fixture(autouse=True)
 
-tests/test_query_tool_service.py:  # 689 lines
+tests/test_query_tool_service.py:  # 905 lines
   imports:
-    - { module: pytest, items: [], line: 10 }
-    - { module: mes_dashboard.services.query_tool_service, items: [validate_date_range, validate_lot_input, validate_equipment_input, _resolve_by_lot_id, _resolve_by_wafer_lot, _resolve_by_serial_number, _resolve_by_work_order, get_lot_split_merge_history, get_equipment_rejects, BATCH_SIZE, MAX_DATE_RANGE_DAYS], line: 12 }
+    - { module: os, items: [], line: 10 }
+    - { module: pytest, items: [], line: 12 }
+    - { module: mes_dashboard.services.query_tool_service, items: [validate_date_range, validate_lot_input, validate_equipment_input, resolve_lots, _resolve_by_lot_id, _resolve_by_wafer_lot, _resolve_by_serial_number, _resolve_by_work_order, get_lot_split_merge_history, get_equipment_rejects, get_equipment_lots, BATCH_SIZE, MAX_DATE_RANGE_DAYS], line: 14 }
   classes:
     - name: TestValidateDateRange
-      lines: 27-88
+      lines: 31-92
       methods:
-        - { name: test_valid_range, lines: 30-33 }
-        - { name: test_same_day, lines: 35-38 }
-        - { name: test_end_before_start, lines: 40-44 }
-        - { name: test_exceeds_max_range, lines: 46-51 }
-        - { name: test_exactly_max_range, lines: 53-57 }
-        - { name: test_one_day_over_max_range, lines: 59-64 }
-        - { name: test_invalid_date_format, lines: 66-70 }
-        - { name: test_invalid_start_date, lines: 72-76 }
-        - { name: test_invalid_end_date, lines: 78-82 }
-        - { name: test_non_date_string, lines: 84-88 }
+        - { name: test_valid_range, lines: 34-37 }
+        - { name: test_same_day, lines: 39-42 }
+        - { name: test_end_before_start, lines: 44-48 }
+        - { name: test_exceeds_max_range, lines: 50-55 }
+        - { name: test_exactly_max_range, lines: 57-61 }
+        - { name: test_one_day_over_max_range, lines: 63-68 }
+        - { name: test_invalid_date_format, lines: 70-74 }
+        - { name: test_invalid_start_date, lines: 76-80 }
+        - { name: test_invalid_end_date, lines: 82-86 }
+        - { name: test_non_date_string, lines: 88-92 }
     - name: TestValidateLotInput
-      lines: 91-135
+      lines: 95-139
       methods:
-        - { name: test_valid_lot_ids, lines: 94-98 }
-        - { name: test_valid_serial_numbers, lines: 100-104 }
-        - { name: test_valid_work_orders, lines: 106-110 }
-        - { name: test_empty_values, lines: 112-116 }
-        - { name: test_large_input_list_allowed_when_no_count_cap, lines: 118-123 }
-        - { name: test_rejects_too_broad_wildcard_pattern, lines: 125-130 }
-        - { name: test_accepts_wildcard_with_prefix, lines: 132-135 }
+        - { name: test_valid_lot_ids, lines: 98-102 }
+        - { name: test_valid_serial_numbers, lines: 104-108 }
+        - { name: test_valid_work_orders, lines: 110-114 }
+        - { name: test_empty_values, lines: 116-120 }
+        - { name: test_large_input_list_allowed_when_no_count_cap, lines: 122-127 }
+        - { name: test_rejects_too_broad_wildcard_pattern, lines: 129-134 }
+        - { name: test_accepts_wildcard_with_prefix, lines: 136-139 }
     - name: TestValidateEquipmentInput
-      lines: 138-151
+      lines: 142-155
       methods:
-        - { name: test_valid_equipment_ids, lines: 141-145 }
-        - { name: test_empty_equipment_ids, lines: 147-151 }
+        - { name: test_valid_equipment_ids, lines: 145-149 }
+        - { name: test_empty_equipment_ids, lines: 151-155 }
     - name: TestResolveQueriesUseBindParams
-      lines: 155-367
+      lines: 159-371
       methods:
-        - { name: test_resolve_by_lot_id_uses_query_builder_params, lines: 158-182 }
-        - { name: test_resolve_by_lot_id_supports_wildcard_pattern, lines: 184-214 }
-        - { name: test_resolve_by_wafer_lot_supports_wildcard_pattern, lines: 216-246 }
-        - { name: test_resolve_by_serial_number_uses_query_builder_params, lines: 248-310 }
-        - { name: test_resolve_by_work_order_uses_query_builder_params, lines: 312-334 }
-        - { name: test_resolve_by_work_order_supports_wildcard_pattern, lines: 336-367 }
+        - { name: test_resolve_by_lot_id_uses_query_builder_params, lines: 162-186 }
+        - { name: test_resolve_by_lot_id_supports_wildcard_pattern, lines: 188-218 }
+        - { name: test_resolve_by_wafer_lot_supports_wildcard_pattern, lines: 220-250 }
+        - { name: test_resolve_by_serial_number_uses_query_builder_params, lines: 252-314 }
+        - { name: test_resolve_by_work_order_uses_query_builder_params, lines: 316-338 }
+        - { name: test_resolve_by_work_order_supports_wildcard_pattern, lines: 340-371 }
     - name: TestSplitMergeHistoryMode
-      lines: 370-407
+      lines: 374-411
       methods:
-        - { name: test_fast_mode_uses_time_window_and_row_limit, lines: 373-388 }
-        - { name: test_full_mode_uses_slow_query_without_limits, lines: 390-407 }
+        - { name: test_fast_mode_uses_time_window_and_row_limit, lines: 377-392 }
+        - { name: test_full_mode_uses_slow_query_without_limits, lines: 394-411 }
     - name: TestServiceConstants
-      lines: 410-419
+      lines: 414-423
       methods:
-        - { name: test_batch_size_is_reasonable, lines: 413-415 }
-        - { name: test_max_date_range_is_two_years, lines: 417-419 }
+        - { name: test_batch_size_is_reasonable, lines: 417-419 }
+        - { name: test_max_date_range_is_two_years, lines: 421-423 }
     - name: TestGetWorkcenterForGroups
-      lines: 423-449
+      lines: 427-453
       methods:
-        - { name: test_calls_filter_cache, lines: 426-437 }
-        - { name: test_returns_empty_list_for_unknown_group, lines: 439-449 }
+        - { name: test_calls_filter_cache, lines: 430-441 }
+        - { name: test_returns_empty_list_for_unknown_group, lines: 443-453 }
     - name: TestGetLotHistoryWithWorkcenterFilter
-      lines: 452-526
+      lines: 456-530
       methods:
-        - { name: test_no_filter_returns_all, lines: 455-472 }
-        - { name: test_with_filter_adds_condition, lines: 474-494 }
-        - { name: test_empty_groups_list_no_filter, lines: 496-509 }
-        - { name: test_filter_with_empty_workcenters_result, lines: 511-526 }
+        - { name: test_no_filter_returns_all, lines: 459-476 }
+        - { name: test_with_filter_adds_condition, lines: 478-498 }
+        - { name: test_empty_groups_list_no_filter, lines: 500-513 }
+        - { name: test_filter_with_empty_workcenters_result, lines: 515-530 }
     - name: TestGetEquipmentRejects
-      lines: 529-689
+      lines: 533-693
       methods:
-        - { name: test_get_equipment_rejects_cross_station_lot, lines: 539-598 }
-        - { name: test_get_equipment_rejects_no_aggregate_columns, lines: 600-662 }
-        - { name: test_get_equipment_rejects_empty_short_circuit, lines: 664-689 }
+        - { name: test_get_equipment_rejects_cross_station_lot, lines: 543-602 }
+        - { name: test_get_equipment_rejects_no_aggregate_columns, lines: 604-666 }
+        - { name: test_get_equipment_rejects_empty_short_circuit, lines: 668-693 }
+    - name: TestTimeoutClassification
+      lines: 696-726
+      methods:
+        - { name: test_resolve_lots_maps_call_timeout_to_query_timeout, lines: 701-714 }
+        - { name: test_resolve_lots_non_timeout_stays_internal_error, lines: 716-726 }
+    - name: TestGetEquipmentLots
+      lines: 729-905
+      methods:
+        - { name: _base_row, lines: 738-758 }
+        - { name: test_equipment_lots_sql_trims_containername_like_productlinename, lines: 760-765 }
+        - { name: test_equipment_lots_containername_trimmed_char_padded, lines: 767-785 }
+        - { name: test_equipment_lots_char_padded_fixture_returns_nonempty_rows, lines: 787-811 }
+        - { name: test_equipment_lots_container_names_filters_via_upper_trim_in, lines: 813-842 }
+        - { name: test_equipment_lots_container_names_applied_in_sql_where_not_python_postfilter, lines: 844-881 }
+        - { name: test_equipment_lots_omitted_container_names_unchanged_behavior, lines: 883-905 }
 
 tests/test_query_tool_sql_runtime.py:  # 492 lines
   imports:
@@ -19560,6 +19654,21 @@ tests/test_query_tool_sql_runtime.py:  # 492 lines
         - { name: _make_rejects_df, lines: 432-452 }
         - { name: test_equipment_rejects_response_includes_productlinename, lines: 454-472 }
         - { name: test_equipment_rejects_export_csv_includes_productlinename, lines: 474-492 }
+
+tests/test_query_tool_url_length_guard.py:  # 105 lines
+  imports:
+    - { module: importlib.util, items: [], line: 17 }
+    - { module: os, items: [], line: 18 }
+    - { module: sys, items: [], line: 19 }
+  constants:
+    - { name: CONTAINER_ID_MAX_LEN, line: 25 }
+  functions:
+    - { name: _load_gunicorn_conf, lines: 31-45 }
+    - { name: _default_max_container_ids, lines: 48-56 }
+    - { name: _worst_case_request_line, lines: 59-69 }
+    - { name: test_gunicorn_sets_explicit_request_line_limit, lines: 72-80 }
+    - { name: test_worst_case_batch_get_fits_within_request_line_limit, lines: 83-95 }
+    - { name: test_current_default_cap_is_covered_by_default_limit, lines: 98-105 }
 
 tests/test_rate_limit.py:  # 223 lines
   imports:

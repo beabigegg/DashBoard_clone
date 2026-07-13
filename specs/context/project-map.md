@@ -3,10 +3,10 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 195
-visible-files: 1042
+visible-dirs: 193
+visible-files: 1017
 omitted-dirs: 67
-truncated-dirs: 6
+truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
 
@@ -54,6 +54,7 @@ DashBoard_clone/
 |-- .hypothesis/
 |   |-- constants/
 |   |   |-- 00731426b90af740
+|   |   |-- 00a00398186063f4
 |   |   |-- 00e4935d1440a2ca
 |   |   |-- 01cb19e636d04082
 |   |   |-- 02bca2c9d2f8566d
@@ -88,22 +89,21 @@ DashBoard_clone/
 |   |   |-- 2b39e13cddad788d
 |   |   |-- 2f2ae64af48e93fe
 |   |   |-- 2f46fe56abf81670
+|   |   |-- 301da8f67d265917
 |   |   |-- 327c52ae13744797
 |   |   |-- 345e5165f13cae58
 |   |   |-- 34f845ad3468bfeb
 |   |   |-- 35342e8dd172004d
 |   |   |-- 392d6328bece7db8
+|   |   |-- 3955e8710f8ecaa2
 |   |   |-- 397bc9bcb3adb4ac
 |   |   |-- 3b7bbdff8600e45e
 |   |   |-- 3d2b36835512d57e
 |   |   |-- 4093a4056e3ed640
 |   |   |-- 40bd549cffe1dc41
+|   |   |-- 41472cf65ca17068
 |   |   |-- 41d662f99bd58f37
-|   |   |-- 432ffc6b1d3385af
-|   |   |-- 46b03a60678f44dd
-|   |   |-- 471dc2d32d0357fb
-|   |   |-- 47b65f8dbbcf8e4a
-|   |   \-- ... (121 more entries truncated; cap=50)
+|   |   \-- ... (134 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -626,7 +626,8 @@ DashBoard_clone/
 |   |   |-- query-tool/
 |   |   |   |-- App.url-state.test.js
 |   |   |   |-- EquipmentRejectsTable.test.js
-|   |   |   \-- useLotDetail.pagination.test.js
+|   |   |   |-- useLotDetail.pagination.test.js
+|   |   |   \-- useLotEquipmentQuery.test.js
 |   |   |-- resource-status/
 |   |   |   |-- App.cross-filter.test.ts
 |   |   |   \-- useCrossFilter.test.ts
@@ -661,57 +662,19 @@ DashBoard_clone/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260708_072105.log
-|   |   |-- access_20260708_073540.log
-|   |   |-- access_20260708_074557.log
-|   |   |-- access_20260708_075940.log
-|   |   |-- access_20260708_082120.log
-|   |   |-- access_20260708_150458.log
-|   |   |-- access_20260708_154029.log
-|   |   |-- access_20260708_155601.log
-|   |   |-- access_20260708_201416.log
-|   |   |-- error_20260708_072105.log
-|   |   |-- error_20260708_073540.log
-|   |   |-- error_20260708_074557.log
-|   |   |-- error_20260708_075940.log
-|   |   |-- error_20260708_082120.log
-|   |   |-- error_20260708_150458.log
-|   |   |-- error_20260708_154029.log
-|   |   |-- error_20260708_155601.log
-|   |   |-- error_20260708_201416.log
-|   |   |-- rq_downtime_worker_20260708_072105.log
-|   |   |-- rq_downtime_worker_20260708_073540.log
-|   |   |-- rq_downtime_worker_20260708_074557.log
-|   |   |-- rq_downtime_worker_20260708_075940.log
-|   |   |-- rq_downtime_worker_20260708_082120.log
-|   |   |-- rq_downtime_worker_20260708_150458.log
-|   |   |-- rq_downtime_worker_20260708_154029.log
-|   |   |-- rq_downtime_worker_20260708_155601.log
-|   |   |-- rq_downtime_worker_20260708_201416.log
-|   |   |-- rq_eap_alarm_worker_20260708_072105.log
-|   |   |-- rq_eap_alarm_worker_20260708_073540.log
-|   |   |-- rq_eap_alarm_worker_20260708_074557.log
-|   |   |-- rq_eap_alarm_worker_20260708_075940.log
-|   |   |-- rq_eap_alarm_worker_20260708_082120.log
-|   |   |-- rq_eap_alarm_worker_20260708_150458.log
-|   |   |-- rq_eap_alarm_worker_20260708_154029.log
-|   |   |-- rq_eap_alarm_worker_20260708_155601.log
-|   |   |-- rq_eap_alarm_worker_20260708_201416.log
-|   |   |-- rq_hold_hist_worker_20260708_072105.log
-|   |   |-- rq_hold_hist_worker_20260708_073540.log
-|   |   |-- rq_hold_hist_worker_20260708_074557.log
-|   |   |-- rq_hold_hist_worker_20260708_075940.log
-|   |   |-- rq_hold_hist_worker_20260708_082120.log
-|   |   |-- rq_hold_hist_worker_20260708_150458.log
-|   |   |-- rq_hold_hist_worker_20260708_154029.log
-|   |   |-- rq_hold_hist_worker_20260708_155601.log
-|   |   |-- rq_hold_hist_worker_20260708_201416.log
-|   |   |-- rq_msd_worker_20260708_072105.log
-|   |   |-- rq_msd_worker_20260708_073540.log
-|   |   |-- rq_msd_worker_20260708_074557.log
-|   |   |-- rq_msd_worker_20260708_075940.log
-|   |   |-- rq_msd_worker_20260708_082120.log
-|   |   \-- ... (67 more entries truncated; cap=50)
+|   |   |-- access_20260709_104124.log
+|   |   |-- error_20260709_104124.log
+|   |   |-- rq_downtime_worker_20260709_104124.log
+|   |   |-- rq_eap_alarm_worker_20260709_104124.log
+|   |   |-- rq_hold_hist_worker_20260709_104124.log
+|   |   |-- rq_msd_worker_20260709_104124.log
+|   |   |-- rq_prod_hist_worker_20260709_104124.log
+|   |   |-- rq_reject_worker_20260709_104124.log
+|   |   |-- rq_resource_worker_20260709_104124.log
+|   |   |-- rq_warmup_worker_20260709_104124.log
+|   |   |-- rq_worker_20260709_104124.log
+|   |   |-- rq_yield_alert_worker_20260709_104124.log
+|   |   \-- watchdog_20260709_104124.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
 |   |-- admin_logs.sqlite-shm
@@ -1239,7 +1202,7 @@ DashBoard_clone/
 |   |-- test_common_filters.py
 |   |-- test_container_filter_cache.py
 |   |-- test_container_resolution_policy.py
-|   \-- ... (198 more entries truncated; cap=50)
+|   \-- ... (199 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
@@ -1258,20 +1221,14 @@ DashBoard_clone/
 |   |   |   \-- daa76e309ed12ee6.parquet
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
-|   |   |-- downtime_analysis_base_events/
-|   |   |   \-- ce1debbbb5da2e5b.parquet
-|   |   |-- downtime_analysis_job_bridge/
-|   |   |   \-- ce1debbbb5da2e5b.parquet
 |   |   |-- hold_dataset/
 |   |   |   \-- c125b5de22268fb6.parquet
 |   |   |-- reject_dataset/
 |   |   |   \-- ab2164b57726d1aa.parquet
 |   |   |-- resource_dataset/
-|   |   |   |-- 2c755a071eb865dd.parquet
-|   |   |   \-- 72c9cd4897ff2f48.parquet
+|   |   |   \-- 2c755a071eb865dd.parquet
 |   |   |-- resource_oee/
-|   |   |   |-- c186447492fb51f4.parquet
-|   |   |   \-- d9245009c9c8cb73.parquet
+|   |   |   \-- c186447492fb51f4.parquet
 |   |   |-- yield_alert_dataset/
 |   |   |   \-- 6ad768c74a6a1782.parquet
 |   |   |-- probe_1006070.json
@@ -1298,26 +1255,41 @@ DashBoard_clone/
 |   |   |-- probe_12085.json
 |   |   |-- probe_127692.json
 |   |   |-- probe_128330.json
+|   |   |-- probe_1493808.json
+|   |   |-- probe_1493861.json
+|   |   |-- probe_1503125.json
+|   |   |-- probe_1503152.json
+|   |   |-- probe_1515046.json
+|   |   |-- probe_1525449.json
 |   |   |-- probe_154932.json
 |   |   |-- probe_154979.json
-|   |   |-- probe_156959.json
-|   |   |-- probe_165073.json
-|   |   |-- probe_165147.json
-|   |   |-- probe_165168.json
-|   |   |-- probe_168402.json
-|   |   |-- probe_172172.json
-|   |   |-- probe_173016.json
-|   |   |-- probe_176174.json
-|   |   |-- probe_181609.json
-|   |   |-- probe_181912.json
-|   |   |-- probe_181994.json
-|   |   |-- probe_191779.json
-|   |   |-- probe_191826.json
-|   |   \-- ... (84 more entries truncated; cap=50)
-|   |-- container_filter_cache.loading
+|   |   |-- probe_1555393.json
+|   |   |-- probe_1555927.json
+|   |   |-- probe_1556030.json
+|   |   |-- probe_1556813.json
+|   |   |-- probe_1556924.json
+|   |   |-- probe_1557180.json
+|   |   |-- probe_1557236.json
+|   |   |-- probe_1564989.json
+|   |   |-- probe_1565010.json
+|   |   \-- ... (106 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
+|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   \-- resource_history.duckdb
+|   |-- resource_history.duckdb
+|   |-- rq_downtime_worker.pid
+|   |-- rq_eap_alarm_worker.pid
+|   |-- rq_hold_hist_worker.pid
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_ach_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_query_tool_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_resource_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_warmup_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
 |-- .coverage
 |-- .dockerignore
 |-- .env

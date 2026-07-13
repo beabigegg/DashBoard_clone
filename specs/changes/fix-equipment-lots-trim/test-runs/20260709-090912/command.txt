@@ -1,0 +1,1 @@
+cd frontend && npx vitest run tests/query-tool/useLotEquipmentQuery.test.js

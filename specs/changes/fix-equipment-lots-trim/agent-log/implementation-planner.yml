@@ -1,0 +1,10 @@
+agent: implementation-planner
+change-id: fix-equipment-lots-trim
+summary: >
+  Wrote backend execution packet. Frontend + contracts already done; backend
+  (SQL TRIM + container_names push-down through sync route and async RQ job) is
+  the only remaining implementation, plus openapi.json mirror regeneration.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/fix-equipment-lots-trim/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer" }
+  - { type: scope-summary, pointer: "6 in scope (IP-1..IP-6), 5 out of scope" }

@@ -1,0 +1,16 @@
+{
+  "change_id": "fix-equipment-lots-trim",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/test_query_tool_service.py::TestGetEquipmentLots tests/test_query_tool_routes.py::TestEquipmentPeriodEndpoint::test_equipment_lots_forwards_container_names_kwarg tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity -q --maxfail=1 --tb=short -ra --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/fix-equipment-lots-trim/test-runs/20260709-093113/junit.xml'",
+  "duration_ms": 1039,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093113/summary.json",
+    "stdout": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093113/stdout.log",
+    "stderr": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093113/stderr.log",
+    "junit": "specs/changes/fix-equipment-lots-trim/test-runs/20260709-093113/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

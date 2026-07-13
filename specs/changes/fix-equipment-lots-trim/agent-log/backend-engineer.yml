@@ -1,0 +1,66 @@
+change-id: fix-equipment-lots-trim
+agent: backend-engineer
+timestamp: "2026-07-09T09:35:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/query_tool/equipment_lots.sql:8-9,31,42-43" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/query_tool_service.py:2430-2517 (get_equipment_lots container_names param + shared-builder CONTAINER_FILTER)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/query_tool_service.py:2910-2917 (execute_query_tool_job lots branch forwards container_names)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/query_tool_routes.py:676 (parse container_names)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/query_tool_routes.py:714 (async _params parity)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/query_tool_routes.py:749-756 (sync get_equipment_lots forwarding)" }
+  - { type: contracts-touched, pointer: "contracts/openapi.json (regenerated, info.version 1.38.3)" }
+  - { type: contracts-touched, pointer: "contracts/api/openapi.json (regenerated, info.version 1.38.3)" }
+  - { type: tests-added, pointer: "tests/test_query_tool_service.py::TestGetEquipmentLots (6 tests: AC-1 x2, AC-2, AC-4, AC-5, AC-6)" }
+  - { type: tests-added, pointer: "tests/test_query_tool_routes.py::TestEquipmentPeriodEndpoint::test_equipment_lots_forwards_container_names_kwarg" }
+  - { type: tests-added, pointer: "tests/test_query_tool_routes.py::TestEquipmentPeriodEndpoint::test_equipment_lots_forwards_pagination (extended: container_names==[] omitted-field regression)" }
+  - { type: tests-added, pointer: "tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity::test_async_job_forwards_container_names_same_as_sync_route" }
+  - { type: tests-added, pointer: "tests/integration/test_query_tool_rq_async.py::TestEquipmentPeriodLotsParity::test_execute_query_tool_job_lots_branch_binds_container_names_kwarg" }
+  - { type: test-output, pointer: "targeted (9 new/extended tests): 9 passed; changed-area (3 files): 182 passed; full suite: passed (exit 0, 246s), no regressions" }
+next-action: none
+notes: >
+  Implemented IP-1..IP-6 exactly per implementation-plan.md. IP-1: equipment_lots.sql
+  now TRIMs c.CONTAINERNAME (matching the existing TRIM(c.PRODUCTLINENAME) sibling
+  treatment) and adds an optional {{ CONTAINER_FILTER }} placeholder to the WHERE
+  clause (documented in the header comment). IP-2: get_equipment_lots() gained a
+  kwarg-only container_names: Optional[List[str]] = None; per the flagged
+  param-collision risk, both EQUIPMENT_FILTER and CONTAINER_FILTER conditions are
+  built on the SAME QueryBuilder instance (builder.conditions[0]/[-1]), not a
+  second QueryBuilder() — this avoids the bind-param counter restarting and
+  clobbering the equipment_ids IN-list params. Values are uppercased+stripped in
+  Python and matched via UPPER(TRIM(c.CONTAINERNAME)) IN (...), matching the
+  existing CHAR-column convention used elsewhere (e.g. yield_alert/reason_detail.sql).
+  Omitted/empty container_names -> CONTAINER_FILTER="1=1" (AC-6 backward compat,
+  verified by exact-dict param assertion in
+  test_equipment_lots_omitted_container_names_unchanged_behavior). IP-3/IP-4: wired
+  container_names through query_equipment_period()'s body parse, the async _params
+  dict, the sync get_equipment_lots() call, and execute_query_tool_job()'s
+  query_sub_type=='lots' branch — closing the sync/async parity gap the plan
+  flagged as the core AC-4 risk. IP-5: added TestGetEquipmentLots (backend-only,
+  since no such class existed yet in tests/test_query_tool_service.py — only a
+  pagination-focused test existed in test_query_tool_pagination_contract.py, left
+  untouched), extended TestEquipmentPeriodEndpoint, and added
+  TestEquipmentPeriodLotsParity (new class; existing TestFlagOnOversizedQuery/
+  TestFlagOffParity only covered status_hours, left untouched) including an
+  inspect.signature(get_equipment_lots).bind(**kwargs) check wrapped around the
+  worker's actual get_equipment_lots() call (a MagicMock alone would not have
+  caught a kwarg-name mismatch — this is the pattern documented in
+  docs/architecture/test-discipline.md's Async Route<->Worker Signature Contract).
+  IP-6: regenerated both contracts/openapi.json and contracts/api/openapi.json via
+  `cdd-kit openapi export`; both now report info.version 1.38.3 matching
+  api-contract.md (was 1.38.2, per the known openapi-sync-gate risk).
+  `cdd-kit validate` passes clean (contracts, API semantic, API conformance,
+  response-shape, env semantic/contract, CI gates, spec traceability, contract
+  versions — all green; pre-existing yield_alert_dataset spool warning is
+  unrelated/out of scope).
+  Ran the bounded ladder via cdd-kit test run: collect, targeted, changed-area,
+  contract, and full — all recorded passed in test-evidence.yml
+  (final-status: passed). The full pytest run regenerated ~175 unrelated
+  tests/contract/samples/*.json files (timestamps/log ids/traceback noise, no
+  content tied to this change, confirmed via diff inspection including
+  post_query_tool_equipment_period.json which only changed its `meta.timestamp`);
+  per the documented promoted learning, ran `git checkout -- tests/contract/samples/`
+  to discard them and re-ran `cdd-kit validate` to confirm still green post-revert.
+  Did not touch frontend files (frontend-engineer's useLotEquipmentQuery.ts/test.js
+  were already complete per their agent log) or contracts/api/api-contract.md /
+  contracts/CHANGELOG.md (contract-reviewer's prose, already at 1.38.3, untouched).

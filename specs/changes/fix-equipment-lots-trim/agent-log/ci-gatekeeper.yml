@@ -1,0 +1,15 @@
+agent: ci-gatekeeper
+change-id: fix-equipment-lots-trim
+summary: >
+  Confirmed existing Tier-1 gates (backend-tests.yml, frontend-tests.yml,
+  contract-driven-gates.yml, openapi-sync.yml) fully cover this change's surface.
+  No new workflow file needed. Verified openapi-sync-gate IS triggered by the
+  contracts/api/api-contract.md edit (path-level trigger, not content-level) and
+  found it would currently FAIL: contracts/openapi.json and contracts/api/openapi.json
+  still report version 1.38.2 vs api-contract.md's 1.38.3 — flagged as a blocking
+  pre-merge action in ci-gates.md.
+artifacts:
+  - { type: tiers-modified, pointer: "none (all pre-existing Tier 1 gates reused)" }
+  - { type: gate-promotions, pointer: "none" }
+  - { type: workflow-files-changed, pointer: "none (.github/workflows/*.yml unchanged, read-only verification)" }
+  - { type: required-status-checks, pointer: "contract-validate, contract-validate-subset, openapi-sync, backend-unit-and-integration, frontend-unit, frontend-css-governance" }

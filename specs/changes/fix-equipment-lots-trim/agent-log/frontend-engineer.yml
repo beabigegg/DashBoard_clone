@@ -1,0 +1,74 @@
+change-id: fix-equipment-lots-trim
+agent: frontend-engineer
+timestamp: "2026-07-09T10:29:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts:1-5" }
+  - { type: files-changed, pointer: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts:250-269" }
+  - { type: files-changed, pointer: "frontend/tests/query-tool/useLotEquipmentQuery.test.js" }
+  - { type: components-affected, pointer: "useLotEquipmentQuery (fetchEquipmentPeriod, shared by queryLots/queryJobs/queryRejects)" }
+  - { type: screenshot-paths, pointer: "n/a (data/composable fix, no visual/layout change)" }
+  - { type: accessibility-audit, pointer: "n/a (no UI/template change, composable-only)" }
+  - { type: files-changed, pointer: "specs/changes/fix-equipment-lots-trim/test-evidence.yml" }
+next-action: none
+notes: >
+  Second reopen (task 4.2) per change-request.md Addendum (2026-07-09,
+  post-fix real-world retest): the earlier .trim()/container_names fix shipped
+  and IS working server-side (confirmed via logs/rq_query_tool_worker.log,
+  1249 records found), but fetchEquipmentPeriod() in useLotEquipmentQuery.ts
+  had no handling for the async 202 job envelope
+  ({async:true, job_id, status_url, result_url}) that the backend returns
+  when a query's date range is wide enough to route to the query-tool RQ
+  worker. It just returned the envelope's data field verbatim, so
+  Array.isArray(payload?.data) was false and every sub-tab (lots/jobs/rejects)
+  silently ended up with zero rows despite the backend already holding the
+  correct result in Redis.
+
+  Fix: copied the exact pattern already used by the sibling composable
+  useEquipmentQuery.ts's fetchEquipmentPeriod() (not modified, reference
+  only) — import pollJobUntilComplete from
+  ../../shared-composables/useAsyncJobPolling (not modified, per instructions);
+  when the POST /api/query-tool/equipment-period response's data has
+  async===true and a status_url, await pollJobUntilComplete(status_url), then
+  GET result_url via the already-imported apiGet and return its data; error
+  if result_url is missing. Falls through to the previous synchronous
+  behavior unchanged when data.async is not true, so no regression for the
+  existing sync path. This one function is shared by queryLots()/queryJobs()/
+  queryRejects(), so all three sub-tabs are fixed by this single change — no
+  per-sub-tab edits needed.
+
+  Added a 4th regression test to the existing
+  frontend/tests/query-tool/useLotEquipmentQuery.test.js (which already had
+  3 tests from the first fix, all still green): mocks
+  ../../src/shared-composables/useAsyncJobPolling via vi.mock so
+  pollJobUntilComplete doesn't actually sleep/poll; the mocked
+  window.MesApi.post for the lots equipment-period call returns a 202-style
+  envelope (data.async=true, status_url='/api/job/xxx',
+  result_url='/api/job/xxx/result'); window.MesApi.get for the result_url
+  returns the real CHAR-padded CONTAINERNAME row fixture reused from the
+  first test. Asserts pollJobUntilComplete was called with the status_url,
+  the result_url GET happened, and lotsRows/_allLotsRows end up populated
+  (length 1, trimmed/uppercased CONTAINERNAME match) rather than silently
+  empty — directly proving the addendum's reported symptom is fixed.
+
+  Verified the new test fails without the fix (temporarily reverted the
+  fetchEquipmentPeriod() change locally, confirmed the new test failed with
+  lotsRows.value having length 0; re-applied the fix, test passed) before
+  finalizing.
+
+  Commands run: `npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js`
+  (4 test files, 16 tests, all passed — 15 pre-existing + 1 new); `npx vue-tsc
+  --noEmit` from frontend/ (no output, no new type errors). Also ran
+  `cdd-kit test run` for collect/targeted/changed-area/contract phases,
+  combining this frontend command with the previously-recorded backend pytest
+  commands in a single per-phase command (per CLAUDE.md promoted learning on
+  concurrent backend+frontend agents racing on test-evidence.yml) so the
+  earlier backend-engineer evidence for this change is not lost; all phases
+  passed, final-status: passed. Did not re-run the `full` phase (prior
+  backend-only full run from the earlier fix remains recorded as the
+  final/CI-smoke entry; unrelated to this frontend-only gap).
+
+  Did not touch useEquipmentQuery.ts, useAsyncJobPolling.ts, or any
+  Python/backend file, per instructions. Did not edit tasks.yml (task 4.2
+  status); leaving that update to the orchestrating/planning agent since it
+  is outside this agent's owned artifact.

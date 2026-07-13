@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
+import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
 import { exportCsv } from '../utils/csv';
 import { normalizeText, parseInputValues } from '../utils/values';
 
@@ -237,6 +238,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
       ...(queryType === 'lots' ? {
         page: Number(options.page || lotsPagination.value.page || 1),
         per_page: Number(options.perPage || DEFAULT_LOTS_PER_PAGE),
+        container_names: resolvedLotNames.value,
       } : {}),
     };
   }
@@ -246,12 +248,27 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
       throw new Error('請先查詢批次對應的設備');
     }
 
-    const payload = await apiPost(
+    const envelope = await apiPost(
       '/api/query-tool/equipment-period',
       buildQueryPayload(queryType, options),
       { timeout: 360000, silent: true },
     );
-    return (payload as Record<string, unknown>)?.data as Record<string, unknown> || {};
+    const data = (envelope as Record<string, unknown>)?.data as Record<string, unknown> || {};
+
+    if (data?.async === true && data?.status_url) {
+      await pollJobUntilComplete(data.status_url as string);
+      const resultUrl = data.result_url as string || '';
+      if (!resultUrl) {
+        throw new Error('非同步查詢完成但未返回 result_url');
+      }
+      const resultEnvelope = await apiGet(resultUrl, {
+        timeout: 360000,
+        silent: true,
+      });
+      return (resultEnvelope as Record<string, unknown>)?.data as Record<string, unknown> || {};
+    }
+
+    return data;
   }
 
   async function queryLots() {
@@ -264,7 +281,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
       const allRows = Array.isArray(payload?.data) ? payload.data : [];
       const relevant = new Set(resolvedLotNames.value);
       _allLotsRows.value = relevant.size > 0
-        ? allRows.filter((row) => relevant.has(String(row.CONTAINERNAME || '').toUpperCase()))
+        ? allRows.filter((row) => relevant.has(String(row.CONTAINERNAME || '').trim().toUpperCase()))
         : allRows;
       _lotsCurrentPage.value = 1;
       queried.lots = true;
@@ -326,7 +343,7 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
       const allRows = Array.isArray(payload?.data) ? payload.data : [];
       const relevant = new Set(resolvedLotNames.value);
       rejectsRows.value = relevant.size > 0
-        ? allRows.filter((row) => relevant.has(String(row.CONTAINERNAME || '').toUpperCase()))
+        ? allRows.filter((row) => relevant.has(String(row.CONTAINERNAME || '').trim().toUpperCase()))
         : allRows;
       queried.rejects = true;
       return true;
