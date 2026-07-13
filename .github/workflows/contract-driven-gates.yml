@@ -85,7 +85,18 @@ jobs:
           # /cdd-close (moved to specs/archive/) would otherwise be gated at a path
           # that no longer exists and fail `cdd-kit gate` with "change not found" —
           # turning every close into a red CI run. An archive-only push yields zero ids.
-          IDS="$(printf '%s\n' "$CHANGED" | sed -n 's|^specs/changes/\([^/][^/]*\)/.*|\1|p' | sort -u | while IFS= read -r id; do [ -n "$id" ] && [ -d "specs/changes/$id" ] && printf '%s\n' "$id"; done)"
+          #
+          # The trailing `; true` is load-bearing under `pipefail`+`-e`: the while
+          # loop's own exit status is whatever its LAST executed command returned,
+          # which for the final id in a sorted list is the `[ -d ... ]` test itself
+          # when that directory was just archived (deliberately absent -> test
+          # fails, exit 1) -- even though `$IDS` correctly ends up empty, that
+          # trailing false leaks out as the whole `IDS="$(...)"` assignment's exit
+          # code and aborts the step. `; true` pins the subshell's exit status to 0
+          # so an empty, filtered-to-nothing result is never conflated with a
+          # command failure. Reproduced live: an archive-only push (add-uph-
+          # performance-page) failed this exact step before this fix.
+          IDS="$(printf '%s\n' "$CHANGED" | sed -n 's|^specs/changes/\([^/][^/]*\)/.*|\1|p' | sort -u | while IFS= read -r id; do [ -n "$id" ] && [ -d "specs/changes/$id" ] && printf '%s\n' "$id"; done; true)"
           echo "::group::Changed spec directories"
           echo "$IDS"
           echo "::endgroup::"
