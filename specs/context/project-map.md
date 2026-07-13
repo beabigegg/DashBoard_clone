@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 196
-visible-files: 1032
-omitted-dirs: 67
+visible-dirs: 236
+visible-files: 1131
+omitted-dirs: 69
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -108,7 +108,7 @@ DashBoard_clone/
 |   |   |-- 40bd549cffe1dc41
 |   |   |-- 41472cf65ca17068
 |   |   |-- 41d662f99bd58f37
-|   |   \-- ... (134 more entries truncated; cap=50)
+|   |   \-- ... (139 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -165,6 +165,7 @@ DashBoard_clone/
 |   |-- mes-dashboard-production-history-worker.service
 |   |-- mes-dashboard-reject-worker.service
 |   |-- mes-dashboard-trace-worker.service
+|   |-- mes-dashboard-uph-performance-worker.service
 |   |-- mes-dashboard-watchdog.service
 |   |-- mes-dashboard-wip-worker.service
 |   \-- mes-dashboard.service
@@ -185,7 +186,8 @@ DashBoard_clone/
 |   |   |-- 0013-db-scheduling-reuse-wip-cache-no-dedicated-query.md
 |   |   |-- 0014-msd-forward-lineage-seed-anchor.md
 |   |   |-- 0015-eap-alarm-dual-shape-event-inclusion.md
-|   |   \-- 0016-production-achievement-async-spool-seam-reduction.md
+|   |   |-- 0016-production-achievement-async-spool-seam-reduction.md
+|   |   \-- 0017-uph-performance-family-conditional-detail-join.md
 |   |-- architecture/
 |   |   |-- base-job-semaphore-wiring-stress-soak-report.md
 |   |   |-- cache-spool-patterns.md
@@ -214,6 +216,56 @@ DashBoard_clone/
 |-- frontend/
 |   |-- .cdd/
 |   |   \-- code-map.yml
+|   |-- playwright-report/
+|   |   |-- data/
+|   |   |   |-- 0247c2b2b68c55e3c3449139c2b5f6e66250c831.zip
+|   |   |   |-- 0d2545ee6f6ff257fd8eeae36634be1b14587d3c.zip
+|   |   |   |-- 15815fc2780b603732bcb2cd0bfd445c012f98e7.zip
+|   |   |   |-- 36f08facbea9c80f69d6f97de03faaef539c44aa.zip
+|   |   |   |-- 4f04dd89fb210c44de1c5494182bde04e07ea8df.zip
+|   |   |   |-- 591d2ea3eb635f8ad32b47b0c5afc1e38566aebf.zip
+|   |   |   |-- 6f07d13a6a2931b300402c8feae9a125fa1a1abe.zip
+|   |   |   |-- 70948b43f1be675e5ba2cd0ad03fc5beb5f029e0.zip
+|   |   |   |-- 899724444492fe5b0d48a41bb0b0348389ad94e2.zip
+|   |   |   |-- 903b31af534db7c07cb63008d2f28c5c40617c6b.zip
+|   |   |   |-- 927d344b559761351e2655f0b923ac35e78532b4.zip
+|   |   |   |-- 9492c877856665cbed9f7ec50403ec6bbca93975.zip
+|   |   |   |-- 94bf4f71495a9029c16c520e75dc24d92ec0ef71.zip
+|   |   |   |-- 9cbec38cd3f89fd122ce1d1cc20de07cc69b2864.zip
+|   |   |   |-- a00487b3fe618369605395dd6dde1d50da1398fb.zip
+|   |   |   |-- a241b7bb4b0b56a538660a990871f227fe0e0616.zip
+|   |   |   |-- ac86ca7c5873f3c396faf3071a289884775b31ba.zip
+|   |   |   |-- b9a6cc3678882123d1bd002845d7b6818548f8b6.zip
+|   |   |   |-- c28a4545908722d3558a971462e7fa93e184d397.zip
+|   |   |   |-- c34611c29ef84811d068635a33c321a8bbf98e02.zip
+|   |   |   |-- c78dba366a038609606fcbf0fc14efeb0c70b6ba.zip
+|   |   |   |-- cdf2571be6b210e44524eb08083f0d4f14dd7d77.zip
+|   |   |   |-- d04887aa1518b8262fedad7cdd73268d159e32c5.zip
+|   |   |   |-- d13df002950c2ade9e968bfc62c702d36d0bb11a.zip
+|   |   |   |-- d3d02d25315c73e0afad0c59635bc47ad32c2e7c.zip
+|   |   |   |-- ddb547500b94d78d34b7e7ef2fa23746948f78f3.zip
+|   |   |   |-- f4fad1950b014aff4e978749c31929d53397b6d6.zip
+|   |   |   |-- f690e437edb78ac97c536e0b59189b430fce6cbb.zip
+|   |   |   |-- f990c9b58f410923415fc6a64eb1f2dc89e35763.zip
+|   |   |   \-- fe9b9757fea61a650692b1b8eb863a6c37cd27ca.zip
+|   |   |-- trace/
+|   |   |   |-- assets/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- codeMirrorModule.DYBRYzYX.css
+|   |   |   |-- codicon.DCmgc-ay.ttf
+|   |   |   |-- defaultSettingsView.7ch9cixO.css
+|   |   |   |-- index.BDwrLSGN.js
+|   |   |   |-- index.BVu7tZDe.css
+|   |   |   |-- index.html
+|   |   |   |-- manifest.webmanifest
+|   |   |   |-- playwright-logo.svg
+|   |   |   |-- snapshot.html
+|   |   |   |-- sw.bundle.js
+|   |   |   |-- uiMode.Btcz36p_.css
+|   |   |   |-- uiMode.CQJ9SCIQ.js
+|   |   |   |-- uiMode.html
+|   |   |   \-- xtermModule.DYP7pi_n.css
+|   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
 |   |   \-- ts-resolver-loader.mjs
@@ -485,6 +537,18 @@ DashBoard_clone/
 |   |   |   \-- index.ts
 |   |   |-- styles/
 |   |   |   \-- tailwind.css
+|   |   |-- uph-performance/
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- App.vue
+|   |   |   |-- DetailTable.vue
+|   |   |   |-- FilterBar.vue
+|   |   |   |-- FineFilterBar.vue
+|   |   |   |-- index.html
+|   |   |   |-- main.js
+|   |   |   |-- RankingBlock.vue
+|   |   |   |-- style.css
+|   |   |   \-- TrendChart.vue
 |   |   |-- wip-detail/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -521,6 +585,68 @@ DashBoard_clone/
 |   |       |-- YieldPackageChart.vue
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
+|   |-- test-results/
+|   |   |-- production-achievement-asy-01334-e-issued-once-table-renders-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-01334-e-issued-once-table-renders-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-070dc--no-progress-bar-ever-shown-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-070dc--no-progress-bar-ever-shown-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-0f0e9-eedback-not-a-stuck-spinner-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-0f0e9-eedback-not-a-stuck-spinner-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-16152--not-hang-or-crash-the-page-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-16152--not-hang-or-crash-the-page-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-23e01--until-the-response-arrives-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-23e01--until-the-response-arrives-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-3324d-s-render-once-visible-again-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-3324d-s-render-once-visible-again-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-3f374-crash-or-leave-a-stuck-page-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-3f374-crash-or-leave-a-stuck-page-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-8391e-and-clears-the-progress-bar-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-8391e-and-clears-the-progress-bar-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-85eea-ery-button-or-spinner-stuck-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-85eea-ery-button-or-spinner-stuck-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-95179-shown-abandon-request-fires-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-95179-shown-abandon-request-fires-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-99f72-l-without-re-issuing-report-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-99f72-l-without-re-issuing-report-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-9e42a-to-empty-rows-never-crashes-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-9e42a-to-empty-rows-never-crashes-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-a7b67-ssage-no-stuck-progress-bar-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-a7b67-ssage-no-stuck-progress-bar-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-d20df-error-does-not-hang-forever-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-d20df-error-does-not-hang-forever-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-f550d-an-empty-table-not-an-error-chromium/
+|   |   |   \-- trace.zip
+|   |   |-- production-achievement-asy-f550d-an-empty-table-not-an-error-chromium-retry1/
+|   |   |   \-- trace.zip
+|   |   \-- .last-run.json
 |   |-- tests/
 |   |   |-- abort/
 |   |   |   |-- production-history-abort.test.js
@@ -627,6 +753,7 @@ DashBoard_clone/
 |   |   |   |-- reject-material-flat-table.spec.js
 |   |   |   |-- resource-history-async.spec.ts
 |   |   |   |-- resource-status.spec.ts
+|   |   |   |-- uph-performance.spec.ts
 |   |   |   |-- wip-detail.spec.ts
 |   |   |   |-- wip-matrix-drilldown.spec.js
 |   |   |   |-- wip-overview.spec.ts
@@ -645,7 +772,11 @@ DashBoard_clone/
 |   |   |   |-- useAutoRefresh.test.js
 |   |   |   \-- useRequestGuard.test.js
 |   |   |-- unit/
-|   |   |   \-- eap-alarm-filter.test.js
+|   |   |   |-- eap-alarm-filter.test.js
+|   |   |   |-- uph-performance-filter-bar.test.js
+|   |   |   |-- uph-performance-filter.test.js
+|   |   |   |-- uph-performance-ranking-block.test.js
+|   |   |   \-- uph-performance-views.test.js
 |   |   |-- validation/
 |   |   |   |-- useHoldOverview.validation.test.js
 |   |   |   |-- useMaterialTrace.validation.test.js
@@ -672,22 +803,33 @@ DashBoard_clone/
 |-- logs/
 |   |-- archive/
 |   |   |-- access_20260713_140321.log
+|   |   |-- access_20260713_204932.log
 |   |   |-- error_20260713_140321.log
+|   |   |-- error_20260713_204932.log
 |   |   |-- rq_downtime_worker_20260713_140321.log
+|   |   |-- rq_downtime_worker_20260713_204932.log
 |   |   |-- rq_eap_alarm_worker_20260713_140321.log
+|   |   |-- rq_eap_alarm_worker_20260713_204932.log
 |   |   |-- rq_hold_hist_worker_20260713_140321.log
+|   |   |-- rq_hold_hist_worker_20260713_204932.log
 |   |   |-- rq_msd_worker_20260713_140321.log
+|   |   |-- rq_msd_worker_20260713_204932.log
 |   |   |-- rq_prod_hist_worker_20260713_140321.log
+|   |   |-- rq_prod_hist_worker_20260713_204932.log
 |   |   |-- rq_reject_worker_20260713_140321.log
+|   |   |-- rq_reject_worker_20260713_204932.log
 |   |   |-- rq_resource_worker_20260713_140321.log
+|   |   |-- rq_resource_worker_20260713_204932.log
 |   |   |-- rq_warmup_worker_20260713_140321.log
+|   |   |-- rq_warmup_worker_20260713_204932.log
 |   |   |-- rq_worker_20260713_140321.log
+|   |   |-- rq_worker_20260713_204932.log
 |   |   |-- rq_yield_alert_worker_20260713_140321.log
-|   |   \-- watchdog_20260713_140321.log
+|   |   |-- rq_yield_alert_worker_20260713_204932.log
+|   |   |-- watchdog_20260713_140321.log
+|   |   \-- watchdog_20260713_204932.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
 |   |-- login_sessions.sqlite-shm
@@ -706,6 +848,7 @@ DashBoard_clone/
 |   |-- rq_query_tool_worker.log
 |   |-- rq_reject_worker.log
 |   |-- rq_resource_worker.log
+|   |-- rq_uph_performance_worker.log
 |   |-- rq_warmup_worker.log
 |   |-- rq_worker.log
 |   |-- rq_yield_alert_worker.log
@@ -840,6 +983,7 @@ DashBoard_clone/
 |       |   |-- resource_routes.py
 |       |   |-- spool_routes.py
 |       |   |-- trace_routes.py
+|       |   |-- uph_performance_routes.py
 |       |   |-- user_auth_routes.py
 |       |   |-- wip_routes.py
 |       |   \-- yield_alert_routes.py
@@ -894,7 +1038,7 @@ DashBoard_clone/
 |       |   |-- production_achievement_permission_service.py
 |       |   |-- production_achievement_service.py
 |       |   |-- production_achievement_target_service.py
-|       |   \-- ... (33 more entries truncated; cap=50)
+|       |   \-- ... (35 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -935,6 +1079,7 @@ DashBoard_clone/
 |       |   |-- filters.py
 |       |   |-- loader.py
 |       |   |-- production_achievement.sql
+|       |   |-- uph_performance.sql
 |       |   \-- wildcards.py
 |       |-- static/
 |       |   |-- js/
@@ -957,7 +1102,8 @@ DashBoard_clone/
 |       |   |-- production_history_worker.py
 |       |   |-- reject_history_worker.py
 |       |   |-- resource_history_base_worker.py
-|       |   \-- resource_history_oee_worker.py
+|       |   |-- resource_history_oee_worker.py
+|       |   \-- uph_performance_worker.py
 |       |-- __init__.py
 |       |-- __main__.py
 |       |-- app.py
@@ -965,6 +1111,7 @@ DashBoard_clone/
 |-- tests/
 |   |-- acceptance/
 |   |   |-- acceptance_loader.py
+|   |   |-- test_add_uph_performance_page_acceptance.py
 |   |   \-- test_fix_equipment_lots_trim_acceptance.py
 |   |-- contract/
 |   |   |-- samples/
@@ -1033,7 +1180,8 @@ DashBoard_clone/
 |   |   |-- test_gate_wiring.py
 |   |   |-- test_manifest_completeness.py
 |   |   |-- test_openapi_schema_resolution.py
-|   |   \-- test_schema_coverage.py
+|   |   |-- test_schema_coverage.py
+|   |   \-- test_uph_performance_contract.py
 |   |-- e2e/
 |   |   |-- __init__.py
 |   |   |-- browser_helpers.py
@@ -1107,6 +1255,9 @@ DashBoard_clone/
 |   |   |-- test_rowcount_flag_parity.py
 |   |   |-- test_rq_semaphore_wiring.py
 |   |   |-- test_soak_workload.py
+|   |   |-- test_uph_performance_data_boundary.py
+|   |   |-- test_uph_performance_resilience.py
+|   |   |-- test_uph_performance_rq_async.py
 |   |   \-- test_wip_rowcount_rq_routing.py
 |   |-- manual/
 |   |   \-- test_job_owner_auth_live.py
@@ -1159,6 +1310,7 @@ DashBoard_clone/
 |   |   |-- test_reject_history_stress.py
 |   |   |-- test_resource_history_stress.py
 |   |   |-- test_rq_semaphore_stress.py
+|   |   |-- test_uph_performance_stress.py
 |   |   |-- test_wip_worker_stress.py
 |   |   \-- test_yield_alert_stress.py
 |   |-- templates/
@@ -1219,7 +1371,7 @@ DashBoard_clone/
 |   |-- test_circuit_breaker.py
 |   |-- test_common_filters.py
 |   |-- test_container_filter_cache.py
-|   \-- ... (200 more entries truncated; cap=50)
+|   \-- ... (202 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
@@ -1228,7 +1380,8 @@ DashBoard_clone/
 |   |   |       \-- ... (max depth)
 |   |   |-- production_history/
 |   |   |-- reject_dataset/
-|   |   \-- test_ns/
+|   |   |-- test_ns/
+|   |   \-- uph_performance/
 |   |-- query_spool/
 |   |   |-- anomaly_hold_dataset/
 |   |   |   \-- 7c193f4e1ec6e300.parquet
@@ -1240,12 +1393,16 @@ DashBoard_clone/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- hold_dataset/
 |   |   |   \-- 3ed2a3bf053e3498.parquet
+|   |   |-- production_achievement/
+|   |   |   \-- d77009d72a8ee2b4.parquet
 |   |   |-- reject_dataset/
 |   |   |   \-- 9975277864b191f1.parquet
 |   |   |-- resource_dataset/
 |   |   |   \-- 8148de3c0fd2fd4a.parquet
 |   |   |-- resource_oee/
 |   |   |   \-- e1fa3f8893b58037.parquet
+|   |   |-- uph_performance/
+|   |   |   \-- uph_performance_2026-04-01_2026-04-01_c51f4b53_v1.parquet
 |   |   |-- yield_alert_dataset/
 |   |   |   \-- 1bca5650d534c79e.parquet
 |   |   |-- probe_1006070.json
@@ -1287,26 +1444,10 @@ DashBoard_clone/
 |   |   |-- probe_1556924.json
 |   |   |-- probe_1557180.json
 |   |   |-- probe_1557236.json
-|   |   |-- probe_1564989.json
-|   |   |-- probe_1565010.json
-|   |   \-- ... (110 more entries truncated; cap=50)
+|   |   \-- ... (139 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
-|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   |-- resource_history.duckdb
-|   |-- rq_downtime_worker.pid
-|   |-- rq_eap_alarm_worker.pid
-|   |-- rq_hold_hist_worker.pid
-|   |-- rq_msd_worker.pid
-|   |-- rq_prod_ach_worker.pid
-|   |-- rq_prod_hist_worker.pid
-|   |-- rq_query_tool_worker.pid
-|   |-- rq_reject_worker.pid
-|   |-- rq_resource_worker.pid
-|   |-- rq_trace_worker.pid
-|   |-- rq_warmup_worker.pid
-|   |-- rq_yield_alert_worker.pid
-|   \-- worker_watchdog.pid
+|   \-- resource_history.duckdb
 |-- .coverage
 |-- .dockerignore
 |-- .env

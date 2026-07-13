@@ -35,8 +35,8 @@ tasks:
   - { id: "5.3", section: Review, title: "Contract review", status: done }
   - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk; residual risks documented in stress-soak-report.md and design.md Open Risks" }
   - { id: "6.1", section: Verification, title: "Local gates", status: done }
-  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 required gates (unit-mock-integration, playwright-critical-journeys, contract validators) pass locally; not yet run in an actual PR/CI context" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Confirmed green in real GitHub Actions CI on push to main (commit f2d7d146): backend-tests, frontend-tests (incl. uph-performance Playwright e2e spec running for real), openapi-sync-gate, released-pages-hardening-gates, contract-driven-gates all passed" }
   - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "nightly-integration equivalent (test_uph_performance_rq_async.py with --run-integration-real) passes locally" }
   - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: done, note: "stress-soak-report.md completed (mock-based); real-Oracle load and GWBA/fHCM_UPH data-availability probe remain as documented residual risk for DBA/ops before production activation, per qa-reviewer" }
-  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
-  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: done }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: done }

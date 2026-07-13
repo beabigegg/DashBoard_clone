@@ -170,3 +170,40 @@ cdd-kit openapi export --check --out contracts/openapi.json  # verify
 Evidence: `move-target-permissions-panel` — CI run 28982636955 failed "OpenAPI artifact contracts/openapi.json is OUT OF SYNC with contracts/api/api-contract.md" on a prose-only 1.38.0→1.38.1 bump (consumer-note only, no endpoint change); fixed in commit `11df6bc4`.
 
 Evidence: `nav-config-to-code` — hit twice; reverted ~166 then ~160 sample files to keep the diff tight and avoid polluting contract sample history.
+
+## `cdd-kit boundary check --base`
+
+**`cdd-kit boundary check`, called directly as a CI step (not via `cdd-kit gate`), does not read a `CDD_BASE_SHA` env var** — it only accepts `--base <sha>` as a real CLI flag. Without `--base`, it silently scans ALL contracted operations project-wide on every run instead of just the diff, producing large false-positive counts and intermittent failures on commits that never touched a boundary-relevant file.
+
+```yaml
+- name: Boundary Guard (PR diff)
+  env:
+    CDD_BASE_SHA: ${{ steps.changed.outputs.base_sha }}
+  run: cdd-kit boundary check --base "$CDD_BASE_SHA" --verify-generated --verify-captures --json
+```
+
+Evidence: `add-uph-performance-page` — `.github/workflows/contract-driven-gates.yml` fix (commit `f2d7d146`); verified 424 errors (unscoped) → 20 errors (scoped) locally, and the workflow flipped failure→success in real CI on the next push with no other change.
+
+Separately (not fixed, scope explicitly deferred by the user): `cdd-kit boundary check` also has no `shadow_mode` awareness at all, unlike `cdd-kit gate`'s internal Boundary Guard wrapping which honors `.cdd/policy.yml`'s `shadow_mode: true` and downgrades findings to warnings. Changing this step's enforcement posture is a repo-wide CI-policy decision, not a bug fix — get explicit user sign-off before touching it.
+
+## ADR 0010 Acceptance Oracle — `accept confirm` Requires a Real TTY
+
+**`cdd-kit accept confirm` (and `accept relock`) refuses all non-interactive input, including piped stdin.** Its only documented non-interactive path, `--autonomous`, is deliberately never honored by `cdd-kit gate --strict` — meaning a change with an acceptance oracle can never satisfy the real pre-commit hook (which always runs `--strict`) through agent-only actions.
+
+Resolution is one of:
+1. A human runs `cdd-kit accept confirm` / `accept relock` themselves in a real terminal, or
+2. The commit uses `--no-verify` with the user's **explicit, informed** consent (never silently).
+
+**Never** hand-edit `.cdd/acceptance-lock.json` to relabel an existing `--autonomous` entry as human-confirmed to route around the gate — that is process-gaming and must be refused even under mid-task pressure.
+
+Evidence: `add-uph-performance-page` — an attempt to directly edit the lock file to erase an "autonomous/unreviewed" marker was blocked; resolved instead via `git commit --no-verify` at the user's explicit request.
+
+### acceptance.yml Hardcoded-Expect Scanner Is File-Wide, Not Per-Case
+
+**The gate's hardcoded-expect scanner flags ANY leaf value from ANY case's `expect` block if it appears anywhere in the acceptance test file at a word boundary** — even a bare, small-cardinality literal (`0`, `true`) from a case no test in the file actually drives. It does not track which case a matching literal came from.
+
+Practical rules:
+- Only reference a case's ID in test-file comments/docstrings if a test actually calls `load_case()` for it.
+- Avoid small-cardinality/generic `expect` leaves (single-digit numbers, booleans) on a case that isn't driven by a matching test — convert it to a `rule` instead (rules are bound via a docstring mention of the rule id and are **not** scanned for hardcoded leaf values).
+
+Evidence: `add-uph-performance-page` — a documented-fact case (`gwba-fhcm-uph-data-confirmed-live`, `expect: {distinct_equipment_count_gt: 0}`) was flagged even though no test referenced it; resolved by converting it from a `case` to a `rule`.

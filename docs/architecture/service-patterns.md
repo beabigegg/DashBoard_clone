@@ -56,6 +56,15 @@ Without this, both builders start at `p0` and Oracle raises `ORA-01006: bind var
 
 Pattern: `src/mes_dashboard/services/query_tool_service.py:2558-2567` (`equipment-rejects-by-lots`)
 
+## SQLLoader.load_with_params — Global String Replace Corrupts Doc Comments
+
+**`SQLLoader.load_with_params` (src/mes_dashboard/sql/loader.py:53-54) substitutes `{{ NAME }}` via a plain `str.replace()` across the ENTIRE .sql file** — including the template's own doc-comment header, not just the real WHERE-clause injection site. Two rules follow:
+
+1. **Builder functions that return a SQL fragment for substitution must never embed a leading/trailing newline in the returned value.** Add the separator (`\n  AND ...`) once, only at the single concatenation site that feeds the real WHERE clause — never inside the reusable builder function itself. An embedded newline that lands inside a `--`-commented header line splits it in two, leaving the back half uncommented; Oracle then receives live garbage ahead of the SELECT and raises `ORA-00900: invalid SQL statement`.
+2. **Never spell out the literal `{{ PLACEHOLDER_NAME }}` token in the template's own prose/doc-comment** (e.g. "this filter is `{{ EXTRA_FILTERS }}`") — describe it in words instead. Otherwise every future substitution corrupts that comment line regardless of what the substituted value contains.
+
+Evidence: `add-uph-performance-page` — live `ORA-00900` reproduced against real production Oracle when any coarse filter was active; `_build_equipment_ids_filter`/`_build_container_exists_filter`/`_build_workcenter_names_exists_filter` originally returned newline-prefixed fragments. Fixed by moving the separator to `pre_query()`'s concatenation site; regression coverage in `tests/test_uph_performance_sql_builder.py::TestFullTemplateRenderNeverCorruptsHeaderComment` (4 tests).
+
 ## _PARTIAL_NONKEY_COLS_LOT — Atomic Updates with SQL
 
 **`query_tool_sql_runtime.py` uses `_PARTIAL_NONKEY_COLS_LOT` (a frozenset) in the QT-06 strict guard.** Any new column added to `lot_history.sql` or `equipment_lots.sql` must also be added to `_PARTIAL_NONKEY_COLS_LOT` atomically with the SQL change.

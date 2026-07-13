@@ -117,6 +117,10 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Full pytest regenerates the whole contract sample set — `git checkout tests/contract/samples/` then re-stage only your change's samples
 - Any `schema-version` bump to `api-contract.md` requires re-running `cdd-kit openapi export` for both output paths
 - ADR 0012: `data-shape:` citation resolver needs the exact heading `## Invalid Data Behavior`; Form-1 can't cite into `type: array` items — cite the array field, put column detail in the rationale text
+- ADR 0012 §2 citation resolver cannot resolve interaction-design.md field citations against an untyped `GenericSuccessResponse`/prose response schema — every endpoint a NEW page's interaction-design.md cites fields from needs a typed `## Schemas` entry in api-contract.md *before* the citations are written, or `gate --strict` hard-fails — see contracts/api/api-contract.md §Schemas and ADR 0012
+- `cdd-kit boundary check` (raw CI step, not via `cdd-kit gate`) ignores `CDD_BASE_SHA` — always pass `--base <sha>` explicitly or it scans the entire contracted surface every run — see docs/cdd-kit-patterns.md §cdd-kit boundary check --base
+- `cdd-kit accept confirm`/`--autonomous` is never honored by `gate --strict` — an acceptance-oracle change only passes the real pre-commit hook via a human running `accept confirm`/`relock` in a real TTY, or `--no-verify` with explicit user consent (never by hand-editing `.cdd/acceptance-lock.json`) — see docs/cdd-kit-patterns.md §ADR 0010 Acceptance Oracle
+- acceptance.yml's hardcoded-expect scanner flags any case's leaf `expect` value found anywhere in the file, even from an undriven case — keep generic/small-cardinality `expect` leaves off undriven cases, or convert to a `rule` (not scanned) — see docs/cdd-kit-patterns.md §ADR 0010 Acceptance Oracle
 
 **Frontend patterns** — see `docs/architecture/frontend-patterns.md`:
 - TS migration complete; `portal-shell/` non-entry modules and `main.js` entry points intentionally remain JS
@@ -170,6 +174,7 @@ For context-governed changes, read `specs/changes/<change-id>/context-manifest.m
 - Every new `execute_*_job` worker must wire BOTH `deploy/*.service` AND `scripts/start_server.sh`; never pass `rq worker --job-execution-timeout` — see contracts/ci/ci-gate-contract.md §New RQ Worker Deploy Checklist
 - COUNT(*) fail-open pre-check for domains without a date range must fail open to sync, never 503 — see §Async Routing Pre-Check Pattern
 - `DW_MES_WIP` has no `CONTAINERID` index — bridge `CONTAINERID`↔`CONTAINERNAME` via indexed `DW_MES_CONTAINER` before joining — see §DW_MES_WIP Has No CONTAINERID Index
+- `SQLLoader.load_with_params` substitutes `{{ NAME }}` via a **global** string replace — builder-function fragments must never embed a newline and template doc-comments must never spell out the literal placeholder token, or the header comment gets corrupted and Oracle raises `ORA-00900` — see docs/architecture/service-patterns.md §SQLLoader.load_with_params
 
 **MES domain semantics:**
 - `LOTWIPHISTORY.TRACKINQTY` is remaining-qty-per-partial (decrements across partials); use only `TRACKINTIMESTAMP` as session key — see contracts/business/business-rules.md §PH-06
