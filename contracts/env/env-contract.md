@@ -3,8 +3,8 @@ contract: env
 summary: Environment variable inventory, secret handling, and deployment sync policy.
 owner: platform-team
 surface: runtime-config
-schema-version: 1.0.25
-last-changed: 2026-07-08
+schema-version: 1.0.26
+last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -71,12 +71,15 @@ breaking-change-policy: deprecate-2-minors
 | MYSQL_OPS_USER | db | all | conditional* | yes | — | — | platform-team | non-empty string; required when MYSQL_OPS_ENABLED=true | yes | connection failure when enabled |
 | MYSQL_OPS_PASSWORD | db | all | conditional* | yes | — | — | platform-team | non-empty string; required when MYSQL_OPS_ENABLED=true | yes | connection failure when enabled |
 | MYSQL_SYNC_ENABLED | db | all | no | no | true | true | platform-team | true or false | yes | controls the separate SQLite→MySQL `core/sync_worker.py` log/metrics sync only — NOT read by the production-achievement target/permission tables, which bypass sync_worker entirely (see note below) |
+| MYSQL_OPS_POOL_SIZE | db | all | no | no | 8 | 8 | platform-team | positive integer | yes | pool undersized relative to concurrent callers (admin log/metrics UI, sync_worker, permission checks, target CRUD) → `sqlalchemy.exc.TimeoutError: QueuePool limit ... connection timed out` on all `core/mysql_client.py` consumers |
+| MYSQL_OPS_MAX_OVERFLOW | db | all | no | no | 4 | 4 | platform-team | non-negative integer | yes | same failure mode as MYSQL_OPS_POOL_SIZE — combined pool capacity is pool_size + max_overflow |
 
 \* "conditional" = required only when `MYSQL_OPS_ENABLED=true`; unused when the flag is `false`.
 
 - `MYSQL_OPS_ENABLED`: Master feature flag gating all direct MySQL OPS read/write paths exposed via `core/mysql_client.py`. **This variable pre-dates this contract entry** — it already existed in code (`core/mysql_client.py`) but was previously undocumented in this contract (known gap, closed by change `production-achievement-kanban`). Default `false`. The production-achievement feature (target-value table + edit-permission table, data-shape-contract.md §3.26/§3.27) is the first consumer whose correctness depends on this flag being `true` in production — this is a deployment precondition for that feature specifically, not a change to any pre-existing MySQL OPS consumer's flag-off behavior. When `false`: `GET /api/production-achievement/targets` and the report's `target_qty`/`achievement_rate` fields degrade to `null` (never 500, per data-shape-contract.md §3.26); `PUT /api/production-achievement/targets` and the admin permission-whitelist write endpoints return 503 `SERVICE_UNAVAILABLE`; the `can_edit_targets` permission check fails closed (deny) when MySQL is unreachable regardless of flag state. Module-level constant frozen at import — restart required.
 - `MYSQL_OPS_HOST` / `MYSQL_OPS_PORT` / `MYSQL_OPS_DATABASE` / `MYSQL_OPS_USER` / `MYSQL_OPS_PASSWORD`: Standard MySQL connection parameters for `core/mysql_client.py` (pre-existing, now documented). Only required when `MYSQL_OPS_ENABLED=true`.
 - `MYSQL_SYNC_ENABLED`: Pre-existing flag controlling the separate, one-way, eventually-consistent (max ~10 min lag) `core/sync_worker.py` path used for log/metrics tables (`dashboard_logs`, `dashboard_metrics_snapshots`). The production-achievement target-value and permission tables are explicitly NOT synced via this path — they read/write MySQL directly through `core/mysql_client.py` for immediate consistency, so this flag has no effect on them.
+- `MYSQL_OPS_POOL_SIZE` / `MYSQL_OPS_MAX_OVERFLOW`: SQLAlchemy `QueuePool` sizing for the single shared MySQL OPS engine (`core/mysql_client.py`, `create_mysql_engine()`). Previously hardcoded `pool_size=3, max_overflow=2` (5-connection capacity). Raised to defaults `8`/`4` (12-connection capacity) because the same engine is shared by several independent, uncoordinated callers: `admin_routes.py` log/metrics UI (`api_logs` opens 2 connections per request), `core/sync_worker.py`'s periodic background cycle (opens up to 3 sequential connections per interval, including a batched up-to-500-row `INSERT IGNORE`), `production_achievement_permission_service.is_user_whitelisted()` (called on every access-gated request), `production_achievement_target_service`, and `user_usage_kpi_service`. Under concurrent load the 5-connection pool saturated and callers hit `sqlalchemy.exc.TimeoutError` after the default 30s `pool_timeout`. `pool_timeout` itself is not exposed via env — only the pool capacity.
 
 ## Frontend Build
 
@@ -333,6 +336,10 @@ Variables such as `VITE_`, `NEXT_PUBLIC_`, and `PUBLIC_` are browser-exposed. Ne
 - `DB_HOST` / `DB_SERVICE` 空值：app factory 啟動時即失敗，不會延遲到首次查詢。
 
 ## CHANGELOG
+
+## [env 1.0.26] — 2026-07-13
+### Added
+- mysql-ops-pool-sizing-fix: `MYSQL_OPS_POOL_SIZE` (default `8`) / `MYSQL_OPS_MAX_OVERFLOW` (default `4`) — new env vars making `core/mysql_client.py`'s `QueuePool` capacity configurable. Previously hardcoded `pool_size=3, max_overflow=2` (5-connection capacity), which saturated under concurrent load from admin log/metrics UI + `sync_worker` background cycle + per-request permission checks + target/KPI services sharing one engine, producing `sqlalchemy.exc.TimeoutError: QueuePool limit ... connection timed out, timeout 30.00`. New defaults raise capacity to 12 connections; both are restart-required, additive, no existing var default or runtime semantics changed.
 
 ## [env 1.0.23] — 2026-07-02
 ### Added

@@ -26,6 +26,9 @@ _MYSQL_USER = os.getenv('MYSQL_OPS_USER', '')
 _MYSQL_PASSWORD = os.getenv('MYSQL_OPS_PASSWORD', '')
 _MYSQL_DATABASE = os.getenv('MYSQL_OPS_DATABASE', '')
 
+_MYSQL_POOL_SIZE = int(os.getenv('MYSQL_OPS_POOL_SIZE', '8'))
+_MYSQL_MAX_OVERFLOW = int(os.getenv('MYSQL_OPS_MAX_OVERFLOW', '4'))
+
 # ============================================================
 # Engine Singleton
 # ============================================================
@@ -44,8 +47,8 @@ def create_mysql_engine():
     )
     return sa_create_engine(
         url,
-        pool_size=3,
-        max_overflow=2,
+        pool_size=_MYSQL_POOL_SIZE,
+        max_overflow=_MYSQL_MAX_OVERFLOW,
         pool_pre_ping=True,
         pool_recycle=1800,
     )
@@ -58,7 +61,11 @@ def get_mysql_engine():
         if not MYSQL_OPS_ENABLED:
             raise RuntimeError("MySQL OPS is disabled (MYSQL_OPS_ENABLED=false)")
         _mysql_engine = create_mysql_engine()
-        logger.info("MySQL OPS engine created (%s:%d/%s)", _MYSQL_HOST, _MYSQL_PORT, _MYSQL_DATABASE)
+        logger.info(
+            "MySQL OPS engine created (%s:%d/%s, pool_size=%d, max_overflow=%d)",
+            _MYSQL_HOST, _MYSQL_PORT, _MYSQL_DATABASE,
+            _MYSQL_POOL_SIZE, _MYSQL_MAX_OVERFLOW,
+        )
     return _mysql_engine
 
 

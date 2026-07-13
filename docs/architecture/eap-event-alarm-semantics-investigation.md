@@ -4,6 +4,11 @@
 
 **Date:** 2026-07-07
 
+**See also:** `docs/architecture/eap-event-uph-collection-investigation.md` —
+sibling investigation of UPH / throughput data in the same tables (the
+non-alarm `EQP_SECS_EVENT` / periodic `M[60]`/`M[30]` events this doc's Shape-B
+analysis brushes past).
+
 ## Trigger
 
 While reviewing EAP ALARM data, it was observed that "alarm" information is not
