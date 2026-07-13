@@ -1,0 +1,1 @@
+cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js --reporter=verbose --silent=false -- --listTests

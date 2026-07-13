@@ -1,0 +1,15 @@
+{
+  "change_id": "query-tool-subtab-cache",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js",
+  "duration_ms": 1539,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/query-tool-subtab-cache/test-runs/20260709-110643/summary.json",
+    "stdout": "specs/changes/query-tool-subtab-cache/test-runs/20260709-110643/stdout.log",
+    "stderr": "specs/changes/query-tool-subtab-cache/test-runs/20260709-110643/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

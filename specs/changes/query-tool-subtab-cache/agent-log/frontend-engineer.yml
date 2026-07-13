@@ -1,0 +1,38 @@
+agent: frontend-engineer
+change-id: query-tool-subtab-cache
+status: complete
+summary: >
+  Implemented sub-tab query caching per implementation-plan.md IP-1/IP-2/IP-3.
+  useLotEquipmentQuery.setActiveSubTab() now returns early when queried[tab] is
+  already true (no new invalidation needed — clearResults() already resets
+  queried.* on every lookupEquipment() call). useEquipmentQuery.setActiveSubTab()
+  got the same guard, plus new invalidation wiring it previously lacked: a private
+  invalidateQueryCache() helper resets queried.{lots,jobs,rejects,timeline}, wired
+  from setSelectedEquipmentIds() and from a `watch([startDate, endDate], ...,
+  { flush: 'sync' })` (App.vue mutates those refs directly with no setter
+  boundary). useLotDetail.ts was audited only, per plan — its loaded.* gate
+  already implements the same pattern correctly; no production edit made, only a
+  pinning regression test. Guard was placed only inside setActiveSubTab() in both
+  composables, never inside queryActiveSubTab()/query*()/pagination, preserving
+  AC-5 explicit-refresh semantics. Added the full AC->test matrix from
+  test-plan.md: extended useLotEquipmentQuery.test.js, created
+  useEquipmentQuery.test.js (new), added one pinning test to
+  useLotDetail.pagination.test.js. All target tests plus the pre-existing
+  tests/legacy/query-tool-composables.test.js pass; vue-tsc --noEmit is clean.
+  Note: during this session useLotEquipmentQuery.ts also picked up unrelated
+  concurrent changes (async job polling, container_names payload field, a
+  CONTAINERNAME .trim() fix) from what appears to be a parallel agent/session
+  working the same file — those are not part of this change's diff; my edit is
+  isolated to the setActiveSubTab guard.
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/query-tool/composables/useLotEquipmentQuery.ts:366-374 (setActiveSubTab cache-hit guard)" }
+  - { type: files-changed, pointer: "frontend/src/query-tool/composables/useEquipmentQuery.ts:1,91-101,319-325,328-331 (invalidateQueryCache helper, sync watch on startDate/endDate, setActiveSubTab guard, setSelectedEquipmentIds invalidation call)" }
+  - { type: files-changed, pointer: "frontend/tests/query-tool/useLotEquipmentQuery.test.js (added 6 cache-hit/invalidation/refresh/cache-signal tests, AC-1/AC-2/AC-3/AC-4/AC-5/AC-7)" }
+  - { type: files-changed, pointer: "frontend/tests/query-tool/useEquipmentQuery.test.js (new file, 7 tests covering AC-1/AC-2/AC-3/AC-4/AC-5/AC-7)" }
+  - { type: files-changed, pointer: "frontend/tests/query-tool/useLotDetail.pagination.test.js (added 1 pinning test for AC-6)" }
+  - { type: components-affected, pointer: "useLotEquipmentQuery, useEquipmentQuery (composables); useLotDetail audited, unchanged" }
+  - { type: files-changed, pointer: "n/a (no useLotDetail.ts production edit per IP-3 audit-and-pin scope)" }
+  - { type: accessibility-audit, pointer: "n/a (no UI/template change; composable-internal state logic only)" }
+  - { type: screenshot-paths, pointer: "n/a (no visual/UI change)" }
+  - { type: test-run, pointer: "specs/changes/query-tool-subtab-cache/test-evidence.yml (phases collect/targeted/changed-area all passed)" }
+  - { type: test-run, pointer: "npx vue-tsc --noEmit: clean (0 errors)" }

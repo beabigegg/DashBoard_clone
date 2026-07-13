@@ -1,0 +1,20 @@
+change-id: query-tool-subtab-cache
+agent: ci-cd-gatekeeper
+status: done
+summary: >
+  Wrote ci-gates.md. Verified all 8 workflows in .github/workflows/ by reading
+  their path filters directly (not assumed): only frontend-tests.yml and
+  contract-driven-gates.yml apply to this change's surface (frontend/src/query-tool/**,
+  frontend/tests/**); backend-tests, openapi-sync, e2e-tests, released-pages-hardening-gates,
+  measure-stability, soak-tests, stress-tests do not trigger. No new workflow needed.
+  Also surfaced (via an early exploratory `cdd-kit gate` run) a tier-floor keyword-scan
+  false positive: "query"/"cache" matched from composable filenames and the change-id,
+  flagging a Tier 2 floor against the declared Tier 3. Main Claude resolved this with
+  a documented tier-floor-override in tasks.yml frontmatter (see change-classification.md
+  Clarifications for the underlying reasoning: in-memory Vue-ref reuse, no new API/queue/
+  cache infrastructure).
+artifacts:
+  - { type: ci-gates, pointer: "specs/changes/query-tool-subtab-cache/ci-gates.md" }
+  - { type: workflow-coverage, pointer: ".github/workflows/frontend-tests.yml" }
+  - { type: workflow-coverage, pointer: ".github/workflows/contract-driven-gates.yml" }
+next-action: proceed-to-implementation-planner

@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import { apiGet, apiPost, ensureMesApiAvailable } from '../../core/api';
 import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
@@ -87,6 +87,18 @@ export function useEquipmentQuery(initial: EquipmentQueryInitial = {}) {
 
   const queried = reactive(emptyTabFlags());
   const exporting = reactive(emptyTabFlags());
+
+  function invalidateQueryCache(): void {
+    const next = emptyTabFlags();
+    const queriedMap = queried as Record<string, boolean>;
+    Object.keys(next).forEach((key) => { queriedMap[key] = false; });
+  }
+
+  // App.vue mutates startDate/endDate directly (no setter boundary), so the
+  // cache invalidation seam for the date-range filter axis has to be a watch.
+  // `flush: 'sync'` keeps the reset deterministic for callers/tests that read
+  // `queried` immediately after assigning to the refs (no nextTick needed).
+  watch([startDate, endDate], invalidateQueryCache, { flush: 'sync' });
 
   const selectedEquipmentNames = computed(() => {
     const selectedSet = new Set(selectedEquipmentIds.value);
@@ -307,11 +319,15 @@ export function useEquipmentQuery(initial: EquipmentQueryInitial = {}) {
     if (!autoQuery) {
       return true;
     }
+    if ((queried as Record<string, boolean>)[activeSubTab.value]) {
+      return true;
+    }
     return queryActiveSubTab();
   }
 
   function setSelectedEquipmentIds(ids: unknown[] = []): void {
     selectedEquipmentIds.value = uniqueValues(ids);
+    invalidateQueryCache();
   }
 
   function canExportSubTab(tab: unknown): boolean {

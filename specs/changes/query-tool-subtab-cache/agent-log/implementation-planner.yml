@@ -1,0 +1,15 @@
+agent: implementation-planner
+change-id: query-tool-subtab-cache
+status: complete
+summary: >
+  Wrote the execution packet for a narrow client-side sub-tab caching optimization.
+  Confirmed against source: useLotEquipmentQuery needs only a setActiveSubTab guard
+  (clearResults already resets queried.*); useEquipmentQuery needs the guard PLUS
+  invalidation (setSelectedEquipmentIds reset + a sync watch on the raw startDate/endDate
+  refs, which App.vue mutates directly with no setter boundary); useLotDetail is
+  audit-and-pin only. Guard must live only in setActiveSubTab to preserve AC-5 refresh
+  and pagination paths.
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/query-tool-subtab-cache/implementation-plan.md" }
+  - { type: owner-map, pointer: "frontend-engineer" }
+  - { type: scope-summary, pointer: "3 composables in scope (2 edit, 1 audit); backend/API/contracts out of scope" }

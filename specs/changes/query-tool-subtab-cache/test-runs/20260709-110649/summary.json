@@ -1,0 +1,15 @@
+{
+  "change_id": "query-tool-subtab-cache",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js && npx vue-tsc --noEmit",
+  "duration_ms": 7741,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/query-tool-subtab-cache/test-runs/20260709-110649/summary.json",
+    "stdout": "specs/changes/query-tool-subtab-cache/test-runs/20260709-110649/stdout.log",
+    "stderr": "specs/changes/query-tool-subtab-cache/test-runs/20260709-110649/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

@@ -1,0 +1,19 @@
+agent: test-strategist
+change-id: query-tool-subtab-cache
+summary: >
+  Mapped AC-1..AC-7 to unit tests in useLotEquipmentQuery.test.js (extend),
+  useEquipmentQuery.test.js (new file), and useLotDetail.pagination.test.js
+  (one pinning test for AC-6, since useLotDetail already implements the
+  cache/invalidation pattern correctly via loaded.* + clearTabData()).
+  Confirmed frontend/tests/legacy/query-tool-composables.test.js needs no
+  edits: it never exercises setActiveSubTab twice under identical filters for
+  useEquipmentQuery, and its useLotDetail.setActiveSubTab calls target
+  previously-unqueried tabs, so no assertion encodes the old always-requery
+  behavior.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/query-tool-subtab-cache/test-plan.md" }
+  - { type: tdd-pairs, pointer: "frontend/tests/query-tool/useLotEquipmentQuery.test.js → frontend/src/query-tool/composables/useLotEquipmentQuery.ts" }
+  - { type: tdd-pairs, pointer: "frontend/tests/query-tool/useEquipmentQuery.test.js (new) → frontend/src/query-tool/composables/useEquipmentQuery.ts" }
+  - { type: tdd-pairs, pointer: "frontend/tests/query-tool/useLotDetail.pagination.test.js → frontend/src/query-tool/composables/useLotDetail.ts (audit-pin only, no behavior change expected)" }
+  - { type: coverage-tiers, pointer: "unit (tier 3) only, per change-classification.md Required Tests" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-7 all mapped; AC-6 mapped to an audit/pin test since useLotDetail.ts already implements correct behavior" }

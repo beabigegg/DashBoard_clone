@@ -1,0 +1,23 @@
+change-id: query-tool-subtab-cache
+schema-version: 0.1.0
+generated-by: cdd-kit test run
+required-phases:
+  - collect
+  - targeted
+  - changed-area
+runs:
+  - phase: collect
+    status: passed
+    command: >-
+      cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js --reporter=verbose
+      --silent=false -- --listTests
+    summary: specs/changes/query-tool-subtab-cache/test-runs/20260709-110636/summary.json
+  - phase: targeted
+    status: passed
+    command: cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js
+    summary: specs/changes/query-tool-subtab-cache/test-runs/20260709-110643/summary.json
+  - phase: changed-area
+    status: passed
+    command: cd frontend && npx vitest run tests/query-tool tests/legacy/query-tool-composables.test.js && npx vue-tsc --noEmit
+    summary: specs/changes/query-tool-subtab-cache/test-runs/20260709-110649/summary.json
+final-status: passed

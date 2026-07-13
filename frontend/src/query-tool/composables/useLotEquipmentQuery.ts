@@ -365,6 +365,9 @@ export function useLotEquipmentQuery(initial: LotEquipmentQueryInitial = {}) {
 
   async function setActiveSubTab(tab: unknown): Promise<boolean> {
     activeSubTab.value = normalizeSubTab(tab);
+    if ((queried as Record<string, boolean>)[activeSubTab.value]) {
+      return true;
+    }
     if (resolvedEquipmentIds.value.length > 0) {
       return queryActiveSubTab();
     }

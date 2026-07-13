@@ -1,0 +1,28 @@
+change-id: query-tool-subtab-cache
+agent: qa-reviewer
+status: approved-with-risk
+summary: >
+  Verified (by reading the actual diff, not the agent-log summary) that the
+  cache-hit guard is confined to setActiveSubTab() only in both
+  useLotEquipmentQuery.ts and useEquipmentQuery.ts — no leak into
+  queryActiveSubTab()/queryLots()/queryJobs()/queryRejects(), so explicit
+  refresh and pagination (AC-5) correctly bypass the cache. Confirmed
+  invalidateQueryCache() resets all four queried.* flags generically via
+  Object.keys(emptyTabFlags()), not a hardcoded partial list. Confirmed
+  watch([startDate,endDate], ..., {flush:'sync'}) has no immediate:true (no
+  spurious mount-time reset) and is idempotent under double-fire. All AC-1
+  through AC-7 mapped to passing tests (29/29). test-evidence.yml final-status:
+  passed. Sole residual risk: the working tree commingles this change with a
+  sibling fix-equipment-lots-trim change (shared file
+  useLotEquipmentQuery.ts has hunks from both) — committer must hunk-stage
+  separately, not blanket-commit.
+artifacts:
+  - { type: gate-results, pointer: "vitest tests/query-tool + tests/legacy/query-tool-composables.test.js: 29/29 passed, vue-tsc clean" }
+  - { type: evidence-quality, pointer: "repro (re-ran suite + read diff directly)" }
+  - { type: decision, pointer: "approved-with-risk" }
+  - { type: failure-routing, pointer: "commingled working tree with fix-equipment-lots-trim -> committer hunk-staging required" }
+notes: >
+  Residual risk is a staging/hygiene item, not a code defect. Handled at
+  commit time by main Claude via careful hunk-level staging (git add -p /
+  git update-index), not a blocker for this change's own correctness.
+next-action: run-gate

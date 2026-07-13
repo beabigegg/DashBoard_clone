@@ -89,4 +89,58 @@ describe('useLotDetail pagination', () => {
     expect(latestMaterialsCall.payload.page).toBe(1);
     expect(latestMaterialsCall.payload.per_page).toBe(100);
   });
+
+  it('revisiting an already-loaded sub-tab issues no new lot-associations/lot-history POST (pins existing loaded.* gate as audit evidence)', async () => {
+    const postCalls = [];
+    setupWindowMesApi({
+      post: async (url, payload) => {
+        postCalls.push({ url, payload });
+
+        if (url === '/api/query-tool/lot-history') {
+          return {
+            data: {
+              data: [{ CONTAINERID: 'CID-001', EQUIPMENTID: 'EQ-01' }],
+              pagination: { page: 1, per_page: 25, total: 1, total_pages: 1 },
+              quality_meta: { status: 'complete', reasons: [] },
+            },
+          };
+        }
+
+        if (url === '/api/query-tool/lot-associations') {
+          const assocType = payload?.type;
+          return {
+            data: {
+              data: [{ TYPE: assocType }],
+              pagination: { page: 1, per_page: 25, total: 1, total_pages: 1 },
+              quality_meta: { status: 'complete', reasons: [] },
+            },
+          };
+        }
+
+        return { data: {} };
+      },
+    });
+
+    const countByUrlType = (url, type) => postCalls.filter(
+      (c) => c.url === url && (type === undefined || c.payload?.type === type),
+    ).length;
+
+    const detail = useLotDetail({ activeSubTab: 'materials' });
+    await detail.setSelectedContainerId('CID-001');
+    expect(countByUrlType('/api/query-tool/lot-associations', 'materials')).toBe(1);
+
+    // Revisiting the already-loaded 'materials' sub-tab must not issue a new
+    // lot-associations POST — this pins useLotDetail.ts's existing loaded.*
+    // gate (loadAssociation only skips when !force && loaded[tab]).
+    await detail.setActiveSubTab('materials');
+    expect(countByUrlType('/api/query-tool/lot-associations', 'materials')).toBe(1);
+
+    // Same pattern for the 'history' sub-tab (and its holds/materials marker
+    // fan-out), which gates through loadHistory()'s loaded.history check.
+    await detail.setActiveSubTab('history');
+    expect(countByUrlType('/api/query-tool/lot-history')).toBe(1);
+
+    await detail.setActiveSubTab('history');
+    expect(countByUrlType('/api/query-tool/lot-history')).toBe(1);
+  });
 });

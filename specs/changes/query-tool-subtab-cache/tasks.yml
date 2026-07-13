@@ -1,0 +1,42 @@
+change-id: query-tool-subtab-cache
+status: in-progress
+tier: 3
+tier-floor-override: "keyword scan matched 'query'/'cache' from composable filenames (useLotEquipmentQuery.ts, useEquipmentQuery.ts) and the change-id itself, not a new API/data-shape/queue/external-integration surface — this is in-memory reuse of already-fetched Vue refs within the live page session, no new caching infrastructure, no new endpoint, no persistent/cross-session storage; see change-classification.md Clarifications"
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done, note: "zero contracts touched — confirmed by classifier and independently by ci-cd-gatekeeper's workflow path-filter analysis; contract-reviewer not required" }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: skipped, note: "no architecture review required per classifier" }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done, note: "ci-gates.md written; existing frontend-tests + contract-driven-gates workflows fully cover this change's surface, no new workflow needed" }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: skipped, note: "no endpoint/request/response change — same routes called fewer times, purely client-side caching" }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: skipped, note: "no CSS/UI contract affected" }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: skipped, note: "no env contract affected" }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: skipped, note: "cached payloads are the existing response shapes, unchanged" }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: skipped, note: "no business rule change, client-side caching only" }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: skipped, note: "no CI/CD contract affected" }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done, note: "6 new tests in useLotEquipmentQuery.test.js, 7 new in useEquipmentQuery.test.js (new file), 1 pinning test in useLotDetail.pagination.test.js; 29/29 in targeted files, 799/801 full suite (2 pre-existing skips)" }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: skipped, note: "no backend/API surface, pure frontend client-side change" }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: skipped, note: "optional strengthening only per classifier; unit-level call-count assertions are primary coverage" }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: skipped, note: "not applicable — cache-hit/invalidation logic, not boundary-value testing" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: skipped, note: "no new load surface, reduces server load if anything" }
+  - { id: "4.1", section: Implementation, title: "Backend", status: skipped, note: "pure frontend change, no backend implementation" }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done, note: "cache-hit guard added to setActiveSubTab() in both useLotEquipmentQuery.ts and useEquipmentQuery.ts; new invalidateQueryCache() + date-range watch wired into useEquipmentQuery.ts; guard confined to setActiveSubTab only (explicit refresh/pagination bypass preserved, AC-5); vitest + vue-tsc green" }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: skipped, note: "no env/deploy change" }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: skipped, note: "no CI/CD workflow change" }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: skipped, note: "no UI/visual change, client-side caching logic only" }
+  - { id: "5.2", section: Review, title: "Visual review", status: skipped, note: "no UI/visual change, client-side caching logic only" }
+  - { id: "5.3", section: Review, title: "Contract review", status: skipped, note: "zero contracts touched per classifier" }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk (staging hygiene only, not a code defect), see agent-log/qa-reviewer.yml" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done, note: "cdd-kit gate query-tool-subtab-cache passed (tier-floor-override correctly recognized and audited)" }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: pending }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: pending }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: pending }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

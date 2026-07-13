@@ -1,0 +1,14 @@
+- type: tier-floor-override
+  change-id: query-tool-subtab-cache
+  timestamp: '2026-07-09T03:12:48.807Z'
+  declared-tier: 3
+  floor-tier: 2
+  label: behavioral surface (api / data shape / queue / cache / external integration)
+  matched:
+    - query
+  reason: >-
+    keyword scan matched 'query'/'cache' from composable filenames (useLotEquipmentQuery.ts,
+    useEquipmentQuery.ts) and the change-id itself, not a new
+    API/data-shape/queue/external-integration surface — this is in-memory reuse of already-fetched
+    Vue refs within the live page session, no new caching infrastructure, no new endpoint, no
+    persistent/cross-session storage; see change-classification.md Clarifications

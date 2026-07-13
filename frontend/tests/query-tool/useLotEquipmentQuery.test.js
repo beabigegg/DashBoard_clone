@@ -233,4 +233,140 @@ describe('useLotEquipmentQuery', () => {
     expect(query.lotsRows.value).toHaveLength(1);
     expect(query.lotsRows.value[0].CONTAINERNAME).toBe('ga25081329-a01   ');
   });
+
+  function makeCountingEquipmentPeriodHandler(postCalls) {
+    return async (url, payload) => {
+      postCalls.push({ url, payload });
+
+      if (url === LOOKUP_URL) {
+        return makeLookupResponse();
+      }
+
+      if (url === EQUIPMENT_PERIOD_URL) {
+        const type = payload?.query_type;
+        const seq = postCalls.filter(
+          (c) => c.url === EQUIPMENT_PERIOD_URL && c.payload?.query_type === type,
+        ).length;
+        // CONTAINERNAME/CONTAINERNAMES must exactly match (lots/rejects) or
+        // substring-match (jobs) the resolved lot name from makeLookupResponse()
+        // so the composable's own row filtering doesn't drop the row; SEQ is
+        // the differentiator proving "replaces previously cached rows".
+        return {
+          data: {
+            data: [{
+              CONTAINERNAME: 'GA25081329-A01',
+              CONTAINERNAMES: 'GA25081329-A01',
+              EQUIPMENTID: 'EQ-01',
+              SEQ: seq,
+            }],
+          },
+        };
+      }
+
+      return { data: {} };
+    };
+  }
+
+  function countByType(postCalls, queryType) {
+    return postCalls.filter(
+      (c) => c.url === EQUIPMENT_PERIOD_URL && c.payload?.query_type === queryType,
+    ).length;
+  }
+
+  async function setupLookedUpQuery(postCalls, { activeSubTab = 'lots' } = {}) {
+    setupWindowMesApi({ post: makeCountingEquipmentPeriodHandler(postCalls) });
+    const query = useLotEquipmentQuery({ activeSubTab });
+    query.inputType.value = 'lot_id';
+    query.inputText.value = 'GA25081329-A01';
+    query.selectedWorkcenterGroups.value = ['GROUP-A'];
+    await query.lookupEquipment();
+    return query;
+  }
+
+  it('setActiveSubTab reuses cached lots rows without a new equipment-period POST on same-filter revisit', async () => {
+    const postCalls = [];
+    const query = await setupLookedUpQuery(postCalls, { activeSubTab: 'lots' });
+
+    // lookupEquipment() auto-queried 'lots' already.
+    expect(countByType(postCalls, 'lots')).toBe(1);
+
+    await query.setActiveSubTab('lots');
+    expect(countByType(postCalls, 'lots')).toBe(1);
+  });
+
+  it('cycling lots→jobs→rejects→lots issues exactly one equipment-period call per query_type', async () => {
+    const postCalls = [];
+    const query = await setupLookedUpQuery(postCalls, { activeSubTab: 'lots' });
+
+    await query.setActiveSubTab('jobs');
+    await query.setActiveSubTab('rejects');
+    await query.setActiveSubTab('lots');
+
+    expect(countByType(postCalls, 'lots')).toBe(1);
+    expect(countByType(postCalls, 'jobs')).toBe(1);
+    expect(countByType(postCalls, 'rejects')).toBe(1);
+  });
+
+  it('re-running lookupEquipment with a changed input/workcenter-group set resets queried.* before auto-query', async () => {
+    const postCalls = [];
+    const query = await setupLookedUpQuery(postCalls, { activeSubTab: 'lots' });
+
+    await query.setActiveSubTab('jobs');
+    await query.setActiveSubTab('rejects');
+    await query.setActiveSubTab('lots');
+    expect(query.queried.lots).toBe(true);
+    expect(query.queried.jobs).toBe(true);
+    expect(query.queried.rejects).toBe(true);
+
+    query.inputText.value = 'GA25081329-A02';
+    query.selectedWorkcenterGroups.value = ['GROUP-B'];
+    await query.lookupEquipment();
+
+    // Auto-query re-populates only the active tab ('lots'); jobs/rejects
+    // must come back false, never a stale-true carried over from before.
+    expect(query.queried.lots).toBe(true);
+    expect(query.queried.jobs).toBe(false);
+    expect(query.queried.rejects).toBe(false);
+  });
+
+  it('entering a sub-tab after re-lookup re-queries and replaces previously cached rows', async () => {
+    const postCalls = [];
+    const query = await setupLookedUpQuery(postCalls, { activeSubTab: 'jobs' });
+    const firstJobsRows = query.jobsRows.value;
+    expect(firstJobsRows).toHaveLength(1);
+
+    query.inputText.value = 'GA25081329-A02';
+    query.selectedWorkcenterGroups.value = ['GROUP-B'];
+    await query.lookupEquipment();
+
+    await query.setActiveSubTab('jobs');
+
+    expect(countByType(postCalls, 'jobs')).toBe(2);
+    expect(query.jobsRows.value).not.toEqual(firstJobsRows);
+  });
+
+  it('explicit refresh re-queries the active sub-tab even when filters and queried flag are unchanged', async () => {
+    const postCalls = [];
+    const query = await setupLookedUpQuery(postCalls, { activeSubTab: 'lots' });
+
+    expect(countByType(postCalls, 'lots')).toBe(1);
+
+    // Explicit refresh bypasses the setActiveSubTab guard by design (AC-5).
+    await query.queryActiveSubTab();
+    expect(countByType(postCalls, 'lots')).toBe(2);
+
+    await query.queryLots();
+    expect(countByType(postCalls, 'lots')).toBe(3);
+  });
+
+  it('queried.lots/jobs/rejects are the sole cache-hit signal: forcing queried.<tab>=false directly causes the next setActiveSubTab to re-query', async () => {
+    const postCalls = [];
+    const query = await setupLookedUpQuery(postCalls, { activeSubTab: 'lots' });
+
+    expect(countByType(postCalls, 'lots')).toBe(1);
+
+    query.queried.lots = false;
+    await query.setActiveSubTab('lots');
+    expect(countByType(postCalls, 'lots')).toBe(2);
+  });
 });
