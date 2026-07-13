@@ -6,5 +6,225 @@
   ".claude/hooks/pre-tool-use-design-write.sh": {
     "version": "3.13.1",
     "digest": "98f099c82a4896b87a6be8418e8a59eada74a4fa82ea0b6556bbf4e8aab2786c"
+  },
+  ".cdd/approval-policy.yml": {
+    "version": "3.13.1",
+    "digest": "c82d4e7f7db43267e36242e58b0c728bd1127ff09fa98fc9467c8782414b2c89"
+  },
+  ".cdd/policy.yml": {
+    "version": "3.13.1",
+    "digest": "750bf491b724fde1c56982ae200a6588c8aba22d8af9f8afe4f859e0cee51c00"
+  },
+  "AGENTS.md": {
+    "version": "3.13.1",
+    "digest": "7a51031b49acaa2af649ab745ca4e934268dd9f4530b4af3d5690d3115fbb6a7"
+  },
+  "specs/templates/acceptance-driver/README.md": {
+    "version": "3.13.1",
+    "digest": "eacc3a48576bba014285038cc2d9672ac0eb8c0a42d35cf8bbf23ba36f6d4419"
+  },
+  "specs/templates/acceptance-driver/acceptance.loader.ts": {
+    "version": "3.13.1",
+    "digest": "fa9e6b2d04eac9840ce58cf10d60034b06ae83dec6e591892ac565cba0bb6399"
+  },
+  "specs/templates/acceptance-driver/acceptance_loader.py": {
+    "version": "3.13.1",
+    "digest": "460fac4789cdea63d27fdd4a4baf01278367d45dfd7e97016eb0bf0a4ee8a50a"
+  },
+  "specs/templates/acceptance.yml": {
+    "version": "3.13.1",
+    "digest": "579c29fe92a95f44cba2159309ce87a8bd4d4dad3bffc12828d72249683a69ca"
+  },
+  "specs/templates/archive.md": {
+    "version": "3.13.1",
+    "digest": "ff95eb3fc0f0b128657185f56b15cc99f31338f5a250fa302f1efe2cfd2e7ed4"
+  },
+  "specs/templates/change-classification.md": {
+    "version": "3.13.1",
+    "digest": "b52ee53f7378bf9d9abb53d0c92276f64ee910afc6c99fd512d701fb758d1a26"
+  },
+  "specs/templates/change-request.md": {
+    "version": "3.13.1",
+    "digest": "0bcc415f9e790452fea789df62dec7efc4d0b12c0771f48ede30447920f7f38d"
+  },
+  "specs/templates/ci-gates.md": {
+    "version": "3.13.1",
+    "digest": "7393a19edbb5edd59ae81d61794a57c78652987968c9dbb511f3d0548a241202"
+  },
+  "specs/templates/context-manifest.md": {
+    "version": "3.13.1",
+    "digest": "1c8e043cdf963076ff69817d8dbf2e7b1a72a6845d50146215b4dd6b2b96208c"
+  },
+  "specs/templates/contracts.md": {
+    "version": "3.13.1",
+    "digest": "c2cb3c44a07bccadc51aa8263d420ba5f6f898a5a61a7d990a660fea2dd720f5"
+  },
+  "specs/templates/current-behavior.md": {
+    "version": "3.13.1",
+    "digest": "f70b26294e1a6e1f6d88970aee1736ee1cc1a2c4ffaea77465be6ab0abb474aa"
+  },
+  "specs/templates/design.md": {
+    "version": "3.13.1",
+    "digest": "6538ebc6b533ce31f6e346c724d8e4a1fbd21acef9851fd99da11205a3c28dad"
+  },
+  "specs/templates/implementation-plan.md": {
+    "version": "3.13.1",
+    "digest": "46a1ac55253b3c27e9f8238655aa9a3de249e3faf4e3de01b8cc9a3a82c8c268"
+  },
+  "specs/templates/interaction-design.md": {
+    "version": "3.13.1",
+    "digest": "eabea55bb4454827025eb702e3c5b6f1e2244b924d40d7d3e7b53396eccd628f"
+  },
+  "specs/templates/monkey-test-report.md": {
+    "version": "3.13.1",
+    "digest": "abad117741d3e46bd278fd7c38b8d36144701717915ff1a0449a621eaaf93fce"
+  },
+  "specs/templates/project-profile.md": {
+    "version": "3.13.1",
+    "digest": "9713cedd32a3180a023ba85ae43aaefffec0dd225cc913b216b77ceb63d4a337"
+  },
+  "specs/templates/proposal.md": {
+    "version": "3.13.1",
+    "digest": "9f7c2f7a200d8a2abeac5893326df3fb38e09a501664cc10878b5812b08ecf3f"
+  },
+  "specs/templates/qa-report.md": {
+    "version": "3.13.1",
+    "digest": "177549570aaca5d7b7400f374d1e376f6d635dd0157b9bd00ad4c138be2ad047"
+  },
+  "specs/templates/regression-report.md": {
+    "version": "3.13.1",
+    "digest": "6decb184a3102b6d51500fa957caef2d59dc0753bac22f757decf58d486c9130"
+  },
+  "specs/templates/spec.md": {
+    "version": "3.13.1",
+    "digest": "8ae5fa962f3397c7837cb1da1945ba7116ac0d0c59f86b222121b46a3679a16d"
+  },
+  "specs/templates/stress-soak-report.md": {
+    "version": "3.13.1",
+    "digest": "33a9bb33dc55f1d79fe196c8294914c6c136e68aff3f96bc71e7caaac7bf17c8"
+  },
+  "specs/templates/tasks.yml": {
+    "version": "3.13.1",
+    "digest": "bf017ea22c3e99a3de0b72c2b45316c60a4a6f18464d5dfe50bf443a07a9baeb"
+  },
+  "specs/templates/test-evidence.yml": {
+    "version": "3.13.1",
+    "digest": "db2a726b8cd31979dfee95a7bcc5cb73d95d6873bbc49bf809d6ac6612c66f3e"
+  },
+  "specs/templates/test-plan.md": {
+    "version": "3.13.1",
+    "digest": "691060440e67b527639240d024a908c2a26e0e43b33f233ac63f5e0fe4f93f53"
+  },
+  "specs/templates/visual-review-report.md": {
+    "version": "3.13.1",
+    "digest": "dd67a6192c5b775e1737bf05525128cd6f3cbdf76347ca974e2d9c1a3a8a7b81"
+  },
+  "tests/templates/data-boundary/malformed-data.spec.md": {
+    "version": "3.13.1",
+    "digest": "7774b447e70e8ded4ed91dc40972797db9c5aa7ecc8a25a3ac39235e917b2db9"
+  },
+  "tests/templates/e2e/critical-journey.spec.md": {
+    "version": "3.13.1",
+    "digest": "8333292823118671943704c19b23cf9b2ebac787438bf11e1ef53fafef74c74e"
+  },
+  "tests/templates/monkey/operation-sequence.spec.md": {
+    "version": "3.13.1",
+    "digest": "e7c01be5b2a796c4f4e666c47cf51e8623fb467b1cf34204e995b71105fe8ba3"
+  },
+  "tests/templates/resilience/api-failure.spec.md": {
+    "version": "3.13.1",
+    "digest": "fd46387024e0cd8c77a1f11664a0869a4b89b95d1ccd73de3bf5b271d610f8b2"
+  },
+  "tests/templates/soak/k6-example.js": {
+    "version": "3.13.1",
+    "digest": "077f42104eacc4ffa99cf604b3dab37fd3366cfba589c17a49495eb9f0b16590"
+  },
+  "tests/templates/soak/locust-example.py": {
+    "version": "3.13.1",
+    "digest": "8b9a1b0f42ec8474bf5011c129f912a358b92d851f41b7a71255570b66a54c4b"
+  },
+  "tests/templates/soak/soak-profile.md": {
+    "version": "3.13.1",
+    "digest": "7e5ae6ca1f7226d0daa9158d597b7846bb218eef95c30c92aff49472b66f853e"
+  },
+  "tests/templates/stress/artillery-example.yml": {
+    "version": "3.13.1",
+    "digest": "534356056b89eda557624c5b479185d37e71b3e08cbc7cdcb348307209495878"
+  },
+  "tests/templates/stress/k6-example.js": {
+    "version": "3.13.1",
+    "digest": "03725a27b1854b73484a46378251d6f4f43cbfb52f5283644fc8943685a68e61"
+  },
+  "tests/templates/stress/load-profile.md": {
+    "version": "3.13.1",
+    "digest": "92113d3f6bfac7f9d4071d8429363be0387651d9960669425695e7f5e33c058f"
+  },
+  "tests/templates/stress/locust-example.py": {
+    "version": "3.13.1",
+    "digest": "5af7816e15a8c52fa517f2059615024009c23af4a558eedad43ed633e454b2a5"
+  },
+  "tests/contract/README.md": {
+    "version": "3.13.1",
+    "digest": "262515d526d591fb7b9e6a79732a5932b693d98ee1a956d212f4f12591ae06e6"
+  },
+  "tests/contract/response-samples.example.json": {
+    "version": "3.13.1",
+    "digest": "def4e438dca759f3885faa56784c2d92a0d5ae61550386b5bdb97ecdca4b1021"
+  },
+  "tests/contract/samples/.gitkeep": {
+    "version": "3.13.1",
+    "digest": "e528d9b4eff231e9ae137200aa52f49f5f595a2ac5ad79bac25a5b40d83edd01"
+  },
+  "ci-templates/bun.yml": {
+    "version": "3.13.1",
+    "digest": "edef7fa4bbb69fe88547c3f644975c087efcd4f8f080a9ec28a07a36af567bff"
+  },
+  "ci-templates/conda.yml": {
+    "version": "3.13.1",
+    "digest": "706e506e41db482e9bff890c61d1a2345ec6ccce38f6b4f7976997d8dd6645b4"
+  },
+  "ci-templates/npm.yml": {
+    "version": "3.13.1",
+    "digest": "35b13d54ce0eea8e3ebf74a4fdd03bceb1f8d1dcff5a152562535611fd7a7d67"
+  },
+  "ci-templates/pip.yml": {
+    "version": "3.13.1",
+    "digest": "314861716ee3600c2fe57e0c04611e9d7ed6b7c97cbb4150848d9de235d09b11"
+  },
+  "ci-templates/pnpm.yml": {
+    "version": "3.13.1",
+    "digest": "7b888c73cc139b5430a084b51e1b5ab4bd0965133da42f1e14236108bb214806"
+  },
+  "ci-templates/poetry.yml": {
+    "version": "3.13.1",
+    "digest": "4632e41a7353122613ba6a40bcf3e2d8d596ecc48e3ec267d591928f5fce16c1"
+  },
+  "ci-templates/unknown.yml": {
+    "version": "3.13.1",
+    "digest": "2599944125a937480181374f7a7dc10943b150c7b8aad5f1bac3364d1fd30458"
+  },
+  "ci-templates/uv.yml": {
+    "version": "3.13.1",
+    "digest": "5e9ca76edc2bec465f4998ccdf0d929e64f60384786505b4212ec7b6bb40c85b"
+  },
+  "ci-templates/yarn.yml": {
+    "version": "3.13.1",
+    "digest": "3f5f48bf9abf3cd683dd9da422420a66e028a3d25c516e0640575185da3d92d1"
+  },
+  ".github/workflows/contract-driven-gates.yml": {
+    "version": "3.13.1",
+    "digest": "7f07458a79abc8576cdda25764bbb9f7cf1e7b037b14d34a1b3a450471085a66"
+  },
+  ".claude/hooks/pre-tool-use-graph-first.sh": {
+    "version": "3.13.1",
+    "digest": "27cf811622d98f69708d4f6e6dfd03cd3b4088b001e7a1b526f2d392fcef79e1"
+  },
+  ".claude/hooks/pre-tool-use-contract-write.sh": {
+    "version": "3.13.1",
+    "digest": "ed20a899d83e547573e2583fb21ebef54811b16e58db2e38c01525da38ae7258"
+  },
+  ".claude/hooks/pre-tool-use-test-runner.sh": {
+    "version": "3.13.1",
+    "digest": "5905a67ebb839f377b02ad311da0afcf87051a807ca346ae198e4cb76075065e"
   }
 }

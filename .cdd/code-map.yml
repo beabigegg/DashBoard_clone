@@ -1,6 +1,6 @@
-# generated: 2026-07-09T02:48:50Z by cdd-kit 3.6.0
-# files: 1023, src-lines: 317998, map-lines: 22752, compression: 14.0x
-# sources-digest: 3ba9db45cded2c13afb06023499772b0462872c4f86beb869e74036cf96c8e1f
+# generated: 2026-07-13T04:27:59Z by cdd-kit 3.13.1
+# files: 1024, src-lines: 318395, map-lines: 22763, compression: 14.0x
+# sources-digest: 902c760cc912657f801514a4f49551a1fc6cbb748f2f04b468329317af164354
 frontend/playwright.config.js:  # 48 lines
   imports:
     - { module: '@playwright/test', items: [defineConfig, devices], line: 1 }
@@ -1851,9 +1851,9 @@ frontend/src/query-tool/components/QueryBar.vue:  # 114 lines
 
 frontend/src/query-tool/components/SerialReverseTraceView.vue:  # 424 lines
 
-frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 422 lines
+frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 438 lines
   imports:
-    - { module: vue, items: [computed, reactive, ref], line: 1 }
+    - { module: vue, items: [computed, reactive, ref, watch], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
     - { module: '../../shared-composables/useAsyncJobPolling', items: [pollJobUntilComplete], line: 4 }
     - { module: '../utils/csv', items: [exportCsv], line: 5 }
@@ -1866,7 +1866,7 @@ frontend/src/query-tool/composables/useEquipmentQuery.ts:  # 422 lines
     - { name: normalizeSubTab, lines: 31-34 }
     - { name: defaultDateRange, lines: 36-44 }
     - { name: emptyTabFlags, lines: 46-53 }
-    - { name: useEquipmentQuery, lines: 55-422 }
+    - { name: useEquipmentQuery, lines: 55-438 }
   interfaces:
     - { name: EquipmentItem, lines: 8-11 }  # local
     - { name: Pagination, lines: 13-18 }  # local
@@ -1901,7 +1901,7 @@ frontend/src/query-tool/composables/useLotDetail.ts:  # 594 lines
     - { name: QualityMeta, lines: 14-17 }  # local
     - { name: LotDetailInitial, lines: 19-23 }  # local
 
-frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 469 lines
+frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 472 lines
   imports:
     - { module: vue, items: [computed, reactive, ref], line: 1 }
     - { module: '../../core/api', items: [apiGet, apiPost, ensureMesApiAvailable], line: 3 }
@@ -1917,7 +1917,7 @@ frontend/src/query-tool/composables/useLotEquipmentQuery.ts:  # 469 lines
   functions:
     - { name: normalizeSubTab, lines: 25-28 }
     - { name: normalizeInputType, lines: 30-33 }
-    - { name: useLotEquipmentQuery, lines: 35-469 }
+    - { name: useLotEquipmentQuery, lines: 35-472 }
   interfaces:
     - { name: LotEquipmentQueryInitial, lines: 8-13 }  # local
 
@@ -3840,14 +3840,25 @@ frontend/tests/query-tool/EquipmentRejectsTable.test.js:  # 129 lines
     - { module: '@vue/test-utils', items: [shallowMount], line: 15 }
     - { module: '../../src/query-tool/components/EquipmentRejectsTable.vue', items: ['default:EquipmentRejectsTable'], line: 38 }
 
-frontend/tests/query-tool/useLotDetail.pagination.test.js:  # 92 lines
+frontend/tests/query-tool/useEquipmentQuery.test.js:  # 188 lines
+  imports:
+    - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
+    - { module: '../../src/query-tool/composables/useEquipmentQuery.ts', items: [useEquipmentQuery], line: 8 }
+  constants:
+    - { name: EQUIPMENT_PERIOD_URL, line: 27 }
+  functions:
+    - { name: setupWindowMesApi, lines: 13-25 }
+    - { name: makeEquipmentPeriodHandler, lines: 29-42 }
+    - { name: countByType, lines: 44-48 }
+
+frontend/tests/query-tool/useLotDetail.pagination.test.js:  # 146 lines
   imports:
     - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
     - { module: '../../src/query-tool/composables/useLotDetail.js', items: [useLotDetail], line: 3 }
   functions:
     - { name: setupWindowMesApi, lines: 7-19 }
 
-frontend/tests/query-tool/useLotEquipmentQuery.test.js:  # 236 lines
+frontend/tests/query-tool/useLotEquipmentQuery.test.js:  # 372 lines
   imports:
     - { module: vitest, items: [afterEach, beforeEach, describe, expect, it, vi], line: 1 }
     - { module: '../../src/query-tool/composables/useLotEquipmentQuery.ts', items: [useLotEquipmentQuery], line: 8 }

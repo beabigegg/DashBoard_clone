@@ -3,8 +3,8 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 193
-visible-files: 1017
+visible-dirs: 194
+visible-files: 1036
 omitted-dirs: 67
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
@@ -33,12 +33,15 @@ Use this deterministic map to choose candidate context paths before reading file
 ```
 DashBoard_clone/
 |-- .cdd/
+|   |-- approval-policy.yml
+|   |-- asset-manifest.json
 |   |-- code-graph.index.json
 |   |-- code-map.index.json
 |   |-- code-map.yml
 |   |-- conformance.json
 |   |-- context-policy.json
 |   |-- model-policy.json
+|   |-- policy.yml
 |   \-- tier-policy.json
 |-- .github/
 |   \-- workflows/
@@ -626,6 +629,7 @@ DashBoard_clone/
 |   |   |-- query-tool/
 |   |   |   |-- App.url-state.test.js
 |   |   |   |-- EquipmentRejectsTable.test.js
+|   |   |   |-- useEquipmentQuery.test.js
 |   |   |   |-- useLotDetail.pagination.test.js
 |   |   |   \-- useLotEquipmentQuery.test.js
 |   |   |-- resource-status/
@@ -663,26 +667,35 @@ DashBoard_clone/
 |-- logs/
 |   |-- archive/
 |   |   |-- access_20260709_104124.log
+|   |   |-- access_20260709_113337.log
 |   |   |-- error_20260709_104124.log
+|   |   |-- error_20260709_113337.log
 |   |   |-- rq_downtime_worker_20260709_104124.log
+|   |   |-- rq_downtime_worker_20260709_113337.log
 |   |   |-- rq_eap_alarm_worker_20260709_104124.log
+|   |   |-- rq_eap_alarm_worker_20260709_113337.log
 |   |   |-- rq_hold_hist_worker_20260709_104124.log
+|   |   |-- rq_hold_hist_worker_20260709_113337.log
 |   |   |-- rq_msd_worker_20260709_104124.log
+|   |   |-- rq_msd_worker_20260709_113337.log
 |   |   |-- rq_prod_hist_worker_20260709_104124.log
+|   |   |-- rq_prod_hist_worker_20260709_113337.log
 |   |   |-- rq_reject_worker_20260709_104124.log
+|   |   |-- rq_reject_worker_20260709_113337.log
 |   |   |-- rq_resource_worker_20260709_104124.log
+|   |   |-- rq_resource_worker_20260709_113337.log
 |   |   |-- rq_warmup_worker_20260709_104124.log
+|   |   |-- rq_warmup_worker_20260709_113337.log
 |   |   |-- rq_worker_20260709_104124.log
+|   |   |-- rq_worker_20260709_113337.log
 |   |   |-- rq_yield_alert_worker_20260709_104124.log
-|   |   \-- watchdog_20260709_104124.log
+|   |   |-- rq_yield_alert_worker_20260709_113337.log
+|   |   |-- watchdog_20260709_104124.log
+|   |   \-- watchdog_20260709_113337.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
-|   |-- admin_logs.sqlite-shm
-|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
-|   |-- login_sessions.sqlite-shm
-|   |-- login_sessions.sqlite-wal
 |   |-- metrics_history.sqlite
 |   |-- metrics_history.sqlite-shm
 |   |-- metrics_history.sqlite-wal
@@ -723,6 +736,11 @@ DashBoard_clone/
 |   |   |-- contracts-index.md
 |   |   \-- project-map.md
 |   \-- templates/
+|       |-- acceptance-driver/
+|       |   |-- acceptance_loader.py
+|       |   |-- acceptance.loader.ts
+|       |   \-- README.md
+|       |-- acceptance.yml
 |       |-- archive.md
 |       |-- change-classification.md
 |       |-- change-request.md
@@ -732,6 +750,7 @@ DashBoard_clone/
 |       |-- current-behavior.md
 |       |-- design.md
 |       |-- implementation-plan.md
+|       |-- interaction-design.md
 |       |-- monkey-test-report.md
 |       |-- project-profile.md
 |       |-- proposal.md
@@ -1272,7 +1291,7 @@ DashBoard_clone/
 |   |   |-- probe_1557236.json
 |   |   |-- probe_1564989.json
 |   |   |-- probe_1565010.json
-|   |   \-- ... (106 more entries truncated; cap=50)
+|   |   \-- ... (108 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
 |   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
@@ -1297,6 +1316,7 @@ DashBoard_clone/
 |-- .env.example
 |-- .env.prd
 |-- .gitignore
+|-- AGENTS.md
 |-- Check.md
 |-- CLAUDE.md
 |-- docker-compose.prd.yml

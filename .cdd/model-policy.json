@@ -1,6 +1,6 @@
 {
   "provider": "claude",
-  "generated_at": "2026-06-13T04:05:41.595Z",
+  "generated_at": "2026-07-13T04:27:57.643Z",
   "schema-version": "0.2.0",
   "roles": {
     "backend-engineer": "sonnet",
@@ -12,6 +12,7 @@
     "e2e-resilience-engineer": "sonnet",
     "frontend-engineer": "sonnet",
     "implementation-planner": "opus",
+    "interaction-designer": "opus",
     "monkey-test-engineer": "sonnet",
     "qa-reviewer": "opus",
     "repo-context-scanner": "haiku",
