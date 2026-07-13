@@ -1,0 +1,1 @@
+cd frontend && npx vitest run && node --experimental-strip-types --experimental-loader ./scripts/ts-resolver-loader.mjs --test tests/legacy/portal-shell-navigation.test.js

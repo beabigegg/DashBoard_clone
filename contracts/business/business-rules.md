@@ -3,8 +3,8 @@ contract: business
 summary: Business decision tables, rule inventory, and change policy for behavior updates.
 owner: application-team
 surface: domain-behavior
-schema-version: 1.45.0
-last-changed: 2026-07-08
+schema-version: 1.46.0
+last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -341,6 +341,11 @@ breaking-change-policy: deprecate-2-minors
 | Production Achievement query: canonical spool `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` hit | HTTP 200 with `spool_download_url`/`spec_workcenter_map`/`targets_map` injected inline (unconditional, not row-count-gated) | PA-08 | route tests |
 | Production Achievement query: spool miss + `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB=on` + worker available | HTTP 202 async job (`ProductionAchievementJob`, `always_async=True`) | PA-08, ASYNC-06 | route tests |
 | Production Achievement query: spool miss + worker unavailable (incl. `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB=off`) | HTTP 503 SERVICE_UNAVAILABLE; no sync fallback (clean pre-launch replacement — no legacy path exists) | PA-08, ASYNC-06 | resilience tests |
+| UPH Performance query: coarse spool key hit | HTTP 200 `{async:false, query_id}` | UPH-ASYNC | route tests |
+| UPH Performance query: spool miss + `UPH_PERFORMANCE_USE_UNIFIED_JOB=on` + worker available | HTTP 202 async job (`UphPerformanceJob`) | UPH-ASYNC, ASYNC-06 | route tests |
+| UPH Performance query: spool miss + worker unavailable (incl. flag `off`) | HTTP 503 `SERVICE_UNAVAILABLE`; no sync fallback | UPH-ASYNC, ASYNC-06 | resilience tests |
+| UPH Performance: `families[]` value outside `{GDBA, GWBA}` | HTTP 400 `VALIDATION_ERROR` | UPH-02 | route tests |
+| UPH Performance: `BondUPH`/`fHCM_UPH` return zero rows for the requested window | Empty result set; UI EmptyState, not an error | UPH-03, data-shape §Invalid Data Behavior | data-boundary tests |
 
 ## Material Consumption Rules
 
@@ -423,6 +428,17 @@ breaking-change-policy: deprecate-2-minors
 | 7 | 品質 |
 | 64 | 繼續錯誤 |
 | _any other_ | 未知 |
+
+## UPH PERFORMANCE Rules
+
+| rule id | name | current behavior | tests |
+|---|---|---|---|
+| UPH-01 | LAST_UPDATE_TIME mandatory index filter + narrow-window chunking | Every Oracle query against `DWH.EAP_EVENT` for UPH data MUST include `LAST_UPDATE_TIME BETWEEN :date_from AND :date_to` (index-driven; mirrors EA-03). The Oracle-phase query is ALWAYS time-chunked into ≤6h windows (`BaseChunkedDuckDBJob`, `chunk_strategy=TIME`) — a single unchunked query over the full requested range is forbidden. Rationale: the `EAP_EVENT_DETAIL` JOIN for this table has previously timed out at >180s over a 24h window (docs/architecture/eap-event-uph-collection-investigation.md). Missing or unbounded `LAST_UPDATE_TIME` → 400 `VALIDATION_ERROR`. | unit + integration tests |
+| UPH-02 | Equipment family scope — GDBA/GWBA only | UPH queries are restricted to `EQUIPMENT_ID LIKE 'GDBA%'` (Die Bond) and `EQUIPMENT_ID LIKE 'GWBA%'` (Wire Bond) exclusively. `GWBK`, `GWMT`, `GPTA`, and any other equipment family are explicitly OUT OF SCOPE — no UPH parameter signal is currently configured for them in EAP. A `families[]` value outside `{GDBA, GWBA}` → 400 `VALIDATION_ERROR`. Extending coverage to other families (e.g. deriving throughput from `DW_MES_HM_LOTMOVEOUT`) is a non-goal of this change and requires a separate future change. | unit + route tests |
+| UPH-03 | Family-conditional PARAMETER_NAME mapping | `EAP_EVENT_DETAIL.PARAMETER_NAME` selected by the equipment's family prefix is FIXED and MUST NOT be swapped: `GDBA` → `BondUPH`; `GWBA` → `fHCM_UPH`. Both parameter names were recently reconfigured on the equipment side by the requesting engineer and confirmed correct (2026-07) — they intentionally do not match the parameter names observed in the earlier read-only investigation (e.g. `UPHBonded`), so implementers MUST NOT "correct" them back. A narrow-window (≤6h) exploratory query verifying non-empty return for both parameters is a required pre-build step (see design.md / docs/architecture/eap-event-uph-collection-investigation.md). | unit tests; pre-build exploratory query (manual, one-time) |
+| UPH-04 | Raw UPH value — no scale conversion | `EAP_EVENT_DETAIL.PARAMETER_VALUE` for the family-selected `PARAMETER_NAME` is used AS-IS for the UPH figure. NO scale conversion (e.g. `× 100`, `÷ 100`) is applied at any layer (Oracle, worker, API, or frontend). This is an explicit, deliberate product decision made by the requesting user — NOT an oversight or a pending TODO. A future engineer MUST NOT silently introduce a scale-conversion "fix" without a new contract change and explicit product sign-off. | unit tests (`test_uph_value_no_scale_conversion`) |
+| UPH-05 | DB/WB classification via workcenter_groups (not equipment-ID prefix enumeration) | The Die-Bond/Wire-Bond (`焊接_DB`/`焊接_WB`) label attached to each row MUST be derived by bridging `EQUIPMENT_ID` → `DW_MES_RESOURCE.RESOURCENAME` (`OBJECTCATEGORY='ASSEMBLY'`) → `WORKCENTERNAME`, then mapping `WORKCENTERNAME` through `src/mes_dashboard/config/workcenter_groups.py`. It MUST NOT be derived from a closed `EQUIPMENT_ID` prefix enumeration (e.g. hardcoding "GDBA%→DB, GWBA%→WB"). Precedent: EA-07 documents that an equivalent equipment-ID-prefix-enumeration approach for EAP ALARM was retired in production because the closed enum never matched real `EQUIPMENT_ID` data — the same failure mode applies here even though GDBA/GWBA happen to look like a clean 1:1 mapping to DB/WB today. Unmapped or `NULL` `WORKCENTERNAME` → DB/WB label `NULL` (not an error, not a default guess). | unit tests (`test_db_wb_label_via_workcenter_groups_not_prefix`) |
+| UPH-ASYNC | Always-async UPH routing, no sync fallback | `uph_performance` is an always-async domain (`JobTypeConfig.always_async=True`, `sync_fallback_allowed=False`) — mirrors EA-ASYNC. When `UPH_PERFORMANCE_USE_UNIFIED_JOB=on` (default) and the spool key misses, the route enqueues via `enqueue_query_job("uph-performance", ..., sync_fallback_allowed=False)`. Queue unavailable → HTTP 503 `SERVICE_UNAVAILABLE` + `Retry-After` (ASYNC-06); NEVER a silent synchronous downgrade. Queue available → HTTP 202. Spool hit (key already resolved) → HTTP 200 regardless of flag state. `off` is a pure kill switch (no legacy code path exists — clean net-new page, mirrors `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB`'s semantics) — job type not registered, spool-miss → 503. | `tests/test_async_query_job_service.py`, `tests/integration/test_uph_performance_rq_async.py` |
 
 ## DB Scheduling Rules
 

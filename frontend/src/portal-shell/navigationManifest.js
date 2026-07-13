@@ -155,6 +155,11 @@ export const routes = Object.freeze({
     order: 2,
     displayName: '生產達成率',
   },
+  '/uph-performance': {
+    drawerId: 'production-assist',
+    order: 3,
+    displayName: 'UPH表現',
+  },
 
   // ── Standalone / drilldown routes (no drawer) ───────────────────────────
   // These are code-owned by STANDALONE_DRILLDOWN_ROUTES in navigationState.js.

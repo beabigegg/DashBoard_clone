@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.38.0
+schema-version: 1.39.0
 last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -619,6 +619,7 @@ fix-equipment-lots-trim/query-tool-subtab-cache archival (ADR 0012 gate).
 | DB unavailable | 503 SERVICE_UNAVAILABLE | SERVICE_UNAVAILABLE | `tests/test_degraded_responses.py` |
 | Spool expired | 410 CACHE_EXPIRED or dataset_expired | CACHE_EXPIRED | resilience tests |
 | Date range > 730 days | 400 VALIDATION_ERROR | VALIDATION_ERROR | route tests |
+| BondUPH/fHCM_UPH parameter returns zero rows for the requested window/family | returns empty result set (not an error); UI shows EmptyState with a family/parameter-specific message | — | `tests/integration/test_uph_performance_data_boundary.py` |
 
 ---
 
@@ -1908,3 +1909,92 @@ On `status=finished`, the job `result` payload is `{"query_id": "<string>"}` onl
 **HTTP 503 — worker unavailable** (spool miss + `always_async=True` + no RQ worker; `sync_fallback_allowed=False`): standard error envelope (§1.2), `error.code = "SERVICE_UNAVAILABLE"`.
 
 **HTTP 400 — validation** (missing/invalid `start_date`/`end_date`, range > 730d per SYS-04): standard error envelope (§1.2).
+
+---
+
+### §3.29 UPH-Performance Spool Schema
+
+Added by change `add-uph-performance-page`. Spool namespace: `tmp/query_spool/uph_performance/`. Governed by `_SCHEMA_VERSION` in `uph_performance_cache.py`. Mirrors `eap-alarm-analysis`'s always-async (Type B) coarse-spool + DuckDB-derived-views pattern (§3.17).
+
+#### Spool key composition
+
+`make_uph_performance_spool_key()` canonical repr covers (sorted): `date_from`, `date_to`, `families` (closed enum subset of `{GDBA, GWBA}`; empty/absent = both), `workcenter_names`, `packages` (PRODUCTLINENAME), `pj_types` (PJ_TYPE), `equipment_ids` (whitespace-stripped). `_SCHEMA_VERSION = 1` participates in the key.
+
+#### Oracle coarse-filter mapping
+
+| filter dim | Oracle predicate | source column | join |
+|---|---|---|---|
+| families | `EQUIPMENT_ID LIKE 'GDBA%'` and/or `EQUIPMENT_ID LIKE 'GWBA%'` (both when absent/empty — UPH-02 restricts the domain to these two families only; never any other prefix) | EAP_EVENT.EQUIPMENT_ID | direct |
+| equipment_ids | `EQUIPMENT_ID IN (...)` | EAP_EVENT.EQUIPMENT_ID | direct |
+| pj_types | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PJ_TYPE),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join (mirrors EA-10) |
+| packages | `EXISTS (SELECT 1 FROM DWH.DW_MES_CONTAINER c WHERE c.CONTAINERNAME = e.LOT_ID AND NVL(TRIM(c.PRODUCTLINENAME),'(NA)') IN (...))` | DWH.DW_MES_CONTAINER | EXISTS semi-join |
+| workcenter_names | `EXISTS (SELECT 1 FROM DWH.DW_MES_RESOURCE r WHERE r.RESOURCENAME = e.EQUIPMENT_ID AND r.OBJECTCATEGORY = 'ASSEMBLY' AND NVL(TRIM(r.WORKCENTERNAME),'(NA)') IN (...))` | DWH.DW_MES_RESOURCE | EXISTS semi-join |
+
+Mandatory index filter (UPH-01, mirrors EA-03): `LAST_UPDATE_TIME BETWEEN :date_from AND :date_to`. Every chunk window is ≤6h (`BaseChunkedDuckDBJob`, `chunk_strategy=TIME`) — the detail JOIN against this ~12M-row/day table has previously timed out at >180s over a 24h window (docs/architecture/eap-event-uph-collection-investigation.md); a single unchunked full-range query is forbidden. Event-type predicate: `EVENT_TYPE LIKE '%_M[60]' AND LOT_ID IS NOT NULL`.
+
+#### Detail JOIN + PARAMETER_NAME mapping (UPH-03)
+
+`EAP_EVENT_DETAIL` joined on `SEQ_ID`. `PARAMETER_NAME` selected by equipment-family prefix — **family-conditional, must not be swapped**:
+
+| family prefix | PARAMETER_NAME |
+|---|---|
+| GDBA | `BondUPH` |
+| GWBA | `fHCM_UPH` |
+
+`PARAMETER_VALUE` is used as-is for the UPH column — **NO scale conversion** (UPH-04; e.g. no `×100`/`÷100`). This is a deliberate product decision, not an oversight — do not "fix" it without a new contract change.
+
+#### Product-dim + workcenter enrichment
+
+- `LOT_ID` → `DW_MES_CONTAINER.CONTAINERNAME` bridge (mirrors `eap_alarm_worker.py`'s pattern — `DW_MES_WIP` has no `CONTAINERID` index) → `PRODUCTLINENAME` (displayed as **Package**), `PJ_TYPE` (displayed as **Type**), `PJ_BOP`, `PJ_FUNCTION`. No container match → all four `NULL`.
+- `EQUIPMENT_ID` → `DW_MES_RESOURCE.RESOURCENAME` bridge (`OBJECTCATEGORY = 'ASSEMBLY'`) → `WORKCENTERNAME`. No resource match → `WORKCENTERNAME` `NULL`.
+- `WORKCENTERNAME` → `src/mes_dashboard/config/workcenter_groups.py` 焊接_DB/焊接_WB mapping → DB/WB label (UPH-05). **MUST use this mapping — MUST NOT use `EQUIPMENT_ID` prefix enumeration** (a prior prefix-enumeration approach for a similar classification was retired because it never matched real production data; business-rules.md EA-07). Unmapped/NULL `WORKCENTERNAME` → DB/WB label `NULL` (not an error).
+
+#### Parquet column schema (schema_version 1)
+
+| column | type | nullable | notes |
+|---|---|---|---|
+| LOT_ID | VARCHAR | no | EAP_EVENT.LOT_ID; event-type predicate requires `LOT_ID IS NOT NULL` at Oracle query time |
+| EQUIPMENT_ID | VARCHAR | no | EAP_EVENT.EQUIPMENT_ID |
+| EQUIPMENT_FAMILY | VARCHAR | no | `SUBSTR(EQUIPMENT_ID, 1, 4)`; closed enum `GDBA \| GWBA` (UPH-02) |
+| EVENT_TIME | TIMESTAMP | no | `LAST_UPDATE_TIME` of the `_M[60]` event |
+| PARAMETER_NAME | VARCHAR | no | `BondUPH` (GDBA) or `fHCM_UPH` (GWBA) — family-conditional (UPH-03) |
+| UPH_VALUE | DOUBLE | yes | raw `PARAMETER_VALUE`, no scale conversion (UPH-04); `NULL` when the detail join finds no matching parameter row for this event |
+| WORKCENTERNAME | VARCHAR | yes | `DW_MES_RESOURCE` bridge; `NULL` if no resource match |
+| DB_WB_LABEL | VARCHAR | yes | `焊接_DB \| 焊接_WB` via `workcenter_groups` mapping (UPH-05); `NULL` if `WORKCENTERNAME` is `NULL` or unmapped |
+| PACKAGE | VARCHAR | yes | `DW_MES_CONTAINER.PRODUCTLINENAME`, displayed as **Package**; `NULL` if no container match |
+| PJ_TYPE | VARCHAR | yes | `DW_MES_CONTAINER.PJ_TYPE`, displayed as **Type**; `NULL` if no container match |
+| PJ_BOP | VARCHAR | yes | `DW_MES_CONTAINER.PJ_BOP`; `NULL` if no container match |
+| PJ_FUNCTION | VARCHAR | yes | `DW_MES_CONTAINER.PJ_FUNCTION`; `NULL` if no container match |
+| coarse_filter_hash | VARCHAR | no | hash of the 5 coarse dims (mirrors EA-01's `eqp_types_filter`); used for partition-reuse validation |
+
+**Breaking-change surface:** column add/remove/rename to the `uph_performance` parquet orphans existing files — bump `_SCHEMA_VERSION` in the same commit. Rollback: `rm -f tmp/query_spool/uph_performance/*.parquet`.
+
+#### Response shapes (DuckDB-derived; all fine-filter aware; no Oracle re-query after spool build)
+
+Fine-filter axes (filter-options / trend / detail — global-filter-scoped): `equipment_id[]`, `workcenter_name[]`, `package[]`, `pj_type[]` (all exact-match against the spool).
+
+**Filter-options** (`GET /api/uph-performance/filter-options?query_id=`): `data = {equipment_id_options: string[], workcenter_name_options: string[], package_options: string[], pj_type_options: string[]}`. Derived from the DuckDB spool only; `NULL` column values excluded from option lists.
+
+**Product-filter-options** (`GET /api/uph-performance/product-filter-options`, no `query_id`): Oracle-free, sourced from `container_filter_cache` cross-filter narrowing (mirrors eap-alarm's `/product-filter-options`) — `data = {pj_types: string[], product_lines: string[]}` populated before the user has run any query, so the Package/Type global-filter dropdowns are not empty pre-first-query.
+
+**Trend** (`GET /api/uph-performance/trend`): `data = {labels: string[], series: [{name: string, data: (number|null)[]}], group_by: string}`. `group_by` closed enum (400 on unknown): `equipment_id` | `family` | `package` (default `family`). Native `M[60]` hourly granularity — no day/hour granularity switch (unlike eap-alarm trend). A group's missing hour bucket is `null` in `data[]`, never `0` — a gap must not visually imply zero output.
+
+**Ranking** (`GET /api/uph-performance/ranking`): `data = {items: [{equipment_id: string, workcenter_name: string | null, db_wb_label: string | null, pj_type: string | null, avg_uph: number | null, sample_count: integer}], pj_types: string[]}`. `items` grouped by `equipment_id` (further groupable by `pj_type` client-side), sorted **ascending** by `avg_uph` (lowest-UPH equipment first — the point is finding underperformers). No threshold/alert coloring (explicit non-goal). The `pj_type[]` query param on this endpoint is a **fine filter independent of the page's global filters** — it re-queries the DuckDB spool with its own selection state and does not read or write the global `pj_type` filter; it is NOT part of the spool key (the spool is already built at global scope). `avg_uph` is `null` for an equipment/pj_type combination with zero rows carrying a non-null `UPH_VALUE` (never a divide-by-zero `0`).
+
+**Detail** (`GET /api/uph-performance/detail`): `data = {rows: [{lot_id: string, equipment_id: string, event_time: string (ISO 8601), uph_value: number | null, package: string | null, pj_type: string | null}], meta: {page: int, per_page: int, total_count: int, total_pages: int}}`. Pagination: `per_page` max 200 (mirrors EA-04 detail pagination).
+
+#### Async envelope (mirrors §3.17 / EA-ASYNC; `POST /api/uph-performance/spool`)
+
+**HTTP 200 — spool-hit** (canonical spool for the coarse-filter key already exists):
+```json
+{ "success": true, "data": { "async": false, "query_id": "<string>" }, "meta": { "timestamp": "...", "app_version": "..." } }
+```
+
+**HTTP 202 — spool-miss** (worker available; generic §1.3 async-job envelope):
+```json
+{ "success": true, "data": { "async": true, "job_id": "<string>", "status_url": "/api/uph-performance/spool/status?job_id=<job_id>", "query_id": "<string>" }, "meta": { "timestamp": "...", "app_version": "..." } }
+```
+
+**HTTP 503 — worker unavailable** (`always_async=True`, `sync_fallback_allowed=False` — UPH-ASYNC/ASYNC-06): standard error envelope (§1.2), `error.code = "SERVICE_UNAVAILABLE"`, `Retry-After` header.
+
+**HTTP 400 — validation**: missing/invalid `date_from`/`date_to`, range > 730d (SYS-04), or a `families[]` value outside `{GDBA, GWBA}` (UPH-02).

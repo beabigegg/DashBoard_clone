@@ -1,0 +1,18 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "targeted",
+  "status": "failed",
+  "exit_code": 4,
+  "command": "pytest tests/test_uph_performance_sql_builder.py tests/test_uph_performance_unified_job.py tests/integration/test_uph_performance_rq_async.py tests/integration/test_uph_performance_data_boundary.py tests/contract/test_uph_performance_contract.py --run-integration-real --run-integration -q --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/add-uph-performance-page/test-runs/20260713-212731/junit.xml' --maxfail=1 --tb=short -ra",
+  "duration_ms": 227,
+  "first_failure": {
+    "kind": "import-error",
+    "message": "E   ModuleNotFoundError: No module named 'flask'"
+  },
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-212731/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-212731/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-212731/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

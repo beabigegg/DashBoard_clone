@@ -1,0 +1,16 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/acceptance/test_add_uph_performance_page_acceptance.py -v --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/add-uph-performance-page/test-runs/20260713-232153/junit.xml' -q --maxfail=1 --tb=short -ra",
+  "duration_ms": 1006,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-232153/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-232153/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-232153/stderr.log",
+    "junit": "specs/changes/add-uph-performance-page/test-runs/20260713-232153/junit.xml"
+  },
+  "next_action": "all phases green"
+}

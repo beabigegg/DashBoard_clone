@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.39.0
+schema-version: 1.40.0
 last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
@@ -76,7 +76,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /health/deep | none | — | HealthPayload | — | smoke tests |
 | GET | /api/job/{job_id} | required | ?prefix= | JobStatusResponse | 400/404 | route tests |
 | POST | /api/job/{job_id}/abandon | required | JSON body | AckResponse | 403/404/409 | route tests |
-| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm, wip_dataset, production_achievement} | application/octet-stream (parquet) | 400/410 | route tests |
+| GET | /api/spool/{namespace}/{query_id}.parquet | required | namespace in {yield_alert_dataset, reject_dataset, resource_dataset, hold_dataset, downtime_analysis_base_events, downtime_analysis_job_bridge, eap_alarm, wip_dataset, production_achievement, uph_performance} | application/octet-stream (parquet) | 400/410 | route tests |
 | GET | /api/wip/overview/summary | required | query params | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/summary | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/wip/overview/matrix | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
@@ -263,6 +263,13 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/eap-alarm/product-filter-options | required | - | EapAlarmProductFilterOptionsResponse | 500 | route tests |
 | POST | /api/query-tool/lot-history | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
 | POST | /api/query-tool/lot-associations | required | JSON body | GenericSuccessResponse | 400/500 | route tests |
+| POST | /api/uph-performance/spool | required | JSON body {date_from, date_to (both required, 730-day cap SYS-04), families[] (opt, closed enum GDBA/GWBA; empty/absent = both), workcenter_names[] (opt), packages[] (opt), pj_types[] (opt), equipment_ids[] (opt, max 200)} | UphPerformanceSpoolJobAccepted | 202/400/500/503 | route tests |
+| GET | /api/uph-performance/spool/status | required | ?query_id= | UphPerformanceSpoolStatusResponse | 400/410 | route tests |
+| GET | /api/uph-performance/filter-options | required | ?query_id= | UphPerformanceFilterOptionsResponse | 400/410 | route tests |
+| GET | /api/uph-performance/product-filter-options | required | - | UphPerformanceProductFilterOptionsResponse | 500 | route tests |
+| GET | /api/uph-performance/trend | required | ?query_id=&group_by=(equipment_id/family/package, default family; 400 on unknown)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceTrendResponse | 400/410 | route tests |
+| GET | /api/uph-performance/ranking | required | ?query_id=&pj_type[]=(opt, own filter axis independent of global filters) | UphPerformanceRankingResponse | 400/410 | route tests |
+| GET | /api/uph-performance/detail | required | ?query_id=&page=&per_page=(max 200)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceDetailResponse | 400/410 | route tests |
 
 ## 5. Routing & Naming
 
@@ -1552,3 +1559,78 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | product_lines | string[] | yes | List of PRODUCTLINENAME values (mapped from packages in cache) |  |
 | pj_bops | string[] | yes | List of PJ_BOP values (mapped from bops in cache) |  |
 | updated_at | string | no | ISO-8601 cache refresh timestamp; null if cache never populated |  |
+
+### UphPerformanceSpoolJobAccepted
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| async | boolean | yes |  | false on spool-hit, true on spool-miss |
+| query_id | string | yes |  | canonical coarse-filter spool key |
+| job_id | string | no |  | present only when async=true; RQ job identifier |
+| status_url | string | no |  | present only when async=true; polling URL |
+
+### UphPerformanceSpoolStatusResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| query_id | string | no |  | spool key, present when known |
+| status | enum(queued,running,finished,failed) | yes |  | async job status, or a plain spool-hit indicator when the key was already resolved |
+
+### UphPerformanceFilterOptionsResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| equipment_id_options | string[] | yes |  | distinct EQUIPMENT_ID values present in the built spool |
+| workcenter_name_options | string[] | yes |  | distinct WORKCENTERNAME values present in the built spool |
+| package_options | string[] | yes |  | distinct PRODUCTLINENAME (Package) values present in the built spool |
+| pj_type_options | string[] | yes |  | distinct PJ_TYPE (Type) values present in the built spool |
+
+### UphPerformanceProductFilterOptionsResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| pj_types | string[] | yes |  | Oracle-free Type options from container_filter_cache, available before any query runs |
+| product_lines | string[] | yes |  | Oracle-free Package options from container_filter_cache, available before any query runs |
+
+### UphPerformanceTrendSeriesItem
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| name | string | yes |  | group label (equipment_id, family, or package value depending on group_by) |
+| data | number[] | yes |  | one value per label bucket; null entries mean a missing hour, never a zero |
+
+### UphPerformanceRankingItem
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| equipment_id | string | yes |  |  |
+| avg_uph | number | no |  | null when zero rows carry a non-null UPH_VALUE for this equipment |
+| sample_count | integer | yes |  |  |
+
+### UphPerformanceDetailRow
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| lot_id | string | yes |  |  |
+| equipment_id | string | yes |  |  |
+| uph_value | number | no |  | raw PARAMETER_VALUE, no scale conversion (UPH-04) |
+
+### UphPerformanceTrendResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| labels | string[] | yes |  | hourly time-bucket labels (native M[60] granularity) |
+| series | UphPerformanceTrendSeriesItem[] | yes |  | see data-shape-contract.md §3.29 Trend for the full per-item shape |
+| group_by | string | yes |  | closed enum: equipment_id, family, or package (default family) |
+
+### UphPerformanceRankingResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| items | UphPerformanceRankingItem[] | yes |  | ranked ascending by avg_uph; see data-shape-contract.md §3.29 Ranking for the full per-row shape |
+| pj_types | string[] | yes |  | available Type values for this block's own independent filter |
+
+### UphPerformanceDetailMeta
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| page | integer | yes |  |  |
+| per_page | integer | yes |  | default 50, contract cap 200 |
+| total_count | integer | yes |  |  |
+| total_pages | integer | yes |  |  |
+
+### UphPerformanceDetailResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| rows | UphPerformanceDetailRow[] | yes |  | see data-shape-contract.md §3.29 Detail for the full per-row shape |
+| meta | UphPerformanceDetailMeta | yes |  | pagination |

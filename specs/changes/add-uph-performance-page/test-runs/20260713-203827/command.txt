@@ -1,0 +1,1 @@
+cd frontend && npx vitest run tests/unit/uph-performance-filter.test.js tests/unit/uph-performance-views.test.js tests/unit/uph-performance-ranking-block.test.js tests/unit/uph-performance-filter-bar.test.js src/shared-ui/components/__tests__/EmptyState.test.ts

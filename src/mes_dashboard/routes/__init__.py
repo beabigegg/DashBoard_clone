@@ -33,6 +33,7 @@ from .production_achievement_routes import (
     production_achievement_bp,
     production_achievement_admin_bp,
 )
+from .uph_performance_routes import uph_performance_bp
 
 
 def register_routes(app) -> None:
@@ -63,6 +64,7 @@ def register_routes(app) -> None:
     app.register_blueprint(db_scheduling_bp)
     app.register_blueprint(production_achievement_bp)
     app.register_blueprint(production_achievement_admin_bp)
+    app.register_blueprint(uph_performance_bp)
 
 __all__ = [
     'wip_bp',
@@ -92,5 +94,6 @@ __all__ = [
     'db_scheduling_bp',
     'production_achievement_bp',
     'production_achievement_admin_bp',
+    'uph_performance_bp',
     'register_routes',
 ]

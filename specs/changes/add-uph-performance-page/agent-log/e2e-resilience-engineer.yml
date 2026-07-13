@@ -1,0 +1,44 @@
+agent: e2e-resilience-engineer
+change-id: add-uph-performance-page
+summary: >
+  Added a dedicated tests/integration/test_uph_performance_resilience.py (mirroring
+  test_production_achievement_resilience.py, the closer BaseChunkedDuckDBJob precedent)
+  covering worker-crash-mid-job -> terminal "failed" status (not just no-partial-spool),
+  RQ job_timeout -> terminal "failed", a TOCTOU Redis-drop-at-enqueue race through the
+  REAL enqueue_job() branch (not a mocked is_async_available shortcut), and
+  heavy_query_slot fail-open/no-double-release/acquire-release-paired correctness for
+  the new 4th consumer on the shared 3-slot semaphore (design.md Open Risk). These were
+  genuinely uncovered beyond the 2 resilience tests backend-engineer already embedded in
+  test_uph_performance_rq_async.py::TestUphPerformanceResilience (not duplicated).
+  Extended tests/integration/test_uph_performance_data_boundary.py (backend-engineer's
+  file; extending per test-plan.md's "check first, extend rather than fork" guidance)
+  with route-level malformed-date-range/family-enum/equipment_ids-overflow boundary
+  cases (garbage date, date_to<date_from, wrong-type payload fields, exact-730-day and
+  exact-200-equipment_ids boundary-succeeds vs strictly-over-fails pairs) and a
+  cross-filter-narrowing test class exercising the real DuckDB get_filter_options()/
+  get_detail() mechanism (one-axis-populated-while-sibling-empty pattern, plus a real
+  per_page>200 truncation test, both of which previously only existed as route-level
+  mocks). Verified frontend/tests/playwright/uph-performance.spec.ts against
+  interaction-design.md's 10 confirmed states and test-plan.md's 17 named Playwright
+  scenarios: full coverage, no gaps, all data-testid selectors resolve to real markup
+  in frontend/src/uph-performance/ + shared-ui MultiSelect.vue. Confirmed the CI-safe
+  fast pre-check (<50-char body, before any waitForFunction) and app-specific
+  `.theme-uph-performance` pageRendered check are both present per ci-workflow.md.
+  Attempted to execute the spec: confirmed environment-only failure (Playwright
+  Chromium executable version mismatch, "chromium_headless_shell-1208" not installed;
+  `npx playwright install chromium` itself fails with "Playwright does not support
+  chromium on ubuntu26.04-x64" in this sandbox) -- reproduced identically on the
+  pre-existing, unrelated production-achievement-async.spec.ts, confirming
+  frontend-engineer's handoff claim is accurate and not a code defect. Did not attempt
+  to fix the sandbox environment. Noted (not fixed, outside allowed paths) that
+  .github/workflows/frontend-tests.yml still lacks the "Run uph-performance e2e spec"
+  CI step required by ci-gates.md -- already tracked as tasks.yml 4.4 status=pending,
+  owned by ci-cd-gatekeeper.
+artifacts:
+  - { type: test-files, pointer: "tests/integration/test_uph_performance_resilience.py" }
+  - { type: test-files, pointer: "tests/integration/test_uph_performance_data_boundary.py (extended, new classes: TestMalformedDateRangeAtRoute, TestFamilyEnumBoundaryAtRoute, TestFineFilterAxisNarrowing)" }
+  - { type: scenarios-covered, pointer: "worker-crash-mid-job-marks-failed, rq-job-timeout-marks-failed, redis-drop-toctou-503, heavy-slot-fail-open, heavy-slot-no-double-release, heavy-slot-acquire-release-paired, malformed-date-format-400, date-to-before-date-from-400, date-range-731-days-400, date-range-exactly-730-days-succeeds, wrong-type-date-field-400, family-lowercase-accepted, family-scalar-wrong-type-normalized, equipment-ids-exactly-200-succeeds, equipment-ids-201-strictly-over-cap-400, filter-axis-narrowing-workcenter-only, filter-axis-narrowing-pj-type-only, filter-axis-both-empty-control, detail-per-page-over-cap-real-truncation" }
+  - { type: mutation-checks, pointer: "none (no mutation tool run this session)" }
+  - { type: trace-artifacts, pointer: "n/a (Playwright spec could not execute in this sandbox -- Chromium unsupported on ubuntu26.04-x64; verified identical failure on pre-existing production-achievement-async.spec.ts, confirming environment gap not a code defect)" }
+  - { type: e2e-spec-review, pointer: "frontend/tests/playwright/uph-performance.spec.ts:1-524 -- all 10 interaction-design.md states + all 17 test-plan.md-named scenarios present; CI-safe fast pre-check at lines 144-152; no gaps found" }
+  - { type: test-runs, pointer: "conda run -n mes-dashboard python -m pytest tests/test_uph_performance_sql_builder.py tests/test_uph_performance_unified_job.py tests/integration/test_uph_performance_rq_async.py tests/integration/test_uph_performance_data_boundary.py tests/integration/test_uph_performance_resilience.py tests/contract/test_uph_performance_contract.py --run-integration-real --run-integration -q -> 79 passed" }

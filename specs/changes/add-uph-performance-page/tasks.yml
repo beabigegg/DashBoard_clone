@@ -1,0 +1,42 @@
+change-id: add-uph-performance-page
+status: in-progress
+tier: 1
+tier-floor-override: "Keyword-scan false positive on 'migration' (maxTier-0 pattern 'migrations?'): design.md/change-request.md explicitly state there is NO data migration -- this is a net-new page/table/spool namespace, nothing existing is altered or migrated. The 'concurrency' surface (shared heavy_query_slot semaphore) is pre-existing infra this change reuses unchanged (explicit Non-goal: no concurrency-knob changes), not new concurrency control being introduced. change-classification.md's Tier 1 reasoning (additive, mirrors two already-shipped features, reuses established safe async patterns) stands; the full Tier 0-1 agent set (design review, e2e-resilience, stress-soak, ui-ux, visual, qa) already ran regardless, since this skill uses an identical agent roster for Tier 0 and Tier 1."
+context-governance: v1
+archive-tasks:
+  - "7.1"
+  - "7.2"
+depends-on: []
+
+tasks:
+  # status: pending | done | skipped   (optional: note: "reason or context")
+  - { id: "1.1", section: Preparation, title: "Confirm classification and required artifacts", status: done }
+  - { id: "1.2", section: Preparation, title: "Confirm contracts to update", status: done }
+  - { id: "1.3", section: Preparation, title: "Confirm design decisions if required", status: done }
+  - { id: "1.4", section: Preparation, title: "Confirm CI/CD gate plan", status: done }
+  - { id: "1.5", section: Preparation, title: "Confirm implementation plan", status: done }
+  - { id: "2.1", section: "Contract Updates", title: "API contract", status: done }
+  - { id: "2.2", section: "Contract Updates", title: "CSS/UI contract", status: done }
+  - { id: "2.3", section: "Contract Updates", title: "Env contract", status: done }
+  - { id: "2.4", section: "Contract Updates", title: "Data shape contract", status: done }
+  - { id: "2.5", section: "Contract Updates", title: "Business logic contract", status: done }
+  - { id: "2.6", section: "Contract Updates", title: "CI/CD contract", status: done }
+  - { id: "3.1", section: "Tests First", title: "Unit/contract tests", status: done }
+  - { id: "3.2", section: "Tests First", title: "Integration tests", status: done }
+  - { id: "3.3", section: "Tests First", title: "E2E/resilience tests", status: done }
+  - { id: "3.4", section: "Tests First", title: "Data-boundary/monkey tests", status: done, note: "data-boundary covered by backend-engineer + e2e-resilience-engineer extensions; monkey/fuzz was classifier-optional, not required" }
+  - { id: "3.5", section: "Tests First", title: "Stress/soak tests if required", status: done }
+  - { id: "4.1", section: Implementation, title: "Backend", status: done }
+  - { id: "4.2", section: Implementation, title: "Frontend", status: done }
+  - { id: "4.3", section: Implementation, title: "Env/deploy", status: done }
+  - { id: "4.4", section: Implementation, title: "CI/CD workflows", status: done }
+  - { id: "5.1", section: Review, title: "UI/UX review", status: done }
+  - { id: "5.2", section: Review, title: "Visual review", status: done }
+  - { id: "5.3", section: Review, title: "Contract review", status: done }
+  - { id: "5.4", section: Review, title: "QA review", status: done, note: "approved-with-risk; residual risks documented in stress-soak-report.md and design.md Open Risks" }
+  - { id: "6.1", section: Verification, title: "Local gates", status: done }
+  - { id: "6.2", section: Verification, title: "PR required gates", status: done, note: "Tier-1 required gates (unit-mock-integration, playwright-critical-journeys, contract validators) pass locally; not yet run in an actual PR/CI context" }
+  - { id: "6.3", section: Verification, title: "Informational gates", status: done, note: "nightly-integration equivalent (test_uph_performance_rq_async.py with --run-integration-real) passes locally" }
+  - { id: "6.4", section: Verification, title: "Nightly/weekly/manual gates if required", status: done, note: "stress-soak-report.md completed (mock-based); real-Oracle load and GWBA/fHCM_UPH data-availability probe remain as documented residual risk for DBA/ops before production activation, per qa-reviewer" }
+  - { id: "7.1", section: Archive, title: "Archive change", status: pending }
+  - { id: "7.2", section: Archive, title: "Promote durable learnings to contracts or CLAUDE.md", status: pending }

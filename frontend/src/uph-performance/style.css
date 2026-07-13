@@ -1,0 +1,203 @@
+/* UPH表現 — all rules scoped under .theme-uph-performance (css-contract Rule 6).
+ * This page intentionally does NOT import resource-shared/styles.css and its
+ * `:is(.theme-X, …)` grouped component rules — it replicates the minimal page
+ * container + card/filter primitives it needs locally, mirroring the
+ * admin-pages / admin-dashboard / material-consumption pattern documented in
+ * css-contract.md §Known Global Rule Interactions. */
+
+/* ── Page container ───────────────────────────────────────────────────────── */
+
+.theme-uph-performance .dashboard {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 0 theme('spacing.token.p16');
+}
+
+.theme-uph-performance .page-content {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p16');
+  padding: theme('spacing.token.p16') 0;
+}
+
+/* ── Filter panel ─────────────────────────────────────────────────────────── */
+
+.theme-uph-performance .filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p16');
+  align-items: flex-end;
+}
+
+.theme-uph-performance .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p6');
+  min-width: 160px;
+}
+
+.theme-uph-performance .filter-group-wide {
+  min-width: 280px;
+  flex: 1;
+}
+
+.theme-uph-performance .filter-group-full {
+  width: 100%;
+}
+
+.theme-uph-performance .filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme('colors.token.h475569');
+}
+
+.theme-uph-performance .filter-required {
+  color: theme('colors.state.danger');
+  margin-left: 2px;
+}
+
+.theme-uph-performance .filter-input {
+  height: 36px;
+  padding: 0 theme('spacing.token.p10');
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: theme('colors.token.hffffff');
+  color: theme('colors.token.h1e293b');
+}
+
+.theme-uph-performance .filter-input:focus {
+  outline: none;
+  border-color: theme('colors.brand.500');
+  box-shadow: 0 0 0 2px theme('colors.brand.100');
+}
+
+.theme-uph-performance .filter-textarea {
+  height: auto;
+  resize: vertical;
+  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.theme-uph-performance .filter-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: theme('spacing.token.p12');
+  flex-wrap: wrap;
+  padding-top: theme('spacing.token.p6');
+}
+
+.theme-uph-performance .filter-actions {
+  display: flex;
+  gap: theme('spacing.token.p8');
+}
+
+.theme-uph-performance .filter-hint {
+  font-size: 11px;
+  color: theme('colors.token.h94a3b8');
+  flex: 1;
+}
+
+/* Overflow-visible for filter cards containing MultiSelect dropdowns
+ * (css-contract Known Global Rule Interactions) */
+.theme-uph-performance .filter-query-card {
+  overflow: visible;
+}
+
+.theme-uph-performance .product-options-warning {
+  font-size: 12px;
+  color: theme('colors.state.danger');
+  background: theme('colors.token.hfef2f2');
+  border: 1px solid theme('colors.token.hfecaca');
+  border-radius: 6px;
+  padding: theme('spacing.token.p8') theme('spacing.token.p10');
+}
+
+/* ── Fine filter panel ────────────────────────────────────────────────────── */
+
+.theme-uph-performance .fine-filter-panel {
+  overflow: visible;
+}
+
+.theme-uph-performance .fine-filter-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p16');
+  align-items: flex-start;
+}
+
+.theme-uph-performance .fine-filter-body .filter-group {
+  min-width: 200px;
+  flex: 1;
+}
+
+.theme-uph-performance .fine-filter-badge {
+  font-size: 11px;
+  font-weight: 400;
+  color: theme('colors.token.h64748b');
+  margin-left: theme('spacing.token.p8');
+  padding: 2px theme('spacing.token.p6');
+  background: theme('colors.token.hf1f5f9');
+  border-radius: 4px;
+}
+
+/* ── Trend chart ──────────────────────────────────────────────────────────── */
+
+.theme-uph-performance .trend-chart-body {
+  height: 320px;
+  position: relative;
+}
+
+.theme-uph-performance .trend-chart {
+  width: 100%;
+  height: 300px;
+}
+
+.theme-uph-performance .trend-groupby-toggle {
+  display: flex;
+  gap: theme('spacing.token.p4');
+}
+
+/* ── Ranking block ────────────────────────────────────────────────────────── */
+
+.theme-uph-performance .ranking-body {
+  overflow: visible;
+}
+
+.theme-uph-performance .ranking-type-filter {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p4');
+  min-width: 260px;
+}
+
+.theme-uph-performance .ranking-type-filter-label {
+  font-size: 11px;
+  color: theme('colors.token.h64748b');
+}
+
+.theme-uph-performance .ranking-loading {
+  padding: theme('spacing.token.p16');
+  text-align: center;
+  color: theme('colors.token.h94a3b8');
+  font-size: 13px;
+}
+
+/* ── Detail table ─────────────────────────────────────────────────────────── */
+
+.theme-uph-performance .detail-card-body {
+  padding: 0;
+}
+
+.theme-uph-performance .detail-count-badge {
+  font-size: 12px;
+  font-weight: 400;
+  color: theme('colors.token.h64748b');
+  margin-left: theme('spacing.token.p8');
+}
+
+.theme-uph-performance .cell-nowrap {
+  white-space: nowrap;
+}

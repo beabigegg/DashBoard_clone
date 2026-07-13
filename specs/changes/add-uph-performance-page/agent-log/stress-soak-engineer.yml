@@ -1,0 +1,41 @@
+agent: stress-soak-engineer
+change-id: add-uph-performance-page
+status: done
+summary: >-
+  Added tests/stress/test_uph_performance_stress.py (9 tests: structural
+  no-second-slot-acquisition, N=20 burst wiring, mixed-fault deadlock check,
+  cross-worker fairness vs sibling BaseChunkedDuckDBJob stub, fail-open on
+  Redis-down, spool-key collision/isolation, plus a live-server 5-concurrent
+  class that gracefully skips without a deployed instance). Extended
+  tests/integration/test_soak_workload.py: added POST /api/uph-performance/spool
+  to the shared _TRAFFIC_ENDPOINTS rotation, and added
+  test_uph_performance_spool_ttl_cleanup_reclaims_namespace mirroring the
+  production_achievement TTL-reclaim soak test for the new namespace. Wrote
+  stress-soak-report.md (required per change-classification.md Optional
+  Artifacts and mandated by ci-gates.md Promotion Policy step 2 before
+  mes-dashboard-uph-performance-worker.service is ever started). All work is
+  mock-based/structural -- no real/sustained Oracle load run was performed in
+  this environment, per this session's established security boundary; the
+  live-Oracle-load gap is documented as residual, pre-existing, cross-cutting
+  risk in the report (not something this change can close).
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_uph_performance_stress.py" }
+  - { type: runner, pointer: "pytest (pytest.mark.stress, --run-stress flag; threading-based, no k6/locust needed for this mock-level layer)" }
+  - { type: tests-added, pointer: "tests/stress/test_uph_performance_stress.py (9 tests: TestNoSecondSlotAcquisition x2, TestSemaphoreWiringStress, TestMixedFaultNoDeadlock, TestCrossWorkerFairness, TestFailOpenNoRedis x2, TestSpoolKeyCollision x2; plus TestUphPerformanceQueueSaturationLive, live-server-only, skips gracefully here)" }
+  - { type: tests-added, pointer: "tests/integration/test_soak_workload.py: _TRAFFIC_ENDPOINTS += POST /api/uph-performance/spool rotation entry; test_uph_performance_spool_ttl_cleanup_reclaims_namespace (new)" }
+  - { type: test-output, pointer: "9 passed (test_uph_performance_stress.py, excl. live-server class which SKIPPED 'Server unreachable'); 2 passed (both TTL-cleanup soak tests, uph_performance + production_achievement unaffected); tests/stress/ + tests/integration/test_soak_workload.py both collect cleanly (179 + 4 items) with no regressions" }
+  - { type: pass-criteria-cited, pointer: "no slot leak (enters==exits); peak_concurrent<=N; zero direct acquire_heavy_query_slot/release_heavy_query_slot/heavy_query_slot calls in uph_performance_worker.py (AST-verified); fail-open acquire <1.0s, job.run() completion <10.0s with Redis down; spool-collision safe-degradation (>=1 writer succeeds, only known IO/rename-race errors, valid surviving parquet schema == data-shape §3.29 13-column set); TTL cleanup meta_deleted>=1 + parquet/Redis-key absence post-reclaim" }
+  - { type: artifacts-location, pointer: "specs/changes/add-uph-performance-page/stress-soak-report.md" }
+  - { type: contracts-touched, pointer: "none (read-only; no contract edits made by this agent)" }
+commands-run:
+  - "conda run -n mes-dashboard python -m pytest tests/stress/test_uph_performance_stress.py -v -m stress --run-stress -k \"not QueueSaturation\"  # 9 passed"
+  - "conda run -n mes-dashboard python -m pytest tests/stress/test_uph_performance_stress.py::TestUphPerformanceQueueSaturationLive -v -m stress --run-stress  # 1 skipped, Server unreachable (expected, no live instance)"
+  - "conda run -n mes-dashboard python -m pytest tests/integration/test_soak_workload.py::test_uph_performance_spool_ttl_cleanup_reclaims_namespace tests/integration/test_soak_workload.py::test_production_achievement_spool_ttl_cleanup_reclaims_namespace -v --run-integration-real -m soak  # 2 passed"
+  - "conda run -n mes-dashboard python -m pytest tests/stress/ --collect-only -q  # 179 tests collected, no errors"
+  - "conda run -n mes-dashboard python -m pytest tests/integration/test_soak_workload.py --collect-only -q  # 4 tests collected"
+  - "cdd-kit test run add-uph-performance-page --phase full --command \"<stress suite> && <folded soak TTL tests>\"  # recorded in test-evidence.yml, passed"
+known-risks:
+  - "Shared 3-slot heavy_query_slot semaphore now has a 4th real production consumer; combined production load across all consumers sharing that cap has never been tested against real Oracle -- pre-existing, cross-cutting gap per design.md Open Risks and ADR-0011, NOT closeable by this change (concurrency-knob tuning is an explicit non-goal). Full residual-risk analysis and sign-off recommendation in stress-soak-report.md."
+  - "The full 30-minute (or 300s local-smoke) test_soak_workload_six_property_regression run (requiring the gunicorn_workers fixture) was NOT executed ad hoc in this pass -- it is the pre-existing nightly/weekly soak gate; this change only adds the new rotation entry + TTL test to that already-scheduled harness."
+  - "No real/sustained Oracle load test was run against DWH.EAP_EVENT/EAP_EVENT_DETAIL in this environment (security boundary) -- the ≤6h chunk-window mitigation's previously-measured 2-12s runtime has not been re-verified under genuine multi-domain concurrent Oracle contention."
+next-reviewer: qa-reviewer (release readiness / approved-with-risk given the residual shared-semaphore gap) and ci-cd-gatekeeper (confirm stress-soak-report.md sign-off satisfies ci-gates.md Promotion Policy step 2 before the worker service is first started)

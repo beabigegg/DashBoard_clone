@@ -1,0 +1,5 @@
+artifacts:
+  - { type: adr-written, pointer: "docs/adr/0017-uph-performance-family-conditional-detail-join.md" }
+  - { type: affected-areas, pointer: "uph_performance worker/sql/service/routes, spool namespace, shared heavy_query semaphore" }
+  - { type: decision-summary, pointer: "single shared uph_performance.sql with family-conditional CASE detail JOIN, append path (no cross-chunk reduction), DB/WB via workcenter_groups in post_aggregate" }
+  - { type: risks-noted, pointer: "3 medium (shared 3-slot semaphore 4th consumer, GWBA fHCM_UPH data-availability, DB/WB NULL rate), 0 high" }

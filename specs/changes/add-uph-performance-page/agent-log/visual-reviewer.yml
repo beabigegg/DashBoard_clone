@@ -1,0 +1,16 @@
+change-id: add-uph-performance-page
+agent: visual-reviewer
+status: done
+verdict: approved
+summary: >-
+  npm run css:check passes with 0 errors (.theme-uph-performance sole scope,
+  Rule 6 clean). Rule 4.5 not applicable (page intentionally does not import
+  resource-shared/styles.css). Rule 4.4 not applicable (no Teleport in this
+  page's own code; the only Teleport is inside shared MultiSelect.vue, a
+  pre-existing 16-app shared-component contract, not introduced by this
+  change). No class-name collision risk (brand-new theme scope, nothing
+  relocated into an existing one). npm run build independently re-verified
+  (not just trusted from frontend-engineer's note) -- emits
+  uph-performance.js/.html. EmptyState/ErrorBanner consistency spot-checked
+  in App.vue, matches interaction-design.md.
+required-changes: none

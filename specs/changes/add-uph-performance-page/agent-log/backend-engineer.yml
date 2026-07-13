@@ -1,0 +1,126 @@
+agent: backend-engineer
+change-id: add-uph-performance-page
+status: done
+summary: >-
+  Implemented the full backend vertical slice for /uph-performance: SQL
+  template, BaseChunkedDuckDBJob worker, cache/service layers, 7-endpoint
+  route blueprint, spool-namespace + job-registry + query-cost-policy
+  tripwire extensions, env-var wiring (gunicorn + systemd unit), deploy
+  unit + start_server.sh launcher functions, and TDD test suites per
+  test-plan.md. All required-floor + contract + quality test phases green.
+oracle-probe:
+  outcome: executed-post-implementation-confirmed-non-empty
+  detail: >-
+    IP-0 mandatory pre-build probe was initially blocked in-band by the
+    harness's auto-mode safety classifier during backend implementation (no
+    live Oracle query executed at that time). It was subsequently run
+    directly by main Claude on 2026-07-13, with explicit user authorization
+    for live Oracle access, AFTER implementation completed -- a <=6h
+    LAST_UPDATE_TIME-windowed, index-bound, read-only GROUP BY probe (no
+    correlated subqueries, per the query-cost guidance in
+    docs/architecture/eap-event-uph-collection-investigation.md) against the
+    real Oracle DWH (the configured internal DB_HOST, same connection this
+    app already uses for all its normal operation; host details redacted
+    from this durable log for confidentiality).
+  probe-result: >-
+    CONFIRMED non-empty for BOTH parameters in the most recent 6h window
+    (run 2026-07-13 ~22:19): GDBA/BondUPH -- 118 distinct EQUIPMENT_ID, 617
+    events, 617/617 non-null PARAMETER_VALUE (100%), sample values in the
+    9581-12157 range (integer-looking). GWBA/fHCM_UPH -- 46 distinct
+    EQUIPMENT_ID, 259 events, 259/259 non-null PARAMETER_VALUE (100%), sample
+    values in the 7750.36-21752.30 range (includes decimals). This directly
+    reverses the 2026-07-08 investigation's finding of ZERO GWBA machines
+    emitting any UPH parameter -- consistent with the user's account that
+    GWBA/fHCM_UPH reporting was configured recently. Value-scale caveat from
+    the original investigation (whether these integers are raw or an
+    implicit x100) remains UNRESOLVED, but is moot for this change per UPH-04
+    (deliberate no-scale-conversion decision, independent of what the true
+    physical scale is).
+  residual-risk: >-
+    RESOLVED for the "does data exist at all" question (see probe-result
+    above) -- this was the primary residual risk flagged by qa-reviewer's
+    approved-with-risk verdict. Remaining, smaller residual risk: this was a
+    single point-in-time 6h sample: coverage could still vary by shift/time-
+    of-day, and the value-scale ambiguity (see above) is inherited, unresolved
+    product-spec territory outside this change's scope (UPH-04 already
+    decided raw-value display regardless). No code or contract change is
+    required as a result of this probe -- it is confirmatory evidence only.
+artifacts:
+  - { type: files-changed, pointer: "src/mes_dashboard/sql/uph_performance.sql (new, 89 lines)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/uph_performance_cache.py (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/services/uph_performance_service.py (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/workers/uph_performance_worker.py (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/uph_performance_routes.py (new)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/__init__.py:31,66,95 (blueprint registration)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/routes/spool_routes.py:31 (_ALLOWED_NAMESPACES += uph_performance)" }
+  - { type: files-changed, pointer: "src/mes_dashboard/app.py (/uph-performance page route, mirrors /eap-alarm)" }
+  - { type: files-changed, pointer: "deploy/mes-dashboard-uph-performance-worker.service (new)" }
+  - { type: files-changed, pointer: "scripts/start_server.sh (config vars, PID/log paths, start/stop/status fns, do_start/do_stop/do_status call sites, log-archive rotation)" }
+  - { type: files-changed, pointer: ".env.example (UPH_PERFORMANCE_* block mirroring contracts/env/.env.example.template)" }
+  - { type: tests-added, pointer: "tests/test_uph_performance_sql_builder.py (11 tests -- UPH-01..05 structural pins)" }
+  - { type: tests-added, pointer: "tests/test_uph_performance_unified_job.py (5 tests -- pre_query/build_chunk_sql/post_aggregate)" }
+  - { type: tests-added, pointer: "tests/integration/test_uph_performance_rq_async.py (22 tests -- route+worker mock integration, integration_real marker)" }
+  - { type: tests-added, pointer: "tests/integration/test_uph_performance_data_boundary.py (6 tests -- empty-state, no parameter-name leak, integration marker)" }
+  - { type: tests-added, pointer: "tests/contract/test_uph_performance_contract.py (11 tests -- response-shape envelopes, openapi resolution)" }
+  - { type: tests-added, pointer: "tests/test_spool_routes.py::test_uph_performance_in_allowed_namespaces + parametrize list entry" }
+  - { type: tests-added, pointer: "tests/test_job_registry.py::TestAlwaysAsyncField::test_uph_performance_registered_with_always_async_true" }
+  - { type: tests-added, pointer: "tests/test_query_cost_policy.py::_APPROVED_CALLERS[\"base_chunked_duckdb_job\"] += uph_performance_worker" }
+  - { type: test-output, pointer: "170 passed (sql_builder 11 + unified_job 5 + rq_async 22 + data_boundary 6 + contract 11 + spool_routes 20 + job_registry 13 + query_cost_policy 42 + eap_alarm_unified_job 28 + production_achievement_unified_job 12), 0 failed" }
+  - { type: contracts-touched, pointer: "none (all six contracts were already authored by contract-reviewer; verified via cdd-kit validate --contracts -- all validators pass, contracts/openapi.json + contracts/api/openapi.json already resolve all 7 endpoints)" }
+commands-run:
+  - "cdd-kit test run add-uph-performance-page --phase collect --command \"pytest ... --collect-only --run-integration-real --run-integration -q\""
+  - "cdd-kit test run add-uph-performance-page --phase targeted --command \"pytest tests/test_uph_performance_sql_builder.py tests/test_uph_performance_unified_job.py tests/integration/test_uph_performance_rq_async.py tests/integration/test_uph_performance_data_boundary.py tests/contract/test_uph_performance_contract.py --run-integration-real --run-integration -q\""
+  - "cdd-kit test run add-uph-performance-page --phase changed-area --command \"pytest tests/test_spool_routes.py tests/test_job_registry.py tests/test_query_cost_policy.py tests/test_eap_alarm_unified_job.py tests/test_production_achievement_unified_job.py tests/test_base_chunked_duckdb_job.py -q\""
+  - "cdd-kit test run add-uph-performance-page --phase contract --command \"cdd-kit validate --contracts\""
+  - "cdd-kit test run add-uph-performance-page --phase quality --command \"ruff check <touched backend files>\""
+  - "ruff check . (repo-wide -- confirmed 9 pre-existing unrelated errors, zero new)"
+  - "cdd-kit openapi export --out contracts/openapi.json / contracts/api/openapi.json (no diff -- already in sync from contract-reviewer's authoring pass)"
+known-risks:
+  - "Oracle probe (IP-0) not executed in this environment -- see oracle-probe above; DBA/ops must run before production activation."
+  - "Shared 3-slot heavy_query_slot semaphore gets a 4th consumer (design.md Open Risks) -- concurrency-knob tuning explicitly out of scope for this change; flagged for stress-soak-engineer."
+  - "DB/WB NULL rate for GDBA/GWBA machines whose WORKCENTERNAME doesn't match 焊接_DB/焊接_WB by design (UPH-05) -- worth spot-checking once real data flows."
+  - "Did not write tests/e2e/test_uph_performance_e2e.py or tests/stress/test_uph_performance_stress.py (Tier 1/3-4, non-required-floor) -- out of this run's effort budget; flagged for whoever owns the e2e/stress phases before those gates are exercised."
+  - "test-evidence.yml is shared with frontend-engineer's concurrent run (CLAUDE.md promoted learning: concurrent backend+frontend cdd-kit test run calls race on this file) -- if frontend-engineer's run lands after this one, re-run the combined-phase commands once more so the file reflects both stacks."
+next-reviewer: contract-reviewer (verify no contract drift) and stress-soak-engineer (Promotion Policy sign-off gate before mes-dashboard-uph-performance-worker.service is ever started)
+
+post-implementation-fix:
+  reported-by: user (live manual test against real Oracle DWH, 2026-07-13 20:50)
+  symptom: "ORA-00900: invalid SQL statement, job_id=uph-performance-*, raised from OracleArrowReader.chunk_iter -> cursor.execute"
+  root-cause: >-
+    SQLLoader.load_with_params substitutes `{{ NAME }}` placeholders via a
+    PLAIN GLOBAL string replace across the whole .sql file -- it also
+    rewrites the placeholder's own mention inside this template's doc-comment
+    header, not just the real WHERE-clause injection site.
+    `_build_equipment_ids_filter`/`_build_container_exists_filter`/
+    `_build_workcenter_names_exists_filter` originally returned fragments
+    prefixed with a literal "\n  AND ..." (embedded newline). Whenever ANY
+    coarse filter was active, that embedded newline got spliced into the
+    header comment's "{{ EXTRA_FILTERS }}" mention too, splitting a single
+    `--`-commented line in two -- the back half of that line was no longer
+    prefixed with `--`, so Oracle received live uncommented garbage text
+    ahead of the actual SELECT and rejected the whole statement.
+  fix: >-
+    (1) The three builder functions no longer return an embedded newline --
+    `pre_query()` now adds the "\n  " separator once, only at the
+    concatenation site that feeds the real WHERE clause. (2) The template's
+    doc comment no longer spells out the literal "{{ FAMILY_FILTER }}" /
+    "{{ EXTRA_FILTERS }}" tokens (rephrased as prose so SQLLoader's global
+    replace can never re-corrupt it in the future, regardless of what any
+    placeholder's value contains).
+  verification: >-
+    Re-ran the exact rendered query via OracleArrowReader.chunk_iter (the
+    real failing code path) against the live Oracle DWH for 8 cases: default
+    (both families), GDBA-only, GWBA-only, each of the four coarse filters
+    individually, and all four combined -- all 8 succeeded (previously: any
+    case with a non-empty coarse filter failed with ORA-00900). Added
+    TestFullTemplateRenderNeverCorruptsHeaderComment (4 new tests) asserting
+    (a) builder fragments never embed a newline, (b) the rendered header
+    comment stays fully commented with zero and with all-four filters
+    active, (c) the real WHERE clause still receives every combined fragment
+    correctly, and (d) the template's own prose never re-introduces the
+    literal placeholder-brace token. Full uph_performance test suite (114
+    tests, includes --run-integration/--run-integration-real markers)
+    re-run clean; ruff clean.
+  fixed-by: main Claude (direct edit, not a subagent) -- user explicitly
+    authorized live Oracle access for this diagnosis after the harness's
+    auto-mode classifier blocked the first attempt (see conversation).

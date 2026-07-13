@@ -134,6 +134,20 @@ _TRAFFIC_ENDPOINTS: Tuple[Tuple[str, str, Dict[str, Any]], ...] = (
     # 401 (no session in the soak harness) is expected and fine — we care about
     # metric deltas, not response status.
     ("GET", "/api/production-achievement/report?start_date=2024-01-01&end_date=2024-01-07", {}),
+    # UPH-Performance async spool path — added per add-uph-performance-page
+    # stress-soak-report.md. always_async=True (no sync fallback, UPH-ASYNC):
+    # spool-miss -> 202 enqueue / spool-hit -> 200 / no worker -> 503; this is
+    # now a 4TH heavy consumer of the SAME shared heavy_query_slot + spool
+    # store as production-achievement/eap-alarm/etc above (design.md Open
+    # Risks) — sustained repetition here exercises UphPerformanceJob's spool
+    # accumulation + cleanup_expired_spool reclaim (see the TTL sub-test at
+    # the bottom of this module) alongside every other domain's traffic in
+    # the SAME rotation, not in isolation. 401 (no session in the soak
+    # harness) is expected and fine — we care about metric deltas, not
+    # response status. Date window kept to 1 day (well within the ≤6h chunk
+    # cap's spirit) so a cold miss enqueues a small, fast job rather than a
+    # multi-day fan-out.
+    ("POST", "/api/uph-performance/spool", {"json": {"date_from": "2024-01-01", "date_to": "2024-01-01"}}),
 )
 
 
@@ -1072,5 +1086,109 @@ def test_production_achievement_spool_ttl_cleanup_reclaims_namespace(
     )
     print(
         f"\n[pa-spool-ttl-cleanup] namespace={namespace} query_id={query_id} "
+        f"reclaimed OK (stats={stats})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tier 4 — uph_performance spool TTL cleanup verification
+# (add-uph-performance-page)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.soak
+def test_uph_performance_spool_ttl_cleanup_reclaims_namespace(
+    tmp_path: Path, local_redis: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cleanup_expired_spool() reclaims BOTH the parquet file and the Redis
+    metadata pointer for the ``uph_performance`` namespace once its TTL has
+    elapsed -- proving the new add-uph-performance-page worker participates
+    correctly in the SAME generic, domain-agnostic cleanup mechanism every
+    other spooled worker (eap_alarm/downtime/material_trace/
+    production_history/reject_history/resource_history/
+    production_achievement) already relies on. No domain-specific carve-out
+    exists (or is needed) in ``cleanup_expired_spool`` -- this test proves the
+    new namespace was not accidentally left out of anything, and that
+    long-running spool accumulation from repeated UphPerformanceJob runs (the
+    soak workload arm added to ``_TRAFFIC_ENDPOINTS`` above) does not grow the
+    spool directory unboundedly. This is the shared soak harness this
+    change's stress-soak-engineer extends per test-plan.md's "soak" row
+    (fold into existing test_soak_workload.py workload list, do not fork a
+    dedicated file).
+
+    Fast, standalone check -- mirrors
+    ``test_production_achievement_spool_ttl_cleanup_reclaims_namespace``
+    exactly (same generic ``cleanup_expired_spool`` mechanism, different
+    namespace); does not require the 30-minute ``gunicorn_workers`` harness,
+    only a real Redis connection via the ``local_redis`` fixture.
+    """
+    import json as _json
+    import time as _time
+
+    import mes_dashboard.core.query_spool_store as spool_mod
+    import mes_dashboard.core.redis_client as redis_client_mod
+
+    # REDIS_ENABLED/REDIS_URL/_REDIS_CLIENT are module-level constants read
+    # once at import (CLAUDE.md "Module-level constants" convention) --
+    # monkeypatch.setattr(), not os.environ, and reset the cached singleton
+    # so get_redis_client() reconnects to the fresh local_redis instance
+    # instead of returning a stale (possibly disabled) cached client.
+    monkeypatch.setattr(redis_client_mod, "REDIS_ENABLED", True)
+    monkeypatch.setattr(redis_client_mod, "REDIS_URL", local_redis)
+    monkeypatch.setattr(redis_client_mod, "_REDIS_CLIENT", None)
+
+    client = redis_client_mod.get_redis_client()
+    if client is None:
+        pytest.skip(
+            "local_redis fixture did not yield a reachable client -- "
+            "cleanup_expired_spool cannot be verified without a real Redis connection"
+        )
+
+    monkeypatch.setattr(spool_mod, "QUERY_SPOOL_DIR", tmp_path)
+
+    namespace = "uph_performance"
+    query_id = "soaktestuph01"  # must satisfy _VALID_ID_RE (>=4 chars)
+
+    # Register a fake spool entry the same way UphPerformanceJob.
+    # post_aggregate() -> register_spool_file() would (real file move + real
+    # Redis metadata write); the parquet BYTES themselves are irrelevant to
+    # a cleanup-reclaim check.
+    src = tmp_path / "src_fake_uph_spool.parquet"
+    src.write_bytes(b"fake-parquet-bytes-for-soak-cleanup-check")
+    registered = spool_mod.register_spool_file(
+        namespace, query_id, src, row_count=1, ttl_seconds=60
+    )
+    assert registered, "register_spool_file() failed -- cannot verify cleanup without a real entry"
+
+    final_path = tmp_path / namespace / f"{query_id}.parquet"
+    assert final_path.exists(), "register_spool_file did not move the fake parquet into place"
+
+    meta_key = redis_client_mod.get_key(spool_mod._meta_key(namespace, query_id))
+    raw = client.get(meta_key)
+    assert raw is not None, "Redis metadata pointer missing immediately after registration"
+
+    # Simulate TTL elapsed: rewrite the metadata payload's expires_at into
+    # the past (cleanup_expired_spool reads THIS field, not Redis's own key
+    # TTL, which only exists as an independent safety net).
+    payload = _json.loads(raw)
+    payload["expires_at"] = int(_time.time()) - 100
+    client.set(meta_key, _json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    stats = spool_mod.cleanup_expired_spool(namespace=namespace)
+
+    assert stats["meta_deleted"] >= 1, (
+        f"cleanup_expired_spool did not report deleting the expired "
+        f"uph_performance metadata entry: {stats}"
+    )
+    assert client.get(meta_key) is None, (
+        "Redis metadata pointer for uph_performance was NOT reclaimed "
+        "by cleanup_expired_spool after its expires_at elapsed"
+    )
+    assert not final_path.exists(), (
+        f"uph_performance spool parquet was NOT deleted by "
+        f"cleanup_expired_spool after TTL expiry: {final_path}"
+    )
+    print(
+        f"\n[uph-spool-ttl-cleanup] namespace={namespace} query_id={query_id} "
         f"reclaimed OK (stats={stats})"
     )

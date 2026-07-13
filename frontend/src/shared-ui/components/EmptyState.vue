@@ -1,10 +1,16 @@
 <script setup lang="ts">
 interface Props {
   type?: 'no-data' | 'filter-empty' | 'error' | 'loading';
+  /** Overrides the canned per-type message with caller-supplied text. Additive
+   *  prop: several existing consumers already pass `message="..."` expecting
+   *  a custom string, which was previously silently dropped as a non-prop
+   *  fallthrough attribute (never rendered) — this makes that intent work. */
+  message?: string;
 }
 
 withDefaults(defineProps<Props>(), {
   type: 'no-data',
+  message: '',
 });
 
 const messages: Record<string, string> = {
@@ -21,7 +27,7 @@ const messages: Record<string, string> = {
       <slot name="illustration" />
     </div>
     <slot name="icon" />
-    <p class="empty-state__message">{{ messages[type] }}</p>
+    <p class="empty-state__message">{{ message || messages[type] }}</p>
     <div v-if="$slots.action" class="empty-state__action">
       <slot name="action" />
     </div>

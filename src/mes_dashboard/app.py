@@ -1371,6 +1371,27 @@ def create_app(config_name: str | None = None) -> Flask:
             200,
         ))
 
+    @app.route('/uph-performance')
+    def uph_performance_page():
+        """UPH Performance page served as pure Vite HTML output."""
+        canonical_redirect = maybe_redirect_to_canonical_shell('/uph-performance')
+        if canonical_redirect is not None:
+            return canonical_redirect
+
+        dist_dir = os.path.join(app.static_folder or "", "dist")
+        dist_html = os.path.join(dist_dir, "uph-performance.html")
+        if os.path.exists(dist_html):
+            return send_from_directory(dist_dir, 'uph-performance.html')
+
+        return missing_in_scope_asset_response('/uph-performance', (
+            "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>UPH表現</title>"
+            "<script type=\"module\" src=\"/static/dist/uph-performance.js\"></script>"
+            "</head><body><div id='app'></div></body></html>",
+            200,
+        ))
+
     # ========================================================
     # Table Query APIs (for table_data_viewer)
     # ========================================================

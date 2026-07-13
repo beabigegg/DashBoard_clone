@@ -315,3 +315,24 @@ class TestAlwaysAsyncField:
         assert config.always_async is True, (
             f"Expected always_async=True, got {config.always_async}"
         )
+
+    def test_uph_performance_registered_with_always_async_true(self):
+        """uph-performance registration must have always_async=True
+        (add-uph-performance-page, AC-5/UPH-ASYNC).
+
+        Does NOT bump the 12-count in TestJobServiceRegistrations --
+        worker-registered types (this one included) are excluded from that
+        count, per eap-alarm/production-achievement precedent.
+        """
+        import importlib
+        import mes_dashboard.services.job_registry as jr
+        import mes_dashboard.workers.uph_performance_worker as w
+
+        # Re-register against the currently-cleared registry
+        importlib.reload(w)
+
+        config = jr.get_job_type_config("uph-performance")
+        assert config is not None, "uph-performance job type not registered"
+        assert config.always_async is True, (
+            f"Expected always_async=True, got {config.always_async}"
+        )

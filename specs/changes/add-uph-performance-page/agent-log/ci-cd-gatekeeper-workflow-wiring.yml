@@ -1,0 +1,42 @@
+agent: ci-cd-gatekeeper
+change-id: add-uph-performance-page
+summary: >
+  Closed the qa-reviewer-flagged tasks.yml 4.4 gap ("CI/CD workflows" still pending).
+  Added a "Run uph-performance e2e spec (add-uph-performance-page, Tier 1)" step to
+  .github/workflows/frontend-tests.yml running
+  `npx playwright test tests/playwright/uph-performance.spec.ts`, placed in the same
+  frontend-unit-tests job right after the mid-section-defect step, single .ts-suffix
+  form (no .ts||.js fallback -- the spec has no legacy .js twin, unlike
+  downtime-analysis.spec.ts). Reuses the shared "Install Playwright browsers" step
+  already present earlier in the job; no new install step needed. Tagged under the
+  existing playwright-critical-journeys gate name (per this change's own ci-gates.md
+  Required Gates table), NOT a new separate gate name -- deliberately following the
+  eap-alarm-analysis / production-achievement-kanban precedent (append spec to that
+  gate's command list) rather than production-achievement-async-spool's
+  separate-named-step precedent, since ci-gates.md already committed to the former.
+  Updated contracts/ci/ci-gate-contract.md Gate Inventory row playwright-critical-journeys
+  to append tests/playwright/uph-performance.spec.ts to its command cell (only Gate
+  Inventory table in the file; confirmed no separate per-workflow-step table exists).
+  Bumped schema-version 1.3.38 -> 1.3.39 and recorded the change in the central
+  contracts/CHANGELOG.md (the in-file "## CHANGELOG" section inside
+  ci-gate-contract.md has been superseded by the central changelog since [ci 1.3.36]
+  and was intentionally left untouched, per the "Version entries go only in
+  contracts/CHANGELOG.md" convention). Updated this change's own ci-gates.md
+  "Workflow Changes Applied" section from "None applied yet" to reflect the actual
+  edits, plus a note on the known sandbox Chromium-install limitation (pre-existing,
+  unrelated to this change, already confirmed by e2e-resilience-engineer). Verified
+  the edited workflow YAML parses cleanly via python3 yaml.safe_load and that the new
+  step sits correctly inside the existing single job (15 steps total, step 13 =
+  the new uph-performance step). Did not attempt to execute Playwright itself (known
+  sandbox gap) and made no changes to application source, deploy/*.service, or
+  scripts/start_server.sh (those remain backend-engineer's tasks.yml 4.3, already done
+  per prior agent logs). Left tasks.yml untouched -- out of my scope restriction
+  (CI workflow files / Makefile gate targets / ci-gates.md only); item 4.4 should be
+  flipped to done by the coordinating agent based on this log.
+artifacts:
+  - { type: tiers-modified, pointer: "1 (playwright-critical-journeys, PR-required)" }
+  - { type: gate-promotions, pointer: "none (no tier change; spec added to existing Tier-1 gate command)" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml (new step: Run uph-performance e2e spec, added after mid-section-defect step, before Verify test discovery)" }
+  - { type: required-status-checks, pointer: "playwright-critical-journeys (unchanged check name, command list extended with tests/playwright/uph-performance.spec.ts)" }
+  - { type: contract-files-changed, pointer: "contracts/ci/ci-gate-contract.md (schema-version 1.3.38 -> 1.3.39, Gate Inventory row playwright-critical-journeys command cell); contracts/CHANGELOG.md ([ci 1.3.39] entry added)" }
+  - { type: yaml-validation, pointer: "python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/frontend-tests.yml'))\" -> OK, 15 steps in frontend-unit-tests job" }

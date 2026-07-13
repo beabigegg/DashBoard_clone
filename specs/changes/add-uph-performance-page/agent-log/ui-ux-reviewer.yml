@@ -1,0 +1,16 @@
+change-id: add-uph-performance-page
+agent: ui-ux-reviewer
+status: done
+verdict: approved
+summary: >-
+  All 10 confirmed states reachable and visually distinguishable; EmptyState
+  vs ErrorBanner never swapped; the two Type selectors correctly separate and
+  independent; empty-state wording matches exactly with no parameter-name
+  leak; family filter shows only GDBA/GWBA with no static DB/WB gloss;
+  dedicated fine-filter bar present; trend defaults group_by=family; detail
+  page size confirmed at 50 (post-fix); no deleted controls reintroduced.
+  Two non-blocking observations: (1) page-level EmptyState + per-widget empty
+  sub-states both render simultaneously on state-empty (minor visual noise,
+  not a spec violation); (2) state-expired (410) recovery copy is generic
+  rather than explicitly telling the user to re-submit. Neither is blocking.
+required-changes: none

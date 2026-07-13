@@ -62,6 +62,9 @@
     ],
     "/production-achievement": [
       "production-achievement.js"
+    ],
+    "/uph-performance": [
+      "uph-performance.js"
     ]
   },
   "deferred_routes": []

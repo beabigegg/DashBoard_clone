@@ -1,0 +1,21 @@
+- type: tier-floor-override
+  change-id: add-uph-performance-page
+  timestamp: '2026-07-13T14:13:31.180Z'
+  declared-tier: 1
+  floor-tier: 0
+  label: critical surface (auth / payments / data migration / concurrency / secrets)
+  matched:
+    - migration
+    - query
+    - route
+    - worker
+  reason: >-
+    Keyword-scan false positive on 'migration' (maxTier-0 pattern 'migrations?'):
+    design.md/change-request.md explicitly state there is NO data migration -- this is a net-new
+    page/table/spool namespace, nothing existing is altered or migrated. The 'concurrency' surface
+    (shared heavy_query_slot semaphore) is pre-existing infra this change reuses unchanged (explicit
+    Non-goal: no concurrency-knob changes), not new concurrency control being introduced.
+    change-classification.md's Tier 1 reasoning (additive, mirrors two already-shipped features,
+    reuses established safe async patterns) stands; the full Tier 0-1 agent set (design review,
+    e2e-resilience, stress-soak, ui-ux, visual, qa) already ran regardless, since this skill uses an
+    identical agent roster for Tier 0 and Tier 1.

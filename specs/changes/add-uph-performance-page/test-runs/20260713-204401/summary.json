@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard cdd-kit validate --contracts",
+  "duration_ms": 2863,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-204401/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-204401/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-204401/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

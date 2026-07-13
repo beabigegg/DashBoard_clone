@@ -27,6 +27,7 @@ _ALLOWED_NAMESPACES = frozenset({
     "eap_alarm",
     "wip_dataset",  # wip-rq-worker-chunks-cleanup: async WIP detail spool
     "production_achievement",  # production-achievement-async-spool
+    "uph_performance",  # add-uph-performance-page
 })
 
 # query_id must be 1-64 hex characters (SHA256 prefix)

@@ -1,0 +1,16 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "pytest tests/test_uph_performance_sql_builder.py tests/test_uph_performance_unified_job.py tests/integration/test_uph_performance_rq_async.py tests/integration/test_uph_performance_data_boundary.py tests/contract/test_uph_performance_contract.py --run-integration-real --run-integration -q --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/add-uph-performance-page/test-runs/20260713-212834/junit.xml' --maxfail=1 --tb=short -ra",
+  "duration_ms": 2353,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-212834/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-212834/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-212834/stderr.log",
+    "junit": "specs/changes/add-uph-performance-page/test-runs/20260713-212834/junit.xml"
+  },
+  "next_action": "proceed to the next phase"
+}

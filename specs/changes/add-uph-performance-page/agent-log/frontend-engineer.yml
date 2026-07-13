@@ -1,0 +1,132 @@
+change-id: add-uph-performance-page
+agent: frontend-engineer
+timestamp: "2026-07-13T20:40:00Z"
+status: complete
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/uph-performance/index.html" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/main.js" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/App.vue" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/FilterBar.vue" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/FineFilterBar.vue" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/TrendChart.vue" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/RankingBlock.vue" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/DetailTable.vue" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/style.css" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/composables/useUphPerformanceFilter.js" }
+  - { type: files-changed, pointer: "frontend/src/uph-performance/composables/useUphPerformanceViews.js" }
+  - { type: files-changed, pointer: "frontend/src/shared-ui/components/EmptyState.vue:1-30" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/navigationManifest.js:153-157" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/routeContracts.js:19-22" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/routeContracts.js:328-338" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/nativeModuleRegistry.js:109-113" }
+  - { type: files-changed, pointer: "frontend/vite.config.ts:39-40" }
+  - { type: files-changed, pointer: "docs/migration/full-modernization-architecture-blueprint/route_scope_matrix.json" }
+  - { type: files-changed, pointer: "docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json" }
+  - { type: files-changed, pointer: "data/page_status.json" }
+  - { type: files-changed, pointer: "frontend/tests/unit/uph-performance-filter.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/unit/uph-performance-views.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/unit/uph-performance-ranking-block.test.js" }
+  - { type: files-changed, pointer: "frontend/tests/unit/uph-performance-filter-bar.test.js" }
+  - { type: files-changed, pointer: "frontend/src/shared-ui/components/__tests__/EmptyState.test.ts" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/uph-performance.spec.ts" }
+  - { type: components-affected, pointer: "App, FilterBar, FineFilterBar, TrendChart, RankingBlock, DetailTable, EmptyState (shared, additive)" }
+  - { type: accessibility-audit, pointer: "n/a (reused shared MultiSelect/DataTable/ErrorBanner/EmptyState a11y patterns verbatim; no new bespoke interactive widgets introduced)" }
+  - { type: screenshot-paths, pointer: "n/a (no dev server / visual-reviewer pass in this session; Playwright chromium binary unavailable in sandbox, see notes)" }
+next-action: none
+notes: >
+  Implemented frontend/src/uph-performance/ as a new Vue app mirroring
+  eap-alarm's coarse-submit/fine-auto-apply/async-poll structure exactly, with
+  production-achievement as the secondary drawer precedent. All 10 states and
+  every control in interaction-design.md's confirmed section are implemented
+  verbatim, including the two visibly-distinct Type selectors
+  (ctrl-type-select-global vs ctrl-ranking-type-filter, entirely separate refs
+  in useUphPerformanceFilter.js — never sharing state, unit-tested explicitly)
+  and the ranking block's default-none-selected prompt gating (fetchRanking
+  never issues a request when the ranking Type selection is empty).
+  workcenter_names / equipment_ids (global coarse filter) are implemented as
+  free-text multi-line textareas, not MultiSelect dropdowns, because the API
+  contract has no pre-query options endpoint for those two dims (only
+  product-filter-options covers Package/Type) — mirrors eap-alarm's LOT ID
+  textarea precedent rather than inventing an undocumented endpoint call.
+  Ranking's own Type MultiSelect reuses filterOptions.pj_type_options (already
+  fetched post-spool via GET /filter-options) as its option source instead of
+  calling GET /ranking with an empty selection just to list options, keeping
+  the ranking endpoint genuinely un-queried until the user picks a Type.
+  Made one additive change to the shared EmptyState.vue: added an optional
+  `message` prop that overrides the canned per-type text. This was necessary
+  to render interaction-design.md's exact confirmed empty-state wording
+  ("此範圍無 UPH 資料，請放寬日期或調整篩選器") — the component previously had
+  no such prop, so several existing consumers' `message="..."` usage
+  (hold-history, eap-alarm's TrendChart/ParetoChart, job-query) was silently
+  dropped as a non-prop fallthrough attribute and never rendered; this change
+  is purely additive/backward-compatible (default unchanged) and fixes that
+  latent drop as a side effect. Full frontend vitest suite (852 tests, 81
+  files) still passes after this change, plus a new dedicated EmptyState.test.ts.
+  Did NOT import frontend/src/resource-shared/styles.css (out of this agent's
+  allowed-path scope per context-manifest.md) — instead followed the
+  admin-pages/admin-dashboard/material-consumption precedent of importing only
+  styles/tailwind.css + the page's own scoped style.css, replicating the
+  minimal `.dashboard`/`.filter-*` primitives locally under
+  `.theme-uph-performance`. This avoids any resource-shared `:is(.theme-X,…)`
+  group-membership edit (css-contract Rule 4.5), which would otherwise have
+  required an out-of-scope path.
+  Wiring: beyond the 4 touchpoints named in the task (navigationManifest.js,
+  route_scope_matrix.json, vite.config.ts INPUT_MAP, routeContracts.js), also
+  updated frontend/src/portal-shell/nativeModuleRegistry.js (the actual SPA
+  mount-gate keyed by route — navigationManifest.js's own header comment
+  states every route key MUST exist there) and
+  docs/migration/full-modernization-architecture-blueprint/asset_readiness_manifest.json
+  (named explicitly in CLAUDE.md's modernization-policy promoted learning
+  alongside route_scope_matrix.json), since eap-alarm/production-achievement
+  both have entries in every one of these files and omitting either would
+  leave the route unable to actually mount inside portal-shell. Did NOT touch
+  db-scheduling/production-achievement's pre-existing gap in
+  routeContracts.js's IN_SCOPE_REPORT_ROUTES array (they have ROUTE_CONTRACTS
+  entries but are absent from that array) — added only /uph-performance there,
+  since fixing the pre-existing gap for other routes is out of this change's
+  scope.
+  data/page_status.json: set /uph-performance to "dev" (mirrors db-scheduling's
+  initial rollout), consistent with design.md's Known Risks — UPH-03 data
+  availability (BondUPH/fHCM_UPH parameter collection) is still probe-pending
+  per backend-engineer's IP-0, and ci-gates.md's Promotion Policy requires a
+  stress-soak sign-off before first worker start in any environment.
+  Detail table default per_page: interaction-design.md's Open Decisions item
+  "Detail table page size" is checked [x] but has NO corresponding transcribed
+  answer in the Confirmed section (the 7 confirmed items map to 7 of the 8
+  open items; this one alone was left unanswered). Implemented per_page=20 —
+  the exact eap-alarm-precedent default named in the open-decision question
+  itself, and a plain numeric default for an already-fully-confirmed control
+  (ctrl-detail-pagination, cap=200), not an invented state/control — but this
+  gap should be closed with a real transcribed human answer before the design
+  doc is next touched.
+  Test evidence: collect/targeted/changed-area phases recorded via `cdd-kit
+  test run` (test-evidence.yml) — vitest unit/component suite (5 new files, 51
+  new tests) all green, full existing frontend vitest suite (852 tests, 81
+  files) still green, portal-shell-navigation.test.js (15 tests) still green,
+  `npm run type-check` clean, `npm run css:check` 0 errors (new
+  `.theme-uph-performance` scoping passes Rule 6; only pre-existing-pattern px
+  warnings, no new error class). `npm run build` succeeds and emits
+  uph-performance.js + uph-performance.html into static/dist.
+  Playwright: frontend/tests/playwright/uph-performance.spec.ts (16 tests)
+  lists and parses correctly (`--list` succeeds) but could not be executed in
+  this sandbox — the pinned @playwright/test~1.58.0 expects chromium
+  revision 1208 while only revision 1228 is cached
+  (~/.cache/ms-playwright/chromium_headless_shell-1228), a pre-existing
+  environment gap reproduced identically on an unrelated, already-merged spec
+  (production-achievement-async.spec.ts). Not fixed here (browser
+  install/version reconciliation is an environment/CI concern, ci-gates.md
+  assigns the `npx playwright install --with-deps chromium` CI step to
+  ci-cd-gatekeeper). ci-gates.md's two required workflow edits
+  (.github/workflows/frontend-tests.yml step + ci-gate-contract.md Gate
+  Inventory row) are explicitly owned by "whoever lands the spec / ci-cd-
+  gatekeeper" per this change's own ci-gates.md — not done here; flagging for
+  that agent since the spec file now exists.
+  Contract/quality test phases intentionally left unrun by this agent: the
+  backend routes this page depends on are being implemented in parallel by
+  another agent in the same change, so `cdd-kit validate --contracts` would
+  either race or validate against not-yet-existing backend code. Per this
+  repo's own promoted learning ("Concurrent backend+frontend agents both
+  calling cdd-kit test run race on test-evidence.yml — last agent must re-run
+  combining both stacks' commands"), the agent that finishes last should
+  re-run test-evidence.yml combining both stacks' commands, including the
+  contract phase.

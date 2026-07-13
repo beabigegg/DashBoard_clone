@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.37
-last-changed: 2026-07-08
+schema-version: 1.3.39
+last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -26,7 +26,7 @@ breaking-change-policy: deprecate-2-minors
 | frontend-type-check | 1 | PR | informational | `cd frontend && npm run type-check` | application-team | — |
 | playwright-resilience | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/resilience/` | application-team | playwright trace |
 | playwright-data-boundary | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/data-boundary/` | application-team | playwright trace |
-| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js tests/playwright/eap-alarm.spec.js tests/playwright/production-achievement.spec.js` | application-team | playwright trace |
+| playwright-critical-journeys | 1 | PR | yes | `cd frontend && npx playwright test tests/playwright/hold-overview.spec.js tests/playwright/reject-history.spec.js tests/playwright/query-tool.spec.js tests/playwright/eap-alarm.spec.js tests/playwright/production-achievement.spec.js tests/playwright/uph-performance.spec.ts` | application-team | playwright trace |
 | visual-regression | 2 | PR | informational | (TBD — Playwright screenshot diff) | application-team | screenshot diff |
 | nightly-integration | 3 | weekly schedule / dispatch | yes (nightly) | `pytest tests/integration/ --run-integration-real -m "integration_real or multi_worker" -x` | application-team | test report |
 | stress-load | 4 | weekly schedule / dispatch | yes (weekly) | `pytest tests/stress/ -m "stress or load"` | platform-team | perf report |
@@ -765,6 +765,20 @@ gate tier, command, or status changed.
 3. Safe because the page is pre-launch/unexposed — 503 has no live-user regression impact.
 
 **Schema-version bump to 1.3.36 (patch)**: gate-compatibility note finalized (new `worker-env-parity-static` Tier-1 gate, new `production-achievement-async-e2e` Playwright step, stress/soak-before-activation policy for a default-on flag) plus deploy/rollback checklist. No existing gate tier, command, or status changed.
+
+## add-uph-performance-page Gate Compatibility Note
+
+**New RQ worker (`mes-dashboard-uph-performance-worker.service`, job type `uph-performance`, `UphPerformanceJob(BaseChunkedDuckDBJob)`, `chunk_strategy=TIME`, ≤6h chunk windows). The `## New RQ Worker Deploy Checklist` above already covers this — no addition to the checklist itself is required**: the worker is wired into BOTH `deploy/mes-dashboard-uph-performance-worker.service` AND `scripts/start_server.sh` in the same PR (config/PID/log vars + start/stop/status + orchestration call site); `acquire_heavy_query_slot` is wired around the Oracle-phase fetch (ASYNC-15); `rq worker` CLI never carries `--job-execution-timeout` (per-job timeout set at enqueue via `job_timeout=JobTypeConfig.timeout_seconds`).
+
+**Tier-1 unit/contract coverage** (existing `unit-mock-integration` gate): new job module `src/mes_dashboard/workers/uph_performance_worker.py` (`test_uph_performance_unified_job.py`: chunk-window ≤6h assertion, family→PARAMETER_NAME mapping, no-scale-conversion pin, DB/WB-via-workcenter_groups pin); new spool namespace `uph_performance` in `spool_routes._ALLOWED_NAMESPACES` — MUST be covered by the parametrized allowlist test in `tests/test_spool_routes.py` in the same PR (same rule as `eap_alarm`/`production_achievement`); env default/enum pin for `UPH_PERFORMANCE_USE_UNIFIED_JOB` (default `on`), `UPH_PERFORMANCE_WORKER_QUEUE`, `UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS`.
+
+**Tier-1 Playwright coverage**: new `tests/playwright/uph-performance.spec.ts` added to the `playwright-critical-journeys` gate command; resilience/data-boundary specs (worker unavailable → 503, zero-UPH-rows empty state) auto-discovered by the existing `playwright-resilience`/`playwright-data-boundary` gate commands.
+
+**Tier-3 integration coverage** (existing `nightly-integration` gate): `tests/integration/test_uph_performance_rq_async.py` (spool round-trip, chunk-boundary, coarse-filter, cross-worker semaphore wiring — extends the existing N-way concurrent-worker fixture to include the UPH worker as an additional Oracle-bound worker type on `heavy_query_slot`).
+
+**Tier-4 stress/soak gate** (existing `stress-load` and `soak` gates, weekly/manual dispatch — not PR-blocking): `stress-soak-report.md` sign-off is required before `mes-dashboard-uph-performance-worker.service` is first started in any environment — `UPH_PERFORMANCE_USE_UNIFIED_JOB` defaults `on` with no legacy path (same collapsed sign-off-onto-first-start precedent as `production-achievement-async-spool`), and this feature queries a ~12M-row/day table with a documented >180s timeout history, raising the stress bar above the typical new-worker case.
+
+**No new workflow file and no gate-tier change**: all new tests fall within existing `unit-mock-integration` (Tier 1), `nightly-integration` (Tier 3), `stress-load`/`soak` (Tier 4) gate commands; the new Playwright step is added inside the existing `frontend-tests.yml` file.
 
 ## CHANGELOG
 

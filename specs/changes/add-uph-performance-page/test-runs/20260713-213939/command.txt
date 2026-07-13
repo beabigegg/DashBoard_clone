@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/integration/test_uph_performance_resilience.py tests/integration/test_uph_performance_data_boundary.py --run-integration --run-integration-real -q

@@ -1,0 +1,11 @@
+agent: implementation-planner
+change-id: add-uph-performance-page
+date: 2026-07-13
+artifacts:
+  - { type: plan-written, pointer: "specs/changes/add-uph-performance-page/implementation-plan.md" }
+  - { type: owner-map, pointer: "backend-engineer (IP-0..IP-10), frontend-engineer (IP-11..IP-12)" }
+  - { type: scope-summary, pointer: "13 required changes (IP-0 probe-first + 12 build); 6 out-of-scope items pinned" }
+notes:
+  - IP-0 (≤6h read-only Oracle probe of BondUPH/fHCM_UPH) is backend-engineer's mandatory blocking first step; empty result => report blocked, do not swap param names.
+  - All six contracts already authored; plan references by path/section only, no contract edits by implementation.
+  - Design confirmed (design.md + ADR-0017 present, filled); interaction-design.md Confirmed section is human-authored and locked. No blockers.

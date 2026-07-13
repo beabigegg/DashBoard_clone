@@ -83,6 +83,10 @@
     {
       "route": "/production-achievement",
       "category": "report"
+    },
+    {
+      "route": "/uph-performance",
+      "category": "report"
     }
   ],
   "deferred": []

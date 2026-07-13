@@ -1,0 +1,20 @@
+change-id: add-uph-performance-page
+agent: qa-reviewer
+status: done
+verdict: approved-with-risk
+summary: >-
+  All required test-evidence.yml phases (collect, targeted, changed-area,
+  contract, quality, full) passed. cdd-kit validate --contracts/--env/--ci/
+  --versions all clean. Contract drift check: zero drift. UI/UX and visual
+  reviews: approved, zero blocking findings.
+residual-risks-accepted:
+  - "RESOLVED post-hoc (2026-07-13): GWBA/fHCM_UPH data-availability was formally confirmed by a live <=6h probe against real Oracle, run with explicit user authorization after this verdict was issued. Result: GDBA/BondUPH 118 distinct equipment / 617 events / 100% non-null; GWBA/fHCM_UPH 46 distinct equipment / 259 events / 100% non-null. This reverses the prior 2026-07-08 investigation's zero-GWBA-signal finding. See agent-log/backend-engineer.yml oracle-probe block and stress-soak-report.md's new Data-Availability Probe section. No further DBA action required on this specific question before enabling UPH_PERFORMANCE_USE_UNIFIED_JOB, though a single point-in-time sample doesn't guarantee coverage across all shifts."
+  - "Shared 3-slot heavy_query_slot semaphore gains a 4th consumer; combined cross-domain production load never tested against real Oracle. Pre-existing, cross-cutting, non-goal for this change (documented in design.md Open Risks + stress-soak-report.md). STILL OPEN -- not resolved by the data-availability probe above."
+notes-on-subagent-claims:
+  - "QA's finding that 'detail table page size has no transcribed answer / frontend uses 20' was STALE -- verified directly: interaction-design.md Confirmed #8 records 50, and useUphPerformanceViews.js:17 DEFAULT_PER_PAGE=50. No action needed, finding disregarded as outdated."
+  - "QA's claim that Tier 1 requires a second 'spec-architect co-sign' reviewer beyond qa-reviewer was NOT found anywhere in .cdd/policy.yml, docs/adr/*, or the skill's documented agent order (qa-reviewer 'always runs last and makes the release-readiness decision', singular). Disregarded as not an actual project policy."
+follow-up-actioned:
+  - "tasks.yml 4.4 (CI/CD workflows) was genuinely pending -- dispatched ci-cd-gatekeeper to wire uph-performance.spec.ts into .github/workflows/frontend-tests.yml's playwright-critical-journeys step. Done, verified via cdd-kit validate --ci."
+follow-up-not-actioned (non-blocking, next iteration):
+  - "4 of 7 endpoints still carry prose GenericSuccessResponse instead of typed ## Schemas entries in api-contract.md (shapes fully documented in data-shape-contract.md §3.29)."
+  - "tests/contract/response-samples.json has zero entries for any of the 7 new endpoints."

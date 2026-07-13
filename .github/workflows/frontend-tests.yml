@@ -98,6 +98,15 @@ jobs:
         # npx playwright install --with-deps chromium already executed above.
         run: npx playwright test tests/playwright/mid-section-defect.spec.ts
 
+      - name: Run uph-performance e2e spec (add-uph-performance-page, Tier 1)
+        working-directory: frontend
+        # ci-gates.md gate: playwright-critical-journeys (Tier 1, required)
+        # Covers: all 10 confirmed UI states in uph-performance.spec.ts (filter render,
+        # trend/ranking/detail views, GDBA/GWBA family scoping, worker-unavailable 503,
+        # zero-row empty state) — statically verified correct by e2e-resilience-engineer.
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/uph-performance.spec.ts
+
       - name: Verify test discovery
         working-directory: frontend
         run: |

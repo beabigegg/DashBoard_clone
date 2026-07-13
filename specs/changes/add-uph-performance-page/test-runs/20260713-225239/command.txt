@@ -1,0 +1,1 @@
+pytest tests/acceptance/test_add_uph_performance_page_acceptance.py -v --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/add-uph-performance-page/test-runs/20260713-225239/junit.xml' -q --maxfail=1 --tb=short -ra

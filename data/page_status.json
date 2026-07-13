@@ -4,6 +4,7 @@
     "/admin/dashboard": "dev",
     "/query-tool": "released",
     "/db-scheduling": "dev",
-    "/production-achievement": "released"
+    "/production-achievement": "released",
+    "/uph-performance": "dev"
   }
 }

@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "cd frontend && npx vitest run tests/unit/uph-performance-filter.test.js tests/unit/uph-performance-views.test.js tests/unit/uph-performance-ranking-block.test.js tests/unit/uph-performance-filter-bar.test.js src/shared-ui/components/__tests__/EmptyState.test.ts",
+  "duration_ms": 1725,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-203827/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-203827/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-203827/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

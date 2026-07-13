@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard env PYTHONPATH=src TESTING=True REDIS_ENABLED=false ORACLE_DB_ENABLED=false LOCAL_AUTH_ENABLED=true SECRET_KEY=test pytest tests/test_spool_routes.py tests/test_job_registry.py tests/test_query_cost_policy.py tests/test_eap_alarm_unified_job.py tests/test_production_achievement_unified_job.py tests/test_base_chunked_duckdb_job.py -q",
+  "duration_ms": 3839,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-204334/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-204334/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-204334/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

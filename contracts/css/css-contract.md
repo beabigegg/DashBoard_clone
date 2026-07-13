@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.14.0
-last-changed: 2026-07-09
+schema-version: 1.15.0
+last-changed: 2026-07-13
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -144,6 +144,8 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 
 
 **eap-alarm-analysis (2026-06-18)**: `frontend/src/eap-alarm/style.css` 全部 CSS 規則必須以 `.theme-eap-alarm` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行。Rule 4.5: `.theme-eap-alarm` must be batch-added to all `:is(.theme-X, …)` groups in `resource-shared/styles.css` via `sed` in the same PR. Rule 4.4: any `<Teleport to="body">` usage must wrap teleported content in `<div class="theme-eap-alarm">`.
+
+**add-uph-performance-page (2026-07-13)**: `frontend/src/uph-performance/style.css` 全部 CSS 規則必須以 `.theme-uph-performance` 為父選擇器作用域；zero unscoped top-level rules permitted。由 `npm run css:check` Rule 6 強制執行。Rule 4.5: `.theme-uph-performance` must be batch-added to all `:is(.theme-X, …)` groups in `resource-shared/styles.css` (and any other shared component-style file this page reuses) via `sed` in the same PR. Rule 4.4: any `<Teleport to="body">` usage (e.g. a modal/dropdown in the equipment-ranking block) must wrap teleported content in `<div class="theme-uph-performance">`.
 
 ## Visual Review Policy
 

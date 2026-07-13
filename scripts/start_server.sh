@@ -70,6 +70,9 @@ RQ_WARMUP_WORKER_QUEUE="${WARMUP_WORKER_QUEUE:-warmup}"
 # RQ query-tool worker configuration
 RQ_QUERY_TOOL_WORKER_ENABLED="${RQ_QUERY_TOOL_WORKER_ENABLED:-true}"
 RQ_QUERY_TOOL_WORKER_QUEUE="${QUERY_TOOL_WORKER_QUEUE:-query-tool}"
+# RQ uph-performance worker configuration
+RQ_UPH_PERFORMANCE_WORKER_ENABLED="${RQ_UPH_PERFORMANCE_WORKER_ENABLED:-true}"
+RQ_UPH_PERFORMANCE_WORKER_QUEUE="${UPH_PERFORMANCE_WORKER_QUEUE:-uph-performance-query}"
 
 # Vite dev server configuration
 VITE_DEV_PORT="${VITE_DEV_PORT:-5173}"
@@ -145,6 +148,8 @@ resolve_runtime_paths() {
     RQ_WARMUP_WORKER_LOG="${LOG_DIR}/rq_warmup_worker.log"
     RQ_QUERY_TOOL_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_query_tool_worker.pid"
     RQ_QUERY_TOOL_WORKER_LOG="${LOG_DIR}/rq_query_tool_worker.log"
+    RQ_UPH_PERFORMANCE_WORKER_PID_FILE="${WATCHDOG_RUNTIME_DIR}/rq_uph_performance_worker.pid"
+    RQ_UPH_PERFORMANCE_WORKER_LOG="${LOG_DIR}/rq_uph_performance_worker.log"
     RQ_LOG_FORMAT="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     RQ_DATE_FORMAT="%Y-%m-%d %H:%M:%S"
     PID_FILE="${WATCHDOG_PID_FILE}"
@@ -682,6 +687,11 @@ rotate_logs() {
     if [ -f "$RQ_WARMUP_WORKER_LOG" ] && [ -s "$RQ_WARMUP_WORKER_LOG" ]; then
         mv "$RQ_WARMUP_WORKER_LOG" "${LOG_DIR}/archive/rq_warmup_worker_${ts}.log"
         log_info "Archived rq_warmup_worker.log -> archive/rq_warmup_worker_${ts}.log"
+    fi
+
+    if [ -f "$RQ_UPH_PERFORMANCE_WORKER_LOG" ] && [ -s "$RQ_UPH_PERFORMANCE_WORKER_LOG" ]; then
+        mv "$RQ_UPH_PERFORMANCE_WORKER_LOG" "${LOG_DIR}/archive/rq_uph_performance_worker_${ts}.log"
+        log_info "Archived rq_uph_performance_worker.log -> archive/rq_uph_performance_worker_${ts}.log"
     fi
 
     # Clean up old archives (keep last 10)
@@ -1892,6 +1902,109 @@ rq_eap_alarm_worker_status() {
     fi
 }
 
+get_rq_uph_performance_worker_pid() {
+    local saved_pid=""
+    if [ -f "${RQ_UPH_PERFORMANCE_WORKER_PID_FILE:-}" ]; then
+        saved_pid=$(cat "${RQ_UPH_PERFORMANCE_WORKER_PID_FILE}" 2>/dev/null || true)
+        if [ -n "$saved_pid" ] && kill -0 "$saved_pid" 2>/dev/null; then
+            echo "$saved_pid"
+            return 0
+        fi
+    fi
+    local discovered_pid
+    discovered_pid=$(pgrep -f "[r]q worker.*${RQ_UPH_PERFORMANCE_WORKER_QUEUE}" 2>/dev/null | head -1 || true)
+    if [ -n "$discovered_pid" ]; then
+        echo "$discovered_pid"
+        return 0
+    fi
+    return 1
+}
+
+is_rq_uph_performance_worker_running() {
+    get_rq_uph_performance_worker_pid &>/dev/null
+}
+
+start_rq_uph_performance_worker() {
+    if ! is_enabled "${RQ_UPH_PERFORMANCE_WORKER_ENABLED:-true}"; then
+        log_info "RQ uph-performance worker is disabled (RQ_UPH_PERFORMANCE_WORKER_ENABLED=${RQ_UPH_PERFORMANCE_WORKER_ENABLED:-true})"
+        return 0
+    fi
+
+    resolve_runtime_paths
+
+    if is_rq_uph_performance_worker_running; then
+        local pid
+        pid=$(get_rq_uph_performance_worker_pid)
+        log_info "RQ uph-performance worker already running (PID: ${pid})"
+        return 0
+    fi
+
+    local redis_url="redis://127.0.0.1:6379/0"
+    if [ -n "${REDIS_URL:-}" ]; then
+        redis_url="${REDIS_URL}"
+    fi
+
+    log_info "Starting RQ uph-performance worker (queue: ${RQ_UPH_PERFORMANCE_WORKER_QUEUE})..."
+
+    if command -v setsid &>/dev/null; then
+        setsid env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 rq worker "${RQ_UPH_PERFORMANCE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_UPH_PERFORMANCE_WORKER_LOG}" 2>&1 < /dev/null &
+    else
+        env DB_POOL_SIZE=2 DB_MAX_OVERFLOW=1 nohup rq worker "${RQ_UPH_PERFORMANCE_WORKER_QUEUE}" --url "${redis_url}" -P src -c mes_dashboard.rq_worker_preload --log-format "${RQ_LOG_FORMAT}" --date-format "${RQ_DATE_FORMAT}" >> "${RQ_UPH_PERFORMANCE_WORKER_LOG}" 2>&1 < /dev/null &
+    fi
+    local worker_pid=$!
+    echo "$worker_pid" > "${RQ_UPH_PERFORMANCE_WORKER_PID_FILE}"
+    sleep 1
+    if kill -0 "$worker_pid" 2>/dev/null; then
+        log_success "RQ uph-performance worker started (PID: ${worker_pid}, queue: ${RQ_UPH_PERFORMANCE_WORKER_QUEUE})"
+        return 0
+    else
+        log_error "RQ uph-performance worker failed to start"
+        return 1
+    fi
+}
+
+stop_rq_uph_performance_worker() {
+    if ! is_rq_uph_performance_worker_running; then
+        log_info "RQ uph-performance worker is not running"
+        return 0
+    fi
+
+    local pid
+    pid=$(get_rq_uph_performance_worker_pid)
+    log_info "Stopping RQ uph-performance worker (PID: ${pid})..."
+    if kill "$pid" 2>/dev/null; then
+        local wait=0
+        while kill -0 "$pid" 2>/dev/null && [ "$wait" -lt 10 ]; do
+            sleep 1
+            wait=$((wait+1))
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "${RQ_UPH_PERFORMANCE_WORKER_PID_FILE:-}" 2>/dev/null || true
+        log_success "RQ uph-performance worker stopped"
+        return 0
+    else
+        log_error "Failed to stop RQ uph-performance worker"
+        return 1
+    fi
+}
+
+rq_uph_performance_worker_status() {
+    if ! is_enabled "${RQ_UPH_PERFORMANCE_WORKER_ENABLED:-true}"; then
+        echo -e "  RQ UPH Performance Worker:${YELLOW} DISABLED${NC}"
+        return 0
+    fi
+
+    if is_rq_uph_performance_worker_running; then
+        local pid
+        pid=$(get_rq_uph_performance_worker_pid)
+        echo -e "  RQ UPH Performance Worker:${GREEN} RUNNING${NC} (PID: ${pid}, queue: ${RQ_UPH_PERFORMANCE_WORKER_QUEUE})"
+    else
+        echo -e "  RQ UPH Performance Worker:${RED} STOPPED${NC}"
+    fi
+}
+
 get_rq_warmup_worker_pid() {
     local saved_pid=""
     if [ -f "${RQ_WARMUP_WORKER_PID_FILE:-}" ]; then
@@ -2266,6 +2379,7 @@ do_start() {
             start_rq_eap_alarm_worker
             start_rq_warmup_worker
             start_rq_query_tool_worker
+            start_rq_uph_performance_worker
             echo "[$(timestamp)] Server started (PID: ${pid})" >> "$STARTUP_LOG"
         else
             log_error "Failed to start server"
@@ -2327,6 +2441,7 @@ do_stop() {
         fi
     fi
 
+    stop_rq_uph_performance_worker
     stop_rq_warmup_worker
     stop_rq_query_tool_worker
     stop_rq_eap_alarm_worker
@@ -2396,6 +2511,7 @@ do_status() {
     rq_eap_alarm_worker_status
     rq_warmup_worker_status
     rq_query_tool_worker_status
+    rq_uph_performance_worker_status
 
     if is_running; then
         echo ""

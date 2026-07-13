@@ -8,6 +8,42 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [ci 1.3.39] — 2026-07-13
+### Added
+- add-uph-performance-page: `.github/workflows/frontend-tests.yml` gains a new `Run uph-performance e2e spec` step running `npx playwright test tests/playwright/uph-performance.spec.ts` under the existing `playwright-critical-journeys` gate (no new gate name/tier, mirrors the `eap-alarm-analysis`/`production-achievement-kanban` precedent of appending a spec to that gate rather than `production-achievement-async-spool`'s separate-named-step precedent). Gate Inventory row `playwright-critical-journeys` command list updated to include the new spec. Spec statically verified correct by e2e-resilience-engineer (all 10 confirmed UI states); cannot execute in this sandbox due to a pre-existing missing-Chromium-binary environment gap, unrelated to this change. Closes tasks.yml item 4.4 (CI/CD workflows).
+
+## [api 1.40.0] — 2026-07-13
+### Added
+- add-uph-performance-page: New endpoint family `/api/uph-performance/*` (7 endpoints: spool, spool/status, filter-options, product-filter-options, trend, ranking, detail). Mirrors `eap-alarm-analysis`'s always-async (Type B, no sync fallback) multi-view + detail-drilldown pattern; restricted to GDBA (Die Bond)/GWBA (Wire Bond) equipment families only. New schema `UphPerformanceSpoolJobAccepted`; other views intentionally left as `GenericSuccessResponse` (mirrors eap-alarm's filter-options/summary/pareto/trend/detail precedent) with detailed shapes in `contracts/data/data-shape-contract.md` §3.29. Spool namespace `uph_performance` added to the `/api/spool/{namespace}/{query_id}.parquet` allowlist. New env var `UPH_PERFORMANCE_USE_UNIFIED_JOB`. Additive; no existing endpoints changed.
+
+## [api-inventory 1.6.0] — 2026-07-13
+### Added
+- add-uph-performance-page: `uph_performance_routes.py` registered in standard-json table; Type B spool-hit-200/spool-miss-202 pattern; DuckDB-only fine-filter/aggregate views; spool namespace `uph_performance`.
+
+## [env 1.0.27] — 2026-07-13
+### Added
+- add-uph-performance-page: `UPH_PERFORMANCE_USE_UNIFIED_JOB` (default `on`, no legacy path — pure kill switch, mirrors `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB`); new `## Async Worker — UPH Performance Query` section (`UPH_PERFORMANCE_WORKER_QUEUE` default `uph-performance-query`, `UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS` default `1800`); added to `## Worker Feature-Flag Env-Var Parity` cross-cutting list.
+
+## [data 1.39.0] — 2026-07-13
+### Added
+- add-uph-performance-page: §3.29 UPH-Performance Spool Schema — coarse spool key (date range + `families[]` restricted to `GDBA`/`GWBA` only + `workcenter_names`/`packages`/`pj_types`/`equipment_ids`), Oracle coarse-filter mapping (family LIKE-prefix + EXISTS semi-joins against `DW_MES_CONTAINER`/`DW_MES_RESOURCE`), family-conditional `PARAMETER_NAME` mapping (`GDBA`→`BondUPH`, `GWBA`→`fHCM_UPH`, no scale conversion on `PARAMETER_VALUE`), DB/WB label via `workcenter_groups` mapping (not equipment-ID-prefix enumeration, mirrors EA-07), parquet schema, and DuckDB-derived filter-options/trend/ranking/detail response shapes. Mirrors `eap-alarm-analysis`'s always-async spool-hit-200/spool-miss-202/worker-unavailable-503 envelope (§3.17). New `## Invalid Data Behavior` row for the zero-UPH-rows case (empty result, not an error). Additive; no existing schemas changed.
+
+## [business 1.46.0] — 2026-07-13
+### Added
+- add-uph-performance-page: New `## UPH PERFORMANCE Rules` section (UPH-01..UPH-05, UPH-ASYNC) — mandatory `LAST_UPDATE_TIME` indexed filter + ≤6h chunking (mirrors EA-03), equipment family scope restricted to GDBA/GWBA only (GWBK/GWMT/GPTA explicitly excluded), family-conditional `PARAMETER_NAME` mapping (`GDBA`→`BondUPH`, `GWBA`→`fHCM_UPH`, must not be swapped), raw UPH value with NO scale conversion (explicit deliberate decision), DB/WB classification via `workcenter_groups` mapping (not equipment-ID-prefix enumeration — mirrors EA-07 precedent), always-async no-sync-fallback routing (mirrors EA-ASYNC/ASYNC-06). Five new Decision Table rows. Additive; no existing rules changed.
+
+## [ci 1.3.38] — 2026-07-13
+### Added
+- add-uph-performance-page: Gate Compatibility Note for the new `uph-performance` RQ worker — confirms `## New RQ Worker Deploy Checklist` applies unchanged (deploy/*.service + scripts/start_server.sh + acquire_heavy_query_slot + no --job-execution-timeout). Tier-1/3/4 test coverage documented; `stress-soak-report.md` sign-off required before first worker start (default-on flag, no legacy path, precedent: production-achievement-async-spool). No new workflow file or gate tier.
+
+## [css 1.15.0] — 2026-07-13
+### Added
+- add-uph-performance-page: `.theme-uph-performance` scoping rule for `frontend/src/uph-performance/style.css`. Enforced by `npm run css:check` Rule 6. Rule 4.5 (`:is()` group maintenance) and Rule 4.4 (Teleport wrapper) apply.
+
+## [css-inventory 1.2.11] — 2026-07-13
+### Added
+- add-uph-performance-page: `frontend/src/uph-performance/style.css` registered with `theme-uph-performance` root in the Route-Local Feature Layers table.
+
 ## [api 1.39.0] — 2026-07-13
 ### Added
 - fix-equipment-lots-trim / query-tool-subtab-cache (interaction-design.md ADR 0012 unblock): typed `POST /api/query-tool/equipment-period`'s response as `EquipmentPeriodResponse` (was `GenericSuccessResponse`) — sync 200 shape (`data.data`/`data.total`/`data.date_range`/`data.pagination`) and async 202 shape (`data.async`/`data.job_id`/`data.status_url`/`data.result_url`) modeled together as optional properties; `data.data[]` row shape intentionally left generic (see `contracts/data/data-shape-contract.md` §3.6/§3.7 — this citation resolver cannot express per-array-item fields). Typed `POST /api/query-tool/lot-equipment-lookup`'s response as `LotEquipmentLookupResponse` (`equipment_ids`, `equipment_names`, `date_range`, `trace_map`, `lot_names`, `not_found_hint`). No behavior change — documentation-only; existing consumers unaffected (`GenericSuccessResponse` was already a superset-permissive envelope).

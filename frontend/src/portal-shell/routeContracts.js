@@ -18,6 +18,7 @@ const IN_SCOPE_REPORT_ROUTES = Object.freeze([
   '/material-consumption',
   '/downtime-analysis',
   '/eap-alarm',
+  '/uph-performance',
   '/login',
 ]);
 
@@ -331,6 +332,17 @@ const ROUTE_CONTRACTS = Object.freeze({
     renderMode: 'native',
     owner: 'frontend-mes-reporting',
     title: '生產達成率',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
+  '/uph-performance': buildContract({
+    route: '/uph-performance',
+    routeId: 'uph-performance',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: 'UPH表現',
     rollbackStrategy: 'fallback_to_legacy_route',
     visibilityPolicy: 'released_or_admin',
     scope: 'in-scope',

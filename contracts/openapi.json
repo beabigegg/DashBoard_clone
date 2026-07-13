@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.39.0"
+    "version": "1.40.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -6069,6 +6069,217 @@
         ],
         "x-cdd-errors": "500"
       }
+    },
+    "/api/uph-performance/spool": {
+      "post": {
+        "summary": "POST /api/uph-performance/spool",
+        "responses": {
+          "201": {
+            "description": "Contract response: UphPerformanceSpoolJobAccepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceSpoolJobAccepted"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Error response (see contract error format)"
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: JSON body {date_from, date_to (both required, 730-day cap SYS-04), families[] (opt, closed enum GDBA/GWBA; empty/absent = both), workcenter_names[] (opt), packages[] (opt), pj_types[] (opt), equipment_ids[] (opt, max 200)} (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "202/400/500/503"
+      }
+    },
+    "/api/uph-performance/spool/status": {
+      "get": {
+        "summary": "GET /api/uph-performance/spool/status",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceSpoolStatusResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceSpoolStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/uph-performance/filter-options": {
+      "get": {
+        "summary": "GET /api/uph-performance/filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceFilterOptionsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceFilterOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/uph-performance/product-filter-options": {
+      "get": {
+        "summary": "GET /api/uph-performance/product-filter-options",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceProductFilterOptionsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceProductFilterOptionsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/uph-performance/trend": {
+      "get": {
+        "summary": "GET /api/uph-performance/trend",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceTrendResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceTrendResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/uph-performance/ranking": {
+      "get": {
+        "summary": "GET /api/uph-performance/ranking",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceRankingResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceRankingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/410"
+      }
+    },
+    "/api/uph-performance/detail": {
+      "get": {
+        "summary": "GET /api/uph-performance/detail",
+        "responses": {
+          "200": {
+            "description": "Contract response: UphPerformanceDetailResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UphPerformanceDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "410": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "400/410"
+      }
     }
   },
   "x-cdd-generated-from": "contracts/api/api-contract.md",
@@ -8161,6 +8372,279 @@
           "pj_types",
           "product_lines",
           "pj_bops"
+        ]
+      },
+      "UphPerformanceSpoolJobAccepted": {
+        "type": "object",
+        "properties": {
+          "async": {
+            "type": "boolean",
+            "description": "false on spool-hit, true on spool-miss"
+          },
+          "query_id": {
+            "type": "string",
+            "description": "canonical coarse-filter spool key"
+          },
+          "job_id": {
+            "type": "string",
+            "description": "present only when async=true; RQ job identifier"
+          },
+          "status_url": {
+            "type": "string",
+            "description": "present only when async=true; polling URL"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "async",
+          "query_id"
+        ]
+      },
+      "UphPerformanceSpoolStatusResponse": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "description": "spool key, present when known"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "finished",
+              "failed"
+            ],
+            "description": "async job status, or a plain spool-hit indicator when the key was already resolved"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ]
+      },
+      "UphPerformanceFilterOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "equipment_id_options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "distinct EQUIPMENT_ID values present in the built spool"
+          },
+          "workcenter_name_options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "distinct WORKCENTERNAME values present in the built spool"
+          },
+          "package_options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "distinct PRODUCTLINENAME (Package) values present in the built spool"
+          },
+          "pj_type_options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "distinct PJ_TYPE (Type) values present in the built spool"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "equipment_id_options",
+          "workcenter_name_options",
+          "package_options",
+          "pj_type_options"
+        ]
+      },
+      "UphPerformanceProductFilterOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "pj_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Oracle-free Type options from container_filter_cache, available before any query runs"
+          },
+          "product_lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Oracle-free Package options from container_filter_cache, available before any query runs"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pj_types",
+          "product_lines"
+        ]
+      },
+      "UphPerformanceTrendSeriesItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "group label (equipment_id, family, or package value depending on group_by)"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "one value per label bucket; null entries mean a missing hour, never a zero"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "data"
+        ]
+      },
+      "UphPerformanceRankingItem": {
+        "type": "object",
+        "properties": {
+          "equipment_id": {
+            "type": "string"
+          },
+          "avg_uph": {
+            "type": "number",
+            "description": "null when zero rows carry a non-null UPH_VALUE for this equipment"
+          },
+          "sample_count": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "equipment_id",
+          "sample_count"
+        ]
+      },
+      "UphPerformanceDetailRow": {
+        "type": "object",
+        "properties": {
+          "lot_id": {
+            "type": "string"
+          },
+          "equipment_id": {
+            "type": "string"
+          },
+          "uph_value": {
+            "type": "number",
+            "description": "raw PARAMETER_VALUE, no scale conversion (UPH-04)"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lot_id",
+          "equipment_id"
+        ]
+      },
+      "UphPerformanceTrendResponse": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "hourly time-bucket labels (native M[60] granularity)"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UphPerformanceTrendSeriesItem"
+            },
+            "description": "see data-shape-contract.md §3.29 Trend for the full per-item shape"
+          },
+          "group_by": {
+            "type": "string",
+            "description": "closed enum: equipment_id, family, or package (default family)"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "labels",
+          "series",
+          "group_by"
+        ]
+      },
+      "UphPerformanceRankingResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UphPerformanceRankingItem"
+            },
+            "description": "ranked ascending by avg_uph; see data-shape-contract.md §3.29 Ranking for the full per-row shape"
+          },
+          "pj_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "available Type values for this block's own independent filter"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "pj_types"
+        ]
+      },
+      "UphPerformanceDetailMeta": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "default 50, contract cap 200"
+          },
+          "total_count": {
+            "type": "integer"
+          },
+          "total_pages": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "per_page",
+          "total_count",
+          "total_pages"
+        ]
+      },
+      "UphPerformanceDetailResponse": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UphPerformanceDetailRow"
+            },
+            "description": "see data-shape-contract.md §3.29 Detail for the full per-row shape"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/UphPerformanceDetailMeta",
+            "description": "pagination"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows",
+          "meta"
         ]
       }
     }

@@ -1,0 +1,19 @@
+change-id: add-uph-performance-page
+timestamp: 2026-07-13
+agent: interaction-designer
+status: done
+summary: >
+  Derived full ADR 0012 chain (screens, presented information, 6 user intents,
+  13 controls + 6 deleted controls with reasons, 10 states with discriminators,
+  reversibility, consistency commitments anchored to eap-alarm precedent).
+  Flagged 3 provenance gaps (state-initial inherently un-citable; family
+  DB/WB adornment is a static gloss not backed by a per-family field;
+  spool/status status=failed resolves only via the generic async envelope) --
+  none required a contract-reviewer round-trip. Raised 8 Open Decisions; all
+  8 resolved via human dialogue and transcribed into ## Confirmed. Locked via
+  `cdd-kit design confirm add-uph-performance-page`
+  (hash 924b0bc0065fa23e8dfaa6245bb76fc493da13971621abf62a3cb72785ff497c).
+artifacts:
+  - { type: interaction-design, pointer: "specs/changes/add-uph-performance-page/interaction-design.md" }
+  - { type: open-decisions-resolved, pointer: "8/8" }
+next-action: frontend-engineer implements against the confirmed States/Controls/Consistency Commitments tables

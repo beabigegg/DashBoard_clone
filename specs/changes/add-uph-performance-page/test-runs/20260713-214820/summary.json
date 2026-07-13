@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/stress/test_uph_performance_stress.py -v -m stress --run-stress -k \"not QueueSaturation\" && conda run -n mes-dashboard python -m pytest tests/integration/test_soak_workload.py::test_uph_performance_spool_ttl_cleanup_reclaims_namespace tests/integration/test_soak_workload.py::test_production_achievement_spool_ttl_cleanup_reclaims_namespace -v --run-integration-real -m soak",
+  "duration_ms": 5226,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-214820/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-214820/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-214820/stderr.log"
+  },
+  "next_action": "all phases green"
+}

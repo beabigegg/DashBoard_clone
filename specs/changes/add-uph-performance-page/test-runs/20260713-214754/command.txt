@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/stress/test_uph_performance_stress.py -v -m stress --run-stress -k "not QueueSaturation"

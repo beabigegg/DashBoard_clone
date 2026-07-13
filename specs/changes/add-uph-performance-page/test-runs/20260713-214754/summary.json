@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/stress/test_uph_performance_stress.py -v -m stress --run-stress -k \"not QueueSaturation\"",
+  "duration_ms": 2799,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-214754/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-214754/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-214754/stderr.log"
+  },
+  "next_action": "all phases green"
+}

@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard ruff check src/mes_dashboard/services/uph_performance_cache.py src/mes_dashboard/services/uph_performance_service.py src/mes_dashboard/workers/uph_performance_worker.py src/mes_dashboard/routes/uph_performance_routes.py src/mes_dashboard/routes/__init__.py src/mes_dashboard/routes/spool_routes.py src/mes_dashboard/app.py tests/test_uph_performance_sql_builder.py tests/test_uph_performance_unified_job.py tests/integration/test_uph_performance_rq_async.py tests/integration/test_uph_performance_data_boundary.py tests/integration/test_uph_performance_resilience.py tests/contract/test_uph_performance_contract.py tests/test_spool_routes.py tests/test_job_registry.py tests/test_query_cost_policy.py",
+  "duration_ms": 1351,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-214118/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-214118/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-214118/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

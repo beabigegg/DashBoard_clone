@@ -1,0 +1,33 @@
+change-id: add-uph-performance-page
+timestamp: 2026-07-13
+agent: contract-reviewer
+status: done
+summary: >
+  Drafted all contract text (agent is read-only; main Claude applied via
+  cdd-kit contract CLI + direct edits to non-api-contract files). Added
+  7 endpoints under /api/uph-performance/* (api-contract.md, api-inventory.md),
+  new UPH_PERFORMANCE_USE_UNIFIED_JOB + worker queue/timeout env vars
+  (env-contract.md, env.schema.json, .env.example.template), §3.29
+  UPH-Performance Spool Schema (data-shape-contract.md), new
+  "## UPH PERFORMANCE Rules" section UPH-01..UPH-05 + UPH-ASYNC
+  (business-rules.md), Gate Compatibility Note confirming the existing
+  New RQ Worker Deploy Checklist applies unchanged (ci-gate-contract.md),
+  and .theme-uph-performance CSS scoping (css-contract.md, css-inventory.md).
+  All schema-versions bumped; contracts/CHANGELOG.md updated (per-contract
+  internal changelogs intentionally NOT touched, per promoted learning).
+  openapi.json (both copies) regenerated. `cdd-kit validate --contracts --env
+  --versions` passes except API conformance (expected: backend routes do not
+  exist yet — resolved when backend-engineer implements uph_performance_routes.py).
+artifacts:
+  - { type: contracts-reviewed, pointer: "contracts/api/api-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/api/api-inventory.md" }
+  - { type: contracts-reviewed, pointer: "contracts/env/env-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/env/env.schema.json" }
+  - { type: contracts-reviewed, pointer: "contracts/data/data-shape-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/business/business-rules.md" }
+  - { type: contracts-reviewed, pointer: "contracts/ci/ci-gate-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/css/css-contract.md" }
+  - { type: contracts-reviewed, pointer: "contracts/css/css-inventory.md" }
+  - { type: version-bumps, pointer: "api 1.39.0->1.40.0, api-inventory 1.5.0->1.6.0, env 1.0.26->1.0.27, data 1.38.0->1.39.0, business 1.45.0->1.46.0, ci 1.3.37->1.3.38, css 1.14.0->1.15.0, css-inventory 1.2.10->1.2.11" }
+  - { type: breaking-changes, pointer: "none - fully additive" }
+next-action: backend-engineer implements uph_performance_routes.py to close the API conformance gap flagged by cdd-kit validate --contracts

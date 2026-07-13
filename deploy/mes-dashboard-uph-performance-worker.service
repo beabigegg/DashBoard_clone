@@ -1,0 +1,51 @@
+[Unit]
+Description=MES Dashboard UPH Performance Query Worker (RQ, Conda Runtime)
+Documentation=https://github.com/your-org/mes-dashboard
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mes-dashboard
+EnvironmentFile=-/opt/mes-dashboard/.env
+Environment="PYTHONPATH=/opt/mes-dashboard/src"
+
+# UPH Performance worker env-var parity (env-contract §Async Worker — UPH Performance Query)
+Environment="UPH_PERFORMANCE_WORKER_QUEUE=uph-performance-query"
+Environment="UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS=1800"
+# Deliberately NOT set here: UPH_PERFORMANCE_USE_UNIFIED_JOB. That flag is
+# read from the shared EnvironmentFile above (same /opt/mes-dashboard/.env
+# gunicorn loads) so this worker and gunicorn always resolve the identical
+# value. Do not add an override line here -- it would silently split-brain
+# job-type routing (env-contract.md §Worker Feature-Flag Env-Var Parity;
+# mirrors production-achievement-async-spool's worker-env-parity precedent).
+
+# NOTE: RQ is pinned rq>=1.16.0,<2.0.0 (pyproject.toml); `rq worker` in that range has
+# NO --job-execution-timeout flag. The per-job timeout is enforced at ENQUEUE time via
+# job_timeout=JobTypeConfig.timeout_seconds (from UPH_PERFORMANCE_JOB_TIMEOUT_SECONDS,
+# resolved on the gunicorn enqueue side), so no CLI timeout flag is needed here.
+ExecStart=/usr/bin/env bash -lc 'exec "${CONDA_BIN:-/opt/miniconda3/bin/conda}" run --no-capture-output -n "${CONDA_ENV_NAME:-mes-dashboard}" rq worker "${UPH_PERFORMANCE_WORKER_QUEUE:-uph-performance-query}" --url "${REDIS_URL:-redis://localhost:6379/0}"'
+
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mes-dashboard-uph-performance-worker
+
+# Memory protection: UPH Performance worker fans Oracle out in <=6h TIME chunks
+# (BaseChunkedDuckDBJob) against a ~12M-row/day EAP_EVENT/EAP_EVENT_DETAIL JOIN.
+MemoryHigh=3G
+MemoryMax=4G
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/mes-dashboard/logs /opt/mes-dashboard/tmp
+
+[Install]
+WantedBy=multi-user.target

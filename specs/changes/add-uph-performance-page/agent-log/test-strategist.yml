@@ -1,0 +1,20 @@
+agent: test-strategist
+change-id: add-uph-performance-page
+summary: >
+  Wrote test-plan.md mapping AC-1..AC-8 to unit/contract/integration/data-boundary/e2e/stress
+  families, modeled on eap-alarm and production-achievement's async test suites. Pinned
+  structural regression tests for UPH-03 (family->parameter mapping), UPH-04 (no scale
+  conversion), UPH-05 (workcenter_groups, not prefix enumeration). Identified 3 pre-existing
+  gates that must be extended, not duplicated: tests/test_spool_routes.py allowlist,
+  tests/test_job_registry.py registration count, tests/test_query_cost_policy.py
+  _APPROVED_CALLERS. Covered independent ranking Type filter as its own cross-filter/EMPTY-
+  while-sibling-populated test surface per test-discipline promoted learnings.
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/add-uph-performance-page/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_uph_performance_rq_async.py -> src/mes_dashboard/workers/uph_performance_worker.py" }
+  - { type: tdd-pairs, pointer: "tests/test_uph_performance_sql_builder.py -> src/mes_dashboard/sql/uph_performance.sql / uph_performance service" }
+  - { type: tdd-pairs, pointer: "tests/contract/test_uph_performance_contract.py -> src/mes_dashboard/routes/uph_performance_routes.py" }
+  - { type: tdd-pairs, pointer: "tests/integration/test_uph_performance_data_boundary.py -> uph_performance empty-state handling" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/uph-performance.spec.ts -> frontend/src/uph-performance/" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, data-boundary, e2e, resilience, stress, soak(existing-suite-fold)" }
+  - { type: mapping-completeness, pointer: "AC-1..AC-8 all mapped; no criterion left without a bounded test file target" }

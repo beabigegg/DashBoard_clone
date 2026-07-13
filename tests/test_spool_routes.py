@@ -99,6 +99,7 @@ def test_valid_spool_streams_parquet(client, tmp_path):
     "downtime_analysis_job_bridge",
     "wip_dataset",  # wip-rq-worker-chunks-cleanup
     "production_achievement",  # production-achievement-async-spool
+    "uph_performance",  # add-uph-performance-page
 ])
 def test_allowed_namespaces_pass_namespace_validation(client, ns):
     with patch(
@@ -166,4 +167,19 @@ def test_production_achievement_in_allowed_namespaces():
     assert "production_achievement" in spool_routes._ALLOWED_NAMESPACES, (
         "'production_achievement' must be in spool_routes._ALLOWED_NAMESPACES "
         "(production-achievement-async-spool adds this namespace; removal causes HTTP 400)"
+    )
+
+
+def test_uph_performance_in_allowed_namespaces():
+    """uph_performance namespace must be in spool_routes._ALLOWED_NAMESPACES.
+
+    Added by change add-uph-performance-page. Required for
+    GET /api/spool/uph_performance/<query_id>.parquet to serve the UPH
+    Performance async spool. Removal causes HTTP 400 for all UPH Performance
+    parquet downloads.
+    """
+    from mes_dashboard.routes import spool_routes
+    assert "uph_performance" in spool_routes._ALLOWED_NAMESPACES, (
+        "'uph_performance' must be in spool_routes._ALLOWED_NAMESPACES "
+        "(add-uph-performance-page adds this namespace; removal causes HTTP 400)"
     )

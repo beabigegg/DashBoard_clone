@@ -1,0 +1,15 @@
+{
+  "change_id": "add-uph-performance-page",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard env PYTHONPATH=src TESTING=True REDIS_ENABLED=false ORACLE_DB_ENABLED=false LOCAL_AUTH_ENABLED=true SECRET_KEY=test pytest tests/test_uph_performance_sql_builder.py tests/test_uph_performance_unified_job.py tests/integration/test_uph_performance_rq_async.py tests/integration/test_uph_performance_data_boundary.py tests/contract/test_uph_performance_contract.py --run-integration-real --run-integration -q",
+  "duration_ms": 3966,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/add-uph-performance-page/test-runs/20260713-204322/summary.json",
+    "stdout": "specs/changes/add-uph-performance-page/test-runs/20260713-204322/stdout.log",
+    "stderr": "specs/changes/add-uph-performance-page/test-runs/20260713-204322/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}
