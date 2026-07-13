@@ -1,0 +1,10 @@
+{
+  ".claude/hooks/pre-tool-use-acceptance-write.sh": {
+    "version": "3.13.1",
+    "digest": "1e3b64c3eedd5cd68e8074bcc211894b4367f9872e8b17b6aba775c2363558b0"
+  },
+  ".claude/hooks/pre-tool-use-design-write.sh": {
+    "version": "3.13.1",
+    "digest": "98f099c82a4896b87a6be8418e8a59eada74a4fa82ea0b6556bbf4e8aab2786c"
+  }
+}
