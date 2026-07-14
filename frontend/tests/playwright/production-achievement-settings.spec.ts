@@ -116,8 +116,8 @@ test.describe('production-achievement-settings — whitelisted edit path', () =>
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement_settings = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement_settings?.trim().length ?? 0) < 50) {
+    const noServerBody10 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody10?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -168,8 +168,8 @@ test.describe('production-achievement-settings — non-whitelisted read-only pat
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement_settings = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement_settings?.trim().length ?? 0) < 50) {
+    const noServerBody11 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody11?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -200,8 +200,8 @@ test.describe('production-achievement-settings — return path', () => {
     await setupDataRoutes(page);
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement_settings = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement_settings?.trim().length ?? 0) < 50) {
+    const noServerBody12 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody12?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -267,8 +267,8 @@ test.describe('production-achievement-settings — return path', () => {
     await setupReportRoutes(page);
 
     await page.goto(REPORT_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody13 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody13?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -307,8 +307,8 @@ test.describe('production-achievement-settings — return path', () => {
     // persistence mechanism lives entirely on the report side of the round trip.
     await page.goto('/portal-shell/production-achievement-settings', { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
     await page.goto(REPORT_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody14 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody14?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }

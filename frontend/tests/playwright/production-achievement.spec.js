@@ -122,8 +122,8 @@ test.describe('production-achievement — navigation from 生產輔助 drawer', 
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody1 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody1?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -151,8 +151,8 @@ test.describe('production-achievement — 4-mode switch + auto-run (OD-3)', () =
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody2 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody2?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -198,8 +198,8 @@ test.describe('production-achievement — 4-mode switch + auto-run (OD-3)', () =
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody3 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody3?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -232,8 +232,8 @@ test.describe('production-achievement — 4-mode switch + auto-run (OD-3)', () =
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody4 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody4?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -293,8 +293,8 @@ test.describe('production-achievement — CumulativeView (當月/自訂區間) +
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody5 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody5?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -393,8 +393,8 @@ test.describe('production-achievement — DailyView (前日) with real D+N shift
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody6 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody6?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -442,8 +442,8 @@ test.describe('production-achievement — 設定 button navigation', () => {
     await page.route('**/api/production-achievement/daily-plans**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) }));
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody7 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody7?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -485,8 +485,8 @@ test.describe('production-achievement — legacy target-value edit permission (T
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody8 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody8?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -530,8 +530,8 @@ test.describe('production-achievement — legacy target-value edit permission (T
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody9 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody9?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }

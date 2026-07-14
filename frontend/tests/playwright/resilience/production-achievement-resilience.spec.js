@@ -127,8 +127,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
     });
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody15 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody15?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -178,8 +178,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
     );
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody16 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody16?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -226,8 +226,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
     );
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody17 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody17?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -288,8 +288,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
     );
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody18 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody18?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
@@ -351,8 +351,8 @@ test.describe('production-achievement resilience — auth expiry mid-poll (401)'
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
-    const bodyText_theme_production_achievement = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
-    if ((bodyText_theme_production_achievement?.trim().length ?? 0) < 50) {
+    const noServerBody19 = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
+    if ((noServerBody19?.trim().length ?? 0) < 50) {
       test.info().annotations.push({ type: 'note', description: 'no server response (body empty) -- skipping' });
       return;
     }
