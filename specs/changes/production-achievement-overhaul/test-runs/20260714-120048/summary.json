@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "collect",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest --collect-only tests/test_production_achievement_unified_job.py tests/test_production_achievement_service.py tests/test_production_achievement_package_lf_service.py tests/test_production_achievement_workcenter_merge_service.py tests/test_production_achievement_daily_plan_service.py tests/test_production_achievement_daily_cache.py tests/test_production_achievement_routes.py tests/test_spool_warmup_scheduler.py tests/test_filter_cache_generic.py tests/contract/test_production_achievement_contract.py tests/integration/test_production_achievement_mysql_roundtrip.py tests/test_frontend_production_achievement_parity.py tests/property/test_production_achievement_aggregate_invariant.py && (cd frontend && npx playwright test --list tests/playwright/production-achievement.spec.js tests/playwright/production-achievement-async.spec.ts tests/playwright/production-achievement-monkey.spec.ts tests/playwright/production-achievement-settings.spec.ts tests/playwright/resilience/production-achievement-resilience.spec.js tests/playwright/data-boundary/production-achievement-data-boundary.spec.js)",
+  "duration_ms": 5167,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-120048/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-120048/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-120048/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

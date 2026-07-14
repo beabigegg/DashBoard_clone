@@ -101,6 +101,20 @@ def can_edit_targets(user_identifier: str | None = None) -> bool:
     ``MYSQL_OPS_ENABLED=false``, or any MySQL exception -- this function does
     not add its own try/except because the service never raises.
 
+    Scope widened by production-achievement-overhaul (verbatim reuse, no
+    code/mechanism change here): this same whitelist flag now ALSO gates
+    write access to the 3 new MySQL-backed config tables --
+    ``production_achievement_package_lf_map`` (D1),
+    ``production_achievement_workcenter_merge_map`` (D2), and
+    ``production_achievement_daily_plans`` -- via their
+    ``GET/PUT/DELETE /api/production-achievement/{package-lf-map,
+    workcenter-merge-map}[/{raw}]`` and ``GET/PUT .../daily-plans``
+    endpoints, reached from the standalone
+    ``/production-achievement-settings`` mini-app. There is still no new
+    permission system: a whitelisted user can now edit 4 tables (targets +
+    3 new) with the exact same single ``can_edit_targets`` flag, not 4
+    independent flags.
+
     Args:
         user_identifier: Explicit identity to check. Defaults to the current
             session's username (``session["user"]["username"]``), matching
@@ -136,6 +150,14 @@ def targets_edit_required(f: Callable) -> Callable:
     current session's user is not whitelisted. Independent of
     ``admin_required`` -- an admin user without a whitelist row is still
     denied (design.md Key Decisions).
+
+    Note: the 10 new production-achievement-overhaul route handlers
+    (package-lf-map / workcenter-merge-map / daily-plans) call
+    ``can_edit_targets()`` directly (mirroring the existing ``PUT /targets``
+    handler's inline-check style in
+    ``routes/production_achievement_routes.py``) rather than this decorator,
+    for consistency with that file's established per-endpoint pattern --
+    the underlying gate is identical either way.
     """
     @wraps(f)
     def decorated(*args: Any, **kwargs: Any) -> Any:

@@ -1,0 +1,30 @@
+change-id: production-achievement-overhaul
+agent: ui-ux-reviewer
+status: approved
+summary: >-
+  Verified all 12 confirmed Open Decisions (OD-1..OD-12) against the actual
+  shipped code, not just prose: all implemented exactly as specified. Deleted
+  Controls correctly absent; confirmed Controls all present and wired. OD-11's
+  KPI cards genuinely sum the same rendered rows (aggregate-then-divide),
+  never a naive re-aggregation. The "—" null-vs-zero convention is single-
+  sourced (one NULL_DISPLAY constant in utils.ts) and consistently threaded
+  through daily/cumulative/legacy TargetEditPanel surfaces. No blocking
+  findings. 6 advisory (non-blocking) findings: stale prior-query results
+  stay undimmed during a filter-triggered re-query (moderate, but
+  interaction-design.md is silent on this -- not a spec violation); no
+  disabled-state visual cue on filter controls mid-poll (minor, direct
+  byproduct of OD-3's confirmed no-submit-button model); an internal CDD
+  change-id slug ("production-achievement-overhaul") leaking into admin-
+  facing copy in PermissionsTab.vue (fixed directly by main Claude, verified
+  no test asserted the exact string, PermissionsTab.test.ts re-run 8/8
+  passing after the fix); 3 trivial cosmetic nits (dash-style mismatch,
+  redundant empty-state text, no staleness indicator for warm-cache data --
+  the last is accepted scope per OD-9/OD-10's precedent, not a gap).
+artifacts:
+  - { type: files-changed, pointer: "none (read-only review; the one fix applied -- frontend/src/admin-dashboard/tabs/PermissionsTab.vue -- was made by main Claude after this agent's report, not by this agent)" }
+notes: |
+  The 2 already-known monkey-test-engineer findings (DailyPlanPanel stale-
+  dropdown race; settings composable's shared editSaving flag) were
+  independently re-confirmed present in code but not re-reported as new --
+  noted as conceptually adjacent to this review's own stale-results finding
+  (both are "reactive state can lag a live change"), distinct code paths.

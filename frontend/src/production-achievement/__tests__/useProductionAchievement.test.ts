@@ -1,17 +1,23 @@
 // @vitest-environment jsdom
 /**
- * useProductionAchievement — orchestration tests (TDD: updated for
- * production-achievement-async-spool's 202/200-spool-hit/503 report flow).
+ * useProductionAchievement — orchestration tests (TDD, production-achievement
+ * -overhaul IP-7).
+ *
+ * 4-mode FilterState (OD-1: no shift_code filter — D/N are columns only),
+ * resolveMonthPeriod() period resolution (PA-13), range end capped at
+ * min(end,today), OD-3 (auto-run on mode/station change), OD-4 (ignore
+ * mode/station change while a 202 poll is in flight — enforced at the
+ * setMode/setWorkcenterGroup mutation site, mirroring the existing runQuery
+ * loading-guard idiom), OD-7 (persist last mode/station across a full page
+ * round-trip via sessionStorage), default workcenter_group 焊接_DB.
  *
  * DuckDB is mocked at the `core/duckdb-client` + `core/duckdb-activation-policy`
- * boundary (same convention as useProductionAchievementDuckDB.test.ts) so the
- * REAL useProductionAchievementDuckDB composable runs end-to-end here —
- * only the browser WASM engine / parquet fetch are stubbed. `global.fetch`
- * drives every JSON `/api/...` call (report/poll/targets/PUT), matching the
- * existing convention in this file.
+ * boundary (same convention as before) so the REAL useProductionAchievementDuckDB
+ * composable runs end-to-end — only the browser WASM engine / parquet fetch
+ * are stubbed. `global.fetch` drives every JSON `/api/...` call.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useProductionAchievement } from '../composables/useProductionAchievement';
+import { useProductionAchievement, resolveMonthPeriod } from '../composables/useProductionAchievement';
 
 vi.mock('../../core/duckdb-activation-policy', () => ({
   checkLocalComputeEligibility: vi.fn().mockReturnValue({ eligible: true, reason: 'ok' }),
@@ -56,26 +62,88 @@ const SPOOL_HIT_BODY = {
     query_id: 'abc123',
     spool_download_url: '/api/spool/production_achievement/abc123.parquet',
     spec_workcenter_map: [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }],
-    targets_map: [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 120 }],
+    targets_map: [],
+    package_lf_map: [],
+    workcenter_merge_map: [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }],
+    daily_plan_map: [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 300 }],
   },
   meta: {},
 };
 
-const COMPUTED_ROW = {
-  output_date: '2026-01-01',
-  shift_code: 'D',
-  workcenter_group: '焊接_DB',
-  actual_output_qty: 100,
-  target_qty: 120,
-  achievement_rate: 0.833,
+const DAILY_ROW = {
+  package_lf_group: 'SOD-123FL',
+  d_output_qty: 200,
+  n_output_qty: 100,
+  daily_output_qty: 300,
+  daily_plan_qty: 300,
+  achievement_rate: 1.0,
 };
 
-describe('useProductionAchievement', () => {
+// Raw shape returned by computeCumulativeView's rowsSql query (composable
+// multiplies daily_plan_qty by elapsed_days in JS — see useProductionAchievementDuckDB.ts).
+// setMode('range') without an explicit setRangeDates() call defaults both
+// start/end to "today", so elapsed_days = 1 here.
+const RAW_CUMULATIVE_ROW = {
+  package_lf_group: 'SOD-123FL',
+  cumulative_actual_qty: 3000,
+  daily_plan_qty: 3000,
+};
+
+const EXPECTED_CUMULATIVE_ROW = {
+  package_lf_group: 'SOD-123FL',
+  cumulative_actual_qty: 3000,
+  cumulative_plan_qty: 3000,
+  cumulative_diff_qty: 0,
+  cumulative_achievement_rate: 1.0,
+};
+
+const TREND_POINT = { output_date: '2026-07-01', actual_qty: 300, plan_qty: 300, achievement_rate: 1.0 };
+
+describe('resolveMonthPeriod (PA-13 pure function)', () => {
+  it('1st-of-month reference date resolves to the FULL previous calendar month', () => {
+    const period = resolveMonthPeriod(new Date(2026, 6, 1)); // 2026-07-01 (local)
+    expect(period.start).toBe('2026-06-01');
+    expect(period.end).toBe('2026-06-30');
+  });
+
+  it('1st-of-January rolls back to December of the previous year', () => {
+    const period = resolveMonthPeriod(new Date(2026, 0, 1)); // 2026-01-01
+    expect(period.start).toBe('2025-12-01');
+    expect(period.end).toBe('2025-12-31');
+  });
+
+  it('non-1st reference date resolves to [1st of current month, referenceDate] (month-to-date)', () => {
+    const period = resolveMonthPeriod(new Date(2026, 6, 14)); // 2026-07-14
+    expect(period.start).toBe('2026-07-01');
+    expect(period.end).toBe('2026-07-14');
+  });
+});
+
+describe('useProductionAchievement — filter state defaults + mode', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('defaults to mode=today and workcenter_group=焊接_DB when no persisted state exists', () => {
+    const { filters } = useProductionAchievement();
+    expect(filters.mode).toBe('today');
+    expect(filters.workcenter_group).toBe('焊接_DB');
+  });
+
+  it('has no shift_code field at all (OD-1: shift filter dropped)', () => {
+    const { filters } = useProductionAchievement();
+    expect((filters as unknown as Record<string, unknown>).shift_code).toBeUndefined();
+  });
+});
+
+describe('useProductionAchievement — runQuery mode branching + auto-run + async flow', () => {
   const originalFetch = global.fetch;
 
   beforeEach(async () => {
-    // core/api.ts's apiGet/apiPost use the global fetch too (no MesApi bridge in jsdom)
-    global.fetch = vi.fn();
+    sessionStorage.clear();
+    global.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({ success: true, data: { shift_codes: ['N', 'D'], workcenter_groups: ['焊接_DB', '焊接_WB'] }, meta: {} }),
+    );
     const client = await mockedDuckDbClient();
     client.init.mockClear();
     client.registerParquet.mockClear();
@@ -88,342 +156,205 @@ describe('useProductionAchievement', () => {
     vi.restoreAllMocks();
   });
 
-  it('runQuery: spool hit (200) activates DuckDB and renders the computed rows', async () => {
+  it('today/yesterday modes compute the DailyView (computeDailyView)', async () => {
     const client = await mockedDuckDbClient();
-    client.sendQuery.mockResolvedValue([]); // CREATE TABLE calls
-    client.sendQuery.mockResolvedValueOnce([]); // spec map create
-    client.sendQuery.mockResolvedValueOnce([]); // targets map create
-    client.sendQuery.mockResolvedValueOnce([]); // rollup create
-    client.sendQuery.mockResolvedValueOnce([COMPUTED_ROW]); // computeView SELECT
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([DAILY_ROW]);
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
 
-    const { rows, runQuery, hasQueried, error } = useProductionAchievement();
+    const { dailyRows, cumulativeRows, runQuery, viewKind } = useProductionAchievement();
     await runQuery();
 
-    expect(hasQueried.value).toBe(true);
-    expect(error.value).toBe('');
-    expect(rows.value).toEqual([COMPUTED_ROW]);
-    expect(client.registerParquet).toHaveBeenCalledWith(
-      'production_achievement_data',
-      expect.any(ArrayBuffer),
-    );
+    expect(viewKind.value).toBe('daily');
+    expect(dailyRows.value).toEqual([DAILY_ROW]);
+    expect(cumulativeRows.value).toEqual([]);
   });
 
-  it('runQuery: spool miss (202) polls to completion, re-fetches, then renders rows', async () => {
+  it('month/range modes compute the CumulativeView (computeCumulativeView) — including a single-day range (OD-2)', async () => {
     const client = await mockedDuckDbClient();
-    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    client.sendQuery.mockResolvedValueOnce([COMPUTED_ROW]);
-
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          data: { async: true, job_id: 'job-1', status_url: '/api/job/job-1?prefix=production-achievement' },
-          meta: {},
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished', query_id: 'abc123' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
-
-    const { rows, runQuery, hasQueried, error, asyncJobProgress } = useProductionAchievement();
-    await runQuery();
-
-    expect(hasQueried.value).toBe(true);
-    expect(error.value).toBe('');
-    expect(rows.value).toEqual([COMPUTED_ROW]);
-    expect(asyncJobProgress.active).toBe(false); // reset after completion
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-
-  it('FIX 2: asyncJobProgress stays active (relabelled) through the tail refetch + DuckDB activate/render, resetting only after the whole cycle settles', async () => {
-    const client = await mockedDuckDbClient();
-    const { runQuery, asyncJobProgress } = useProductionAchievement();
-
-    let activeDuringCompute: boolean | null = null;
-    let statusDuringCompute: string | null = null;
-    let progressDuringCompute = '';
-    let pctDuringCompute = -1;
-
-    client.sendQuery
-      .mockResolvedValueOnce([]) // spec map create
-      .mockResolvedValueOnce([]) // targets map create
-      .mockResolvedValueOnce([]) // rollup create
-      .mockImplementationOnce(async () => {
-        // Snapshot progress state exactly when the final computeView SELECT
-        // runs — stands in for the multi-second parquet-fetch + WASM-compute
-        // leg that must NOT drop back to a blank full-page overlay (FIX 2).
-        activeDuringCompute = asyncJobProgress.active;
-        statusDuringCompute = asyncJobProgress.status;
-        progressDuringCompute = asyncJobProgress.progress;
-        pctDuringCompute = asyncJobProgress.pct;
-        return [COMPUTED_ROW];
-      });
-
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          data: { async: true, job_id: 'job-2', status_url: '/api/job/job-2?prefix=production-achievement' },
-          meta: {},
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished', query_id: 'abc123' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
-
-    await runQuery();
-
-    expect(activeDuringCompute).toBe(true);
-    expect(statusDuringCompute).toBe('finished');
-    expect(progressDuringCompute).toBe('正在載入結果…');
-    expect(pctDuringCompute).toBe(100);
-    // Only AFTER the whole cycle (poll + tail refetch + activate/render) has
-    // settled does the progress card reset.
-    expect(asyncJobProgress.active).toBe(false);
-  });
-
-  it('FIX 3: mid-poll date-range edits do not leak into the tail re-GET (enqueue-time snapshot, not live filters)', async () => {
-    const client = await mockedDuckDbClient();
-    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([COMPUTED_ROW]);
-
-    const { filters, runQuery, rows } = useProductionAchievement();
-    const originalStart = filters.start_date;
-    const originalEnd = filters.end_date;
-
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          data: { async: true, job_id: 'job-3', status_url: '/api/job/job-3?prefix=production-achievement' },
-          meta: {},
-        }),
-      )
-      .mockImplementationOnce(async () => {
-        // The user edits the date range WHILE the job is still polling.
-        filters.start_date = '2099-01-01';
-        filters.end_date = '2099-01-31';
-        return jsonResponse({ success: true, data: { status: 'finished', query_id: 'abc123' }, meta: {} });
-      })
-      .mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
-
-    await runQuery();
-
-    expect(rows.value).toEqual([COMPUTED_ROW]);
-    const tailCallUrl = String(fetchMock.mock.calls[2][0]);
-    expect(tailCallUrl).toContain(`start_date=${originalStart}`);
-    expect(tailCallUrl).toContain(`end_date=${originalEnd}`);
-    expect(tailCallUrl).not.toContain('2099-01-01');
-    // The user's live edit is preserved for their NEXT query — only the
-    // already-in-flight cycle ignored it.
-    expect(filters.start_date).toBe('2099-01-01');
-  });
-
-  it('FIX 3: tail re-GET returning 202 again is handled by re-polling the new job, not by throwing', async () => {
-    const client = await mockedDuckDbClient();
-    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([COMPUTED_ROW]);
-
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          data: { async: true, job_id: 'job-4', status_url: '/api/job/job-4?prefix=production-achievement' },
-          meta: {},
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished' }, meta: {} })) // first poll finished
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          data: { async: true, job_id: 'job-4b', status_url: '/api/job/job-4b?prefix=production-achievement' },
-          meta: {},
-        }),
-      ) // tail re-GET unexpectedly still 202 (e.g. spool TTL/eviction raced completion)
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished' }, meta: {} })) // second poll finished
-      .mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY)); // second tail re-GET -> 200 spool-hit
-
-    const { runQuery, rows, error } = useProductionAchievement();
-    await expect(runQuery()).resolves.toBeUndefined();
-
-    expect(error.value).toBe('');
-    expect(rows.value).toEqual([COMPUTED_ROW]);
-    expect(fetchMock).toHaveBeenCalledTimes(5);
-  });
-
-  it('FIX 3: repeated 202-on-retry beyond the safety cap surfaces a clear error instead of looping forever', async () => {
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { async: true, job_id: 'j0', status_url: '/api/job/j0?prefix=production-achievement' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { async: true, job_id: 'j1', status_url: '/api/job/j1?prefix=production-achievement' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { async: true, job_id: 'j2', status_url: '/api/job/j2?prefix=production-achievement' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { status: 'finished' }, meta: {} }))
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: { async: true, job_id: 'j3', status_url: '/api/job/j3?prefix=production-achievement' }, meta: {} }));
-
-    const { runQuery, rows, error } = useProductionAchievement();
-    await runQuery();
-
-    expect(rows.value).toEqual([]);
-    expect(error.value).not.toBe('');
-  });
-
-  it('runQuery: 503 worker-unavailable surfaces a clear error and empties rows', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      jsonResponse(
-        { success: false, error: { code: 'SERVICE_UNAVAILABLE', message: '背景查詢服務不可用，請稍後再試' }, meta: {} },
-        503,
-      ),
-    );
-
-    const { rows, runQuery, error, hasQueried } = useProductionAchievement();
-    await runQuery();
-
-    expect(rows.value).toEqual([]);
-    expect(error.value).toContain('背景查詢服務不可用');
-    // FIX 1 precondition: hasQueried stays true AND error is truthy at the
-    // same time — App.vue's showResults = hasQueried && !error must resolve
-    // to false here (see App.test.ts for the template-level assertion) so
-    // the summary/chart/empty-table never render alongside this error.
-    expect(hasQueried.value).toBe(true);
-  });
-
-  it('runQuery sets error and empties rows on network failure (no crash)', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
-
-    const { rows, runQuery, error } = useProductionAchievement();
-    await runQuery();
-
-    expect(rows.value).toEqual([]);
-    expect(error.value).not.toBe('');
-  });
-
-  it('runQuery: empty spool renders an empty row set, not an error (empty-result invariant)', async () => {
-    const client = await mockedDuckDbClient();
-    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    client.sendQuery.mockResolvedValueOnce([]); // computeView SELECT -> zero rows
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([RAW_CUMULATIVE_ROW]); // rows query
+    client.sendQuery.mockResolvedValueOnce([TREND_POINT]); // trend query
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
 
-    const { rows, runQuery, hasQueried, error } = useProductionAchievement();
-    await runQuery();
+    const { cumulativeRows, cumulativeTrend, dailyRows, runQuery, setMode, viewKind } = useProductionAchievement();
+    // setMode() itself auto-runs (OD-3) — do not ALSO call runQuery() here,
+    // it would race the fire-and-forget query already triggered by setMode().
+    void runQuery;
+    setMode('range');
+    await vi.waitFor(() => expect(cumulativeRows.value).toEqual([EXPECTED_CUMULATIVE_ROW]));
 
-    expect(hasQueried.value).toBe(true);
-    expect(error.value).toBe('');
-    expect(rows.value).toEqual([]);
+    expect(viewKind.value).toBe('cumulative');
+    expect(cumulativeTrend.value).toEqual([TREND_POINT]);
+    expect(dailyRows.value).toEqual([]);
   });
 
-  it('saveTarget: recomputes client-side from refreshed targets when DuckDB is already active (no re-query)', async () => {
+  it('OD-3: setMode auto-runs the query without any explicit submit call', async () => {
     const client = await mockedDuckDbClient();
-    client.sendQuery
-      .mockResolvedValueOnce([]) // spec map create
-      .mockResolvedValueOnce([]) // targets map create
-      .mockResolvedValueOnce([]) // rollup create
-      .mockResolvedValueOnce([COMPUTED_ROW]); // computeView after runQuery()
+    client.sendQuery.mockResolvedValue([]);
 
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY)) // runQuery's GET /report
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: null, meta: {} })) // PUT targets
-      .mockResolvedValueOnce(
-        jsonResponse({
-          success: true,
-          data: [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 200, updated_at: 't', updated_by: 'u' }],
-          meta: {},
-        }),
-      ); // GET targets refetch
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(SPOOL_HIT_BODY));
 
-    const { runQuery, saveTarget, hasQueried, rows } = useProductionAchievement();
-    await runQuery();
-    expect(hasQueried.value).toBe(true);
-
-    client.sendQuery.mockClear();
-    client.sendQuery
-      .mockResolvedValueOnce([]) // updateTargetsMap re-registration
-      .mockResolvedValueOnce([{ ...COMPUTED_ROW, target_qty: 200, achievement_rate: 0.5 }]); // computeView after save
-
-    const ok = await saveTarget({ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 200 });
-
-    expect(ok).toBe(true);
-    // Only 2 sendQuery calls (targets-map re-register + recompute) — no
-    // second parquet download / rollup rebuild, and NO extra GET /report.
-    expect(client.sendQuery).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenCalledTimes(3); // report, PUT, targets-refetch only
-    expect(rows.value[0].target_qty).toBe(200);
+    const { setMode, hasQueried } = useProductionAchievement();
+    setMode('month'); // no explicit runQuery() call from the test
+    await vi.waitFor(() => expect(hasQueried.value).toBe(true));
   });
 
-  it('saveTarget: falls back to a full runQuery when DuckDB is not active yet', async () => {
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: null, meta: {} })) // PUT
-      .mockResolvedValueOnce(jsonResponse({ success: true, data: [], meta: {} })); // GET targets refetch
+  it('OD-3: setWorkcenterGroup auto-runs (or client-side re-filters) without an explicit submit call', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
 
-    const { saveTarget, editForbidden, editError } = useProductionAchievement();
-    const ok = await saveTarget({ shift_code: 'D', workcenter_group: 'A1', target_qty: 100 });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(SPOOL_HIT_BODY));
 
-    expect(ok).toBe(true);
-    expect(editForbidden.value).toBe(false);
-    expect(editError.value).toBe('');
+    const { setWorkcenterGroup, hasQueried } = useProductionAchievement();
+    setWorkcenterGroup('焊接_WB');
+    await vi.waitFor(() => expect(hasQueried.value).toBe(true));
   });
 
-  it('saveTarget flips editForbidden on a 403 FORBIDDEN response (graceful degrade)', async () => {
+  it('re-selecting the CURRENT mode is a no-op (free, no new fetch) — Reversibility note', async () => {
+    const { setMode, filters } = useProductionAchievement();
+    expect(filters.mode).toBe('today');
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockClear();
+    setMode('today');
+    await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('OD-4: a mode/station change while a 202 poll is in flight is ignored — filters do not change and no second query starts', async () => {
+    const JOB_ID = 'pa-job-mid-poll';
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    let reportCallCount = 0;
+    let resolveJobStatus: ((v: Response) => void) | null = null;
+    const jobStatusPromise = new Promise<Response>((resolve) => {
+      resolveJobStatus = resolve;
+    });
+
+    fetchMock.mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/report')) {
+        reportCallCount++;
+        if (reportCallCount === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              success: true,
+              data: { async: true, job_id: JOB_ID, status_url: `/api/job/${JOB_ID}?prefix=production-achievement` },
+              meta: {},
+            }),
+          );
+        }
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      if (u.includes(`/api/job/${JOB_ID}`)) {
+        return jobStatusPromise; // held pending until the test resolves it below — a true mid-poll state
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
+    });
+
+    const { runQuery, setMode, setWorkcenterGroup, filters, loading } = useProductionAchievement();
+    const runPromise = runQuery();
+    await vi.waitFor(() => expect(loading.value).toBe(true));
+
+    expect(filters.mode).toBe('today');
+    setMode('month'); // OD-4: must be ignored while loading
+    expect(filters.mode).toBe('today'); // unchanged — the change never took effect
+
+    expect(filters.workcenter_group).toBe('焊接_DB');
+    setWorkcenterGroup('焊接_WB'); // OD-4: must also be ignored while loading
+    expect(filters.workcenter_group).toBe('焊接_DB');
+
+    expect(reportCallCount).toBe(1); // only the original enqueue — no second /report call fired
+
+    // Resolve the held job-status call so runQuery() finishes cleanly (no dangling poll timer).
+    resolveJobStatus!(jsonResponse({ success: true, data: { status: 'finished', job_id: JOB_ID }, meta: {} }));
+    await runPromise;
+  });
+
+  it('OD-7: persists mode + workcenter_group to sessionStorage on change, and a fresh composable instance restores them', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-      jsonResponse(
-        { success: false, error: { code: 'FORBIDDEN', message: '無權限' }, meta: {} },
-        403,
-      ),
+      jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }),
     );
 
-    const { saveTarget, editForbidden, editError } = useProductionAchievement();
-    const ok = await saveTarget({ shift_code: 'D', workcenter_group: 'A1', target_qty: 100 });
+    const first = useProductionAchievement();
+    first.setWorkcenterGroup('焊接_WB');
+    await vi.waitFor(() => expect(first.hasQueried.value).toBe(true));
 
-    expect(ok).toBe(false);
-    expect(editForbidden.value).toBe(true);
-    expect(editError.value).not.toBe('');
+    // Simulate a full page round-trip (new module-level composable instance,
+    // same sessionStorage — mirrors navigating to /production-achievement-settings and back).
+    const second = useProductionAchievement();
+    expect(second.filters.workcenter_group).toBe('焊接_WB');
+  });
+});
+
+describe('useProductionAchievement — month mode date resolution (regression: field-name mismatch)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
   });
 
-  it('saveTarget surfaces a 503 without flipping editForbidden (OPS disabled, not a permission denial)', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-      jsonResponse(
-        { success: false, error: { code: 'SERVICE_UNAVAILABLE', message: '服務暫停' }, meta: {} },
-        503,
-      ),
-    );
-
-    const { saveTarget, editForbidden, editError } = useProductionAchievement();
-    const ok = await saveTarget({ shift_code: 'D', workcenter_group: 'A1', target_qty: 100 });
-
-    expect(ok).toBe(false);
-    expect(editForbidden.value).toBe(false);
-    expect(editError.value).not.toBe('');
-  });
-
-  it('resetFilters clears rows/hasQueried and deactivates the DuckDB session', async () => {
+  it('setMode("month") sends REAL start_date/end_date query params, never undefined (resolveMonthPeriod returns {start,end}, the request needs {start_date,end_date})', async () => {
     const client = await mockedDuckDbClient();
-    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    client.sendQuery.mockResolvedValueOnce([COMPUTED_ROW]);
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
+    client.sendQuery.mockResolvedValue([]);
+    let capturedUrl = '';
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/production-achievement/report')) {
+        capturedUrl = String(url);
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
+    });
 
-    const { rows, runQuery, hasQueried, resetFilters } = useProductionAchievement();
-    await runQuery();
-    expect(rows.value.length).toBe(1);
+    const { setMode } = useProductionAchievement();
+    setMode('month');
+    await vi.waitFor(() => expect(capturedUrl).toContain('/api/production-achievement/report'));
 
-    resetFilters();
-    expect(rows.value).toEqual([]);
-    expect(hasQueried.value).toBe(false);
-    expect(client.destroy).toHaveBeenCalled();
+    expect(capturedUrl).not.toContain('start_date=undefined');
+    expect(capturedUrl).not.toContain('end_date=undefined');
+    expect(capturedUrl).toMatch(/start_date=\d{4}-\d{2}-\d{2}/);
+    expect(capturedUrl).toMatch(/end_date=\d{4}-\d{2}-\d{2}/);
+  });
+});
+
+describe('useProductionAchievement — range mode date handling', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
   });
 
-  it('cancelQuery aborts an in-flight poll without throwing', async () => {
-    const { cancelQuery, asyncJobProgress } = useProductionAchievement();
-    asyncJobProgress.active = true;
-    asyncJobProgress.jobId = 'job-xyz';
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse({ success: true, data: { acknowledged: true }, meta: {} }));
+  it('setRangeDates caps end_date at today when a future date is supplied', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    let capturedUrl = '';
+    let reportCallCount = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (String(url).includes('/api/production-achievement/report')) {
+        reportCallCount++;
+        capturedUrl = String(url);
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
+    });
 
-    await expect(cancelQuery()).resolves.toBeUndefined();
-    expect(asyncJobProgress.active).toBe(false);
+    const { setMode, setRangeDates, loading } = useProductionAchievement();
+    setMode('range');
+    // Let setMode()'s own OD-3 auto-run fully settle before the next
+    // sequential interaction — mirrors a real user's separate clicks, and
+    // avoids racing two fire-and-forget runQuery() calls in the same tick.
+    await vi.waitFor(() => {
+      expect(reportCallCount).toBeGreaterThanOrEqual(1);
+      expect(loading.value).toBe(false);
+    });
+
+    const farFuture = '2099-12-31';
+    setRangeDates('2026-07-01', farFuture);
+    await vi.waitFor(() => expect(reportCallCount).toBeGreaterThanOrEqual(2));
+
+    expect(capturedUrl).not.toContain(farFuture);
+    expect(capturedUrl).toContain('start_date=2026-07-01');
   });
 });

@@ -79,6 +79,58 @@ jobs:
         # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
         run: npx playwright test tests/playwright/production-achievement-async.spec.ts
 
+      - name: Run production-achievement critical-journey spec (playwright-critical-journeys, Tier 1)
+        working-directory: frontend
+        timeout-minutes: 8
+        # ci-gates.md gate: playwright-critical-journeys (Tier 1, required) — gate name and
+        # command already declared in contracts/ci/ci-gate-contract.md's Gate Inventory row,
+        # but this file was never actually wired to an executing CI step in this workflow
+        # until production-achievement-overhaul closed the gap. Ground-up rewrite for the
+        # 4-mode UI (AC-8/AC-9/AC-10): filter/table/chart surface changed entirely.
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/production-achievement.spec.js
+
+      - name: Run production-achievement resilience spec (playwright-resilience, Tier 1)
+        working-directory: frontend
+        timeout-minutes: 8
+        # ci-gates.md gate: playwright-resilience (Tier 1, required) — gate name and directory
+        # command already declared in contracts/ci/ci-gate-contract.md's Gate Inventory row,
+        # but no workflow step actually ran tests/playwright/resilience/ until this change.
+        # Scoped to this change's own spec file (not the whole directory) so this PR does not
+        # newly surface unrelated pre-existing specs as a side effect.
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/resilience/production-achievement-resilience.spec.js
+
+      - name: Run production-achievement data-boundary spec (playwright-data-boundary, Tier 1)
+        working-directory: frontend
+        timeout-minutes: 8
+        # ci-gates.md gate: playwright-data-boundary (Tier 1, required) — same pre-existing
+        # wiring gap as playwright-resilience above; scoped to this change's own spec file.
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/data-boundary/production-achievement-data-boundary.spec.js
+
+      - name: Run production-achievement-monkey spec (production-achievement-monkey, Tier 1)
+        working-directory: frontend
+        timeout-minutes: 8
+        # ci-gates.md gate: production-achievement-monkey (Tier 1, required per test-plan.md's
+        # monkey-family tier assignment). First monkey/fuzz Playwright spec wired into this
+        # repo's CI — no prior gate name existed for this family. Rewritten for 4-mode
+        # rapid mode/station switching + settings-page CRUD adversarial input. If this proves
+        # flaky, quarantine per ci-gates.md Promotion Policy rather than disabling it.
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/production-achievement-monkey.spec.ts
+
+      - name: Run production-achievement-settings e2e spec (production-achievement-settings-e2e, Tier 1)
+        working-directory: frontend
+        timeout-minutes: 8
+        # ci-gates.md gate: production-achievement-settings-e2e (Tier 1, required, new gate) —
+        # AC-11: whitelisted-edit vs non-whitelisted-read-only across all 3 new MySQL tables.
+        # New spec file — this step will fail until frontend-engineer's implementation phase
+        # adds tests/playwright/production-achievement-settings.spec.ts (expected/blocking in
+        # this Tier-0 contracts-ahead-of-implementation flow, not a gate defect).
+        # npx playwright install --with-deps chromium already executed in "Install Playwright browsers" step above.
+        run: npx playwright test tests/playwright/production-achievement-settings.spec.ts
+
       - name: Run db-scheduling e2e spec (add-db-scheduling-page, Tier 2 informational)
         working-directory: frontend
         # ci-gates.md gate: e2e-db-scheduling (Tier 2, informational — continue-on-error: true)

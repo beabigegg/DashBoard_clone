@@ -2,19 +2,27 @@
 /**
  * 生產達成率 (Production Achievement Rate) report page.
  *
- * Ordinary filterable report — NOT an auto-refresh/big-screen kanban
- * (explicit non-goal, implementation-plan.md IP-7). Modeled on
- * production-history's filter + DataTable/chart pattern.
+ * Change: production-achievement-overhaul (IP-8). Rewritten from a free-form
+ * date-range + shift/station filter query into the design.md 2×2 view model:
+ * 4-button mode switch (當日/前日/當月/自訂區間, default 當日) drives BOTH the
+ * date window and which computed view renders — DailyView (當日/前日: rows =
+ * PACKAGE_LF group, columns = D/N/合計/計畫/達成率) or CumulativeView
+ * (當月/自訂區間: rows = PACKAGE_LF group, columns = 累計計畫/產出/差異/達成率),
+ * sharing PlanAchievementStackedChart.vue for the chart. All auto-run — OD-3 —
+ * no 查詢/清除篩選 buttons. OD-1: no shift filter (D/N are columns only).
  *
- * production-achievement-async-spool (ADR-0016): GET .../report is now an
- * always-async spool-backed endpoint (api-contract.md rows 256-261,
- * data-shape-contract.md §3.28) — a spool miss enqueues a background job and
- * polls via the shared AsyncQueryProgress component; a spool hit computes
- * PA-06/PA-07 client-side in DuckDB-WASM (useProductionAchievementDuckDB).
- * The rendered row shape is unchanged — only the data path changed.
+ * The station-group filter is a SINGLE-select — MultiSelect.vue has no native
+ * single-select mode and is additive-only (16 consumers, CLAUDE.md), so this
+ * reuses the same fake-single-select idiom the OLD App.vue already used
+ * (`:model-value="x ? [x] : []"`).
+ *
+ * 設定 button navigates to the standalone /production-achievement-settings
+ * mini-app (D4, no drawer entry); OD-7 mode/station preservation across that
+ * round-trip is handled inside useProductionAchievement.ts (sessionStorage).
  */
 import { computed, onMounted, onUnmounted } from 'vue';
-import { useProductionAchievement } from './composables/useProductionAchievement';
+import { useProductionAchievement, type ProductionAchievementMode } from './composables/useProductionAchievement';
+import { navigateToRuntimeRoute } from '../core/shell-navigation';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import DataTable from '../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../shared-ui/components/DataTableColumn.vue';
@@ -23,15 +31,18 @@ import LoadingOverlay from '../shared-ui/components/LoadingOverlay.vue';
 import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
-import AchievementChart from './components/AchievementChart.vue';
+import PlanAchievementStackedChart from './components/PlanAchievementStackedChart.vue';
 import TargetEditPanel from './components/TargetEditPanel.vue';
-import { formatQty, formatAchievementRate } from './utils';
-import type { ProductionAchievementReportRow } from './composables/useProductionAchievement';
+import { formatQty, formatAchievementRate, achievementRateForChart } from './utils';
+import type { DailyViewRow, CumulativeViewRow } from './composables/useProductionAchievementDuckDB';
 
 const {
   filters,
   filterOptions,
-  rows,
+  dailyRows,
+  cumulativeRows,
+  cumulativeTrend,
+  viewKind,
   targets,
   loading,
   error,
@@ -43,13 +54,24 @@ const {
   fetchFilterOptions,
   fetchTargets,
   runQuery,
+  setMode,
+  setWorkcenterGroup,
+  setRangeDates,
   saveTarget,
-  resetFilters,
   cancelQuery,
 } = useProductionAchievement();
 
-onMounted(async () => {
-  await Promise.all([fetchFilterOptions(), fetchTargets()]);
+const MODE_OPTIONS: { value: ProductionAchievementMode; label: string }[] = [
+  { value: 'today', label: '當日' },
+  { value: 'yesterday', label: '前日' },
+  { value: 'month', label: '當月' },
+  { value: 'range', label: '自訂區間' },
+];
+
+onMounted(() => {
+  void fetchFilterOptions();
+  void fetchTargets();
+  void runQuery(); // OD-3: land on 當日 (or the OD-7 persisted mode) and auto-run immediately
 });
 
 // Avoid a zombie poll/timer if the user navigates away mid-query.
@@ -61,72 +83,117 @@ onUnmounted(() => {
 // enqueued, AsyncQueryProgress replaces it so the page stays interactive.
 const showPageLoading = computed(() => loading.value && !asyncJobProgress.active);
 
-// FIX 1 (UX-1): once a query has run, only render the summary/chart/table
-// when it actually SUCCEEDED (no error) — otherwise ErrorBanner above is the
-// sole message, instead of also showing a contradictory "no matching data"
-// empty table underneath a "service unavailable" banner. A genuine
-// zero-row *success* (hasQueried && !error && rows.length === 0) still
-// renders normally — DataTable's own empty-type="filter-empty" state.
+// Once a query has run, only render the summary/chart/table when it actually
+// SUCCEEDED (no error) — otherwise ErrorBanner above is the sole message,
+// instead of also showing a contradictory "no matching data" empty table
+// underneath a "service unavailable" banner. A genuine zero-row *success*
+// still renders normally — DataTable's own empty-type="filter-empty" state.
 const showResults = computed(() => hasQueried.value && !error.value);
 
-async function handleQuery(): Promise<void> {
-  if (loading.value) return;
-  await runQuery();
+function handleRangeStartChange(e: Event): void {
+  const value = (e.target as HTMLInputElement).value;
+  setRangeDates(value, filters.end_date);
 }
 
-function handleClearFilters(): void {
-  resetFilters();
+function handleRangeEndChange(e: Event): void {
+  const value = (e.target as HTMLInputElement).value;
+  setRangeDates(filters.start_date, value);
+}
+
+function goToSettings(): void {
+  navigateToRuntimeRoute('/production-achievement-settings');
 }
 
 async function handleSaveTarget(payload: { shift_code: string; workcenter_group: string; target_qty: number }): Promise<void> {
   await saveTarget(payload);
 }
 
-// ── Summary cards ──────────────────────────────────────────────────────────
-const totalActual = computed(() =>
-  (rows.value || []).reduce((sum: number, r: ProductionAchievementReportRow) => sum + Number(r.actual_output_qty || 0), 0),
+// ── Row helpers shared by table + chart + KPI (single source per OD-11) ────
+type ViewRow = DailyViewRow | CumulativeViewRow;
+
+const currentRows = computed<ViewRow[]>(() => (viewKind.value === 'daily' ? dailyRows.value : cumulativeRows.value));
+
+function actualOf(row: ViewRow): number {
+  return 'daily_output_qty' in row ? row.daily_output_qty : row.cumulative_actual_qty;
+}
+function planOf(row: ViewRow): number | null {
+  return 'daily_plan_qty' in row ? row.daily_plan_qty : row.cumulative_plan_qty;
+}
+function rateOf(row: ViewRow): number | null {
+  return 'achievement_rate' in row ? row.achievement_rate : row.cumulative_achievement_rate;
+}
+
+// ── KPI cards (OD-11): SUM(actual)/SUM(plan) over the SAME rows already
+// rendered in the table/chart below — never an independent re-aggregation. ──
+const totalActual = computed(() => currentRows.value.reduce((sum, r) => sum + Number(actualOf(r) || 0), 0));
+const rowsWithPlan = computed(() => currentRows.value.filter((r) => planOf(r) !== null));
+const totalPlan = computed(() =>
+  rowsWithPlan.value.length === 0 ? null : rowsWithPlan.value.reduce((sum, r) => sum + Number(planOf(r) || 0), 0),
 );
-const groupsWithTarget = computed(() =>
-  (rows.value || []).filter((r: ProductionAchievementReportRow) => r.target_qty !== null && r.target_qty !== undefined),
+const overallRate = computed(() => (totalPlan.value === null || totalPlan.value === 0 ? null : totalActual.value / totalPlan.value));
+
+// ── Chart series (shared PlanAchievementStackedChart — daily x=package group, cumulative x=date) ──
+const chartCategories = computed(() =>
+  viewKind.value === 'daily' ? dailyRows.value.map((r) => r.package_lf_group) : cumulativeTrend.value.map((t) => t.output_date),
 );
-const overallAchievementRate = computed(() => {
-  const targetSum = groupsWithTarget.value.reduce((sum: number, r: ProductionAchievementReportRow) => sum + Number(r.target_qty || 0), 0);
-  if (targetSum === 0) return null;
-  const actualSumForTargeted = groupsWithTarget.value.reduce(
-    (sum: number, r: ProductionAchievementReportRow) => sum + Number(r.actual_output_qty || 0),
-    0,
-  );
-  return actualSumForTargeted / targetSum;
+const chartSeries = computed(() => {
+  if (viewKind.value === 'daily') {
+    return [
+      { name: 'D班', colorVar: 'var(--pa-shift-d)', data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.d_output_qty / r.daily_plan_qty : null)) },
+      { name: 'N班', colorVar: 'var(--pa-shift-n)', data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.n_output_qty / r.daily_plan_qty : null)) },
+    ];
+  }
+  return [{ name: '達成率', colorVar: 'var(--pa-cumulative-rate)', data: cumulativeTrend.value.map((t) => achievementRateForChart(t.achievement_rate)) }];
 });
-const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionAchievementReportRow) => r.workcenter_group)).size);
 </script>
 
 <template>
   <div class="theme-production-achievement pa-app__page" data-testid="pa-app">
-    <!-- Filter panel -->
+    <!-- Mode + station filter panel -->
     <div class="ui-card pa-filter-card">
       <div class="ui-card-header">
         <span class="ui-card-title">查詢條件</span>
+        <button type="button" class="ui-btn ui-btn--secondary ui-btn--sm" data-testid="pa-settings-btn" @click="goToSettings">
+          設定
+        </button>
       </div>
       <div class="ui-card-body pa-app__filter-panel">
+        <div class="pa-app__mode-switch" role="group" aria-label="查詢模式">
+          <button
+            v-for="opt in MODE_OPTIONS"
+            :key="opt.value"
+            type="button"
+            class="ui-btn ui-btn--sm"
+            :class="filters.mode === opt.value ? 'ui-btn--primary' : 'ui-btn--secondary'"
+            :aria-pressed="filters.mode === opt.value"
+            :data-testid="`pa-mode-${opt.value}`"
+            @click="setMode(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
         <div class="pa-app__filter-row">
-          <div class="ui-filter-group">
-            <label for="pa-start-date" class="ui-filter-label">開始日期 <span class="pa-app__required">*</span></label>
-            <input id="pa-start-date" v-model="filters.start_date" type="date" class="pa-app__input" data-testid="pa-start-date" />
+          <div v-if="filters.mode === 'range'" class="ui-filter-group">
+            <label for="pa-range-start" class="ui-filter-label">開始日期</label>
+            <input
+              id="pa-range-start"
+              type="date"
+              class="pa-app__input"
+              data-testid="pa-range-start"
+              :value="filters.start_date"
+              @change="handleRangeStartChange"
+            />
           </div>
-          <div class="ui-filter-group">
-            <label for="pa-end-date" class="ui-filter-label">結束日期 <span class="pa-app__required">*</span></label>
-            <input id="pa-end-date" v-model="filters.end_date" type="date" class="pa-app__input" data-testid="pa-end-date" />
-          </div>
-          <div class="ui-filter-group">
-            <label class="ui-filter-label">班別</label>
-            <MultiSelect
-              data-testid="pa-shift-code"
-              :model-value="filters.shift_code ? [filters.shift_code] : []"
-              :options="filterOptions.shift_codes"
-              placeholder="全部"
-              :searchable="false"
-              @update:model-value="filters.shift_code = ($event as string[])[0] || ''"
+          <div v-if="filters.mode === 'range'" class="ui-filter-group">
+            <label for="pa-range-end" class="ui-filter-label">結束日期</label>
+            <input
+              id="pa-range-end"
+              type="date"
+              class="pa-app__input"
+              data-testid="pa-range-end"
+              :value="filters.end_date"
+              @change="handleRangeEndChange"
             />
           </div>
           <div class="ui-filter-group">
@@ -135,40 +202,18 @@ const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionA
               data-testid="pa-workcenter-group"
               :model-value="filters.workcenter_group ? [filters.workcenter_group] : []"
               :options="filterOptions.workcenter_groups"
-              placeholder="全部"
+              placeholder="請選擇站點群組"
               :searchable="true"
-              @update:model-value="filters.workcenter_group = ($event as string[])[0] || ''"
+              @update:model-value="setWorkcenterGroup(($event as string[])[0] || '')"
             />
           </div>
-        </div>
-
-        <div class="pa-app__filter-actions">
-          <button
-            type="button"
-            class="ui-btn ui-btn--secondary"
-            :disabled="loading"
-            data-testid="pa-clear-filters"
-            @click="handleClearFilters"
-          >
-            清除篩選
-          </button>
-          <button
-            type="button"
-            class="ui-btn ui-btn--primary"
-            :disabled="loading"
-            data-testid="pa-query-btn"
-            @click="handleQuery"
-          >
-            {{ loading ? '查詢中…' : '查詢' }}
-          </button>
         </div>
       </div>
     </div>
 
     <ErrorBanner :message="error || ''" :dismissible="false" />
 
-    <!-- RQ async job progress (202 spool-miss path) — replaces the generic
-         loading overlay while the worker fans out; data-shape-contract.md §3.28.4 -->
+    <!-- RQ async job progress (202 spool-miss path) — shared across all 4 modes (D5) -->
     <AsyncQueryProgress
       :active="asyncJobProgress.active"
       :progress="asyncJobProgress.progress"
@@ -178,45 +223,73 @@ const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionA
       @cancel="cancelQuery"
     />
 
-    <!-- Target-value management (always visible per api-contract.md row 258 — no permission gate on read) -->
+    <!-- Target-value management (always visible per api-contract.md row 258 — no permission gate on read).
+         Unchanged panel/wiring — the legacy shift-based target table is untouched by this change. -->
     <TargetEditPanel
       :targets="targets"
       :edit-forbidden="editForbidden"
       :edit-error="editError"
       :edit-saving="editSaving"
       :workcenter-group-options="filterOptions.workcenter_groups"
-      :shift-code-options="filterOptions.shift_codes"
       @save="handleSaveTarget"
     />
 
-    <!-- Results — suppressed on error (FIX 1): ErrorBanner above is the sole
-         message then, instead of also showing a contradictory empty table. -->
+    <!-- Results — suppressed on error: ErrorBanner above is the sole message
+         then, instead of also showing a contradictory empty table. -->
     <template v-if="showResults">
-      <SummaryCardGroup :columns="4">
-        <SummaryCard label="實際產出總量" :value="totalActual" format="number" accent="brand" />
-        <SummaryCard label="整體達成率" :value="overallAchievementRate !== null ? overallAchievementRate * 100 : null" format="percent" accent="success" />
-        <SummaryCard label="站點群組數" :value="groupCount" format="number" accent="info" />
-        <SummaryCard label="資料筆數" :value="rows.length" format="number" accent="neutral" />
+      <SummaryCardGroup :columns="3" data-testid="pa-kpi-cards">
+        <SummaryCard label="實際產出合計" :value="totalActual" format="number" accent="brand" />
+        <SummaryCard label="計畫合計" :value="totalPlan" format="number" accent="info" />
+        <SummaryCard label="整體達成率" :value="overallRate !== null ? overallRate * 100 : null" format="percent" accent="success" />
       </SummaryCardGroup>
 
-      <AchievementChart :rows="rows" />
+      <PlanAchievementStackedChart
+        :title="viewKind === 'daily' ? '每日達成率' : '累計達成率趨勢'"
+        :categories="chartCategories"
+        :series="chartSeries"
+        :category-axis-name="viewKind === 'daily' ? '包裝群組' : '日期'"
+      />
 
       <div class="ui-card">
         <div class="ui-card-header">
           <span class="ui-card-title">生產達成率明細</span>
         </div>
         <div class="ui-card-body">
-          <DataTable :data="(rows as unknown as Record<string, unknown>[])" :loading="loading" empty-type="filter-empty" data-testid="pa-report-table">
-            <DataTableColumn column-key="output_date" label="日期" sortable />
-            <DataTableColumn column-key="shift_code" label="班別" sortable />
-            <DataTableColumn column-key="workcenter_group" label="站點群組" sortable />
-            <DataTableColumn column-key="actual_output_qty" label="實際產出" align="right" sortable />
-            <DataTableColumn column-key="target_qty" label="目標值" align="right" sortable />
-            <DataTableColumn column-key="achievement_rate" label="達成率" align="right" sortable />
+          <DataTable
+            v-if="viewKind === 'daily'"
+            :data="(dailyRows as unknown as Record<string, unknown>[])"
+            :loading="loading"
+            empty-type="filter-empty"
+            data-testid="pa-report-table"
+          >
+            <DataTableColumn column-key="package_lf_group" label="包裝群組" sortable />
+            <DataTableColumn column-key="d_output_qty" label="D班產出" align="right" sortable />
+            <DataTableColumn column-key="n_output_qty" label="N班產出" align="right" sortable />
+            <DataTableColumn column-key="daily_output_qty" label="每日產出" align="right" sortable />
+            <DataTableColumn column-key="daily_plan_qty" label="每日計畫" align="right" sortable />
+            <DataTableColumn column-key="achievement_rate" label="每日達成率" align="right" sortable />
             <template #cell="{ columnKey, value }">
-              <template v-if="columnKey === 'actual_output_qty'">{{ formatQty(value as number) }}</template>
-              <template v-else-if="columnKey === 'target_qty'">{{ formatQty(value as number | null) }}</template>
+              <template v-if="['d_output_qty', 'n_output_qty', 'daily_output_qty', 'daily_plan_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
               <template v-else-if="columnKey === 'achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
+              <template v-else>{{ value }}</template>
+            </template>
+          </DataTable>
+
+          <DataTable
+            v-else
+            :data="(cumulativeRows as unknown as Record<string, unknown>[])"
+            :loading="loading"
+            empty-type="filter-empty"
+            data-testid="pa-report-table"
+          >
+            <DataTableColumn column-key="package_lf_group" label="包裝群組" sortable />
+            <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫" align="right" sortable />
+            <DataTableColumn column-key="cumulative_actual_qty" label="累計產出" align="right" sortable />
+            <DataTableColumn column-key="cumulative_diff_qty" label="累計差異" align="right" sortable />
+            <DataTableColumn column-key="cumulative_achievement_rate" label="累計達成率" align="right" sortable />
+            <template #cell="{ columnKey, value }">
+              <template v-if="['cumulative_plan_qty', 'cumulative_actual_qty', 'cumulative_diff_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
+              <template v-else-if="columnKey === 'cumulative_achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
               <template v-else>{{ value }}</template>
             </template>
           </DataTable>
@@ -225,7 +298,7 @@ const groupCount = computed(() => new Set((rows.value || []).map((r: ProductionA
     </template>
 
     <div v-else-if="!hasQueried && !loading" class="pa-app__empty-state" data-testid="pa-empty-state">
-      請選擇日期區間後按「查詢」
+      正在載入生產達成率資料…
     </div>
 
     <LoadingOverlay v-if="showPageLoading" tier="page" />

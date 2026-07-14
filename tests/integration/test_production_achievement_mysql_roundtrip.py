@@ -143,3 +143,145 @@ class TestPermissionTableRoundtrip:
         from mes_dashboard.services import production_achievement_permission_service as svc
 
         assert svc.is_user_whitelisted("alice") is False
+
+
+class TestPackageLfTableRoundtrip:
+    """production-achievement-overhaul, D1 (sparse, fallback-to-self on
+    absence). Mirrors TestTargetTableRoundtrip."""
+
+    @patch("mes_dashboard.services.production_achievement_package_lf_service.MYSQL_OPS_ENABLED", True)
+    def test_package_lf_table_write_then_read_roundtrip(self, monkeypatch):
+        from mes_dashboard.services import production_achievement_package_lf_service as svc
+
+        table = _FakeMySQLTable()
+        conn = _FakeConn(table, key_fields=("raw_package_lf",))
+        monkeypatch.setattr(svc, "get_mysql_connection", lambda: _FakeConnCtx(conn))
+
+        svc.upsert_package_lf(
+            raw_package_lf="SOT23-5L", merged_group="SOT23-5L/6L", updated_by="tester"
+        )
+        rows = svc.get_package_lf_entries()
+        assert len(rows) == 1
+        assert rows[0]["raw_package_lf"] == "SOT23-5L"
+        assert rows[0]["merged_group"] == "SOT23-5L/6L"
+
+        assert svc.get_package_lf_map() == {"SOT23-5L": "SOT23-5L/6L"}
+
+    @patch("mes_dashboard.services.production_achievement_package_lf_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_read_degrades_to_empty(self):
+        """D1: an empty/degraded table means every raw value falls back to
+        itself -- a valid report, not an error state."""
+        from mes_dashboard.services import production_achievement_package_lf_service as svc
+
+        assert svc.get_package_lf_entries() == []
+        assert svc.get_package_lf_map() == {}
+
+    @patch("mes_dashboard.services.production_achievement_package_lf_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_write_returns_503(self):
+        from mes_dashboard.services import production_achievement_package_lf_service as svc
+
+        with pytest.raises(svc.MySQLUnavailableError):
+            svc.upsert_package_lf(
+                raw_package_lf="SOT23-5L", merged_group="SOT23-5L/6L", updated_by="tester"
+            )
+
+    @patch("mes_dashboard.services.production_achievement_package_lf_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_delete_returns_503(self):
+        from mes_dashboard.services import production_achievement_package_lf_service as svc
+
+        with pytest.raises(svc.MySQLUnavailableError):
+            svc.delete_package_lf(raw_package_lf="SOT23-5L")
+
+
+class TestWorkcenterMergeTableRoundtrip:
+    """production-achievement-overhaul, D2 (explicit-inclusion,
+    exclude-by-absence -- the OPPOSITE default from
+    TestPackageLfTableRoundtrip above). Mirrors TestTargetTableRoundtrip."""
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", True)
+    def test_workcenter_merge_table_write_then_read_roundtrip(self, monkeypatch):
+        from mes_dashboard.services import production_achievement_workcenter_merge_service as svc
+
+        table = _FakeMySQLTable()
+        conn = _FakeConn(table, key_fields=("raw_workcenter_group",))
+        monkeypatch.setattr(svc, "get_mysql_connection", lambda: _FakeConnCtx(conn))
+
+        svc.upsert_workcenter_merge(
+            raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB", updated_by="tester"
+        )
+        rows = svc.get_workcenter_merge_entries()
+        assert len(rows) == 1
+        assert rows[0]["raw_workcenter_group"] == "焊接_DW"
+        assert rows[0]["merged_workcenter_group"] == "焊接_WB"
+
+        assert svc.get_workcenter_merge_map() == {"焊接_DW": "焊接_WB"}
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_read_degrades_to_empty(self):
+        """D2: an empty/degraded table means the report renders empty for
+        every workcenter_group (INNER JOIN matches nothing) -- the OPPOSITE
+        downstream effect from D1's degrade above."""
+        from mes_dashboard.services import production_achievement_workcenter_merge_service as svc
+
+        assert svc.get_workcenter_merge_entries() == []
+        assert svc.get_workcenter_merge_map() == {}
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_write_returns_503(self):
+        from mes_dashboard.services import production_achievement_workcenter_merge_service as svc
+
+        with pytest.raises(svc.MySQLUnavailableError):
+            svc.upsert_workcenter_merge(
+                raw_workcenter_group="焊接_DW", merged_workcenter_group="焊接_WB", updated_by="tester"
+            )
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_delete_returns_503(self):
+        from mes_dashboard.services import production_achievement_workcenter_merge_service as svc
+
+        with pytest.raises(svc.MySQLUnavailableError):
+            svc.delete_workcenter_merge(raw_workcenter_group="焊接_DW")
+
+
+class TestDailyPlanTableRoundtrip:
+    """production-achievement-overhaul (PA-11): keyed on
+    (workcenter_group, package_lf_group), no shift dimension, fully
+    independent of production_achievement_targets. Mirrors
+    TestTargetTableRoundtrip."""
+
+    @patch("mes_dashboard.services.production_achievement_daily_plan_service.MYSQL_OPS_ENABLED", True)
+    def test_daily_plan_table_write_then_read_roundtrip(self, monkeypatch):
+        from mes_dashboard.services import production_achievement_daily_plan_service as svc
+
+        table = _FakeMySQLTable()
+        conn = _FakeConn(table, key_fields=("workcenter_group", "package_lf_group"))
+        monkeypatch.setattr(svc, "get_mysql_connection", lambda: _FakeConnCtx(conn))
+
+        svc.upsert_daily_plan(
+            workcenter_group="焊接_DB", package_lf_group="SOD-123FL",
+            daily_plan_qty=300, updated_by="tester",
+        )
+        rows = svc.get_daily_plans()
+        assert len(rows) == 1
+        assert rows[0]["workcenter_group"] == "焊接_DB"
+        assert rows[0]["package_lf_group"] == "SOD-123FL"
+        assert rows[0]["daily_plan_qty"] == 300
+
+        assert svc.get_daily_plans_map() == {("焊接_DB", "SOD-123FL"): 300}
+
+    @patch("mes_dashboard.services.production_achievement_daily_plan_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_read_degrades_to_empty_null_qty(self):
+        from mes_dashboard.services import production_achievement_daily_plan_service as svc
+
+        assert svc.get_daily_plans() == []
+        assert svc.get_daily_plans_map() == {}
+
+    @patch("mes_dashboard.services.production_achievement_daily_plan_service.MYSQL_OPS_ENABLED", False)
+    def test_mysql_ops_disabled_write_returns_503(self):
+        from mes_dashboard.services import production_achievement_daily_plan_service as svc
+
+        with pytest.raises(svc.MySQLUnavailableError):
+            svc.upsert_daily_plan(
+                workcenter_group="焊接_DB", package_lf_group="SOD-123FL",
+                daily_plan_qty=300, updated_by="tester",
+            )

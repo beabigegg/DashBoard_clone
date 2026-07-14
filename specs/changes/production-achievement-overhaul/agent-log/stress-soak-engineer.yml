@@ -1,0 +1,142 @@
+change-id: production-achievement-overhaul
+agent: stress-soak-engineer
+timestamp: "2026-07-14T02:58:08Z"
+status: complete
+summary: >-
+  Read implementation-plan.md, test-plan.md, design.md, ci-gates.md,
+  change-classification.md, and tasks.yml before touching any test file, per
+  instructions. Extended (never rewrote) the 2 files test-plan.md's Stress
+  scope names: tests/stress/test_production_achievement_stress.py (+1 new
+  class, 4 tests: warmup-scheduler 8-job registry fairness, PA-14) and
+  tests/stress/test_chunk_boundary.py (+1 new class, 2 parametrized test
+  methods x 3 scales = 6 tests: D6 closing-chunk fetch-completeness fix at
+  stress-scale chunk counts). ci-gates.md (already written before my session)
+  correctly anticipated that test_chunk_boundary.py already existed as a
+  shared multi-domain file and that new content needed @pytest.mark.stress --
+  followed that guidance exactly. All 10 new tests pass; re-ran 5x to confirm
+  no timing flakiness in the concurrency-based assertions. Also found and
+  fixed 3 PRE-EXISTING failures in test_production_achievement_stress.py
+  (backend-engineer's PACKAGE_LF grain-widening, Phase 1, updated the unit
+  test file's copy of a chunk-parquet-writing helper but not this stress
+  file's separate copy, and left one schema assertion stale at 4 columns) --
+  confirmed via diffing against git HEAD with all other uncommitted work
+  intact that these 3 failures pre-date my session and are not something I
+  introduced; fixed since I'm required to extend this file and leave it
+  green. Full file-level regression run of both files (all stress-marked
+  tests + the pre-existing unmarked Tier-1 classes) is green. Recorded
+  evidence via `cdd-kit test run --phase full` (additive -- test-evidence.yml
+  already had collect/targeted/changed-area/contract/quality all passed from
+  prior agents; `--phase stress` is not a valid ladder enum value, confirmed
+  by direct CLI probe, so used the unused `full` slot instead, which added a
+  new entry without touching any of the 5 existing phase records).
+  stress-soak-report.md NOT created: change-classification.md's own Required
+  Artifacts table says "no" for this file ("Warm-cache is low-frequency and
+  fail-safe; captured via extended stress tests + agent-log. Promote to yes
+  only if warmup-scheduler load or chunk-boundary results are concerning.")
+  and neither result set is concerning (see pass-criteria-cited below) -- the
+  one bug found was a stale test-helper schema assertion, not a
+  warmup-scheduler or chunk-boundary correctness finding, and it is now
+  fixed and green. Soak testing was intentionally NOT implemented, per
+  test-plan.md's explicit classification (soak: "not required" in the Test
+  Families table, "consider" only per change-classification.md, § Out of
+  Scope explicitly states "no soak test file is planned") -- this is a
+  deliberate, explicit skip citing the source classification, not a silent
+  omission.
+
+artifacts:
+  - { type: runner-config-path, pointer: "tests/stress/test_production_achievement_stress.py" }
+  - { type: runner-config-path, pointer: "tests/stress/test_chunk_boundary.py" }
+  - { type: runner, pointer: "pytest -m stress --run-stress (this repo's established in-process stress-harness convention across all of tests/stress/ -- threading/concurrent.futures + monkeypatched Oracle/Redis boundaries, not k6/Locust/JMeter; matches every sibling file in the directory)" }
+
+  - { type: test-files, pointer: "tests/stress/test_production_achievement_stress.py::TestWarmupSchedulerEightJobsNoMonopolization (NEW class, 4 tests: enqueue-config parity, enqueue-fault isolation, concurrent slow-sibling no-delay, concurrent faulting-sibling no-block)" }
+  - { type: test-files, pointer: "tests/stress/test_chunk_boundary.py::TestProductionAchievementD6ClosingChunkStress (NEW class, 2 methods x n_days=[30,90,180] = 6 tests: chunk-count invariant, real post_aggregate merge-exactly-once/zero-leakage)" }
+  - { type: test-files, pointer: "tests/stress/test_production_achievement_stress.py::_write_chunk_parquet (BUGFIX, pre-existing: added missing PACKAGE_LF 5th column to match the already-landed schema-v2 GROUP BY, mirroring tests/test_production_achievement_unified_job.py's already-updated copy of this same helper)" }
+  - { type: test-files, pointer: "tests/stress/test_production_achievement_stress.py::TestFailOpenNoRedis.test_job_run_completes_when_redis_down (BUGFIX, pre-existing: schema assertion updated 4 cols -> 5 cols, PACKAGE_LF)" }
+  - { type: test-files, pointer: "tests/stress/test_production_achievement_stress.py::TestSpoolKeyCollision.test_identical_date_range_concurrent_jobs_no_spool_corruption (BUGFIX, pre-existing: schema assertion updated 4 cols -> 5 cols, PACKAGE_LF)" }
+
+  - { type: pass-criteria-cited, pointer: "warmup-scheduler R-7: all 8 _WARMUP_JOBS (6 pre-existing + 2 new achievement today/yesterday) enqueued with IDENTICAL job_timeout=WARMUP_JOB_TIMEOUT/result_ttl=300/failure_ttl=300 -- no job type structurally privileged on the single-worker FIFO `rq worker warmup` process" }
+  - { type: pass-criteria-cited, pointer: "warmup-scheduler R-7: enqueue-loop reaches and attempts all 8 jobs even when one's queue.enqueue() raises (simulated Redis blip) -- achievement jobs enqueued after the fault are still reached" }
+  - { type: pass-criteria-cited, pointer: "warmup-scheduler R-7: 8 real worker_fn callables run concurrently (1 deliberately slow sibling, ~0.35s) -- total wall-clock < 0.35s+5s margin (proves concurrent, not serialized); achievement_today/achievement_yesterday's own enter->exit duration < 0.35s (not blocked behind the slow sibling)" }
+  - { type: pass-criteria-cited, pointer: "warmup-scheduler R-7: 1 sibling's underlying call raises under concurrency -- fault never propagates out of its thread; all other 7 (incl. both achievement jobs) still reach a normal exit" }
+  - { type: pass-criteria-cited, pointer: "chunk-boundary D6: at n_days=[30,90,180], pre_query() appends exactly n_days regular whole-day chunks + exactly ONE D6 closing chunk [end+1 00:00:00, end+1 07:30:00) -- never duplicated/omitted, no duplicate chunk entries anywhere in the list" }
+  - { type: pass-criteria-cited, pointer: "chunk-boundary D6: at n_days=[30,90,180] with every regular day-to-day seam AND the closing-chunk seam simulated straddling (PA-03 tail-attribution pattern), post_aggregate() yields exactly 2*n_days distinct (date,shift) rows (zero duplication/collapse), every day's N-shift = evening+tail summed exactly once, zero leakage into end_date+1, elapsed <30s (up to 181 chunk parquets, actual: <0.03s)" }
+
+  - { type: artifacts-location, pointer: "specs/changes/production-achievement-overhaul/test-runs/20260714-105216/ (cdd-kit test run --phase full: summary.json, stdout.log, stderr.log, junit.xml)" }
+  - { type: artifacts-location, pointer: "specs/changes/production-achievement-overhaul/test-evidence.yml (new `full` phase entry appended; collect/targeted/changed-area/contract/quality untouched, final-status: passed)" }
+
+next-action: none
+
+notes: |
+  SCOPE NOTE on test_chunk_boundary.py: test-plan.md and this change's own
+  task instructions describe this file as "(new)", but it already existed in
+  the repo pre-dating this change (a shared multi-domain boundary-probe file
+  covering reject-history/container-ID/material-trace/etc., last touched
+  2026-07-01) -- ci-gates.md (already written by an earlier agent before my
+  session) had already caught and correctly documented this exact fact
+  ("tests/stress/test_chunk_boundary.py already exists... New D6 stress-scale
+  content in this file must follow the marked convention or it silently never
+  executes in any gate"). I extended it (append-only, 240 insertions / 0
+  deletions) rather than creating a duplicate or rewriting it, and marked the
+  new class @pytest.mark.stress per that guidance so `stress-tests.yml`'s
+  `pytest tests/stress/ -m stress --run-stress` picks it up; verified the
+  pre-existing unmarked Tier-1 classes (TestChunkSeam, TestOrderByTieStability)
+  are unaffected (still pass via the `-k` filter backend-tests.yml uses).
+
+  BUGFIX DISCLOSURE (self-reported, in-scope, mechanical): while running the
+  full test_production_achievement_stress.py file to confirm a clean
+  baseline before adding my own tests ("Baseline first" per this agent's own
+  operating principle), found 3 pre-existing failures unrelated to
+  warmup-scheduler or chunk-boundary: TestFailOpenNoRedis::
+  test_job_run_completes_when_redis_down and both
+  TestSpoolKeyCollision tests. Root cause: backend-engineer's Phase 1
+  PACKAGE_LF grain-widening (schema v1->v2) updated post_aggregate()'s SQL to
+  GROUP BY a 5th column (PACKAGE_LF) and updated
+  tests/test_production_achievement_unified_job.py's copy of the
+  chunk-parquet-writing test helper accordingly, but this STRESS test file
+  has its own separate copy of the same helper (_write_chunk_parquet) that
+  was never updated, plus one hardcoded 4-column schema assertion. Verified
+  via git diff isolation (checked out only this one file to HEAD while
+  leaving all other uncommitted work, including the worker's PACKAGE_LF
+  change, intact) that these 3 failures pre-date my session and are not
+  something my own edits introduced -- my diff to this file is otherwise
+  pure-addition (git diff --numstat: 415 insertions / 4 deletions, and the 4
+  deletions are exactly these 3 fixes). Fixed since: (a) this is the exact
+  file test-plan.md assigns me to extend, (b) "extend, don't rewrite" implies
+  leaving it in a genuinely working state, not just adding new green tests
+  alongside known-red ones, and (c) the fix is mechanical/low-risk (add one
+  nullable column to a test fixture helper + widen 2 hardcoded assertion
+  sets to match the already-landed, already-contracted 5-column schema in
+  data-shape-contract.md SS3.28.1 -- no design decision, no behavior change to
+  production code). Not promoting to stress-soak-report.md since this is a
+  test-infrastructure staleness fix, not a warmup-scheduler-load or
+  chunk-boundary-correctness finding (the specific promotion trigger named
+  in change-classification.md).
+
+  SOAK: explicitly and deliberately skipped. test-plan.md Test Families
+  table: "soak | not required | classification marks this 'consider' only
+  (low-frequency, fail-safe hourly warm-cache) -- no soak file planned, see
+  Out of Scope". change-classification.md: "soak: consider -- hourly
+  warm-cache is fail-safe/low-frequency; a light soak is optional, not
+  blocking." implementation-plan.md's own Out of Scope section repeats this.
+  No soak test file created, no soak-tests.yml change made -- this matches
+  all 3 source documents' explicit classification, not an oversight.
+
+  TEST-EXECUTION LADDER: `cdd-kit test select production-achievement-overhaul
+  --json` returned a pre-existing "needs-test-plan-update" advisory about
+  cdd-kit being unable to infer one bounded runner across mixed
+  vitest/Playwright targets in test-plan.md's mapping table -- unrelated to
+  tests/stress/ and not something this pass's scope covers fixing (already
+  flagged by e2e-resilience-engineer's own agent-log as a pre-existing,
+  unrelated advisory). `--phase stress` is rejected by the CLI as an invalid
+  enum value (confirmed directly: {"status":"error","reason":"invalid phase:
+  stress"}) -- only collect/targeted/changed-area/contract/quality/full are
+  accepted. Used the unused `full` slot (not in required-phases, not yet
+  present in test-evidence.yml) so the stress evidence is additive and none
+  of the 5 already-passed phase records from prior agents were touched or
+  overwritten. final-status remains passed.
+
+  No tests/contract/ files were touched or executed this session; the
+  known ~175-unrelated-sample-regeneration issue does not apply to this
+  agent's run (verified via `git status --short tests/contract/samples/`
+  before and after -- only the pre-existing 10 legitimate new samples from
+  an earlier agent's contract work are present, untouched by me).

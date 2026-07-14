@@ -348,6 +348,22 @@ const ROUTE_CONTRACTS = Object.freeze({
     scope: 'in-scope',
     compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
   }),
+  '/production-achievement-settings': buildContract({
+    route: '/production-achievement-settings',
+    routeId: 'production-achievement-settings',
+    renderMode: 'native',
+    owner: 'frontend-mes-reporting',
+    title: '生產達成率 - 對照設定',
+    rollbackStrategy: 'fallback_to_legacy_route',
+    // Standalone drilldown (D4, no drawer entry) — same whitelisted-edit/
+    // read-only-else visibility as the report page itself: any released user
+    // can view it (state-settings-readonly), write access is gated
+    // server-side by can_edit_targets (editForbidden, first-403 fail-closed),
+    // never a route-level admin_only gate.
+    visibilityPolicy: 'released_or_admin',
+    scope: 'in-scope',
+    compatibilityPolicy: 'redirect_to_shell_when_spa_enabled',
+  }),
 });
 
 const REQUIRED_FIELDS = Object.freeze([

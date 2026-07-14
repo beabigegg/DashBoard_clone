@@ -3,8 +3,27 @@
  * All feature-specific styles must live here (css-contract.md Rule 4.2/4.3).
  */
 
+/* Chart color tokens (production-achievement-overhaul, IP-8) — read via
+ * PlanAchievementStackedChart.vue's resolveCssVar(), mirroring
+ * resource-history/components/StackedChart.vue's established convention
+ * (css-contract.md §2.4 chart-exception governance: ECharts option colors
+ * may not use theme() directly, so they are indirected through a CSS custom
+ * property instead of a hardcoded rgb()/hex literal). */
+.theme-production-achievement {
+  --pa-shift-d: theme('colors.token.h2563eb');
+  --pa-shift-n: theme('colors.token.h7c3aed');
+  --pa-plan-line: theme('colors.token.hef4444');
+  --pa-cumulative-rate: theme('colors.token.h16a34a');
+}
+
 .theme-production-achievement .pa-app__filter-panel {
   @apply p-4 flex flex-col gap-3 overflow-visible;
+}
+
+/* 4-button mode switch (當日/前日/當月/自訂區間, IP-8) — replaces the old
+ * free-form start/end date pickers for 3 of the 4 modes (OD-2). */
+.theme-production-achievement .pa-app__mode-switch {
+  @apply flex flex-wrap gap-2;
 }
 
 /* Scoped override for the global `.ui-card { overflow: hidden }` rule so the

@@ -1,0 +1,140 @@
+change-id: production-achievement-overhaul
+agent: monkey-test-engineer
+timestamp: "2026-07-14T02:27:13Z"
+status: complete
+summary: >-
+  Read implementation-plan.md/test-plan.md/design.md/interaction-design.md
+  (Confirmed OD-1..OD-12) and frontend-engineer's own agent-log "SCOPE
+  REDUCTIONS" section first, per instructions. Then compared the CURRENT
+  production-achievement-monkey.spec.ts (6 tests) against the ORIGINAL
+  pre-overhaul file (git show 4b48c570, 14 named scenarios, 1045 lines) AND
+  against production-achievement-async.spec.ts / data-boundary /
+  resilience specs (already extended by e2e-resilience-engineer) to find
+  genuine, non-duplicate gaps rather than assume the flag's word. Verdict:
+  7 of the original 14 scenarios are legitimately covered elsewhere now
+  (mid-poll/cancel/back-forward/hidden-tab in async.spec.ts; empty/unmapped
+  -spool and target-recompute moved to the unit-test tier in
+  useProductionAchievementDuckDB.test.ts) or structurally impossible under
+  the new design (mid-poll filter mutation -- setRangeDates() now shares
+  the identical `if (loading.value) return` OD-4 guard as setMode(), so the
+  old stale-result-overwrite bug class was engineered away, not merely
+  untested). 3 scenarios were genuinely dropped with NO replacement anywhere
+  (TargetEditPanel rapid-double-click Save; adversarial 自訂區間 date-range
+  input; 6 of 8 adversarial target_qty value classes) -- reinstated all 3,
+  and the 4th ask (rapid mode-mashing) was upgraded from a same-tick/
+  synchronous-response fixture (weak signal) to a genuine multi-tick 202-poll
+  fixture (the actual OD-3+OD-4 race window). Also ran the 5 domain-specific
+  probes this change's own business rules invented (D1 self-referential
+  mapping, OD-12 empty/stale dropdown options, Unicode/SQL/script strings in
+  the 3 new settings text fields, daily_plan_qty 0/large/overflow boundaries,
+  cross-panel editSaving race) -- found and confirmed 2 REAL findings (not
+  hypothetical): (1) DailyPlanPanel's new-row form submits a STALE
+  workcenter_group/package_lf_group value if another session narrows the
+  options list after selection but before submit (verified via direct
+  probe: DOM <select>.value resets to blank, but the underlying v-model
+  value does not, and submitNewRow()'s only guard is a truthy check); (2)
+  useProductionAchievementSettings.ts's 5 write functions (savePackageLf/
+  deletePackageLf/saveWorkcenterMerge/excludeWorkcenterGroup/saveDailyPlan)
+  share ONE editSaving flag but NONE has a reentrancy guard (unlike
+  runQuery()'s `if (loading.value) return`) -- an edit opened in one panel
+  BEFORE another panel's save starts can still submit concurrently via its
+  own un-gated keydown.enter handler. Both are recorded as hardening
+  findings (not hard-failed), consistent with this exact codebase's own
+  precedent for the analogous pre-overhaul TargetEditPanel finding: neither
+  is a crash or data-corruption risk (upsert-shaped writes are idempotent;
+  the stale write is an orphaned-but-harmless row, no FK in the DDL).
+  No existing test (backend or frontend) was found failing before my
+  changes -- all baseline runs (184 backend targeted, 258 backend
+  changed-area, 932 repo-wide vitest, 49 Playwright --list) were green
+  before and after. Did not touch any backend Python file or test (checked
+  test_production_achievement_daily_plan_service.py/test_production_achievement
+  _routes.py first per instructions -- zero/negative daily_plan_qty already
+  covered there; VARCHAR(60)/BIGINT DB-column-overflow behavior would need a
+  live MySQL connection to test meaningfully and is noted as an observation,
+  not a new backend test, since it is DB-integration territory outside a
+  mocked unit test's honest reach). Did not touch tests/contract/ (no
+  contract edits made; re-running the keyword-filtered backend
+  changed-area command produced zero tests/contract/samples/ noise, verified
+  via git status before/after).
+
+artifacts:
+  - { type: test-files, pointer: "frontend/tests/playwright/production-achievement-monkey.spec.ts (+3 describe blocks / +5 tests: genuine-202-poll rapid mode-mashing race condition; adversarial 自訂區間 date-range input incl. DOM-forced SQL/script string; TargetEditPanel rapid double-click Save reinstated)" }
+  - { type: test-files, pointer: "frontend/src/production-achievement/__tests__/TargetEditPanel.test.ts (+8 tests: full 8-value adversarial target_qty matrix -- decimal/scientific-notation/full-width-Unicode-digits/script-like/SQL-like/overlong-digit-overflow-to-Infinity/whitespace-only, +1 script-non-execution guard)" }
+  - { type: test-files, pointer: "frontend/src/production-achievement/__tests__/useProductionAchievementDuckDB.test.ts (+1 test: D1 self-referential raw_package_lf===merged_group proven identical output to an absent mapping)" }
+  - { type: test-files, pointer: "frontend/src/production-achievement-settings/components/__tests__/PackageLfMappingPanel.test.ts (+7 tests: SQL-like/script-like/emoji-RTL-ZWJ/surrogate-pair/overlong-string pass through verbatim; script-like value re-rendered as inert text; BOM-prefix correctly trimmed per ECMAScript WhiteSpace semantics)" }
+  - { type: test-files, pointer: "frontend/src/production-achievement-settings/components/__tests__/WorkcenterMergeMappingPanel.test.ts (+4 tests: SQL-like/script-like/emoji adversarial rename-field strings pass through verbatim and render as inert text)" }
+  - { type: test-files, pointer: "frontend/src/production-achievement-settings/components/__tests__/DailyPlanPanel.test.ts (+5 tests: OD-12 empty-options-list graceful rejection; CONFIRMED stale-selected-value-after-option-removal still submits; daily_plan_qty=0 accepted; large-finite accepted; overlong-digit-overflow-to-Infinity rejected)" }
+  - { type: test-files, pointer: "frontend/src/production-achievement-settings/__tests__/App.test.ts (+1 test: CONFIRMED cross-panel concurrent-save race on the shared editSaving flag -- two panels' edits opened before either submits both fire real concurrent PUT requests)" }
+
+  - { type: failure-modes-mapped, pointer: "rapid ALL-4-mode-button mash while a genuine 202 poll is in flight -> exactly 1 /report call, mode stays on the pre-mash value (not last-clicked), no crash, recovers after resolution" }
+  - { type: failure-modes-mapped, pointer: "自訂區間 end_date < start_date / range > 730 days / DOM-forced SQL-script date string -> graceful 400, no crash, no XSS side effect, mode buttons remain usable" }
+  - { type: failure-modes-mapped, pointer: "TargetEditPanel rapid double-click Save (unchanged component) -> clean non-torn DOM state; exact PUT count recorded as an annotation, not hard-asserted (matches pre-overhaul precedent)" }
+  - { type: failure-modes-mapped, pointer: "adversarial target_qty (7 classes) -> validateTargetQtyInput() rejects every one client-side, no save emitted, no script executes" }
+  - { type: failure-modes-mapped, pointer: "Unicode/emoji/SQL-like/script-like raw_package_lf, merged_group, merged_workcenter_group -> stored/emitted as inert plain-string data, rendered as literal text, never executed; BOM specifically gets trimmed (documented as intended, not verbatim)" }
+  - { type: failure-modes-mapped, pointer: "D1 self-referential package_lf_map row (raw===merged) -> provably identical rollup output to an absent row (harmless no-op write)" }
+  - { type: failure-modes-mapped, pointer: "OD-12 DailyPlanPanel: empty workcenterGroupOptions/packageLfGroupOptions -> zero selectable options, graceful inline-error rejection on submit, no crash" }
+  - { type: failure-modes-mapped, pointer: "OD-12 DailyPlanPanel: option removed after selection (deleted by another session) -> DOM select visually resets to blank BUT the stale value still reaches emit('save'); recorded as a genuine hardening finding, not hard-failed (orphaned-but-harmless row)" }
+  - { type: failure-modes-mapped, pointer: "daily_plan_qty 0 / large-finite (999999999999) / overlong-digit-overflow-to-Infinity -> 0 and large-finite accepted, overflow rejected, mirroring validateTargetQtyInput()'s guard" }
+  - { type: failure-modes-mapped, pointer: "cross-panel concurrent settings saves (editSaving shared flag) -> a second panel's already-open edit still submits a real concurrent PUT while a first panel's save is pending; recorded as a genuine hardening finding (no reentrancy guard on any of the 5 write functions, unlike runQuery())" }
+
+  - { type: seeds-recorded, pointer: "n/a (fixed adversarial literal values used throughout -- decimal/sci-notation/Unicode/SQL/script/overlong strings and 2 fixed date-range boundary cases; no property-based/fast-check generation was added this pass, so no PRNG seed applies)" }
+
+notes: |
+  Baseline verification (before + after my edits, all green, nothing
+  pre-existing broken): backend `conda run -n mes-dashboard python -m pytest`
+  targeted (184 passed) and changed-area (`-k production_achievement`, 258
+  passed/3 skipped) suites; frontend `npx vitest run` repo-wide (932 passed/2
+  skipped, up from 906 before my pass); `npx playwright test --list` across
+  all 6 production-achievement* spec files (49 tests, up from 44 after
+  e2e-resilience-engineer's pass) -- all parse cleanly, full execution still
+  blocked by this sandbox's Chromium v1228-cached/v1208-pinned mismatch
+  (same constraint every other agent this session worked under; installing a
+  new version would violate ci-workflow.md's CI-runner-only policy). `npx
+  vue-tsc --noEmit`: zero NEW errors -- only the same 6 pre-existing
+  TargetEditPanel.vue errors frontend-engineer already documented (I did not
+  touch that component's source, only its test file; the errors are outside
+  tsconfig.json's scope change anyway). `npm run css:check`: 0 errors, 308
+  warnings (unchanged count -- I touched no CSS/Vue template files).
+
+  cdd-kit test run: re-ran collect/targeted/changed-area phases (the 3 that
+  actually execute files I touched) with the SAME combined backend+frontend
+  commands already on record (directory-level frontend globs already covered
+  my new test content without narrowing), all 3 passed and test-evidence.yml
+  now reflects fresh runs including my additions. Left the contract and
+  quality phase entries untouched -- I made zero contract edits and zero
+  backend Python edits, so re-running those would be redundant motion, not
+  additional coverage; their prior PASSED records remain valid and
+  unaffected by my changes. `cdd-kit test select production-achievement
+  -overhaul --json` returned status "needs-test-plan-update" (a pre-existing
+  test-plan.md mapping-resolution gap, unrelated to my edits -- other agents
+  already worked around this the same way, via explicit `--command`).
+
+  Two CONFIRMED (directly probed, not guessed) findings worth qa-reviewer/
+  frontend-engineer awareness, both already encoded as passing tests with
+  explanatory comments at their exact location (see artifacts above) rather
+  than left as prose-only claims:
+    1. production-achievement-settings/components/DailyPlanPanel.vue's
+       new-row form has no submit-time re-validation against the LIVE
+       options list -- a stale selection survives a prop update that
+       narrows the choices. Low severity (no FK in the DDL; produces an
+       orphaned, never-joined plan row, not corruption), but it is a real
+       gap in the OD-12 "always a currently-valid choice" guarantee.
+    2. production-achievement-settings/composables/useProductionAchievement
+       Settings.ts's savePackageLf/deletePackageLf/saveWorkcenterMerge/
+       excludeWorkcenterGroup/saveDailyPlan all set/clear ONE shared
+       editSaving flag with no `if (editSaving.value) return` guard (unlike
+       useProductionAchievement.ts's runQuery()). The shared flag correctly
+       disables buttons that OPEN a new edit across panels, but an
+       inline-edit <input>'s own keydown.enter handler is never gated, so
+       an edit opened before a save starts can still submit concurrently.
+       Same low-severity profile as (1) -- MySQL's ON DUPLICATE KEY UPDATE
+       makes the resulting writes idempotent, not corrupting.
+
+  No scope creep: did not modify any backend Python file, any
+  frontend Vue/composable SOURCE file (only their `__tests__`/spec files),
+  any contract file, or tests/contract/. Did not duplicate any scenario
+  already covered by production-achievement-async.spec.ts, data-boundary,
+  or resilience specs (verified by reading all of them first). Did not
+  create a monkey-test-report.md -- this log + concise response text is
+  sufficient per the default-reporting guidance; no approved-with-risk /
+  durable-prose trigger applies.

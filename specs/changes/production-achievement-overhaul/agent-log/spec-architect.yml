@@ -1,0 +1,32 @@
+change-id: production-achievement-overhaul
+agent: spec-architect
+timestamp: "2026-07-14T09:40:00Z"
+status: complete
+artifacts:
+  - { type: adr-written, pointer: "none — architectural decision already recorded in docs/adr/0016-*.md Extension addendum (plan Phase 0 directs an extension, not a new ADR); design.md references it" }
+  - { type: affected-areas, pointer: "production-achievement (SQL/worker/service/routes/frontend), 3 new MySQL config services, filter_cache, spool_warmup_scheduler (shared +2 jobs), permissions (scope-widen docstring only), new production-achievement-settings mini-app + 7-loc route registration" }
+  - { type: decision-summary, pointer: "extend ADR-0016 client-side-rollup to a 2-stage DuckDB-WASM pipeline; warm-cache 當日/前日 by reusing ProductionAchievementJob via a progress_report()-no-op subclass; D1/D2 opposite defaults are intentional; D6 is fetch-completeness not rollup-locus" }
+  - { type: risks-noted, pointer: "0 high, 4 medium (month-warmup out-of-scope non-goal; OD-9 silent-empty on config-down; settings→report propagation latency; D6 alters historical N-shift totals)" }
+  - { type: design-doc, pointer: "specs/changes/production-achievement-overhaul/design.md" }
+next-action: implementation-planner writes implementation-plan.md + tasks.yml execution packet
+notes: >
+  design.md written to the archived production-achievement-async-spool precedent's
+  structure (Summary / Affected Components table / Key Decisions prose with rejected
+  alternatives / Migration-Rollback prose / Open Risks). No new ADR: the load-bearing
+  architectural trade-offs (client-side-rollup relocation extended, 2-stage pipeline,
+  D6 as fetch-completeness) are all captured in docs/adr/0016's existing Extension
+  section, which already carries the reversal-discipline clause — a separate ADR would
+  fragment that record, and plan Phase 0 explicitly directed an addendum.
+  Verified all three plan-flagged traps against live source before writing:
+  (1) BaseChunkedDuckDBJob.run() has no RQ-context dependency (job_id is a plain
+  string; base progress_report() only logs at DEBUG) — direct .run() from the warmup
+  module is safe; (2) ProductionAchievementJob.progress_report() -> update_job_progress()
+  does an unconditional Redis HSET with no TTL / no existence check
+  (async_query_job_service.py:272-281) — the orphan-key leak is real, hence the
+  subclass no-op override; (3) spool_warmup_scheduler._WARMUP_JOBS currently holds 6
+  entries and the production_history exclusion is unrelated to this feature.
+  Endpoint count stated as 10 (contract-reviewer's 9 + OD-8's later known-workcenter-groups),
+  matching current api-contract.md rows 273-282 and test-plan.md's note.
+  Kept design.md close to the soft line cap; deferred all implementation detail
+  (exact SQL, panel component internals, sessionStorage-vs-route-param choice for OD-7)
+  to implementation-planner / engineers by reference, per artifact rules.

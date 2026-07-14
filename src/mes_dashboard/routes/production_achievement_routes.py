@@ -1,18 +1,26 @@
 # -*- coding: utf-8 -*-
 """Production Achievement Rate (生產達成率) API routes.
 
-Endpoints per api-contract.md rows 256-261:
+Endpoints per api-contract.md rows 256-261 and 273-282 (production-achievement-
+overhaul adds 10 new rows):
   GET  /api/production-achievement/report
   GET  /api/production-achievement/filter-options
   GET  /api/production-achievement/targets
   PUT  /api/production-achievement/targets
   GET  /admin/api/production-achievement/permissions
   PUT  /admin/api/production-achievement/permissions/{user_identifier}
+  GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}]     (D1)
+  GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/{raw}] (D2)
+  GET/PUT        /api/production-achievement/daily-plans
+  GET            /api/production-achievement/known-package-lf-values
+  GET            /api/production-achievement/known-workcenter-groups
 
-Per-endpoint MySQL-failure behavior (design.md): report/targets reads
-degrade (target_qty/achievement_rate -> null, HTTP 200, never 500) when
-MySQL OPS is off/unreachable. Writes return 503 SERVICE_UNAVAILABLE in that
-case. PUT targets is additionally gated by can_edit_targets (403 FORBIDDEN).
+Per-endpoint MySQL-failure behavior (design.md): report/targets/package-lf-map/
+workcenter-merge-map/daily-plans reads degrade (empty array / null values,
+HTTP 200, never 500) when MySQL OPS is off/unreachable. Writes return 503
+SERVICE_UNAVAILABLE in that case. All 3 new tables' write endpoints are
+gated by the SAME verbatim can_edit_targets permission (widened scope, no
+new permission system) -- 403 FORBIDDEN when not whitelisted.
 """
 
 from __future__ import annotations
@@ -35,6 +43,7 @@ from mes_dashboard.core.response import (
     error_response,
     forbidden_error,
     internal_error,
+    not_found_error,
     service_unavailable_error,
     success_response,
     validation_error,
@@ -43,7 +52,25 @@ from mes_dashboard.services.async_query_job_service import (
     enqueue_query_job,
     is_async_available,
 )
-from mes_dashboard.services.filter_cache import get_spec_workcenter_mapping
+from mes_dashboard.services.filter_cache import (
+    get_known_package_lf_values,
+    get_spec_workcenter_mapping,
+)
+from mes_dashboard.services.production_achievement_daily_plan_service import (
+    DailyPlanValidationError,
+    MySQLUnavailableError as DailyPlanMySQLUnavailableError,
+    get_daily_plans,
+    get_daily_plans_map,
+    upsert_daily_plan,
+    validate_daily_plan_qty,
+)
+from mes_dashboard.services.production_achievement_package_lf_service import (
+    MySQLUnavailableError as PackageLfMySQLUnavailableError,
+    delete_package_lf,
+    get_package_lf_entries,
+    get_package_lf_map,
+    upsert_package_lf,
+)
 from mes_dashboard.services.production_achievement_permission_service import (
     MySQLUnavailableError as PermissionMySQLUnavailableError,
     get_permissions,
@@ -53,6 +80,7 @@ from mes_dashboard.services.production_achievement_service import (
     ProductionAchievementValidationError,
     _validate_date_range,
     get_filter_options,
+    get_known_workcenter_groups,
     make_canonical_pa_spool_id,
 )
 from mes_dashboard.services.production_achievement_target_service import (
@@ -62,6 +90,13 @@ from mes_dashboard.services.production_achievement_target_service import (
     get_targets_map,
     upsert_target,
     validate_target_qty,
+)
+from mes_dashboard.services.production_achievement_workcenter_merge_service import (
+    MySQLUnavailableError as WorkcenterMergeMySQLUnavailableError,
+    delete_workcenter_merge,
+    get_workcenter_merge_entries,
+    get_workcenter_merge_map,
+    upsert_workcenter_merge,
 )
 
 logger = logging.getLogger("mes_dashboard.production_achievement_routes")
@@ -122,7 +157,10 @@ def api_get_report():
     query_id = make_canonical_pa_spool_id(start_date, end_date)
 
     # ── Spool-hit: 200, inline maps injected unconditionally (Q1, not
-    # row-count gated like resource_history's threshold) ─────────────────────
+    # row-count gated like resource_history's threshold). Grows from 2 to 5
+    # inline arrays by production-achievement-overhaul (data-shape-contract.md
+    # §3.28.4): +package_lf_map (D1), +workcenter_merge_map (D2),
+    # +daily_plan_map. ─────────────────────────────────────────────────────
     spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
     if spool_path is not None:
         try:
@@ -135,6 +173,18 @@ def api_get_report():
                 {"shift_code": sc, "workcenter_group": wg, "target_qty": tq}
                 for (sc, wg), tq in get_targets_map().items()
             ]
+            package_lf_map = [
+                {"raw_package_lf": raw, "merged_group": merged}
+                for raw, merged in get_package_lf_map().items()
+            ]
+            workcenter_merge_map = [
+                {"raw_workcenter_group": raw, "merged_workcenter_group": merged}
+                for raw, merged in get_workcenter_merge_map().items()
+            ]
+            daily_plan_map = [
+                {"workcenter_group": wg, "package_lf_group": plg, "daily_plan_qty": qty}
+                for (wg, plg), qty in get_daily_plans_map().items()
+            ]
         except Exception as exc:
             return internal_error(str(exc))
 
@@ -143,6 +193,9 @@ def api_get_report():
             "spool_download_url": f"/api/spool/{_SPOOL_NAMESPACE}/{query_id}.parquet",
             "spec_workcenter_map": spec_workcenter_map,
             "targets_map": targets_map,
+            "package_lf_map": package_lf_map,
+            "workcenter_merge_map": workcenter_merge_map,
+            "daily_plan_map": daily_plan_map,
         })
 
     # ── Spool-miss + no worker available: 503, no sync fallback ─────────────
@@ -312,3 +365,219 @@ def api_admin_put_permission(user_identifier: str):
         return internal_error(str(exc))
 
     return success_response({"acknowledged": True})
+
+
+# ============================================================
+# GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}] (D1)
+# ============================================================
+
+
+@production_achievement_bp.route("/package-lf-map", methods=["GET"])
+@login_required
+def api_get_package_lf_map():
+    try:
+        rows = get_package_lf_entries()
+    except Exception as exc:
+        return internal_error(str(exc))
+    return success_response(rows)
+
+
+@production_achievement_bp.route("/package-lf-map", methods=["PUT"])
+@login_required
+def api_put_package_lf_map():
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯 PACKAGE_LF 對應表")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    body = request.get_json(silent=True) or {}
+    raw_package_lf = body.get("raw_package_lf")
+    merged_group = body.get("merged_group")
+
+    if not raw_package_lf or not merged_group:
+        return validation_error("必須提供 raw_package_lf 和 merged_group")
+
+    try:
+        upsert_package_lf(
+            raw_package_lf=raw_package_lf,
+            merged_group=merged_group,
+            updated_by=get_owner_token(),
+        )
+    except PackageLfMySQLUnavailableError as exc:
+        return service_unavailable_error(str(exc))
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    return success_response({"acknowledged": True})
+
+
+@production_achievement_bp.route("/package-lf-map/<raw>", methods=["DELETE"])
+@login_required
+def api_delete_package_lf_map(raw: str):
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯 PACKAGE_LF 對應表")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    try:
+        deleted = delete_package_lf(raw_package_lf=raw)
+    except PackageLfMySQLUnavailableError as exc:
+        return service_unavailable_error(str(exc))
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    if not deleted:
+        return not_found_error("找不到指定的 raw_package_lf")
+
+    return success_response({"acknowledged": True})
+
+
+# ============================================================
+# GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/{raw}] (D2)
+# ============================================================
+
+
+@production_achievement_bp.route("/workcenter-merge-map", methods=["GET"])
+@login_required
+def api_get_workcenter_merge_map():
+    try:
+        rows = get_workcenter_merge_entries()
+    except Exception as exc:
+        return internal_error(str(exc))
+    return success_response(rows)
+
+
+@production_achievement_bp.route("/workcenter-merge-map", methods=["PUT"])
+@login_required
+def api_put_workcenter_merge_map():
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯站點合併對應表")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    body = request.get_json(silent=True) or {}
+    raw_workcenter_group = body.get("raw_workcenter_group")
+    merged_workcenter_group = body.get("merged_workcenter_group")
+
+    if not raw_workcenter_group or not merged_workcenter_group:
+        return validation_error("必須提供 raw_workcenter_group 和 merged_workcenter_group")
+
+    try:
+        upsert_workcenter_merge(
+            raw_workcenter_group=raw_workcenter_group,
+            merged_workcenter_group=merged_workcenter_group,
+            updated_by=get_owner_token(),
+        )
+    except WorkcenterMergeMySQLUnavailableError as exc:
+        return service_unavailable_error(str(exc))
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    return success_response({"acknowledged": True})
+
+
+@production_achievement_bp.route("/workcenter-merge-map/<raw>", methods=["DELETE"])
+@login_required
+def api_delete_workcenter_merge_map(raw: str):
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯站點合併對應表")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    try:
+        deleted = delete_workcenter_merge(raw_workcenter_group=raw)
+    except WorkcenterMergeMySQLUnavailableError as exc:
+        return service_unavailable_error(str(exc))
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    if not deleted:
+        return not_found_error("找不到指定的 raw_workcenter_group")
+
+    return success_response({"acknowledged": True})
+
+
+# ============================================================
+# GET/PUT /api/production-achievement/daily-plans
+# ============================================================
+
+
+@production_achievement_bp.route("/daily-plans", methods=["GET"])
+@login_required
+def api_get_daily_plans():
+    try:
+        rows = get_daily_plans()
+    except Exception as exc:
+        return internal_error(str(exc))
+    return success_response(rows)
+
+
+@production_achievement_bp.route("/daily-plans", methods=["PUT"])
+@login_required
+def api_put_daily_plans():
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯每日計畫")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    body = request.get_json(silent=True) or {}
+    workcenter_group = body.get("workcenter_group")
+    package_lf_group = body.get("package_lf_group")
+    daily_plan_qty = body.get("daily_plan_qty")
+
+    if not workcenter_group or not package_lf_group:
+        return validation_error("必須提供 workcenter_group 和 package_lf_group")
+
+    try:
+        validated_qty = validate_daily_plan_qty(daily_plan_qty)
+    except DailyPlanValidationError as exc:
+        return validation_error(str(exc))
+
+    try:
+        upsert_daily_plan(
+            workcenter_group=workcenter_group,
+            package_lf_group=package_lf_group,
+            daily_plan_qty=validated_qty,
+            updated_by=get_owner_token(),
+        )
+    except DailyPlanMySQLUnavailableError as exc:
+        return service_unavailable_error(str(exc))
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    return success_response({"acknowledged": True})
+
+
+# ============================================================
+# GET /api/production-achievement/known-package-lf-values
+# ============================================================
+
+
+@production_achievement_bp.route("/known-package-lf-values", methods=["GET"])
+@login_required
+def api_get_known_package_lf_values():
+    try:
+        values = get_known_package_lf_values()
+    except Exception as exc:
+        return internal_error(str(exc))
+    return success_response({"package_lf_values": values})
+
+
+# ============================================================
+# GET /api/production-achievement/known-workcenter-groups (OD-8)
+# ============================================================
+
+
+@production_achievement_bp.route("/known-workcenter-groups", methods=["GET"])
+@login_required
+def api_get_known_workcenter_groups():
+    try:
+        groups = get_known_workcenter_groups()
+    except Exception as exc:
+        return internal_error(str(exc))
+    return success_response({"raw_workcenter_groups": groups})

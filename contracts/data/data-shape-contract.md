@@ -3,8 +3,8 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.39.0
-last-changed: 2026-07-13
+schema-version: 1.40.0
+last-changed: 2026-07-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -1609,6 +1609,13 @@ Added by change `add-db-scheduling-page`. One row per recommended equipment per 
 ---
 
 ## CHANGELOG
+## [data 1.40.0] — 2026-07-14
+### Changed (BREAKING)
+- production-achievement-overhaul: §3.28.1 SPECNAME-grain parquet schema widens to SPECNAME+PACKAGE_LF grain (`(output_date, shift_code, SPECNAME, PACKAGE_LF)`) — new nullable `PACKAGE_LF` column; `_PA_SPOOL_SCHEMA_VERSION` 1→2 (stale v1 parquets self-heal by key-mismatch; optional `rm -f tmp/query_spool/production_achievement/*.parquet` fast-forward). §3.28.4 envelope's `data` grows from 2 to 5 inline arrays (breaking under the same `ProductionAchievementReportResponse` schema name — see api-contract.md Compatibility Notes).
+
+### Added
+- production-achievement-overhaul: New §3.30 (`production_achievement_package_lf_map` MySQL table — D1 sparse/fallback-to-self default). New §3.31 (`production_achievement_workcenter_merge_map` MySQL table — D2 explicit-inclusion/exclude-by-absence default; explicitly the OPPOSITE of §3.30). New §3.32 (`production_achievement_daily_plans` MySQL table — keyed `(workcenter_group, package_lf_group)`, no shift dimension; independent of and additive to §3.26/`production_achievement_targets`). New §3.33 (`package_lf_map`/`workcenter_merge_map` inline array shapes, injected in the §3.28.4 envelope) and §3.34 (`daily_plan_map` inline array shape). §3.25/§3.26/§3.27/§3.28.2/§3.28.3 unchanged. See business-rules.md PA-09..PA-15 and ADR-0016's Extension section (production-achievement-overhaul) for the full current client-side join chain.
+
 ## [data 1.36.0] — 2026-07-07
 ### Changed
 - eap-event-alarm-semantics: §3.17 schema_version 4→5 — new `ALARM_SOURCE` column (raw `EVENT_TYPE`, part of the SET/CLEAR pairing key); Oracle event-type predicate widened to include Shape B alarm-alias rows (`EQP_SECS_EVENT` + `AlarmDetected`/`AlarmCleared`; `ProcessAlarm`/MTBA-MTBF excluded); cross-channel dedup at spool-write drops Shape B occurrences duplicating a Shape A occurrence on `(EQP_ID, ALARM_ID)` within ±60s (measured 70.43% GDBA overlap). Parquet column table corrected to the actual occurrence-level layout (documented table had drifted, still describing the retired v1 event-level column set). Detail response gains additive `alarm_source` field (null for pre-v5 spools via DESCRIBE fallback); stale `eqp_types` coarse-filter mapping row corrected to `EQUIPMENT_ID IN` (EA-07). Deploy: no manual parquet rm (key bump orphans v4); rollback: orphaned v5 files expire by TTL/cleanup daemon.
@@ -1825,26 +1832,29 @@ Constraints: unique constraint on `user_identifier`. Absence of a row for a user
 
 ### §3.28 Production-Achievement Async Spool Schema (`GET /api/production-achievement/report`, browser-DuckDB path)
 
-Added by change `production-achievement-async-spool` (ADR-0016). Replaces the synchronous Oracle-backed row response (§3.25 is retained as the frontend-computed / parity-golden-reference row shape only). The RQ worker (`ProductionAchievementJob`, `BaseChunkedDuckDBJob` subclass, `chunk_strategy=TIME`, `requires_cross_chunk_reduction=False` with a re-aggregating `post_aggregate`) writes one SPECNAME-grain parquet per canonical spool key. PA-06 (SPECNAME→workcenter_group rollup) and PA-07 (target join + achievement_rate) are computed entirely client-side in DuckDB-WASM from this spool plus the two inline maps below; no server-side Python performs this computation on the request path.
+Added by change `production-achievement-async-spool` (ADR-0016); extended by change `production-achievement-overhaul` to a PACKAGE_LF-aware grain plus three additional inline maps (§3.33/§3.34) — see ADR-0016's Extension section for the full current join chain. Replaces the synchronous Oracle-backed row response (§3.25 is retained as the frontend-computed / parity-golden-reference row shape only). The RQ worker (`ProductionAchievementJob`, `BaseChunkedDuckDBJob` subclass, `chunk_strategy=TIME`, `requires_cross_chunk_reduction=False` with a re-aggregating `post_aggregate`) writes one SPECNAME+PACKAGE_LF-grain parquet per canonical spool key. PA-06 (SPECNAME→workcenter_group rollup), PA-09/PA-10 (PACKAGE_LF/workcenter_group merge-mapping), and PA-07/PA-12/PA-13 (target/daily-plan join + achievement_rate, both shift-keyed and daily/cumulative variants) are computed entirely client-side in DuckDB-WASM from this spool plus the five inline maps below (§3.28.2, §3.28.3, §3.33 ×2, §3.34); no server-side Python performs this computation on the request path.
 
 **Canonical spool key**: `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` — **date-range only**. `shift_code`/`workcenter_group` request query params do NOT participate in the spool key and do NOT filter the spooled dataset server-side; the full PA-05-qualifying dataset for the date range is always spooled, and any shift_code/workcenter_group narrowing is applied client-side after download (ADR-0016), so changing these two filters never requires a new Oracle fetch or a new spool file.
 
 **`_PA_SPOOL_SCHEMA_VERSION`**: integer constant, participates in the spool key. Bumping it orphans stale parquets by key (no manual `rm` needed on ordinary bumps). Schema-breaking rollback additionally requires `rm -f tmp/query_spool/production_achievement/*.parquet` in the same commit as the version bump (cache-spool-patterns.md).
 
-#### §3.28.1 SPECNAME-grain Parquet Schema
+#### §3.28.1 SPECNAME+PACKAGE_LF-grain Parquet Schema
 
-Source: `sql/production_achievement.sql` (PA-05 predicate preserved verbatim), fanned out per TIME chunk, re-aggregated in `post_aggregate` via `GROUP BY output_date, shift_code, SPECNAME` `SUM(actual_output_qty)` (seam-safe — ADR-0016).
+Source: `sql/production_achievement.sql` (PA-05 predicate preserved verbatim), fanned out per TIME chunk, re-aggregated in `post_aggregate` via `GROUP BY output_date, shift_code, SPECNAME, PACKAGE_LF` `SUM(actual_output_qty)` (seam-safe — ADR-0016; grain widened from 3 to 4 dimensions by change `production-achievement-overhaul`, business-rules.md PA-09).
 
 | column | DuckDB type | nullable | description |
 |---|---|---|---|
 | output_date | DATE | no | PA-03/PA-04 cross-night-attributed output date (already shifted) |
 | shift_code | VARCHAR | no | Closed enum `N \| D` (current) or `A \| B \| C` (historical 2020/01/01–2020/03/29 window) — PA-01/PA-02 |
-| SPECNAME | VARCHAR | no | Raw station spec name (`WC.SPECNAME`); NOT yet rolled up to `workcenter_group` — that join happens client-side via §3.28.2 |
-| actual_output_qty | BIGINT | no | `SUM(TRACKOUTQTY)` over PA-05-qualifying rows for this `(output_date, shift_code, SPECNAME)` group, re-aggregated across chunk seams |
+| SPECNAME | VARCHAR | no | Raw station spec name (`WC.SPECNAME`); NOT yet rolled up to `workcenter_group` — that join happens client-side via §3.28.2/§3.33 |
+| PACKAGE_LF | VARCHAR | yes | Raw `DW_MES_LOTWIPHISTORY.PACKAGE_LF` value (`VARCHAR2(60)` at Oracle; 37 distinct non-null values observed year-to-date at the time of this change); NULL when the source row's PACKAGE_LF is null/blank. NOT yet rolled up to `package_lf_group` — that join happens client-side via §3.33 (business-rules.md PA-09). Added by change `production-achievement-overhaul`. |
+| actual_output_qty | BIGINT | no | `SUM(TRACKOUTQTY)` over PA-05-qualifying rows for this `(output_date, shift_code, SPECNAME, PACKAGE_LF)` group, re-aggregated across chunk seams |
 
-Row-grain: one row per distinct `(output_date, shift_code, SPECNAME)` combination with ≥1 PA-05-qualifying trackout event in range — same "no dense cross-product" rule as §3.25, one level finer (SPECNAME instead of workcenter_group, since the rollup has not yet happened). A `SPECNAME` with no entry in `spec_workcenter_map` (§3.28.2) is still present in this parquet — unmapped-SPECNAME exclusion (PA-06) happens client-side during the rollup join, not at spool-write time.
+Row-grain: one row per distinct `(output_date, shift_code, SPECNAME, PACKAGE_LF)` combination with ≥1 PA-05-qualifying trackout event in range — same "no dense cross-product" rule as §3.25, now two levels finer (SPECNAME and PACKAGE_LF instead of workcenter_group and package_lf_group, since neither rollup has happened yet). NULL `PACKAGE_LF` is its own distinct GROUP BY bucket (SQL NULL-grouping semantics), separate from any non-null value — it resolves to the `"(未分類)"` sentinel client-side (business-rules.md PA-09), not at spool-write time. A `SPECNAME` with no entry in `spec_workcenter_map` (§3.28.2) is still present in this parquet — unmapped-SPECNAME exclusion (PA-06) happens client-side during the rollup join, not at spool-write time.
 
 **Empty-result invariant**: a date range with zero PA-05-qualifying rows (or all-unmapped SPECNAMEs) still writes a valid empty parquet with this schema (0 rows) — never omits the file or errors. The browser must render an empty table, never an error, for a 200 response whose parquet has 0 rows.
+
+**Breaking parquet-schema change**: `_PA_SPOOL_SCHEMA_VERSION` bumps `1` → `2` in this change (new `PACKAGE_LF` column) — stale v1 parquets self-heal by key mismatch (no manual `rm` required on ordinary bumps); an optional `rm -f tmp/query_spool/production_achievement/*.parquet` fast-forward is documented in ci-gates.md §Rollback Policy.
 
 #### §3.28.2 `spec_workcenter_map` (inline-injected, HTTP 200 spool-hit response)
 
@@ -1880,13 +1890,16 @@ Notes: One row per `(shift_code, workcenter_group)` with a stored target row (§
     "query_id": "<string>",
     "spool_download_url": "/api/spool/production_achievement/<query_id>.parquet",
     "spec_workcenter_map": [ { "SPECNAME": "...", "workcenter_group": "..." } ],
-    "targets_map": [ { "shift_code": "...", "workcenter_group": "...", "target_qty": 500 } ]
+    "targets_map": [ { "shift_code": "...", "workcenter_group": "...", "target_qty": 500 } ],
+    "package_lf_map": [ { "raw_package_lf": "...", "merged_group": "..." } ],
+    "workcenter_merge_map": [ { "raw_workcenter_group": "...", "merged_workcenter_group": "..." } ],
+    "daily_plan_map": [ { "workcenter_group": "...", "package_lf_group": "...", "daily_plan_qty": 300 } ]
   },
   "meta": { "timestamp": "...", "app_version": "..." }
 }
 ```
 
-Injection is unconditional whenever the canonical spool exists — NOT row-count-gated (unlike `resource_history`'s `total_row_count >= threshold` gate; Q1 overrides the local-compute activation threshold to 0 for this page).
+Injection is unconditional whenever the canonical spool exists — NOT row-count-gated (unlike `resource_history`'s `total_row_count >= threshold` gate; Q1 overrides the local-compute activation threshold to 0 for this page). `data` grows from 2 to 5 inline arrays as of change `production-achievement-overhaul` — `package_lf_map` (§3.33, D1), `workcenter_merge_map` (§3.33, D2), and `daily_plan_map` (§3.34) are new; `spec_workcenter_map`/`targets_map` (§3.28.2/§3.28.3) are unchanged in shape.
 
 **HTTP 202 — spool-miss** (generic §1.3 async-job envelope):
 
@@ -1998,3 +2011,88 @@ Fine-filter axes (filter-options / trend / detail — global-filter-scoped): `eq
 **HTTP 503 — worker unavailable** (`always_async=True`, `sync_fallback_allowed=False` — UPH-ASYNC/ASYNC-06): standard error envelope (§1.2), `error.code = "SERVICE_UNAVAILABLE"`, `Retry-After` header.
 
 **HTTP 400 — validation**: missing/invalid `date_from`/`date_to`, range > 730d (SYS-04), or a `families[]` value outside `{GDBA, GWBA}` (UPH-02).
+
+---
+
+### §3.30 Production-Achievement PACKAGE_LF Merge-Mapping Table (MySQL, `production_achievement_package_lf_map`)
+
+Added by change `production-achievement-overhaul`. Sparse EXCEPTIONS-ONLY table (D1): stores a row only for a raw `PACKAGE_LF` value that must be merged into a differently-named group. Seeded with the ~9 rows behind the 4 confirmed merges (SOD-123FL OP1 + SOD-123FL → SOD-123FL; SOT23-5L + SOT23-6L → SOT23-5L/6L; SOT-543 + SOT-553 + SOT-563 → SOT-543/553/563; TO-277 + TO-277B → TO-277(B)) — NOT all ~37 raw values observed in Oracle year-to-date.
+
+| field | type | required |
+|---|---|---|
+| id | integer | yes |
+| raw_package_lf | string | yes |
+| merged_group | string | yes |
+| updated_at | string | yes |
+| updated_by | string | yes |
+
+Notes: `id` is the primary key (auto-increment); not exposed via the API response row shape (`ProductionAchievementPackageLfMapRow`, api-contract.md) — `DELETE` identifies a row by `raw_package_lf` in the URL path, not by `id`. `raw_package_lf` is the Oracle `DW_MES_LOTWIPHISTORY.PACKAGE_LF` value (`VARCHAR2(60)`); unique. `merged_group` is the display group name this raw value rolls up to. `updated_at`/`updated_by` follow the same audit-trail convention as §3.26/§3.27.
+
+Constraints: unique constraint on `raw_package_lf`. **Default-on-absence (D1 — sparse, fallback-to-self):** a raw `PACKAGE_LF` value with NO row in this table is NOT excluded from the report — it groups under itself (its own raw value becomes its own `package_lf_group`). Client-side resolution is a `LEFT JOIN` (never `INNER JOIN`) plus `COALESCE(merged_group, raw_package_lf, '(未分類)')` — NULL/blank raw `PACKAGE_LF` resolves to the sentinel group `"(未分類)"`. Every raw value Oracle has ever emitted appears in the report under some group — new raw values that appear in Oracle in the future require zero code or table changes to show up (they simply appear as their own group until an admin explicitly adds a merge row). When `MYSQL_OPS_ENABLED=false`, both the CRUD read endpoint and the inline `package_lf_map` (§3.33) degrade to an empty array (never 500) — an empty table under D1's fallback-to-self default means every raw value groups under itself, a valid (if maximally-fragmented) report, not an error state. Write endpoints return 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled (same as §3.26/§3.27).
+
+### §3.31 Production-Achievement Workcenter Merge-Mapping Table (MySQL, `production_achievement_workcenter_merge_map`)
+
+Added by change `production-achievement-overhaul`. **Default-on-absence is the OPPOSITE of §3.30**: this table is explicit-inclusion (D2) — it must contain one row for EVERY raw `workcenter_group` (the `WORK_CENTER_GROUP` field from `filter_cache.get_spec_workcenter_mapping()`, business-rules.md PA-06) that should appear in the report at all. Seeded with exactly 12 rows: 焊接_WB→焊接_WB, 焊接_DW→焊接_WB (merge), 焊接_DB→焊接_DB, plus 9 other 1:1 groups (成型/去膠/移印/水吹砂/電鍍/切彎腳/TMTT/品檢/FQC).
+
+| field | type | required |
+|---|---|---|
+| id | integer | yes |
+| raw_workcenter_group | string | yes |
+| merged_workcenter_group | string | yes |
+| updated_at | string | yes |
+| updated_by | string | yes |
+
+Notes: `id` is the primary key (auto-increment); not exposed via the API response row shape (`ProductionAchievementWorkcenterMergeMapRow`, api-contract.md) — `DELETE` identifies a row by `raw_workcenter_group` in the URL path. `raw_workcenter_group` is a `WORK_CENTER_GROUP` value as produced by `filter_cache.get_spec_workcenter_mapping()`; unique. `merged_workcenter_group` is the display group name.
+
+Constraints: unique constraint on `raw_workcenter_group`. **Default-on-absence (D2 — explicit-inclusion, exclude-by-absence — the OPPOSITE default from §3.30's D1 sparse/fallback-to-self):** a raw `workcenter_group` value with NO row in this table is EXCLUDED from the report entirely — it does not appear as its own group, unlike §3.30's fallback behavior. The 15 raw groups intentionally left out (切割/PKG_SAW/點測/可靠性/補鍍/預備站/成品倉/IST/CP線邊倉/成品入庫/已CP入庫/已CP倉/DS線邊倉/MA/TCT) never appear in the production-achievement report as a result. Client-side resolution is an `INNER JOIN` (never `LEFT JOIN`) — mirrors the existing default-deny idiom already used by the permission table (§3.27: absence of a row = fail-closed/deny) rather than the target table's reuse-missing-as-null idiom (§3.26). **This opposite-default pairing with §3.30 is deliberate and must not be "fixed" by copy-pasting one table's join kind onto the other** — see business-rules.md PA-09/PA-10 and ADR-0016's Extension section. When `MYSQL_OPS_ENABLED=false`, the CRUD read endpoint and the inline `workcenter_merge_map` (§3.33) degrade to an empty array (never 500) — but the DOWNSTREAM effect differs from §3.30's degrade: an empty `workcenter_merge_map` means the INNER JOIN matches zero rows, so the ENTIRE report renders empty (not "every raw value shows as its own group" — that fallback behavior belongs to §3.30 only). Write endpoints return 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled.
+
+### §3.32 Production-Achievement Daily-Plan Table (MySQL, `production_achievement_daily_plans`)
+
+Added by change `production-achievement-overhaul`. New independent MySQL table, read/written directly via `core/mysql_client.py` (same immediate-consistency rationale as §3.26/§3.27). Keyed by `(workcenter_group, package_lf_group)` — both already-MERGED/resolved values (post §3.30/§3.31 mapping) — with NO shift dimension, unlike `production_achievement_targets` (§3.26, keyed by `(shift_code, workcenter_group)`). The two tables are fully independent: this table is an ADDITIVE new denominator concept for the DailyView/CumulativeView report modes; `production_achievement_targets` and its PA-06/PA-07 formula are completely unaffected and continue to serve whatever other consumer relies on the shift-keyed target.
+
+| field | type | required |
+|---|---|---|
+| id | integer | yes |
+| workcenter_group | string | yes |
+| package_lf_group | string | yes |
+| daily_plan_qty | integer | yes |
+| updated_at | string | yes |
+| updated_by | string | yes |
+
+Notes: `id` is the primary key (auto-increment); not exposed via the API response row shape (`ProductionAchievementDailyPlanRow`, api-contract.md). `workcenter_group` must match a `merged_workcenter_group` value produced by §3.31. `package_lf_group` must match a `merged_group` value produced by §3.30 (or a raw fallback-to-self value, per D1). `daily_plan_qty` is a non-negative integer — the denominator for business-rules.md PA-12 (daily achievement rate) and the elapsed-days-scaled denominator for PA-13 (cumulative achievement rate); negative or non-numeric input is rejected with 400 `VALIDATION_ERROR` before reaching MySQL (mirrors §3.26's `target_qty` validation). `updated_at`/`updated_by` follow the same audit-trail convention as §3.26/§3.27. No `output_date` column — this table is explicitly date-independent; the same value is reused for every calendar day (same idiom as §3.26).
+
+Constraints: unique constraint on `(workcenter_group, package_lf_group)` — exactly one plan row per resolved-dimension combination; writes are upsert (`INSERT ... ON DUPLICATE KEY UPDATE`), never append-only history. When `MYSQL_OPS_ENABLED=false`, read endpoints and the inline `daily_plan_map` (§3.34) degrade to an empty array/`daily_plan_qty: null` (never 500) — every client-computed daily/cumulative `achievement_rate` becomes `null`, consistent with §3.26's flag-off degradation rule (PA-12/PA-13). Write endpoints return 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled.
+
+### §3.33 `package_lf_map` and `workcenter_merge_map` (inline-injected, HTTP 200 spool-hit response)
+
+Added by change `production-achievement-overhaul`. Two additional arrays injected inline in the `GET /report` 200 response (§3.28.4), alongside the pre-existing `spec_workcenter_map`/`targets_map` (§3.28.2/§3.28.3) — same "inline injection, not a separate endpoint" precedent. Consumed together by the client-side rollup Stage 2 (`pa_rollup`, ADR-0016 Extension).
+
+**`package_lf_map`** — sourced from `services/production_achievement_package_lf_service.get_package_lf_map()` (§3.30).
+
+| field | type | required |
+|---|---|---|
+| raw_package_lf | string | yes |
+| merged_group | string | yes |
+
+Notes: FULL current mapping table content (not scoped to PACKAGE_LF values present in this spool). A spool `PACKAGE_LF` value with no matching row is NOT excluded — client resolves it via `LEFT JOIN` + `COALESCE(merged_group, raw_package_lf, '(未分類)')` (D1, business-rules.md PA-09). When `MYSQL_OPS_ENABLED=false`, this array is empty — every raw value falls back to itself (D1's own default, not an error state).
+
+**`workcenter_merge_map`** — sourced from `services/production_achievement_workcenter_merge_service.get_workcenter_merge_map()` (§3.31).
+
+| field | type | required |
+|---|---|---|
+| raw_workcenter_group | string | yes |
+| merged_workcenter_group | string | yes |
+
+Notes: FULL current mapping table content. A rolled-up `workcenter_group` (from Stage 1, `spec_workcenter_map`) with no matching row here IS excluded from the final rollup — client resolves via `INNER JOIN` (D2, business-rules.md PA-10) — the OPPOSITE join kind from `package_lf_map` above; see ADR-0016's Extension section. When `MYSQL_OPS_ENABLED=false`, this array is empty — the INNER JOIN then matches nothing and the report renders empty for every workcenter_group (D2's own default, not an error state; contrast with `package_lf_map`'s empty-array behavior above).
+
+### §3.34 `daily_plan_map` (inline-injected, HTTP 200 spool-hit response)
+
+Added by change `production-achievement-overhaul`. Sourced from `services/production_achievement_daily_plan_service.get_daily_plans_map()` (§3.32); injected inline alongside the other four maps (§3.28.2/§3.28.3/§3.33).
+
+| field | type | required |
+|---|---|---|
+| workcenter_group | string | yes |
+| package_lf_group | string | yes |
+| daily_plan_qty | integer \| null | yes |
+
+Notes: One row per `(workcenter_group, package_lf_group)` with a stored plan row (§3.32) — a combination with NO plan row is simply absent from this array; the browser's `LEFT JOIN` naturally yields `daily_plan_qty = null` for any resolved `(workcenter_group, package_lf_group)` absent from this array (business-rules.md PA-12 missing-plan-row semantics, mirrors PA-07's `targets_map` pattern exactly). Consumed by both `computeDailyView` (daily achievement rate, PA-12) and `computeCumulativeView` (cumulative achievement rate via `daily_plan_qty × elapsed_days`, PA-13). When `MYSQL_OPS_ENABLED=false`, `get_daily_plans_map()` degrades to an empty array (never 500) — every client-computed row gets `daily_plan_qty = null` / `achievement_rate = null`, consistent with §3.26/§3.32's flag-off degradation rule.

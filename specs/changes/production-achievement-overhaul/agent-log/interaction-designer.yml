@@ -1,0 +1,25 @@
+change-id: production-achievement-overhaul
+agent: interaction-designer
+timestamp: "2026-07-13T22:30:28Z"
+status: complete
+artifacts:
+  - { type: interaction-design, pointer: "specs/changes/production-achievement-overhaul/interaction-design.md#Confirmed" }
+  - { type: design-lock, pointer: ".cdd/design-lock.json" }
+  - { type: contract-addition, pointer: "contracts/api/api-contract.md#ProductionAchievementKnownWorkcenterGroupsResponse" }
+next-action: none
+notes: >
+  12 Open Decisions surfaced (OD-1..OD-12; OD-2 pre-resolved from earlier
+  planning conversation). Human dialogue run across 3 AskUserQuestion rounds;
+  all answers transcribed verbatim into ## Confirmed and locked via
+  `cdd-kit design confirm`. OD-8 required a contract addition (new
+  GET /api/production-achievement/known-workcenter-groups endpoint, mirroring
+  the existing known-package-lf-values pattern) -- added directly in this pass
+  via the same cdd-kit contract CLI path used by contract-reviewer, plus the
+  matching Compatibility Notes/CHANGELOG updates, since it is a narrow,
+  fully-precedented mirror needing no fresh design work. OD-9/OD-10 resolved
+  as "accept existing behavior" so no further contract change was needed for
+  those. Deleted 4 controls (shift_code filter, 3-mode date pickers, Query
+  button, Clear-filters button) with reasons recorded in interaction-design.md.
+  openapi.json regenerated (both paths); full contract validation passes
+  except the expected "no backend route yet" API-conformance warnings for the
+  10 new endpoints (backend-engineer's phase, not yet run).

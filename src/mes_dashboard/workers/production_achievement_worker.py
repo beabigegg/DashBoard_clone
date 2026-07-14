@@ -59,7 +59,12 @@ PRODUCTION_ACHIEVEMENT_JOB_TIMEOUT_SECONDS: int = max(
 # job_type / status_url prefix (hyphen) -- distinct from the spool namespace
 # / _ALLOWED_NAMESPACES / spool-path segment (underscore). Do not conflate.
 _JOB_PREFIX = "production-achievement"
-_NAMESPACE = "production_achievement"
+# Shared constant (production-achievement-overhaul, IP-1) -- single source of
+# truth reused by the route and the warm-cache module so all three call
+# sites can never drift apart.
+from mes_dashboard.services.production_achievement_service import (  # noqa: E402
+    PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE as _NAMESPACE,
+)
 
 
 class ProductionAchievementJob(BaseChunkedDuckDBJob):
@@ -88,7 +93,21 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
 
     def pre_query(self) -> None:
         """Parse start_date/end_date, compute the canonical spool key, and
-        build daily TIME chunks (mirrors resource_history_base_worker.py)."""
+        build daily TIME chunks (mirrors resource_history_base_worker.py)
+        plus one D6 closing chunk (PA-15).
+
+        D6/PA-15 fetch-completeness fix: a date-only ``chunk_end_excl`` bind
+        (implicit midnight) never fetched the overnight N-shift tail
+        ``[end_date+1 00:00:00, end_date+1 07:30:00)`` that PA-03 attributes
+        back to ``end_date``. sql/production_achievement.sql's
+        ``:chunk_end_excl`` bind is now widened to accept a full
+        ``YYYY-MM-DD HH24:MI:SS`` datetime, so EVERY chunk's ``chunk_end_excl``
+        (not only the closing chunk's) must be formatted as a full datetime
+        string -- the widened Oracle format mask requires the bind value to
+        match it exactly. ``start_date``'s format mask is untouched
+        (date-only): every chunk's lower bound is always exactly midnight, so
+        a date-only string already represents it precisely.
+        """
         from mes_dashboard.services.production_achievement_service import (
             make_canonical_pa_spool_id,
         )
@@ -110,9 +129,23 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
             chunk_end_excl_dt = current + timedelta(days=1)
             chunks.append({
                 "start_date": current.strftime("%Y-%m-%d"),
-                "chunk_end_excl": chunk_end_excl_dt.strftime("%Y-%m-%d"),
+                "chunk_end_excl": chunk_end_excl_dt.strftime("%Y-%m-%d %H:%M:%S"),
             })
             current += timedelta(days=1)
+
+        # D6/PA-15: append exactly ONE narrow closing chunk covering the
+        # overnight N-shift tail attributed back to end_date. Non-overlapping
+        # with the last regular chunk's [end_date 00:00, end_date+1 00:00)
+        # window -- post_aggregate's GROUP BY re-aggregation (unchanged
+        # locus) folds both into the same (end_date, 'N', SPECNAME,
+        # PACKAGE_LF) group, never double-counting.
+        closing_start_dt = end_dt + timedelta(days=1)
+        closing_end_excl_dt = closing_start_dt + timedelta(hours=7, minutes=30)
+        chunks.append({
+            "start_date": closing_start_dt.strftime("%Y-%m-%d"),
+            "chunk_end_excl": closing_end_excl_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
         self._chunks = chunks
 
     def build_chunk_sql(self, chunk_params: dict) -> tuple[str, dict]:
@@ -133,13 +166,17 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
         return sql, bind_params
 
     def post_aggregate(self, job_duckdb_path: "str | None") -> str:
-        """Re-aggregate all chunk parquets into the canonical SPECNAME-grain
-        spool via ``GROUP BY output_date, shift_code, SPECNAME
-        SUM(actual_output_qty)`` -- seam-safe merge (ADR-0016; NOT a plain
-        concat, see module docstring "Chunk-seam correctness").
+        """Re-aggregate all chunk parquets into the canonical
+        SPECNAME+PACKAGE_LF-grain spool via ``GROUP BY output_date,
+        shift_code, SPECNAME, PACKAGE_LF SUM(actual_output_qty)`` -- seam-safe
+        merge (ADR-0016; NOT a plain concat, see module docstring "Chunk-seam
+        correctness"). This same re-aggregation is what folds the D6 closing
+        chunk's rows into the same group as the last regular day's own
+        N-shift chunk (PA-15) -- the GROUP BY locus itself is unchanged by D6.
 
         Empty/no-parquet (or all-unmapped) window still writes a VALID empty
-        parquet with the exact data-shape-contract.md §3.28.1 schema.
+        parquet with the exact data-shape-contract.md §3.28.1 schema
+        (5 columns incl. nullable PACKAGE_LF, production-achievement-overhaul).
         """
         import duckdb
 
@@ -159,6 +196,7 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
                 pa.field("output_date", pa.date32()),
                 pa.field("shift_code", pa.string()),
                 pa.field("SPECNAME", pa.string()),
+                pa.field("PACKAGE_LF", pa.string()),
                 pa.field("actual_output_qty", pa.int64()),
             ])
             pq.write_table(
@@ -175,18 +213,20 @@ class ProductionAchievementJob(BaseChunkedDuckDBJob):
             con = duckdb.connect()
             try:
                 # Re-aggregate across ALL chunk parquets -- collapses any
-                # (output_date, shift_code, SPECNAME) group that straddled a
-                # calendar-midnight chunk seam into a single SUMmed row
-                # (chunk-seam correctness -- design.md, ADR-0016).
+                # (output_date, shift_code, SPECNAME, PACKAGE_LF) group that
+                # straddled a calendar-midnight chunk seam (or the D6 closing
+                # chunk) into a single SUMmed row (chunk-seam correctness --
+                # design.md, ADR-0016; PA-15).
                 con.execute(
                     "COPY ("
                     "  SELECT"
                     "    CAST(OUTPUT_DATE AS DATE) AS output_date,"
                     "    SHIFT_CODE AS shift_code,"
                     "    SPECNAME,"
+                    "    PACKAGE_LF,"
                     "    SUM(ACTUAL_OUTPUT_QTY) AS actual_output_qty"
                     f"  FROM read_parquet('{parquet_glob}')"
-                    "  GROUP BY OUTPUT_DATE, SHIFT_CODE, SPECNAME"
+                    "  GROUP BY OUTPUT_DATE, SHIFT_CODE, SPECNAME, PACKAGE_LF"
                     f") TO '{spool_path}' (FORMAT PARQUET, CODEC 'SNAPPY')"
                 )
                 row_count = con.execute(

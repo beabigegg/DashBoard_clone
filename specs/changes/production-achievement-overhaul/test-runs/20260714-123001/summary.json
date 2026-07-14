@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "acceptance",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/acceptance/test_production_achievement_overhaul_acceptance.py -v",
+  "duration_ms": 3307,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-123001/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-123001/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-123001/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

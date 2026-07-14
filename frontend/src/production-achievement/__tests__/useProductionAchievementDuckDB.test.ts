@@ -2,28 +2,33 @@
 /**
  * useProductionAchievementDuckDB — unit tests (TDD: written failing first).
  *
- * Change: production-achievement-async-spool (ADR-0016)
- * AC-7: PA-06 rollup (SPECNAME -> workcenter_group, case-insensitive join key)
- *       + PA-07 target join / achievement_rate null-zero guards
- * AC-8: activation threshold overridden to 0 (always activate on spool hit)
+ * Change: production-achievement-overhaul (IP-6)
+ * design.md -> DuckDB-WASM rollup; ADR-0016 Extension section (2-stage pipeline).
  *
- * `rollupAndJoin()` below is a pure-JS mirror of the DuckDB SQL built by
- * _buildRollup()/computeView() in useProductionAchievementDuckDB.ts — used
- * here for fast, engine-free numeric-correctness coverage. The authoritative
- * SQL-dialect parity check (same SQL text executed via the real `duckdb`
+ * Stage 1 (`pa_rollup_raw`): identical INNER JOIN SPECNAME -> raw workcenter_group
+ *   (PA-06, unchanged), now carrying PACKAGE_LF through GROUP BY.
+ * Stage 2 (`pa_rollup`, redefined in place): INNER JOIN workcenter_merge_map (D2,
+ *   PA-10, exclude-by-absence) + LEFT JOIN package_lf_map (D1, PA-09,
+ *   fallback-to-self / '(未分類)').
+ * computeDailyView / computeCumulativeView replace the flat computeView()
+ * (PA-12/PA-13, D3 aggregate-then-divide).
+ *
+ * `rollupAndJoin()` below is a pure-JS mirror of the DuckDB SQL for fast,
+ * engine-free numeric-correctness coverage (mirrors the previous file's own
+ * convention). The authoritative SQL-dialect parity check (real `duckdb`
  * engine) lives in tests/test_frontend_production_achievement_parity.py.
- * Composable-level tests below (activation policy call, state machine,
- * error surfacing) exercise the REAL composable against a mocked DuckDB
- * client, mirroring downtime-analysis's useDowntimeDuckDB.test.ts pattern.
+ * Composable-level tests exercise the REAL composable against a mocked DuckDB
+ * client (same convention as before).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Types mirroring §3.28.1/.2/.3 ────────────────────────────────────────────
+// ── Types mirroring §3.28.1 / §3.28.2 / §3.33 / §3.34 ───────────────────────
 
 interface SpoolRow {
   output_date: string;
   shift_code: string;
   SPECNAME: string;
+  PACKAGE_LF: string | null;
   actual_output_qty: number;
 }
 
@@ -32,154 +37,189 @@ interface SpecMapRow {
   workcenter_group: string;
 }
 
-interface TargetsMapRow {
-  shift_code: string;
-  workcenter_group: string;
-  target_qty: number | null;
+interface PackageLfMapRow {
+  raw_package_lf: string;
+  merged_group: string;
 }
 
-interface ReportRow {
+interface WorkcenterMergeMapRow {
+  raw_workcenter_group: string;
+  merged_workcenter_group: string;
+}
+
+interface DailyPlanMapRow {
+  workcenter_group: string;
+  package_lf_group: string;
+  daily_plan_qty: number | null;
+}
+
+interface RollupRow {
   output_date: string;
   shift_code: string;
   workcenter_group: string;
+  package_lf_group: string;
   actual_output_qty: number;
-  target_qty: number | null;
-  achievement_rate: number | null;
 }
 
-// ── Pure-JS mirror of the composable's SQL (PA-06 rollup + PA-07 join) ──────
+const UNCLASSIFIED = '(未分類)';
+
+// ── Pure-JS mirror of the 2-stage pipeline (PA-06/PA-09/PA-10) ──────────────
 
 function rollupAndJoin(
   spoolRows: SpoolRow[],
   specMap: SpecMapRow[],
-  targetsMap: TargetsMapRow[],
-  filters: { shiftCode?: string; workcenterGroup?: string } = {},
-): ReportRow[] {
+  workcenterMergeMap: WorkcenterMergeMapRow[],
+  packageLfMap: PackageLfMapRow[],
+): RollupRow[] {
   const specToGroup = new Map<string, string>();
   for (const row of specMap) {
     specToGroup.set(row.SPECNAME.trim().toUpperCase(), row.workcenter_group);
   }
 
-  const rollup = new Map<string, { output_date: string; shift_code: string; workcenter_group: string; actual_output_qty: number }>();
+  // Stage 1: pa_rollup_raw (SPECNAME -> raw workcenter_group, PACKAGE_LF carried through)
+  const rawRollup = new Map<string, { output_date: string; shift_code: string; workcenter_group: string; package_lf: string | null; actual_output_qty: number }>();
   for (const row of spoolRows) {
-    const group = specToGroup.get(row.SPECNAME.trim().toUpperCase());
-    if (!group) continue; // PA-06 unmapped-SPECNAME exclusion
-    const key = `${row.output_date}||${row.shift_code}||${group}`;
-    const entry = rollup.get(key) || { output_date: row.output_date, shift_code: row.shift_code, workcenter_group: group, actual_output_qty: 0 };
+    const rawGroup = specToGroup.get(row.SPECNAME.trim().toUpperCase());
+    if (!rawGroup) continue; // PA-06 unmapped-SPECNAME exclusion
+    const key = `${row.output_date}||${row.shift_code}||${rawGroup}||${row.PACKAGE_LF ?? ''}`;
+    const entry = rawRollup.get(key) || { output_date: row.output_date, shift_code: row.shift_code, workcenter_group: rawGroup, package_lf: row.PACKAGE_LF, actual_output_qty: 0 };
     entry.actual_output_qty += Number(row.actual_output_qty || 0);
-    rollup.set(key, entry);
+    rawRollup.set(key, entry);
   }
 
-  const targetLookup = new Map<string, number | null>();
-  for (const t of targetsMap) {
-    targetLookup.set(`${t.shift_code}||${t.workcenter_group}`, t.target_qty);
+  // Stage 2: pa_rollup — INNER JOIN workcenter_merge_map (D2) + LEFT JOIN package_lf_map (D1)
+  const wcMergeLookup = new Map<string, string>();
+  for (const row of workcenterMergeMap) wcMergeLookup.set(row.raw_workcenter_group, row.merged_workcenter_group);
+  const pkgMergeLookup = new Map<string, string>();
+  for (const row of packageLfMap) pkgMergeLookup.set(row.raw_package_lf, row.merged_group);
+
+  const rollup = new Map<string, RollupRow>();
+  for (const entry of rawRollup.values()) {
+    const mergedWc = wcMergeLookup.get(entry.workcenter_group);
+    if (mergedWc === undefined) continue; // D2: absence -> excluded (INNER JOIN)
+    const rawPkg = entry.package_lf;
+    const mergedPkg =
+      rawPkg === null || rawPkg === '' ? UNCLASSIFIED : (pkgMergeLookup.get(rawPkg) ?? rawPkg); // D1: absence -> fallback-to-self
+    const key = `${entry.output_date}||${entry.shift_code}||${mergedWc}||${mergedPkg}`;
+    const row = rollup.get(key) || { output_date: entry.output_date, shift_code: entry.shift_code, workcenter_group: mergedWc, package_lf_group: mergedPkg, actual_output_qty: 0 };
+    row.actual_output_qty += entry.actual_output_qty;
+    rollup.set(key, row);
   }
-
-  let rows: ReportRow[] = [...rollup.values()].map((r) => {
-    const target = targetLookup.has(`${r.shift_code}||${r.workcenter_group}`)
-      ? targetLookup.get(`${r.shift_code}||${r.workcenter_group}`)!
-      : null;
-    let rate: number | null;
-    if (target === null || target === 0) {
-      rate = null; // PA-07: missing OR zero target -> null, never Infinity
-    } else {
-      rate = r.actual_output_qty / target;
-    }
-    return { ...r, target_qty: target, achievement_rate: rate };
-  });
-
-  if (filters.shiftCode) rows = rows.filter((r) => r.shift_code === filters.shiftCode);
-  if (filters.workcenterGroup) rows = rows.filter((r) => r.workcenter_group === filters.workcenterGroup);
-
-  rows.sort((a, b) =>
-    a.output_date.localeCompare(b.output_date) ||
-    a.shift_code.localeCompare(b.shift_code) ||
-    a.workcenter_group.localeCompare(b.workcenter_group),
-  );
-  return rows;
+  return [...rollup.values()];
 }
 
-describe('rollupAndJoin (PA-06 rollup parity mirror)', () => {
-  const specMap: SpecMapRow[] = [
-    { SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' },
-    { SPECNAME: '金線製程', workcenter_group: '焊接_WB' },
-  ];
+describe('rollupAndJoin (2-stage pipeline: PA-06 -> PA-09/PA-10)', () => {
+  const specMap: SpecMapRow[] = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
 
-  it('groups by (output_date, shift_code, workcenter_group), collapsing case-variant SPECNAMEs', () => {
-    const spool: SpoolRow[] = [
-      { output_date: '2026-04-27', shift_code: 'D', SPECNAME: 'Epoxy D/B', actual_output_qty: 100 },
-      { output_date: '2026-04-27', shift_code: 'D', SPECNAME: 'epoxy d/b', actual_output_qty: 50 },
-    ];
-    const rows = rollupAndJoin(spool, specMap, []);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].workcenter_group).toBe('焊接_DB');
-    expect(rows[0].actual_output_qty).toBe(150);
+  it('Stage 1 excludes unmapped SPECNAME (PA-06, unchanged)', () => {
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'UNKNOWN', PACKAGE_LF: 'X', actual_output_qty: 10 }];
+    expect(rollupAndJoin(spool, specMap, [], [])).toEqual([]);
   });
 
-  it('excludes SPECNAMEs with no spec_workcenter_map entry (unmapped, data-boundary not error)', () => {
-    const spool: SpoolRow[] = [
-      { output_date: '2026-04-27', shift_code: 'D', SPECNAME: 'UNKNOWN_SPEC', actual_output_qty: 999 },
-    ];
-    const rows = rollupAndJoin(spool, specMap, []);
+  it('D2 (workcenter_merge_map): raw workcenter_group absent from the map is EXCLUDED entirely (INNER JOIN, not LEFT JOIN)', () => {
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: 'SOD-123FL', actual_output_qty: 100 }];
+    // No workcenter_merge_map row for 焊接_DB -> absence must exclude, never fall back to itself.
+    const rows = rollupAndJoin(spool, specMap, [], []);
     expect(rows).toEqual([]);
   });
 
-  it('produces separate rows per distinct workcenter_group for the same output_date/shift_code', () => {
-    const spool: SpoolRow[] = [
-      { output_date: '2026-04-27', shift_code: 'N', SPECNAME: 'Epoxy D/B', actual_output_qty: 10 },
-      { output_date: '2026-04-27', shift_code: 'N', SPECNAME: '金線製程', actual_output_qty: 20 },
+  it('D2: raw workcenter_group present in the map is included and renamed to merged_workcenter_group', () => {
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: null, actual_output_qty: 100 }];
+    const wcMap: WorkcenterMergeMapRow[] = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const rows = rollupAndJoin(spool, specMap, wcMap, []);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].workcenter_group).toBe('焊接_DB');
+  });
+
+  it('D2: two raw workcenter_groups merging into one (焊接_DW -> 焊接_WB) combine their actual_output_qty', () => {
+    const specMap2: SpecMapRow[] = [
+      { SPECNAME: 'SPEC-WB', workcenter_group: '焊接_WB' },
+      { SPECNAME: 'SPEC-DW', workcenter_group: '焊接_DW' },
     ];
-    const rows = rollupAndJoin(spool, specMap, []);
-    expect(rows.map((r) => r.workcenter_group).sort()).toEqual(['焊接_DB', '焊接_WB']);
+    const spool: SpoolRow[] = [
+      { output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'SPEC-WB', PACKAGE_LF: null, actual_output_qty: 100 },
+      { output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'SPEC-DW', PACKAGE_LF: null, actual_output_qty: 50 },
+    ];
+    const wcMap: WorkcenterMergeMapRow[] = [
+      { raw_workcenter_group: '焊接_WB', merged_workcenter_group: '焊接_WB' },
+      { raw_workcenter_group: '焊接_DW', merged_workcenter_group: '焊接_WB' },
+    ];
+    const rows = rollupAndJoin(spool, specMap2, wcMap, []);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].workcenter_group).toBe('焊接_WB');
+    expect(rows[0].actual_output_qty).toBe(150);
+  });
+
+  it('D1 (package_lf_map): raw PACKAGE_LF absent from the map falls back to ITSELF (LEFT JOIN, not INNER JOIN)', () => {
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: 'BRAND-NEW-VALUE', actual_output_qty: 10 }];
+    const wcMap: WorkcenterMergeMapRow[] = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const rows = rollupAndJoin(spool, specMap, wcMap, []); // no package_lf_map rows at all
+    expect(rows).toHaveLength(1);
+    expect(rows[0].package_lf_group).toBe('BRAND-NEW-VALUE'); // fell back to self, not dropped
+  });
+
+  it('D1: NULL PACKAGE_LF resolves to the sentinel group (未分類)', () => {
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: null, actual_output_qty: 10 }];
+    const wcMap: WorkcenterMergeMapRow[] = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const rows = rollupAndJoin(spool, specMap, wcMap, []);
+    expect(rows[0].package_lf_group).toBe('(未分類)');
+  });
+
+  it('D1: blank-string PACKAGE_LF also resolves to (未分類), same as NULL', () => {
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: '', actual_output_qty: 10 }];
+    const wcMap: WorkcenterMergeMapRow[] = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const rows = rollupAndJoin(spool, specMap, wcMap, []);
+    expect(rows[0].package_lf_group).toBe('(未分類)');
+  });
+
+  it('D1: the 4 confirmed merges resolve raw PACKAGE_LF to their merged_group', () => {
+    const spool: SpoolRow[] = [
+      { output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: 'SOD-123FL OP1', actual_output_qty: 10 },
+      { output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: 'TO-277B', actual_output_qty: 5 },
+    ];
+    const wcMap: WorkcenterMergeMapRow[] = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const pkgMap: PackageLfMapRow[] = [
+      { raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL' },
+      { raw_package_lf: 'TO-277B', merged_group: 'TO-277(B)' },
+    ];
+    const rows = rollupAndJoin(spool, specMap, wcMap, pkgMap);
+    const byGroup = Object.fromEntries(rows.map((r) => [r.package_lf_group, r.actual_output_qty]));
+    expect(byGroup['SOD-123FL']).toBe(10);
+    expect(byGroup['TO-277(B)']).toBe(5);
+  });
+
+  it('D1: a self-referential mapping (raw_package_lf === merged_group) is a harmless no-op, identical to an absent mapping (monkey-test: malformed/redundant settings write)', () => {
+    // Nothing in upsert_package_lf() (backend) or this client-side resolution
+    // validates against raw===merged — a settings-page admin CAN write this
+    // redundant row. Since D1 resolution is `mapping.get(raw, raw)`, a
+    // self-referential entry produces the EXACT same output as no entry at
+    // all: this is provably safe, not merely "does not crash." (Note: for
+    // D2/workcenter_merge_map, raw===merged is the NORMAL/expected shape for
+    // every currently-included station — see the DDL seed data — so it is
+    // asserted separately above, not adversarial there.)
+    const spool: SpoolRow[] = [{ output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: 'SELF-MAPPED', actual_output_qty: 42 }];
+    const wcMap: WorkcenterMergeMapRow[] = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const selfReferentialPkgMap: PackageLfMapRow[] = [{ raw_package_lf: 'SELF-MAPPED', merged_group: 'SELF-MAPPED' }];
+
+    const withSelfMap = rollupAndJoin(spool, specMap, wcMap, selfReferentialPkgMap);
+    const withNoMap = rollupAndJoin(spool, specMap, wcMap, []);
+
+    expect(withSelfMap).toEqual(withNoMap);
+    expect(withSelfMap).toHaveLength(1);
+    expect(withSelfMap[0].package_lf_group).toBe('SELF-MAPPED');
+  });
+
+  it('D1/D2 join kinds are not swapped: an excluded workcenter_group never falls back to itself, and an unmapped package_lf is never dropped', () => {
+    const spool: SpoolRow[] = [
+      { output_date: '2026-07-01', shift_code: 'D', SPECNAME: 'Epoxy D/B', PACKAGE_LF: 'UNMAPPED-PKG', actual_output_qty: 10 },
+    ];
+    // 焊接_DB has NO row in workcenter_merge_map -> must be excluded (D2), regardless of package_lf_map.
+    const rows = rollupAndJoin(spool, specMap, [], []);
+    expect(rows).toEqual([]);
   });
 
   it('empty spool yields empty rows, never an error', () => {
-    expect(rollupAndJoin([], specMap, [])).toEqual([]);
-  });
-});
-
-describe('rollupAndJoin (PA-07 achievement_rate guards)', () => {
-  const specMap: SpecMapRow[] = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
-  const spool: SpoolRow[] = [
-    { output_date: '2026-04-27', shift_code: 'D', SPECNAME: 'Epoxy D/B', actual_output_qty: 250 },
-  ];
-
-  it('missing target row -> achievement_rate null', () => {
-    const rows = rollupAndJoin(spool, specMap, []);
-    expect(rows[0].target_qty).toBeNull();
-    expect(rows[0].achievement_rate).toBeNull();
-  });
-
-  it('stored target_qty=0 -> achievement_rate null, never Infinity', () => {
-    const targets: TargetsMapRow[] = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 0 }];
-    const rows = rollupAndJoin(spool, specMap, targets);
-    expect(rows[0].target_qty).toBe(0);
-    expect(rows[0].achievement_rate).toBeNull();
-    expect(rows[0].achievement_rate).not.toBe(Infinity);
-  });
-
-  it('zero actual_output_qty + non-null non-zero target -> achievement_rate 0.0 (not null)', () => {
-    const zeroSpool: SpoolRow[] = [
-      { output_date: '2026-04-27', shift_code: 'D', SPECNAME: 'Epoxy D/B', actual_output_qty: 0 },
-    ];
-    const targets: TargetsMapRow[] = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
-    const rows = rollupAndJoin(zeroSpool, specMap, targets);
-    expect(rows[0].actual_output_qty).toBe(0);
-    expect(rows[0].achievement_rate).toBe(0.0);
-  });
-
-  it('normal division computes actual/target', () => {
-    const targets: TargetsMapRow[] = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
-    const rows = rollupAndJoin(spool, specMap, targets);
-    expect(rows[0].achievement_rate).toBe(0.5);
-  });
-
-  it('client-side shift_code/workcenter_group filters narrow the result set', () => {
-    const targets: TargetsMapRow[] = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
-    const matched = rollupAndJoin(spool, specMap, targets, { shiftCode: 'D', workcenterGroup: '焊接_DB' });
-    const unmatched = rollupAndJoin(spool, specMap, targets, { shiftCode: 'N' });
-    expect(matched).toHaveLength(1);
-    expect(unmatched).toHaveLength(0);
+    expect(rollupAndJoin([], specMap, [], [])).toEqual([]);
   });
 });
 
@@ -221,10 +261,6 @@ async function mockedClient() {
 
 describe('useProductionAchievementDuckDB composable', () => {
   beforeEach(() => {
-    // Clear call history on the shared mocked DuckDB client singleton between
-    // tests (getDuckDBClient() returns the SAME mock instance every call,
-    // mirroring the real module's singleton) — implementations set via
-    // mockResolvedValue survive clearAllMocks(), only call history resets.
     vi.clearAllMocks();
     eligibilityMock.mockReturnValue({ eligible: true, reason: 'ok' });
   });
@@ -237,10 +273,10 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(composable.error.value).toBe('');
   });
 
-  it('activate() calls checkLocalComputeEligibility with threshold=0 (AC-8, always activate)', async () => {
+  it('activate() calls checkLocalComputeEligibility with threshold=0 (always activate)', async () => {
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await composable.activate('/api/spool/production_achievement/x.parquet', [], []);
+    await composable.activate('/api/spool/production_achievement/x.parquet', [], [], [], []);
     expect(eligibilityMock).toHaveBeenCalledWith(
       expect.objectContaining({ spoolDownloadUrl: '/api/spool/production_achievement/x.parquet', threshold: 0 }),
     );
@@ -253,28 +289,46 @@ describe('useProductionAchievementDuckDB composable', () => {
 
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await expect(composable.activate('url', [], [])).rejects.toThrow();
+    await expect(composable.activate('url', [], [], [], [])).rejects.toThrow();
     expect(composable.isActive.value).toBe(false);
     expect(composable.error.value.length).toBeGreaterThan(0);
-    // No attempt to init the DuckDB client — nothing to fall back to.
     expect(client.init).not.toHaveBeenCalled();
   });
 
-  it('activate() registers the spool parquet and both inline maps, then builds the rollup', async () => {
+  it('activate() registers the spool parquet and all 5 inline maps, then builds both rollup stages', async () => {
     const client = await mockedClient();
     client.sendQuery.mockClear();
 
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    const specMap: SpecMapRow[] = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
-    const targetsMap: TargetsMapRow[] = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
-    await composable.activate('/api/spool/production_achievement/x.parquet', specMap, targetsMap);
+    const specMap = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
+    const targetsMap = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
+    const packageLfMap = [{ raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL' }];
+    const workcenterMergeMap = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const dailyPlanMap = [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 300 }];
+    await composable.activate('/api/spool/production_achievement/x.parquet', specMap, targetsMap, packageLfMap, workcenterMergeMap, dailyPlanMap);
 
     expect(client.registerParquet).toHaveBeenCalledWith('production_achievement_data', expect.any(ArrayBuffer));
     const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
     expect(sqlCalls.some((sql) => sql.includes('pa_spec_workcenter_map') && sql.includes('EPOXY D/B'))).toBe(true);
     expect(sqlCalls.some((sql) => sql.includes('pa_targets_map') && sql.includes('500'))).toBe(true);
-    expect(sqlCalls.some((sql) => sql.includes('pa_rollup') && sql.toUpperCase().includes('UPPER(TRIM'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('pa_package_lf_map') && sql.includes('SOD-123FL'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('pa_workcenter_merge_map') && sql.includes('焊接_DB'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('pa_daily_plan_map') && sql.includes('300'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('pa_rollup_raw') && sql.toUpperCase().includes('UPPER(TRIM'))).toBe(true);
+    // Stage 2 must show BOTH join kinds distinctly (D2 INNER, D1 LEFT) — never the same kind twice.
+    const stage2Sql = sqlCalls.find((sql) => /CREATE OR REPLACE TABLE pa_rollup\s/.test(sql));
+    expect(stage2Sql).toBeDefined();
+    expect(stage2Sql!.toUpperCase()).toContain('INNER JOIN');
+    expect(stage2Sql!.toUpperCase()).toContain('LEFT JOIN');
+  });
+
+  it('activate() defaults missing package_lf_map/workcenter_merge_map/daily_plan_map to empty (MYSQL_OPS_ENABLED=false degrade)', async () => {
+    const client = await mockedClient();
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await expect(composable.activate('url', [], [])).resolves.toBeUndefined();
+    expect(client.registerParquet).toHaveBeenCalled();
   });
 
   it('activate() sets error + isActive=false and rethrows on DuckDB init failure', async () => {
@@ -283,15 +337,23 @@ describe('useProductionAchievementDuckDB composable', () => {
 
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await expect(composable.activate('url', [], [])).rejects.toThrow('WASM init failed');
+    await expect(composable.activate('url', [], [], [], [])).rejects.toThrow('WASM init failed');
     expect(composable.isActive.value).toBe(false);
     expect(composable.error.value.length).toBeGreaterThan(0);
   });
 
-  it('computeView() throws when called before activate() (state guard)', async () => {
+  it('computeDailyView() throws when called before activate() (state guard)', async () => {
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await expect(composable.computeView()).rejects.toThrow();
+    await expect(composable.computeDailyView({ workcenterGroup: '焊接_DB' })).rejects.toThrow();
+  });
+
+  it('computeCumulativeView() throws when called before activate() (state guard)', async () => {
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await expect(
+      composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-10' }),
+    ).rejects.toThrow();
   });
 
   it('updateTargetsMap() throws when called before activate()', async () => {
@@ -300,57 +362,131 @@ describe('useProductionAchievementDuckDB composable', () => {
     await expect(composable.updateTargetsMap([])).rejects.toThrow();
   });
 
-  it('computeView() maps raw query rows into typed ProductionAchievementReportRow shape, empty spool -> empty rows', async () => {
+  it('computeDailyView() sums D+N shifts into a single daily_output_qty per package_lf_group row', async () => {
     const client = await mockedClient();
-    client.sendQuery.mockResolvedValueOnce([]); // spec map create
-    client.sendQuery.mockResolvedValueOnce([]); // targets map create
+    client.sendQuery.mockResolvedValue([]); // all CREATE TABLE calls
+    client.sendQuery.mockResolvedValueOnce([]); // spec map
+    client.sendQuery.mockResolvedValueOnce([]); // targets map
+    client.sendQuery.mockResolvedValueOnce([]); // package lf map
+    client.sendQuery.mockResolvedValueOnce([]); // workcenter merge map
+    client.sendQuery.mockResolvedValueOnce([]); // daily plan map
+    client.sendQuery.mockResolvedValueOnce([]); // rollup_raw create
     client.sendQuery.mockResolvedValueOnce([]); // rollup create
     client.sendQuery.mockResolvedValueOnce([
       {
-        output_date: '2026-04-27',
-        shift_code: 'D',
-        workcenter_group: '焊接_DB',
-        actual_output_qty: 150,
-        target_qty: null,
-        achievement_rate: null,
+        package_lf_group: 'SOD-123FL',
+        d_output_qty: 300,
+        n_output_qty: 100,
+        daily_output_qty: 400,
+        daily_plan_qty: 500,
+        achievement_rate: 0.8,
       },
-    ]); // final SELECT for computeView()
+    ]); // computeDailyView SELECT
 
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await composable.activate('url', [{ SPECNAME: 'X', workcenter_group: 'Y' }], []);
-    const rows = await composable.computeView();
+    await composable.activate('url', [], [], [], [], []);
+    const rows = await composable.computeDailyView({ workcenterGroup: '焊接_DB' });
     expect(rows).toEqual([
       {
-        output_date: '2026-04-27',
-        shift_code: 'D',
-        workcenter_group: '焊接_DB',
-        actual_output_qty: 150,
-        target_qty: null,
-        achievement_rate: null,
+        package_lf_group: 'SOD-123FL',
+        d_output_qty: 300,
+        n_output_qty: 100,
+        daily_output_qty: 400,
+        daily_plan_qty: 500,
+        achievement_rate: 0.8,
       },
     ]);
+    const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    const selectSql = sqlCalls[sqlCalls.length - 1];
+    expect(selectSql).toContain("'焊接_DB'");
   });
 
-  it('computeView() with a fully empty spool result returns an empty array, never an error', async () => {
+  it('computeDailyView() null/zero-rate guards mirror PA-12 (missing plan -> null, zero plan -> null, zero actual+plan -> 0.0)', async () => {
     const client = await mockedClient();
     client.sendQuery.mockResolvedValue([]);
+    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([
+      { package_lf_group: 'A', d_output_qty: 10, n_output_qty: 0, daily_output_qty: 10, daily_plan_qty: null, achievement_rate: null },
+      { package_lf_group: 'B', d_output_qty: 10, n_output_qty: 0, daily_output_qty: 10, daily_plan_qty: 0, achievement_rate: null },
+      { package_lf_group: 'C', d_output_qty: 0, n_output_qty: 0, daily_output_qty: 0, daily_plan_qty: 100, achievement_rate: 0 },
+    ]);
 
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await composable.activate('url', [], []);
-    const rows = await composable.computeView();
-    expect(rows).toEqual([]);
+    await composable.activate('url', [], [], [], [], []);
+    const rows = await composable.computeDailyView({ workcenterGroup: '焊接_DB' });
+    expect(rows.find((r) => r.package_lf_group === 'A')!.achievement_rate).toBeNull();
+    expect(rows.find((r) => r.package_lf_group === 'B')!.achievement_rate).toBeNull();
+    expect(rows.find((r) => r.package_lf_group === 'C')!.achievement_rate).toBe(0);
+  });
+
+  it('computeCumulativeView() aggregate-then-divide (D3): per-day trend rate must NOT equal the mean of per-group percentages when plan magnitudes differ', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    // 5 CREATE TABLE calls (spec/targets/pkg/wc/plan maps) + 2 rollup stage creates
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    // per-group cumulative rows query
+    client.sendQuery.mockResolvedValueOnce([
+      { package_lf_group: 'BIG', cumulative_actual_qty: 950, daily_plan_qty: 1000 },
+      { package_lf_group: 'SMALL', cumulative_actual_qty: 5, daily_plan_qty: 10 },
+    ]);
+    // per-day trend query: day 1 actual=955 across both groups, plan=1010 (aggregate-then-divide != mean)
+    client.sendQuery.mockResolvedValueOnce([{ output_date: '2026-07-01', actual_qty: 955, plan_qty: 1010 }]);
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    const result = await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-01' });
+
+    const aggregateThenDivide = 955 / 1010; // ~0.9455
+    const meanOfPercentages = (950 / 1000 + 5 / 10) / 2; // 0.95 exactly — deliberately different
+    expect(result.trend[0].achievement_rate).toBeCloseTo(aggregateThenDivide, 6);
+    expect(result.trend[0].achievement_rate).not.toBeCloseTo(meanOfPercentages, 3);
+  });
+
+  it('computeCumulativeView() scales daily_plan_qty by elapsed_days for 累計計畫', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([{ package_lf_group: 'SOD-123FL', cumulative_actual_qty: 3000, daily_plan_qty: 500 }]);
+    client.sendQuery.mockResolvedValueOnce([]);
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    // 2026-07-01 .. 2026-07-05 inclusive = 5 elapsed days
+    const result = await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-05' });
+    expect(result.rows[0].cumulative_plan_qty).toBe(2500); // 500 * 5
+    expect(result.rows[0].cumulative_diff_qty).toBe(500); // 3000 - 2500
+    expect(result.rows[0].cumulative_achievement_rate).toBeCloseTo(3000 / 2500, 6);
+  });
+
+  it('computeCumulativeView() null-plan row -> cumulative_plan_qty/diff/rate all null (never Infinity)', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([{ package_lf_group: '(未分類)', cumulative_actual_qty: 42, daily_plan_qty: null }]);
+    client.sendQuery.mockResolvedValueOnce([]);
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    const result = await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-01' });
+    expect(result.rows[0].cumulative_plan_qty).toBeNull();
+    expect(result.rows[0].cumulative_diff_qty).toBeNull();
+    expect(result.rows[0].cumulative_achievement_rate).toBeNull();
   });
 
   it('deactivate() resets state and releases the DuckDB client', async () => {
     const client = await mockedClient();
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await composable.activate('url', [], []);
+    await composable.activate('url', [], [], [], [], []);
     composable.deactivate();
     expect(composable.isActive.value).toBe(false);
     expect(client.destroy).toHaveBeenCalled();
-    await expect(composable.computeView()).rejects.toThrow();
+    await expect(composable.computeDailyView({ workcenterGroup: 'x' })).rejects.toThrow();
   });
 });

@@ -14,6 +14,7 @@ from typing import Optional, Dict, List, Any
 
 from mes_dashboard.core.database import read_sql_df
 from mes_dashboard.core.redis_client import get_redis_client, get_key, REDIS_ENABLED
+from mes_dashboard.sql import SQLLoader
 
 logger = logging.getLogger('mes_dashboard.filter_cache')
 
@@ -40,6 +41,7 @@ _CACHE = {
     'workcenter_to_short': None,    # Dict {workcentername: short_name}
     'spec_order_mapping': None,     # Dict {spec_name_upper: spec_order}
     'spec_workcenter_mapping': None,  # Dict {spec_name_upper: {workcenter, group, sequence}}
+    'package_lf_values': None,      # List[str] distinct raw PACKAGE_LF values (production-achievement-overhaul)
     'last_refresh': None,
     'is_loading': False,
 }
@@ -197,6 +199,22 @@ def get_specs_for_groups(groups: List[str]) -> List[str]:
             if info['group'].strip().upper() in target]
 
 
+def get_known_package_lf_values(force_refresh: bool = False) -> List[str]:
+    """Get the distinct raw PACKAGE_LF values observed over the ~13-month
+    rolling window (production-achievement-overhaul).
+
+    Backs ``GET /api/production-achievement/known-package-lf-values`` so
+    ``PackageLfMappingPanel.vue`` can show admins the full universe of raw
+    values that may need a merge-map entry (business-rules.md PA-09).
+
+    Returns:
+        Sorted list of distinct raw PACKAGE_LF strings, or [] if never
+        loaded / load failed.
+    """
+    _ensure_cache_loaded(force_refresh)
+    return _CACHE.get('package_lf_values') or []
+
+
 # ============================================================
 # Redis L2 Cache Helpers
 # ============================================================
@@ -211,6 +229,7 @@ _REDIS_PAYLOAD_KEYS = (
     'workcenter_to_short',
     'spec_order_mapping',
     'spec_workcenter_mapping',
+    'package_lf_values',
 )
 
 
@@ -353,6 +372,7 @@ def _load_cache() -> bool:
         wc_groups, wc_mapping, wc_short = _load_workcenter_data()
         spec_order_mapping = _load_spec_order_mapping_from_spec()
         spec_wc_mapping = _load_spec_workcenter_mapping()
+        package_lf_values = _load_package_lf_values()
 
         with _CACHE_LOCK:
             _CACHE['workcenter_groups'] = wc_groups
@@ -360,16 +380,18 @@ def _load_cache() -> bool:
             _CACHE['workcenter_to_short'] = wc_short
             _CACHE['spec_order_mapping'] = spec_order_mapping
             _CACHE['spec_workcenter_mapping'] = spec_wc_mapping
+            _CACHE['package_lf_values'] = package_lf_values
             _CACHE['last_refresh'] = datetime.now()
             _CACHE['is_loading'] = False
 
         logger.info(
             "Filter cache refreshed from Oracle: %d groups, %d workcenters, "
-            "%d specs, %d spec-wc mappings",
+            "%d specs, %d spec-wc mappings, %d package_lf values",
             len(wc_groups or []),
             len(wc_mapping or {}),
             len(spec_order_mapping or {}),
             len(spec_wc_mapping or {}),
+            len(package_lf_values or []),
         )
 
         # Write Oracle result back to Redis L2 for other workers
@@ -379,6 +401,7 @@ def _load_cache() -> bool:
             'workcenter_to_short': wc_short,
             'spec_order_mapping': spec_order_mapping,
             'spec_workcenter_mapping': spec_wc_mapping,
+            'package_lf_values': package_lf_values,
         })
 
         return True
@@ -583,6 +606,29 @@ def _load_spec_workcenter_mapping() -> Dict[str, Dict[str, Any]]:
     except Exception as exc:
         logger.error(f"Failed to load SPEC_WORKCENTER mapping from SPEC_WORKCENTER_V: {exc}")
         return {}
+
+
+def _load_package_lf_values() -> List[str]:
+    """Load distinct raw PACKAGE_LF values over the ~13-month rolling window
+    (sql/production_achievement_known_package_lf.sql, production-achievement-
+    overhaul). Mirrors the internal try/except convention of every other
+    Oracle loader in this module -- never raises, so an unmocked call during
+    an unrelated cache-key's test never breaks that test.
+    """
+    try:
+        sql = SQLLoader.load("production_achievement_known_package_lf")
+        df = read_sql_df(sql)
+        if df is None or df.empty:
+            return []
+        values = {
+            str(v).strip()
+            for v in df['PACKAGE_LF'].tolist()
+            if v is not None and str(v).strip()
+        }
+        return sorted(values)
+    except Exception as exc:
+        logger.error(f"Failed to load known PACKAGE_LF values: {exc}")
+        return []
 
 
 def _extract_workcenter_data_from_df(df):

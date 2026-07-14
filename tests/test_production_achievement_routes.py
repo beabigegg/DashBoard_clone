@@ -169,6 +169,18 @@ class TestReportRoute:
     # ── AC-2/AC-8: spool hit -> 200, unconditional map injection ────────────
 
     @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_daily_plans_map",
+        return_value={("焊接_DB", "SOD-123FL"): 300},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_map",
+        return_value={"焊接_DW": "焊接_WB"},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_package_lf_map",
+        return_value={"SOT23-5L": "SOT23-5L/6L"},
+    )
+    @patch(
         "mes_dashboard.routes.production_achievement_routes.get_targets_map",
         return_value={("D", "焊接_DB"): 500, ("N", "焊接_WB"): None},
     )
@@ -181,8 +193,13 @@ class TestReportRoute:
         return_value="/tmp/fake/spool.parquet",
     )
     def test_spool_hit_response_shape_has_spool_download_url_spec_map_targets_map(
-        self, mock_spool, mock_spec_map, mock_targets_map, auth_client
+        self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
+        mock_workcenter_merge_map, mock_daily_plans_map, auth_client
     ):
+        """AC-6: envelope grows from 2 to 5 inline arrays
+        (data-shape-contract.md §3.28.4) -- spec_workcenter_map, targets_map
+        (unchanged shape) plus the 3 new arrays: package_lf_map (D1),
+        workcenter_merge_map (D2), daily_plan_map."""
         resp = auth_client.get(
             "/api/production-achievement/report",
             query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
@@ -200,9 +217,30 @@ class TestReportRoute:
         ]
         assert {"shift_code": "D", "workcenter_group": "焊接_DB", "target_qty": 500} in data["targets_map"]
         assert {"shift_code": "N", "workcenter_group": "焊接_WB", "target_qty": None} in data["targets_map"]
+        assert data["package_lf_map"] == [
+            {"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"}
+        ]
+        assert data["workcenter_merge_map"] == [
+            {"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"}
+        ]
+        assert data["daily_plan_map"] == [
+            {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300}
+        ]
         # Enqueue must never be reached on a spool hit.
         mock_spool.assert_called_once()
 
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_daily_plans_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_map",
+        return_value={},
+    )
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_package_lf_map",
+        return_value={},
+    )
     @patch(
         "mes_dashboard.routes.production_achievement_routes.get_targets_map",
         return_value={},
@@ -216,7 +254,8 @@ class TestReportRoute:
         return_value="/tmp/fake/spool.parquet",
     )
     def test_spool_hit_injects_download_url_unconditionally_not_row_count_gated(
-        self, mock_spool, mock_spec_map, mock_targets_map, auth_client
+        self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
+        mock_workcenter_merge_map, mock_daily_plans_map, auth_client
     ):
         """AC-8: injection is unconditional -- even with empty maps (which
         would correspond to a tiny/empty spool), spool_download_url must
@@ -230,6 +269,9 @@ class TestReportRoute:
         assert data["spool_download_url"].startswith("/api/spool/production_achievement/")
         assert data["spec_workcenter_map"] == []
         assert data["targets_map"] == []
+        assert data["package_lf_map"] == []
+        assert data["workcenter_merge_map"] == []
+        assert data["daily_plan_map"] == []
 
     # ── AC-1/AC-8: spool miss + no worker -> 503, no sync fallback ──────────
 
@@ -282,6 +324,29 @@ class TestFilterOptionsRoute:
         assert resp.status_code == 200
         payload = resp.get_json()
         assert payload["success"] is True
+
+    @patch(
+        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+    )
+    def test_filter_options_workcenter_groups_is_merged_d2_list_end_to_end(
+        self, mock_merge_map, auth_client
+    ):
+        """Phase 1 (production-achievement-overhaul): workcenter_groups is
+        redefined in place to the merged (D2) list. Exercises the REAL
+        get_filter_options() through the route (only the deep
+        get_workcenter_merge_map dependency is mocked) -- 焊接_WB/焊接_DW
+        both merge to 焊接_WB and must appear once, not twice; an excluded
+        raw group (absent from the merge map) must never appear."""
+        mock_merge_map.return_value = {
+            "焊接_WB": "焊接_WB",
+            "焊接_DW": "焊接_WB",
+            "焊接_DB": "焊接_DB",
+        }
+        resp = auth_client.get("/api/production-achievement/filter-options")
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["workcenter_groups"] == ["焊接_DB", "焊接_WB"]
+        assert "切割" not in data["workcenter_groups"]
 
 
 # ---------------------------------------------------------------------------
@@ -429,3 +494,351 @@ class TestAdminPermissionsRoutes:
             json={"can_edit_targets": True},
         )
         assert resp.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}] (D1)
+# ---------------------------------------------------------------------------
+
+class TestPackageLfMapRoutes:
+    def test_get_requires_login(self, client):
+        resp = client.get("/api/production-achievement/package-lf-map")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_package_lf_entries")
+    def test_get_forwards(self, mock_get, auth_client):
+        mock_get.return_value = [
+            {
+                "raw_package_lf": "SOT23-5L",
+                "merged_group": "SOT23-5L/6L",
+                "updated_at": "2026-07-01T00:00:00",
+                "updated_by": "tester",
+            }
+        ]
+        resp = auth_client.get("/api/production-achievement/package-lf-map")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["data"] == mock_get.return_value
+        mock_get.assert_called_once()
+
+    def test_put_requires_login(self, client):
+        resp = client.put(
+            "/api/production-achievement/package-lf-map",
+            json={"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"},
+        )
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
+    def test_put_403_not_whitelisted(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/package-lf-map",
+            json={"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"},
+        )
+        assert resp.status_code == 403
+        assert resp.get_json()["error"]["code"] == "FORBIDDEN"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", False)
+    def test_put_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/package-lf-map",
+            json={"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"},
+        )
+        assert resp.status_code == 503
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    def test_put_400_when_missing_fields(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/package-lf-map",
+            json={"raw_package_lf": "SOT23-5L"},
+        )
+        assert resp.status_code == 400
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.upsert_package_lf")
+    def test_put_forwards_kwargs(self, mock_upsert, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/package-lf-map",
+            json={"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"},
+        )
+        assert resp.status_code == 200
+        kwargs = mock_upsert.call_args.kwargs
+        assert kwargs["raw_package_lf"] == "SOT23-5L"
+        assert kwargs["merged_group"] == "SOT23-5L/6L"
+        assert kwargs["updated_by"] == "alice"
+
+    def test_delete_requires_login(self, client):
+        resp = client.delete("/api/production-achievement/package-lf-map/SOT23-5L")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
+    def test_delete_403_not_whitelisted(self, mock_can_edit, auth_client):
+        resp = auth_client.delete("/api/production-achievement/package-lf-map/SOT23-5L")
+        assert resp.status_code == 403
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.delete_package_lf")
+    def test_delete_forwards_url_encoded_raw(self, mock_delete, mock_can_edit, auth_client):
+        """The path segment {raw} is URL-encoded by the caller (e.g. a space
+        in 'SOD-123FL OP1' -> %20); Flask/Werkzeug decodes it before it
+        reaches the handler, which must forward the DECODED string."""
+        mock_delete.return_value = True
+        resp = auth_client.delete(
+            "/api/production-achievement/package-lf-map/SOD-123FL%20OP1"
+        )
+        assert resp.status_code == 200
+        kwargs = mock_delete.call_args.kwargs
+        assert kwargs["raw_package_lf"] == "SOD-123FL OP1"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.delete_package_lf")
+    def test_delete_404_when_row_absent(self, mock_delete, mock_can_edit, auth_client):
+        mock_delete.return_value = False
+        resp = auth_client.delete("/api/production-achievement/package-lf-map/NOT-THERE")
+        assert resp.status_code == 404
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", False)
+    def test_delete_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
+        resp = auth_client.delete("/api/production-achievement/package-lf-map/SOT23-5L")
+        assert resp.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/{raw}] (D2)
+# ---------------------------------------------------------------------------
+
+class TestWorkcenterMergeMapRoutes:
+    def test_get_requires_login(self, client):
+        resp = client.get("/api/production-achievement/workcenter-merge-map")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries")
+    def test_get_forwards(self, mock_get, auth_client):
+        mock_get.return_value = [
+            {
+                "raw_workcenter_group": "焊接_DW",
+                "merged_workcenter_group": "焊接_WB",
+                "updated_at": "2026-07-01T00:00:00",
+                "updated_by": "tester",
+            }
+        ]
+        resp = auth_client.get("/api/production-achievement/workcenter-merge-map")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["data"] == mock_get.return_value
+        mock_get.assert_called_once()
+
+    def test_put_requires_login(self, client):
+        resp = client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"},
+        )
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
+    def test_put_403_not_whitelisted(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"},
+        )
+        assert resp.status_code == 403
+        assert resp.get_json()["error"]["code"] == "FORBIDDEN"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", False)
+    def test_put_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"},
+        )
+        assert resp.status_code == 503
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    def test_put_400_when_missing_fields(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={"raw_workcenter_group": "焊接_DW"},
+        )
+        assert resp.status_code == 400
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.upsert_workcenter_merge")
+    def test_put_forwards_kwargs(self, mock_upsert, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/workcenter-merge-map",
+            json={"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"},
+        )
+        assert resp.status_code == 200
+        kwargs = mock_upsert.call_args.kwargs
+        assert kwargs["raw_workcenter_group"] == "焊接_DW"
+        assert kwargs["merged_workcenter_group"] == "焊接_WB"
+        assert kwargs["updated_by"] == "alice"
+
+    def test_delete_requires_login(self, client):
+        resp = client.delete("/api/production-achievement/workcenter-merge-map/焊接_DW")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
+    def test_delete_403_not_whitelisted(self, mock_can_edit, auth_client):
+        resp = auth_client.delete("/api/production-achievement/workcenter-merge-map/焊接_DW")
+        assert resp.status_code == 403
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.delete_workcenter_merge")
+    def test_delete_forwards_url_encoded_raw(self, mock_delete, mock_can_edit, auth_client):
+        mock_delete.return_value = True
+        resp = auth_client.delete("/api/production-achievement/workcenter-merge-map/%E7%84%8A%E6%8E%A5_DW")
+        assert resp.status_code == 200
+        kwargs = mock_delete.call_args.kwargs
+        assert kwargs["raw_workcenter_group"] == "焊接_DW"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.delete_workcenter_merge")
+    def test_delete_404_when_row_absent(self, mock_delete, mock_can_edit, auth_client):
+        mock_delete.return_value = False
+        resp = auth_client.delete("/api/production-achievement/workcenter-merge-map/NOT-THERE")
+        assert resp.status_code == 404
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", False)
+    def test_delete_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
+        resp = auth_client.delete("/api/production-achievement/workcenter-merge-map/焊接_DW")
+        assert resp.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# GET/PUT /api/production-achievement/daily-plans
+# ---------------------------------------------------------------------------
+
+class TestDailyPlansRoutes:
+    def test_get_requires_login(self, client):
+        resp = client.get("/api/production-achievement/daily-plans")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_daily_plans")
+    def test_get_forwards(self, mock_get, auth_client):
+        mock_get.return_value = [
+            {
+                "workcenter_group": "焊接_DB",
+                "package_lf_group": "SOD-123FL",
+                "daily_plan_qty": 300,
+                "updated_at": "2026-07-01T00:00:00",
+                "updated_by": "tester",
+            }
+        ]
+        resp = auth_client.get("/api/production-achievement/daily-plans")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["data"] == mock_get.return_value
+
+    def test_put_requires_login(self, client):
+        resp = client.put(
+            "/api/production-achievement/daily-plans",
+            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
+        )
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
+    def test_put_403_not_whitelisted(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/daily-plans",
+            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
+        )
+        assert resp.status_code == 403
+        assert resp.get_json()["error"]["code"] == "FORBIDDEN"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", False)
+    def test_put_503_when_mysql_ops_disabled(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/daily-plans",
+            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
+        )
+        assert resp.status_code == 503
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    def test_put_400_when_negative_qty(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/daily-plans",
+            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": -5},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    def test_put_400_when_missing_fields(self, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/daily-plans",
+            json={"workcenter_group": "焊接_DB"},
+        )
+        assert resp.status_code == 400
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.routes.production_achievement_routes.upsert_daily_plan")
+    def test_put_forwards_kwargs(self, mock_upsert, mock_can_edit, auth_client):
+        resp = auth_client.put(
+            "/api/production-achievement/daily-plans",
+            json={"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300},
+        )
+        assert resp.status_code == 200
+        kwargs = mock_upsert.call_args.kwargs
+        assert kwargs["workcenter_group"] == "焊接_DB"
+        assert kwargs["package_lf_group"] == "SOD-123FL"
+        assert kwargs["daily_plan_qty"] == 300
+        assert kwargs["updated_by"] == "alice"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/production-achievement/known-package-lf-values
+# ---------------------------------------------------------------------------
+
+class TestKnownPackageLfValuesRoute:
+    def test_get_requires_login(self, client):
+        resp = client.get("/api/production-achievement/known-package-lf-values")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_known_package_lf_values")
+    def test_get_returns_success(self, mock_get, auth_client):
+        mock_get.return_value = ["SOT23-5L", "SOT23-6L", "TO-277"]
+        resp = auth_client.get("/api/production-achievement/known-package-lf-values")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["data"]["package_lf_values"] == ["SOT23-5L", "SOT23-6L", "TO-277"]
+
+
+# ---------------------------------------------------------------------------
+# GET /api/production-achievement/known-workcenter-groups (OD-8)
+# ---------------------------------------------------------------------------
+
+class TestKnownWorkcenterGroupsRoute:
+    def test_get_requires_login(self, client):
+        resp = client.get("/api/production-achievement/known-workcenter-groups")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_known_workcenter_groups")
+    def test_get_returns_success(self, mock_get, auth_client):
+        """OD-8: enumerates the FULL raw WORK_CENTER_GROUP universe
+        (including currently-excluded groups), NOT the merged D2 list --
+        so WorkcenterMergeMappingPanel can toggle include/exclude."""
+        mock_get.return_value = ["切割", "焊接_DB", "焊接_DW", "焊接_WB"]
+        resp = auth_client.get("/api/production-achievement/known-workcenter-groups")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["data"]["raw_workcenter_groups"] == ["切割", "焊接_DB", "焊接_DW", "焊接_WB"]

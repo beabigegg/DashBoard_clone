@@ -19,6 +19,7 @@ import pytest
 
 from mes_dashboard.services.production_achievement_service import (
     build_achievement_rows,
+    get_filter_options,
     PA05_PREDICATE_SQL,
 )
 
@@ -71,12 +72,14 @@ class TestGroupingAndWorkcenterGroupResolution:
                     "OUTPUT_DATE": "2026-04-27",
                     "SHIFT_CODE": "D",
                     "SPECNAME": "Epoxy D/B",
+                    "PACKAGE_LF": "SOD-123FL",
                     "ACTUAL_OUTPUT_QTY": 100,
                 },
                 {
                     "OUTPUT_DATE": "2026-04-27",
                     "SHIFT_CODE": "D",
                     "SPECNAME": "epoxy d/b",
+                    "PACKAGE_LF": "SOT23-5L",
                     "ACTUAL_OUTPUT_QTY": 50,
                 },
             ]
@@ -88,6 +91,15 @@ class TestGroupingAndWorkcenterGroupResolution:
         assert row["shift_code"] == "D"
         assert row["workcenter_group"] == "焊接_DB"
         assert row["actual_output_qty"] == 150
+        # PACKAGE_LF passthrough (production-achievement-overhaul, PA-09): the
+        # SQL/spool grain widened to (output_date, shift_code, SPECNAME,
+        # PACKAGE_LF), so this golden-reference function's input df now
+        # legitimately carries a PACKAGE_LF column with DIFFERING values per
+        # row -- it must still sum correctly into ONE workcenter_group row.
+        # This function's own output grouping key/formula are UNCHANGED
+        # (business-rules.md PA-06; data-shape-contract.md §3.25 unchanged):
+        # no package_lf_group field is added to the output row shape.
+        assert "package_lf_group" not in row
 
     @patch("mes_dashboard.services.production_achievement_service.get_spec_workcenter_mapping")
     def test_workcenter_group_resolved_via_filter_cache_not_hardcoded(self, mock_mapping):
@@ -172,3 +184,45 @@ class TestAchievementRateMath:
         targets = {("D", "焊接_DB"): 500}
         rows = build_achievement_rows(df, targets=targets)
         assert rows[0]["achievement_rate"] == 0.5
+
+
+class TestGetFilterOptions:
+    """production-achievement-overhaul, Phase 1: get_filter_options()'s
+    workcenter_groups field is redefined in place to the MERGED (D2) list,
+    sourced from production_achievement_workcenter_merge_service --
+    NOT the raw WORK_CENTER_GROUP set from filter_cache.get_spec_workcenter_mapping()."""
+
+    @patch(
+        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+    )
+    def test_workcenter_groups_is_merged_deduplicated_list(self, mock_merge_map):
+        # 焊接_WB and 焊接_DW both merge to 焊接_WB (D2 seed row) -- must
+        # appear once, not twice, in the returned workcenter_groups list.
+        mock_merge_map.return_value = {
+            "焊接_WB": "焊接_WB",
+            "焊接_DW": "焊接_WB",
+            "焊接_DB": "焊接_DB",
+        }
+        options = get_filter_options()
+        assert options["workcenter_groups"] == ["焊接_DB", "焊接_WB"]
+
+    @patch(
+        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+    )
+    def test_shift_codes_enum_unchanged(self, mock_merge_map):
+        mock_merge_map.return_value = {}
+        options = get_filter_options()
+        assert options["shift_codes"] == ["N", "D", "A", "B", "C"]
+
+    @patch(
+        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+    )
+    def test_excluded_raw_group_absent_from_merge_map_never_appears(self, mock_merge_map):
+        """D2 exclude-by-absence: get_workcenter_merge_map() never contains
+        an excluded raw group as a value in the first place (the merge
+        service itself already excludes it), so get_filter_options() must
+        not somehow reintroduce it via filter_cache's raw group set."""
+        mock_merge_map.return_value = {"焊接_DB": "焊接_DB"}
+        options = get_filter_options()
+        assert "切割" not in options["workcenter_groups"]
+        assert options["workcenter_groups"] == ["焊接_DB"]

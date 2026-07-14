@@ -91,7 +91,11 @@ onMounted(() => {
       <template #header>
         <div>
           <h2 class="panel-title">生產達成率 — 目標值編輯權限</h2>
-          <p class="sub-title">管理可編輯「生產達成率」目標值的使用者白名單（can_edit_targets）</p>
+          <p class="sub-title">
+            管理可編輯「生產達成率」目標值的使用者白名單（can_edit_targets）。
+            此白名單同時管控「生產達成率 - 對照設定」頁面
+            （PACKAGE_LF 合併對照、站點群組合併對照、每日計畫量）的編輯權限。
+          </p>
         </div>
       </template>
       <BlockLoadingState v-if="loading" data-testid="loading-state" />

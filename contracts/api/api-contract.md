@@ -3,8 +3,8 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.40.0
-last-changed: 2026-07-13
+schema-version: 1.41.0
+last-changed: 2026-07-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -270,6 +270,16 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/uph-performance/trend | required | ?query_id=&group_by=(equipment_id/family/package, default family; 400 on unknown)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceTrendResponse | 400/410 | route tests |
 | GET | /api/uph-performance/ranking | required | ?query_id=&pj_type[]=(opt, own filter axis independent of global filters) | UphPerformanceRankingResponse | 400/410 | route tests |
 | GET | /api/uph-performance/detail | required | ?query_id=&page=&per_page=(max 200)&equipment_id[]=(opt)&workcenter_name[]=(opt)&package[]=(opt)&pj_type[]=(opt) | UphPerformanceDetailResponse | 400/410 | route tests |
+| GET | /api/production-achievement/package-lf-map | required | - | ProductionAchievementPackageLfMapResponse | 500 | route tests |
+| PUT | /api/production-achievement/package-lf-map | required | body {raw_package_lf, merged_group}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
+| DELETE | /api/production-achievement/package-lf-map/{raw} | required | path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/404/500/503 | route tests |
+| GET | /api/production-achievement/workcenter-merge-map | required | - | ProductionAchievementWorkcenterMergeMapResponse | 500 | route tests |
+| PUT | /api/production-achievement/workcenter-merge-map | required | body {raw_workcenter_group, merged_workcenter_group}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
+| DELETE | /api/production-achievement/workcenter-merge-map/{raw} | required | path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/404/500/503 | route tests |
+| GET | /api/production-achievement/daily-plans | required | - | ProductionAchievementDailyPlanResponse | 500 | route tests |
+| PUT | /api/production-achievement/daily-plans | required | body {workcenter_group, package_lf_group, daily_plan_qty}; gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
+| GET | /api/production-achievement/known-package-lf-values | required | - | ProductionAchievementKnownPackageLfValuesResponse | 500 | route tests |
+| GET | /api/production-achievement/known-workcenter-groups | required | - | ProductionAchievementKnownWorkcenterGroupsResponse | 500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -478,6 +488,14 @@ Breaking changes（移除欄位、改變 error code、改變 URL）需走 deprec
   - Consumer: `frontend/src/query-tool/composables/useLotEquipmentQuery.ts` (`queryLots()`/`queryRejects()`) — also gains a defensive `.trim()` before `.toUpperCase()` in its own exact-match filter; no other known consumers (internal jobs/mobile/partners).
 - **query-tool-url-timeout (2026-07-09, PR #32):** Additive — `POST /api/query-tool/lot-history` and `POST /api/query-tool/lot-associations` added alongside the existing `GET` routes. The frontend batch path (`useLotDetail.ts`) now sends `container_ids`/`workcenter_groups` as a JSON body instead of a comma-joined query-string param, so a large batch (up to `QUERY_TOOL_MAX_CONTAINER_IDS`) can no longer produce a request line long enough to be rejected by gunicorn's `limit_request_line` before the app's own 413 batch-size guard runs. `GET` remains supported (same params, query string) for single-CID reads and external callers. Request/response shapes and error codes are otherwise unchanged.
 - **move-target-permissions-panel (2026-07-08):** UI-only relocation, no endpoint/schema/auth change. `GET /admin/api/production-achievement/permissions` and `PUT /admin/api/production-achievement/permissions/{user_identifier}` are unchanged (still `admin_required`, same request/response shapes). The consumer of these two endpoints moves from `frontend/src/admin-pages/` (permission block, removed) to `frontend/src/admin-dashboard/` (new tab) — this supersedes the consumer note in the `production-achievement-kanban (2026-07-02)` entry below, which is left as historical record and not edited in place.
+- **production-achievement-overhaul (2026-07-14):** `GET /api/production-achievement/report` `ProductionAchievementReportResponse` is redefined in place again (second breaking redefinition of the same schema name — first was `production-achievement-async-spool`). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (same exception precedent: sole consumer `frontend/src/production-achievement/` ships in the same atomic PR):
+  - Oracle SQL and worker now group by 4 dimensions (`output_date, shift_code, SPECNAME, PACKAGE_LF` — business-rules.md PA-09); `start_date`/`end_date` unchanged (both required, 730-day cap SYS-04); `shift_code`/`workcenter_group` request query params remain accepted-but-inert (unchanged from `production-achievement-async-spool` — still do not affect the canonical spool key or the server response).
+  - **Spool-hit (HTTP 200)**: `data` grows from 2 to 5 inline arrays: `{query_id, spool_download_url, spec_workcenter_map, targets_map, package_lf_map, workcenter_merge_map, daily_plan_map}` (data-shape-contract.md §3.28.4). Three new arrays: `package_lf_map` (§3.33, D1 sparse/fallback-to-self), `workcenter_merge_map` (§3.33, D2 explicit-inclusion/exclude-by-absence), `daily_plan_map` (§3.34). `spool_download_url` parquet gains a 5th nullable column `PACKAGE_LF` (§3.28.1); `_PA_SPOOL_SCHEMA_VERSION` bumps 1→2 (breaking parquet-schema change — stale v1 parquets self-heal by key mismatch; optional `rm -f tmp/query_spool/production_achievement/*.parquet` fast-forward, see ci-gates.md §Rollback Policy).
+  - **Spool-miss (HTTP 202)** / **Worker-unavailable (HTTP 503)**: unchanged from `production-achievement-async-spool` (`ProductionAchievementJobAccepted`, `always_async=True`, `sync_fallback_allowed=False`).
+  - **New env vars**: none — reuses `PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB` and the shared `WARMUP_INTERVAL_SECONDS`/`WARMUP_SCHEDULER_ENABLED` verbatim (business-rules.md PA-14).
+  - **New endpoints** (additive) for the 3 new MySQL-backed CRUD tables plus 2 read-only "known values" helper endpoints: `GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}]`, `GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/{raw}]`, `GET/PUT /api/production-achievement/daily-plans`, `GET /api/production-achievement/known-package-lf-values`, `GET /api/production-achievement/known-workcenter-groups` (10 distinct method+path rows) — all gated by the existing `can_edit_targets` permission verbatim (widened scope, no new permission system; business-rules.md PA-09/PA-10/PA-11); 403 on write when not whitelisted. New schemas: `ProductionAchievementPackageLfMapRow`/`Response`, `ProductionAchievementWorkcenterMergeMapRow`/`Response`, `ProductionAchievementDailyPlanRow`/`Response`, `ProductionAchievementKnownPackageLfValuesResponse`, `ProductionAchievementKnownWorkcenterGroupsResponse`. The `known-workcenter-groups` endpoint was added after initial review, per interaction-design.md OD-8, to let `WorkcenterMergeMappingPanel` enumerate the full raw `WORK_CENTER_GROUP` universe (including currently-excluded groups) for admin include/exclude toggling — mirrors `known-package-lf-values` exactly.
+  - `GET /filter-options`, the admin permission endpoints, and `GET/PUT /targets` (shift-based) are unchanged — coexist independently (business-rules.md PA-11).
+  - Sole consumer: `frontend/src/production-achievement/` + new `frontend/src/production-achievement-settings/`. No external partners or mobile consumers known.
 - **production-achievement-async-spool (2026-07-08):** `GET /api/production-achievement/report` changes from a synchronous Oracle-backed aggregate-row response to the async RQ → DuckDB parquet spool pattern (mirrors `resource-history-rq-async`; ADR-0016). BREAKING response-shape change under the same endpoint/schema name — no deprecate-2-minors window (feature is pre-launch, sole consumer `frontend/src/production-achievement/` ships in the same atomic PR; same precedent as `equipment-rejects-by-lots`/`nav-config-to-code`):
   - Request params unchanged: `start_date`, `end_date` (both required, 730-day cap SYS-04), `shift_code` (opt), `workcenter_group` (opt). **Behavior change**: `shift_code`/`workcenter_group` no longer affect the server-side response or the canonical spool key — the canonical spool key is `(start_date, end_date, _PA_SPOOL_SCHEMA_VERSION)` only (date-range only, ADR-0016). The unfiltered SPECNAME-grain dataset for the full date range is always spooled; `shift_code`/`workcenter_group` filtering (PA-06/PA-07) is now applied client-side in DuckDB-WASM, not server-side.
   - **Spool-hit (HTTP 200)**: `data = {query_id, spool_download_url, spec_workcenter_map, targets_map}` (data-shape-contract.md §3.28). `spool_download_url = /api/spool/production_achievement/<query_id>.parquet` — namespace added to `spool_routes._ALLOWED_NAMESPACES` (AC-3). Injection is unconditional (Q1 resolved: local-compute activation threshold overridden to 0 for this page — no `total_row_count` gate, unlike `resource_history`'s `>= threshold` gate).
@@ -1275,7 +1293,7 @@ See data-shape-contract.md §3.25 for field semantics (nullable `target_qty`/`ac
 
 ### ProductionAchievementReportResponse
 
-Tier-B — `GET /api/production-achievement/report`. **Redefined by `production-achievement-async-spool`** (previously an already-aggregated row array; now the async spool-hit envelope — see data-shape-contract.md §3.28 and the Compatibility Notes entry above). Describes the HTTP 200 spool-hit shape only; the HTTP 202 spool-miss shape is `ProductionAchievementJobAccepted`. Contract error codes `400/500/503` mean an error-envelope capture (`success:false`, no `data`) is a valid sample.
+Tier-B — `GET /api/production-achievement/report`. Redefined by `production-achievement-async-spool`, then extended in place again by `production-achievement-overhaul` (originally an already-aggregated row array; then a 2-array async spool-hit envelope; now a 5-array spool-hit envelope — see data-shape-contract.md §3.28). Describes the HTTP 200 spool-hit shape only; the HTTP 202 spool-miss shape is `ProductionAchievementJobAccepted`. Only `success` is required (matching `ProductionAchievementPermissionsResponse`'s pattern) — contract error codes 400/500/503 mean an error-envelope capture (`success:false`, no `data`) is a valid sample.
 
 ```json-schema
 {
@@ -1287,7 +1305,7 @@ Tier-B — `GET /api/production-achievement/report`. **Redefined by `production-
       "type": ["object", "null"],
       "properties": {
         "query_id": { "type": "string" },
-        "spool_download_url": { "type": "string", "pattern": "^/api/spool/production_achievement/.+\\.parquet$" },
+        "spool_download_url": { "type": "string" },
         "spec_workcenter_map": {
           "type": "array",
           "items": {
@@ -1308,6 +1326,40 @@ Tier-B — `GET /api/production-achievement/report`. **Redefined by `production-
               "shift_code": { "type": "string" },
               "workcenter_group": { "type": "string" },
               "target_qty": { "type": ["integer", "null"] }
+            }
+          }
+        },
+        "package_lf_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["raw_package_lf", "merged_group"],
+            "properties": {
+              "raw_package_lf": { "type": "string" },
+              "merged_group": { "type": "string" }
+            }
+          }
+        },
+        "workcenter_merge_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["raw_workcenter_group", "merged_workcenter_group"],
+            "properties": {
+              "raw_workcenter_group": { "type": "string" },
+              "merged_workcenter_group": { "type": "string" }
+            }
+          }
+        },
+        "daily_plan_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["workcenter_group", "package_lf_group", "daily_plan_qty"],
+            "properties": {
+              "workcenter_group": { "type": "string" },
+              "package_lf_group": { "type": "string" },
+              "daily_plan_qty": { "type": ["integer", "null"] }
             }
           }
         }
@@ -1634,3 +1686,111 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 |---|---|---|---|---|
 | rows | UphPerformanceDetailRow[] | yes |  | see data-shape-contract.md §3.29 Detail for the full per-row shape |
 | meta | UphPerformanceDetailMeta | yes |  | pagination |
+
+### ProductionAchievementPackageLfMapRow
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| raw_package_lf | string | yes |  |  |
+| merged_group | string | yes |  |  |
+| updated_at | string | yes |  |  |
+| updated_by | string | yes |  |  |
+
+### ProductionAchievementWorkcenterMergeMapRow
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| raw_workcenter_group | string | yes |  |  |
+| merged_workcenter_group | string | yes |  |  |
+| updated_at | string | yes |  |  |
+| updated_by | string | yes |  |  |
+
+### ProductionAchievementDailyPlanRow
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| workcenter_group | string | yes |  |  |
+| package_lf_group | string | yes |  |  |
+| daily_plan_qty | integer | yes |  |  |
+| updated_at | string | yes |  |  |
+| updated_by | string | yes |  |  |
+
+### ProductionAchievementKnownPackageLfValuesResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| data | ProductionAchievementKnownPackageLfValuesData | yes |  |  |
+| meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementSpecWorkcenterMapRow
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| SPECNAME | string | yes |  |  |
+| workcenter_group | string | yes |  |  |
+
+### ProductionAchievementTargetsMapEntry
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| shift_code | string | yes |  |  |
+| workcenter_group | string | yes |  |  |
+| target_qty | integer | yes |  |  |
+
+### ProductionAchievementPackageLfMapEntry
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| raw_package_lf | string | yes |  |  |
+| merged_group | string | yes |  |  |
+
+### ProductionAchievementWorkcenterMergeMapEntry
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| raw_workcenter_group | string | yes |  |  |
+| merged_workcenter_group | string | yes |  |  |
+
+### ProductionAchievementDailyPlanMapEntry
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| workcenter_group | string | yes |  |  |
+| package_lf_group | string | yes |  |  |
+| daily_plan_qty | integer | yes |  |  |
+
+### ProductionAchievementKnownWorkcenterGroupsResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| data | ProductionAchievementKnownWorkcenterGroupsData | yes |  |  |
+| meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementPackageLfMapResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| data | ProductionAchievementPackageLfMapRow[] | yes |  |  |
+| meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementWorkcenterMergeMapResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| data | ProductionAchievementWorkcenterMergeMapRow[] | yes |  |  |
+| meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementDailyPlanResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| data | ProductionAchievementDailyPlanRow[] | yes |  |  |
+| meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementKnownPackageLfValuesData
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| package_lf_values | string[] | yes |  |  |
+
+### ProductionAchievementKnownWorkcenterGroupsData
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| raw_workcenter_groups | string[] | yes |  |  |
+
+### ProductionAchievementResponseMeta
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| timestamp | string | no |  |  |
+| app_version | string | no |  |  |

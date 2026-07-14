@@ -19,8 +19,14 @@ import pytest
 
 CONTRACT_PATH = Path(__file__).parent.parent.parent / "contracts" / "api" / "api-contract.md"
 
-# Valid schema name: starts with an uppercase letter (PascalCase)
-VALID_SCHEMA_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]+$")
+# Valid schema name: starts with an uppercase letter (PascalCase).
+# Optional trailing "[]" denotes "array of this named schema" (e.g.
+# production-achievement-overhaul's `ProductionAchievementPackageLfMapRow[]`
+# for a GET endpoint whose `data` is directly an array of that row shape,
+# rather than a separate named "...Response" wrapper schema) -- this is
+# still an unambiguous reference to a real, defined schema section, not
+# free-text prose, so it must be accepted here same as the bare name.
+VALID_SCHEMA_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]+(\[\])?$")
 
 VALID_CONTENT_TYPE_CELLS = {
     "text/csv stream",

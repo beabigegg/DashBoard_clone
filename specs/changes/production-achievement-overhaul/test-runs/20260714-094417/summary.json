@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/contract/ -q && cdd-kit validate --contracts",
+  "duration_ms": 113880,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-094417/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-094417/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-094417/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

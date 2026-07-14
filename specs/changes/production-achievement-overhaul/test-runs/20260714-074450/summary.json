@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "npx vitest run src/production-achievement/__tests__/useProductionAchievementDuckDB.test.ts",
+  "duration_ms": 954,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-074450/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-074450/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-074450/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

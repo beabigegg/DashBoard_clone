@@ -31,6 +31,7 @@ def _reset_cache():
             'workcenter_to_short': None,
             'spec_order_mapping': None,
             'spec_workcenter_mapping': None,
+            'package_lf_values': None,
             'last_refresh': None,
             'is_loading': False,
         })
@@ -42,6 +43,7 @@ def _reset_cache():
             'workcenter_to_short': None,
             'spec_order_mapping': None,
             'spec_workcenter_mapping': None,
+            'package_lf_values': None,
             'last_refresh': None,
             'is_loading': False,
         })
@@ -229,3 +231,69 @@ class TestCacheStatus:
         assert status['last_refresh'] is not None
         assert status['workcenter_groups_count'] == 2
         assert status['workcenter_mapping_count'] == 2
+
+
+class TestPackageLfValuesCache:
+    """production-achievement-overhaul: `package_lf_values` is a 4th cache
+    key added to the existing 3-loader `_load_cache()` orchestration
+    (implementation-plan.md IP-3), backed by
+    sql/production_achievement_known_package_lf.sql."""
+
+    def test_package_lf_values_loaded_via_shared_load_cache_orchestration(self):
+        """Oracle branch: _load_cache() must call _load_package_lf_values()
+        alongside the existing 3 loaders, store the result under
+        _CACHE['package_lf_values'], expose it via
+        get_known_package_lf_values(), and include it in the Redis L2
+        write-back payload -- the same orchestration every other cache key
+        already goes through."""
+        oracle_package_lf_values = ["SOT23-5L", "SOT23-6L", "TO-277"]
+
+        with patch.object(fc, '_read_from_redis', return_value=None), \
+             patch.object(fc, '_load_workcenter_data', return_value=([], {}, {})), \
+             patch.object(fc, '_load_spec_order_mapping_from_spec', return_value={}), \
+             patch.object(fc, '_load_spec_workcenter_mapping', return_value={}), \
+             patch.object(fc, '_load_package_lf_values', return_value=oracle_package_lf_values) as mock_pkg, \
+             patch.object(fc, '_write_to_redis') as mock_write:
+            result = fc._load_cache()
+
+        assert result is True
+        mock_pkg.assert_called_once()
+
+        with fc._CACHE_LOCK:
+            assert fc._CACHE['package_lf_values'] == oracle_package_lf_values
+
+        assert fc.get_known_package_lf_values() == oracle_package_lf_values
+
+        written_data = mock_write.call_args[0][0]
+        assert written_data['package_lf_values'] == oracle_package_lf_values
+
+    def test_package_lf_values_restored_from_redis_l2_hit(self):
+        """Redis L2 hit: package_lf_values is restored from the generic
+        _REDIS_PAYLOAD_KEYS loop, same as every other cache key -- Oracle
+        loaders (including _load_package_lf_values) must NOT be called."""
+        redis_payload = {
+            'workcenter_groups': [],
+            'workcenter_mapping': {},
+            'workcenter_to_short': {},
+            'spec_order_mapping': {},
+            'spec_workcenter_mapping': {},
+            'package_lf_values': ["SOD-123FL", "SOD-123FL OP1"],
+        }
+
+        with patch.object(fc, '_read_from_redis', return_value=redis_payload), \
+             patch.object(fc, '_load_package_lf_values') as mock_pkg:
+            result = fc._load_cache()
+
+        assert result is True
+        mock_pkg.assert_not_called()
+        assert fc.get_known_package_lf_values() == ["SOD-123FL", "SOD-123FL OP1"]
+
+    @patch("mes_dashboard.services.filter_cache.read_sql_df")
+    def test_load_package_lf_values_degrades_empty_on_oracle_failure(self, mock_read):
+        """_load_package_lf_values() itself must never raise -- mirrors the
+        existing internal try/except convention of every other Oracle loader
+        in this module (_load_workcenter_mapping_from_spec etc.), so an
+        unmocked call during an unrelated test's Oracle branch can never
+        break that test."""
+        mock_read.side_effect = RuntimeError("Oracle down")
+        assert fc._load_package_lf_values() == []

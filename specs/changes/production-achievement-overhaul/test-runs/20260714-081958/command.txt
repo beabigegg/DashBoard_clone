@@ -1,0 +1,1 @@
+conda run -n mes-dashboard python -m pytest tests/contract/ --ignore=tests/contract/test_capture_samples.py -q

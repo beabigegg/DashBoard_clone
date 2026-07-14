@@ -1,0 +1,1 @@
+python -m pytest tests/ -k "production_achievement" --ignore=tests/stress --run-integration -q && (cd frontend && npx vitest run)

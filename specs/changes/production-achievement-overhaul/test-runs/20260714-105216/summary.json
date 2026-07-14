@@ -1,0 +1,16 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "full",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "python -m pytest tests/stress/test_production_achievement_stress.py tests/stress/test_chunk_boundary.py -m stress --run-stress -q --tb=short --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/production-achievement-overhaul/test-runs/20260714-105216/junit.xml' --maxfail=1 -ra",
+  "duration_ms": 116543,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-105216/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-105216/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-105216/stderr.log",
+    "junit": "specs/changes/production-achievement-overhaul/test-runs/20260714-105216/junit.xml"
+  },
+  "next_action": "all phases green"
+}

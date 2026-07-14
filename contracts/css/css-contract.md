@@ -3,8 +3,8 @@ contract: css
 summary: UI token policy, component styling rules, and visual review constraints.
 owner: application-team
 surface: ui
-schema-version: 1.15.0
-last-changed: 2026-07-13
+schema-version: 1.16.0
+last-changed: 2026-07-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -152,6 +152,12 @@ All new CSS rules (if any) added to `frontend/src/resource-status/style.css` mus
 所有 UI 變更必須提供視覺佐證（截圖或 Playwright visual diff）。CSS contract drift 由 `spec-drift-auditor` 在每次 release 前檢查。
 
 ## CHANGELOG
+
+## [css 1.16.0] — 2026-07-14
+### Added
+- production-achievement-overhaul: `frontend/src/production-achievement-settings/style.css` scoped under `.theme-production-achievement-settings` (Rule 4.2/4.3); zero unscoped top-level rules permitted, enforced by `npm run css:check` Rule 6 (verified: 0 errors). New standalone mini-app (D4, `STANDALONE_DRILLDOWN_ROUTES`, no drawer entry) — a satellite of the production-achievement report page, reached only via its 設定 button. No Rule 4.5 `:is()` batch-add needed (this app does not reuse `resource-shared/styles.css` component styles). No Rule 4.4 Teleport wrapper needed (no `<Teleport to="body">` usage — the 3 settings panels use native `<select>`/table markup, not `MultiSelect.vue`).
+### Changed
+- production-achievement-overhaul: `frontend/src/production-achievement/style.css` — chart rewrite (IP-8): `AchievementChart.vue` deleted (hard cutover, no flag), replaced by `PlanAchievementStackedChart.vue`. New CSS custom properties `--pa-shift-d`/`--pa-shift-n`/`--pa-plan-line`/`--pa-cumulative-rate` scoped under `.theme-production-achievement`, resolved via the chart's own `resolveCssVar()` — mirrors `resource-history/components/StackedChart.vue`'s established convention (Rule 2.4 chart-exception governance: ECharts option colors cannot use `theme()` directly, so they are indirected through a CSS custom property rather than a hardcoded `rgb()`/hex literal). New `.pa-app__mode-switch` rule for the 4-button mode switch. All new rules remain scoped under `.theme-production-achievement`; `npm run css:check` Rule 6 still passes (0 errors).
 
 ## [css 1.13.0] — 2026-07-08
 ### Changed

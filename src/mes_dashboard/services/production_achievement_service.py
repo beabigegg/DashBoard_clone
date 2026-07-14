@@ -26,6 +26,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from mes_dashboard.services.filter_cache import get_spec_workcenter_mapping
+from mes_dashboard.services.production_achievement_workcenter_merge_service import (
+    get_workcenter_merge_map,
+)
 
 logger = logging.getLogger("mes_dashboard.production_achievement_service")
 
@@ -208,10 +211,19 @@ def _validate_date_range(start_date: str, end_date: str) -> None:
 # parity gate (business-rules.md PA-06/PA-07) -- the frontend now performs
 # this rollup client-side in DuckDB-WASM from the SPECNAME-grain spool.
 
-_PA_SPOOL_SCHEMA_VERSION = 1
-"""Schema version for the SPECNAME-grain async spool (data-shape-contract.md
-§3.28). Participates in the canonical spool key so a schema-breaking bump
-orphans stale parquets by key (cache-spool-patterns.md)."""
+_PA_SPOOL_SCHEMA_VERSION = 2
+"""Schema version for the SPECNAME+PACKAGE_LF-grain async spool
+(data-shape-contract.md §3.28.1). Participates in the canonical spool key so
+a schema-breaking bump orphans stale parquets by key (cache-spool-patterns.md).
+Bumped 1->2 by production-achievement-overhaul (+PACKAGE_LF nullable column,
+business-rules.md PA-09)."""
+
+PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE = "production_achievement"
+"""Shared spool namespace constant -- single source of truth for the
+worker's ``ProductionAchievementJob.namespace``, the route's spool-hit/miss
+lookup, and the warm-cache module's ``get_spool_file_path()`` calls, so the
+three call sites can never drift apart (production-achievement-overhaul,
+IP-1/IP-5)."""
 
 
 def make_canonical_pa_spool_id(start_date: str, end_date: str) -> str:
@@ -242,11 +254,37 @@ _SHIFT_CODE_ENUM = ["N", "D", "A", "B", "C"]
 
 def get_filter_options() -> Dict[str, Any]:
     """Return available shift_code enum + workcenter_group values for the
-    FilterBar. Sourced from filter_cache + the shift-code enum, not a new
-    cache namespace (api-contract.md)."""
-    mapping = get_spec_workcenter_mapping()
-    groups = sorted({info.get("group") for info in mapping.values() if info.get("group")})
+    FilterBar (api-contract.md).
+
+    ``workcenter_groups`` redefined in place by production-achievement-overhaul
+    (Phase 1/3) to the MERGED (D2) list: the deduplicated set of
+    ``merged_workcenter_group`` values from
+    ``production_achievement_workcenter_merge_service.get_workcenter_merge_map()``
+    -- NOT the raw ``WORK_CENTER_GROUP`` set previously sourced directly from
+    ``filter_cache.get_spec_workcenter_mapping()``. A raw workcenter_group
+    absent from ``production_achievement_workcenter_merge_map`` is excluded
+    here too (D2 exclude-by-absence, business-rules.md PA-10) -- the merge
+    service's own map already reflects that default, this function just
+    de-duplicates its values.
+    """
+    merged_groups = sorted(set(get_workcenter_merge_map().values()))
     return {
         "shift_codes": _SHIFT_CODE_ENUM,
-        "workcenter_groups": groups,
+        "workcenter_groups": merged_groups,
     }
+
+
+def get_known_workcenter_groups() -> List[str]:
+    """Return the FULL raw WORK_CENTER_GROUP universe (including currently
+    D2-excluded groups), sourced directly from
+    filter_cache.get_spec_workcenter_mapping() -- NOT the merged/filtered
+    list from get_filter_options().
+
+    Backs ``GET /api/production-achievement/known-workcenter-groups``
+    (interaction-design.md OD-8), added so ``WorkcenterMergeMappingPanel``
+    can enumerate every raw group an admin might want to include/exclude/
+    merge, mirroring ``filter_cache.get_known_package_lf_values()``'s role
+    for D1.
+    """
+    mapping = get_spec_workcenter_mapping()
+    return sorted({info.get("group") for info in mapping.values() if info.get("group")})

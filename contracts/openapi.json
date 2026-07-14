@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.40.0"
+    "version": "1.41.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -6280,6 +6280,356 @@
         ],
         "x-cdd-errors": "400/410"
       }
+    },
+    "/api/production-achievement/package-lf-map": {
+      "get": {
+        "summary": "GET /api/production-achievement/package-lf-map",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementPackageLfMapResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementPackageLfMapResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      },
+      "put": {
+        "summary": "PUT /api/production-achievement/package-lf-map",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: body {raw_package_lf, merged_group}; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
+    },
+    "/api/production-achievement/package-lf-map/{raw}": {
+      "delete": {
+        "summary": "DELETE /api/production-achievement/package-lf-map/{raw}",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "raw",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/404/500/503"
+      }
+    },
+    "/api/production-achievement/workcenter-merge-map": {
+      "get": {
+        "summary": "GET /api/production-achievement/workcenter-merge-map",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementWorkcenterMergeMapResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementWorkcenterMergeMapResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      },
+      "put": {
+        "summary": "PUT /api/production-achievement/workcenter-merge-map",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: body {raw_workcenter_group, merged_workcenter_group}; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
+    },
+    "/api/production-achievement/workcenter-merge-map/{raw}": {
+      "delete": {
+        "summary": "DELETE /api/production-achievement/workcenter-merge-map/{raw}",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "404": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "raw",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: path segment {raw} URL-encoded; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/404/500/503"
+      }
+    },
+    "/api/production-achievement/daily-plans": {
+      "get": {
+        "summary": "GET /api/production-achievement/daily-plans",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementDailyPlanResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementDailyPlanResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      },
+      "put": {
+        "summary": "PUT /api/production-achievement/daily-plans",
+        "responses": {
+          "200": {
+            "description": "Contract response: AckResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: body {workcenter_group, package_lf_group, daily_plan_qty}; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
+    },
+    "/api/production-achievement/known-package-lf-values": {
+      "get": {
+        "summary": "GET /api/production-achievement/known-package-lf-values",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementKnownPackageLfValuesResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementKnownPackageLfValuesResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
+    },
+    "/api/production-achievement/known-workcenter-groups": {
+      "get": {
+        "summary": "GET /api/production-achievement/known-workcenter-groups",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementKnownWorkcenterGroupsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementKnownWorkcenterGroupsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
     }
   },
   "x-cdd-generated-from": "contracts/api/api-contract.md",
@@ -7839,8 +8189,7 @@
                 "type": "string"
               },
               "spool_download_url": {
-                "type": "string",
-                "pattern": "^/api/spool/production_achievement/.+\\.parquet$"
+                "type": "string"
               },
               "spec_workcenter_map": {
                 "type": "array",
@@ -7877,6 +8226,67 @@
                       "type": "string"
                     },
                     "target_qty": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "package_lf_map": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "raw_package_lf",
+                    "merged_group"
+                  ],
+                  "properties": {
+                    "raw_package_lf": {
+                      "type": "string"
+                    },
+                    "merged_group": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "workcenter_merge_map": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "raw_workcenter_group",
+                    "merged_workcenter_group"
+                  ],
+                  "properties": {
+                    "raw_workcenter_group": {
+                      "type": "string"
+                    },
+                    "merged_workcenter_group": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "daily_plan_map": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "workcenter_group",
+                    "package_lf_group",
+                    "daily_plan_qty"
+                  ],
+                  "properties": {
+                    "workcenter_group": {
+                      "type": "string"
+                    },
+                    "package_lf_group": {
+                      "type": "string"
+                    },
+                    "daily_plan_qty": {
                       "type": [
                         "integer",
                         "null"
@@ -8646,6 +9056,316 @@
           "rows",
           "meta"
         ]
+      },
+      "ProductionAchievementPackageLfMapRow": {
+        "type": "object",
+        "properties": {
+          "raw_package_lf": {
+            "type": "string"
+          },
+          "merged_group": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw_package_lf",
+          "merged_group",
+          "updated_at",
+          "updated_by"
+        ]
+      },
+      "ProductionAchievementWorkcenterMergeMapRow": {
+        "type": "object",
+        "properties": {
+          "raw_workcenter_group": {
+            "type": "string"
+          },
+          "merged_workcenter_group": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw_workcenter_group",
+          "merged_workcenter_group",
+          "updated_at",
+          "updated_by"
+        ]
+      },
+      "ProductionAchievementDailyPlanRow": {
+        "type": "object",
+        "properties": {
+          "workcenter_group": {
+            "type": "string"
+          },
+          "package_lf_group": {
+            "type": "string"
+          },
+          "daily_plan_qty": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workcenter_group",
+          "package_lf_group",
+          "daily_plan_qty",
+          "updated_at",
+          "updated_by"
+        ]
+      },
+      "ProductionAchievementKnownPackageLfValuesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProductionAchievementKnownPackageLfValuesData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementSpecWorkcenterMapRow": {
+        "type": "object",
+        "properties": {
+          "SPECNAME": {
+            "type": "string"
+          },
+          "workcenter_group": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "SPECNAME",
+          "workcenter_group"
+        ]
+      },
+      "ProductionAchievementTargetsMapEntry": {
+        "type": "object",
+        "properties": {
+          "shift_code": {
+            "type": "string"
+          },
+          "workcenter_group": {
+            "type": "string"
+          },
+          "target_qty": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shift_code",
+          "workcenter_group",
+          "target_qty"
+        ]
+      },
+      "ProductionAchievementPackageLfMapEntry": {
+        "type": "object",
+        "properties": {
+          "raw_package_lf": {
+            "type": "string"
+          },
+          "merged_group": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw_package_lf",
+          "merged_group"
+        ]
+      },
+      "ProductionAchievementWorkcenterMergeMapEntry": {
+        "type": "object",
+        "properties": {
+          "raw_workcenter_group": {
+            "type": "string"
+          },
+          "merged_workcenter_group": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw_workcenter_group",
+          "merged_workcenter_group"
+        ]
+      },
+      "ProductionAchievementDailyPlanMapEntry": {
+        "type": "object",
+        "properties": {
+          "workcenter_group": {
+            "type": "string"
+          },
+          "package_lf_group": {
+            "type": "string"
+          },
+          "daily_plan_qty": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workcenter_group",
+          "package_lf_group",
+          "daily_plan_qty"
+        ]
+      },
+      "ProductionAchievementKnownWorkcenterGroupsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProductionAchievementKnownWorkcenterGroupsData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementPackageLfMapResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionAchievementPackageLfMapRow"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementWorkcenterMergeMapResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionAchievementWorkcenterMergeMapRow"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementDailyPlanResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionAchievementDailyPlanRow"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementKnownPackageLfValuesData": {
+        "type": "object",
+        "properties": {
+          "package_lf_values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "package_lf_values"
+        ]
+      },
+      "ProductionAchievementKnownWorkcenterGroupsData": {
+        "type": "object",
+        "properties": {
+          "raw_workcenter_groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw_workcenter_groups"
+        ]
+      },
+      "ProductionAchievementResponseMeta": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string"
+          },
+          "app_version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

@@ -1,0 +1,18 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "changed-area",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "conda run -n mes-dashboard python -m pytest tests/ -k \"production_achievement\" --ignore=tests/stress --run-integration -q",
+  "duration_ms": 5908,
+  "first_failure": {
+    "kind": "fixture-error",
+    "nodeid": "tests/integration/test_production_achievement_resilience.py::TestRedisUnavailableAtEnqueue::test_route_returns_503_when_redis_drops_between_health_check_and_enqueue"
+  },
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-081706/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-081706/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-081706/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

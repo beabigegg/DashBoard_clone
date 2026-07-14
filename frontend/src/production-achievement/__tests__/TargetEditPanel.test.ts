@@ -51,6 +51,50 @@ describe('TargetEditPanel', () => {
     expect(wrapper.emitted('save')).toBeUndefined();
   });
 
+  // Adversarial target_qty matrix (monkey-test-engineer, production-achievement
+  // -overhaul). TargetEditPanel.vue is UNCHANGED by this change (verified by
+  // frontend-engineer's own agent-log: "read-only diff check, zero edits"),
+  // and the pre-overhaul monkey spec's dedicated 8-case adversarial target_qty
+  // E2E scenario was dropped during the Phase 8/9 Playwright rewrite with no
+  // equivalent replacement anywhere in the current suite (only "negative" and
+  // "non-numeric letters" are covered above) — this fills that gap at the
+  // vitest tier (deterministic, actually executes) rather than E2E, since
+  // validateTargetQtyInput() is a pure function and the risk is purely
+  // client-side rejection, not a network round trip.
+  describe('adversarial target_qty input matrix (overlong / Unicode / SQL-like / script-like)', () => {
+    const adversarialValues: { name: string; value: string }[] = [
+      { name: 'decimal (must be integer)', value: '12.5' },
+      { name: 'scientific notation', value: '1e10' },
+      { name: 'full-width Unicode digits', value: '１２３' },
+      { name: 'script-like injection string', value: '<script>window.__pa_target_xss=1</script>' },
+      { name: 'SQL-like injection string', value: "1' OR '1'='1" },
+      { name: 'overlong digit string overflowing Number to Infinity', value: '9'.repeat(400) },
+      { name: 'whitespace-only', value: '   ' },
+    ];
+
+    for (const adversarial of adversarialValues) {
+      it(`rejects target_qty="${adversarial.name}" client-side and does not emit save`, async () => {
+        const wrapper = await mountAndFlush({ targets: ROWS, editForbidden: false });
+        await wrapper.find('[data-testid="pa-target-edit-btn"]').trigger('click');
+        await wrapper.vm.$nextTick();
+        const input = wrapper.find('[data-testid="pa-target-edit-input"]');
+        await input.setValue(adversarial.value);
+        await input.trigger('keydown.enter');
+        expect(wrapper.emitted('save')).toBeUndefined();
+      });
+    }
+
+    it('never evaluates a script-like value as script (Vue text interpolation only, no eval/innerHTML)', async () => {
+      const wrapper = await mountAndFlush({ targets: ROWS, editForbidden: false });
+      await wrapper.find('[data-testid="pa-target-edit-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      const input = wrapper.find('[data-testid="pa-target-edit-input"]');
+      await input.setValue('<script>window.__pa_target_xss=1</script>');
+      await input.trigger('keydown.enter');
+      expect((window as unknown as { __pa_target_xss?: boolean }).__pa_target_xss).toBeUndefined();
+    });
+  });
+
   it('emits save with the parsed integer for a valid edit', async () => {
     const wrapper = await mountAndFlush({ targets: ROWS, editForbidden: false });
     await wrapper.find('[data-testid="pa-target-edit-btn"]').trigger('click');

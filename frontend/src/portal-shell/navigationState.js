@@ -5,6 +5,10 @@ const STANDALONE_DRILLDOWN_ROUTES = Object.freeze([
   '/wip-detail',
   '/hold-detail',
   '/anomaly-overview',
+  // production-achievement-overhaul (D4): satellite settings mini-app for
+  // the 生產達成率 report, reached only via its own 設定 button — no drawer
+  // entry (navigationManifest.js is intentionally NOT touched for this route).
+  '/production-achievement-settings',
 ]);
 
 function safeInt(value, fallback = 9999) {

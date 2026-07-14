@@ -1,0 +1,147 @@
+/* Production Achievement Settings mini-app styles
+ * Scoped under .theme-production-achievement-settings
+ * All feature-specific styles must live here (css-contract.md Rule 4.2/4.3).
+ *
+ * Visual parity note: the readonly-note/error/input/new-row classes below are
+ * DELIBERATELY styled identically to production-achievement/style.css's
+ * .pa-target-panel__* rules (TargetEditPanel.vue) so the fail-closed
+ * editForbidden / inline-edit affordance reads as "one language everywhere"
+ * (interaction-design.md § Consistency Commitments) even though the two
+ * apps are separate theme scopes and cannot share one CSS selector.
+ */
+
+.theme-production-achievement-settings {
+  @apply p-4 flex flex-col gap-4;
+}
+
+.theme-production-achievement-settings .pa-settings__header-card .ui-card-header {
+  @apply flex items-center justify-between;
+}
+
+.theme-production-achievement-settings .pa-settings__save-note {
+  @apply flex items-center justify-between gap-3 text-sm rounded px-3 py-2;
+  background: theme('colors.token.hecfdf5');
+  border: 1px solid theme('colors.token.h6ee7b7');
+  color: theme('colors.token.h065f46');
+}
+
+.theme-production-achievement-settings .pa-settings__save-note-dismiss {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 13px;
+}
+.theme-production-achievement-settings .pa-settings__save-note-dismiss:hover {
+  opacity: 1;
+}
+
+.theme-production-achievement-settings .pa-settings-panel {
+  @apply bg-white border rounded-lg p-4 flex flex-col gap-3;
+  border-color: theme('colors.stroke.soft');
+}
+
+.theme-production-achievement-settings .pa-settings-panel__header {
+  @apply flex items-center justify-between;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme('colors.text.primary');
+}
+
+.theme-production-achievement-settings .pa-settings-panel__readonly-note {
+  @apply text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded px-3 py-2;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__error {
+  @apply text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__new-row {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__select,
+.theme-production-achievement-settings .pa-settings-panel__input {
+  padding: theme('spacing.token.p6') theme('spacing.token.p10');
+  border: 1px solid theme('colors.token.hdbe4ef');
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__input {
+  width: 140px;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__input--sm {
+  width: 100px;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__edit-cell {
+  @apply flex flex-col gap-1;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__inline-error {
+  @apply text-xs text-red-600;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__empty-note {
+  @apply text-center text-gray-400 py-6 text-sm;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__muted {
+  color: theme('colors.text.subtle');
+}
+
+.theme-production-achievement-settings .pa-settings-panel__toggle {
+  @apply text-xs font-semibold rounded-full px-3 py-1 border;
+  cursor: pointer;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__toggle--on {
+  background: theme('colors.token.hecfdf5');
+  border-color: theme('colors.token.h6ee7b7');
+  color: theme('colors.token.h065f46');
+}
+
+.theme-production-achievement-settings .pa-settings-panel__toggle--off {
+  background: theme('colors.token.hf3f4f6');
+  border-color: theme('colors.token.hd1d5db');
+  color: theme('colors.token.h6b7280');
+}
+
+.theme-production-achievement-settings .pa-settings-panel__toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__hints {
+  @apply mt-2 pt-3 border-t;
+  border-color: theme('colors.stroke.soft');
+}
+
+.theme-production-achievement-settings .pa-settings-panel__hints-title {
+  @apply text-xs text-gray-500 mb-2;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__hint-list {
+  @apply flex flex-wrap gap-2;
+}
+
+.theme-production-achievement-settings .pa-settings-panel__hint-chip {
+  @apply text-xs rounded-full px-3 py-1 border;
+  background: theme('colors.surface.muted');
+  border-color: theme('colors.stroke.soft');
+  color: theme('colors.text.secondary');
+  cursor: pointer;
+}
+.theme-production-achievement-settings .pa-settings-panel__hint-chip:hover {
+  background: theme('colors.surface.hover');
+}
+.theme-production-achievement-settings .pa-settings-panel__hint-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

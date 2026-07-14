@@ -1,0 +1,32 @@
+change-id: production-achievement-overhaul
+agent: test-strategist
+timestamp: "2026-07-14T00:00:00Z"
+status: needs-review
+artifacts:
+  - { type: test-plan-path, pointer: "specs/changes/production-achievement-overhaul/test-plan.md" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_package_lf_service.py → src/mes_dashboard/services/production_achievement_package_lf_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_workcenter_merge_service.py → src/mes_dashboard/services/production_achievement_workcenter_merge_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_daily_plan_service.py → src/mes_dashboard/services/production_achievement_daily_plan_service.py" }
+  - { type: tdd-pairs, pointer: "tests/test_production_achievement_daily_cache.py → src/mes_dashboard/services/production_achievement_daily_cache.py" }
+  - { type: tdd-pairs, pointer: "frontend/src/production-achievement/__tests__/PlanAchievementStackedChart.test.ts → frontend/src/production-achievement/components/PlanAchievementStackedChart.vue" }
+  - { type: tdd-pairs, pointer: "frontend/tests/playwright/production-achievement-settings.spec.ts → frontend/src/production-achievement-settings/App.vue" }
+  - { type: coverage-tiers, pointer: "unit, contract, integration, e2e, data-boundary, resilience, monkey, stress" }
+  - { type: mapping-completeness, pointer: "AC-1 through AC-13 all mapped; AC-6 tests all 10 current endpoints (api-contract.md), not the classification doc's stale count of 9" }
+next-action: run-backend-engineer-and-frontend-engineer
+notes: >
+  test-plan.md is 141 lines, over the ~100-line soft cap -- justified by
+  13 broad ACs, 10 new endpoints, 3 new MySQL tables, 2 frontend apps, and
+  D1/D2/D3/D6 correctness traps each needing an explicit
+  not-the-other-behavior assertion. Every AC row carries a concrete bare
+  target (existing file/class node ID where the file exists, a named
+  not-yet-created file otherwise) so `cdd-kit test select` has a real
+  collect target per criterion. implementation-plan.md and ci-gates.md
+  were still template placeholders at the time this was written, so this
+  test-plan.md's mapping table -- not implementation-plan.md's Test
+  Execution Plan -- is the sole source cdd-kit test select can read from
+  right now. Added one new hypothesis-based property test
+  (tests/property/test_production_achievement_aggregate_invariant.py) for
+  the PA-13/D3 aggregate-then-divide invariant, generalizing the
+  single-fixture unit test across generated unequal-plan-magnitude cases.
+  Visual/pixel assertions and month-mode warm-cache tests are explicitly
+  out of scope (see test-plan.md's Out of Scope section).

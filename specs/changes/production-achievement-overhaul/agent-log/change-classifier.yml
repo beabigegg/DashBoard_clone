@@ -1,0 +1,21 @@
+change-id: production-achievement-overhaul
+agent: change-classifier
+timestamp: "2026-07-13T16:25:21Z"
+status: needs-review
+artifacts:
+  - { type: classification, pointer: "specs/changes/production-achievement-overhaul/change-classification.md#tier" }
+  - { type: manifest, pointer: "specs/changes/production-achievement-overhaul/context-manifest.md#allowed-paths" }
+  - { type: context-expansion, pointer: "specs/changes/production-achievement-overhaul/context-manifest.md#context-expansion-requests" }
+next-action: run-spec-architect-then-implementation-planner
+notes: >
+  Tier 0 (classified upward; high risk + cross-module impact radius).
+  Lane=feature; D6 N-shift-tail chunk-boundary fix bundled in-scope under
+  backend-engineer, not routed through the bug-fix lane. Atomic-split
+  proposal suppressed: user explicitly chose force-monolithic in writing
+  (change-request.md Original Request + the approved plan at
+  /home/egg/.claude/plans/calm-plotting-diffie.md). Architecture Review
+  Required=yes, so spec-architect must write design.md before
+  implementation-planner runs. CER-001 (specs/archive/2026/production-achievement-async-spool/)
+  pre-approved as an artifact-template reference for spec-architect and
+  implementation-planner. Env and CI/CD contracts marked not required (no
+  new env vars, no new RQ worker service/deploy file).

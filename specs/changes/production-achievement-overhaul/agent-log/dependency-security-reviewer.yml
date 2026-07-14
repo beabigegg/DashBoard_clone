@@ -1,0 +1,34 @@
+change-id: production-achievement-overhaul
+agent: dependency-security-reviewer
+status: approved
+summary: >-
+  Reviewed the 3 new MySQL DDL tables (package_lf_map, workcenter_merge_map,
+  daily_plans) in scripts/sql/production_achievement_tables.sql: sound types/
+  constraints/charset consistent with the existing 2 tables in the same file,
+  seed data programmatically diffed 1:1 against business-rules.md PA-09/PA-10
+  (9/9 and 12/12 rows exact, 15 excluded workcenter groups confirmed absent).
+  All 3 new services use parameterized SQLAlchemy text() throughout, zero
+  string-interpolated SQL. No new dependency in requirements.txt/pyproject.toml/
+  frontend/package.json/package-lock.json (diff-confirmed empty). Rollback is
+  append-only/orphan-safe: no FK, no sync_worker.py wiring, and every read/write
+  path fails open (empty list / 503) rather than crashing on a botched rollback.
+  Ran the directly-relevant test suites live: 89/89 passed.
+artifacts:
+  - { type: files-changed, pointer: "none (read-only review)" }
+  - { type: test-output, pointer: "89 passed across test_production_achievement_{package_lf,workcenter_merge,daily_plan}_service.py, test_production_achievement_mysql_roundtrip.py --run-integration, test_production_achievement_routes.py -k PackageLfMapRoutes-or-WorkcenterMergeMapRoutes-or-DailyPlansRoutes" }
+notes: |
+  Two advisory (non-blocking) findings: (1) the 3 new services don't
+  pre-validate string length against VARCHAR(60)/VARCHAR(100) column widths
+  before the MySQL round-trip, so an oversized string surfaces as a generic
+  503 rather than a precise validation error -- this exactly mirrors the
+  pre-existing production_achievement_targets service's own behavior, not a
+  new regression. (2) If the DDL script is applied AFTER the code deploy
+  (violating the stated precondition), workcenter_merge_map reads empty and
+  D2's INNER JOIN silently empties the whole report -- same failure shape
+  already accepted in design.md's Open Risks for MYSQL_OPS_ENABLED=false,
+  just a different trigger; worth a one-line callout in the deploy runbook.
+
+  Also flagged (and fixed by main Claude, not this agent): ci-gates.md's
+  Merge Eligibility section still read "blocked (pending implementation)"
+  despite implementation being complete -- stale housekeeping text, now
+  corrected to reflect actual state (pending qa-reviewer sign-off).

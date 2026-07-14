@@ -1,0 +1,1 @@
+python -m pytest tests/stress/test_production_achievement_stress.py tests/stress/test_chunk_boundary.py -m stress --run-stress -q --tb=short --junitxml='/home/egg/Projects/DashBoard_clone/specs/changes/production-achievement-overhaul/test-runs/20260714-105216/junit.xml' --maxfail=1 -ra

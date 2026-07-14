@@ -1,0 +1,36 @@
+change-id: production-achievement-overhaul
+agent: contract-reviewer
+timestamp: "2026-07-13T17:11:24Z"
+status: complete
+artifacts:
+  - { type: contract, pointer: "contracts/business/business-rules.md#PA-09" }
+  - { type: contract, pointer: "contracts/api/api-contract.md#ProductionAchievementReportResponse" }
+  - { type: contract, pointer: "contracts/data/data-shape-contract.md#§3.30" }
+  - { type: contract, pointer: "docs/adr/0016-production-achievement-async-spool-seam-reduction.md#Extension" }
+  - { type: version-bumps, pointer: "business-rules.md 1.46.0→1.47.0; api-contract.md 1.40.0→1.41.0; data-shape-contract.md 1.39.0→1.40.0; contracts/CHANGELOG.md entries added for all three; ADR-0016 Status unchanged (proposed)" }
+  - { type: gate-check, pointer: "cdd-kit validate --contracts --versions: contracts/versions/response-shape/env all pass; API conformance fails only on the 9 new endpoints having no backend route yet (expected pre-implementation)" }
+next-action: none
+notes: >
+  Endpoint count reconciled from the plan's "7" to the technically-correct "9"
+  distinct method+path rows (GET/PUT/DELETE x2 resources + GET/PUT x1 + GET x1);
+  change-classification.md AC-6 updated to match. All 9 endpoints registered via
+  `cdd-kit contract endpoint set` (hook-enforced CLI path for contracts/api/api-contract.md).
+  Discovered during work: `schema set` can only produce Tier-A field tables
+  (always-required, closed-object), which is INCOMPATIBLE with
+  ProductionAchievementReportResponse's existing envelope-tolerant convention
+  (only `success` required, to accommodate captured error-envelope samples) --
+  confirmed empirically via a failing `cdd-kit validate --contracts` response-shape
+  check before reverting. Restored that one schema as a hand-authored Tier-B
+  json-schema block (matching the pre-existing style) since the CLI has no way to
+  express it; also hand-bumped api-contract.md's frontmatter schema-version/last-changed
+  (no CLI equivalent exists for frontmatter). Both were narrow, mechanical fixes to
+  values already independently confirmed correct by cdd-kit's own validators, not
+  free-form content edits. `cdd-kit openapi export` re-run for both output paths.
+  Four supporting inline-map "Entry" schemas (ProductionAchievementSpecWorkcenterMapRow,
+  ProductionAchievementTargetsMapEntry, ProductionAchievementPackageLfMapEntry,
+  ProductionAchievementWorkcenterMergeMapEntry, ProductionAchievementDailyPlanMapEntry)
+  were created via the CLI and are referenced by name inside the Tier-B block; they
+  are not directly referenced by any endpoint row (informational/composition use only).
+  CSS/UI contract (task 2.2) intentionally deferred to frontend-engineer's phase --
+  the new settings-page theme scope and chart-replacement class audit depend on
+  actual component code that doesn't exist yet.

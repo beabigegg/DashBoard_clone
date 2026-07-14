@@ -37,6 +37,7 @@ const INPUT_MAP: Record<string, string> = {
   'eap-alarm':            resolve(__dirname, 'src/eap-alarm/index.html'),
   'db-scheduling':        resolve(__dirname, 'src/db-scheduling/index.html'),
   'production-achievement': resolve(__dirname, 'src/production-achievement/index.html'),
+  'production-achievement-settings': resolve(__dirname, 'src/production-achievement-settings/index.html'),
   'uph-performance':      resolve(__dirname, 'src/uph-performance/index.html'),
 };
 

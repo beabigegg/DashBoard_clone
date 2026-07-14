@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "服務暫時無法使用，請稍後再試"
+  },
+  "meta": {
+    "app_version": "unknown",
+    "timestamp": "2026-07-14T12:10:49.713965"
+  },
+  "success": false
+}

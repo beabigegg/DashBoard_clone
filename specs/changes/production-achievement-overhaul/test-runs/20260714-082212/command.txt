@@ -1,0 +1,1 @@
+MODERNIZATION_ENFORCE_ASSET_READINESS=false conda run -n mes-dashboard python -m pytest tests/contract/ -q

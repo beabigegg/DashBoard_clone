@@ -1,0 +1,1 @@
+npx vitest run src/production-achievement/__tests__/useProductionAchievementDuckDB.test.ts

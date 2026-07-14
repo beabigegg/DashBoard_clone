@@ -177,6 +177,10 @@ export default {
           hea580c: '#ea580c',
           heab308: '#eab308',
           hfefce8: '#fefce8',
+          h065f46: '#065f46',
+          h6ee7b7: '#6ee7b7',
+          h7c3aed: '#7c3aed',
+          hecfdf5: '#ecfdf5',
         }
       },
       fontFamily: {

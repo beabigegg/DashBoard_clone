@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "targeted",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/test_production_achievement_unified_job.py tests/test_production_achievement_service.py tests/test_production_achievement_package_lf_service.py tests/test_production_achievement_workcenter_merge_service.py tests/test_production_achievement_daily_plan_service.py tests/test_production_achievement_daily_cache.py tests/test_production_achievement_routes.py tests/test_spool_warmup_scheduler.py tests/test_filter_cache_generic.py && (cd frontend && npx vitest run src/production-achievement/ src/production-achievement-settings/ tests/production-achievement-settings-registration.test.js src/admin-dashboard/tabs/__tests__/PermissionsTab.test.ts)",
+  "duration_ms": 7560,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-102402/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-102402/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-102402/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

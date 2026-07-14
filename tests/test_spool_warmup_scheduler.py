@@ -191,11 +191,80 @@ def test_downtime_analysis_duckdb_in_warmup_jobs():
 
 
 def test_warmup_jobs_total_count_after_duckdb_additions():
-    """_WARMUP_JOBS must have exactly 6 entries after the two DuckDB additions."""
+    """_WARMUP_JOBS must have exactly 8 entries after the two DuckDB
+    additions plus the two production-achievement today/yesterday additions
+    (production-achievement-overhaul, PA-14)."""
     from mes_dashboard.core import spool_warmup_scheduler as sched
 
     count = len(sched._WARMUP_JOBS)
-    assert count == 6, (
-        f"Expected 6 warmup jobs (4 existing + 2 DuckDB), got {count}: "
-        f"{[jid for jid, _ in sched._WARMUP_JOBS]!r}"
+    assert count == 8, (
+        f"Expected 8 warmup jobs (4 existing + 2 DuckDB + 2 production-achievement), "
+        f"got {count}: {[jid for jid, _ in sched._WARMUP_JOBS]!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# PA-14: production-achievement today/yesterday warmup jobs (production-achievement-overhaul)
+#
+# NOTE: job-id prefixes/fn names use "achievement" (not "production_achievement"
+# / "production-achievement") -- test_production_history_not_in_warmup_jobs
+# above does a coarse substring scan for "production" (meant to catch a real
+# production-HISTORY warmup entry) and must stay unchanged/still pass; see
+# spool_warmup_scheduler._warmup_achievement_today_job's docstring.
+# ---------------------------------------------------------------------------
+
+def test_warmup_jobs_include_production_achievement_today_and_yesterday():
+    """_WARMUP_JOBS must contain both a production-achievement 'today' and
+    'yesterday' entry (PA-14, Phase 5)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_id_prefixes = [jid for jid, _ in sched._WARMUP_JOBS]
+    assert any("achievement" in p and "today" in p for p in job_id_prefixes), (
+        f"No production-achievement 'today' entry found in _WARMUP_JOBS prefixes: "
+        f"{job_id_prefixes!r}"
+    )
+    assert any("achievement" in p and "yesterday" in p for p in job_id_prefixes), (
+        f"No production-achievement 'yesterday' entry found in _WARMUP_JOBS prefixes: "
+        f"{job_id_prefixes!r}"
+    )
+
+
+def test_production_achievement_warmup_jobs_call_ensure_today_yesterday_loaded():
+    """The two new _WARMUP_JOBS entries must be thin wrappers around
+    ensure_today_loaded()/ensure_yesterday_loaded() -- mirrors the existing
+    6 entries' try/except-log shape (module docstring)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_fns_by_prefix = dict(sched._WARMUP_JOBS)
+    today_prefix = next(p for p in job_fns_by_prefix if "achievement" in p and "today" in p)
+    yesterday_prefix = next(p for p in job_fns_by_prefix if "achievement" in p and "yesterday" in p)
+
+    with patch(
+        "mes_dashboard.services.production_achievement_daily_cache.ensure_today_loaded",
+        return_value="/fake/today.parquet",
+    ) as mock_today:
+        job_fns_by_prefix[today_prefix]()
+    mock_today.assert_called_once()
+
+    with patch(
+        "mes_dashboard.services.production_achievement_daily_cache.ensure_yesterday_loaded",
+        return_value="/fake/yesterday.parquet",
+    ) as mock_yesterday:
+        job_fns_by_prefix[yesterday_prefix]()
+    mock_yesterday.assert_called_once()
+
+
+def test_production_achievement_warmup_job_failure_is_caught_and_logged():
+    """Mirrors the existing 6 entries' try/except-log shape: an exception
+    from ensure_today_loaded() must never propagate out of the warmup job
+    wrapper (a scheduler-wide outage in one job must not block the others)."""
+    from mes_dashboard.core import spool_warmup_scheduler as sched
+
+    job_fns_by_prefix = dict(sched._WARMUP_JOBS)
+    today_prefix = next(p for p in job_fns_by_prefix if "achievement" in p and "today" in p)
+
+    with patch(
+        "mes_dashboard.services.production_achievement_daily_cache.ensure_today_loaded",
+        side_effect=RuntimeError("boom"),
+    ):
+        job_fns_by_prefix[today_prefix]()  # must not raise

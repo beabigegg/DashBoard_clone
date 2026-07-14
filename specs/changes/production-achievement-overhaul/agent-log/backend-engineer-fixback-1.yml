@@ -1,0 +1,146 @@
+change-id: production-achievement-overhaul
+agent: backend-engineer
+timestamp: "2026-07-14T12:05:00Z"
+status: complete
+artifacts:
+  - { type: fixback-context, pointer: "n/a (fix-back cycle for qa-reviewer's 2 verified test-coverage gaps; original Phase 1-5 work recorded separately in agent-log/backend-engineer.yml, left untouched per instruction)" }
+  - { type: files-changed, pointer: "tests/test_frontend_production_achievement_parity.py (full rewrite, 586 lines)" }
+  - { type: files-changed, pointer: "tests/property/test_production_achievement_aggregate_invariant.py (new, 149 lines)" }
+  - { type: tests-added, pointer: "tests/property/test_production_achievement_aggregate_invariant.py::test_two_group_aggregate_equals_mean_iff_ratio_or_plan_shared" }
+  - { type: tests-added, pointer: "tests/property/test_production_achievement_aggregate_invariant.py::test_generalizes_hand_picked_950_1000_vs_5_10_fixture" }
+  - { type: tests-added, pointer: "tests/property/test_production_achievement_aggregate_invariant.py::test_aggregate_then_divide_is_weighted_average_bounded_by_extremes" }
+  - { type: tests-added, pointer: "tests/test_frontend_production_achievement_parity.py::TestProductionAchievementStage1RollupParity (4 tests, Stage 1 vs build_achievement_rows(), business-rules.md PA-06's still-live citation)" }
+  - { type: tests-added, pointer: "tests/test_frontend_production_achievement_parity.py::TestProductionAchievementRollupParity (8 tests incl. test_multiple_package_lf_per_specname_day_parity, D1+D2 in one shared fixture, business-rules.md PA-06's '2-stage pipeline parity test' citation)" }
+  - { type: tests-added, pointer: "tests/test_frontend_production_achievement_parity.py::TestProductionAchievementEmptySpoolParity (2 tests, widened 5-col §3.28.1 schema)" }
+  - { type: tests-removed, pointer: "tests/test_frontend_production_achievement_parity.py::TestProductionAchievementRateParity (deliberately dropped, not carried forward -- see notes)" }
+  - { type: test-output, pointer: "18 passed (15 rewritten dual-tier + 3 new property) on first run, 0 failures" }
+  - { type: test-output, pointer: "238 passed, 31 skipped (integration_real stubs) on `pytest tests/ -k production_achievement --ignore=tests/stress --run-integration -q` -- zero regressions vs pre-session baseline" }
+  - { type: contracts-touched, pointer: "none (both gaps are test-only; verified no production code needed a fix -- see notes)" }
+  - { type: index-queries, pointer: "cdd-kit index query \"useProductionAchievementDuckDB\" --with-source" }
+  - { type: index-queries, pointer: "cdd-kit index query \"build_achievement_rows\" --with-source" }
+next-action: none
+notes: >
+  Closed both qa-reviewer-verified gaps from the fix-back task packet. Did
+  not touch anything outside these 2 gaps (no src/ production code, no
+  contracts, no other test files) -- confirmed via `git status --short`
+  before finishing that only the 2 intended test files show as
+  changed/new.
+
+
+  GAP 1 (missing property test): created
+  tests/property/test_production_achievement_aggregate_invariant.py from
+  scratch (confirmed via `git log --all` it never existed, matching the
+  task's claim). Read tests/property/README.md + an existing file
+  (test_hold_history_duration_invariants.py) first for house style
+  (`@pytest.mark.property` + `@given`, local `@st.composite` strategies are
+  an established convention, not just tests/property/strategies.py entries).
+  Generalizes the single hand-picked 950/1000-vs-5/10 D3 fixture from
+  useProductionAchievementDuckDB.test.ts across generated cases using EXACT
+  Fraction arithmetic, not float tolerance. Derived and empirically verified
+  (via a throwaway python3 -c snippet before encoding it as an assertion) a
+  closed-form identity for 2 groups: aggregate-then-divide minus
+  mean-of-percentages = (r1-r2)(p1-p2) / (2(p1+p2)) -- so the two formulas
+  coincide EXACTLY iff ratios or plan magnitudes are shared, and differ in
+  EVERY other case; this is airtight, not probabilistic. Used this to write
+  an `iff` test with zero flake risk, plus a second test using a
+  `@st.composite` strategy that GUARANTEES (by construction/deterministic
+  perturbation, never by `assume()`-discarding) that generated examples
+  satisfy "both ratio and plan differ" -- avoiding any FilteredTooMuch
+  health-check risk. Deliberately did NOT encode the commonly-repeated
+  shorthand "differs whenever plan magnitudes differ" as the tested
+  invariant -- it is false in general (2 groups with different plans but the
+  SAME ratio still coincide); documented this precision explicitly in the
+  module docstring so a future reader understands why the precondition is
+  "ratio AND plan" not just "plan".
+
+
+  GAP 2 (stale dual-tier parity test): before rewriting, read the CURRENT
+  useProductionAchievementDuckDB.ts (2-stage _buildRollupRaw/_buildRollup +
+  computeDailyView/computeCumulativeView) and CURRENT
+  production_achievement_service.py's build_achievement_rows(), per the task's
+  explicit instruction to check whether the latter needed widening to
+  PACKAGE_LF. It does NOT: business-rules.md PA-06 explicitly states "This
+  rule's own grouping key, formula, and unmapped-SPECNAME exclusion
+  described above are themselves unchanged by [the PACKAGE_LF/D1/D2]
+  extension" -- build_achievement_rows() is contractually pinned to Stage-1
+  only, and an ALREADY-EXISTING test (test_production_achievement_service.py
+  ::test_grouping_by_output_date_shift_workcenter_group) already asserts
+  `"package_lf_group" not in row` for exactly this reason. Verified this is
+  the correct, non-stale interpretation (not itself a bug to fix) by reading
+  the contract text directly rather than trusting the test's own comment at
+  face value. Did NOT modify production_achievement_service.py.
+
+
+  Found instead that the D1 (production_achievement_package_lf_service
+  .resolve_package_lf_group) and D2
+  (production_achievement_workcenter_merge_service.resolve_workcenter_merge_group)
+  services already expose exactly the "parity-verification helper" functions
+  needed for a widened-grain golden reference (each docstring says so
+  explicitly) -- reused them directly (reuse-first) instead of
+  reimplementing D1/D2 resolution logic a third time. Rewrote the whole file
+  in place (same path, matching test-plan.md's literal
+  TestProductionAchievementRollupParity class-name reference for the new
+  test_multiple_package_lf_per_specname_day_parity test) with two parity
+  surfaces: TestProductionAchievementStage1RollupParity (Stage 1 vs
+  build_achievement_rows(), business-rules.md PA-06's still-live "dual-tier
+  parity test vs build_achievement_rows() reference" citation) and
+  TestProductionAchievementRollupParity (full widened business key
+  (output_date, shift_code, workcenter_group, package_lf_group), business-
+  rules.md PA-06's "2-stage pipeline parity test (PA-09/PA-10 joins)"
+  citation) -- both citations from the SAME contract row, now both
+  satisfied by one file instead of neither. D1's fallback-to-self
+  (unmapped/null/blank PACKAGE_LF) and D2's exclude-by-absence (unmapped
+  workcenter_group, dropped not defaulted) share one fixture per the task's
+  instruction, plus an explicit same-fixture opposite-join-kind assertion
+  (business-rules.md PA-09/PA-10's own "easiest copy-paste inversion"
+  warning). Preserved the established case-variant-SPECNAME-collapse and
+  unmapped-SPECNAME-exclusion conventions in both classes. All hand-computed
+  expected fixture totals (150/30/25/310/515, 40/15) were independently
+  verified via a throwaway python3 script calling the REAL resolver
+  functions before being hard-coded as test assertions.
+
+
+  Deliberately did NOT carry forward the old file's TestProductionAchievementRateParity
+  (achievement_rate via a LEFT JOIN pa_targets_map). Verified by direct grep
+  of the CURRENT useProductionAchievementDuckDB.ts that computeDailyView()/
+  computeCumulativeView() join only pa_daily_plan_map, never pa_targets_map
+  -- that table is still registered/updatable (feeds TargetEditPanel.vue's
+  still-present edit-target UI via useProductionAchievement.ts::saveTarget(),
+  confirmed via App.vue/useProductionAchievement.ts reads) but is no longer
+  joined into any rendered figure on this report. Recreating that join as
+  test-only SQL would have reproduced the exact "parity test exercising
+  deleted logic" defect this fix-back closes. Documented this decision and
+  its evidence trail in the rewritten file's module docstring so it reads as
+  a deliberate, traceable choice, not a silent coverage drop. This may mean
+  business-rules.md PA-07's own "browser: dual-tier parity test vs
+  build_achievement_rows() reference" citation is itself now stale relative
+  to the shipped frontend -- flagging for contract-reviewer/qa-reviewer
+  awareness, non-blocking for this fix-back's 2 gaps.
+
+
+  Evidence: extended (not narrowed) the existing test-evidence.yml's collect/
+  targeted/quality phase commands to include both files; re-ran changed-area
+  with its existing unmodified command (already covers both new files via
+  its broad `-k "production_achievement"` sweep, confirmed by output). Did
+  NOT touch the contract or full phases (neither gap affects contract
+  samples or stress tests) -- both remain as previously recorded, per
+  instruction to extend without narrowing. Did not run the full tests/contract/
+  suite; confirmed via `git status --short tests/contract/samples/` that the
+  count of new sample files is unchanged at 10 (matches the task's stated
+  pre-existing count).
+
+
+  agent-log placement: read
+  ~/.claude/skills/contract-driven-delivery/references/agent-log-protocol.md
+  and the gate's real listAgentLogs()/collectEvidence() implementation
+  (contract-driven-delivery/dist/cli/index.js) to decide between appending a
+  `---`-separated document vs a new file. The protocol's own stated
+  convention for a repeat run is "overwrite the file" (no multi-document
+  append convention exists anywhere in the tooling), and collectEvidence()
+  parses one YAML document per file via a single-document loader -- so a
+  `---`-appended second document would silently not be read as intended.
+  Used a new file (this one) instead, per the task's own explicit fallback
+  instruction; confirmed listAgentLogs() scans every *.yml file in
+  agent-log/ independently (filtering only by extension, not by an
+  exact-filename-match to the agent name), so this file is picked up
+  correctly alongside the untouched original agent-log/backend-engineer.yml.

@@ -1,0 +1,18 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "contract",
+  "status": "failed",
+  "exit_code": 1,
+  "command": "MODERNIZATION_ENFORCE_ASSET_READINESS=false conda run -n mes-dashboard python -m pytest tests/contract/ -q && cdd-kit validate --contracts",
+  "duration_ms": 114439,
+  "first_failure": {
+    "kind": "contract-drift",
+    "message": "\u001b[31m✗\u001b[0m  One or more validations failed."
+  },
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-082744/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-082744/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-082744/stderr.log"
+  },
+  "next_action": "fix the first failure before running broader phases; do not waive it"
+}

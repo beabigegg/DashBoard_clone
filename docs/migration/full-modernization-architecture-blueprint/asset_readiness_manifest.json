@@ -63,6 +63,9 @@
     "/production-achievement": [
       "production-achievement.js"
     ],
+    "/production-achievement-settings": [
+      "production-achievement-settings.js"
+    ],
     "/uph-performance": [
       "uph-performance.js"
     ]

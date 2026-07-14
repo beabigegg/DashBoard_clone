@@ -439,6 +439,30 @@ ENDPOINTS = [
     ("PUT",  "/admin/api/production-achievement/permissions/testuser",
      "put_admin_production_achievement_permissions", True,
      {"can_edit_targets": True}, None),
+    # ── Production Achievement Overhaul: 10 new endpoints ──────────────────
+    ("GET",    "/api/production-achievement/package-lf-map",
+     "get_production_achievement_package_lf_map", True, None, None),
+    ("PUT",    "/api/production-achievement/package-lf-map",
+     "put_production_achievement_package_lf_map_forbidden", True,
+     {"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"}, None),
+    ("DELETE", "/api/production-achievement/package-lf-map/test-raw-value",
+     "delete_production_achievement_package_lf_map_forbidden", True, None, None),
+    ("GET",    "/api/production-achievement/workcenter-merge-map",
+     "get_production_achievement_workcenter_merge_map", True, None, None),
+    ("PUT",    "/api/production-achievement/workcenter-merge-map",
+     "put_production_achievement_workcenter_merge_map_forbidden", True,
+     {"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"}, None),
+    ("DELETE", "/api/production-achievement/workcenter-merge-map/test-raw-value",
+     "delete_production_achievement_workcenter_merge_map_forbidden", True, None, None),
+    ("GET",    "/api/production-achievement/daily-plans",
+     "get_production_achievement_daily_plans", True, None, None),
+    ("PUT",    "/api/production-achievement/daily-plans",
+     "put_production_achievement_daily_plans_forbidden", True,
+     {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300}, None),
+    ("GET",    "/api/production-achievement/known-package-lf-values",
+     "get_production_achievement_known_package_lf_values", True, None, None),
+    ("GET",    "/api/production-achievement/known-workcenter-groups",
+     "get_production_achievement_known_workcenter_groups", True, None, None),
 ]
 
 
@@ -473,6 +497,7 @@ def _canonical_manifest_key(endpoint_tuple):
     path = _re.sub(r"/TEST-JOB-001(?=/|$)", "/{job_id}", path)
     path = _re.sub(r"/TEST(?=/|$)", "/{workcenter}", path)
     path = _re.sub(r"/testuser(?=/|$)", "/{user_identifier}", path)
+    path = _re.sub(r"/test-raw-value(?=/|$)", "/{raw}", path)
     return f"{method} {path}"
 
 def capture(client, authenticated_client, admin_client, endpoint_tuple):

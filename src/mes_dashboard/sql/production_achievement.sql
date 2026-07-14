@@ -1,11 +1,17 @@
--- Production Achievement Rate — Oracle read (production-achievement-kanban)
+-- Production Achievement Rate — Oracle read (production-achievement-kanban;
+-- grain widened + D6 fetch-completeness fix by production-achievement-overhaul)
 --
 -- Groups PA-05-qualifying DW_MES_LOTWIPHISTORY trackout events by
--- (output_date, shift_code, SPECNAME). SPECNAME is the finest station
--- granularity available at the DB; workcenter_group (大站點/PACKAGE) is
--- resolved in Python via services/filter_cache.get_spec_workcenter_mapping()
--- (business-rules.md PA-06) — no SPECNAME->station mapping is done here,
--- keeping this query source-agnostic to that cache's contents.
+-- (output_date, shift_code, SPECNAME, PACKAGE_LF) -- PACKAGE_LF added by
+-- production-achievement-overhaul (business-rules.md PA-09) as a first-class
+-- spool dimension; it is NOT rolled up to package_lf_group here (that D1
+-- merge-mapping join happens client-side, data-shape-contract.md §3.33).
+-- SPECNAME is the finest station granularity available at the DB;
+-- workcenter_group (大站點/PACKAGE) is resolved client-side via the
+-- spec_workcenter_map inline array (sourced from
+-- services/filter_cache.get_spec_workcenter_mapping(), business-rules.md
+-- PA-06) — no SPECNAME->station mapping is done here, keeping this query
+-- source-agnostic to that cache's contents.
 --
 -- shift_code (PA-01/PA-02) and output_date (PA-03/PA-04) are computed as SQL
 -- CASE expressions so GROUP BY / SUM run server-side (design.md: avoids
@@ -18,7 +24,15 @@
 --
 -- Parameters (bound via oracledb named params):
 --   :start_date     - YYYY-MM-DD (inclusive)
---   :chunk_end_excl - YYYY-MM-DD (exclusive = user end_date + 1 day)
+--   :chunk_end_excl - YYYY-MM-DD HH24:MI:SS (exclusive upper bound). Widened
+--                     from a date-only bind by production-achievement-overhaul
+--                     (D6/PA-15) so the worker's pre_query() can append one
+--                     narrow closing chunk `[end_date+1 00:00:00,
+--                     end_date+1 07:30:00)` covering the overnight N-shift
+--                     tail that a date-only (implicit-midnight) bind
+--                     previously excluded from every fetch entirely. The
+--                     :start_date bind's format mask stays date-only --
+--                     every chunk's lower bound is always exactly midnight.
 --
 -- Dynamic placeholder (replaced by service; empty string when no filter):
 --   {{ CONTAINERNAME_FILTER }} - optional caller-supplied CONTAINERNAME
@@ -58,7 +72,7 @@ WITH scoped_containers AS (
     SELECT DISTINCT weh.CONTAINERID
     FROM DWH.DW_MES_LOTWIPHISTORY weh
     WHERE weh.TRACKOUTTIMESTAMP >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
-      AND weh.TRACKOUTTIMESTAMP <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD')
+      AND weh.TRACKOUTTIMESTAMP <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD HH24:MI:SS')
       {{ CONTAINERNAME_FILTER }}
       AND weh.SPECNAME IN (
         'Epoxy D/B','Eutectic D/B','Solder Paste D/B','Solder D/B+E-Clip+固化',
@@ -130,11 +144,12 @@ SELECT
             END
     END AS OUTPUT_DATE,
     weh.SPECNAME AS SPECNAME,
+    weh.PACKAGE_LF AS PACKAGE_LF,
     SUM(weh.TRACKOUTQTY) AS ACTUAL_OUTPUT_QTY
 FROM DWH.DW_MES_LOTWIPHISTORY weh
 LEFT JOIN workflow_info wb ON weh.CONTAINERID = wb.CONTAINERID
 WHERE weh.TRACKOUTTIMESTAMP >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
-  AND weh.TRACKOUTTIMESTAMP <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD')
+  AND weh.TRACKOUTTIMESTAMP <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD HH24:MI:SS')
   {{ CONTAINERNAME_FILTER }}
   AND (
     (CASE WHEN (wb.WORKFLOWNAME LIKE '%雙晶%' OR wb.WORKFLOWNAME LIKE '%三晶%') THEN 1 ELSE 0 END = 0
@@ -183,4 +198,5 @@ GROUP BY
                 ELSE TRUNC(weh.TRACKOUTTIMESTAMP)
             END
     END,
-    weh.SPECNAME
+    weh.SPECNAME,
+    weh.PACKAGE_LF

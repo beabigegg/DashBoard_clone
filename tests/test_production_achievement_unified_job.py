@@ -40,12 +40,15 @@ def _make_job(job_id: str = "test-pa-001", params: dict | None = None):
 
 def _write_chunk_parquet(chunk_dir: Path, name: str, rows: list[dict]) -> None:
     """Write a fake per-chunk parquet using the RAW Oracle-cursor column
-    names (SHIFT_CODE, OUTPUT_DATE, SPECNAME, ACTUAL_OUTPUT_QTY) that
-    OracleArrowReader/production_achievement.sql would actually produce."""
+    names (SHIFT_CODE, OUTPUT_DATE, SPECNAME, PACKAGE_LF, ACTUAL_OUTPUT_QTY)
+    that OracleArrowReader/production_achievement.sql would actually produce
+    (PACKAGE_LF added as the 5th nullable column, production-achievement-overhaul,
+    PA-09)."""
     table = pa.table({
         "OUTPUT_DATE": pa.array([r["OUTPUT_DATE"] for r in rows], type=pa.date32()),
         "SHIFT_CODE": pa.array([r["SHIFT_CODE"] for r in rows], type=pa.string()),
         "SPECNAME": pa.array([r["SPECNAME"] for r in rows], type=pa.string()),
+        "PACKAGE_LF": pa.array([r.get("PACKAGE_LF") for r in rows], type=pa.string()),
         "ACTUAL_OUTPUT_QTY": pa.array([r["ACTUAL_OUTPUT_QTY"] for r in rows], type=pa.int64()),
     })
     pq.write_table(table, str(chunk_dir / name))
@@ -72,17 +75,22 @@ class TestProductionAchievementJob:
         assert ProductionAchievementJob.requires_cross_chunk_reduction is False
 
     def test_pre_query_builds_time_chunks_no_direct_read_sql_df(self):
-        """AC-1: pre_query builds one daily TIME chunk per day in range;
-        the worker module must never call read_sql_df directly (Oracle
-        access goes exclusively through BaseChunkedDuckDBJob's
-        OracleArrowReader fan-out)."""
+        """AC-1/AC-12: pre_query builds one daily TIME chunk per day in range
+        PLUS one D6 closing chunk (PA-15) covering the overnight N-shift tail
+        `[end_date+1 00:00:00, end_date+1 07:30:00)`; every chunk_end_excl is
+        now a full datetime (D6 widens the SQL's format mask). The worker
+        module must never call read_sql_df directly (Oracle access goes
+        exclusively through BaseChunkedDuckDBJob's OracleArrowReader fan-out)."""
         job = _make_job(params={"start_date": "2024-03-01", "end_date": "2024-03-03"})
         job.pre_query()
 
-        assert len(job._chunks) == 3
-        assert job._chunks[0] == {"start_date": "2024-03-01", "chunk_end_excl": "2024-03-02"}
-        assert job._chunks[1] == {"start_date": "2024-03-02", "chunk_end_excl": "2024-03-03"}
-        assert job._chunks[2] == {"start_date": "2024-03-03", "chunk_end_excl": "2024-03-04"}
+        # 3 daily chunks + 1 D6 closing chunk.
+        assert len(job._chunks) == 4
+        assert job._chunks[0] == {"start_date": "2024-03-01", "chunk_end_excl": "2024-03-02 00:00:00"}
+        assert job._chunks[1] == {"start_date": "2024-03-02", "chunk_end_excl": "2024-03-03 00:00:00"}
+        assert job._chunks[2] == {"start_date": "2024-03-03", "chunk_end_excl": "2024-03-04 00:00:00"}
+        # D6 closing chunk: [2024-03-04 00:00:00, 2024-03-04 07:30:00).
+        assert job._chunks[3] == {"start_date": "2024-03-04", "chunk_end_excl": "2024-03-04 07:30:00"}
         assert job._spool_key
         assert job._spool_path.endswith(f"{job._spool_key}.parquet")
 
@@ -150,16 +158,16 @@ class TestChunkSeamReaggregation:
 
         # Chunk 1 (day D-1, e.g. 2024-03-04): server-side GROUP BY already
         # summed same-chunk rows for the N-shift evening portion of
-        # (output_date=2024-03-04, shift_code=N, SPECNAME=Epoxy D/B).
+        # (output_date=2024-03-04, shift_code=N, SPECNAME=Epoxy D/B, PACKAGE_LF=PKG-1).
         _write_chunk_parquet(chunk_dir, "chunk-0000-0000.parquet", [
-            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "ACTUAL_OUTPUT_QTY": 100},
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 100},
         ])
         # Chunk 2 (day D, 2024-03-05): the N-shift's pre-07:30 tail on the
         # NEXT calendar day still attributes to output_date=2024-03-04
         # (PA-03), but its TRACKOUTTIMESTAMP falls inside chunk-2's
         # [2024-03-05, 2024-03-06) window -- the seam this test tripwires.
         _write_chunk_parquet(chunk_dir, "chunk-0001-0000.parquet", [
-            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "ACTUAL_OUTPUT_QTY": 50},
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 50},
         ])
 
         job.post_aggregate(None)
@@ -191,12 +199,12 @@ class TestChunkSeamReaggregation:
 
         chunk_dir = job._make_chunk_parquet_dir(job.job_id)
         _write_chunk_parquet(chunk_dir, "chunk-0000-0000.parquet", [
-            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "ACTUAL_OUTPUT_QTY": 100},
-            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "D", "SPECNAME": "Epoxy D/B", "ACTUAL_OUTPUT_QTY": 20},
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 100},
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "D", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 20},
         ])
         _write_chunk_parquet(chunk_dir, "chunk-0001-0000.parquet", [
-            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "ACTUAL_OUTPUT_QTY": 50},
-            {"OUTPUT_DATE": date(2024, 3, 5), "SHIFT_CODE": "D", "SPECNAME": "金線製程", "ACTUAL_OUTPUT_QTY": 7},
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 50},
+            {"OUTPUT_DATE": date(2024, 3, 5), "SHIFT_CODE": "D", "SPECNAME": "金線製程", "PACKAGE_LF": "PKG-2", "ACTUAL_OUTPUT_QTY": 7},
         ])
 
         job.post_aggregate(None)
@@ -217,6 +225,152 @@ class TestChunkSeamReaggregation:
         assert rows[(date(2024, 3, 4), "N", "Epoxy D/B")] == 150
         assert rows[(date(2024, 3, 4), "D", "Epoxy D/B")] == 20
         assert rows[(date(2024, 3, 5), "D", "金線製程")] == 7
+
+    def test_closing_chunk_included_zero_leakage_next_day(self, tmp_path, monkeypatch):
+        """D6/PA-15: post_aggregate must fold the D6 closing-chunk's rows
+        (which Oracle's existing PA-03 CASE expression already attributes to
+        output_date=end_date, shift_code='N', since their TRACKOUTTIMESTAMP
+        is < 07:30:00) into the SAME group as end_date's own N-shift chunk --
+        and must never leak them into output_date=end_date+1's own N-shift
+        group (the seam this fix must not invert)."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path / "duckdb_jobs"))
+
+        job = _make_job(
+            job_id="closing-chunk-001",
+            params={"start_date": "2024-03-01", "end_date": "2024-03-04"},
+        )
+        job._spool_key = "closing-chunk-key"
+        job._spool_path = str(tmp_path / "spool" / "closing-chunk-key.parquet")
+
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+
+        # Last regular day's own chunk: the evening N-shift portion for
+        # output_date=2024-03-04 (before midnight).
+        _write_chunk_parquet(chunk_dir, "chunk-0003-0000.parquet", [
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 80},
+        ])
+        # D6 closing chunk: [2024-03-05 00:00:00, 2024-03-05 07:30:00) --
+        # Oracle's PA-03 CASE expression (unchanged) already attributes these
+        # rows to output_date=2024-03-04 (previous day) since their
+        # TRACKOUTTIMESTAMP time-of-day is < 07:30:00. This chunk's data was
+        # NEVER fetched before D6 (date-only chunk_end_excl stopped at
+        # 2024-03-05 00:00:00 sharp).
+        _write_chunk_parquet(chunk_dir, "chunk-0004-0000.parquet", [
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 45},
+        ])
+
+        job.post_aggregate(None)
+
+        con = duckdb.connect()
+        try:
+            rows = {
+                (r[0], r[1], r[2], r[3]): r[4]
+                for r in con.execute(
+                    f"SELECT output_date, shift_code, SPECNAME, PACKAGE_LF, actual_output_qty "
+                    f"FROM read_parquet('{job._spool_path}')"
+                ).fetchall()
+            }
+        finally:
+            con.close()
+
+        # Exactly one merged row for the seam key -- the closing chunk's rows
+        # fold into end_date's own N-shift group (SUM, not a new row).
+        assert rows[(date(2024, 3, 4), "N", "Epoxy D/B", "PKG-1")] == 125
+        # Zero leakage: no row was ever attributed to end_date+1's own
+        # N-shift group as a side effect of fetching the closing chunk.
+        assert (date(2024, 3, 5), "N", "Epoxy D/B", "PKG-1") not in rows
+
+    def test_pre_fix_undercount_fixture_now_corrected(self, tmp_path, monkeypatch):
+        """D6/PA-15 regression: reproduces the pre-fix under-count (only the
+        calendar-day chunk was ever fetched, missing the overnight N-shift
+        tail) and asserts the CORRECTED TOTAL once the D6 closing chunk's
+        data is included -- the regression must assert the corrected total,
+        not merely new-row presence (implementation-plan.md Known Risks)."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path / "duckdb_jobs"))
+
+        # --- Pre-fix simulation: only the calendar-day chunk was ever
+        # fetched (reproduces the historical undercount baseline). ---
+        pre_fix_job = _make_job(
+            job_id="pre-fix-001",
+            params={"start_date": "2024-03-04", "end_date": "2024-03-04"},
+        )
+        pre_fix_job._spool_key = "pre-fix-key"
+        pre_fix_job._spool_path = str(tmp_path / "spool" / "pre-fix-key.parquet")
+        pre_fix_chunk_dir = pre_fix_job._make_chunk_parquet_dir(pre_fix_job.job_id)
+        _write_chunk_parquet(pre_fix_chunk_dir, "chunk-0000-0000.parquet", [
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 80},
+        ])
+        pre_fix_job.post_aggregate(None)
+
+        con = duckdb.connect()
+        try:
+            pre_fix_total = con.execute(
+                f"SELECT actual_output_qty FROM read_parquet('{pre_fix_job._spool_path}') "
+                f"WHERE output_date = DATE '2024-03-04' AND shift_code = 'N' AND SPECNAME = 'Epoxy D/B'"
+            ).fetchone()[0]
+        finally:
+            con.close()
+        assert pre_fix_total == 80, "pre-fix fixture must reproduce the undercount baseline"
+
+        # --- Post-fix: the D6 closing chunk's previously-unfetched data is
+        # now included alongside the calendar-day chunk. ---
+        post_fix_job = _make_job(
+            job_id="post-fix-001",
+            params={"start_date": "2024-03-04", "end_date": "2024-03-04"},
+        )
+        post_fix_job._spool_key = "post-fix-key"
+        post_fix_job._spool_path = str(tmp_path / "spool" / "post-fix-key.parquet")
+        post_fix_chunk_dir = post_fix_job._make_chunk_parquet_dir(post_fix_job.job_id)
+        _write_chunk_parquet(post_fix_chunk_dir, "chunk-0000-0000.parquet", [
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 80},
+        ])
+        _write_chunk_parquet(post_fix_chunk_dir, "chunk-0001-0000.parquet", [
+            # D6 closing chunk's rows -- previously never fetched at all.
+            {"OUTPUT_DATE": date(2024, 3, 4), "SHIFT_CODE": "N", "SPECNAME": "Epoxy D/B", "PACKAGE_LF": "PKG-1", "ACTUAL_OUTPUT_QTY": 45},
+        ])
+        post_fix_job.post_aggregate(None)
+
+        con = duckdb.connect()
+        try:
+            post_fix_total = con.execute(
+                f"SELECT actual_output_qty FROM read_parquet('{post_fix_job._spool_path}') "
+                f"WHERE output_date = DATE '2024-03-04' AND shift_code = 'N' AND SPECNAME = 'Epoxy D/B'"
+            ).fetchone()[0]
+        finally:
+            con.close()
+        assert post_fix_total == 125, (
+            f"Expected corrected total 80+45=125 once the D6 closing chunk is "
+            f"included, got {post_fix_total}"
+        )
+
+    def test_build_chunk_sql_binds_full_datetime_chunk_end_excl(self):
+        """D6/PA-15: the SQL's :chunk_end_excl bind must be widened to accept
+        a full YYYY-MM-DD HH24:MI:SS datetime (needed for the closing
+        chunk's 07:30:00 boundary); build_chunk_sql must forward a
+        full-datetime chunk_end_excl value unchanged (no truncation to
+        date-only). The :start_date bind's format mask stays date-only --
+        D6 widens chunk_end_excl only."""
+        job = _make_job(params={"start_date": "2024-03-01", "end_date": "2024-03-03"})
+        job.pre_query()
+
+        # The closing chunk is always last; its chunk_end_excl is a full datetime.
+        closing_chunk = job._chunks[-1]
+        assert closing_chunk["chunk_end_excl"].endswith("07:30:00")
+
+        sql, params = job.build_chunk_sql(closing_chunk)
+        assert params["chunk_end_excl"] == closing_chunk["chunk_end_excl"]
+        assert params["start_date"] == closing_chunk["start_date"]
+
+        import re
+
+        assert re.search(r"TO_TIMESTAMP\(:chunk_end_excl,\s*'YYYY-MM-DD HH24:MI:SS'\)", sql), (
+            "sql/production_achievement.sql must widen the :chunk_end_excl "
+            "TO_TIMESTAMP format mask to accept a full datetime (D6)"
+        )
+        assert re.search(r"TO_TIMESTAMP\(:start_date,\s*'YYYY-MM-DD'\)", sql), (
+            ":start_date's format mask must stay date-only -- D6 widens "
+            ":chunk_end_excl only"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -253,14 +407,17 @@ class TestSpoolSchema:
         finally:
             con.close()
 
-        assert set(cols) == {"output_date", "shift_code", "SPECNAME", "actual_output_qty"}
+        assert set(cols) == {"output_date", "shift_code", "SPECNAME", "PACKAGE_LF", "actual_output_qty"}
         assert row_count == 0
 
     def test_schema_version_constant_pinned(self):
-        """AC-6: _PA_SPOOL_SCHEMA_VERSION participates in the canonical spool
-        key (cache-spool-patterns.md) and must be a stable positive integer."""
+        """AC-1/AC-6: _PA_SPOOL_SCHEMA_VERSION participates in the canonical
+        spool key (cache-spool-patterns.md) and must be pinned at 2 -- the
+        production-achievement-overhaul breaking parquet-schema bump (+PACKAGE_LF
+        column, data-shape-contract.md §3.28.1) orphans stale v1 parquets by
+        key mismatch."""
         from mes_dashboard.services.production_achievement_service import (
             _PA_SPOOL_SCHEMA_VERSION,
         )
         assert isinstance(_PA_SPOOL_SCHEMA_VERSION, int)
-        assert _PA_SPOOL_SCHEMA_VERSION >= 1
+        assert _PA_SPOOL_SCHEMA_VERSION == 2

@@ -31,6 +31,7 @@ AC / risk coverage:
   R-4 (fail-open when Redis down)      -> TestFailOpenNoRedis
   R-5 (spool key collision safety)     -> TestSpoolKeyCollision
   R-6 (live-server async queue saturation, deferred) -> TestProductionAchievementQueueSaturationLive
+  R-7 (warmup-scheduler 8-job registry fairness, PA-14) -> TestWarmupSchedulerEightJobsNoMonopolization
 """
 
 from __future__ import annotations
@@ -61,12 +62,16 @@ pytestmark = pytest.mark.stress
 
 def _write_chunk_parquet(chunk_dir: Path, name: str, rows: list[dict]) -> None:
     """Write a fake per-chunk parquet using the raw Oracle-cursor column names
-    (SHIFT_CODE, OUTPUT_DATE, SPECNAME, ACTUAL_OUTPUT_QTY) that
-    OracleArrowReader/production_achievement.sql would actually produce."""
+    (SHIFT_CODE, OUTPUT_DATE, SPECNAME, PACKAGE_LF, ACTUAL_OUTPUT_QTY) that
+    OracleArrowReader/production_achievement.sql would actually produce
+    (PACKAGE_LF added as the 5th nullable column, production-achievement-overhaul,
+    PA-09 -- mirrors tests/test_production_achievement_unified_job.py's own
+    _write_chunk_parquet, which was updated for the same schema bump)."""
     table = pa.table({
         "OUTPUT_DATE": pa.array([r["OUTPUT_DATE"] for r in rows], type=pa.date32()),
         "SHIFT_CODE": pa.array([r["SHIFT_CODE"] for r in rows], type=pa.string()),
         "SPECNAME": pa.array([r["SPECNAME"] for r in rows], type=pa.string()),
+        "PACKAGE_LF": pa.array([r.get("PACKAGE_LF") for r in rows], type=pa.string()),
         "ACTUAL_OUTPUT_QTY": pa.array([r["ACTUAL_OUTPUT_QTY"] for r in rows], type=pa.int64()),
     })
     pq.write_table(table, str(chunk_dir / name))
@@ -477,7 +482,7 @@ class TestFailOpenNoRedis:
             ]
         finally:
             con.close()
-        assert set(cols) == {"output_date", "shift_code", "SPECNAME", "actual_output_qty"}
+        assert set(cols) == {"output_date", "shift_code", "SPECNAME", "PACKAGE_LF", "actual_output_qty"}
 
 
 # ---------------------------------------------------------------------------
@@ -612,7 +617,7 @@ class TestSpoolKeyCollision:
         finally:
             con.close()
 
-        assert set(cols) == {"output_date", "shift_code", "SPECNAME", "actual_output_qty"}, (
+        assert set(cols) == {"output_date", "shift_code", "SPECNAME", "PACKAGE_LF", "actual_output_qty"}, (
             f"Final spool file has corrupted/unexpected schema after concurrent writers: {cols}"
         )
         assert row_count >= 0
@@ -678,6 +683,412 @@ class TestSpoolKeyCollision:
             assert rows == [(f"SPEC-{idx}", 100 + idx)], (
                 f"Spool file for job {idx} contains unexpected/cross-contaminated rows: {rows}"
             )
+
+
+# ---------------------------------------------------------------------------
+# R-7: Warmup-scheduler 8-job registry fairness (production-achievement-
+# overhaul, PA-14) -- the 2 NEW hourly _warmup_achievement_{today,yesterday}_job
+# entries running ALONGSIDE the 6 pre-existing _WARMUP_JOBS entries
+# (reject_dataset/yield_alert_dataset/hold_dataset/resource_dataset/
+# resource_history_duckdb/downtime_duckdb), confirming no cross-job
+# monopolization: a slow (or faulting) job must never starve the others'
+# scheduled slots, and no job type is structurally privileged at enqueue
+# time. Distinct from TestCrossWorkerFairness above (which probes the
+# shared heavy_query_slot semaphore with ONE generic sibling stub): this
+# class exercises the REAL spool_warmup_scheduler._WARMUP_JOBS registry --
+# all 8 real worker_fn callables -- at the exact granularity the single
+# `rq worker warmup` process (scripts/start_server.sh start_rq_warmup_worker,
+# no --burst/no worker-count flag: exactly one process, strictly FIFO) uses
+# to dispatch work.
+# ---------------------------------------------------------------------------
+
+
+def _record(events: List[Tuple[float, str, str]], lock: threading.Lock, name: str, fn):
+    """Wrap fn so every call is timestamped enter/exit into a shared,
+    thread-safe events log -- same recording idiom as
+    _recording_cm_factory above, but around a plain function call instead
+    of a context manager."""
+
+    def _wrapped(*args, **kwargs):
+        with lock:
+            events.append((time.monotonic(), "enter", name))
+        result = fn(*args, **kwargs)
+        with lock:
+            events.append((time.monotonic(), "exit", name))
+        return result
+
+    return _wrapped
+
+
+@pytest.mark.stress
+class TestWarmupSchedulerEightJobsNoMonopolization:
+    """_WARMUP_JOBS now has 8 entries (6 pre-existing + 2 new production-
+    achievement today/yesterday, PA-14). This class proves the 2 new
+    entries neither starve nor are starved by the 6 pre-existing ones, at
+    both the enqueue layer (_enqueue_warmup_jobs) and the execution layer
+    (the worker_fn callables actually running)."""
+
+    def test_enqueue_config_identical_across_all_eight_job_types(self, monkeypatch):
+        """_enqueue_warmup_jobs() must submit IDENTICAL job_timeout/
+        result_ttl/failure_ttl for all 8 _WARMUP_JOBS entries -- no job
+        type (old or new) gets a structurally longer leash that could let
+        it monopolize the single-worker `rq worker warmup` process (exactly
+        one such process is started; jobs execute strictly FIFO -- a
+        mismatched timeout would let one job type block the queue for
+        materially longer than any other before RQ's own timeout
+        preempts it)."""
+        import mes_dashboard.core.spool_warmup_scheduler as sched
+
+        assert len(sched._WARMUP_JOBS) == 8, (
+            f"Expected 8 _WARMUP_JOBS entries (6 pre-existing + 2 production-achievement); "
+            f"got {len(sched._WARMUP_JOBS)}: {[jid for jid, _ in sched._WARMUP_JOBS]!r}"
+        )
+
+        enqueue_calls: List[dict] = []
+
+        class _FakeQueue:
+            def __init__(self, name, connection=None):
+                self.name = name
+
+            def enqueue(self, fn, **kwargs):
+                enqueue_calls.append({"fn": fn.__name__, **kwargs})
+
+        monkeypatch.setattr(sched, "get_redis_client", lambda: object())
+        import rq
+        monkeypatch.setattr(rq, "Queue", _FakeQueue)
+
+        count = sched._enqueue_warmup_jobs()
+
+        assert count == 8, f"Expected 8 successful enqueues, got {count}: {enqueue_calls}"
+        assert len(enqueue_calls) == 8
+
+        timeouts = {c["job_timeout"] for c in enqueue_calls}
+        result_ttls = {c["result_ttl"] for c in enqueue_calls}
+        failure_ttls = {c["failure_ttl"] for c in enqueue_calls}
+        assert len(timeouts) == 1, f"job_timeout differs across job types: {enqueue_calls}"
+        assert len(result_ttls) == 1, f"result_ttl differs across job types: {enqueue_calls}"
+        assert len(failure_ttls) == 1, f"failure_ttl differs across job types: {enqueue_calls}"
+
+        fn_names = {c["fn"] for c in enqueue_calls}
+        assert "_warmup_achievement_today_job" in fn_names
+        assert "_warmup_achievement_yesterday_job" in fn_names
+
+    def test_enqueue_loop_reaches_all_eight_jobs_despite_one_enqueue_fault(self, monkeypatch):
+        """A single job's queue.enqueue() call raising (simulated Redis
+        blip) must not prevent the REMAINING 7 of 8 from being attempted --
+        the 2 new achievement jobs are enqueued AFTER the faulting sibling
+        in _WARMUP_JOBS list order and must still be reached."""
+        import mes_dashboard.core.spool_warmup_scheduler as sched
+
+        attempted: List[str] = []
+
+        class _FaultingQueue:
+            def __init__(self, name, connection=None):
+                pass
+
+            def enqueue(self, fn, **kwargs):
+                attempted.append(fn.__name__)
+                if fn.__name__ == "_warmup_hold_dataset_job":
+                    raise RuntimeError("simulated Redis blip enqueuing hold_dataset")
+
+        monkeypatch.setattr(sched, "get_redis_client", lambda: object())
+        import rq
+        monkeypatch.setattr(rq, "Queue", _FaultingQueue)
+
+        count = sched._enqueue_warmup_jobs()
+
+        assert len(attempted) == 8, f"Expected all 8 jobs attempted, got {len(attempted)}: {attempted}"
+        assert count == 7, f"Expected 7 successful enqueues (1 faulted), got {count}"
+        assert "_warmup_achievement_today_job" in attempted
+        assert "_warmup_achievement_yesterday_job" in attempted
+
+    def test_eight_worker_fns_concurrent_slow_sibling_does_not_delay_achievement_jobs(
+        self, monkeypatch, tmp_path
+    ):
+        """All 8 REAL _WARMUP_JOBS worker_fn callables invoked CONCURRENTLY
+        via threads. One of the 6 pre-existing sibling jobs is deliberately
+        SLOW (simulates a large-dataset warmup cycle); the 2 NEW
+        production-achievement jobs run their REAL ensure_today_loaded()/
+        ensure_yesterday_loaded() -> ProductionAchievementJob.run() path
+        (Oracle fan-out mocked, same idiom as TestSemaphoreWiringStress
+        above). Threads (rather than a real single-worker RQ FIFO queue)
+        are the right fairness probe here because the worker_fn wrapper
+        functions are plain, independent callables with no shared lock
+        between them -- if this test found one blocking another, that
+        WOULD be a genuine monopolization bug (an accidental shared
+        resource), since production's single-worker FIFO ordering is a
+        capacity/ordering property, not a correctness one, and is
+        unaffected either way.
+
+        Asserts: all 8 underlying calls complete; the two achievement
+        jobs' own enter->exit duration is not inflated by the
+        concurrently-running slow sibling (no accidental blocking on a
+        shared resource/lock)."""
+        import mes_dashboard.core.base_chunked_duckdb_job as base_mod
+        import mes_dashboard.core.global_concurrency as gc_mod
+        import mes_dashboard.core.spool_warmup_scheduler as sched
+        from mes_dashboard.services import (
+            downtime_analysis_duckdb_cache,
+            hold_dataset_cache,
+            production_achievement_daily_cache,
+            reject_dataset_cache,
+            resource_dataset_cache,
+            resource_history_duckdb_cache,
+            yield_alert_dataset_cache,
+        )
+
+        _patch_spool_dirs(monkeypatch, tmp_path)
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(base_mod.BaseChunkedDuckDBJob, "_fan_out_append", lambda self, chunks: None)
+        # Deterministic fail-open (no dependency on ambient Redis
+        # availability in whatever environment this runs -- mirrors
+        # TestFailOpenNoRedis above).
+        monkeypatch.setattr(gc_mod, "get_redis_client", lambda: None)
+
+        _SLOW_SECONDS = 0.35
+        _FAST_SECONDS = 0.01
+
+        events: List[Tuple[float, str, str]] = []
+        lock = threading.Lock()
+
+        def _fast_dataset_result():
+            time.sleep(_FAST_SECONDS)
+            return {"query_id": "fake", "cache_hit": True}
+
+        def _slow_dataset_result():
+            time.sleep(_SLOW_SECONDS)
+            return {"query_id": "fake", "cache_hit": True}
+
+        def _fast_prewarm():
+            time.sleep(_FAST_SECONDS)
+
+        monkeypatch.setattr(
+            reject_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "reject_dataset", _fast_dataset_result),
+        )
+        monkeypatch.setattr(
+            yield_alert_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "yield_alert_dataset", _fast_dataset_result),
+        )
+        # Deliberately slow sibling.
+        monkeypatch.setattr(
+            hold_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "hold_dataset", _slow_dataset_result),
+        )
+        monkeypatch.setattr(
+            resource_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "resource_dataset", _fast_dataset_result),
+        )
+        monkeypatch.setattr(
+            resource_history_duckdb_cache, "run_prewarm_job",
+            _record(events, lock, "resource_history_duckdb", _fast_prewarm),
+        )
+        monkeypatch.setattr(
+            downtime_analysis_duckdb_cache, "run_prewarm_job",
+            _record(events, lock, "downtime_duckdb", _fast_prewarm),
+        )
+        # The two NEW jobs run their REAL path -- wrap (not replace) the
+        # real function so its genuine ensure_*_loaded -> job.run() pipeline
+        # executes (Oracle fan-out mocked via the class-level patch above).
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_today_loaded",
+            _record(
+                events, lock, "achievement_today",
+                production_achievement_daily_cache.ensure_today_loaded,
+            ),
+        )
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_yesterday_loaded",
+            _record(
+                events, lock, "achievement_yesterday",
+                production_achievement_daily_cache.ensure_yesterday_loaded,
+            ),
+        )
+
+        job_fns = dict(sched._WARMUP_JOBS)
+        assert len(job_fns) == 8
+
+        errors: List[str] = []
+        errors_lock = threading.Lock()
+
+        def _run(prefix, fn):
+            try:
+                fn()
+            except Exception as exc:  # pragma: no cover -- each _warmup_*_job already try/excepts internally
+                with errors_lock:
+                    errors.append(f"{prefix}: {exc}")
+
+        threads = [threading.Thread(target=_run, args=(prefix, fn)) for prefix, fn in job_fns.items()]
+        t_start = time.monotonic()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30.0)
+        elapsed = time.monotonic() - t_start
+
+        assert not errors, f"Unexpected error escaping a warmup worker_fn wrapper: {errors}"
+
+        expected_names = {
+            "reject_dataset", "yield_alert_dataset", "hold_dataset", "resource_dataset",
+            "resource_history_duckdb", "downtime_duckdb", "achievement_today", "achievement_yesterday",
+        }
+        observed_names = {e[2] for e in events}
+        assert observed_names == expected_names, (
+            f"Not all 8 underlying calls were invoked exactly once: {sorted(observed_names)}"
+        )
+
+        # Bounded total wall-clock: the 8 worker_fns ran CONCURRENTLY
+        # (bounded by the slowest, ~0.35s, plus generous scheduling margin)
+        # -- not serialized end-to-end, which would push this well past 1s.
+        assert elapsed < _SLOW_SECONDS + 5.0, (
+            f"8 warmup worker_fns took {elapsed:.2f}s wall-clock -- expected roughly "
+            f"bounded by the slowest (~{_SLOW_SECONDS}s); suggests serialization/"
+            "monopolization instead of independent concurrent execution"
+        )
+
+        durations = {}
+        for name in expected_names:
+            enters = sorted(e[0] for e in events if e[1] == "enter" and e[2] == name)
+            exits = sorted(e[0] for e in events if e[1] == "exit" and e[2] == name)
+            assert enters and exits, f"{name}: missing enter/exit event pair"
+            durations[name] = exits[0] - enters[0]
+
+        # No-starvation: the two achievement jobs must not be measurably
+        # blocked behind the concurrently-running slow hold_dataset job.
+        assert durations["achievement_today"] < _SLOW_SECONDS, (
+            f"achievement_today took {durations['achievement_today']:.2f}s -- "
+            f"appears blocked behind the slow hold_dataset job ({_SLOW_SECONDS}s)"
+        )
+        assert durations["achievement_yesterday"] < _SLOW_SECONDS, (
+            f"achievement_yesterday took {durations['achievement_yesterday']:.2f}s -- "
+            f"appears blocked behind the slow hold_dataset job ({_SLOW_SECONDS}s)"
+        )
+        print(
+            f"\n[warmup-8-fairness] elapsed={elapsed:.2f}s "
+            f"durations={ {k: round(v, 3) for k, v in durations.items()} }"
+        )
+
+    def test_eight_worker_fns_one_faults_others_still_complete_under_concurrency(
+        self, monkeypatch, tmp_path
+    ):
+        """One sibling's underlying call raises inside its worker_fn
+        wrapper (each _warmup_*_job already try/excepts internally,
+        mirrored across all 8 including the 2 new achievement ones). When
+        all 8 run concurrently, the fault must never propagate out of its
+        own thread, and the OTHER 7 (including both achievement jobs) must
+        still complete normally -- no cross-job monopolization from a
+        faulting sibling either."""
+        import mes_dashboard.core.base_chunked_duckdb_job as base_mod
+        import mes_dashboard.core.global_concurrency as gc_mod
+        import mes_dashboard.core.spool_warmup_scheduler as sched
+        from mes_dashboard.services import (
+            downtime_analysis_duckdb_cache,
+            hold_dataset_cache,
+            production_achievement_daily_cache,
+            reject_dataset_cache,
+            resource_dataset_cache,
+            resource_history_duckdb_cache,
+            yield_alert_dataset_cache,
+        )
+
+        _patch_spool_dirs(monkeypatch, tmp_path)
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(base_mod.BaseChunkedDuckDBJob, "_fan_out_append", lambda self, chunks: None)
+        monkeypatch.setattr(gc_mod, "get_redis_client", lambda: None)
+
+        events: List[Tuple[float, str, str]] = []
+        lock = threading.Lock()
+
+        def _fast_dataset_result():
+            time.sleep(0.01)
+            return {"query_id": "fake", "cache_hit": True}
+
+        def _faulting_dataset_result():
+            time.sleep(0.01)
+            raise RuntimeError("simulated Oracle fault for hold_dataset warmup")
+
+        def _fast_prewarm():
+            time.sleep(0.01)
+
+        monkeypatch.setattr(
+            reject_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "reject_dataset", _fast_dataset_result),
+        )
+        monkeypatch.setattr(
+            yield_alert_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "yield_alert_dataset", _fast_dataset_result),
+        )
+        # Deliberately faulting sibling.
+        monkeypatch.setattr(
+            hold_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "hold_dataset", _faulting_dataset_result),
+        )
+        monkeypatch.setattr(
+            resource_dataset_cache, "ensure_dataset_loaded",
+            _record(events, lock, "resource_dataset", _fast_dataset_result),
+        )
+        monkeypatch.setattr(
+            resource_history_duckdb_cache, "run_prewarm_job",
+            _record(events, lock, "resource_history_duckdb", _fast_prewarm),
+        )
+        monkeypatch.setattr(
+            downtime_analysis_duckdb_cache, "run_prewarm_job",
+            _record(events, lock, "downtime_duckdb", _fast_prewarm),
+        )
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_today_loaded",
+            _record(
+                events, lock, "achievement_today",
+                production_achievement_daily_cache.ensure_today_loaded,
+            ),
+        )
+        monkeypatch.setattr(
+            production_achievement_daily_cache, "ensure_yesterday_loaded",
+            _record(
+                events, lock, "achievement_yesterday",
+                production_achievement_daily_cache.ensure_yesterday_loaded,
+            ),
+        )
+
+        job_fns = dict(sched._WARMUP_JOBS)
+        errors: List[str] = []
+        errors_lock = threading.Lock()
+
+        def _run(prefix, fn):
+            try:
+                fn()
+            except Exception as exc:  # pragma: no cover -- must never happen (see assertion below)
+                with errors_lock:
+                    errors.append(f"{prefix}: {exc}")
+
+        threads = [threading.Thread(target=_run, args=(prefix, fn)) for prefix, fn in job_fns.items()]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30.0)
+
+        assert not errors, (
+            f"Fault propagated out of a warmup worker_fn wrapper (must be swallowed "
+            f"internally, matching every _warmup_*_job's own try/except): {errors}"
+        )
+
+        expected_all = {
+            "reject_dataset", "yield_alert_dataset", "hold_dataset", "resource_dataset",
+            "resource_history_duckdb", "downtime_duckdb", "achievement_today", "achievement_yesterday",
+        }
+        enters = {e[2] for e in events if e[1] == "enter"}
+        exits = {e[2] for e in events if e[1] == "exit"}
+
+        assert enters == expected_all, f"Not all 8 underlying calls were attempted: {sorted(enters)}"
+        # hold_dataset's underlying call faulted before reaching the
+        # wrapper's own "exit" record line -- every OTHER job (crucially
+        # BOTH new achievement jobs) recorded a normal exit.
+        assert "hold_dataset" not in exits, "hold_dataset should have faulted before its exit record"
+        assert exits == expected_all - {"hold_dataset"}, (
+            f"Some non-faulting job failed to complete when a sibling faulted "
+            f"concurrently: missing={expected_all - {'hold_dataset'} - exits}"
+        )
+        print(f"\n[warmup-8-fault-isolation] enters={sorted(enters)} exits={sorted(exits)}")
 
 
 # ---------------------------------------------------------------------------

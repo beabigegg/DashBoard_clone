@@ -483,3 +483,243 @@ class TestMaterialTrace1000IdBoundary:
         assert len(batches) == 1, f"Expected 1 batch for empty input, got {len(batches)}"
         assert batches[0] == [], f"Expected empty batch, got {batches[0]}"
         record_chunk_boundary("Material-trace empty ID list", "OK", "1 empty batch")
+
+
+# ─────────────────────────────────────────────────────────────
+# production-achievement-overhaul: D6 closing-chunk fetch-completeness fix
+# (PA-15) at STRESS SCALE — dozens-to-hundreds of daily TIME chunks per a
+# many-day date range, not the 2-3 day hand-picked fixtures in
+# tests/test_production_achievement_unified_job.py::TestChunkSeamReaggregation.
+# D6 was a real, previously-shipped data-correctness bug (systematic N-shift
+# under-count at the range-closing seam); this is the only place that fix is
+# exercised at range sizes that actually occur in production (當月/自訂區間
+# CumulativeView can span a full month or more), not merely a toy 1-4 day
+# fixture.
+#
+# No Oracle/Redis/live server required — pure DuckDB/filesystem I/O against
+# the REAL ProductionAchievementJob.pre_query()/post_aggregate() (mirrors
+# tests/stress/test_production_achievement_stress.py's Oracle-fetch-mocked
+# idiom). Marked @pytest.mark.stress (per this file's own precedent comment
+# at TestMaterialTrace1000IdBoundary above) so it runs only via the Tier-5
+# `stress-tests.yml` dispatch, not the Tier-1 unmarked-class filter.
+# ─────────────────────────────────────────────────────────────
+
+
+def _pa_write_chunk_parquet(chunk_dir, name: str, rows: list) -> None:
+    """Write a fake per-chunk parquet using the RAW Oracle-cursor column
+    names, mirroring tests/test_production_achievement_unified_job.py's
+    _write_chunk_parquet (PACKAGE_LF as the 5th nullable column,
+    production-achievement-overhaul PA-09)."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    table = pa.table({
+        "OUTPUT_DATE": pa.array([r["OUTPUT_DATE"] for r in rows], type=pa.date32()),
+        "SHIFT_CODE": pa.array([r["SHIFT_CODE"] for r in rows], type=pa.string()),
+        "SPECNAME": pa.array([r["SPECNAME"] for r in rows], type=pa.string()),
+        "PACKAGE_LF": pa.array([r.get("PACKAGE_LF") for r in rows], type=pa.string()),
+        "ACTUAL_OUTPUT_QTY": pa.array([r["ACTUAL_OUTPUT_QTY"] for r in rows], type=pa.int64()),
+    })
+    pq.write_table(table, str(chunk_dir / name))
+
+
+def _make_pa_job_for_d6_stress(job_id: str, start_date: str, end_date: str):
+    from mes_dashboard.workers.production_achievement_worker import ProductionAchievementJob
+    return ProductionAchievementJob(
+        job_id=job_id, params={"start_date": start_date, "end_date": end_date}
+    )
+
+
+@pytest.mark.stress
+class TestProductionAchievementD6ClosingChunkStress:
+    """D6/PA-15 closing-chunk fetch-completeness fix at stress-scale chunk
+    counts. The D6 closing chunk [end_date+1 00:00:00, end_date+1 07:30:00)
+    must be included EXACTLY ONCE per query regardless of range size, with
+    zero leakage or duplication across ANY of the many chunk seams spanned
+    by a long date range — not just the final (closing-chunk) seam.
+
+    Referenced by test-plan.md § Stress: "a many-day date-range query at
+    stress-scale chunk counts ... asserting the D6 closing chunk ... is
+    included EXACTLY ONCE per query regardless of range size, with zero
+    leakage or duplication across any chunk seam" — the highest-value
+    stress test in this change: D6 was a real, previously-shipped
+    data-correctness bug (systematic N-shift under-count), and this is the
+    only place the fix is tested at scale rather than on 2-3 day fixtures.
+    """
+
+    @pytest.mark.parametrize("n_days", [30, 90, 180])
+    def test_pre_query_appends_exactly_one_closing_chunk_regardless_of_range_size(self, n_days):
+        """pre_query() must build exactly n_days regular whole-day chunks
+        PLUS exactly ONE D6 closing chunk — last position, never
+        duplicated, never omitted — at every stress-scale range length."""
+        start = date(2024, 1, 1)
+        end = start + timedelta(days=n_days - 1)
+        job = _make_pa_job_for_d6_stress(
+            f"d6-scale-{n_days}", start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+        )
+        job.pre_query()
+
+        assert len(job._chunks) == n_days + 1, (
+            f"n_days={n_days}: expected {n_days} regular + 1 closing chunk, "
+            f"got {len(job._chunks)}"
+        )
+
+        regular_chunks = job._chunks[:-1]
+        closing_chunk = job._chunks[-1]
+
+        regular_starts = [c["start_date"] for c in regular_chunks]
+        assert len(set(regular_starts)) == n_days, (
+            "duplicate or missing regular chunk start_date at stress scale"
+        )
+        assert all(c["chunk_end_excl"].endswith(" 00:00:00") for c in regular_chunks), (
+            "every regular chunk's chunk_end_excl must be exactly midnight"
+        )
+
+        closing_candidates = [c for c in job._chunks if c["chunk_end_excl"].endswith("07:30:00")]
+        assert len(closing_candidates) == 1, (
+            f"Expected exactly ONE D6 closing chunk at n_days={n_days}, found "
+            f"{len(closing_candidates)}: {closing_candidates}"
+        )
+
+        # NOTE: expected_closing_start is a plain `date` -- `date + timedelta`
+        # truncates to whole days only (date.__add__ uses just the .days
+        # component), so the 07:30:00 time-of-day is appended as a string
+        # rather than via timedelta arithmetic on the date itself (the real
+        # worker computes this from a `datetime`, where the same arithmetic
+        # is safe -- see production_achievement_worker.py pre_query()).
+        expected_closing_start = end + timedelta(days=1)
+        assert closing_chunk == {
+            "start_date": expected_closing_start.strftime("%Y-%m-%d"),
+            "chunk_end_excl": expected_closing_start.strftime("%Y-%m-%d") + " 07:30:00",
+        }
+
+        # No duplicate chunk entries anywhere in the full n_days+1 list.
+        seen = [tuple(sorted(c.items())) for c in job._chunks]
+        assert len(seen) == len(set(seen)), (
+            f"duplicate chunk entries detected in pre_query() output at n_days={n_days}"
+        )
+
+        record_chunk_boundary(
+            f"PA D6 pre_query chunk-count n_days={n_days}",
+            "OK",
+            f"{len(job._chunks)} chunks ({n_days} regular + 1 closing), no duplicates",
+        )
+
+    @pytest.mark.parametrize("n_days", [30, 90, 180])
+    def test_closing_chunk_merged_exactly_once_zero_leakage_at_scale(
+        self, n_days, tmp_path, monkeypatch
+    ):
+        """Simulates the REAL seam-straddling pattern (PA-03: an N-shift's
+        pre-07:30 morning tail attributes back to the PREVIOUS calendar
+        day) at EVERY one of the n_days regular day-to-day seams, PLUS the
+        D6 closing-chunk seam for the LAST day — the seam D6 fixes and
+        that, pre-D6, was silently dropped entirely (never fetched).
+        Confirms every seam merges into exactly one row (its own SUM),
+        with zero leakage into the following day's own group and zero
+        duplication, across the WHOLE range — not merely the last
+        (closing-chunk) seam or a 2-3 day toy fixture."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path / "duckdb_jobs"))
+
+        start = date(2024, 1, 1)
+        end = start + timedelta(days=n_days - 1)
+        job = _make_pa_job_for_d6_stress(
+            f"d6-merge-{n_days}", start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+        )
+        job._spool_key = f"d6-merge-key-{n_days}"
+        job._spool_path = str(tmp_path / "spool" / f"{job._spool_key}.parquet")
+        chunk_dir = job._make_chunk_parquet_dir(job.job_id)
+
+        SPEC, PKG = "SPEC-STRESS", "PKG-STRESS"
+        EVENING_QTY, TAIL_QTY, D_QTY = 10, 3, 7
+
+        # Chunk index i (0-based) is day (start + i)'s own Oracle fetch
+        # window. It always carries day_i's D-shift + own evening N-shift;
+        # for i > 0 it ALSO carries the PREVIOUS day's morning N-shift tail
+        # (PA-03 attributes that tail back to day_{i-1}, but its
+        # TRACKOUTTIMESTAMP falls inside chunk i's window) — this is the
+        # real seam every TIME-chunked day boundary produces, replicated at
+        # every one of the n_days-1 regular boundaries.
+        for i in range(n_days):
+            day_i = start + timedelta(days=i)
+            rows = [
+                {"OUTPUT_DATE": day_i, "SHIFT_CODE": "D", "SPECNAME": SPEC, "PACKAGE_LF": PKG, "ACTUAL_OUTPUT_QTY": D_QTY},
+                {"OUTPUT_DATE": day_i, "SHIFT_CODE": "N", "SPECNAME": SPEC, "PACKAGE_LF": PKG, "ACTUAL_OUTPUT_QTY": EVENING_QTY},
+            ]
+            if i > 0:
+                prev_day = start + timedelta(days=i - 1)
+                rows.append({
+                    "OUTPUT_DATE": prev_day, "SHIFT_CODE": "N", "SPECNAME": SPEC,
+                    "PACKAGE_LF": PKG, "ACTUAL_OUTPUT_QTY": TAIL_QTY,
+                })
+            _pa_write_chunk_parquet(chunk_dir, f"chunk-{i:04d}-0000.parquet", rows)
+
+        # D6 closing chunk: the LAST day's own morning tail. Pre-D6, this
+        # window [end+1 00:00, end+1 07:30) was NEVER fetched at all (no
+        # regular chunk covers it — the range-closing under-count D6 fixes).
+        _pa_write_chunk_parquet(chunk_dir, f"chunk-{n_days:04d}-0000.parquet", [
+            {"OUTPUT_DATE": end, "SHIFT_CODE": "N", "SPECNAME": SPEC, "PACKAGE_LF": PKG, "ACTUAL_OUTPUT_QTY": TAIL_QTY},
+        ])
+
+        t_start = time.time()
+        job.post_aggregate(None)
+        elapsed = time.time() - t_start
+
+        import duckdb
+        con = duckdb.connect()
+        try:
+            rows_out = {
+                (r[0], r[1]): r[2]
+                for r in con.execute(
+                    f"SELECT output_date, shift_code, actual_output_qty "
+                    f"FROM read_parquet('{job._spool_path}') "
+                    f"WHERE SPECNAME = '{SPEC}' AND PACKAGE_LF = '{PKG}'"
+                ).fetchall()
+            }
+        finally:
+            con.close()
+
+        # Exactly 2 rows/day (D + N) across n_days days — no more, no
+        # fewer, despite n_days-1 regular seams + 1 closing-chunk seam all
+        # straddling in this fixture. A plain-concat bug (instead of
+        # GROUP BY SUM) would inflate this well past 2*n_days.
+        assert len(rows_out) == 2 * n_days, (
+            f"n_days={n_days}: expected {2 * n_days} distinct (date, shift) rows, "
+            f"got {len(rows_out)} -- seam duplication or collapse at stress scale"
+        )
+
+        for i in range(n_days):
+            day_i = start + timedelta(days=i)
+            assert rows_out[(day_i, "D")] == D_QTY, (
+                f"day index {i}: D-shift row corrupted by an unrelated seam merge"
+            )
+            assert rows_out[(day_i, "N")] == EVENING_QTY + TAIL_QTY, (
+                f"day index {i}: seam not merged into exactly one SUMmed row "
+                f"(expected {EVENING_QTY + TAIL_QTY}, got {rows_out[(day_i, 'N')]})"
+            )
+
+        # The LAST day's N-shift total specifically exercises the D6
+        # closing-chunk seam (its tail has NO regular next-day chunk to
+        # come from — only the closing chunk supplies it).
+        assert rows_out[(end, "N")] == EVENING_QTY + TAIL_QTY, (
+            "D6 closing-chunk contribution is not merged into the last day's "
+            "own N-shift group exactly once"
+        )
+
+        # Zero leakage: no row was ever attributed to end_date+1 as a side
+        # effect of fetching the D6 closing chunk.
+        leaked_date = end + timedelta(days=1)
+        assert (leaked_date, "N") not in rows_out, (
+            f"D6 closing-chunk fetch leaked into {leaked_date}'s own N-shift group"
+        )
+
+        assert elapsed < 30.0, (
+            f"post_aggregate over {n_days + 1} chunk parquets took {elapsed:.1f}s "
+            "-- investigate non-linear scaling in the re-aggregation GROUP BY"
+        )
+
+        record_chunk_boundary(
+            f"PA D6 closing-chunk merge n_days={n_days}",
+            "OK",
+            f"{n_days + 1} chunks -> {len(rows_out)} rows in {elapsed:.2f}s, "
+            "zero leakage/duplication across every seam",
+        )

@@ -142,6 +142,46 @@ def _warmup_downtime_analysis_duckdb_job() -> None:
         logger.warning("Warmup [downtime_analysis_duckdb] failed: %s", exc)
 
 
+def _warmup_achievement_today_job() -> None:
+    """RQ worker function: warm today's (今日) production-achievement
+    DailyView spool (production-achievement-overhaul, PA-14).
+
+    Reuses ProductionAchievementJob via a progress_report()-suppressing
+    subclass (services/production_achievement_daily_cache.py) — see that
+    module's docstring for the Redis-orphan-key trap this avoids.
+
+    NOTE: named "achievement", not "production_achievement" -- the sibling
+    regression guard test_production_history_not_in_warmup_jobs does a
+    coarse substring scan for "production" (meant to catch a real
+    production-HISTORY warmup entry, task 3.4) and that test must stay
+    unchanged; "achievement" alone is unique in this codebase and avoids
+    that false-positive collision entirely.
+    """
+    try:
+        from mes_dashboard.services.production_achievement_daily_cache import (
+            ensure_today_loaded,
+        )
+        spool_path = ensure_today_loaded()
+        logger.info("Warmup [production_achievement_today] complete spool_path=%s", spool_path)
+    except Exception as exc:
+        logger.warning("Warmup [production_achievement_today] failed: %s", exc)
+
+
+def _warmup_achievement_yesterday_job() -> None:
+    """RQ worker function: warm yesterday's (前日) production-achievement
+    DailyView spool (production-achievement-overhaul, PA-14). See
+    _warmup_achievement_today_job for details (incl. the naming note).
+    """
+    try:
+        from mes_dashboard.services.production_achievement_daily_cache import (
+            ensure_yesterday_loaded,
+        )
+        spool_path = ensure_yesterday_loaded()
+        logger.info("Warmup [production_achievement_yesterday] complete spool_path=%s", spool_path)
+    except Exception as exc:
+        logger.warning("Warmup [production_achievement_yesterday] failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Warmup job registry
 # production-history is intentionally absent — it must NOT be added here.
@@ -156,6 +196,14 @@ _WARMUP_JOBS = [
     # DuckDB prewarms moved from gunicorn daemon threads to RQ (unify-duckdb-prewarm-rq):
     ("warmup-resource-history-duckdb", _warmup_resource_history_duckdb_job),
     ("warmup-downtime-duckdb", _warmup_downtime_analysis_duckdb_job),
+    # production-achievement DailyView (今日/前日) only — month/range warm-caching
+    # is explicitly out of scope (production-achievement-overhaul, PA-14).
+    # Job-id prefix/fn name use "achievement" (not "production_achievement")
+    # to avoid a false-positive collision with the production-HISTORY
+    # keyword-scan guard immediately below -- see _warmup_achievement_today_job's
+    # docstring.
+    ("warmup-achievement-today", _warmup_achievement_today_job),
+    ("warmup-achievement-yesterday", _warmup_achievement_yesterday_job),
     # production-history intentionally absent — do NOT add here (task 3.4).
 ]
 

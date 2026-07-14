@@ -1,0 +1,45 @@
+change-id: production-achievement-overhaul
+agent: qa-reviewer
+status: blocked
+decision: blocked
+summary: >-
+  Independently re-ran every gate rather than trusting prior agents' claims:
+  cdd-kit validate --contracts --versions passes; cdd-kit gate (non-strict)
+  passes (only the pending-tasks warning); cdd-kit gate --strict fails on
+  pending tasks + the acceptance-oracle blocker; 196 backend + 17 integration
+  + 3 warmup-regression + 93 frontend trap-critical tests all pass; npm run
+  build/css:check both clean (tailwind token fix independently re-confirmed
+  a 3rd time). Verified test-evidence.yml is genuinely tool-generated (no
+  waiver fields, all 6 phases exit_code:0) and tests/contract/samples/ is
+  still clean (exactly 10 new files, 0 modified). Verified the design-lock
+  hash's ## Confirmed section was untouched by main Claude's interaction-
+  design.md citation-grammar repair.
+
+  Surfaced 3 gaps NO prior agent had flagged: (1) tests/property/
+  test_production_achievement_aggregate_invariant.py -- explicitly planned
+  in test-plan.md and test-strategist's own agent-log notes, but never
+  actually created (confirmed via git log --all: the file never existed).
+  (2) tests/test_frontend_production_achievement_parity.py is a holdover
+  from the PRIOR change (production-achievement-async-spool) -- zero
+  PACKAGE_LF references, transcribes the OLD _buildRollup/computeView SQL
+  that this change's frontend-engineer deleted, so it green-passes while
+  verifying a code path that no longer exists (the single most consequential
+  finding: a false-confidence dual-tier parity gate on exactly the riskiest
+  new logic). (3) regression-report.md, required "yes" per change-
+  classification.md, was never produced.
+
+  Decision: blocked. Not because the implementation is broken -- every
+  executable gate is green and reproducible -- but because gate --strict
+  genuinely fails on the human-only acceptance.yml oracle (ADR 0010, cannot
+  be waived or authored by any agent), and QA's own job is exactly to catch
+  the kind of coverage gap it found in (1)/(2)/(3).
+artifacts:
+  - { type: gate-results, pointer: "validate+versions: pass; gate(non-strict): pass; gate(strict): fail(pending-tasks+acceptance); backend 196 passed; integration 17 passed; warmup-regression 3 passed; vitest 93 passed; build/css:check: pass" }
+  - { type: findings-new, pointer: "(1) tests/property/test_production_achievement_aggregate_invariant.py never created (2) tests/test_frontend_production_achievement_parity.py stale, tests deleted SQL, 0 PACKAGE_LF refs (3) regression-report.md missing" }
+next-action: >
+  main Claude dispatched backend-engineer for a fix-back cycle covering
+  findings (1) and (2); wrote regression-report.md directly from already-
+  passing evidence for (3), re-verifying all 4 of its required regression
+  areas (warmup scheduler, filter_cache, permission scope, D6 historical
+  correction) live before writing. acceptance.yml (the hard blocker) remains
+  a human-only action per ADR 0010 -- cannot be closed by any agent.

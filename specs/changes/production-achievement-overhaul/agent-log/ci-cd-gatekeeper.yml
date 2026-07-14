@@ -1,0 +1,43 @@
+change-id: production-achievement-overhaul
+agent: ci-cd-gatekeeper
+timestamp: "2026-07-14T07:00:00Z"
+status: needs-review
+artifacts:
+  - { type: tiers-modified, pointer: "1 (5 new frontend-tests.yml Playwright steps); 0 (documented local-only cdd-kit validate --contracts --versions gate)" }
+  - { type: gate-promotions, pointer: "none — playwright-critical-journeys/playwright-resilience/playwright-data-boundary wired to their pre-existing Tier-1 status (not promoted); production-achievement-monkey and production-achievement-settings-e2e are brand-new gates starting directly at Tier 1 per test-plan.md's explicit tier assignment" }
+  - { type: workflow-files-changed, pointer: ".github/workflows/frontend-tests.yml" }
+  - { type: required-status-checks, pointer: "frontend-unit-tests job +5 steps: production-achievement critical-journey, resilience, data-boundary, monkey, settings-e2e — all Tier 1 required (no continue-on-error)" }
+next-action: run-backend-engineer-and-frontend-engineer
+notes: >
+  ci-gates.md written at 68 lines (under the 80-line soft cap). Verified,
+  not assumed, by grepping every .github/workflows/*.yml file: the
+  playwright-critical-journeys, playwright-resilience, and
+  playwright-data-boundary gate names+commands were already declared
+  Tier-1-required in contracts/ci/ci-gate-contract.md's Gate Inventory, and
+  several prior changes' Gate Compatibility Notes claimed coverage "by the
+  existing gate" — but no workflow step in this repo had ever actually
+  executed tests/playwright/production-achievement.spec.js,
+  tests/playwright/resilience/, or tests/playwright/data-boundary/. This is
+  a pre-existing, repo-wide wiring gap predating this change. Closed it for
+  exactly this change's own spec files only (not the whole resilience/ or
+  data-boundary/ directories), so this PR does not newly surface unrelated
+  pages' latent failures as a side effect; the broader gap is flagged in
+  ci-gates.md's Workflow section but left out of scope for this change.
+  Also flagged (not fixed — frontend/tsconfig.json is outside this agent's
+  write scope) that tsconfig.json's include array does not list
+  src/production-achievement/**/* today, so the informational type-check
+  gate has zero coverage of this app's existing .ts composables;
+  frontend-engineer must add both src/production-achievement/**/* and
+  src/production-achievement-settings/**/* in the same PR (gate stays
+  informational either way, per unbroken repo precedent). No
+  contracts/ci/ci-gate-contract.md change and no new workflow file
+  (confirmed consistent with change-classification.md and tasks.yml
+  2.6/4.4). Rollback Policy formalizes design.md's mechanics into an
+  ordered 7-step runbook (MySQL DDL orphan-not-drop, parquet
+  fast-forward rm command, hard chart-cutover-via-revert, 7-location
+  settings registry with mandatory INPUT_MAP-first ordering, warm-cache
+  job removal, post-revert openapi re-export, no RQ worker to stop). Merge
+  Eligibility is explicitly "blocked (pending implementation)" — several
+  new steps reference spec files/routes that do not exist until
+  backend-engineer/frontend-engineer land their phases; expected in this
+  Tier-0 contracts-ahead-of-implementation flow, not a gate defect.

@@ -1,0 +1,31 @@
+change-id: production-achievement-overhaul
+agent: visual-reviewer
+status: approved
+summary: >-
+  Independently re-verified main Claude's Tailwind color-token fix (4 missing
+  colors.token.h* entries added to tailwind.config.js after e2e-resilience-
+  engineer found a build-breaking gap) three ways: static cross-reference of
+  all 21 unique theme() references across both style.css files against the
+  config's actual registered keys (all resolve), a fresh full npm run build
+  (exit 0, zero unresolved theme( strings anywhere in the built dist tree,
+  not just the 2 changed files), and direct inspection of the compiled CSS
+  output (all 4 tokens resolve to the intended hex values). css-contract.md
+  Rule 4.2/4.3 (scoping) and Rule 2.4 (chart-exception governance via
+  resolveCssVar()) both compliant; fresh npm run css:check 0 errors. Confirmed
+  PlanAchievementStackedChart.vue uses real (non-normalized) stacking with an
+  uncapped >100% path and a single y=100 計畫 markLine, via source read plus a
+  fresh 7/7-passing unit-test run. Responsive/state-coverage reviewed
+  statically (flex-wrap/min-max-width reasoning); Playwright execution not
+  possible in this sandbox (Chromium version mismatch, same limitation every
+  test agent hit this session).
+artifacts:
+  - { type: files-changed, pointer: "none (read-only review)" }
+  - { type: report, pointer: "specs/changes/production-achievement-overhaul/visual-review-report.md" }
+  - { type: test-output, pointer: "npm run build exit 0 (2895 modules); npm run css:check 0 errors/308 pre-existing warnings; npx vitest run PlanAchievementStackedChart.test.ts 7/7 passed" }
+notes: |
+  Two advisory (non-blocking) nits, both documented in visual-review-report.md:
+  a cosmetic class/text mismatch on the pre-query placeholder
+  (pa-app__empty-state showing loading copy), and settings-panel inputs
+  lacking a custom :focus ring -- the latter is a faithful, deliberate parity
+  replication of the pre-existing .pa-target-panel__* classes (which also
+  lack one), not a new regression.

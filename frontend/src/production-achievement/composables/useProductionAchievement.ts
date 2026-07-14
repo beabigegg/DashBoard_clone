@@ -1,47 +1,67 @@
 /**
- * useProductionAchievement — filter state + async report/target fetch
+ * useProductionAchievement — 4-mode filter state + async report/target fetch
  * orchestration for the 生產達成率 report page.
  *
- * production-achievement-async-spool (ADR-0016): GET .../report is now an
- * always-async spool-backed endpoint (mirrors resource-history's async flow
- * -- see useResourceHistoryDuckDB.ts / App.vue for the reference pattern):
- *   - spool miss  -> 202 {async:true, job_id, status_url}; poll via the
- *     generic GET /api/job/<job_id>?prefix=production-achievement until
- *     status=finished, then re-issue the identical GET /report (now a
- *     zero-Oracle-cost spool hit, data-shape-contract.md §3.28.4).
- *   - spool hit   -> 200 {query_id, spool_download_url, spec_workcenter_map,
- *     targets_map}; PA-06/PA-07 (rollup + target join + achievement_rate)
- *     now run entirely client-side in DuckDB-WASM (useProductionAchievementDuckDB).
- *   - worker unavailable -> 503, no sync fallback (always_async=True).
+ * Change: production-achievement-overhaul (IP-7). Widens the filter model
+ * from a free-form date-range + shift_code/workcenter_group query into a
+ * fixed 4-mode selector (當日/前日/當月/自訂區間) with a single station-group
+ * filter — OD-1 drops shift_code as a filter entirely (D/N render as columns,
+ * never a filter). Mode determines both the date window (`resolveMonthPeriod`
+ * for 當月; range end capped at min(end,today) for 自訂區間) and which
+ * DuckDB-WASM view is computed: 當日/前日 -> computeDailyView (PA-12),
+ * 當月/自訂區間 -> computeCumulativeView (PA-13, D3 aggregate-then-divide;
+ * OD-2: 自訂區間 is ALWAYS cumulative-style, even a single-day range).
  *
- * shift_code/workcenter_group are NO LONGER server-side filter params (the
- * canonical spool key is date-range only) -- narrowing now happens in the
- * DuckDB computeView() SQL (business-rules.md PA-08).
+ * The async 202-poll machinery (spool-miss -> enqueue -> poll -> tail re-GET)
+ * is UNCHANGED from production-achievement-async-spool (ADR-0016) — only its
+ * request params (drop shift_code, mode replaces literal start/end from the
+ * caller) and its post-fetch DuckDB activation (5 inline maps, 2-stage
+ * rollup) changed. See useProductionAchievementDuckDB.ts.
+ *
+ * OD-3 (full auto-run, all 4 modes) / OD-4 (ignore a mode or station change
+ * while a 202 poll is in flight, no cancel-and-restart): both are enforced at
+ * the `setMode`/`setWorkcenterGroup`/`setRangeDates` mutation sites via the
+ * SAME `if (loading.value) return` idiom `runQuery()` already used — a change
+ * attempted mid-poll is a pure no-op (filters do not update, no new query
+ * starts); it is not queued or retried once the in-flight query resolves.
+ *
+ * OD-7 (preserve mode/station across the round-trip to /production-achievement
+ * -settings and back): persisted to `sessionStorage` on every successful
+ * mode/station change and restored when a new composable instance is created
+ * (survives a full page navigation, since settings is a separate mini-app).
+ *
+ * "Station-group switch is instant/free — a client-side re-filter of the
+ * already-downloaded day's spool, not a new query" (interaction-design.md §
+ * Reversibility): setWorkcenterGroup() recomputes from the cached DuckDB
+ * tables directly when a spool is already active, exactly like the existing
+ * saveTarget() client-side-recompute precedent — no new /report fetch.
  *
  * Endpoints (api-contract.md rows 256-261, data-shape-contract.md §3.28):
- *   GET /api/production-achievement/report?start_date&end_date
+ *   GET /api/production-achievement/report?start_date&end_date&workcenter_group
  *   GET /api/job/<job_id>?prefix=production-achievement            (generic poll, §1.4)
  *   POST /api/job/<job_id>/abandon  { prefix }                     (generic cancel, §1.4)
  *   GET /api/production-achievement/filter-options
  *   GET /api/production-achievement/targets?shift_code&workcenter_group
  *   PUT /api/production-achievement/targets  { shift_code, workcenter_group, target_qty }
  */
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { apiGet, apiPost } from '../../core/api';
 import type { ApiResponse } from '../../core/types';
 import { unwrapApiData } from '../../core/unwrap-api-result';
 import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
 import { useProductionAchievementDuckDB } from './useProductionAchievementDuckDB';
-import type { SpecWorkcenterMapRow, TargetsMapRow } from './useProductionAchievementDuckDB';
+import type {
+  SpecWorkcenterMapRow,
+  TargetsMapRow,
+  PackageLfMapRow,
+  WorkcenterMergeMapRow,
+  DailyPlanMapRow,
+  DailyViewRow,
+  CumulativeViewRow,
+  CumulativeTrendPoint,
+} from './useProductionAchievementDuckDB';
 
-export interface ProductionAchievementReportRow {
-  output_date: string;
-  shift_code: string;
-  workcenter_group: string;
-  actual_output_qty: number;
-  target_qty: number | null;
-  achievement_rate: number | null;
-}
+export type ProductionAchievementMode = 'today' | 'yesterday' | 'month' | 'range';
 
 export interface ProductionAchievementTargetRow {
   shift_code: string;
@@ -52,10 +72,12 @@ export interface ProductionAchievementTargetRow {
 }
 
 export interface FilterState {
-  start_date: string;
-  end_date: string;
-  shift_code: string;
+  mode: ProductionAchievementMode;
   workcenter_group: string;
+  /** Meaningful only when mode === 'range'. */
+  start_date: string;
+  /** Meaningful only when mode === 'range'; capped at min(end_date, today) before use. */
+  end_date: string;
 }
 
 interface ReportSpoolHit {
@@ -63,6 +85,9 @@ interface ReportSpoolHit {
   spool_download_url: string;
   spec_workcenter_map: SpecWorkcenterMapRow[];
   targets_map: TargetsMapRow[];
+  package_lf_map: PackageLfMapRow[];
+  workcenter_merge_map: WorkcenterMergeMapRow[];
+  daily_plan_map: DailyPlanMapRow[];
 }
 
 interface ReportAsyncEnqueued {
@@ -75,7 +100,13 @@ interface ReportAsyncEnqueued {
 // -- mirrors resource-history/eap-alarm's async-page timeout, not the 90s default.
 const API_TIMEOUT = 360000;
 
-const DEFAULT_SHIFT_CODES = ['N', 'D', 'A', 'B', 'C'];
+const DEFAULT_MODE: ProductionAchievementMode = 'today';
+const DEFAULT_WORKCENTER_GROUP = '焊接_DB';
+const VALID_MODES: ProductionAchievementMode[] = ['today', 'yesterday', 'month', 'range'];
+
+// OD-7: survives a full page navigation to /production-achievement-settings
+// and back (separate mini-app — no in-memory store can bridge that round-trip).
+const PERSIST_KEY = 'production-achievement:last-report-state';
 
 function getCsrfToken(): string {
   return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
@@ -113,12 +144,59 @@ async function apiPut<T>(url: string, payload: unknown): Promise<ApiResponse<T>>
   return body as ApiResponse<T>;
 }
 
-function defaultDateRange(): { start: string; end: string } {
-  const today = new Date();
-  const end = today.toISOString().slice(0, 10);
-  const monthAgo = new Date(today);
-  monthAgo.setDate(monthAgo.getDate() - 30);
-  return { start: monthAgo.toISOString().slice(0, 10), end };
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * PA-13 period resolution: on the 1st of the month, resolve to the FULL
+ * previous calendar month (the current month has not started yet); any other
+ * day resolves to month-to-date [1st, referenceDate]. Pure function, local
+ * Date components only (never `.toISOString()` — that converts to UTC and
+ * can shift the calendar date near local midnight, e.g. UTC+8).
+ */
+export function resolveMonthPeriod(referenceDate: Date): { start: string; end: string } {
+  const y = referenceDate.getFullYear();
+  const m = referenceDate.getMonth(); // 0-indexed
+  if (referenceDate.getDate() === 1) {
+    const prevMonthLastDay = new Date(y, m, 0); // day 0 rolls back to the last day of the previous month
+    const prevMonthFirstDay = new Date(y, m - 1, 1);
+    return { start: formatLocalDate(prevMonthFirstDay), end: formatLocalDate(prevMonthLastDay) };
+  }
+  const firstOfMonth = new Date(y, m, 1);
+  return { start: formatLocalDate(firstOfMonth), end: formatLocalDate(referenceDate) };
+}
+
+interface PersistedReportState {
+  mode: ProductionAchievementMode;
+  workcenter_group: string;
+}
+
+function readPersistedState(): PersistedReportState {
+  try {
+    const raw = sessionStorage.getItem(PERSIST_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<PersistedReportState>;
+      const mode = VALID_MODES.includes(parsed.mode as ProductionAchievementMode) ? (parsed.mode as ProductionAchievementMode) : DEFAULT_MODE;
+      const workcenter_group =
+        typeof parsed.workcenter_group === 'string' && parsed.workcenter_group ? parsed.workcenter_group : DEFAULT_WORKCENTER_GROUP;
+      return { mode, workcenter_group };
+    }
+  } catch {
+    // sessionStorage unavailable (e.g. private browsing quota) — fall back to defaults
+  }
+  return { mode: DEFAULT_MODE, workcenter_group: DEFAULT_WORKCENTER_GROUP };
+}
+
+function persistState(mode: ProductionAchievementMode, workcenter_group: string): void {
+  try {
+    sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ mode, workcenter_group }));
+  } catch {
+    // best-effort only — never throw from a persistence side-effect
+  }
 }
 
 function isAsyncEnqueued(data: unknown): data is ReportAsyncEnqueued {
@@ -127,31 +205,34 @@ function isAsyncEnqueued(data: unknown): data is ReportAsyncEnqueued {
 }
 
 export function useProductionAchievement() {
-  const { start, end } = defaultDateRange();
+  const persisted = readPersistedState();
 
   const filters = reactive<FilterState>({
-    start_date: start,
-    end_date: end,
-    shift_code: '',
-    workcenter_group: '',
+    mode: persisted.mode,
+    workcenter_group: persisted.workcenter_group,
+    start_date: '',
+    end_date: '',
   });
 
-  const filterOptions = reactive<{ shift_codes: string[]; workcenter_groups: string[] }>({
-    shift_codes: [...DEFAULT_SHIFT_CODES],
+  const filterOptions = reactive<{ workcenter_groups: string[] }>({
     workcenter_groups: [],
   });
 
-  const rows = ref<ProductionAchievementReportRow[]>([]);
+  const dailyRows = ref<DailyViewRow[]>([]);
+  const cumulativeRows = ref<CumulativeViewRow[]>([]);
+  const cumulativeTrend = ref<CumulativeTrendPoint[]>([]);
   const targets = ref<ProductionAchievementTargetRow[]>([]);
   const loading = ref(false);
   const error = ref('');
   const hasQueried = ref(false);
 
+  const viewKind = computed<'daily' | 'cumulative'>(() =>
+    filters.mode === 'today' || filters.mode === 'yesterday' ? 'daily' : 'cumulative',
+  );
+
   // Permission is not pre-checkable via a dedicated contract endpoint for a
-  // non-admin user (api-contract.md only exposes GET .../targets, ungated,
-  // and the admin-only GET .../permissions). The edit control is shown
-  // optimistically and this flag is flipped to false the first time a PUT
-  // 403s, so a stale permission cache never lets the user retry silently.
+  // non-admin user. The edit control is shown optimistically and this flag is
+  // flipped to false the first time a PUT 403s (fail-closed, same as before).
   const editForbidden = ref(false);
   const editError = ref('');
   const editSaving = ref(false);
@@ -219,19 +300,14 @@ export function useProductionAchievement() {
 
   async function fetchFilterOptions(): Promise<void> {
     try {
-      const res = await apiGet<{ shift_codes?: string[]; workcenter_groups?: string[] }>(
-        '/api/production-achievement/filter-options',
-      );
+      const res = await apiGet<{ workcenter_groups?: string[] }>('/api/production-achievement/filter-options');
       if (res.success) {
-        const data = (res.data ?? {}) as { shift_codes?: string[]; workcenter_groups?: string[] };
-        if (Array.isArray(data.shift_codes) && data.shift_codes.length > 0) {
-          filterOptions.shift_codes = data.shift_codes;
-        }
+        const data = (res.data ?? {}) as { workcenter_groups?: string[] };
         filterOptions.workcenter_groups = Array.isArray(data.workcenter_groups) ? data.workcenter_groups : [];
       }
     } catch {
-      // Fail-open on filter-options load: keep the default shift-code enum,
-      // leave workcenter_groups empty (user can still submit with no filter).
+      // Fail-open on filter-options load: station select just shows no options
+      // beyond the current default value; the report itself is unaffected.
     }
   }
 
@@ -242,34 +318,56 @@ export function useProductionAchievement() {
         targets.value = Array.isArray(res.data) ? res.data : [];
       }
     } catch {
-      // GET targets degrades server-side to null target_qty; a network-level
-      // failure here just leaves the local target list empty (view-only, no crash).
       targets.value = [];
     }
   }
 
   /**
    * Params captured once at enqueue time and threaded through the entire
-   * poll -> tail-refetch -> render cycle for a single runQuery() call — NOT
-   * live `filters` (monkey scenario 3 / FIX 3). Without this, a user who
-   * edits the date range while a 202 job is still polling would cause the
-   * tail re-GET to ask for a DIFFERENT date range whose spool doesn't exist
-   * yet (still 202, not the expected 200 spool-hit), and/or would filter the
-   * OLD spool's rendered rows by a shift_code/workcenter_group the user
-   * selected for a query that never actually ran against that range.
-   * Mirrors the repo's "snapshot committed params" pattern.
+   * poll -> tail-refetch -> render cycle for a single runQuery() call (same
+   * "snapshot committed params" precedent as production-achievement-async
+   * -spool). Mode/station cannot actually change mid-flight any more (OD-4 is
+   * now enforced earlier, at the setMode/setWorkcenterGroup call site), but
+   * the snapshot is kept as defense-in-depth and because start_date/end_date
+   * are RESOLVED values (today/yesterday/month compute their own window every
+   * call) that must stay fixed across the tail re-GET regardless.
    */
   interface QuerySnapshot {
+    mode: ProductionAchievementMode;
     start_date: string;
     end_date: string;
-    shift_code: string;
     workcenter_group: string;
+  }
+
+  let _lastSnapshot: QuerySnapshot | null = null;
+
+  function _resolveSnapshotDates(mode: ProductionAchievementMode, now: Date): { start_date: string; end_date: string } {
+    if (mode === 'today') {
+      const d = formatLocalDate(now);
+      return { start_date: d, end_date: d };
+    }
+    if (mode === 'yesterday') {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const d = formatLocalDate(y);
+      return { start_date: d, end_date: d };
+    }
+    if (mode === 'month') {
+      const period = resolveMonthPeriod(now);
+      return { start_date: period.start, end_date: period.end };
+    }
+    // range (OD-2: always cumulative-style, even a single day)
+    const todayStr = formatLocalDate(now);
+    const rawStart = filters.start_date || todayStr;
+    const rawEnd = filters.end_date || todayStr;
+    const end = rawEnd > todayStr ? todayStr : rawEnd; // never a future end_date (PA-13)
+    return { start_date: rawStart, end_date: end };
   }
 
   async function _fetchReportOnce(snapshot: QuerySnapshot): Promise<ReportSpoolHit | ReportAsyncEnqueued> {
     const response = await apiGet<ReportSpoolHit | ReportAsyncEnqueued>('/api/production-achievement/report', {
       timeout: API_TIMEOUT,
-      params: { start_date: snapshot.start_date, end_date: snapshot.end_date },
+      params: { start_date: snapshot.start_date, end_date: snapshot.end_date, workcenter_group: snapshot.workcenter_group },
     });
     return unwrapApiData(response, '查詢失敗，請稍後再試') as ReportSpoolHit | ReportAsyncEnqueued;
   }
@@ -278,15 +376,9 @@ export function useProductionAchievement() {
 
   /**
    * Poll the enqueued job to completion, then re-issue the identical
-   * GET /report (bound to the immutable `snapshot`, not live `filters`) —
-   * the canonical spool now exists, so the second call normally takes the
-   * 200 spool-hit path at zero Oracle cost (data-shape-contract.md §3.28.4).
-   *
-   * `asyncJobProgress.active` is deliberately left `true` (relabelled) after
-   * the job finishes, through the tail re-GET — the caller (runQuery) resets
-   * it only once the whole cycle (including DuckDB activate/render) has
-   * settled, so the blank full-page LoadingOverlay never flashes back on for
-   * the multi-second parquet-fetch + WASM-compute leg (FIX 2).
+   * GET /report (bound to the immutable `snapshot`) — the canonical spool now
+   * exists, so the second call normally takes the 200 spool-hit path at zero
+   * Oracle cost (data-shape-contract.md §3.28.4).
    *
    * Returns null (with error.value / a blank error already set as
    * appropriate) on cancellation, job failure, or poll timeout.
@@ -318,7 +410,7 @@ export function useProductionAchievement() {
       });
     } catch (err) {
       if (_jobAbortController === controller) _jobAbortController = null;
-      _resetAsyncProgress(); // no further render will happen — safe to drop the card now
+      _resetAsyncProgress();
       const e = err as Error & { name?: string; errorCode?: string };
       if (e?.name === 'AbortError') {
         return null; // user-cancelled — leave error blank
@@ -335,20 +427,12 @@ export function useProductionAchievement() {
 
     if (_jobAbortController === controller) _jobAbortController = null;
     _stopElapsedTimer();
-    // Keep the progress card visible (relabelled, FIX 2) — do NOT call
-    // _resetAsyncProgress() here; runQuery()'s finally does that once
-    // activate()/computeView() has also settled.
     asyncJobProgress.status = 'finished';
     asyncJobProgress.progress = '正在載入結果…';
     asyncJobProgress.pct = 100;
 
     const data = await _fetchReportOnce(snapshot);
 
-    // FIX 3: the tail re-GET can itself come back 202 again (e.g. the spool
-    // TTL/eviction raced the completion signal) — re-poll the NEW job
-    // against the SAME snapshot rather than feeding an undefined
-    // spool_download_url into activate(). Bounded so a backend bug can't
-    // spin this forever.
     if (isAsyncEnqueued(data)) {
       if (attempt >= MAX_TAIL_REENQUEUE_ATTEMPTS) {
         _resetAsyncProgress();
@@ -368,13 +452,38 @@ export function useProductionAchievement() {
     return data as ReportSpoolHit;
   }
 
+  function _clearRows(): void {
+    dailyRows.value = [];
+    cumulativeRows.value = [];
+    cumulativeTrend.value = [];
+  }
+
+  /** Re-run computeDailyView/computeCumulativeView against the ALREADY-cached
+   *  DuckDB tables (no spool re-fetch) for the given mode/date-window. */
+  async function _recompute(mode: ProductionAchievementMode, startDate: string, endDate: string, workcenterGroup: string): Promise<void> {
+    if (mode === 'today' || mode === 'yesterday') {
+      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup });
+      cumulativeRows.value = [];
+      cumulativeTrend.value = [];
+    } else {
+      const result = await duckdb.computeCumulativeView({ workcenterGroup, startDate, endDate });
+      cumulativeRows.value = result.rows;
+      cumulativeTrend.value = result.trend;
+      dailyRows.value = [];
+    }
+  }
+
   /** Hand the spool-hit response to DuckDB-WASM and render the computed rows. */
   async function _activateAndRender(data: ReportSpoolHit, snapshot: QuerySnapshot): Promise<void> {
-    await duckdb.activate(data.spool_download_url, data.spec_workcenter_map || [], data.targets_map || []);
-    rows.value = await duckdb.computeView({
-      shiftCode: snapshot.shift_code || undefined,
-      workcenterGroup: snapshot.workcenter_group || undefined,
-    });
+    await duckdb.activate(
+      data.spool_download_url,
+      data.spec_workcenter_map || [],
+      data.targets_map || [],
+      data.package_lf_map || [],
+      data.workcenter_merge_map || [],
+      data.daily_plan_map || [],
+    );
+    await _recompute(snapshot.mode, snapshot.start_date, snapshot.end_date, snapshot.workcenter_group);
   }
 
   async function runQuery(): Promise<void> {
@@ -384,35 +493,68 @@ export function useProductionAchievement() {
     hasQueried.value = true;
     _resetAsyncProgress();
     duckdb.deactivate();
-    // FIX 3: snapshot the enqueue-time params once — the entire poll ->
-    // tail-refetch -> render cycle below reads ONLY this snapshot, never
-    // live `filters` (which the user may keep editing while a 202 job polls).
-    const snapshot: QuerySnapshot = {
-      start_date: filters.start_date,
-      end_date: filters.end_date,
-      shift_code: filters.shift_code,
-      workcenter_group: filters.workcenter_group,
-    };
+    const mode = filters.mode;
+    const { start_date, end_date } = _resolveSnapshotDates(mode, new Date());
+    const snapshot: QuerySnapshot = { mode, start_date, end_date, workcenter_group: filters.workcenter_group };
     try {
       const data = await _fetchReport(snapshot);
       if (!data) {
         // Cancelled mid-poll or the poll failed — error.value (if any) is
         // already set by _pollForCompletion(); table renders empty, not an error.
-        rows.value = [];
+        _clearRows();
         return;
       }
       await _activateAndRender(data, snapshot);
+      _lastSnapshot = snapshot;
     } catch (err: unknown) {
-      rows.value = [];
+      _clearRows();
       error.value = err instanceof Error ? err.message : '查詢失敗，請稍後再試';
     } finally {
       loading.value = false;
-      // FIX 2: only now (after activate()/computeView() has also settled,
-      // success or failure) is it safe to drop the progress card — doing
-      // this earlier flashes the blank full-page overlay back on during the
-      // parquet-fetch + WASM-compute leg. No-op if the poll never ran.
       _resetAsyncProgress();
     }
+  }
+
+  // ── Mode / station mutation entry points (OD-3 auto-run, OD-4 ignore-mid-poll, OD-7 persist) ──
+
+  /** 4-button mode switch (當日/前日/當月/自訂區間). Auto-runs (OD-3); ignored while a poll is in flight (OD-4). */
+  function setMode(mode: ProductionAchievementMode): void {
+    if (loading.value) return; // OD-4: mid-poll change is a pure no-op
+    if (filters.mode === mode) return; // Reversibility: re-selecting the current mode is free (no new fetch)
+    filters.mode = mode;
+    if (mode === 'range' && (!filters.start_date || !filters.end_date)) {
+      const todayStr = formatLocalDate(new Date());
+      if (!filters.start_date) filters.start_date = todayStr;
+      if (!filters.end_date) filters.end_date = todayStr;
+    }
+    persistState(filters.mode, filters.workcenter_group);
+    void runQuery();
+  }
+
+  /**
+   * Station-group single-select. Auto-runs (OD-3); ignored while a poll is in
+   * flight (OD-4). When a spool is already active, this is a pure client-side
+   * re-filter against the cached DuckDB tables — the canonical spool key is
+   * date-range only (PA-08), so no new /report fetch is needed.
+   */
+  function setWorkcenterGroup(group: string): void {
+    if (loading.value) return; // OD-4
+    if (filters.workcenter_group === group) return;
+    filters.workcenter_group = group;
+    persistState(filters.mode, filters.workcenter_group);
+    if (duckdb.isActive.value && _lastSnapshot) {
+      void _recompute(_lastSnapshot.mode, _lastSnapshot.start_date, _lastSnapshot.end_date, group);
+    } else {
+      void runQuery();
+    }
+  }
+
+  /** 自訂區間 date inputs. Auto-runs (OD-3); ignored while a poll is in flight (OD-4). */
+  function setRangeDates(startDate: string, endDate: string): void {
+    if (loading.value) return; // OD-4
+    filters.start_date = startDate;
+    filters.end_date = endDate;
+    void runQuery();
   }
 
   async function saveTarget(payload: { shift_code: string; workcenter_group: string; target_qty: number }): Promise<boolean> {
@@ -421,23 +563,19 @@ export function useProductionAchievement() {
     try {
       await apiPut<null>('/api/production-achievement/targets', payload);
       await fetchTargets();
-      // Re-render achievement_rate immediately from the refreshed target
-      // list. A target-value PUT never changes the spooled report data
-      // (only PA-07's join input) -- when DuckDB is already active for this
-      // session, recompute client-side (zero Oracle/spool cost) instead of
-      // re-issuing the async report.
+      // Re-render immediately from the refreshed target list. A target-value
+      // PUT never changes the spooled report data (only PA-07's join input)
+      // -- when DuckDB is already active for this session, recompute
+      // client-side (zero Oracle/spool cost) instead of re-issuing the async report.
       if (hasQueried.value) {
-        if (duckdb.isActive.value) {
+        if (duckdb.isActive.value && _lastSnapshot) {
           const targetsMap: TargetsMapRow[] = targets.value.map((t) => ({
             shift_code: t.shift_code,
             workcenter_group: t.workcenter_group,
             target_qty: t.target_qty,
           }));
           await duckdb.updateTargetsMap(targetsMap);
-          rows.value = await duckdb.computeView({
-            shiftCode: filters.shift_code || undefined,
-            workcenterGroup: filters.workcenter_group || undefined,
-          });
+          await _recompute(_lastSnapshot.mode, _lastSnapshot.start_date, _lastSnapshot.end_date, _lastSnapshot.workcenter_group);
         } else {
           await runQuery();
         }
@@ -465,23 +603,13 @@ export function useProductionAchievement() {
     }
   }
 
-  function resetFilters(): void {
-    const { start: s, end: e } = defaultDateRange();
-    filters.start_date = s;
-    filters.end_date = e;
-    filters.shift_code = '';
-    filters.workcenter_group = '';
-    rows.value = [];
-    hasQueried.value = false;
-    error.value = '';
-    void cancelQuery();
-    duckdb.deactivate();
-  }
-
   return {
     filters,
     filterOptions,
-    rows,
+    dailyRows,
+    cumulativeRows,
+    cumulativeTrend,
+    viewKind,
     targets,
     loading,
     error,
@@ -493,8 +621,10 @@ export function useProductionAchievement() {
     fetchFilterOptions,
     fetchTargets,
     runQuery,
+    setMode,
+    setWorkcenterGroup,
+    setRangeDates,
     saveTarget,
-    resetFilters,
     cancelQuery,
   };
 }

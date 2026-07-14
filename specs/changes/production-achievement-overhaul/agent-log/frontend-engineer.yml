@@ -1,0 +1,163 @@
+agent: frontend-engineer
+change-id: production-achievement-overhaul
+status: done-with-flags
+summary: >-
+  Implemented Phases 6-9 (IP-6..IP-9) per implementation-plan.md: 2-stage
+  DuckDB-WASM rollup with D1/D2 opposite join kinds + D3 aggregate-then-divide
+  (IP-6); 4-mode composable state with OD-1/OD-3/OD-4/OD-7 (IP-7); App.vue
+  rewrite + new PlanAchievementStackedChart.vue replacing AchievementChart.vue
+  (IP-8); standalone production-achievement-settings mini-app + 3 panels +
+  7-location route registration + tsconfig.json coverage fix (IP-9). TDD
+  throughout (tests written before/alongside implementation, all green).
+  Also fixed a genuine pre-existing contract defect (5 response schemas
+  un-enveloped) discovered while running the required contract-validate gate,
+  via the sanctioned cdd-kit contract CLI (not free-form edit) — see notes.
+
+artifacts:
+  - { type: files-changed, pointer: "frontend/src/production-achievement/composables/useProductionAchievementDuckDB.ts (full rewrite, 2-stage rollup + computeDailyView/computeCumulativeView)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/composables/useProductionAchievement.ts (full rewrite, 4-mode FilterState + resolveMonthPeriod + setMode/setWorkcenterGroup/setRangeDates)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/App.vue (full rewrite, 4-button mode switch + single station select + daily/cumulative tables + reduced KPI cards)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/components/PlanAchievementStackedChart.vue (new, real-% stacked chart, y=100 markLine, resolveCssVar colors)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/components/AchievementChart.vue (deleted, hard cutover)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/style.css (new .pa-app__mode-switch + 4 chart color-token custom properties)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement/components/TargetEditPanel.vue (verified untouched — read-only diff check, zero edits)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement-settings/{index.html,main.ts,App.vue,style.css} (new standalone mini-app shell)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement-settings/composables/useProductionAchievementSettings.ts (new, shared editForbidden/saveNote + OD-8 workcenterFullList + OD-12 dropdown option computeds)" }
+  - { type: files-changed, pointer: "frontend/src/production-achievement-settings/components/{PackageLfMappingPanel,WorkcenterMergeMappingPanel,DailyPlanPanel}.vue (new dumb panels)" }
+  - { type: files-changed, pointer: "frontend/src/admin-dashboard/tabs/PermissionsTab.vue:93-98 (copy-only: can_edit_targets now also gates the 3 new settings tables)" }
+  - { type: files-changed, pointer: "frontend/src/portal-shell/{routeContracts.js,navigationState.js,nativeModuleRegistry.js} + frontend/vite.config.ts + data/page_status.json + docs/migration/.../{route_scope_matrix.json,asset_readiness_manifest.json} (7-location registration for /production-achievement-settings)" }
+  - { type: files-changed, pointer: "frontend/tsconfig.json (added src/production-achievement/**/* + src/production-achievement-settings/**/* to include, closing the ci-gates.md-flagged coverage gap)" }
+  - { type: files-changed, pointer: "contracts/css/{css-inventory.md,css-contract.md} (new .theme-production-achievement-settings row + changelog entries, schema-version bumped)" }
+  - { type: files-changed, pointer: "contracts/api/api-contract.md + contracts/api/openapi.json + contracts/openapi.json (5 new/corrected response-envelope schemas via cdd-kit contract CLI — see notes, NOT a shape/behavior change)" }
+  - { type: files-changed, pointer: "frontend/tests/legacy/portal-shell-navigation.test.js (+1 test: settings route in STANDALONE_DRILLDOWN_ROUTES, no drawer entry — 7th of 7 registration locations)" }
+  - { type: files-changed, pointer: "frontend/tests/production-achievement-settings-registration.test.js (new: 6-registry parity — vite.config.ts/routeContracts.js/nativeModuleRegistry.js/page_status.json/route_scope_matrix.json/asset_readiness_manifest.json)" }
+  - { type: files-changed, pointer: "frontend/tests/playwright/production-achievement.spec.js (ground-up rewrite); production-achievement-async.spec.ts (rewrite); production-achievement-monkey.spec.ts (rewrite, reduced scope — see notes); production-achievement-settings.spec.ts (new); resilience/production-achievement-resilience.spec.js (rewrite); data-boundary/production-achievement-data-boundary.spec.js (rewrite+extend)" }
+
+  - { type: components-affected, pointer: "App.vue (production-achievement), PlanAchievementStackedChart.vue, production-achievement-settings/App.vue, PackageLfMappingPanel.vue, WorkcenterMergeMappingPanel.vue, DailyPlanPanel.vue, admin-dashboard/PermissionsTab.vue" }
+
+  - { type: screenshot-paths, pointer: "n/a (no visual capture tooling run this session — visual-reviewer owns screenshot/visual-diff evidence per test-plan.md Out of Scope)" }
+
+  - { type: accessibility-audit, pointer: "manual only, no axe-core run available this session: mode/workcenter-toggle/wc-include buttons carry aria-pressed; range date inputs have associated <label for>; OD-5 save note uses role=status, edit errors use role=alert (mirrors ErrorBanner/TargetEditPanel convention); MultiSelect reused unmodified (its own existing a11y, incl. focus-return-on-close, unaffected)" }
+
+  - { type: files-changed, pointer: "frontend/src/production-achievement/__tests__/{useProductionAchievementDuckDB,useProductionAchievement,App,PlanAchievementStackedChart}.test.ts + production-achievement-settings/__tests__/App.test.ts + components/__tests__/{PackageLfMappingPanel,WorkcenterMergeMappingPanel,DailyPlanPanel}.test.ts (all new/rewritten, TDD, all passing)" }
+
+notes: |
+  Test evidence: cdd-kit test run for production-achievement-overhaul, all 5
+  required phases (collect/targeted/changed-area/contract/quality) passed with
+  COMBINED backend+frontend commands per this repo's documented concurrent
+  -agent race lesson (backend-engineer's own single-stack runs had already
+  landed in test-evidence.yml; I re-ran each phase combining both stacks so
+  neither agent's coverage is lost). final-status: passed. Vitest: 123 tests
+  across 12 production-achievement(-settings) + registration + PermissionsTab
+  files, all green; full repo-wide `npx vitest run` also re-checked (906
+  passed/2 skipped, zero regressions from the 7-location registration edits).
+  `npx vue-tsc --noEmit`: zero NEW errors (only pre-existing TargetEditPanel.vue
+  errors, now surfaced for the first time by the tsconfig.json fix — that file
+  is explicitly out of scope, untouched). `npm run css:check`: 0 errors (308
+  pre-existing warnings elsewhere, none from my new files). Playwright specs:
+  all 6 production-achievement* spec files parse cleanly (`--list`, 34 tests
+  total) — full execution requires a live dev server + build, not run this
+  session (see Remaining risks).
+
+  CONTRACT FIX (flagging per task instructions, not silently improvised):
+  While running the required `cdd-kit validate --contracts` gate, found a
+  genuine PRE-EXISTING defect (predates my IP-6..IP-9 work, from the
+  already-frozen Phase-0 contract-authoring pass): the 5 new endpoints'
+  response schemas (package-lf-map/workcenter-merge-map/daily-plans GET +
+  known-package-lf-values/known-workcenter-groups) were registered as BARE
+  shapes (`FooRow[]` or an un-enveloped object), but the actual Flask routes
+  correctly use the site-wide `{success, data, meta}` envelope (via
+  `core/response.py`'s `success_response()`, per CLAUDE.md convention) — the
+  SAME pattern the sibling `/targets` endpoint's `ProductionAchievementTargetsResponse`
+  already uses correctly. api-contract.md's own Compatibility Notes prose
+  (line ~496) already NAMED the intended schemas as ".../Row`/`Response`" for
+  each table, so the un-enveloped registration looks like an oversight in
+  completing that intent, not a deliberate design choice. Fixed via the
+  sanctioned CLI (never free-form Edit, per the repo's hook):
+  `cdd-kit contract schema set` (new schemas ProductionAchievementPackageLfMapResponse
+  / WorkcenterMergeMapResponse / DailyPlanResponse, each `{success, data:
+  Row[], meta: ProductionAchievementResponseMeta}`; redefined the 2 existing
+  known-values Response schemas in place the same way) + `cdd-kit contract
+  endpoint set --response <name>` (repointed the 3 GET rows) + `cdd-kit
+  openapi export --out contracts/openapi.json` and `--out
+  contracts/api/openapi.json` (both re-synced, `--check` clean) +
+  `cdd-kit validate --contracts` now fully green. This changes ONLY the
+  contract's OWN description of already-correct wire behavior — no backend
+  route, no frontend call site, and no test fixture needed to change as a
+  result (my frontend code already assumed/consumed the correct enveloped
+  shape throughout, since that's what the real Flask backend actually
+  returns). Flagging for contract-reviewer/qa-reviewer awareness since this
+  is contract-authoring territory outside my own IP-6..IP-9 file-level plan.
+
+  DEVIATION FLAG (interaction-design.md / OD confirmed items): none — all 12
+  OD items (OD-1 through OD-12) implemented exactly as transcribed in
+  `## Confirmed`, no reinterpretation. Two secondary implementation-judgment
+  calls NOT pinned by any OD or contract (documented here for visibility,
+  per "report discrepancies" instruction, not because they contradict a
+  confirmed decision):
+    1. OD-7 persistence mechanism: chose sessionStorage (one of the 3 options
+       implementation-plan.md explicitly left to my judgment: "route query
+       params, a shared composable/store, or sessionStorage"), keyed
+       `production-achievement:last-report-state`, storing {mode,
+       workcenter_group} only (not custom-range dates, per OD-7's literal
+       "mode and station-group" scope).
+    2. D3 cumulative-trend per-day denominator when a package_lf_group lacks
+       a daily-plan row: business-rules.md PA-13 does not fully pin this
+       corner (only that same-day actual/plan must sum-then-divide when
+       MAGNITUDES differ). Implemented as SQL `SUM(daily_plan_qty)` (ignores
+       NULL, i.e. a missing-plan group contributes 0 to that day's plan sum
+       rather than making the whole day's rate null) — see the code comment
+       at useProductionAchievementDuckDB.ts's computeCumulativeView trend SQL.
+
+  PRE-EXISTING GATE-READINESS GAPS (found via `cdd-kit gate`, NOT part of my
+  file-level plan, not fixed by me — flagging for qa-reviewer/spec-architect):
+    - interaction-design.md's `## Open Decisions` checkboxes are still literally
+      `- [ ]` (unchecked) even though `## Confirmed` below transcribes all 12
+      answers, and several `Presented Information`/`State` citation strings
+      don't match ADR-0012 §2's expected citation-form syntax. This is a
+      SPEC-DOCUMENT formatting gap in an artifact I was told is frozen/
+      human-confirmed and to implement against, not redesign — I did not
+      touch it. All 12 confirmed decisions ARE correctly implemented in code;
+      this is purely a checkbox/citation-syntax compliance issue for the gate
+      tool.
+    - tests/acceptance/acceptance.yml is still a placeholder (already flagged
+      in implementation-plan.md's own Known Risks as qa-reviewer's concern).
+    - `cdd-kit gate`'s new "Boundary Guard [shadow]" warnings appear
+      repo-wide (also fire on pre-existing eap-alarm/uph-performance/query-tool
+      endpoints untouched by this change) — informational/shadow-mode, not
+      something this change introduced or can resolve in isolation.
+
+  SCOPE REDUCTIONS in E2E Playwright coverage (flagging, not hiding):
+  given the scale of this change (4 pre-existing production-achievement
+  Playwright spec files totaling ~2400 lines, all needing rewrite/extension
+  for the new 4-mode/no-submit-button UI + 5-inline-map envelope + 5-column
+  parquet grain), I prioritized correctness and full parsing/listing success
+  over exhaustive 1:1 porting of every original scenario:
+    - production-achievement-async.spec.ts: kept all core categories (happy
+      path, empty/malformed payload, 503/failed-job errors, cancel +
+      OD-4 mode-switch retry, hidden-tab, back/forward, target-edit recompute)
+      but dropped the original's "300-entry large-payload stress" and
+      "401 session-expiry mid-poll" sub-cases to stay within session scope.
+    - production-achievement-monkey.spec.ts: re-scoped to match test-plan.md's
+      own literal description ("4-mode rapid-click + settings CRUD adversarial
+      input") rather than the original file's 12 describe-blocks, several of
+      which (mid-poll mutation, navigate-away, explicit-cancel, browser
+      back/forward, hidden-tab, stale-session) now materially overlap with
+      production-achievement-async.spec.ts's own cancel/hidden-tab/back-forward
+      coverage (rewritten in this same pass) — this is a real, not merely
+      cosmetic, reduction from the original file's exhaustiveness; flagging
+      for monkey-test-engineer / a follow-up pass if deeper adversarial
+      coverage is wanted beyond what's now here.
+  All 6 production-achievement* Playwright files parse/list cleanly (34
+  tests) and were not executed end-to-end against a live server this session
+  (would need `npm run build` + a running Flask dev server — out of session
+  scope; ci-gates.md's own CI steps will exercise them for real).
+
+  Working-tree note (not acted on, no commit requested this session):
+  `tests/contract/samples/*.json` shows ~170 files modified purely by
+  `timestamp` field churn (mechanical regeneration side-effect of running
+  `tests/contract/` — confirmed via spot-diff, no content/shape changes).
+  Per CLAUDE.md's own documented pattern, whoever eventually commits this
+  change should `git checkout tests/contract/samples/` then re-stage only
+  the production_achievement-specific sample files (the new ones this change
+  added, listed as untracked in git status).

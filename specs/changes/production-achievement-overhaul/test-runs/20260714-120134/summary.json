@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "quality",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard ruff check src/mes_dashboard/workers/production_achievement_worker.py src/mes_dashboard/services/production_achievement_service.py src/mes_dashboard/services/production_achievement_package_lf_service.py src/mes_dashboard/services/production_achievement_workcenter_merge_service.py src/mes_dashboard/services/production_achievement_daily_plan_service.py src/mes_dashboard/services/production_achievement_daily_cache.py src/mes_dashboard/services/filter_cache.py src/mes_dashboard/core/permissions.py src/mes_dashboard/core/spool_warmup_scheduler.py src/mes_dashboard/routes/production_achievement_routes.py tests/test_frontend_production_achievement_parity.py tests/property/test_production_achievement_aggregate_invariant.py && (cd frontend && npm run css:check)",
+  "duration_ms": 1712,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-120134/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-120134/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-120134/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

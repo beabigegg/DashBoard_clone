@@ -1,10 +1,10 @@
 ---
 contract: css-inventory
-schema-version: 1.2.11
+schema-version: 1.2.12
 summary: Governed inventory of authored CSS source files under frontend/src/.
 owner: application-team
 surface: ui
-last-changed: 2026-07-13
+last-changed: 2026-07-14
 ---
 
 # CSS Inventory (Governed Source List)
@@ -77,7 +77,8 @@ last-changed: 2026-07-13
 | `frontend/src/wip-overview/style.css` | `theme-wip-overview` | wip-overview |
 | `frontend/src/yield-alert-center/style.css` | `theme-yield-alert-center` | yield-alert-center |
 | `frontend/src/production-history/style.css` | `theme-production-history` | production-history |
-| `frontend/src/production-achievement/style.css` | `theme-production-achievement` | production-achievement |
+| `frontend/src/production-achievement/style.css` | `theme-production-achievement` | production-achievement | production-achievement-overhaul: new `.pa-app__mode-switch` (4-button mode switch) + chart color-token custom properties (`--pa-shift-d`/`--pa-shift-n`/`--pa-plan-line`/`--pa-cumulative-rate`, read by PlanAchievementStackedChart.vue's `resolveCssVar()`, mirroring resource-history/components/StackedChart.vue's convention) |
+| `frontend/src/production-achievement-settings/style.css` | `theme-production-achievement-settings` | production-achievement-settings (new standalone mini-app, production-achievement-overhaul) |
 | `frontend/src/uph-performance/style.css` | `theme-uph-performance` | uph-performance |
 
 ---
@@ -87,6 +88,12 @@ last-changed: 2026-07-13
 任何新增/刪除/重新命名/搬移 `frontend/src/**/*.css` 的 PR 必須在同一變更同步更新此清單。
 
 ## CHANGELOG
+
+## [css-inventory 1.2.12] — 2026-07-14
+### Added
+- production-achievement-overhaul: `frontend/src/production-achievement-settings/style.css` registered with `theme-production-achievement-settings` root (new standalone mini-app, IP-9). Route-Local Feature Layers table.
+### Changed
+- production-achievement-overhaul: `frontend/src/production-achievement/style.css` row note updated — gained `.pa-app__mode-switch` (4-button mode switch) and 4 new chart color-token custom properties consumed by the new `PlanAchievementStackedChart.vue` (replaces the deleted `AchievementChart.vue`).
 
 ## [css-inventory 1.2.10] — 2026-07-08
 ### Changed

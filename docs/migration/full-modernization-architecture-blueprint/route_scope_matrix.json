@@ -85,6 +85,10 @@
       "category": "report"
     },
     {
+      "route": "/production-achievement-settings",
+      "category": "report"
+    },
+    {
       "route": "/uph-performance",
       "category": "report"
     }

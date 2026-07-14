@@ -109,6 +109,41 @@ test('buildDynamicNavigationState can include standalone drilldown routes withou
 });
 
 
+// ============================================================================
+// production-achievement-overhaul (D4): /production-achievement-settings is a
+// STANDALONE_DRILLDOWN_ROUTES entry, not a navigationManifest.js drawer page —
+// this is the "1 code-path check" that complements the 6-registry parity test
+// in production-achievement-settings-registration.test.js (7 locations total).
+// ============================================================================
+
+test('production-achievement-settings is registered as a standalone drilldown route with NO drawer entry (D4)', () => {
+  const state = buildDynamicNavigationState(
+    [
+      {
+        id: 'production-assist',
+        name: '生產輔助',
+        order: 1,
+        pages: [{ route: '/production-achievement', name: '生產達成率', status: 'released', order: 1 }],
+      },
+    ],
+    { isAdmin: false, includeStandaloneDrilldown: true },
+  );
+
+  const targetRoutes = state.dynamicRoutes.map((route) => route.targetRoute);
+  assert.equal(targetRoutes.includes('/production-achievement-settings'), true);
+  assert.equal(state.allowedPaths.includes('/production-achievement-settings'), true);
+
+  // No drawer entry: the settings route must not appear in ANY manifest
+  // drawer's page list (it is reached only via the report page's 設定 button).
+  const settingsAsDrawerPage = Object.keys(MANIFEST_ROUTES).includes('/production-achievement-settings');
+  assert.equal(settingsAsDrawerPage, false, '/production-achievement-settings must NOT have a navigationManifest.js routes entry');
+
+  // Standalone routes carry no drawerName (mirrors /wip-detail/hold-detail above).
+  const settingsRoute = state.dynamicRoutes.find((r) => r.targetRoute === '/production-achievement-settings');
+  assert.equal(settingsRoute.drawerName, '');
+});
+
+
 test('buildDynamicNavigationState resolves admin routes with correct contract metadata', () => {
   const state = buildDynamicNavigationState(
     [

@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "changed-area",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/ -k \"production_achievement\" --ignore=tests/stress --run-integration -q && (cd frontend && npx vitest run)",
+  "duration_ms": 14216,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-120113/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-120113/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-120113/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}

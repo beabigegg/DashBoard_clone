@@ -110,6 +110,10 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
     () => import('../production-achievement/App.vue'),
     [() => import('../resource-shared/styles.css'), () => import('../styles/tailwind.css'), () => import('../production-achievement/style.css')],
   ),
+  '/production-achievement-settings': createNativeLoader(
+    () => import('../production-achievement-settings/App.vue'),
+    [() => import('../styles/tailwind.css'), () => import('../production-achievement-settings/style.css')],
+  ),
   '/uph-performance': createNativeLoader(
     () => import('../uph-performance/App.vue'),
     [() => import('../styles/tailwind.css'), () => import('../uph-performance/style.css')],

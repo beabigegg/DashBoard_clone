@@ -1,0 +1,1 @@
+python -m pytest tests/contract/ -q && cdd-kit validate --contracts

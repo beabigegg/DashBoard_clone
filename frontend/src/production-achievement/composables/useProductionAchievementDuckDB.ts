@@ -2,43 +2,48 @@
  * useProductionAchievementDuckDB — DuckDB-WASM composable for
  * production-achievement.
  *
- * Change: production-achievement-async-spool (ADR-0016)
- * IP-6: activate(spoolUrl, spec_workcenter_map, targets_map) downloads the
- * SPECNAME-grain parquet spool (data-shape-contract.md §3.28.1) and computes
- * PA-06 (SPECNAME -> workcenter_group rollup) + PA-07 (target join +
- * achievement_rate) entirely client-side in DuckDB-WASM SQL. No server-side
- * Python performs this computation on the request path any more
- * (business-rules.md PA-06/PA-07 "Implementation locus" notes).
+ * Change: production-achievement-overhaul (IP-6)
+ * Extends ADR-0016 (production-achievement-async-spool) one level further —
+ * see ADR-0016 § Extension for the full current join chain. The server still
+ * ships one SPECNAME+PACKAGE_LF-grain spool + 5 inline maps and computes
+ * nothing on the request path (data-shape-contract.md §3.28); this composable
+ * now runs a 2-stage rollup:
  *
- * Mirrors resource-history's useResourceHistoryDuckDB.ts lifecycle
- * (activate -> computeView -> deactivate), with two production-achievement
- * -specific differences:
- *   - Q1 (design.md, RESOLVED): the local-compute activation threshold is
- *     overridden to 0 here — DuckDB-WASM always activates on a spool hit (no
- *     row-count gate, unlike resource_history's >= threshold gate). A
- *     browser without WASM/Worker support gets an explicit "unsupported"
- *     error from activate() — there is no hidden server-side rollup to fall
- *     back to.
- *   - spec_workcenter_map / targets_map are small inline arrays injected by
- *     the server alongside spool_download_url (Q2, data-shape-contract.md
- *     §3.28.2/.3), not derived from the spool itself — they are registered
- *     as small in-memory DuckDB tables via a literal VALUES list (the
- *     Worker's message protocol only exposes 'register' for Parquet buffers
- *     and 'query' for arbitrary SQL; there is no JSON-register message type).
+ *   Stage 1 (`pa_rollup_raw`): identical INNER JOIN spool.SPECNAME ->
+ *     spec_workcenter_map (PA-06, unchanged case-insensitive join), now also
+ *     carrying PACKAGE_LF through the GROUP BY (it did not exist at this
+ *     grain before this change).
+ *   Stage 2 (`pa_rollup`, redefined in place): pa_rollup_raw
+ *     INNER JOIN workcenter_merge_map (PA-10, D2 — explicit-inclusion /
+ *       exclude-by-absence: an unmapped raw workcenter_group is DROPPED)
+ *     LEFT JOIN package_lf_map (PA-09, D1 — sparse / fallback-to-self:
+ *       COALESCE(merged_group, raw_package_lf, '(未分類)'), the OPPOSITE join
+ *       kind from workcenter_merge_map — never swap these two).
+ *
+ * `computeDailyView`/`computeCumulativeView` replace the old flat
+ * `computeView()` (PA-12/PA-13): the daily view sums D+N shifts per
+ * package_lf_group; the cumulative view additionally builds a per-day trend
+ * that aggregates ACROSS ALL package_lf_groups before dividing (D3 —
+ * SUM(actual)/SUM(plan), never a mean of per-group percentages).
  */
 
 import { ref, readonly } from 'vue';
 import { getDuckDBClient, fetchParquetBuffer } from '../../core/duckdb-client';
 import type { DuckDBClient } from '../../core/duckdb-client';
 import { checkLocalComputeEligibility } from '../../core/duckdb-activation-policy';
-import type { ProductionAchievementReportRow } from './useProductionAchievement';
 
 const TABLE_NAME = 'production_achievement_data';
 const SPEC_MAP_TABLE = 'pa_spec_workcenter_map';
 const TARGETS_TABLE = 'pa_targets_map';
+const PACKAGE_LF_MAP_TABLE = 'pa_package_lf_map';
+const WORKCENTER_MERGE_MAP_TABLE = 'pa_workcenter_merge_map';
+const DAILY_PLAN_MAP_TABLE = 'pa_daily_plan_map';
+const ROLLUP_RAW_TABLE = 'pa_rollup_raw';
 const ROLLUP_TABLE = 'pa_rollup';
 
-// ── Inline-injected map shapes (data-shape-contract.md §3.28.2/.3) ──────────
+const UNCLASSIFIED_SENTINEL = '(未分類)';
+
+// ── Inline-injected map shapes (data-shape-contract.md §3.28.2/.3/§3.33/§3.34) ──
 
 export interface SpecWorkcenterMapRow {
   SPECNAME: string;
@@ -51,10 +56,65 @@ export interface TargetsMapRow {
   target_qty: number | null;
 }
 
-export interface ComputeViewOptions {
-  /** Client-side narrowing only — the spool itself is never re-fetched for these. */
-  shiftCode?: string;
-  workcenterGroup?: string;
+/** §3.33 D1 — sparse exceptions-only, fallback-to-self on absence (PA-09). */
+export interface PackageLfMapRow {
+  raw_package_lf: string;
+  merged_group: string;
+}
+
+/** §3.33 D2 — explicit-inclusion, exclude-by-absence (PA-10). OPPOSITE default from PackageLfMapRow. */
+export interface WorkcenterMergeMapRow {
+  raw_workcenter_group: string;
+  merged_workcenter_group: string;
+}
+
+/** §3.34 — keyed (workcenter_group, package_lf_group), both already-merged values (PA-11). */
+export interface DailyPlanMapRow {
+  workcenter_group: string;
+  package_lf_group: string;
+  daily_plan_qty: number | null;
+}
+
+// ── Computed view row shapes (PA-12 daily / PA-13 cumulative) ───────────────
+
+export interface DailyViewRow {
+  package_lf_group: string;
+  d_output_qty: number;
+  n_output_qty: number;
+  daily_output_qty: number;
+  daily_plan_qty: number | null;
+  achievement_rate: number | null;
+}
+
+export interface CumulativeViewRow {
+  package_lf_group: string;
+  cumulative_actual_qty: number;
+  cumulative_plan_qty: number | null;
+  cumulative_diff_qty: number | null;
+  cumulative_achievement_rate: number | null;
+}
+
+export interface CumulativeTrendPoint {
+  output_date: string;
+  actual_qty: number;
+  plan_qty: number | null;
+  achievement_rate: number | null;
+}
+
+export interface CumulativeViewResult {
+  rows: CumulativeViewRow[];
+  trend: CumulativeTrendPoint[];
+}
+
+export interface ComputeDailyViewOptions {
+  workcenterGroup: string;
+}
+
+export interface ComputeCumulativeViewOptions {
+  workcenterGroup: string;
+  /** Already-resolved/capped date bounds (useProductionAchievement.ts owns resolveMonthPeriod()/range-end capping). */
+  startDate: string;
+  endDate: string;
 }
 
 // ── SQL literal helpers ──────────────────────────────────────────────────────
@@ -84,9 +144,9 @@ interface ValuesColumn {
 /**
  * Build a `CREATE OR REPLACE TABLE <name> AS ...` statement from an array of
  * plain-object rows. A bare `VALUES (...)` list requires >= 1 row, so the
- * empty-array case emits a typed zero-row SELECT instead (empty
- * spec_workcenter_map / targets_map is a valid degraded state — data-shape
- * -contract.md §3.28.3 MYSQL_OPS_ENABLED=false note).
+ * empty-array case emits a typed zero-row SELECT instead (an empty inline map
+ * is a valid degraded state — data-shape-contract.md §3.28.3/§3.30/§3.31/§3.32
+ * MYSQL_OPS_ENABLED=false notes).
  */
 function buildValuesTableSql(
   tableName: string,
@@ -132,6 +192,42 @@ function buildTargetsMapSql(rows: TargetsMapRow[]): string {
   );
 }
 
+/** D1 map (PA-09) — LEFT JOIN target, fallback-to-self on absence. */
+function buildPackageLfMapSql(rows: PackageLfMapRow[]): string {
+  return buildValuesTableSql(
+    PACKAGE_LF_MAP_TABLE,
+    [
+      { name: 'raw_package_lf', type: 'VARCHAR', kind: 'string' },
+      { name: 'merged_group', type: 'VARCHAR', kind: 'string' },
+    ],
+    rows as unknown as Record<string, unknown>[],
+  );
+}
+
+/** D2 map (PA-10) — INNER JOIN target, exclude-by-absence. OPPOSITE default from PackageLfMapRow above. */
+function buildWorkcenterMergeMapSql(rows: WorkcenterMergeMapRow[]): string {
+  return buildValuesTableSql(
+    WORKCENTER_MERGE_MAP_TABLE,
+    [
+      { name: 'raw_workcenter_group', type: 'VARCHAR', kind: 'string' },
+      { name: 'merged_workcenter_group', type: 'VARCHAR', kind: 'string' },
+    ],
+    rows as unknown as Record<string, unknown>[],
+  );
+}
+
+function buildDailyPlanMapSql(rows: DailyPlanMapRow[]): string {
+  return buildValuesTableSql(
+    DAILY_PLAN_MAP_TABLE,
+    [
+      { name: 'workcenter_group', type: 'VARCHAR', kind: 'string' },
+      { name: 'package_lf_group', type: 'VARCHAR', kind: 'string' },
+      { name: 'daily_plan_qty', type: 'INTEGER', kind: 'number' },
+    ],
+    rows as unknown as Record<string, unknown>[],
+  );
+}
+
 function eligibilityErrorMessage(reason: string): string {
   if (reason === 'browser_unsupported') {
     return '此瀏覽器不支援本頁面所需的資料運算功能（DuckDB-WASM），請改用 Chrome、Edge 等現代瀏覽器後再試';
@@ -150,6 +246,15 @@ function nullableNumber(val: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Inclusive day count between two 'YYYY-MM-DD' strings (PA-13 elapsed_days). */
+function daysBetweenInclusive(startDate: string, endDate: string): number {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const diffMs = end.getTime() - start.getTime();
+  const days = Math.round(diffMs / 86400000) + 1;
+  return Number.isFinite(days) && days > 0 ? days : 1;
+}
+
 // ── Main composable ───────────────────────────────────────────────────────────
 
 export function useProductionAchievementDuckDB() {
@@ -161,33 +266,65 @@ export function useProductionAchievementDuckDB() {
   let _isRegistered = false;
 
   /**
-   * PA-06 rollup: join the SPECNAME-grain spool to spec_workcenter_map via
-   * UPPER(TRIM(SPECNAME)) on BOTH sides — must equal the backend's
-   * `str(specname).strip().upper()` (business-rules.md PA-06) or rows
-   * silently drop out of the parity diff. Rows whose SPECNAME has no mapping
-   * entry are excluded (INNER JOIN — unmapped-SPECNAME exclusion).
+   * Stage 1 (`pa_rollup_raw`) — identical INNER JOIN to the original ADR-0016
+   * SPECNAME -> raw workcenter_group rollup (PA-06, case-insensitive join on
+   * UPPER(TRIM(SPECNAME)) both sides), now carrying PACKAGE_LF through the
+   * GROUP BY. This intermediate grain is what workcenter_merge_map keys on —
+   * it cannot be joined against the SPECNAME-grain spool directly (design.md
+   * "the two DuckDB stages stay separate").
+   */
+  async function _buildRollupRaw(): Promise<void> {
+    const sql = `
+      CREATE OR REPLACE TABLE ${ROLLUP_RAW_TABLE} AS
+      SELECT
+        s.output_date AS output_date,
+        s.shift_code AS shift_code,
+        m.workcenter_group AS raw_workcenter_group,
+        s.PACKAGE_LF AS raw_package_lf,
+        SUM(s.actual_output_qty) AS actual_output_qty
+      FROM ${TABLE_NAME} s
+      INNER JOIN ${SPEC_MAP_TABLE} m
+        ON UPPER(TRIM(CAST(s.SPECNAME AS VARCHAR))) = UPPER(TRIM(CAST(m.SPECNAME AS VARCHAR)))
+      GROUP BY s.output_date, s.shift_code, m.workcenter_group, s.PACKAGE_LF
+    `;
+    await _client!.sendQuery(sql);
+  }
+
+  /**
+   * Stage 2 (`pa_rollup`, redefined in place) — INNER JOIN workcenter_merge_map
+   * (PA-10, D2: a raw workcenter_group with no row is EXCLUDED — never LEFT
+   * JOIN) + LEFT JOIN package_lf_map (PA-09, D1: a raw PACKAGE_LF with no row
+   * falls back to itself, NULL/blank -> '(未分類)' — never INNER JOIN). These
+   * are deliberately opposite join kinds; do not "normalize" them to match.
    */
   async function _buildRollup(): Promise<void> {
     const sql = `
       CREATE OR REPLACE TABLE ${ROLLUP_TABLE} AS
       SELECT
-        s.output_date AS output_date,
-        s.shift_code AS shift_code,
-        m.workcenter_group AS workcenter_group,
-        SUM(s.actual_output_qty) AS actual_output_qty
-      FROM ${TABLE_NAME} s
-      INNER JOIN ${SPEC_MAP_TABLE} m
-        ON UPPER(TRIM(CAST(s.SPECNAME AS VARCHAR))) = UPPER(TRIM(CAST(m.SPECNAME AS VARCHAR)))
-      GROUP BY s.output_date, s.shift_code, m.workcenter_group
+        r.output_date AS output_date,
+        r.shift_code AS shift_code,
+        wm.merged_workcenter_group AS workcenter_group,
+        COALESCE(pm.merged_group, NULLIF(CAST(r.raw_package_lf AS VARCHAR), ''), ${sqlString(UNCLASSIFIED_SENTINEL)}) AS package_lf_group,
+        SUM(r.actual_output_qty) AS actual_output_qty
+      FROM ${ROLLUP_RAW_TABLE} r
+      INNER JOIN ${WORKCENTER_MERGE_MAP_TABLE} wm
+        ON r.raw_workcenter_group = wm.raw_workcenter_group
+      LEFT JOIN ${PACKAGE_LF_MAP_TABLE} pm
+        ON r.raw_package_lf = pm.raw_package_lf
+      GROUP BY r.output_date, r.shift_code, wm.merged_workcenter_group,
+        COALESCE(pm.merged_group, NULLIF(CAST(r.raw_package_lf AS VARCHAR), ''), ${sqlString(UNCLASSIFIED_SENTINEL)})
     `;
     await _client!.sendQuery(sql);
   }
 
   /**
    * Activate local compute mode.
-   * @param spoolUrl          - SPECNAME-grain Parquet spool download URL (§3.28.1)
-   * @param specWorkcenterMap - inline SPECNAME -> workcenter_group map (§3.28.2)
-   * @param targetsMap        - inline (shift_code, workcenter_group) -> target_qty map (§3.28.3)
+   * @param spoolUrl           - SPECNAME+PACKAGE_LF-grain Parquet spool download URL (§3.28.1)
+   * @param specWorkcenterMap  - inline SPECNAME -> workcenter_group map (§3.28.2)
+   * @param targetsMap         - inline (shift_code, workcenter_group) -> target_qty map (§3.28.3)
+   * @param packageLfMap       - inline PACKAGE_LF merge map, D1 (§3.33)
+   * @param workcenterMergeMap - inline workcenter merge map, D2 (§3.33)
+   * @param dailyPlanMap       - inline (workcenter_group, package_lf_group) -> daily_plan_qty map (§3.34)
    * @throws when WASM is unsupported (explicit unsupported state, no server
    *         fallback), the parquet fetch fails, or DuckDB init/SQL fails.
    */
@@ -195,6 +332,9 @@ export function useProductionAchievementDuckDB() {
     spoolUrl: string,
     specWorkcenterMap: SpecWorkcenterMapRow[],
     targetsMap: TargetsMapRow[],
+    packageLfMap: PackageLfMapRow[] = [],
+    workcenterMergeMap: WorkcenterMergeMapRow[] = [],
+    dailyPlanMap: DailyPlanMapRow[] = [],
   ): Promise<void> {
     isLoading.value = true;
     error.value = '';
@@ -221,6 +361,10 @@ export function useProductionAchievementDuckDB() {
       await _client.registerParquet(TABLE_NAME, buffer);
       await _client.sendQuery(buildSpecWorkcenterMapSql(specWorkcenterMap || []));
       await _client.sendQuery(buildTargetsMapSql(targetsMap || []));
+      await _client.sendQuery(buildPackageLfMapSql(packageLfMap || []));
+      await _client.sendQuery(buildWorkcenterMergeMapSql(workcenterMergeMap || []));
+      await _client.sendQuery(buildDailyPlanMapSql(dailyPlanMap || []));
+      await _buildRollupRaw();
       await _buildRollup();
       _isRegistered = true;
       isActive.value = true;
@@ -236,8 +380,9 @@ export function useProductionAchievementDuckDB() {
 
   /**
    * Re-register targets_map only (e.g. after a target-value PUT) without
-   * re-downloading the spool parquet or rebuilding the PA-06 rollup — only
-   * PA-07's join input changed. Call computeView() afterwards to re-render.
+   * re-downloading the spool parquet or rebuilding the rollup stages — only
+   * PA-07's join input changed. Call computeDailyView/computeCumulativeView
+   * afterwards to re-render.
    */
   async function updateTargetsMap(targetsMap: TargetsMapRow[]): Promise<void> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
@@ -245,46 +390,130 @@ export function useProductionAchievementDuckDB() {
   }
 
   /**
-   * PA-07: LEFT JOIN the PA-06 rollup against targets_map on
-   * (shift_code, workcenter_group). achievement_rate is null when the
-   * target is missing or 0 (never Infinity); 0.0 when actual=0 and a
-   * non-null non-zero target exists (business-rules.md PA-07).
+   * PA-12: DailyView — one row per package_lf_group for the selected
+   * (already-merged) workcenter_group, summing D+N shifts into a single daily
+   * total, LEFT JOIN daily_plan_map on (workcenter_group, package_lf_group).
+   * achievement_rate is null when the plan row is missing or 0 (never
+   * Infinity); 0.0 when daily output is 0 and a non-null non-zero plan exists.
    */
-  async function computeView(options: ComputeViewOptions = {}): Promise<ProductionAchievementReportRow[]> {
+  async function computeDailyView(options: ComputeDailyViewOptions): Promise<DailyViewRow[]> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
-
-    const whereClauses: string[] = [];
-    if (options.shiftCode) whereClauses.push(`r.shift_code = ${sqlString(options.shiftCode)}`);
-    if (options.workcenterGroup) whereClauses.push(`r.workcenter_group = ${sqlString(options.workcenterGroup)}`);
-    const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const wc = sqlString(options.workcenterGroup);
 
     const sql = `
       SELECT
-        strftime(CAST(r.output_date AS DATE), '%Y-%m-%d') AS output_date,
-        r.shift_code AS shift_code,
-        r.workcenter_group AS workcenter_group,
-        r.actual_output_qty AS actual_output_qty,
-        t.target_qty AS target_qty,
+        package_lf_group,
+        d_output_qty,
+        n_output_qty,
+        daily_output_qty,
+        daily_plan_qty,
         CASE
-          WHEN t.target_qty IS NULL THEN NULL
-          WHEN t.target_qty = 0 THEN NULL
-          ELSE CAST(r.actual_output_qty AS DOUBLE) / t.target_qty
+          WHEN daily_plan_qty IS NULL THEN NULL
+          WHEN daily_plan_qty = 0 THEN NULL
+          ELSE CAST(daily_output_qty AS DOUBLE) / daily_plan_qty
         END AS achievement_rate
-      FROM ${ROLLUP_TABLE} r
-      LEFT JOIN ${TARGETS_TABLE} t
-        ON r.shift_code = t.shift_code AND r.workcenter_group = t.workcenter_group
-      ${where}
-      ORDER BY r.output_date, r.shift_code, r.workcenter_group
+      FROM (
+        SELECT
+          r.package_lf_group AS package_lf_group,
+          SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) AS d_output_qty,
+          SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) AS n_output_qty,
+          SUM(r.actual_output_qty) AS daily_output_qty,
+          MAX(dp.daily_plan_qty) AS daily_plan_qty
+        FROM ${ROLLUP_TABLE} r
+        LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+          ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
+        WHERE r.workcenter_group = ${wc}
+        GROUP BY r.package_lf_group
+      ) sub
+      ORDER BY package_lf_group
     `;
     const rows = await _client.sendQuery(sql);
     return (rows as Record<string, unknown>[]).map((row) => ({
-      output_date: String(row.output_date ?? ''),
-      shift_code: String(row.shift_code ?? ''),
-      workcenter_group: String(row.workcenter_group ?? ''),
-      actual_output_qty: sf(row.actual_output_qty),
-      target_qty: nullableNumber(row.target_qty),
+      package_lf_group: String(row.package_lf_group ?? ''),
+      d_output_qty: sf(row.d_output_qty),
+      n_output_qty: sf(row.n_output_qty),
+      daily_output_qty: sf(row.daily_output_qty),
+      daily_plan_qty: nullableNumber(row.daily_plan_qty),
       achievement_rate: nullableNumber(row.achievement_rate),
     }));
+  }
+
+  /**
+   * PA-13: CumulativeView — per-package_lf_group cumulative rows (計畫 scaled
+   * by elapsed_days, computed in JS from the already-resolved/capped
+   * start/end dates) PLUS a daily trend that aggregates ACROSS ALL
+   * package_lf_groups before dividing (D3 — SUM(actual)/SUM(plan) per day,
+   * never a mean of each group's own percentage).
+   */
+  async function computeCumulativeView(options: ComputeCumulativeViewOptions): Promise<CumulativeViewResult> {
+    if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
+    const wc = sqlString(options.workcenterGroup);
+    const elapsedDays = daysBetweenInclusive(options.startDate, options.endDate);
+
+    const rowsSql = `
+      SELECT
+        r.package_lf_group AS package_lf_group,
+        SUM(r.actual_output_qty) AS cumulative_actual_qty,
+        MAX(dp.daily_plan_qty) AS daily_plan_qty
+      FROM ${ROLLUP_TABLE} r
+      LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+        ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
+      WHERE r.workcenter_group = ${wc}
+      GROUP BY r.package_lf_group
+      ORDER BY r.package_lf_group
+    `;
+    const rawRows = await _client.sendQuery(rowsSql);
+    const rows: CumulativeViewRow[] = (rawRows as Record<string, unknown>[]).map((row) => {
+      const dailyPlan = nullableNumber(row.daily_plan_qty);
+      const actual = sf(row.cumulative_actual_qty);
+      const cumulativePlan = dailyPlan === null ? null : dailyPlan * elapsedDays;
+      const diff = cumulativePlan === null ? null : actual - cumulativePlan;
+      const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
+      return {
+        package_lf_group: String(row.package_lf_group ?? ''),
+        cumulative_actual_qty: actual,
+        cumulative_plan_qty: cumulativePlan,
+        cumulative_diff_qty: diff,
+        cumulative_achievement_rate: rate,
+      };
+    });
+
+    // D3 aggregate-then-divide trend: sum actual and (known) plan across ALL
+    // package_lf_groups for each day BEFORE dividing. A package_lf_group with
+    // no daily_plan_map row contributes 0 to that day's plan sum (SQL SUM
+    // ignores NULL) rather than making the whole day's rate unknown — this
+    // mirrors summing only the KNOWN plans, consistent with how the detail
+    // rows above already show a "—" only for THAT group's own missing plan.
+    const trendSql = `
+      SELECT
+        g.output_date AS output_date,
+        SUM(g.actual_output_qty) AS actual_qty,
+        SUM(dp.daily_plan_qty) AS plan_qty
+      FROM (
+        SELECT output_date, package_lf_group, SUM(actual_output_qty) AS actual_output_qty
+        FROM ${ROLLUP_TABLE}
+        WHERE workcenter_group = ${wc}
+        GROUP BY output_date, package_lf_group
+      ) g
+      LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+        ON dp.workcenter_group = ${wc} AND dp.package_lf_group = g.package_lf_group
+      GROUP BY g.output_date
+      ORDER BY g.output_date
+    `;
+    const rawTrend = await _client.sendQuery(trendSql);
+    const trend: CumulativeTrendPoint[] = (rawTrend as Record<string, unknown>[]).map((row) => {
+      const actual = sf(row.actual_qty);
+      const plan = nullableNumber(row.plan_qty);
+      const rate = plan === null || plan === 0 ? null : actual / plan;
+      return {
+        output_date: String(row.output_date ?? ''),
+        actual_qty: actual,
+        plan_qty: plan,
+        achievement_rate: rate,
+      };
+    });
+
+    return { rows, trend };
   }
 
   /** Tear down local mode and release DuckDB resources. */
@@ -304,7 +533,8 @@ export function useProductionAchievementDuckDB() {
     isLoading: readonly(isLoading),
     error: readonly(error),
     activate,
-    computeView,
+    computeDailyView,
+    computeCumulativeView,
     updateTargetsMap,
     deactivate,
   };

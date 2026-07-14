@@ -1,0 +1,15 @@
+{
+  "change_id": "production-achievement-overhaul",
+  "phase": "contract",
+  "status": "passed",
+  "exit_code": 0,
+  "command": "conda run -n mes-dashboard python -m pytest tests/contract/ --ignore=tests/contract/test_capture_samples.py -q",
+  "duration_ms": 5124,
+  "first_failure": null,
+  "artifacts": {
+    "summary": "specs/changes/production-achievement-overhaul/test-runs/20260714-081958/summary.json",
+    "stdout": "specs/changes/production-achievement-overhaul/test-runs/20260714-081958/stdout.log",
+    "stderr": "specs/changes/production-achievement-overhaul/test-runs/20260714-081958/stderr.log"
+  },
+  "next_action": "proceed to the next phase"
+}
