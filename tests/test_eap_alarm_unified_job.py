@@ -48,6 +48,27 @@ class TestEapAlarmJobPreQuery:
         assert job._chunks[0]["kind"] == "events"
         assert job._chunks[1]["kind"] == "detail"
 
+    def test_explicit_lot_query_uses_one_unbounded_chunk_pair(self, tmp_path, monkeypatch):
+        """A specified LOT query must not manufacture a date range."""
+        monkeypatch.setenv("DUCKDB_JOB_DIR", str(tmp_path))
+        from mes_dashboard.workers.eap_alarm_worker import EapAlarmJob
+
+        job = EapAlarmJob("test-lot-001", params={
+            "query_mode": "lot_ids",
+            "lot_ids": ["LOT-001"],
+        })
+        with patch("mes_dashboard.services.eap_alarm_cache.make_eap_alarm_spool_key", return_value="lot-key"), \
+             patch("mes_dashboard.services.eap_alarm_cache.get_eap_alarm_spool_path", return_value=str(tmp_path / "lot.parquet")):
+            job.pre_query()
+
+        assert [chunk["kind"] for chunk in job._chunks] == ["events", "detail"]
+        assert "date_from" not in job._chunks[0]["base_params"]
+
+        sql, params = job.build_chunk_sql(job._chunks[0])
+        assert "LAST_UPDATE_TIME BETWEEN" not in sql
+        assert "LOT_ID IN" in sql
+        assert params["lot_0"] == "LOT-001"
+
 
 class TestEapAlarmJobBuildChunkSql:
     """AC-3: build_chunk_sql returns correct SQL per kind."""
@@ -581,3 +602,38 @@ class TestEapAlarmJobProgressReport:
         job.progress_report(15)
         assert calls[0][0] == "eap-alarm"
         assert calls[0][2].get("pct") == "15"
+
+
+class TestExecuteEapAlarmUnifiedJob:
+    def test_forwards_query_mode_to_job(self, monkeypatch):
+        from mes_dashboard.workers import eap_alarm_worker as worker
+
+        captured = {}
+
+        class FakeJob:
+            def __init__(self, job_id, params):
+                captured["job_id"] = job_id
+                captured["params"] = params
+                self._spool_key = "lot-key"
+
+            def run(self):
+                return "/tmp/lot.parquet"
+
+        monkeypatch.setattr(worker, "EapAlarmJob", FakeJob)
+        monkeypatch.setattr(
+            "mes_dashboard.rq_worker_preload.ensure_rq_logging", lambda: None
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.services.async_query_job_service.complete_job", lambda *a, **kw: None
+        )
+
+        worker.execute_eap_alarm_unified_job(
+            job_id="job-lot-001",
+            date_from="",
+            date_to="",
+            lot_ids=["LOT-001"],
+            query_mode="lot_ids",
+        )
+
+        assert captured["params"]["query_mode"] == "lot_ids"
+        assert captured["params"]["lot_ids"] == ["LOT-001"]

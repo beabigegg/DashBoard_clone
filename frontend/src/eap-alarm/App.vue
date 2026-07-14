@@ -91,6 +91,7 @@ let _jobAbortController: AbortController | null = null;
 // ── Loading / error state ────────────────────────────────────────────────────
 const queryLoading = ref(false);
 const errorMessage = ref('');
+const queryMode = ref<'date_range' | 'lot_ids'>('date_range');
 
 const hasNoResults = computed(
   () =>
@@ -134,17 +135,19 @@ function cancelAsyncJob(): void {
 }
 
 function validateCoarseFilter(): string {
+  if (queryMode.value === 'lot_ids') {
+    return coarseFilter.lot_ids.length > 0 ? '' : '請至少輸入一個 LOT ID';
+  }
   if (!coarseFilter.date_from) return '請填入開始日期';
   if (!coarseFilter.date_to) return '請填入結束日期';
   if (coarseFilter.date_from > coarseFilter.date_to) return '開始日期不能晚於結束日期';
-  // At-least-one-of-three: machines, lot_ids, or any product dim (EA-08)
+  // Date mode requires one narrowing condition.
   const hasProductDim =
     coarseFilter.pj_types.length > 0 ||
     coarseFilter.product_lines.length > 0 ||
     coarseFilter.pj_bops.length > 0;
   if (
     coarseFilter.machines.length === 0 &&
-    coarseFilter.lot_ids.length === 0 &&
     !hasProductDim
   ) {
     return '請選擇至少一個篩選條件 / Please select at least one filter';
@@ -172,7 +175,7 @@ async function handleSubmit(): Promise<void> {
   resetViews();
 
   try {
-    const body = buildCoarseParams();
+    const body = buildCoarseParams(queryMode.value);
 
     const resp = await apiPost('/api/eap-alarm/spool', body, { timeout: 60000 });
     const respObj = resp as Record<string, unknown>;
@@ -260,6 +263,7 @@ function handleClear(): void {
   resetFineFilter();
   resetFilterOptions();
   resetViews();
+  queryMode.value = 'date_range';
   setDefaultDateRange();
 }
 
@@ -351,11 +355,13 @@ async function handleParetoClick(name: string): Promise<void> {
       <!-- Coarse filter bar -->
       <FilterBar
         :filters="coarseFilter"
+        :query-mode="queryMode"
         :resource-options="resourceOptions"
         :product-filter-options="productFilterOptions"
         :product-options-loading="productOptionsLoading"
         :loading="{ querying: queryLoading }"
         @update:filters="(val) => Object.assign(coarseFilter, val)"
+        @update:query-mode="(mode) => queryMode = mode"
         @submit="handleSubmit"
         @clear="handleClear"
       />

@@ -32,6 +32,11 @@ logger = logging.getLogger("mes_dashboard.async_query_job_service")
 ASYNC_JOB_DEFAULT_TTL_SECONDS = int(os.getenv("ASYNC_JOB_TTL_SECONDS", "3600"))
 ASYNC_JOB_DEFAULT_TIMEOUT_SECONDS = int(os.getenv("ASYNC_JOB_TIMEOUT_SECONDS", "600"))
 _RQ_HEALTH_TTL_SECONDS = 60
+# Keep positive health checks warm, but retry failures quickly. During a full
+# service restart the web process can probe Redis a few seconds before the RQ
+# workers finish registering; caching that transient miss for the full minute
+# makes healthy always-async routes return 503 unnecessarily.
+_RQ_HEALTH_FAILURE_TTL_SECONDS = 2
 _FAILED_JOB_COUNT = 0
 _FAILED_JOB_LOCK = threading.Lock()
 _DEFAULT_RETRY_SENTINEL = object()
@@ -64,9 +69,15 @@ def is_async_available() -> bool:
         return False
 
     now = time.monotonic()
+    cached_available = _rq_health_cache["available"]
+    cache_ttl = (
+        _RQ_HEALTH_TTL_SECONDS
+        if cached_available is True
+        else _RQ_HEALTH_FAILURE_TTL_SECONDS
+    )
     if (
-        _rq_health_cache["available"] is not None
-        and (now - _rq_health_cache["checked_at"]) < _RQ_HEALTH_TTL_SECONDS
+        cached_available is not None
+        and (now - _rq_health_cache["checked_at"]) < cache_ttl
     ):
         return bool(_rq_health_cache["available"])
 

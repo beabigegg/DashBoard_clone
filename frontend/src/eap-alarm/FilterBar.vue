@@ -36,17 +36,21 @@ interface LoadingState {
   [key: string]: unknown;
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   filters: CoarseFilter;
+  queryMode?: 'date_range' | 'lot_ids';
   resourceOptions: ResourceOptions;
   productFilterOptions: ProductFilterOptions;
   loading: LoadingState;
   productOptionsLoading?: boolean;
-}>();
+}>(), {
+  queryMode: 'date_range',
+});
 
 const emit = defineEmits<{
   (e: 'submit'): void;
   (e: 'clear'): void;
+  (e: 'update:queryMode', value: 'date_range' | 'lot_ids'): void;
   (e: 'update:filters', value: CoarseFilter): void;
 }>();
 
@@ -59,6 +63,13 @@ function onLotIdBlur() {
     .map((s) => s.trim())
     .filter(Boolean);
   emit('update:filters', { ...props.filters, lot_ids: parsedIds });
+}
+
+function setQueryMode(mode: 'date_range' | 'lot_ids') {
+  if (mode === props.queryMode) return;
+  lotIdRaw.value = '';
+  emit('update:filters', { ...props.filters, lot_ids: [] });
+  emit('update:queryMode', mode);
 }
 
 // ── Cascade state (local; determines the machine options pool) ───────────────
@@ -107,7 +118,11 @@ function handleSubmit() {
       ? [...machineOptions.value]
       : props.filters.machines;
 
-  emit('update:filters', { ...props.filters, lot_ids: parsedIds, machines });
+  emit('update:filters', {
+    ...props.filters,
+    lot_ids: props.queryMode === 'lot_ids' ? parsedIds : [],
+    machines: props.queryMode === 'date_range' ? machines : [],
+  });
   // Use nextTick-like approach: emit submit after filter update propagates
   // (parent's Object.assign is synchronous so emit order is sufficient)
   emit('submit');
@@ -133,16 +148,18 @@ const hasLotIds = computed(() =>
 );
 
 const canSubmit = computed(() =>
-  !props.loading.querying &&
-  !!props.filters.date_from &&
-  !!props.filters.date_to &&
-  (
-    (props.filters.machines?.length ?? 0) > 0 ||
-    cascade.families.length > 0 ||
-    hasLotIds.value ||
-    (props.filters.pj_types?.length ?? 0) > 0 ||
-    (props.filters.product_lines?.length ?? 0) > 0 ||
-    (props.filters.pj_bops?.length ?? 0) > 0
+  !props.loading.querying && (
+    props.queryMode === 'lot_ids'
+      ? hasLotIds.value
+      : !!props.filters.date_from &&
+        !!props.filters.date_to &&
+        (
+          (props.filters.machines?.length ?? 0) > 0 ||
+          cascade.families.length > 0 ||
+          (props.filters.pj_types?.length ?? 0) > 0 ||
+          (props.filters.product_lines?.length ?? 0) > 0 ||
+          (props.filters.pj_bops?.length ?? 0) > 0
+        )
   )
 );
 </script>
@@ -153,32 +170,53 @@ const canSubmit = computed(() =>
       <div class="card-title ui-card-title">查詢條件</div>
     </div>
     <div class="card-body ui-card-body filter-panel">
-      <!-- Date range -->
-      <div class="filter-group">
-        <label class="filter-label" for="eap-date-from">開始日期 <span class="filter-required">*</span></label>
-        <input
-          id="eap-date-from"
-          v-model="filters.date_from"
-          type="date"
-          class="filter-input"
-          data-testid="start-date"
-          required
-        />
-      </div>
-      <div class="filter-group">
-        <label class="filter-label" for="eap-date-to">結束日期 <span class="filter-required">*</span></label>
-        <input
-          id="eap-date-to"
-          v-model="filters.date_to"
-          type="date"
-          class="filter-input"
-          data-testid="end-date"
-          required
-        />
+      <div class="filter-group-full mode-tab-row">
+        <button
+          type="button"
+          data-testid="query-mode-date"
+          :class="['mode-tab', { active: queryMode === 'date_range' }]"
+          :disabled="loading.querying"
+          @click="setQueryMode('date_range')"
+        >
+          日期區間
+        </button>
+        <button
+          type="button"
+          data-testid="query-mode-lot"
+          :class="['mode-tab', { active: queryMode === 'lot_ids' }]"
+          :disabled="loading.querying"
+          @click="setQueryMode('lot_ids')"
+        >
+          指定 LOT
+        </button>
       </div>
 
-      <!-- 型號 cascade filter -->
-      <div class="filter-group">
+      <template v-if="queryMode === 'date_range'">
+        <div class="filter-group">
+          <label class="filter-label" for="eap-date-from">開始日期 <span class="filter-required">*</span></label>
+          <input
+            id="eap-date-from"
+            v-model="filters.date_from"
+            type="date"
+            class="filter-input"
+            data-testid="start-date"
+            required
+          />
+        </div>
+        <div class="filter-group">
+          <label class="filter-label" for="eap-date-to">結束日期 <span class="filter-required">*</span></label>
+          <input
+            id="eap-date-to"
+            v-model="filters.date_to"
+            type="date"
+            class="filter-input"
+            data-testid="end-date"
+            required
+          />
+        </div>
+
+        <!-- 型號 cascade filter -->
+        <div class="filter-group">
         <label class="filter-label">型號</label>
         <MultiSelect
           :model-value="cascade.families"
@@ -188,10 +226,10 @@ const canSubmit = computed(() =>
           searchable
           @update:model-value="updateFamilies"
         />
-      </div>
+        </div>
 
-      <!-- 機台 (filtered by 型號 + flags) -->
-      <div class="filter-group filter-group-wide">
+        <!-- 機台 (filtered by 型號 + flags) -->
+        <div class="filter-group filter-group-wide">
         <label class="filter-label">機台</label>
         <MultiSelect
           :model-value="filters.machines"
@@ -202,40 +240,25 @@ const canSubmit = computed(() =>
           data-testid="machine-select"
           @update:model-value="updateMachines"
         />
-      </div>
+        </div>
 
-      <!-- LOT ID textarea (one per line) -->
-      <div class="filter-group filter-group-wide">
-        <label class="filter-label" for="eap-lot-id">LOT ID</label>
-        <textarea
-          id="eap-lot-id"
-          v-model="lotIdRaw"
-          class="filter-input filter-textarea"
-          :disabled="loading.querying"
-          placeholder="每行一個 LOT ID / One LOT ID per line"
-          rows="3"
-          data-testid="lot-id-textarea"
-          @blur="onLotIdBlur"
-        />
-      </div>
-
-      <!-- PJ 類型 (TYPE) -->
-      <div class="filter-group">
-        <label class="filter-label">PJ 類型 / PJ Type</label>
+        <!-- Type -->
+        <div class="filter-group">
+        <label class="filter-label">Type</label>
         <MultiSelect
           :model-value="filters.pj_types"
           :options="productFilterOptions.pj_types"
           :disabled="loading.querying || productOptionsLoading"
-          :placeholder="productOptionsLoading ? '載入中...' : '全部 PJ 類型'"
+          :placeholder="productOptionsLoading ? '載入中...' : '全部 Type'"
           searchable
           data-testid="pj-type-select"
           @update:model-value="(v: string[]) => emit('update:filters', { ...filters, pj_types: v })"
         />
-      </div>
+        </div>
 
-      <!-- Package (product_lines) -->
-      <div class="filter-group">
-        <label class="filter-label">Package / 封裝</label>
+        <!-- Package -->
+        <div class="filter-group">
+        <label class="filter-label">Package</label>
         <MultiSelect
           :model-value="filters.product_lines"
           :options="productFilterOptions.product_lines"
@@ -245,11 +268,11 @@ const canSubmit = computed(() =>
           data-testid="product-line-select"
           @update:model-value="(v: string[]) => emit('update:filters', { ...filters, product_lines: v })"
         />
-      </div>
+        </div>
 
-      <!-- BOP (pj_bops) -->
-      <div class="filter-group">
-        <label class="filter-label">BOP 製程 / BOP</label>
+        <!-- BOP -->
+        <div class="filter-group">
+        <label class="filter-label">BOP</label>
         <MultiSelect
           :model-value="filters.pj_bops"
           :options="productFilterOptions.pj_bops"
@@ -259,6 +282,22 @@ const canSubmit = computed(() =>
           data-testid="pj-bop-select"
           @update:model-value="(v: string[]) => emit('update:filters', { ...filters, pj_bops: v })"
         />
+        </div>
+      </template>
+
+      <div v-else class="filter-group filter-group-full">
+        <label class="filter-label" for="eap-lot-id">LOT ID</label>
+        <textarea
+          id="eap-lot-id"
+          v-model="lotIdRaw"
+          class="filter-input filter-textarea"
+          :disabled="loading.querying"
+          placeholder="每行一個 LOT ID / One LOT ID per line"
+          rows="4"
+          data-testid="lot-id-textarea"
+          @blur="onLotIdBlur"
+        />
+        <span class="filter-hint">指定 LOT 查詢不需填寫日期。</span>
       </div>
 
       <!-- Toolbar -->
@@ -269,7 +308,7 @@ const canSubmit = computed(() =>
             class="ui-btn ui-btn--primary"
             data-testid="coarse-submit-btn"
             :disabled="!canSubmit"
-            :title="!canSubmit ? '請選擇至少一項：機台、LOT ID 或產品條件' : ''"
+            :title="!canSubmit ? (queryMode === 'lot_ids' ? '請至少輸入一個 LOT ID' : '請選擇至少一項：機台、Type、Package 或 BOP') : ''"
             @click="handleSubmit"
           >
             <template v-if="loading.querying">查詢中...</template>
@@ -285,8 +324,10 @@ const canSubmit = computed(() =>
           </button>
         </div>
         <div class="filter-hint">
-          日期為必填。機台、LOT ID、PJ 類型 / Package / BOP 至少填入一項。
-          / Date required. At least one of: machines, LOT ID, or product dims.
+          <template v-if="queryMode === 'date_range'">
+            日期為必填；機台、Type、Package、BOP 至少填入一項。
+          </template>
+          <template v-else>每行一個 LOT ID，最多 200 筆。</template>
         </div>
       </div>
     </div>

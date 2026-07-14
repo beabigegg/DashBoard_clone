@@ -30,6 +30,38 @@
   width: 100%;
 }
 
+.theme-eap-alarm .mode-tab-row {
+  display: flex;
+  gap: theme('spacing.token.p4');
+}
+
+.theme-eap-alarm .mode-tab {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: theme('spacing.token.p7') theme('spacing.token.p16');
+  background: theme('colors.token.hffffff');
+  color: theme('colors.token.h475569');
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.theme-eap-alarm .mode-tab:hover:not(.active):not(:disabled) {
+  border-color: theme('colors.brand.600');
+  color: theme('colors.brand.600');
+}
+
+.theme-eap-alarm .mode-tab.active {
+  background: theme('colors.brand.600');
+  border-color: theme('colors.brand.600');
+  color: theme('colors.token.hffffff');
+}
+
+.theme-eap-alarm .mode-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .theme-eap-alarm .filter-label {
   font-size: 12px;
   font-weight: 600;
@@ -133,13 +165,13 @@
 }
 
 .theme-eap-alarm .pareto-chart-body {
-  height: 320px;
+  height: 410px;
   position: relative;
 }
 
 .theme-eap-alarm .pareto-chart {
   width: 100%;
-  height: 300px;
+  height: 390px;
 }
 
 .theme-eap-alarm .pareto-loading,
@@ -147,7 +179,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 280px;
+  height: 370px;
   color: theme('colors.token.h94a3b8');
   font-size: 14px;
 }

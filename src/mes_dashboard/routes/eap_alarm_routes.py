@@ -142,8 +142,19 @@ def api_eap_alarm_spool():
             status_code=payload_error.status_code,
         )
 
+    query_mode = str(body.get("query_mode") or "date_range").strip()
+    if query_mode not in {"date_range", "lot_ids"}:
+        return validation_error("query_mode must be 'date_range' or 'lot_ids'")
+
     date_from = str(body.get("date_from") or "").strip()
     date_to = str(body.get("date_to") or "").strip()
+    if query_mode == "lot_ids":
+        # The explicit-LOT path is deliberately unbounded by time. Keeping the
+        # dates empty makes the worker choose its indexed LOT_ID SQL template.
+        date_from = ""
+        date_to = ""
+    elif not date_from or not date_to:
+        return validation_error("date_from and date_to are required for a date-range query")
 
     # Parse eqp_types (formerly 'machines'; accept both keys for backward compat)
     eqp_types_raw = body.get("eqp_types") or body.get("machines") or []
@@ -156,6 +167,9 @@ def api_eap_alarm_spool():
     if not isinstance(lot_ids_raw, list):
         lot_ids_raw = [lot_ids_raw] if lot_ids_raw else []
     lot_ids = [str(v).strip() for v in lot_ids_raw if str(v).strip()]
+
+    if query_mode == "lot_ids" and not lot_ids:
+        return validation_error("lot_ids must be provided for a LOT query")
 
     pj_types_raw = body.get("pj_types") or []
     if not isinstance(pj_types_raw, list):
@@ -220,6 +234,7 @@ def api_eap_alarm_spool():
                 owner=get_owner_token(),
                 params={
                     "job_id": job_id,
+                    "query_mode": query_mode,
                     "date_from": date_from,
                     "date_to": date_to,
                     "eqp_types": eqp_types,
@@ -246,6 +261,7 @@ def api_eap_alarm_spool():
                 job_id=job_id,
                 kwargs={
                     "job_id": job_id,
+                    "query_mode": query_mode,
                     "date_from": date_from,
                     "date_to": date_to,
                     "eqp_types": eqp_types,

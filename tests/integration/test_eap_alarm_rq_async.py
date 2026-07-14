@@ -130,6 +130,43 @@ class TestEapAlarmSpoolTrigger:
             )
         assert resp.status_code == 400
 
+    def test_lot_query_enqueues_without_dates(self, monkeypatch):
+        """The explicit LOT mode dispatches the date-free worker path."""
+        captured: Dict[str, Any] = {}
+
+        def _mock_enqueue_query_job(job_type, owner, params, **kwargs):
+            captured["job_type"] = job_type
+            captured["params"] = dict(params)
+            return ("eap-alarm-lot-001", None, None)
+
+        monkeypatch.setattr(
+            "mes_dashboard.services.async_query_job_service.enqueue_query_job",
+            _mock_enqueue_query_job,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.routes.eap_alarm_routes._get_spool_path",
+            lambda key: None,
+        )
+        monkeypatch.setattr(
+            "mes_dashboard.core.permissions.get_owner_token",
+            lambda: "test-user",
+        )
+
+        app = _make_app()
+        with app.test_client() as client:
+            resp = client.post(
+                "/api/eap-alarm/spool",
+                json={"query_mode": "lot_ids", "lot_ids": ["LOT-001"]},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 202
+        assert captured["job_type"] == "eap-alarm"
+        assert captured["params"]["query_mode"] == "lot_ids"
+        assert captured["params"]["lot_ids"] == ["LOT-001"]
+        assert captured["params"]["date_from"] == ""
+        assert captured["params"]["date_to"] == ""
+
     def test_post_spool_blank_eqp_type_returns_400(self, monkeypatch):
         """Blank-after-strip eqp_type entry → 400 VALIDATION_ERROR (EA-07).
 

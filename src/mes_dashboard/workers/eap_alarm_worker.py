@@ -109,6 +109,34 @@ WHERE e.LAST_UPDATE_TIME BETWEEN TO_DATE(:date_from, 'YYYY-MM-DD')
   AND {_ALARM_EVENT_PREDICATE}{{extra_filters}}
 """
 
+# Explicit LOT queries omit LAST_UPDATE_TIME entirely and rely on the required
+# ``e.LOT_ID IN (...)`` clause. This is intentionally a separate template so a
+# date predicate cannot be accidentally left behind when the UI selects LOT
+# mode.
+_EAP_EVENT_LOT_SQL_TEMPLATE = f"""\
+SELECT
+    TO_CHAR(e.SEQ_ID)              AS EVENT_ID,
+    e.EQUIPMENT_ID                 AS EQP_ID,
+    SUBSTR(e.EQUIPMENT_ID, 1, 4)   AS EQP_TYPE,
+    e.LOT_ID,
+    e.EVENT_TYPE,
+    e.EVENT_NAME                   AS ALARM_ID,
+    e.LAST_UPDATE_TIME             AS ALARM_TIME
+FROM DWH.EAP_EVENT e
+WHERE {{equipment_filter}}
+  AND {_ALARM_EVENT_PREDICATE}{{extra_filters}}
+"""
+
+_DETAIL_LOT_SQL_TEMPLATE = f"""\
+SELECT TO_CHAR(e.SEQ_ID) AS EVENT_ID,
+       d.PARAMETER_NAME,
+       d.PARAMETER_VALUE
+FROM DWH.EAP_EVENT e
+JOIN DWH.EAP_EVENT_DETAIL d ON d.SEQ_ID = e.SEQ_ID
+WHERE {{equipment_filter}}
+  AND {_ALARM_EVENT_PREDICATE}{{extra_filters}}
+"""
+
 # ── DuckDB pairing query ───────────────────────────────────────────────────────
 # Registers three tables:
 #   events_raw   — from Oracle main query (EVENT_ID, EQP_ID, ...)
@@ -396,6 +424,7 @@ def run_eap_alarm_query_job(
     pj_types: List[str] = (),
     product_lines: List[str] = (),
     pj_bops: List[str] = (),
+    query_mode: str = "date_range",
 ) -> None:
     """RQ worker: Oracle fetch → DuckDB in-memory pairing → parquet write."""
     import hashlib
@@ -438,20 +467,23 @@ def run_eap_alarm_query_job(
             extra_filter_parts.append(f"\n  AND {ec}")
         extra_filters = "".join(extra_filter_parts)
 
-        base_params: Dict[str, Any] = {
-            "date_from": date_from,
-            "date_to": date_to,
-            **eqp_params,
-            **lot_params,
-            **exists_params,
-        }
+        base_params: Dict[str, Any] = {**eqp_params, **lot_params, **exists_params}
+        if query_mode == "date_range":
+            base_params.update({"date_from": date_from, "date_to": date_to})
+
+        event_template = (
+            _EAP_EVENT_LOT_SQL_TEMPLATE if query_mode == "lot_ids" else _EAP_EVENT_SQL_TEMPLATE
+        )
+        detail_template = (
+            _DETAIL_LOT_SQL_TEMPLATE if query_mode == "lot_ids" else _DETAIL_SQL_TEMPLATE
+        )
 
         update_job_progress(_JOB_PREFIX, job_id, status="running", progress="querying Oracle", pct="15")
 
         from mes_dashboard.core.database import read_sql_df_slow
 
         events_df = read_sql_df_slow(
-            _EAP_EVENT_SQL_TEMPLATE.format(
+            event_template.format(
                 equipment_filter=equipment_filter,
                 extra_filters=extra_filters,
             ),
@@ -465,7 +497,7 @@ def run_eap_alarm_query_job(
 
         try:
             detail_df = read_sql_df_slow(
-                _DETAIL_SQL_TEMPLATE.format(
+                detail_template.format(
                     equipment_filter=equipment_filter,
                     extra_filters=extra_filters,
                 ),
@@ -579,11 +611,13 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         self._eqp_types: List[str] = []
         self._date_from: str = ""
         self._date_to: str = ""
+        self._query_mode: str = "date_range"
 
     def pre_query(self) -> None:
         """Parse params, compute spool key, build daily chunk pairs."""
         date_from = str(self.params.get("date_from", "")).strip()
         date_to = str(self.params.get("date_to", "")).strip()
+        query_mode = str(self.params.get("query_mode", "date_range")).strip()
         eqp_types = list(self.params.get("eqp_types", []))
         lot_ids = list(self.params.get("lot_ids", []))
         pj_types = list(self.params.get("pj_types", []))
@@ -593,6 +627,7 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         self._date_from = date_from
         self._date_to = date_to
         self._eqp_types = eqp_types
+        self._query_mode = query_mode
 
         self._equipment_filter, self._eqp_params = _build_equipment_filter(eqp_types)
 
@@ -613,6 +648,16 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
         )
         self._spool_path = get_eap_alarm_spool_path(self._spool_key)
         self._machines_hash = hashlib.sha256(self._spool_key.encode("utf-8")).hexdigest()[:8]
+
+        # Explicit LOT queries are already selective and run as one events/detail
+        # pair without a date predicate. Date queries retain the daily fan-out.
+        if query_mode == "lot_ids":
+            base_params: Dict[str, Any] = {**self._eqp_params, **self._extra_params}
+            self._chunks = [
+                {"kind": "events", "base_params": base_params},
+                {"kind": "detail", "base_params": base_params},
+            ]
+            return
 
         # Build daily chunk pairs: one "events" chunk + one "detail" chunk per day
         start = datetime.strptime(date_from, "%Y-%m-%d")
@@ -646,16 +691,26 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
     def build_chunk_sql(self, chunk_params: dict) -> tuple[str, dict]:
         """Return (sql, binds) for the given chunk kind."""
         if chunk_params["kind"] == "events":
+            template = (
+                _EAP_EVENT_LOT_SQL_TEMPLATE
+                if self._query_mode == "lot_ids"
+                else _EAP_EVENT_SQL_TEMPLATE
+            )
             return (
-                _EAP_EVENT_SQL_TEMPLATE.format(
+                template.format(
                     equipment_filter=self._equipment_filter,
                     extra_filters=self._extra_filters,
                 ),
                 chunk_params["base_params"],
             )
         else:
+            template = (
+                _DETAIL_LOT_SQL_TEMPLATE
+                if self._query_mode == "lot_ids"
+                else _DETAIL_SQL_TEMPLATE
+            )
             return (
-                _DETAIL_SQL_TEMPLATE.format(
+                template.format(
                     equipment_filter=self._equipment_filter,
                     extra_filters=self._extra_filters,
                 ),
@@ -791,6 +846,7 @@ def execute_eap_alarm_unified_job(
     pj_types: list = (),
     product_lines: list = (),
     pj_bops: list = (),
+    query_mode: str = "date_range",
 ) -> None:
     """RQ entry point for EapAlarmJob (EAP_ALARM_USE_UNIFIED_JOB=on path).
 
@@ -806,6 +862,7 @@ def execute_eap_alarm_unified_job(
         job = EapAlarmJob(
             job_id=job_id,
             params={
+                "query_mode": query_mode,
                 "date_from": date_from,
                 "date_to": date_to,
                 "eqp_types": list(eqp_types),

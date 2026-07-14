@@ -48,14 +48,14 @@ def validate_eap_alarm_params(
     product_lines: Optional[list] = None,
     pj_bops: Optional[list] = None,
 ) -> None:
-    """Validate EAP ALARM coarse filter params (EA-03, EA-07, EA-08, EA-09).
+    """Validate EAP ALARM coarse filter params.
 
     Raises:
-        ValueError: on missing dates, non-string/blank eqp_type entries (EA-07),
+        ValueError: on incomplete date ranges, non-string/blank eqp_type entries,
                     all-empty filter axes (EA-08), or lot_ids overflow (EA-09).
     """
-    if not date_from or not date_to:
-        raise ValueError("LAST_UPDATE_TIME filter required (date_from and date_to must be provided)")
+    if bool(date_from) != bool(date_to):
+        raise ValueError("date_from and date_to must be provided together")
 
     # Normalize eqp_types — validated like lot_ids: reject non-string/blank entries,
     # keep every non-empty stripped value, no closed-enum membership check (EA-07,
@@ -81,6 +81,12 @@ def validate_eap_alarm_params(
         raise ValueError(
             f"lot_ids exceeds max {_LOT_IDS_MAX} entries (EA-09): got {len(cleaned_lots)}"
         )
+
+    # An explicit LOT query intentionally has no date range. It must be
+    # constrained by at least one LOT ID so the unbounded event lookup remains
+    # selective.
+    if not date_from and not cleaned_lots:
+        raise ValueError("lot_ids must be provided when no date range is supplied")
 
     # Check product_dims presence (any of pj_types / product_lines / pj_bops non-empty)
     has_product_dims = bool(pj_types) or bool(product_lines) or bool(pj_bops)

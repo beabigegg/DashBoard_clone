@@ -251,6 +251,19 @@ describe('useEapAlarmFilter', () => {
       expect(params.lot_ids).toEqual(['LOT001', 'LOT002']);
     });
 
+    it('builds a LOT query without date fields or date-mode dimensions', () => {
+      filter.coarseFilter.lot_ids = ['LOT001', 'LOT002'];
+      filter.coarseFilter.machines = ['MACHINE-1'];
+      filter.coarseFilter.pj_types = ['TYPE-A'];
+
+      const params = filter.buildCoarseParams('lot_ids');
+
+      expect(params).toEqual({
+        query_mode: 'lot_ids',
+        lot_ids: ['LOT001', 'LOT002'],
+      });
+    });
+
     it('forwards pj_types as separate param', () => {
       filter.coarseFilter.machines = ['MACHINE-1']; // satisfy at-least-one (not in composable)
       filter.coarseFilter.pj_types = ['TYPE-A', 'TYPE-B'];
@@ -410,10 +423,11 @@ describe('FilterBar handleSubmit family expansion', () => {
     };
   }
 
-  function mountFilterBar(filters) {
+  function mountFilterBar(filters, queryMode = 'date_range') {
     return shallowMount(FilterBar, {
       props: {
         filters,
+        queryMode,
         resourceOptions: RESOURCE_OPTIONS,
         productFilterOptions: PRODUCT_FILTER_OPTIONS,
         loading: { querying: false },
@@ -488,11 +502,9 @@ describe('FilterBar handleSubmit family expansion', () => {
   });
 
   it('no family and no machine selected leaves submitted machines as empty array unchanged', async () => {
-    // canSubmit requires at-least-one-of-three; set lot_ids (orthogonal to
-    // family/machine) so the submit button is enabled without touching the
-    // 型號/機台 axes under test here.
+    // LOT IDs are now queried in their own mode, independent of date filters.
     const filters = makeFilters({ machines: [], lot_ids: ['LOT-001'] });
-    const wrapper = mountFilterBar(filters);
+    const wrapper = mountFilterBar(filters, 'lot_ids');
 
     // No family selection performed — cascade.families stays empty.
     await wrapper.find('[data-testid="coarse-submit-btn"]').trigger('click');

@@ -155,11 +155,16 @@ export function useEapAlarmFilter() {
    * Omits empty arrays so the backend does not receive spurious empty dims.
    * machines maps to the "machines" key (backward-compat with existing API).
    */
-  function buildCoarseParams() {
-    const params = {
-      date_from: coarseFilter.date_from,
-      date_to: coarseFilter.date_to,
-    };
+  function buildCoarseParams(queryMode = 'date_range') {
+    const params = { query_mode: queryMode };
+    if (queryMode === 'date_range') {
+      params.date_from = coarseFilter.date_from;
+      params.date_to = coarseFilter.date_to;
+    }
+    if (queryMode === 'lot_ids') {
+      if (coarseFilter.lot_ids.length > 0) params.lot_ids = coarseFilter.lot_ids;
+      return params;
+    }
     if (coarseFilter.machines.length > 0) {
       params.machines = coarseFilter.machines;
     }

@@ -50,6 +50,8 @@ def make_eap_alarm_spool_key(
     """Build the deterministic spool key for a coarse EAP ALARM query (EA-01).
 
     Format: ``eap_alarm_{date_from}_{date_to}_{coarse_dims_hash8}_v{schema_version}``
+    for date queries, or ``eap_alarm_lot_{coarse_dims_hash8}_v{schema_version}``
+    for an explicit LOT query.
 
     Uses underscores (not colons) so the key passes query_spool_store's
     _VALID_ID_RE = r"^[A-Za-z0-9._-]{4,128}$" and can be used directly as
@@ -61,10 +63,13 @@ def make_eap_alarm_spool_key(
     (EA-01 canonical repr, D-1).
 
     Raises:
-        ValueError: if date_from or date_to is missing (EA-03 guard).
+        ValueError: if only one date boundary is supplied.
     """
-    if not date_from or not date_to:
-        raise ValueError("LAST_UPDATE_TIME filter required (date_from and date_to must be provided)")
+    if bool(date_from) != bool(date_to):
+        raise ValueError("date_from and date_to must be provided together")
+    lot_query = not date_from and not date_to
+    if lot_query and not lot_ids:
+        raise ValueError("lot_ids must be provided when no date range is supplied")
 
     # Canonicalize each dim: sorted, stripped, distinct per-dim separator prevents
     # cross-dim hash collisions when some dims are empty.
@@ -74,9 +79,14 @@ def make_eap_alarm_spool_key(
     pln_part = "pln:" + ",".join(sorted(str(v).strip() for v in product_lines if str(v).strip()))
     bop_part = "bop:" + ",".join(sorted(str(v).strip() for v in pj_bops if str(v).strip()))
 
-    canonical = "|".join([eqp_part, lot_part, pjt_part, pln_part, bop_part])
+    canonical = "|".join([
+        "mode:lot" if lot_query else "mode:date",
+        eqp_part, lot_part, pjt_part, pln_part, bop_part,
+    ])
     dims_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:8]
 
+    if lot_query:
+        return f"eap_alarm_lot_{dims_hash}_v{_SCHEMA_VERSION}"
     return f"eap_alarm_{date_from}_{date_to}_{dims_hash}_v{_SCHEMA_VERSION}"
 
 

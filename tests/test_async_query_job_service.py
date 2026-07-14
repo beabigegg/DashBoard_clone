@@ -111,6 +111,23 @@ class TestIsAsyncAvailable:
         assert result is True
         mock_conn.ping.assert_called_once()
 
+    def test_negative_cache_refreshes_quickly_after_worker_startup(self):
+        """A transient startup miss must not block async routes for 60 seconds."""
+        svc._RQ_AVAILABLE = True
+        svc._rq_health_cache["available"] = False
+        svc._rq_health_cache["checked_at"] = (
+            time.monotonic() - svc._RQ_HEALTH_FAILURE_TTL_SECONDS - 0.1
+        )
+
+        mock_conn = MagicMock()
+        with patch.object(svc, "get_redis_client", return_value=mock_conn), \
+             patch("rq.Worker") as mock_worker_cls:
+            mock_worker_cls.all.return_value = [MagicMock()]
+            result = svc.is_async_available()
+
+        assert result is True
+        mock_conn.ping.assert_called_once()
+
     def test_returns_false_when_worker_query_raises(self):
         """Should return False when rq.Worker.all() raises an unexpected exception."""
         svc._RQ_AVAILABLE = True

@@ -4,12 +4,27 @@ import { computed } from 'vue';
 import EmptyState from '../shared-ui/components/EmptyState.vue';
 import LoadingSpinner from '../shared-ui/components/LoadingSpinner.vue';
 import { BarChart, LineChart } from 'echarts/charts';
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import {
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from 'echarts/components';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 
-use([CanvasRenderer, BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent]);
+use([
+  CanvasRenderer,
+  BarChart,
+  LineChart,
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+]);
+
+const MAX_VISIBLE_CATEGORIES = 15;
 
 interface ParetoItem {
   // `name` is the generic dim value; `alarm_text` is the legacy alias kept in
@@ -53,6 +68,10 @@ const chartOption = computed(() => {
   const labels = items.map((i) => itemName(i));
   const counts = items.map((i) => Number(i.count || 0));
   const cumPcts = items.map((i) => Number((i.cumulative_pct ?? 0).toFixed(1)));
+  const needsHorizontalZoom = items.length > MAX_VISIBLE_CATEGORIES;
+  const initialZoomEnd = needsHorizontalZoom
+    ? Math.max(1, (MAX_VISIBLE_CATEGORIES / items.length) * 100)
+    : 100;
 
   return {
     tooltip: {
@@ -69,17 +88,27 @@ const chartOption = computed(() => {
     },
     legend: {
       data: ['ALARM 次數', '累積百分比'],
-      bottom: 0,
+      top: 0,
+      left: 'center',
     },
-    grid: { left: 60, right: 60, top: 20, bottom: 60, containLabel: false },
+    grid: {
+      left: 64,
+      right: 64,
+      top: 52,
+      bottom: needsHorizontalZoom ? 112 : 82,
+      containLabel: false,
+    },
     xAxis: {
       type: 'category',
       data: labels,
+      axisTick: { alignWithLabel: true },
       axisLabel: {
-        rotate: 30,
+        rotate: needsHorizontalZoom ? 35 : 25,
         interval: 0,
+        width: 96,
+        overflow: 'truncate',
         formatter(value: string) {
-          return value.length > 12 ? `${value.slice(0, 12)}...` : value;
+          return value.length > 14 ? `${value.slice(0, 14)}...` : value;
         },
       },
     },
@@ -103,6 +132,35 @@ const chartOption = computed(() => {
         axisLabel: { formatter: (v: unknown) => `${v}%` },
       },
     ],
+    dataZoom: needsHorizontalZoom
+      ? [
+          {
+            type: 'inside',
+            xAxisIndex: 0,
+            start: 0,
+            end: initialZoomEnd,
+            zoomOnMouseWheel: true,
+            moveOnMouseMove: true,
+            moveOnMouseWheel: true,
+          },
+          {
+            type: 'slider',
+            xAxisIndex: 0,
+            start: 0,
+            end: initialZoomEnd,
+            bottom: 10,
+            height: 20,
+            brushSelect: false,
+            showDetail: false,
+            borderColor: 'rgb(203, 213, 225)',
+            fillerColor: 'rgba(37, 99, 235, 0.16)',
+            handleStyle: {
+              color: 'rgb(37, 99, 235)',
+              borderColor: 'rgb(37, 99, 235)',
+            },
+          },
+        ]
+      : [],
     series: [
       {
         name: 'ALARM 次數',

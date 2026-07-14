@@ -119,17 +119,17 @@ class TestSpoolKeyComposition:
 
 # ── test_missing_date_range_raises_value_error ────────────────────────────────
 
-class TestMissingDateRangeRaisesValueError:
-    """EA-03: Missing date_from or date_to must raise ValueError."""
+class TestDateRangeOrLotValidation:
+    """Date ranges must be complete; explicit LOT queries may omit both dates."""
 
     def test_missing_date_from_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
+        with pytest.raises(ValueError, match="date_from and date_to"):
             make_eap_alarm_spool_key(None, "2025-01-07", ["GDBA"])
 
     def test_missing_date_to_spool_key(self):
         from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
-        with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
+        with pytest.raises(ValueError, match="date_from and date_to"):
             make_eap_alarm_spool_key("2025-01-01", None, ["GDBA"])
 
     def test_empty_date_from_spool_key(self):
@@ -139,18 +139,26 @@ class TestMissingDateRangeRaisesValueError:
 
     def test_missing_date_from_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
+        with pytest.raises(ValueError, match="date_from and date_to"):
             validate_eap_alarm_params(None, "2025-01-07", eqp_types=["GDBA"])
 
     def test_missing_date_to_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
-        with pytest.raises(ValueError, match="LAST_UPDATE_TIME filter required"):
+        with pytest.raises(ValueError, match="date_from and date_to"):
             validate_eap_alarm_params("2025-01-01", "", eqp_types=["GDBA"])
 
     def test_both_dates_missing_validate(self):
         from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
         with pytest.raises(ValueError):
             validate_eap_alarm_params(None, None, eqp_types=["GDBA"])
+
+    def test_explicit_lot_query_allows_no_dates(self):
+        from mes_dashboard.services.eap_alarm_cache import make_eap_alarm_spool_key
+        from mes_dashboard.services.eap_alarm_service import validate_eap_alarm_params
+
+        validate_eap_alarm_params(None, None, lot_ids=["LOT-001"])
+        key = make_eap_alarm_spool_key(None, None, [], lot_ids=["LOT-001"])
+        assert key.startswith("eap_alarm_lot_")
 
 
 # ── test_machines_validation ──────────────────────────────────────────────────
