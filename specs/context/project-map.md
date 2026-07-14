@@ -3,9 +3,9 @@ artifact: project-map
 generated-by: cdd-kit context-scan
 schema-version: 1
 root: DashBoard_clone
-visible-dirs: 236
-visible-files: 1131
-omitted-dirs: 69
+visible-dirs: 207
+visible-files: 1086
+omitted-dirs: 71
 truncated-dirs: 5
 inputs-digest: 58ec80699f498bf40074f81de6138b321f2d3ecc03137b33052a2dd7345722a2
 ---
@@ -36,6 +36,7 @@ DashBoard_clone/
 |   |-- acceptance-lock.json
 |   |-- approval-policy.yml
 |   |-- asset-manifest.json
+|   |-- boundary-manifest.yml
 |   |-- code-graph.index.json
 |   |-- code-map.index.json
 |   |-- code-map.yml
@@ -67,6 +68,7 @@ DashBoard_clone/
 |   |   |-- 05224b1f50d4c8e2
 |   |   |-- 06e37be44b7c2558
 |   |   |-- 0860b7ce1f462945
+|   |   |-- 089ae2cdd6d01dff
 |   |   |-- 096794da29b0a5fe
 |   |   |-- 09af02b32eace3be
 |   |   |-- 0a24b457adbbced2
@@ -107,8 +109,7 @@ DashBoard_clone/
 |   |   |-- 4093a4056e3ed640
 |   |   |-- 40bd549cffe1dc41
 |   |   |-- 41472cf65ca17068
-|   |   |-- 41d662f99bd58f37
-|   |   \-- ... (139 more entries truncated; cap=50)
+|   |   \-- ... (153 more entries truncated; cap=50)
 |   |-- unicode_data/
 |   |   \-- 14.0.0/
 |   |       |-- charmap.json.gz
@@ -217,54 +218,6 @@ DashBoard_clone/
 |   |-- .cdd/
 |   |   \-- code-map.yml
 |   |-- playwright-report/
-|   |   |-- data/
-|   |   |   |-- 0247c2b2b68c55e3c3449139c2b5f6e66250c831.zip
-|   |   |   |-- 0d2545ee6f6ff257fd8eeae36634be1b14587d3c.zip
-|   |   |   |-- 15815fc2780b603732bcb2cd0bfd445c012f98e7.zip
-|   |   |   |-- 36f08facbea9c80f69d6f97de03faaef539c44aa.zip
-|   |   |   |-- 4f04dd89fb210c44de1c5494182bde04e07ea8df.zip
-|   |   |   |-- 591d2ea3eb635f8ad32b47b0c5afc1e38566aebf.zip
-|   |   |   |-- 6f07d13a6a2931b300402c8feae9a125fa1a1abe.zip
-|   |   |   |-- 70948b43f1be675e5ba2cd0ad03fc5beb5f029e0.zip
-|   |   |   |-- 899724444492fe5b0d48a41bb0b0348389ad94e2.zip
-|   |   |   |-- 903b31af534db7c07cb63008d2f28c5c40617c6b.zip
-|   |   |   |-- 927d344b559761351e2655f0b923ac35e78532b4.zip
-|   |   |   |-- 9492c877856665cbed9f7ec50403ec6bbca93975.zip
-|   |   |   |-- 94bf4f71495a9029c16c520e75dc24d92ec0ef71.zip
-|   |   |   |-- 9cbec38cd3f89fd122ce1d1cc20de07cc69b2864.zip
-|   |   |   |-- a00487b3fe618369605395dd6dde1d50da1398fb.zip
-|   |   |   |-- a241b7bb4b0b56a538660a990871f227fe0e0616.zip
-|   |   |   |-- ac86ca7c5873f3c396faf3071a289884775b31ba.zip
-|   |   |   |-- b9a6cc3678882123d1bd002845d7b6818548f8b6.zip
-|   |   |   |-- c28a4545908722d3558a971462e7fa93e184d397.zip
-|   |   |   |-- c34611c29ef84811d068635a33c321a8bbf98e02.zip
-|   |   |   |-- c78dba366a038609606fcbf0fc14efeb0c70b6ba.zip
-|   |   |   |-- cdf2571be6b210e44524eb08083f0d4f14dd7d77.zip
-|   |   |   |-- d04887aa1518b8262fedad7cdd73268d159e32c5.zip
-|   |   |   |-- d13df002950c2ade9e968bfc62c702d36d0bb11a.zip
-|   |   |   |-- d3d02d25315c73e0afad0c59635bc47ad32c2e7c.zip
-|   |   |   |-- ddb547500b94d78d34b7e7ef2fa23746948f78f3.zip
-|   |   |   |-- f4fad1950b014aff4e978749c31929d53397b6d6.zip
-|   |   |   |-- f690e437edb78ac97c536e0b59189b430fce6cbb.zip
-|   |   |   |-- f990c9b58f410923415fc6a64eb1f2dc89e35763.zip
-|   |   |   \-- fe9b9757fea61a650692b1b8eb863a6c37cd27ca.zip
-|   |   |-- trace/
-|   |   |   |-- assets/
-|   |   |   |   \-- ... (max depth)
-|   |   |   |-- codeMirrorModule.DYBRYzYX.css
-|   |   |   |-- codicon.DCmgc-ay.ttf
-|   |   |   |-- defaultSettingsView.7ch9cixO.css
-|   |   |   |-- index.BDwrLSGN.js
-|   |   |   |-- index.BVu7tZDe.css
-|   |   |   |-- index.html
-|   |   |   |-- manifest.webmanifest
-|   |   |   |-- playwright-logo.svg
-|   |   |   |-- snapshot.html
-|   |   |   |-- sw.bundle.js
-|   |   |   |-- uiMode.Btcz36p_.css
-|   |   |   |-- uiMode.CQJ9SCIQ.js
-|   |   |   |-- uiMode.html
-|   |   |   \-- xtermModule.DYP7pi_n.css
 |   |   \-- index.html
 |   |-- scripts/
 |   |   |-- css-governance-check.js
@@ -454,6 +407,17 @@ DashBoard_clone/
 |   |   |   |-- main.ts
 |   |   |   |-- style.css
 |   |   |   \-- utils.ts
+|   |   |-- production-achievement-settings/
+|   |   |   |-- __tests__/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- components/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- composables/
+|   |   |   |   \-- ... (max depth)
+|   |   |   |-- App.vue
+|   |   |   |-- index.html
+|   |   |   |-- main.ts
+|   |   |   \-- style.css
 |   |   |-- production-history/
 |   |   |   |-- components/
 |   |   |   |   \-- ... (max depth)
@@ -586,65 +550,7 @@ DashBoard_clone/
 |   |       |-- YieldStationChart.vue
 |   |       \-- YieldTrendChart.vue
 |   |-- test-results/
-|   |   |-- production-achievement-asy-01334-e-issued-once-table-renders-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-01334-e-issued-once-table-renders-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-070dc--no-progress-bar-ever-shown-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-070dc--no-progress-bar-ever-shown-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-0f0e9-eedback-not-a-stuck-spinner-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-0f0e9-eedback-not-a-stuck-spinner-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-16152--not-hang-or-crash-the-page-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-16152--not-hang-or-crash-the-page-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-23e01--until-the-response-arrives-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-23e01--until-the-response-arrives-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-3324d-s-render-once-visible-again-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-3324d-s-render-once-visible-again-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-3f374-crash-or-leave-a-stuck-page-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-3f374-crash-or-leave-a-stuck-page-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-8391e-and-clears-the-progress-bar-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-8391e-and-clears-the-progress-bar-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-85eea-ery-button-or-spinner-stuck-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-85eea-ery-button-or-spinner-stuck-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-95179-shown-abandon-request-fires-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-95179-shown-abandon-request-fires-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-99f72-l-without-re-issuing-report-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-99f72-l-without-re-issuing-report-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-9e42a-to-empty-rows-never-crashes-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-9e42a-to-empty-rows-never-crashes-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-a7b67-ssage-no-stuck-progress-bar-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-a7b67-ssage-no-stuck-progress-bar-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-d20df-error-does-not-hang-forever-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-d20df-error-does-not-hang-forever-chromium-retry1/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-f550d-an-empty-table-not-an-error-chromium/
-|   |   |   \-- trace.zip
-|   |   |-- production-achievement-asy-f550d-an-empty-table-not-an-error-chromium-retry1/
+|   |   |-- production-achievement-pro-44709-達成率-page-and-defaults-to-當日-chromium/
 |   |   |   \-- trace.zip
 |   |   \-- .last-run.json
 |   |-- tests/
@@ -737,6 +643,7 @@ DashBoard_clone/
 |   |   |   |-- portal-shell-login.spec.ts
 |   |   |   |-- production-achievement-async.spec.ts
 |   |   |   |-- production-achievement-monkey.spec.ts
+|   |   |   |-- production-achievement-settings.spec.ts
 |   |   |   |-- production-achievement.spec.js
 |   |   |   |-- production-history-cross-filter.spec.ts
 |   |   |   |-- production-history-filter-options-error.spec.ts
@@ -789,6 +696,7 @@ DashBoard_clone/
 |   |   |   |-- App.csv-export.test.js
 |   |   |   \-- useYieldAlertDuckDB.departments.test.js
 |   |   |-- pending-jobs-registry.test.js
+|   |   |-- production-achievement-settings-registration.test.js
 |   |   |-- schema-guard.test.js
 |   |   \-- unwrap-api-result.test.js
 |   |-- .gitignore
@@ -802,34 +710,24 @@ DashBoard_clone/
 |   \-- vitest.config.js
 |-- logs/
 |   |-- archive/
-|   |   |-- access_20260713_140321.log
-|   |   |-- access_20260713_204932.log
-|   |   |-- error_20260713_140321.log
-|   |   |-- error_20260713_204932.log
-|   |   |-- rq_downtime_worker_20260713_140321.log
-|   |   |-- rq_downtime_worker_20260713_204932.log
-|   |   |-- rq_eap_alarm_worker_20260713_140321.log
-|   |   |-- rq_eap_alarm_worker_20260713_204932.log
-|   |   |-- rq_hold_hist_worker_20260713_140321.log
-|   |   |-- rq_hold_hist_worker_20260713_204932.log
-|   |   |-- rq_msd_worker_20260713_140321.log
-|   |   |-- rq_msd_worker_20260713_204932.log
-|   |   |-- rq_prod_hist_worker_20260713_140321.log
-|   |   |-- rq_prod_hist_worker_20260713_204932.log
-|   |   |-- rq_reject_worker_20260713_140321.log
-|   |   |-- rq_reject_worker_20260713_204932.log
-|   |   |-- rq_resource_worker_20260713_140321.log
-|   |   |-- rq_resource_worker_20260713_204932.log
-|   |   |-- rq_warmup_worker_20260713_140321.log
-|   |   |-- rq_warmup_worker_20260713_204932.log
-|   |   |-- rq_worker_20260713_140321.log
-|   |   |-- rq_worker_20260713_204932.log
-|   |   |-- rq_yield_alert_worker_20260713_140321.log
-|   |   |-- rq_yield_alert_worker_20260713_204932.log
-|   |   |-- watchdog_20260713_140321.log
-|   |   \-- watchdog_20260713_204932.log
+|   |   |-- access_20260714_130852.log
+|   |   |-- error_20260714_130852.log
+|   |   |-- rq_downtime_worker_20260714_130852.log
+|   |   |-- rq_eap_alarm_worker_20260714_130852.log
+|   |   |-- rq_hold_hist_worker_20260714_130852.log
+|   |   |-- rq_msd_worker_20260714_130852.log
+|   |   |-- rq_prod_hist_worker_20260714_130852.log
+|   |   |-- rq_reject_worker_20260714_130852.log
+|   |   |-- rq_resource_worker_20260714_130852.log
+|   |   |-- rq_uph_performance_worker_20260714_130852.log
+|   |   |-- rq_warmup_worker_20260714_130852.log
+|   |   |-- rq_worker_20260714_130852.log
+|   |   |-- rq_yield_alert_worker_20260714_130852.log
+|   |   \-- watchdog_20260714_130852.log
 |   |-- access.log
 |   |-- admin_logs.sqlite
+|   |-- admin_logs.sqlite-shm
+|   |-- admin_logs.sqlite-wal
 |   |-- error.log
 |   |-- login_sessions.sqlite
 |   |-- login_sessions.sqlite-shm
@@ -1035,10 +933,10 @@ DashBoard_clone/
 |       |   |-- msd_seed_job_service.py
 |       |   |-- navigation_contract.py
 |       |   |-- page_registry.py
-|       |   |-- production_achievement_permission_service.py
-|       |   |-- production_achievement_service.py
-|       |   |-- production_achievement_target_service.py
-|       |   \-- ... (35 more entries truncated; cap=50)
+|       |   |-- production_achievement_daily_cache.py
+|       |   |-- production_achievement_daily_plan_service.py
+|       |   |-- production_achievement_package_lf_service.py
+|       |   \-- ... (39 more entries truncated; cap=50)
 |       |-- sql/
 |       |   |-- analytics/
 |       |   |   \-- ... (max depth)
@@ -1078,6 +976,7 @@ DashBoard_clone/
 |       |   |-- builder.py
 |       |   |-- filters.py
 |       |   |-- loader.py
+|       |   |-- production_achievement_known_package_lf.sql
 |       |   |-- production_achievement.sql
 |       |   |-- uph_performance.sql
 |       |   \-- wildcards.py
@@ -1112,10 +1011,13 @@ DashBoard_clone/
 |   |-- acceptance/
 |   |   |-- acceptance_loader.py
 |   |   |-- test_add_uph_performance_page_acceptance.py
-|   |   \-- test_fix_equipment_lots_trim_acceptance.py
+|   |   |-- test_fix_equipment_lots_trim_acceptance.py
+|   |   \-- test_production_achievement_overhaul_acceptance.py
 |   |-- contract/
 |   |   |-- samples/
 |   |   |   |-- .gitkeep
+|   |   |   |-- delete_production_achievement_package_lf_map_forbidden.json
+|   |   |   |-- delete_production_achievement_workcenter_merge_map_forbidden.json
 |   |   |   |-- get_admin_logs.json
 |   |   |   |-- get_admin_metrics.json
 |   |   |   |-- get_admin_pages.json
@@ -1163,9 +1065,7 @@ DashBoard_clone/
 |   |   |   |-- get_material_trace_filter_options.json
 |   |   |   |-- get_material_trace_job.json
 |   |   |   |-- get_mid_section_defect_analysis_detail.json
-|   |   |   |-- get_mid_section_defect_analysis.json
-|   |   |   |-- get_mid_section_defect_container_filter_options.json
-|   |   |   \-- ... (133 more entries truncated; cap=50)
+|   |   |   \-- ... (143 more entries truncated; cap=50)
 |   |   |-- capture_samples.py
 |   |   |-- README.md
 |   |   |-- response-samples.example.json
@@ -1180,6 +1080,7 @@ DashBoard_clone/
 |   |   |-- test_gate_wiring.py
 |   |   |-- test_manifest_completeness.py
 |   |   |-- test_openapi_schema_resolution.py
+|   |   |-- test_production_achievement_contract.py
 |   |   |-- test_schema_coverage.py
 |   |   \-- test_uph_performance_contract.py
 |   |-- e2e/
@@ -1272,6 +1173,7 @@ DashBoard_clone/
 |   |   |-- test_hold_history_duration_invariants.py
 |   |   |-- test_hold_today_snapshot_invariants.py
 |   |   |-- test_pagination_safe_defaults.py
+|   |   |-- test_production_achievement_aggregate_invariant.py
 |   |   |-- test_request_validation_idempotence.py
 |   |   |-- test_request_validation_integers.py
 |   |   |-- test_request_validation_robustness.py
@@ -1371,7 +1273,7 @@ DashBoard_clone/
 |   |-- test_circuit_breaker.py
 |   |-- test_common_filters.py
 |   |-- test_container_filter_cache.py
-|   \-- ... (202 more entries truncated; cap=50)
+|   \-- ... (206 more entries truncated; cap=50)
 |-- tmp/
 |   |-- duckdb_jobs/
 |   |   |-- eap_alarm/
@@ -1392,19 +1294,29 @@ DashBoard_clone/
 |   |   |-- anomaly_yield_dataset/
 |   |   |   \-- 301649741a76a9aa.parquet
 |   |   |-- hold_dataset/
-|   |   |   \-- 3ed2a3bf053e3498.parquet
+|   |   |   |-- 0b1612940ccd4c4a.parquet
+|   |   |   |-- e367c4ed78d6d70a.parquet
+|   |   |   \-- ef38f59047af8118.parquet
 |   |   |-- production_achievement/
-|   |   |   \-- d77009d72a8ee2b4.parquet
+|   |   |   |-- 08c2c6e7a3cc7f36.parquet
+|   |   |   \-- a09846bc9fab3926.parquet
 |   |   |-- reject_dataset/
-|   |   |   \-- 9975277864b191f1.parquet
+|   |   |   |-- 01a58ef66a9ad017.parquet
+|   |   |   \-- a44cb4bc1c0804dc.parquet
 |   |   |-- resource_dataset/
-|   |   |   \-- 8148de3c0fd2fd4a.parquet
+|   |   |   |-- 58383bcb2be3dff8.parquet
+|   |   |   |-- 5ce2411ee1a6cec9.parquet
+|   |   |   |-- 6634c51c542d9a9b.parquet
+|   |   |   \-- 7d2ee9025463aabc.parquet
 |   |   |-- resource_oee/
-|   |   |   \-- e1fa3f8893b58037.parquet
-|   |   |-- uph_performance/
-|   |   |   \-- uph_performance_2026-04-01_2026-04-01_c51f4b53_v1.parquet
+|   |   |   |-- 43dc6676a902087d.parquet
+|   |   |   |-- 58383bcb2be3dff8.parquet
+|   |   |   |-- 5ce2411ee1a6cec9.parquet
+|   |   |   \-- 9d8470dc02a00a67.parquet
 |   |   |-- yield_alert_dataset/
-|   |   |   \-- 1bca5650d534c79e.parquet
+|   |   |   |-- 6134fde4c72712e3.parquet
+|   |   |   |-- c706fbf3131ab06d.parquet
+|   |   |   \-- e0abeb7e48bee179.parquet
 |   |   |-- probe_1006070.json
 |   |   |-- probe_1024367.json
 |   |   |-- probe_103606.json
@@ -1444,10 +1356,26 @@ DashBoard_clone/
 |   |   |-- probe_1556924.json
 |   |   |-- probe_1557180.json
 |   |   |-- probe_1557236.json
-|   |   \-- ... (139 more entries truncated; cap=50)
+|   |   |-- probe_1564989.json
+|   |   \-- ... (190 more entries truncated; cap=50)
 |   |-- downtime_analysis.duckdb
+|   |-- gunicorn.pid
 |   |-- mes_dashboard_restart_state.json
-|   \-- resource_history.duckdb
+|   |-- resource_history.duckdb
+|   |-- rq_downtime_worker.pid
+|   |-- rq_eap_alarm_worker.pid
+|   |-- rq_hold_hist_worker.pid
+|   |-- rq_msd_worker.pid
+|   |-- rq_prod_ach_worker.pid
+|   |-- rq_prod_hist_worker.pid
+|   |-- rq_query_tool_worker.pid
+|   |-- rq_reject_worker.pid
+|   |-- rq_resource_worker.pid
+|   |-- rq_trace_worker.pid
+|   |-- rq_uph_performance_worker.pid
+|   |-- rq_warmup_worker.pid
+|   |-- rq_yield_alert_worker.pid
+|   \-- worker_watchdog.pid
 |-- .coverage
 |-- .dockerignore
 |-- .env

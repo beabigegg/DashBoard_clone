@@ -4,7 +4,7 @@ generated-by: cdd-kit context-scan
 schema-version: 1
 contract-count: 10
 missing-summary-count: 0
-inputs-digest: 21d7082e0f816930890cd1ef4da04603f6664998d4c9556a3055f141283d9480
+inputs-digest: 1921a82e463c64c918c278216f49f6fa1511e143dbff0c0a2e269861ecd87b21
 ---
 
 # Contracts Index
@@ -35,8 +35,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: API Contract — MES Dashboard
 - owner: application-team
 - surface: api
-- schema-version: 1.40.0
-- last-changed: 2026-07-13
+- schema-version: 1.41.0
+- last-changed: 2026-07-14
 - breaking-change-policy: deprecate-2-minors
 - summary: API behavior, compatibility rules, and endpoint contract requirements.
 
@@ -72,8 +72,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Business Rules — MES Dashboard
 - owner: application-team
 - surface: domain-behavior
-- schema-version: 1.46.0
-- last-changed: 2026-07-13
+- schema-version: 1.47.0
+- last-changed: 2026-07-14
 - breaking-change-policy: deprecate-2-minors
 - summary: Business decision tables, rule inventory, and change policy for behavior updates.
 
@@ -85,8 +85,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CI/CD Gate Contract — MES Dashboard
 - owner: platform-team
 - surface: delivery-pipeline
-- schema-version: 1.3.39
-- last-changed: 2026-07-13
+- schema-version: 1.3.40
+- last-changed: 2026-07-14
 - breaking-change-policy: deprecate-2-minors
 - summary: CI gate inventory, artifact retention, and rollback requirements.
 
@@ -98,8 +98,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: CSS / UI Contract — MES Dashboard
 - owner: application-team
 - surface: ui
-- schema-version: 1.15.0
-- last-changed: 2026-07-13
+- schema-version: 1.16.0
+- last-changed: 2026-07-14
 - breaking-change-policy: deprecate-2-minors
 - summary: UI token policy, component styling rules, and visual review constraints.
 
@@ -109,10 +109,10 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - type: css-inventory
 - directory: contracts/css
 - title: CSS Inventory (Governed Source List)
-- schema-version: 1.2.11
+- schema-version: 1.2.12
 - owner: application-team
 - surface: ui
-- last-changed: 2026-07-13
+- last-changed: 2026-07-14
 - summary: Governed inventory of authored CSS source files under frontend/src/.
 
 
@@ -135,8 +135,8 @@ Generated from deterministic metadata. Add YAML frontmatter fields such as `summ
 - title: Data Shape Contract — MES Dashboard
 - owner: application-team
 - surface: data
-- schema-version: 1.39.0
-- last-changed: 2026-07-13
+- schema-version: 1.40.0
+- last-changed: 2026-07-14
 - breaking-change-policy: deprecate-2-minors
 - summary: Data schema, invalid-data handling, and row-level compatibility rules.
 

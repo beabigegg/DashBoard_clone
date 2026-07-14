@@ -3,8 +3,8 @@ contract: ci
 summary: CI gate inventory, artifact retention, and rollback requirements.
 owner: platform-team
 surface: delivery-pipeline
-schema-version: 1.3.39
-last-changed: 2026-07-13
+schema-version: 1.3.40
+last-changed: 2026-07-14
 breaking-change-policy: deprecate-2-minors
 ---
 
@@ -544,6 +544,17 @@ queue enqueued but never consumed in dev (no RQ log, silent). Never pass
 `--job-execution-timeout` to `rq worker` on any unit or launcher line — invalid under
 the pinned `rq>=1.16.0,<2.0.0`; per-job timeout is enforced at enqueue via
 `job_timeout=JobTypeConfig.timeout_seconds`. Evidence: production-achievement-async-spool PV-1/PV-3.
+
+## Gate Inventory Verification (Cross-Cutting Rule)
+
+A Gate Inventory row, or a Gate Compatibility Note's "covered by existing gate X"
+claim, documents intent — not proof that a workflow step executes it. Grep the
+exact command against `.github/workflows/*.yml` before relying on a coverage
+claim. Evidence: `production-achievement-overhaul` found
+`playwright-critical-journeys`/`playwright-resilience`/`playwright-data-boundary`
+had been claimed-covered by several prior notes with no step ever executing the
+referenced files until this change wired its own spec files into
+`frontend-tests.yml`.
 
 ## response-shape-adr0007 Gate Compatibility Note
 

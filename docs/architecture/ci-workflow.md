@@ -67,6 +67,8 @@ Evidence: `resource-history-rq-async` — CI run failed (all 3 tests ECONNREFUSE
 
 Evidence: `production-achievement-async-spool` — `production-achievement-async.spec.ts`'s `gotoAndWaitForApp` initially skipped this pre-check (went straight to a 20s `waitForFunction` per test) → ~25 min CI slow-fail; mirroring the fast check (commit `a83e7331`) dropped it to 5.8s.
 
+Second occurrence, `production-achievement-overhaul`: 5 rewritten spec files shipped without this gate (a bare `waitForFunction(20s/30s)` right after `goto`), producing a ~50-65s/test tax and blowing the step timeout. Shortening the `waitForFunction` timeout value alone (first fix attempt, commit `36972fbc`) did not help — `waitForFunction` does not reliably honor its own `timeout` on a frame whose navigation just failed, confirmed by direct comparison against `production-achievement-async.spec.ts`/`production-achievement-monkey.spec.ts`'s `gotoAndWaitForApp()`, which already gated correctly and ran in ~200-300ms/test. Real fix (the check must gate, i.e. `return` before ever calling `waitForFunction`, not just bound its timeout): commit `76c584a3`.
+
 ## Playwright `pageRendered` Guard — Use App-Specific Content, Not `bodyText.length`
 
 **Chrome's ECONNREFUSED error page body can exceed 100 chars.** A guard like `pageRendered = bodyText.length > 100` will incorrectly report the Vue app as mounted on the browser error page, causing assertions to run against error-page DOM and fail unexpectedly. Use app-specific content detection instead: `bodyText.includes('<feature-keyword>') || (await page.locator('.theme-<name>, #<app-id>').count()) > 0`.

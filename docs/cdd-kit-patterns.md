@@ -179,12 +179,24 @@ Evidence: `nav-config-to-code` — hit twice; reverted ~166 then ~160 sample fil
 - name: Boundary Guard (PR diff)
   env:
     CDD_BASE_SHA: ${{ steps.changed.outputs.base_sha }}
-  run: cdd-kit boundary check --base "$CDD_BASE_SHA" --verify-generated --verify-captures --json
+  run: |
+    set +e
+    cdd-kit boundary check --base "$CDD_BASE_SHA" --verify-generated --verify-captures --json
+    status=$?
+    set -e
+    if [ "$status" -ne 0 ]; then
+      shadow_mode="$(grep -E '^shadow_mode:' .cdd/policy.yml | awk '{print $2}')"
+      if [ "$shadow_mode" = "true" ]; then
+        echo "::warning::Boundary Guard failed (exit $status) but shadow_mode is true -- advisory, not blocking."
+        exit 0
+      fi
+      exit "$status"
+    fi
 ```
 
 Evidence: `add-uph-performance-page` — `.github/workflows/contract-driven-gates.yml` fix (commit `f2d7d146`); verified 424 errors (unscoped) → 20 errors (scoped) locally, and the workflow flipped failure→success in real CI on the next push with no other change.
 
-Separately (not fixed, scope explicitly deferred by the user): `cdd-kit boundary check` also has no `shadow_mode` awareness at all, unlike `cdd-kit gate`'s internal Boundary Guard wrapping which honors `.cdd/policy.yml`'s `shadow_mode: true` and downgrades findings to warnings. Changing this step's enforcement posture is a repo-wide CI-policy decision, not a bug fix — get explicit user sign-off before touching it.
+Fixed this session (`production-achievement-overhaul`, explicit user sign-off obtained): `cdd-kit boundary check` also had no `shadow_mode` awareness at all, unlike `cdd-kit gate`'s internal Boundary Guard wrapping which honors `.cdd/policy.yml`'s `shadow_mode: true` and downgrades findings to warnings — a project correctly configured for gradual Boundary Guard rollout still got hard-blocked in CI on day one of any API-contract-touching change. The CI step now greps `.cdd/policy.yml` for `shadow_mode` and emits `::warning::` + exit 0 instead of hard-failing when it's `true`, matching `cdd-kit gate`'s own wrapping (shown above). This also required scaffolding the never-before-existing `.cdd/boundary-manifest.yml` (212 ops, fail-closed) via `cdd-kit boundary init` — the policy/CI step had been wired in by a `cdd-kit` version sync 2 days prior, but nothing had ever bootstrapped the manifest itself. Filed upstream (not yet fixed in the CLI itself): https://github.com/beabigegg/contract-driven-delivery-kit/issues/65
 
 ## ADR 0010 Acceptance Oracle — `accept confirm` Requires a Real TTY
 

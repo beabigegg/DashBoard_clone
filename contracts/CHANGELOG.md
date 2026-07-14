@@ -38,6 +38,10 @@ a corresponding entry below.
 ### Added
 - production-achievement-overhaul: `frontend/src/production-achievement-settings/style.css` registered with `theme-production-achievement-settings` root in the Route-Local Feature Layers table.
 
+## [ci 1.3.40] — 2026-07-14
+### Added
+- production-achievement-overhaul (durable-learning promotion, /cdd-close): new `## Gate Inventory Verification (Cross-Cutting Rule)` — a Gate Inventory row or a Gate Compatibility Note's "covered by existing gate X" claim documents intent, not proof of wiring; verify via grep against `.github/workflows/*.yml`. Evidence: `playwright-critical-journeys`/`playwright-resilience`/`playwright-data-boundary` were claimed-covered by several prior Gate Compatibility Notes with no workflow step ever executing the referenced spec files/directories until this change wired its own spec files into `frontend-tests.yml`. No gate tier, command, or status changed.
+
 ## [ci 1.3.39] — 2026-07-13
 ### Added
 - add-uph-performance-page: `.github/workflows/frontend-tests.yml` gains a new `Run uph-performance e2e spec` step running `npx playwright test tests/playwright/uph-performance.spec.ts` under the existing `playwright-critical-journeys` gate (no new gate name/tier, mirrors the `eap-alarm-analysis`/`production-achievement-kanban` precedent of appending a spec to that gate rather than `production-achievement-async-spool`'s separate-named-step precedent). Gate Inventory row `playwright-critical-journeys` command list updated to include the new spec. Spec statically verified correct by e2e-resilience-engineer (all 10 confirmed UI states); cannot execute in this sandbox due to a pre-existing missing-Chromium-binary environment gap, unrelated to this change. Closes tasks.yml item 4.4 (CI/CD workflows).

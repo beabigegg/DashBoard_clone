@@ -86,3 +86,4 @@
 | fix-equipment-lots-trim | 2026 | 2026-07-13 | specs/archive/2026/fix-equipment-lots-trim/ |
 | query-tool-subtab-cache | 2026 | 2026-07-13 | specs/archive/2026/query-tool-subtab-cache/ |
 | add-uph-performance-page | 2026 | 2026-07-13 | specs/archive/2026/add-uph-performance-page/ |
+| production-achievement-overhaul | 2026 | 2026-07-14 | specs/archive/2026/production-achievement-overhaul/ |
