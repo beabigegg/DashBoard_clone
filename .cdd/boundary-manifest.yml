@@ -1,0 +1,3308 @@
+schema_version: 1.0.0
+contract_digest: sha256:d5194482f3cc77161fde2d34a6eafb4820584fb05319ae17e91979207bbeab13
+generated_at: '2026-07-14T04:39:14.332Z'
+operations:
+  - method: POST
+    path: /api/auth/login
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AuthSessionResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/auth/logout
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/auth/me
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AuthMeResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PATCH
+    path: /api/auth/heartbeat
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /health
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: HealthPayload
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /health/deep
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: HealthPayload
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/job/{job_id}/abandon
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/spool/{namespace}/{query_id}.parquet
+    parameters:
+      - name: namespace
+        in: path
+        schema: string
+        required: true
+      - name: query_id
+        in: path
+        schema: string
+        required: true
+    variants: []
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/overview/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/wip/overview/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/wip/overview/matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/overview/matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/overview/hold
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/wip/overview/hold
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/detail/{workcenter}
+    parameters:
+      - name: workcenter
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/wip/detail/{workcenter}
+    parameters:
+      - name: workcenter
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/lot/{lotid}
+    parameters:
+      - name: lotid
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/meta/workcenters
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/meta/packages
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/meta/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/wip/meta/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/meta/search
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/hold-overview/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/hold-overview/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/hold-overview/matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/hold-overview/matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/hold-overview/treemap
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/hold-overview/treemap
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/hold-overview/lots
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/hold-overview/lots
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/hold-detail/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/hold-detail/distribution
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/wip/hold-detail/lots
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/hold-history/config
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/hold-history/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/hold-history/today-snapshot
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/hold-history/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/qc-gate/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/by_status
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/by_workcenter
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/workcenter_status_matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/resource/detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/filter_options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/status_values
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/status
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/status/options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/status/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/status/matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/history/options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/resource/history/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/history/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/history/page
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/history/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/resource/history/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/resource/history/query/progress
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProgressResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/trend
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/reason-pareto
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/reject-history/batch-pareto
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/batch-pareto
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/list
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/export-cached
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/reject-history/export-cached
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/analytics
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/reject-history/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/count
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/reject-history/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/reject-history/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/yield-alert/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/yield-alert/analyze
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/trend
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/alerts
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: YieldAlertAlertsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/reason-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/drilldown-context
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/yield-alert/cross-filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-history/type-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-history/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/production-history/options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/production-history/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-history/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/production-history/page
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/production-history/matrix
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-history/count
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-history/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/production-history/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/material-trace/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/material-trace/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/material-trace/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/material-trace/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/trace/seed-resolve
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/trace/lineage
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/lineage/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/lineage/job/{job_id}/result
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/trace/events
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/job/{job_id}/result
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/job/{job_id}/stream
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/mid-section-defect/station-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/mid-section-defect/container-filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: MsdContainerFilterOptionsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/mid-section-defect/analysis
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: MsdForwardAnalysisResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/mid-section-defect/analysis/detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: MsdForwardDetailResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/mid-section-defect/loss-reasons
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/mid-section-defect/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/anomaly-summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AnomalySummaryResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/yield-anomalies
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/reject-spikes
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/hold-outliers
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/equipment-deviation
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/yield-anomalies/drilldown
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/reject-spikes/drilldown
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/hold-outliers/drilldown
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/analytics/equipment-deviation/drilldown
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query-tool/resolve
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/query-tool/lot-history
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/query-tool/adjacent-lots
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/query-tool/lot-associations
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query-tool/equipment-period
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: EquipmentPeriodResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/query-tool/equipment-list
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/query-tool/workcenter-groups
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query-tool/lot-equipment-lookup
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: LotEquipmentLookupResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/query-tool/equipment-recent-jobs/{equipment_id}
+    parameters:
+      - name: equipment_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query-tool/export-csv
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/job-query/resources
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/job-query/jobs
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/job-query/txn/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/job-query/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/dashboard/kpi
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/dashboard/workcenter_cards
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/dashboard/detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/dashboard/ou_trend
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/dashboard/utilization_heatmap
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/ai/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AiQueryResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/system-status
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/metrics
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/logs
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /admin/api/logs/cleanup
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /admin/api/log-files/cleanup
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/performance-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/performance-history
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /admin/api/performance-history/purge
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/storage-info
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /admin/api/worker/restart
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/worker/status
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/user-usage-kpi
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/pages
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AdminPagesResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PUT
+    path: /admin/api/pages/{route}
+    parameters:
+      - name: route
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /admin/api/analytics/recalculate
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/downtime-analysis/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: DowntimeQueryResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/equipment-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/event-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/export-equipment-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/export-event-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/portal/navigation
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: PortalNavigationResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/seed/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/trace/seed/job/{job_id}/result
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/material-consumption/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/material-consumption/query
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/material-consumption/view
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/material-consumption/detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/material-consumption/detail/page
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/material-consumption/detail/job/{job_id}
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: JobStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/material-consumption/export
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/get_table_info
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/get_table_columns
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query_table
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/eap-alarm/spool
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: EapAlarmSpoolJobAccepted
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/spool/status
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/summary
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/pareto
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/trend
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/downtime-analysis/meta
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/db-scheduling/queue
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: DbSchedulingQueueResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/db-scheduling/equipment-detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: EquipmentDetailResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/report
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementReportResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/targets
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementTargetsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PUT
+    path: /api/production-achievement/targets
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /admin/api/production-achievement/permissions
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementPermissionsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PUT
+    path: /admin/api/production-achievement/permissions/{user_identifier}
+    parameters:
+      - name: user_identifier
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/job/{job_id}/result
+    parameters:
+      - name: job_id
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/eap-alarm/product-filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: EapAlarmProductFilterOptionsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query-tool/lot-history
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/query-tool/lot-associations
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: GenericSuccessResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: POST
+    path: /api/uph-performance/spool
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceSpoolJobAccepted
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/uph-performance/spool/status
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceSpoolStatusResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/uph-performance/filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceFilterOptionsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/uph-performance/product-filter-options
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceProductFilterOptionsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/uph-performance/trend
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceTrendResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/uph-performance/ranking
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceRankingResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/uph-performance/detail
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: UphPerformanceDetailResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/package-lf-map
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementPackageLfMapResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PUT
+    path: /api/production-achievement/package-lf-map
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: DELETE
+    path: /api/production-achievement/package-lf-map/{raw}
+    parameters:
+      - name: raw
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/workcenter-merge-map
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementWorkcenterMergeMapResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PUT
+    path: /api/production-achievement/workcenter-merge-map
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: DELETE
+    path: /api/production-achievement/workcenter-merge-map/{raw}
+    parameters:
+      - name: raw
+        in: path
+        schema: string
+        required: true
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/daily-plans
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementDailyPlanResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: PUT
+    path: /api/production-achievement/daily-plans
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: AckResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/known-package-lf-values
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementKnownPackageLfValuesResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.
+  - method: GET
+    path: /api/production-achievement/known-workcenter-groups
+    variants:
+      - id: default-200
+        status: 200
+        content_type: application/json
+        schema: ProductionAchievementKnownWorkcenterGroupsResponse
+        required: true
+    consumers: []
+    source_files: []
+    discovery:
+      adapter: unconfigured
+      completeness: unknown
+      unknown_reasons:
+        - Configure a stack adapter and enumerate runtime branches.

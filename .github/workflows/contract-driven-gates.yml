@@ -115,10 +115,35 @@ jobs:
         # every run regardless of what actually changed. Pass --base
         # explicitly so this step checks only the operations this push/PR
         # actually touched.
+        #
+        # Unlike `cdd-kit gate`, this direct CLI invocation has no shadow_mode
+        # awareness at all: it hard-fails the job on every finding even when
+        # .cdd/policy.yml declares shadow_mode: true -- the project's own
+        # signal (and cdd-kit's own documented rollout design, see
+        # node_modules/contract-driven-delivery/docs/boundary-guard.md) that
+        # Boundary Guard coverage is still being onboarded and should not yet
+        # block merges. Reported upstream (not fixed in the CLI as of this
+        # cdd-kit version): https://github.com/beabigegg/contract-driven-delivery-kit/issues/65
+        # Read shadow_mode here so this step's blocking
+        # severity matches the local gate until real per-operation
+        # source/consumer/capture coverage lands and shadow_mode flips false.
         if: github.event_name == 'pull_request' || github.event_name == 'push'
+        shell: bash
         env:
           CDD_BASE_SHA: ${{ steps.changed.outputs.base_sha }}
-        run: cdd-kit boundary check --base "$CDD_BASE_SHA" --verify-generated --verify-captures --json
+        run: |
+          set +e
+          cdd-kit boundary check --base "$CDD_BASE_SHA" --verify-generated --verify-captures --json
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            shadow_mode="$(grep -E '^shadow_mode:' .cdd/policy.yml | awk '{print $2}')"
+            if [ "$shadow_mode" = "true" ]; then
+              echo "::warning::Boundary Guard failed (exit $status) but .cdd/policy.yml shadow_mode is true -- treating as advisory, matching cdd-kit gate's local behavior. Set shadow_mode: false once real per-operation coverage is onboarded."
+              exit 0
+            fi
+            exit "$status"
+          fi
 
       - name: cdd-kit gate (changed specs)
         # Zero changed spec dirs is a no-op success, not a failure (this step
