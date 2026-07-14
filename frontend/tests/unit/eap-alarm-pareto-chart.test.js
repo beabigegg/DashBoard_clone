@@ -26,6 +26,15 @@ function mountChart(itemCount) {
 }
 
 describe('EAP ALARM Pareto chart layout', () => {
+  it('uses the normalized product dimension labels', () => {
+    const wrapper = mountChart(10);
+    const labels = wrapper
+      .findAll('[data-testid="pareto-dim-toggle"] button')
+      .map((button) => button.text());
+
+    expect(labels).toEqual(['ALARM 訊息', '機台', 'LOT', 'Type', 'Package', 'BOP']);
+  });
+
   it('uses horizontal data zoom when categories exceed the visible limit', () => {
     const wrapper = mountChart(30);
     const option = wrapper.findComponent(VChart).props('option');

@@ -38,7 +38,7 @@ const GROUP_BY_OPTIONS = Object.freeze([
   { value: 'alarm_text', label: 'ALARM 訊息' },
   { value: 'eqp_id', label: '機台' },
   { value: 'lot_id', label: 'LOT' },
-  { value: 'pj_type', label: 'PJ 類型' },
+  { value: 'pj_type', label: 'Type' },
   { value: 'product_line', label: 'Package' },
   { value: 'pj_bop', label: 'BOP' },
 ]);

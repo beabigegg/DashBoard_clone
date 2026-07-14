@@ -114,7 +114,7 @@ const hasExpandable = computed(() =>
         <DataTableColumn column-key="alarm_end"       label="解除時間"     :sortable="false" />
         <DataTableColumn column-key="duration_seconds"label="排除時間"     :sortable="false" />
         <DataTableColumn column-key="lot_id"          label="LOT ID"       :sortable="false" />
-        <DataTableColumn column-key="pj_type"         label="PJ 類型"      :sortable="false" />
+        <DataTableColumn column-key="pj_type"         label="Type"         :sortable="false" />
         <DataTableColumn column-key="product_line"    label="Package"      :sortable="false" />
         <DataTableColumn column-key="pj_bop"          label="BOP"          :sortable="false" />
 

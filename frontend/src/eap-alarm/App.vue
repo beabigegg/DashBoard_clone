@@ -15,6 +15,7 @@ import SummaryCards from './SummaryCards.vue';
 import ParetoChart from './ParetoChart.vue';
 import TrendChart from './TrendChart.vue';
 import DetailTable from './DetailTable.vue';
+import { classifyEapAlarmSpoolResponse } from './spoolResponse';
 
 import { useEapAlarmFilter } from './composables/useEapAlarmFilter';
 import { useEapAlarmViews } from './composables/useEapAlarmViews';
@@ -178,16 +179,19 @@ async function handleSubmit(): Promise<void> {
     const body = buildCoarseParams(queryMode.value);
 
     const resp = await apiPost('/api/eap-alarm/spool', body, { timeout: 60000 });
-    const respObj = resp as Record<string, unknown>;
-    const respData = (respObj?.data || {}) as Record<string, unknown>;
+    const spoolResponse = classifyEapAlarmSpoolResponse(resp);
+
+    // Warm spool: the backend returns 200/async=false and the result can be
+    // loaded immediately without creating or polling a background job.
+    if (spoolResponse.kind === 'cache-hit') {
+      setQueryId(spoolResponse.queryId);
+      await _loadAfterSpool(spoolResponse.queryId);
+      return;
+    }
 
     // EAP ALARM is always-async (Type B, no sync fallback).
-    if (respObj?._status === 202 || respData.async === true || respData.job_id) {
-      const jobId = (respData.job_id as string) ?? '';
-      const statusUrl =
-        (respData.status_url as string | undefined) ??
-        `/api/eap-alarm/spool/status?query_id=${encodeURIComponent(respData.query_id as string ?? '')}`;
-      const preQueryId = (respData.query_id as string) ?? '';
+    if (spoolResponse.kind === 'async') {
+      const { jobId, queryId: preQueryId, statusUrl } = spoolResponse;
 
       jobProgress.active = true;
       jobProgress.jobId = jobId;

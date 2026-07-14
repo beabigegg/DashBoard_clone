@@ -86,11 +86,11 @@ function handleMultiSelectClose(event: Event): void {
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">PJ 類型 / PJ Type</label>
+        <label class="filter-label">Type</label>
         <MultiSelect
           :model-value="fineFilter.pj_type"
           :options="filterOptions.pj_type_options"
-          placeholder="全部 PJ 類型"
+          placeholder="全部 Type"
           searchable
           data-testid="fine-pj-type-select"
           @update:model-value="(v: string[]) => onFilterChange('pj_type', v)"
@@ -99,7 +99,7 @@ function handleMultiSelectClose(event: Event): void {
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">Package / 封裝</label>
+        <label class="filter-label">Package</label>
         <MultiSelect
           :model-value="fineFilter.product_line"
           :options="filterOptions.product_line_options"
@@ -112,7 +112,7 @@ function handleMultiSelectClose(event: Event): void {
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">BOP 製程 / BOP</label>
+        <label class="filter-label">BOP</label>
         <MultiSelect
           :model-value="fineFilter.pj_bop"
           :options="filterOptions.pj_bop_options"
