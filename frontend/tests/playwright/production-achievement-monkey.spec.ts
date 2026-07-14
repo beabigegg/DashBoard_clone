@@ -28,7 +28,7 @@ const EMPTY_PARQUET_B64 =
   'UEFSMRUCGWw1ABgNZHVja2RiX3NjaGVtYRUKABUCJQIYC291dHB1dF9kYXRlJQwAFQwlAhgKc2hpZnRfY29kZSUAABUMJQIYCFNQRUNOQU1FJQAAFQwlAhgKUEFDS0FHRV9MRiUAABUEJQIYEWFjdHVhbF9vdXRwdXRfcXR5JSQAFgAZDCgoRHVja0RCIHZlcnNpb24gdjEuNS40IChidWlsZCAwOGUzNGM0NDdiKRlcHAAAHAAAHAAAHAAAHAAAAL0AAABQQVIx';
 
 async function setupReportRoutes(page: Page) {
-  await page.route('**/*', (route) => route.continue());
+  await page.route('**/*', (route) => (route.request().resourceType() === 'document' ? route.fallback() : route.continue()));
   await page.route('**/api/auth/me**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope({ username: 'testuser', role: 'user' }) }));
   await page.route('**/api/pages**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) }));
   await page.route('**/api/portal/navigation**', (route) =>
@@ -154,7 +154,7 @@ test.describe('production-achievement monkey — rapid mode-button clicking', ()
 
 test.describe('production-achievement-settings monkey — rapid CRUD clicks (double-submit protection)', () => {
   async function setupSettingsRoutes(page: Page) {
-    await page.route('**/*', (route) => route.continue());
+    await page.route('**/*', (route) => (route.request().resourceType() === 'document' ? route.fallback() : route.continue()));
     await page.route('**/api/auth/me**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope({ username: 'testuser', role: 'admin', is_admin: true }) }));
     await page.route('**/api/pages**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) }));
     await page.route('**/api/portal/navigation**', (route) =>
