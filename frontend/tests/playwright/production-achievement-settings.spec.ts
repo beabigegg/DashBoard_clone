@@ -115,8 +115,8 @@ test.describe('production-achievement-settings — whitelisted edit path', () =>
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(PLAN_ROWS) });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -162,8 +162,8 @@ test.describe('production-achievement-settings — non-whitelisted read-only pat
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope(PKG_ROWS) });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -189,8 +189,8 @@ test.describe('production-achievement-settings — return path', () => {
     await setupBaseRoutes(page, { isAdmin: true });
     await setupDataRoutes(page);
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -199,7 +199,7 @@ test.describe('production-achievement-settings — return path', () => {
     }
 
     await page.locator('[data-testid="pa-settings-back-btn"]').click();
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
     const backOnReport = await page.evaluate(() => document.querySelector('.theme-production-achievement') !== null);
     if (backOnReport) {
       await expect(page.locator('[data-testid="pa-app"]')).toBeVisible({ timeout: 15_000 });
@@ -251,8 +251,8 @@ test.describe('production-achievement-settings — return path', () => {
   test('mode + station survive a full navigation to /production-achievement-settings and back (OD-7, sessionStorage)', async ({ page }) => {
     await setupReportRoutes(page);
 
-    await page.goto(REPORT_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(REPORT_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const reportRendered = await page.evaluate(() => {
       const el = document.querySelector('.theme-production-achievement');
@@ -285,9 +285,9 @@ test.describe('production-achievement-settings — return path', () => {
     // (useProductionAchievement.ts's readPersistedState()/persistState()) —
     // it does NOT require the settings bundle itself to render, since OD-7's
     // persistence mechanism lives entirely on the report side of the round trip.
-    await page.goto('/portal-shell/production-achievement-settings', { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
-    await page.goto(REPORT_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto('/portal-shell/production-achievement-settings', { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.goto(REPORT_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rerendered = await page.evaluate(() => document.querySelector('.theme-production-achievement') !== null);
     if (!rerendered) {

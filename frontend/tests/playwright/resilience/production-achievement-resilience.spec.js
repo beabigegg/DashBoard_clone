@@ -126,8 +126,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(ONE_ROW_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -172,8 +172,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(ONE_ROW_PARQUET_B64, 'base64') }),
     );
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -215,8 +215,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(UNMAPPED_PKG_PARQUET_B64, 'base64') }),
     );
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -272,8 +272,8 @@ test.describe('production-achievement resilience — MySQL unavailable (daily_pl
       }),
     );
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -330,8 +330,8 @@ test.describe('production-achievement resilience — auth expiry mid-poll (401)'
     const pageErrors = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {

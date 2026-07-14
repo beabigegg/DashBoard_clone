@@ -121,8 +121,8 @@ test.describe('production-achievement — navigation from 生產輔助 drawer', 
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(TWO_ROW_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -145,8 +145,8 @@ test.describe('production-achievement — 4-mode switch + auto-run (OD-3)', () =
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(TWO_ROW_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -187,8 +187,8 @@ test.describe('production-achievement — 4-mode switch + auto-run (OD-3)', () =
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(TWO_ROW_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -216,8 +216,8 @@ test.describe('production-achievement — 4-mode switch + auto-run (OD-3)', () =
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(TWO_ROW_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -272,8 +272,8 @@ test.describe('production-achievement — CumulativeView (當月/自訂區間) +
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(D3_CUMULATIVE_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -367,8 +367,8 @@ test.describe('production-achievement — DailyView (前日) with real D+N shift
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(TWO_SHIFT_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -411,8 +411,8 @@ test.describe('production-achievement — 設定 button navigation', () => {
     await page.route('**/api/production-achievement/known-workcenter-groups**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope({ raw_workcenter_groups: [] }) }));
     await page.route('**/api/production-achievement/daily-plans**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) }));
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -421,7 +421,7 @@ test.describe('production-achievement — 設定 button navigation', () => {
     }
 
     await page.locator('[data-testid="pa-settings-btn"]').click();
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 3_000 }).catch(() => {});
 
     const settingsRendered = await page.evaluate(() => document.querySelector('.theme-production-achievement-settings') !== null);
     if (settingsRendered) {
@@ -449,8 +449,8 @@ test.describe('production-achievement — legacy target-value edit permission (T
       }
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {
@@ -489,8 +489,8 @@ test.describe('production-achievement — legacy target-value edit permission (T
       }
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page);
     if (!rendered) {

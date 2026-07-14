@@ -107,8 +107,8 @@ test.describe('production-achievement data-boundary — legacy target_qty valida
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(EMPTY_PARQUET_B64, 'base64') }),
     );
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement');
     if (!rendered) {
@@ -152,8 +152,8 @@ test.describe('production-achievement data-boundary — legacy target_qty valida
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(EMPTY_PARQUET_B64, 'base64') }),
     );
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement');
     if (!rendered) {
@@ -202,8 +202,8 @@ test.describe('production-achievement data-boundary — empty result set', () =>
       route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(EMPTY_PARQUET_B64, 'base64') });
     });
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement');
     if (!rendered) {
@@ -261,8 +261,8 @@ test.describe('production-achievement data-boundary — large payload (300 disti
     const pageErrors = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement');
     if (!rendered) {
@@ -320,8 +320,8 @@ test.describe('production-achievement data-boundary — wrong-type inline map va
     const pageErrors = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement');
     if (!rendered) {
@@ -366,8 +366,8 @@ test.describe('production-achievement data-boundary — wrong-type inline map va
     const pageErrors = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement');
     if (!rendered) {
@@ -423,8 +423,8 @@ test.describe('production-achievement-settings data-boundary — daily_plan_qty 
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) });
     });
 
-    await page.goto(SETTINGS_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(SETTINGS_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement-settings');
     if (!rendered) {
@@ -453,8 +453,8 @@ test.describe('production-achievement-settings data-boundary — daily_plan_qty 
       return route.fulfill({ status: 200, contentType: 'application/json', body: envelope([]) });
     });
 
-    await page.goto(SETTINGS_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
-    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 20_000 }).catch(() => {});
+    await page.goto(SETTINGS_PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.theme-production-achievement-settings') !== null, { timeout: 3_000 }).catch(() => {});
 
     const rendered = await isPageRendered(page, '.theme-production-achievement-settings');
     if (!rendered) {

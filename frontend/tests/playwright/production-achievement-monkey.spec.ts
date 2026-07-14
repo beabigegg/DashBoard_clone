@@ -75,10 +75,10 @@ async function setupReportRoutes(page: Page) {
 }
 
 async function gotoAndWaitForApp(page: Page, themeClass: string): Promise<boolean> {
-  await page.goto(page.url().includes(SETTINGS_PAGE_URL) ? SETTINGS_PAGE_URL : PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
+  await page.goto(page.url().includes(SETTINGS_PAGE_URL) ? SETTINGS_PAGE_URL : PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 5_000 }).catch(() => {});
   const bodyText = await page.locator('body').textContent({ timeout: 5_000 }).catch(() => '');
   if ((bodyText?.trim().length ?? 0) < 50) return false;
-  await page.waitForFunction((cls) => document.querySelector(cls) !== null, themeClass, { timeout: 10_000 }).catch(() => {});
+  await page.waitForFunction((cls) => document.querySelector(cls) !== null, themeClass, { timeout: 3_000 }).catch(() => {});
   return page.evaluate((cls) => {
     const el = document.querySelector(cls);
     return el !== null && (el as HTMLElement).offsetParent !== null;
@@ -96,7 +96,6 @@ test.describe('production-achievement monkey — rapid mode-button clicking', ()
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {});
     const rendered = await gotoAndWaitForApp(page, '.theme-production-achievement');
     if (skipIfNotRendered(rendered, 'app not mounted — skipping rapid mode-click assertions')) return;
 
