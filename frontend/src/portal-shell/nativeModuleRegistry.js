@@ -116,7 +116,7 @@ const NATIVE_MODULE_LOADERS = Object.freeze({
   ),
   '/uph-performance': createNativeLoader(
     () => import('../uph-performance/App.vue'),
-    [() => import('../styles/tailwind.css'), () => import('../uph-performance/style.css')],
+    [() => import('../styles/tailwind.css'), () => import('../resource-shared/styles.css'), () => import('../uph-performance/style.css')],
   ),
 });
 

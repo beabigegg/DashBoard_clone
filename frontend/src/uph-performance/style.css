@@ -1,16 +1,21 @@
 /* UPH表現 — all rules scoped under .theme-uph-performance (css-contract Rule 6).
- * This page intentionally does NOT import resource-shared/styles.css and its
- * `:is(.theme-X, …)` grouped component rules — it replicates the minimal page
- * container + card/filter primitives it needs locally, mirroring the
- * admin-pages / admin-dashboard / material-consumption pattern documented in
- * css-contract.md §Known Global Rule Interactions. */
+ * Shared card and MultiSelect primitives come from resource-shared/styles.css;
+ * this file owns only the UPH-specific layout and overrides. */
 
 /* ── Page container ───────────────────────────────────────────────────────── */
 
-.theme-uph-performance .dashboard {
-  max-width: 1800px;
-  margin: 0 auto;
-  padding: 0 theme('spacing.token.p16');
+.theme-uph-performance {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Specificity intentionally exceeds resource-shared's grouped dashboard rule,
+ * so load order cannot restore its legacy 1800px cap inside portal-shell. */
+.theme-uph-performance .dashboard.page-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-inline: 0;
 }
 
 .theme-uph-performance .page-content {
@@ -59,7 +64,7 @@
 .theme-uph-performance .filter-input {
   height: 36px;
   padding: 0 theme('spacing.token.p10');
-  border: 1px solid var(--border);
+  border: 1px solid var(--resource-border);
   border-radius: 6px;
   font-size: 13px;
   background: theme('colors.token.hffffff');

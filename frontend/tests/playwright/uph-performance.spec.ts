@@ -176,6 +176,30 @@ test.describe('uph-performance — state-initial and coarse-options-degraded', (
     await expect(page.locator('[data-testid="start-date"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-testid="empty-state"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.async-job-progress')).toHaveCount(0);
+
+    const layout = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('.theme-uph-performance');
+      const dashboard = document.querySelector<HTMLElement>('.theme-uph-performance .dashboard');
+      const multiSelect = document.querySelector<HTMLElement>('.theme-uph-performance .multi-select-trigger');
+      if (!root || !dashboard || !multiSelect) return null;
+      const dashboardStyle = getComputedStyle(dashboard);
+      const multiSelectStyle = getComputedStyle(multiSelect);
+      return {
+        rootWidth: root.getBoundingClientRect().width,
+        dashboardWidth: dashboard.getBoundingClientRect().width,
+        dashboardMaxWidth: dashboardStyle.maxWidth,
+        multiSelectDisplay: multiSelectStyle.display,
+        multiSelectBorderWidth: multiSelectStyle.borderTopWidth,
+        multiSelectBorderStyle: multiSelectStyle.borderTopStyle,
+      };
+    });
+
+    expect(layout).not.toBeNull();
+    expect(Math.abs((layout?.rootWidth ?? 0) - (layout?.dashboardWidth ?? 0))).toBeLessThanOrEqual(1);
+    expect(layout?.dashboardMaxWidth).toBe('none');
+    expect(layout?.multiSelectDisplay).toBe('flex');
+    expect(layout?.multiSelectBorderWidth).toBe('1px');
+    expect(layout?.multiSelectBorderStyle).toBe('solid');
   });
 
   test('state-coarse-options-degraded: product-filter-options 500 shows an inline warning, other filters stay usable', async ({ page }) => {
