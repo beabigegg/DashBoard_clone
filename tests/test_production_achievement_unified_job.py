@@ -412,12 +412,12 @@ class TestSpoolSchema:
 
     def test_schema_version_constant_pinned(self):
         """AC-1/AC-6: _PA_SPOOL_SCHEMA_VERSION participates in the canonical
-        spool key (cache-spool-patterns.md) and must be pinned at 2 -- the
-        production-achievement-overhaul breaking parquet-schema bump (+PACKAGE_LF
-        column, data-shape-contract.md §3.28.1) orphans stale v1 parquets by
-        key mismatch."""
+        spool key (cache-spool-patterns.md) and must be pinned at 3 -- bumped
+        2->3 by production-achievement-moveout (canonical key gains a `source`
+        dimension AND the 'output' PA-05 query gained a GA%/GC% rework filter),
+        both requiring stale 'output' parquets to be re-fetched once."""
         from mes_dashboard.services.production_achievement_service import (
             _PA_SPOOL_SCHEMA_VERSION,
         )
         assert isinstance(_PA_SPOOL_SCHEMA_VERSION, int)
-        assert _PA_SPOOL_SCHEMA_VERSION == 2
+        assert _PA_SPOOL_SCHEMA_VERSION == 3

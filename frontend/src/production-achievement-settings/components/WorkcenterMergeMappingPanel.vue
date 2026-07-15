@@ -32,22 +32,29 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  include: [payload: { raw_workcenter_group: string; merged_workcenter_group: string }];
+  include: [payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group: string }];
   exclude: [raw_workcenter_group: string];
-  rename: [payload: { raw_workcenter_group: string; merged_workcenter_group: string }];
+  rename: [payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group: string }];
 }>();
 
 const editingRaw = ref<string | null>(null);
 const draftMergedName = ref('');
+// PA-19: the 大項 this子站 rolls up under (電鍍/切割 for their sub-stations;
+// otherwise === merged name).
+const draftParentName = ref('');
 
 function toggleInclude(row: WorkcenterFullListRow): void {
   if (props.editForbidden) return;
   if (row.included) {
     emit('exclude', row.raw_workcenter_group);
   } else {
-    // Including a previously-excluded raw group defaults its merged name to
-    // itself (1:1) — the admin can rename it afterwards via the same inline edit.
-    emit('include', { raw_workcenter_group: row.raw_workcenter_group, merged_workcenter_group: row.raw_workcenter_group });
+    // Including a previously-excluded raw group defaults its merged name AND
+    // its大項 to itself (1:1, single-layer) — the admin can edit both afterwards.
+    emit('include', {
+      raw_workcenter_group: row.raw_workcenter_group,
+      merged_workcenter_group: row.raw_workcenter_group,
+      parent_group: row.raw_workcenter_group,
+    });
   }
 }
 
@@ -55,17 +62,21 @@ function startRename(row: WorkcenterFullListRow): void {
   if (props.editForbidden || !row.included) return;
   editingRaw.value = row.raw_workcenter_group;
   draftMergedName.value = row.merged_workcenter_group || row.raw_workcenter_group;
+  draftParentName.value = row.parent_group || row.merged_workcenter_group || row.raw_workcenter_group;
 }
 
 function cancelRename(): void {
   editingRaw.value = null;
   draftMergedName.value = '';
+  draftParentName.value = '';
 }
 
 function confirmRename(row: WorkcenterFullListRow): void {
   const merged = draftMergedName.value.trim();
   if (!merged) return;
-  emit('rename', { raw_workcenter_group: row.raw_workcenter_group, merged_workcenter_group: merged });
+  // Blank 大項 falls back to the merged name (single-layer station).
+  const parent = draftParentName.value.trim() || merged;
+  emit('rename', { raw_workcenter_group: row.raw_workcenter_group, merged_workcenter_group: merged, parent_group: parent });
   editingRaw.value = null;
 }
 
@@ -86,7 +97,8 @@ const isEmpty = computed(() => !props.loading && props.fullList.length === 0);
     <DataTable :data="(fullList as unknown as Record<string, unknown>[])" :loading="loading" empty-type="no-data">
       <DataTableColumn column-key="raw_workcenter_group" label="原始站點群組" />
       <DataTableColumn column-key="included" label="納入報表" align="center" />
-      <DataTableColumn column-key="merged_workcenter_group" label="合併名稱" />
+      <DataTableColumn column-key="merged_workcenter_group" label="合併名稱(子站)" />
+      <DataTableColumn column-key="parent_group" label="大項" />
       <DataTableColumn column-key="actions" label="操作" align="center" />
       <template #cell="{ columnKey, row }">
         <template v-if="columnKey === 'included'">
@@ -111,6 +123,20 @@ const isEmpty = computed(() => !props.loading && props.fullList.length === 0);
             type="text"
             class="pa-settings-panel__input pa-settings-panel__input--sm"
             data-testid="pa-wc-name-input"
+            @keydown.enter="confirmRename(row as unknown as WorkcenterFullListRow)"
+            @keydown.escape="cancelRename"
+          />
+        </template>
+        <template v-else-if="columnKey === 'parent_group'">
+          <span v-if="!(row as unknown as WorkcenterFullListRow).included" class="pa-settings-panel__muted">—</span>
+          <span v-else-if="editingRaw !== (row as unknown as WorkcenterFullListRow).raw_workcenter_group">{{ (row as unknown as WorkcenterFullListRow).parent_group || (row as unknown as WorkcenterFullListRow).merged_workcenter_group }}</span>
+          <input
+            v-else
+            v-model="draftParentName"
+            type="text"
+            class="pa-settings-panel__input pa-settings-panel__input--sm"
+            placeholder="留空=同子站"
+            data-testid="pa-wc-parent-input"
             @keydown.enter="confirmRename(row as unknown as WorkcenterFullListRow)"
             @keydown.escape="cancelRename"
           />

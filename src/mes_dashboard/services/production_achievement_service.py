@@ -27,7 +27,7 @@ import pandas as pd
 
 from mes_dashboard.services.filter_cache import get_spec_workcenter_mapping
 from mes_dashboard.services.production_achievement_workcenter_merge_service import (
-    get_workcenter_merge_map,
+    get_workcenter_parent_groups,
 )
 
 logger = logging.getLogger("mes_dashboard.production_achievement_service")
@@ -213,37 +213,52 @@ def _validate_date_range(start_date: str, end_date: str) -> None:
 # parity gate (business-rules.md PA-06/PA-07) -- the frontend now performs
 # this rollup client-side in DuckDB-WASM from the SPECNAME-grain spool.
 
-_PA_SPOOL_SCHEMA_VERSION = 2
+_PA_SPOOL_SCHEMA_VERSION = 3
 """Schema version for the SPECNAME+PACKAGE_LF-grain async spool
 (data-shape-contract.md §3.28.1). Participates in the canonical spool key so
 a schema-breaking bump orphans stale parquets by key (cache-spool-patterns.md).
 Bumped 1->2 by production-achievement-overhaul (+PACKAGE_LF nullable column,
-business-rules.md PA-09)."""
+business-rules.md PA-09). Bumped 2->3 by production-achievement-moveout: the
+canonical key now carries a ``source`` dimension (output|moveout, PA-18) AND
+the 'output' source's PA-05 query gained a GA%/GC% rework filter (PA-05
+supplement) that changes existing numbers -- both require every stale 'output'
+parquet to be re-fetched once, which a schema-version bump forces."""
 
 PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE = "production_achievement"
 """Shared spool namespace constant -- single source of truth for the
 worker's ``ProductionAchievementJob.namespace``, the route's spool-hit/miss
 lookup, and the warm-cache module's ``get_spool_file_path()`` calls, so the
 three call sites can never drift apart (production-achievement-overhaul,
-IP-1/IP-5)."""
+IP-1/IP-5). This is the 'output' (產出) source namespace."""
+
+PRODUCTION_ACHIEVEMENT_MOVEOUT_SPOOL_NAMESPACE = "production_achievement_moveout"
+"""Spool namespace for the 'moveout' (轉出) source
+(DW_MES_HM_LOTMOVEOUT-based, PA-18). Distinct namespace from the 'output'
+source above so the two sources' parquets never collide on disk even at an
+identical date-range key. Mirror-registered in spool_routes._ALLOWED_NAMESPACES
+and the moveout worker's ``ProductionAchievementMoveoutJob.namespace``."""
 
 
-def make_canonical_pa_spool_id(start_date: str, end_date: str) -> str:
-    """Return the canonical spool key for the production-achievement async spool.
+def make_canonical_pa_spool_id(
+    start_date: str, end_date: str, source: str = "output"
+) -> str:
+    """Return the canonical spool key for a production-achievement async spool.
 
-    Date-range only (data-shape-contract.md §3.28 canonical-key rule):
+    Date-range + source (data-shape-contract.md §3.28 canonical-key rule):
     ``shift_code``/``workcenter_group`` request params do NOT participate in
     the spool key and do NOT filter the spooled dataset server-side -- the
-    full PA-05-qualifying dataset for the date range is always spooled, and
-    any shift_code/workcenter_group narrowing happens client-side after
-    download. Shared by the route (spool-hit check) and the worker
-    (pre_query spool-path resolution) so both resolve the identical key.
+    full qualifying dataset for the date range is always spooled, and any
+    narrowing happens client-side after download. ``source`` ('output' |
+    'moveout', PA-18) DOES participate so the two data sources never resolve
+    the same key. Shared by the route (spool-hit check) and both workers
+    (pre_query spool-path resolution) so all resolve the identical key.
     """
     canonical = json.dumps(
         {
             "schema_version": _PA_SPOOL_SCHEMA_VERSION,
             "start_date": start_date,
             "end_date": end_date,
+            "source": source,
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -258,21 +273,20 @@ def get_filter_options() -> Dict[str, Any]:
     """Return available shift_code enum + workcenter_group values for the
     FilterBar (api-contract.md).
 
-    ``workcenter_groups`` redefined in place by production-achievement-overhaul
-    (Phase 1/3) to the MERGED (D2) list: the deduplicated set of
-    ``merged_workcenter_group`` values from
-    ``production_achievement_workcenter_merge_service.get_workcenter_merge_map()``
-    -- NOT the raw ``WORK_CENTER_GROUP`` set previously sourced directly from
-    ``filter_cache.get_spec_workcenter_mapping()``. A raw workcenter_group
-    absent from ``production_achievement_workcenter_merge_map`` is excluded
-    here too (D2 exclude-by-absence, business-rules.md PA-10) -- the merge
-    service's own map already reflects that default, this function just
-    de-duplicates its values.
+    ``workcenter_groups`` is the DISTINCT ``parent_group`` (大項) list from
+    ``production_achievement_workcenter_merge_service.get_workcenter_parent_groups()``
+    (business-rules.md PA-19). Redefined by production-achievement-moveout from
+    the earlier "distinct merged_workcenter_group" list: the dropdown now shows
+    大項 (電鍍/切割/焊接_DB/…), and selecting a 大項 with >1 子站 (電鍍/切割)
+    expands its sub-stations in the detail table. A raw workcenter_group absent
+    from ``production_achievement_workcenter_merge_map`` is still excluded (D2
+    exclude-by-absence, PA-10); a single-layer station's parent_group is itself,
+    so the two lists coincide for every station except 電鍍/切割.
     """
-    merged_groups = sorted(set(get_workcenter_merge_map().values()))
+    parent_groups = get_workcenter_parent_groups()
     return {
         "shift_codes": _SHIFT_CODE_ENUM,
-        "workcenter_groups": merged_groups,
+        "workcenter_groups": parent_groups,
     }
 
 

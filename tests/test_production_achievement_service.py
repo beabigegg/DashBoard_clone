@@ -207,42 +207,39 @@ class TestAchievementRateMath:
 
 
 class TestGetFilterOptions:
-    """production-achievement-overhaul, Phase 1: get_filter_options()'s
-    workcenter_groups field is redefined in place to the MERGED (D2) list,
-    sourced from production_achievement_workcenter_merge_service --
-    NOT the raw WORK_CENTER_GROUP set from filter_cache.get_spec_workcenter_mapping()."""
+    """production-achievement-moveout, PA-19: get_filter_options()'s
+    workcenter_groups field is the DISTINCT parent_group (大項) list from
+    production_achievement_workcenter_merge_service.get_workcenter_parent_groups()
+    -- redefined from the earlier "distinct merged_workcenter_group" list so the
+    dropdown shows 大項 (電鍍/切割/焊接_DB/…) and a大項 with >1子站 expands in
+    the detail table. A single-layer station's parent == its merged value."""
 
     @patch(
-        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+        "mes_dashboard.services.production_achievement_service.get_workcenter_parent_groups"
     )
-    def test_workcenter_groups_is_merged_deduplicated_list(self, mock_merge_map):
-        # 焊接_WB and 焊接_DW both merge to 焊接_WB (D2 seed row) -- must
-        # appear once, not twice, in the returned workcenter_groups list.
-        mock_merge_map.return_value = {
-            "焊接_WB": "焊接_WB",
-            "焊接_DW": "焊接_WB",
-            "焊接_DB": "焊接_DB",
-        }
+    def test_workcenter_groups_is_distinct_parent_list(self, mock_parents):
+        # 電鍍 (parent of 掛鍍/條鍍/滾鍍/委外) and 切割 (parent of 切割/PKG_SAW)
+        # each appear once; single-layer stations appear as themselves.
+        mock_parents.return_value = ["切割", "成型", "焊接_DB", "電鍍"]
         options = get_filter_options()
-        assert options["workcenter_groups"] == ["焊接_DB", "焊接_WB"]
+        assert options["workcenter_groups"] == ["切割", "成型", "焊接_DB", "電鍍"]
 
     @patch(
-        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+        "mes_dashboard.services.production_achievement_service.get_workcenter_parent_groups"
     )
-    def test_shift_codes_enum_unchanged(self, mock_merge_map):
-        mock_merge_map.return_value = {}
+    def test_shift_codes_enum_unchanged(self, mock_parents):
+        mock_parents.return_value = []
         options = get_filter_options()
         assert options["shift_codes"] == ["N", "D", "A", "B", "C"]
 
     @patch(
-        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+        "mes_dashboard.services.production_achievement_service.get_workcenter_parent_groups"
     )
-    def test_excluded_raw_group_absent_from_merge_map_never_appears(self, mock_merge_map):
-        """D2 exclude-by-absence: get_workcenter_merge_map() never contains
-        an excluded raw group as a value in the first place (the merge
-        service itself already excludes it), so get_filter_options() must
-        not somehow reintroduce it via filter_cache's raw group set."""
-        mock_merge_map.return_value = {"焊接_DB": "焊接_DB"}
+    def test_excluded_raw_group_absent_never_appears(self, mock_parents):
+        """D2 exclude-by-absence: an excluded raw group (TCT/MA/IST/補鍍) has no
+        row in the merge map, so it contributes no parent_group -- and
+        get_filter_options() must not somehow reintroduce it."""
+        mock_parents.return_value = ["焊接_DB"]
         options = get_filter_options()
-        assert "切割" not in options["workcenter_groups"]
+        assert "TCT" not in options["workcenter_groups"]
         assert options["workcenter_groups"] == ["焊接_DB"]

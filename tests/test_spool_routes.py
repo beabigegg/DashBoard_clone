@@ -99,6 +99,7 @@ def test_valid_spool_streams_parquet(client, tmp_path):
     "downtime_analysis_job_bridge",
     "wip_dataset",  # wip-rq-worker-chunks-cleanup
     "production_achievement",  # production-achievement-async-spool
+    "production_achievement_moveout",  # production-achievement-moveout (PA-18)
     "uph_performance",  # add-uph-performance-page
 ])
 def test_allowed_namespaces_pass_namespace_validation(client, ns):

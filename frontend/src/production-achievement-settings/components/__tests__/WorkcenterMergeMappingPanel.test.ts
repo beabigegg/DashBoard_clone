@@ -10,8 +10,8 @@ import { mount, flushPromises } from '@vue/test-utils';
 import WorkcenterMergeMappingPanel from '../WorkcenterMergeMappingPanel.vue';
 
 const FULL_LIST = [
-  { raw_workcenter_group: '焊接_DB', included: true, merged_workcenter_group: '焊接_DB', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' },
-  { raw_workcenter_group: '切割', included: false, merged_workcenter_group: null, updated_at: null, updated_by: null },
+  { raw_workcenter_group: '焊接_DB', included: true, merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB', updated_at: '2026-07-01T00:00:00Z', updated_by: 'admin' },
+  { raw_workcenter_group: '切割', included: false, merged_workcenter_group: null, parent_group: null, updated_at: null, updated_by: null },
 ];
 
 async function mountAndFlush(props: Record<string, unknown>) {
@@ -36,7 +36,7 @@ describe('WorkcenterMergeMappingPanel', () => {
     const wrapper = await mountAndFlush({ fullList: FULL_LIST });
     const toggles = wrapper.findAll('[data-testid="pa-wc-toggle"]');
     await toggles[1].trigger('click'); // 切割 row (excluded)
-    expect(wrapper.emitted('include')).toEqual([[{ raw_workcenter_group: '切割', merged_workcenter_group: '切割' }]]);
+    expect(wrapper.emitted('include')).toEqual([[{ raw_workcenter_group: '切割', merged_workcenter_group: '切割', parent_group: '切割' }]]);
   });
 
   it('toggling an INCLUDED row emits exclude with just the raw value', async () => {
@@ -53,7 +53,7 @@ describe('WorkcenterMergeMappingPanel', () => {
     const input = wrapper.find('[data-testid="pa-wc-name-input"]');
     await input.setValue('焊接_DB_RENAMED');
     await input.trigger('keydown.enter');
-    expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB_RENAMED' }]]);
+    expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB_RENAMED', parent_group: '焊接_DB' }]]);
   });
 
   it('an excluded row shows no rename control and its merged name renders as "—"', async () => {
@@ -94,7 +94,7 @@ describe('WorkcenterMergeMappingPanel', () => {
         const input = wrapper.find('[data-testid="pa-wc-name-input"]');
         await input.setValue(adversarial.value);
         await input.trigger('keydown.enter');
-        expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: adversarial.value }]]);
+        expect(wrapper.emitted('rename')).toEqual([[{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: adversarial.value, parent_group: '焊接_DB' }]]);
       });
     }
 

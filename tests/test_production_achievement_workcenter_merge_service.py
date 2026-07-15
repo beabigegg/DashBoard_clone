@@ -31,24 +31,34 @@ _DDL_PATH = (
     Path(__file__).parent.parent / "scripts" / "sql" / "production_achievement_tables.sql"
 )
 
-_SEEDED_12 = [
-    ("焊接_WB", "焊接_WB"),
-    ("焊接_DW", "焊接_WB"),
-    ("焊接_DB", "焊接_DB"),
-    ("成型", "成型"),
-    ("去膠", "去膠"),
-    ("移印", "移印"),
-    ("水吹砂", "水吹砂"),
-    ("電鍍", "電鍍"),
-    ("切彎腳", "切彎腳"),
-    ("TMTT", "TMTT"),
-    ("品檢", "品檢"),
-    ("FQC", "FQC"),
+# PA-19 taxonomy: raw -> (merged 子站, parent 大項). 電鍍/切割 are two-layer.
+_SEEDED = [
+    ("焊接_WB", "焊接_WB", "焊接_WB"),
+    ("焊接_DW", "焊接_WB", "焊接_WB"),
+    ("焊接_DB", "焊接_DB", "焊接_DB"),
+    ("成型", "成型", "成型"),
+    ("去膠", "去膠", "去膠"),
+    ("移印", "移印", "移印"),
+    ("水吹砂", "水吹砂", "水吹砂"),
+    ("切彎腳", "切彎腳", "切彎腳"),
+    ("TMTT", "TMTT", "TMTT"),
+    ("品檢", "品檢", "品檢"),
+    ("FQC", "FQC", "FQC"),
+    ("成品入庫", "成品入庫", "成品入庫"),
+    ("切割", "切割", "切割"),
+    ("PKG_SAW", "PKG_SAW", "切割"),
+    ("掛鍍", "掛鍍", "電鍍"),
+    ("條鍍", "條鍍", "電鍍"),
+    ("滾鍍", "滾鍍", "電鍍"),
+    ("BANDL", "委外", "電鍍"),
+    ("TOTAI", "委外", "電鍍"),
 ]
 
-_EXCLUDED_15 = [
-    "切割", "PKG_SAW", "點測", "可靠性", "補鍍", "預備站", "成品倉", "IST",
-    "CP線邊倉", "成品入庫", "已CP入庫", "已CP倉", "DS線邊倉", "MA", "TCT",
+# Raw workcenters intentionally NOT seeded (D2 default-deny). 切割/PKG_SAW/成品入庫
+# were previously excluded but are now INCLUDED (PA-19), so they left this list.
+_EXCLUDED = [
+    "TCT", "MA", "IST", "補鍍", "點測", "可靠性", "預備站", "成品倉",
+    "CP線邊倉", "已CP入庫", "已CP倉", "DS線邊倉",
 ]
 
 
@@ -58,16 +68,21 @@ class TestResolveWorkcenterMergeGroupD2Semantics:
     real resolution runs client-side in DuckDB-WASM."""
 
     def test_seeded_raw_group_resolves_to_merged(self):
-        mapping = dict(_SEEDED_12)
+        mapping = {raw: merged for raw, merged, _ in _SEEDED}
         assert resolve_workcenter_merge_group("焊接_DW", mapping) == "焊接_WB"
         assert resolve_workcenter_merge_group("焊接_DB", mapping) == "焊接_DB"
+        # 委外 子站 is BANDL+TOTAI merged (PA-19)
+        assert resolve_workcenter_merge_group("BANDL", mapping) == "委外"
+        assert resolve_workcenter_merge_group("TOTAI", mapping) == "委外"
 
     def test_absent_raw_group_is_excluded_not_fallback(self):
         """INNER JOIN semantics: a raw value with NO row in the map is
         EXCLUDED (resolves to None) -- never falls back to itself (that
-        would be D1's package_lf_map semantics)."""
-        mapping = dict(_SEEDED_12)
-        assert resolve_workcenter_merge_group("切割", mapping) is None
+        would be D1's package_lf_map semantics). TCT/MA/IST/補鍍 stay excluded
+        under PA-19 (切割/PKG_SAW are now INCLUDED, so no longer good examples)."""
+        mapping = {raw: merged for raw, merged, _ in _SEEDED}
+        assert resolve_workcenter_merge_group("TCT", mapping) is None
+        assert resolve_workcenter_merge_group("補鍍", mapping) is None
 
     def test_inner_join_not_left_join_semantics(self):
         """Guard against the easiest copy-paste inversion (business-rules.md
@@ -81,30 +96,49 @@ class TestResolveWorkcenterMergeGroupD2Semantics:
 
 
 class TestSeedDataInDDLScript:
-    """PA-10: the DDL seed script (Phase 2) contains exactly the 12 seeded
-    groups and excludes all 15 non-production raw groups."""
+    """PA-10/PA-19: the DDL seed script contains exactly the PA-19 seeded
+    rows (raw -> merged 子站 + parent 大項) and excludes all non-production
+    raw groups."""
 
-    def test_twelve_seeded_groups_present(self):
+    def test_seeded_groups_present_with_parent(self):
         sql_text = _DDL_PATH.read_text(encoding="utf-8")
-        assert len(_SEEDED_12) == 12
-        for raw, merged in _SEEDED_12:
-            assert f"'{raw}'" in sql_text and f"'{merged}'" in sql_text, (
-                f"seed row for {raw!r}->{merged!r} missing from DDL script"
+        start = sql_text.index("INSERT IGNORE INTO production_achievement_workcenter_merge_map")
+        end = sql_text.index(";", start)
+        seed_block = sql_text[start:end]
+        for raw, merged, parent in _SEEDED:
+            assert f"'{raw}'" in seed_block, (
+                f"seed row for {raw!r} missing from DDL seed block"
+            )
+            assert f"'{merged}'" in seed_block, (
+                f"merged {merged!r} for {raw!r} missing from DDL seed block"
+            )
+            assert f"'{parent}'" in seed_block, (
+                f"parent_group {parent!r} for {raw!r} missing from DDL seed block"
             )
 
-    def test_each_of_fifteen_excluded_groups_absent(self):
+    def test_excluded_groups_absent(self):
         sql_text = _DDL_PATH.read_text(encoding="utf-8")
-        assert len(_EXCLUDED_15) == 15
         # Isolate the workcenter_merge_map seed INSERT block so a coincidental
         # substring match elsewhere in the file (e.g. a comment) can't hide
         # a real omission or a real accidental inclusion.
         start = sql_text.index("INSERT IGNORE INTO production_achievement_workcenter_merge_map")
         end = sql_text.index(";", start)
         seed_block = sql_text[start:end]
-        for raw in _EXCLUDED_15:
+        for raw in _EXCLUDED:
             assert f"'{raw}'" not in seed_block, (
                 f"{raw!r} must be excluded from the seed block (D2 default-deny)"
             )
+
+    def test_electroplating_and_saw_two_layer_children_roll_up_to_parents(self):
+        """PA-19: 掛鍍/條鍍/滾鍍/委外 -> 電鍍; 切割/PKG_SAW -> 切割. BANDL/TOTAI
+        both merge to the '委外' 子站 (Excel presentation-layer merge)."""
+        by_raw = {raw: (merged, parent) for raw, merged, parent in _SEEDED}
+        for raw in ("掛鍍", "條鍍", "滾鍍"):
+            assert by_raw[raw] == (raw, "電鍍")
+        assert by_raw["BANDL"] == ("委外", "電鍍")
+        assert by_raw["TOTAI"] == ("委外", "電鍍")
+        assert by_raw["切割"] == ("切割", "切割")
+        assert by_raw["PKG_SAW"] == ("PKG_SAW", "切割")
 
 
 class TestGetWorkcenterMergeEntries:
@@ -116,6 +150,7 @@ class TestGetWorkcenterMergeEntries:
         row._mapping = {
             "raw_workcenter_group": "焊接_DW",
             "merged_workcenter_group": "焊接_WB",
+            "parent_group": "焊接_WB",
             "updated_at": "2026-07-01T00:00:00",
             "updated_by": "tester",
         }
@@ -129,10 +164,33 @@ class TestGetWorkcenterMergeEntries:
             {
                 "raw_workcenter_group": "焊接_DW",
                 "merged_workcenter_group": "焊接_WB",
+                "parent_group": "焊接_WB",
                 "updated_at": "2026-07-01T00:00:00",
                 "updated_by": "tester",
             }
         ]
+
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", True)
+    @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.get_mysql_connection")
+    def test_null_parent_group_falls_back_to_merged(self, mock_conn_ctx):
+        """PA-19: a legacy row with NULL parent_group (pre-backfill install)
+        must fall back to its merged_workcenter_group, never collapse out."""
+        conn = MagicMock()
+        row = MagicMock()
+        row._mapping = {
+            "raw_workcenter_group": "去膠",
+            "merged_workcenter_group": "去膠",
+            "parent_group": None,
+            "updated_at": "2026-07-01T00:00:00",
+            "updated_by": "tester",
+        }
+        result = MagicMock()
+        result.fetchall.return_value = [row]
+        conn.execute.return_value = result
+        mock_conn_ctx.return_value.__enter__.return_value = conn
+
+        rows = get_workcenter_merge_entries()
+        assert rows[0]["parent_group"] == "去膠"
 
     @patch("mes_dashboard.services.production_achievement_workcenter_merge_service.MYSQL_OPS_ENABLED", False)
     def test_read_degrades_empty_when_ops_disabled(self):
@@ -159,6 +217,7 @@ class TestGetWorkcenterMergeMap:
         row._mapping = {
             "raw_workcenter_group": "焊接_DW",
             "merged_workcenter_group": "焊接_WB",
+            "parent_group": "焊接_WB",
             "updated_at": "2026-07-01T00:00:00",
             "updated_by": "tester",
         }
@@ -167,6 +226,7 @@ class TestGetWorkcenterMergeMap:
         conn.execute.return_value = result
         mock_conn_ctx.return_value.__enter__.return_value = conn
 
+        # get_workcenter_merge_map is still raw->merged (子站) -- unchanged by PA-19.
         assert get_workcenter_merge_map() == {"焊接_DW": "焊接_WB"}
 
 

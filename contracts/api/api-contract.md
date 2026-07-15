@@ -3,7 +3,7 @@ contract: api
 summary: API behavior, compatibility rules, and endpoint contract requirements.
 owner: application-team
 surface: api
-schema-version: 1.42.0
+schema-version: 1.43.0
 last-changed: 2026-07-15
 breaking-change-policy: deprecate-2-minors
 ---
@@ -253,7 +253,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/downtime-analysis/meta | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/db-scheduling/queue | required | - | DbSchedulingQueueResponse | 400/500 | route tests |
 | GET | /api/db-scheduling/equipment-detail | required | - | EquipmentDetailResponse | 400/500 | route tests |
-| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementReportResponse | 202/400/500/503 | route tests |
+| GET | /api/production-achievement/report | required | ?start_date=&end_date=&shift_code=(opt)&workcenter_group=(opt)&source=(opt,output/moveout,default output) | ProductionAchievementReportResponse | 202/400/500/503 | route tests |
 | GET | /api/production-achievement/filter-options | required | - | GenericSuccessResponse | 500 | route tests |
 | GET | /api/production-achievement/targets | required | ?shift_code=(opt)&workcenter_group=(opt) | ProductionAchievementTargetsResponse | 500 | route tests |
 | PUT | /api/production-achievement/targets | required | body {shift_code, workcenter_group, target_qty}; also gated by can_edit_targets permission (403 if not whitelisted) | AckResponse | 400/403/500/503 | route tests |
@@ -282,6 +282,7 @@ breaking-change-policy: deprecate-2-minors
 | GET | /api/production-achievement/known-workcenter-groups | required | - | ProductionAchievementKnownWorkcenterGroupsResponse | 500 | route tests |
 | POST | /api/production-achievement/daily-plans/import/preview | required | multipart/form-data field file (.xlsx only); parses PJMES052-生產達成率 report, categorizes rows against live legal-value/current-plan state, writes nothing; gated by can_edit_targets permission (403 if not whitelisted) | ProductionAchievementDailyPlanImportPreviewResponse | 400/403/500/503 | route tests |
 | POST | /api/production-achievement/daily-plans/import/confirm | required | body {rows: [{workcenter_group, package_lf_group, daily_plan_qty}]}; server re-validates every row against legal-value sets (never trusts client selection) and bulk-upserts in a single transaction (all-or-nothing); gated by can_edit_targets permission (403 if not whitelisted) | ProductionAchievementDailyPlanImportConfirmResponse | 400/403/500/503 | route tests |
+| GET | /api/production-achievement/permissions/me | required | - | ProductionAchievementOwnPermissionResponse | 500 | route tests |
 
 ## 5. Routing & Naming
 
@@ -1854,3 +1855,15 @@ Tier-B — response for `GET /api/mid-section-defect/analysis/detail?direction=f
 | success | boolean | yes |  |  |
 | data | ProductionAchievementDailyPlanImportConfirmData | yes |  |  |
 | meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementOwnPermissionResponse
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| success | boolean | yes |  |  |
+| data | ProductionAchievementOwnPermissionData | yes |  |  |
+| meta | ProductionAchievementResponseMeta | no |  |  |
+
+### ProductionAchievementOwnPermissionData
+| field | type | required | format | notes |
+|---|---|---|---|---|
+| can_edit_targets | boolean | yes |  | Whether the current session user is whitelisted to edit production-achievement targets/settings. |

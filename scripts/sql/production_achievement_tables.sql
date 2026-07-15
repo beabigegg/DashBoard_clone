@@ -65,14 +65,43 @@ CREATE TABLE IF NOT EXISTS production_achievement_package_lf_map (
 -- exclude-by-absence -- the OPPOSITE default from the table above,
 -- business-rules.md PA-10). Do NOT copy-paste this table's semantics onto
 -- production_achievement_package_lf_map above, or vice versa.
+--
+-- parent_group (business-rules.md PA-19, production-achievement-moveout): the
+-- "大項" a子站 rolls up under for the station dropdown + Excel-style expanded
+-- detail. Most stations are single-layer (parent_group = merged_workcenter_group
+-- = itself). The two exceptions are 電鍍 (parent of 掛鍍/條鍍/滾鍍/委外) and
+-- 切割 (parent of 切割/PKG_SAW). The dropdown lists DISTINCT parent_group;
+-- selecting a parent with >1 child expands its sub-stations in the detail table.
 CREATE TABLE IF NOT EXISTS production_achievement_workcenter_merge_map (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     raw_workcenter_group VARCHAR(100) NOT NULL,
     merged_workcenter_group VARCHAR(100) NOT NULL,
+    parent_group VARCHAR(100) NOT NULL,
     updated_at DATETIME(3) NOT NULL,
     updated_by VARCHAR(100) NOT NULL,
     UNIQUE KEY uq_raw_workcenter_group (raw_workcenter_group)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Idempotent column-add + backfill for installs created BEFORE parent_group
+-- existed (CREATE TABLE IF NOT EXISTS above is a no-op on an existing table).
+-- Backfill parent_group = merged_workcenter_group (single-layer default). NOTE:
+-- an existing deployment still needs a MANUAL reseed to adopt the 電鍍/切割
+-- sub-station taxonomy below -- INSERT IGNORE never overwrites the old
+-- (電鍍→電鍍) row, and this backfill only fills the NEW column, it does not
+-- restructure existing rows.
+SET @col_exists := (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'production_achievement_workcenter_merge_map'
+      AND COLUMN_NAME = 'parent_group'
+);
+SET @ddl := IF(@col_exists = 0,
+    'ALTER TABLE production_achievement_workcenter_merge_map ADD COLUMN parent_group VARCHAR(100) NOT NULL DEFAULT '''' AFTER merged_workcenter_group',
+    'SELECT 1');
+PREPARE _pa_alter FROM @ddl; EXECUTE _pa_alter; DEALLOCATE PREPARE _pa_alter;
+UPDATE production_achievement_workcenter_merge_map
+    SET parent_group = merged_workcenter_group
+    WHERE parent_group IS NULL OR parent_group = '';
 
 -- §3.32 -- Daily-plan table, keyed on (workcenter_group, package_lf_group)
 -- (both already-MERGED/resolved values) with NO shift dimension -- unlike
@@ -113,22 +142,34 @@ VALUES
     ('TO-277',        'TO-277(B)',        NOW(3), 'system-seed'),
     ('TO-277B',       'TO-277(B)',        NOW(3), 'system-seed');
 
--- PA-10: exactly 12 rows -- every raw workcenter_group NOT listed here is
--- INTENTIONALLY excluded from the report entirely (D2 exclude-by-absence
--- default; the 15 excluded raw groups: 切割/PKG_SAW/點測/可靠性/補鍍/預備站/
--- 成品倉/IST/CP線邊倉/成品入庫/已CP入庫/已CP倉/DS線邊倉/MA/TCT).
+-- PA-10 / PA-19: raw FROMWORKCENTER -> (merged 子站, parent 大項). Every raw
+-- workcenter NOT listed here is INTENTIONALLY excluded (D2 exclude-by-absence;
+-- notably TCT / MA / IST / 補鍍 -- the change request confirmed these are not
+-- shown in either 產出 or 轉出). Two-layer stations:
+--   電鍍(parent) = 掛鍍 / 條鍍 / 滾鍍 / 委外(=BANDL+TOTAI, Excel presentation-
+--                  layer merge -- 025.txt keeps BANDL/TOTAI raw & separate)
+--   切割(parent) = 切割 / PKG_SAW
+-- All other stations are single-layer (parent_group = merged = itself). 焊接_DW
+-- still merges into 焊接_WB (unchanged), parent 焊接_WB.
 INSERT IGNORE INTO production_achievement_workcenter_merge_map
-    (raw_workcenter_group, merged_workcenter_group, updated_at, updated_by)
+    (raw_workcenter_group, merged_workcenter_group, parent_group, updated_at, updated_by)
 VALUES
-    ('焊接_WB', '焊接_WB', NOW(3), 'system-seed'),
-    ('焊接_DW', '焊接_WB', NOW(3), 'system-seed'),
-    ('焊接_DB', '焊接_DB', NOW(3), 'system-seed'),
-    ('成型',    '成型',    NOW(3), 'system-seed'),
-    ('去膠',    '去膠',    NOW(3), 'system-seed'),
-    ('移印',    '移印',    NOW(3), 'system-seed'),
-    ('水吹砂',  '水吹砂',  NOW(3), 'system-seed'),
-    ('電鍍',    '電鍍',    NOW(3), 'system-seed'),
-    ('切彎腳',  '切彎腳',  NOW(3), 'system-seed'),
-    ('TMTT',    'TMTT',    NOW(3), 'system-seed'),
-    ('品檢',    '品檢',    NOW(3), 'system-seed'),
-    ('FQC',     'FQC',     NOW(3), 'system-seed');
+    ('焊接_WB',  '焊接_WB',  '焊接_WB',  NOW(3), 'system-seed'),
+    ('焊接_DW',  '焊接_WB',  '焊接_WB',  NOW(3), 'system-seed'),
+    ('焊接_DB',  '焊接_DB',  '焊接_DB',  NOW(3), 'system-seed'),
+    ('成型',     '成型',     '成型',     NOW(3), 'system-seed'),
+    ('去膠',     '去膠',     '去膠',     NOW(3), 'system-seed'),
+    ('移印',     '移印',     '移印',     NOW(3), 'system-seed'),
+    ('水吹砂',   '水吹砂',   '水吹砂',   NOW(3), 'system-seed'),
+    ('切彎腳',   '切彎腳',   '切彎腳',   NOW(3), 'system-seed'),
+    ('TMTT',     'TMTT',     'TMTT',     NOW(3), 'system-seed'),
+    ('品檢',     '品檢',     '品檢',     NOW(3), 'system-seed'),
+    ('FQC',      'FQC',      'FQC',      NOW(3), 'system-seed'),
+    ('成品入庫', '成品入庫', '成品入庫', NOW(3), 'system-seed'),
+    ('切割',     '切割',     '切割',     NOW(3), 'system-seed'),
+    ('PKG_SAW',  'PKG_SAW',  '切割',     NOW(3), 'system-seed'),
+    ('掛鍍',     '掛鍍',     '電鍍',     NOW(3), 'system-seed'),
+    ('條鍍',     '條鍍',     '電鍍',     NOW(3), 'system-seed'),
+    ('滾鍍',     '滾鍍',     '電鍍',     NOW(3), 'system-seed'),
+    ('BANDL',    '委外',     '電鍍',     NOW(3), 'system-seed'),
+    ('TOTAI',    '委外',     '電鍍',     NOW(3), 'system-seed');

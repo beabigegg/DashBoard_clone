@@ -47,7 +47,7 @@ def resolve_workcenter_merge_group(
 
 
 def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
-    """Return all workcenter_merge_map rows (full shape incl.
+    """Return all workcenter_merge_map rows (full shape incl. parent_group,
     updated_at/updated_by).
 
     Used by ``GET /api/production-achievement/workcenter-merge-map``.
@@ -55,6 +55,11 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
     D2's downstream effect differs from D1's: an empty table here means the
     INNER JOIN matches zero rows, so the ENTIRE report renders empty (not
     "every raw value shows as its own group").
+
+    ``parent_group`` (PA-19) is the 大項 a子站 rolls up under. A row whose DB
+    ``parent_group`` is NULL/blank (legacy install pre-backfill) falls back to
+    its ``merged_workcenter_group`` so a missing column never collapses a
+    station out of the dropdown.
     """
     if not MYSQL_OPS_ENABLED:
         return []
@@ -64,7 +69,8 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
         with get_mysql_connection() as conn:
             result = conn.execute(
                 text(
-                    "SELECT raw_workcenter_group, merged_workcenter_group, updated_at, updated_by "
+                    "SELECT raw_workcenter_group, merged_workcenter_group, parent_group, "
+                    "updated_at, updated_by "
                     "FROM production_achievement_workcenter_merge_map "
                     "ORDER BY raw_workcenter_group ASC"
                 )
@@ -74,6 +80,10 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
                 {
                     "raw_workcenter_group": r._mapping["raw_workcenter_group"],
                     "merged_workcenter_group": r._mapping["merged_workcenter_group"],
+                    "parent_group": (
+                        r._mapping["parent_group"]
+                        or r._mapping["merged_workcenter_group"]
+                    ),
                     "updated_at": r._mapping["updated_at"],
                     "updated_by": r._mapping["updated_by"],
                 }
@@ -89,12 +99,8 @@ def get_workcenter_merge_entries() -> List[Dict[str, Any]]:
 
 def get_workcenter_merge_map() -> Dict[str, str]:
     """Return {raw_workcenter_group: merged_workcenter_group} for all rows
-    (data-shape §3.31).
-
-    Sourced for the inline ``workcenter_merge_map`` array injected in the
-    ``GET /report`` 200 spool-hit envelope (data-shape-contract.md §3.33) and
-    for ``get_filter_options().workcenter_groups`` (redefined to the merged
-    D2 list, production-achievement-overhaul). Degrades to {} when
+    (data-shape §3.31) -- the raw->子站 (merged) resolution the client-side
+    D2 INNER JOIN keys on (unchanged by PA-19). Degrades to {} when
     unavailable.
     """
     return {
@@ -103,12 +109,29 @@ def get_workcenter_merge_map() -> Dict[str, str]:
     }
 
 
+def get_workcenter_parent_groups() -> List[str]:
+    """Return the sorted DISTINCT set of ``parent_group`` values (PA-19) --
+    the 大項 list the station dropdown is populated from
+    (``get_filter_options().workcenter_groups``). A 大項 with >1 子站
+    (電鍍/切割) appears once here; selecting it expands its子站 in the detail
+    table. Degrades to [] when unavailable.
+    """
+    return sorted({row["parent_group"] for row in get_workcenter_merge_entries()})
+
+
 def upsert_workcenter_merge(
-    *, raw_workcenter_group: str, merged_workcenter_group: str, updated_by: str
+    *,
+    raw_workcenter_group: str,
+    merged_workcenter_group: str,
+    parent_group: Optional[str] = None,
+    updated_by: str,
 ) -> None:
     """Upsert (INSERT ... ON DUPLICATE KEY UPDATE) a workcenter_merge_map
     row, keyed on ``raw_workcenter_group`` (data-shape §3.31 unique
     constraint).
+
+    ``parent_group`` (PA-19) defaults to ``merged_workcenter_group`` when not
+    supplied (single-layer station).
 
     Raises MySQLUnavailableError when MYSQL_OPS_ENABLED=false or MySQL is
     unreachable -- writes cannot degrade gracefully.
@@ -116,16 +139,19 @@ def upsert_workcenter_merge(
     if not MYSQL_OPS_ENABLED:
         raise MySQLUnavailableError("MySQL OPS is disabled (MYSQL_OPS_ENABLED=false)")
 
+    resolved_parent = parent_group or merged_workcenter_group
+
     from sqlalchemy import text
 
     sql = text(
         """
         INSERT INTO production_achievement_workcenter_merge_map
-            (raw_workcenter_group, merged_workcenter_group, updated_at, updated_by)
+            (raw_workcenter_group, merged_workcenter_group, parent_group, updated_at, updated_by)
         VALUES
-            (:raw_workcenter_group, :merged_workcenter_group, NOW(), :updated_by)
+            (:raw_workcenter_group, :merged_workcenter_group, :parent_group, NOW(), :updated_by)
         ON DUPLICATE KEY UPDATE
             merged_workcenter_group = VALUES(merged_workcenter_group),
+            parent_group = VALUES(parent_group),
             updated_at = NOW(),
             updated_by = VALUES(updated_by)
         """
@@ -137,6 +163,7 @@ def upsert_workcenter_merge(
                 {
                     "raw_workcenter_group": raw_workcenter_group,
                     "merged_workcenter_group": merged_workcenter_group,
+                    "parent_group": resolved_parent,
                     "updated_by": updated_by,
                 },
             )

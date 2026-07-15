@@ -3,7 +3,7 @@ contract: data
 summary: Data schema, invalid-data handling, and row-level compatibility rules.
 owner: application-team
 surface: data
-schema-version: 1.40.0
+schema-version: 1.41.0
 last-changed: 2026-07-14
 breaking-change-policy: deprecate-2-minors
 ---
@@ -1889,10 +1889,11 @@ Notes: One row per `(shift_code, workcenter_group)` with a stored target row (§
   "data": {
     "query_id": "<string>",
     "spool_download_url": "/api/spool/production_achievement/<query_id>.parquet",
+    "source": "output",
     "spec_workcenter_map": [ { "SPECNAME": "...", "workcenter_group": "..." } ],
     "targets_map": [ { "shift_code": "...", "workcenter_group": "...", "target_qty": 500 } ],
     "package_lf_map": [ { "raw_package_lf": "...", "merged_group": "..." } ],
-    "workcenter_merge_map": [ { "raw_workcenter_group": "...", "merged_workcenter_group": "..." } ],
+    "workcenter_merge_map": [ { "raw_workcenter_group": "...", "merged_workcenter_group": "...", "parent_group": "..." } ],
     "daily_plan_map": [ { "workcenter_group": "...", "package_lf_group": "...", "daily_plan_qty": 300 } ]
   },
   "meta": { "timestamp": "...", "app_version": "..." }
@@ -1900,6 +1901,8 @@ Notes: One row per `(shift_code, workcenter_group)` with a stored target row (§
 ```
 
 Injection is unconditional whenever the canonical spool exists — NOT row-count-gated (unlike `resource_history`'s `total_row_count >= threshold` gate; Q1 overrides the local-compute activation threshold to 0 for this page). `data` grows from 2 to 5 inline arrays as of change `production-achievement-overhaul` — `package_lf_map` (§3.33, D1), `workcenter_merge_map` (§3.33, D2), and `daily_plan_map` (§3.34) are new; `spec_workcenter_map`/`targets_map` (§3.28.2/§3.28.3) are unchanged in shape.
+
+**§3.28.5 `source` variants (production-achievement-moveout, business-rules.md PA-18).** The `GET /report` `source` query param (`output` default \| `moveout`) selects the actual-value data source; the response echoes it as `data.source`. The `moveout` source (`DWH.DW_MES_HM_LOTMOVEOUT`, run by `ProductionAchievementMoveoutJob`) writes to the distinct `production_achievement_moveout` spool namespace, so `spool_download_url` is `/api/spool/production_achievement_moveout/<query_id>.parquet`. Its parquet grain is `(output_date, shift_code, raw_workcenter_group, PACKAGE_LF) → actual_output_qty` — note `raw_workcenter_group` (the source station `FROMWORKCENTER`) **instead of** `SPECNAME`, since the moveout event already carries its station (no SPECNAME→station join needed). Consequently `spec_workcenter_map` is an **empty array** in `moveout` mode; the client's moveout Stage-1 rollup reads `raw_workcenter_group` straight from the spool. `workcenter_merge_map` (with `parent_group`, PA-19), `package_lf_map`, `targets_map`, and `daily_plan_map` are shared verbatim with the `output` source. The canonical spool key (`make_canonical_pa_spool_id`) includes `source`, and `_PA_SPOOL_SCHEMA_VERSION` bumped 2→3 (the `source` dimension + the `output` PA-05 GA/GC filter both need stale `output` parquets re-fetched once).
 
 **HTTP 202 — spool-miss** (generic §1.3 async-job envelope):
 
@@ -2039,12 +2042,13 @@ Added by change `production-achievement-overhaul`. **Default-on-absence is the O
 | id | integer | yes |
 | raw_workcenter_group | string | yes |
 | merged_workcenter_group | string | yes |
+| parent_group | string | yes |
 | updated_at | string | yes |
 | updated_by | string | yes |
 
-Notes: `id` is the primary key (auto-increment); not exposed via the API response row shape (`ProductionAchievementWorkcenterMergeMapRow`, api-contract.md) — `DELETE` identifies a row by `raw_workcenter_group` in the URL path. `raw_workcenter_group` is a `WORK_CENTER_GROUP` value as produced by `filter_cache.get_spec_workcenter_mapping()`; unique. `merged_workcenter_group` is the display group name.
+Notes: `id` is the primary key (auto-increment); not exposed via the API response row shape (`ProductionAchievementWorkcenterMergeMapRow`, api-contract.md) — `DELETE` identifies a row by `raw_workcenter_group` in the URL path. `raw_workcenter_group` is a `WORK_CENTER_GROUP`/`FROMWORKCENTER` value; unique. `merged_workcenter_group` is the display group name (子站). `parent_group` (added by change `production-achievement-moveout`, business-rules.md PA-19) is the 大項 this子站 rolls up under — `= merged_workcenter_group` for every single-layer station; only `電鍍` (parent of 掛鍍/條鍍/滾鍍/委外) and `切割` (parent of 切割/PKG_SAW) differ. The station dropdown (`get_filter_options().workcenter_groups`) is the DISTINCT `parent_group` set; a大項 with >1子站 renders the detail table expanded per子站. A legacy NULL `parent_group` (pre-backfill install) falls back to `merged_workcenter_group` in the service read. The migration is an idempotent `ALTER TABLE … ADD COLUMN parent_group` + backfill in `scripts/sql/production_achievement_tables.sql`.
 
-Constraints: unique constraint on `raw_workcenter_group`. **Default-on-absence (D2 — explicit-inclusion, exclude-by-absence — the OPPOSITE default from §3.30's D1 sparse/fallback-to-self):** a raw `workcenter_group` value with NO row in this table is EXCLUDED from the report entirely — it does not appear as its own group, unlike §3.30's fallback behavior. The 15 raw groups intentionally left out (切割/PKG_SAW/點測/可靠性/補鍍/預備站/成品倉/IST/CP線邊倉/成品入庫/已CP入庫/已CP倉/DS線邊倉/MA/TCT) never appear in the production-achievement report as a result. Client-side resolution is an `INNER JOIN` (never `LEFT JOIN`) — mirrors the existing default-deny idiom already used by the permission table (§3.27: absence of a row = fail-closed/deny) rather than the target table's reuse-missing-as-null idiom (§3.26). **This opposite-default pairing with §3.30 is deliberate and must not be "fixed" by copy-pasting one table's join kind onto the other** — see business-rules.md PA-09/PA-10 and ADR-0016's Extension section. When `MYSQL_OPS_ENABLED=false`, the CRUD read endpoint and the inline `workcenter_merge_map` (§3.33) degrade to an empty array (never 500) — but the DOWNSTREAM effect differs from §3.30's degrade: an empty `workcenter_merge_map` means the INNER JOIN matches zero rows, so the ENTIRE report renders empty (not "every raw value shows as its own group" — that fallback behavior belongs to §3.30 only). Write endpoints return 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled.
+Constraints: unique constraint on `raw_workcenter_group`. **Default-on-absence (D2 — explicit-inclusion, exclude-by-absence — the OPPOSITE default from §3.30's D1 sparse/fallback-to-self):** a raw `workcenter_group` value with NO row in this table is EXCLUDED from the report entirely — it does not appear as its own group, unlike §3.30's fallback behavior. The 12 raw groups intentionally left out (點測/可靠性/補鍍/預備站/成品倉/IST/CP線邊倉/已CP入庫/已CP倉/DS線邊倉/MA/TCT) never appear in the production-achievement report as a result. (PA-19 promoted 切割/PKG_SAW → the 切割 大項 and 成品入庫 → its own single-layer station via the reseeded `production_achievement_workcenter_merge_map`, so those three are now INCLUDED — see the §3.31 Notes above and business-rules.md PA-19.) Client-side resolution is an `INNER JOIN` (never `LEFT JOIN`) — mirrors the existing default-deny idiom already used by the permission table (§3.27: absence of a row = fail-closed/deny) rather than the target table's reuse-missing-as-null idiom (§3.26). **This opposite-default pairing with §3.30 is deliberate and must not be "fixed" by copy-pasting one table's join kind onto the other** — see business-rules.md PA-09/PA-10 and ADR-0016's Extension section. When `MYSQL_OPS_ENABLED=false`, the CRUD read endpoint and the inline `workcenter_merge_map` (§3.33) degrade to an empty array (never 500) — but the DOWNSTREAM effect differs from §3.30's degrade: an empty `workcenter_merge_map` means the INNER JOIN matches zero rows, so the ENTIRE report renders empty (not "every raw value shows as its own group" — that fallback behavior belongs to §3.30 only). Write endpoints return 503 `SERVICE_UNAVAILABLE` when MySQL OPS is disabled.
 
 ### §3.32 Production-Achievement Daily-Plan Table (MySQL, `production_achievement_daily_plans`)
 

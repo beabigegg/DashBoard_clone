@@ -62,12 +62,16 @@ import type {
   DailyViewRow,
   CumulativeViewRow,
   CumulativeTrendPoint,
+  ProductionSourceMode,
 } from './useProductionAchievementDuckDB';
 
 export type ProductionAchievementMode = 'today' | 'yesterday' | 'month' | 'range';
+export type { ProductionSourceMode } from './useProductionAchievementDuckDB';
 
 export interface FilterState {
   mode: ProductionAchievementMode;
+  /** PA-18: 產出 (output) vs 轉出 (moveout) data source, TAB-switched. */
+  source: ProductionSourceMode;
   workcenter_group: string;
   /** Meaningful only when mode === 'range'. */
   start_date: string;
@@ -96,8 +100,10 @@ interface ReportAsyncEnqueued {
 const API_TIMEOUT = 360000;
 
 const DEFAULT_MODE: ProductionAchievementMode = 'today';
+const DEFAULT_SOURCE: ProductionSourceMode = 'output';
 const DEFAULT_WORKCENTER_GROUP = '焊接_DB';
 const VALID_MODES: ProductionAchievementMode[] = ['today', 'yesterday', 'month', 'range'];
+const VALID_SOURCES: ProductionSourceMode[] = ['output', 'moveout'];
 
 // OD-7: survives a full page navigation to /production-achievement-settings
 // and back (separate mini-app — no in-memory store can bridge that round-trip).
@@ -131,6 +137,7 @@ export function resolveMonthPeriod(referenceDate: Date): { start: string; end: s
 
 interface PersistedReportState {
   mode: ProductionAchievementMode;
+  source: ProductionSourceMode;
   workcenter_group: string;
 }
 
@@ -140,19 +147,20 @@ function readPersistedState(): PersistedReportState {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PersistedReportState>;
       const mode = VALID_MODES.includes(parsed.mode as ProductionAchievementMode) ? (parsed.mode as ProductionAchievementMode) : DEFAULT_MODE;
+      const source = VALID_SOURCES.includes(parsed.source as ProductionSourceMode) ? (parsed.source as ProductionSourceMode) : DEFAULT_SOURCE;
       const workcenter_group =
         typeof parsed.workcenter_group === 'string' && parsed.workcenter_group ? parsed.workcenter_group : DEFAULT_WORKCENTER_GROUP;
-      return { mode, workcenter_group };
+      return { mode, source, workcenter_group };
     }
   } catch {
     // sessionStorage unavailable (e.g. private browsing quota) — fall back to defaults
   }
-  return { mode: DEFAULT_MODE, workcenter_group: DEFAULT_WORKCENTER_GROUP };
+  return { mode: DEFAULT_MODE, source: DEFAULT_SOURCE, workcenter_group: DEFAULT_WORKCENTER_GROUP };
 }
 
-function persistState(mode: ProductionAchievementMode, workcenter_group: string): void {
+function persistState(mode: ProductionAchievementMode, source: ProductionSourceMode, workcenter_group: string): void {
   try {
-    sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ mode, workcenter_group }));
+    sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ mode, source, workcenter_group }));
   } catch {
     // best-effort only — never throw from a persistence side-effect
   }
@@ -168,6 +176,7 @@ export function useProductionAchievement() {
 
   const filters = reactive<FilterState>({
     mode: persisted.mode,
+    source: persisted.source,
     workcenter_group: persisted.workcenter_group,
     start_date: '',
     end_date: '',
@@ -176,6 +185,29 @@ export function useProductionAchievement() {
   const filterOptions = reactive<{ workcenter_groups: string[] }>({
     workcenter_groups: [],
   });
+
+  // PA-19: parent_group (大項) -> set of子站 (merged_workcenter_group) under it,
+  // rebuilt from each report response's workcenter_merge_map. A selection whose
+  // parent has >1子站 (電鍍/切割) is rendered EXPANDED in the detail table.
+  const _parentChildren = new Map<string, Set<string>>();
+
+  function _rebuildParentChildren(rows: WorkcenterMergeMapRow[]): void {
+    _parentChildren.clear();
+    for (const r of rows) {
+      const parent = r.parent_group || r.merged_workcenter_group;
+      if (!parent) continue;
+      if (!_parentChildren.has(parent)) _parentChildren.set(parent, new Set());
+      _parentChildren.get(parent)!.add(r.merged_workcenter_group);
+    }
+  }
+
+  function _isExpanded(group: string): boolean {
+    const children = _parentChildren.get(group);
+    return !!children && children.size > 1;
+  }
+
+  /** Whether the currently-selected station renders as an expanded 大項 (PA-19). */
+  const isExpandedSelection = computed(() => _isExpanded(filters.workcenter_group));
 
   const dailyRows = ref<DailyViewRow[]>([]);
   const cumulativeRows = ref<CumulativeViewRow[]>([]);
@@ -274,6 +306,7 @@ export function useProductionAchievement() {
    */
   interface QuerySnapshot {
     mode: ProductionAchievementMode;
+    source: ProductionSourceMode;
     start_date: string;
     end_date: string;
     workcenter_group: string;
@@ -309,6 +342,7 @@ export function useProductionAchievement() {
       start_date: snapshot.start_date,
       end_date: snapshot.end_date,
       workcenter_group: snapshot.workcenter_group,
+      source: snapshot.source,
     };
     if (forceRefresh) params.force_refresh = 'true';
     const response = await apiGet<ReportSpoolHit | ReportAsyncEnqueued>('/api/production-achievement/report', {
@@ -407,16 +441,19 @@ export function useProductionAchievement() {
   /** Re-run computeDailyView/computeCumulativeView against the ALREADY-cached
    *  DuckDB tables (no spool re-fetch) for the given mode/date-window. */
   async function _recompute(mode: ProductionAchievementMode, startDate: string, endDate: string, workcenterGroup: string): Promise<void> {
+    // PA-19: a selection whose 大項 has >1子站 (電鍍/切割) renders expanded
+    // (rows split per子站 + 大項小計 computed in the view layer).
+    const expand = _isExpanded(workcenterGroup);
     if (mode === 'today' || mode === 'yesterday') {
       // today/yesterday are always a single day (start_date === end_date,
       // see _resolveSnapshotDates) — outputDate scopes computeDailyView to
       // exactly that day so the preceding day's overnight N-shift tail
       // (captured by this query's own fetch window, PA-03) never bleeds in.
-      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup, outputDate: startDate });
+      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup, outputDate: startDate, expand });
       cumulativeRows.value = [];
       cumulativeTrend.value = [];
     } else {
-      const result = await duckdb.computeCumulativeView({ workcenterGroup, startDate, endDate });
+      const result = await duckdb.computeCumulativeView({ workcenterGroup, startDate, endDate, expand });
       cumulativeRows.value = result.rows;
       cumulativeTrend.value = result.trend;
       dailyRows.value = [];
@@ -425,6 +462,7 @@ export function useProductionAchievement() {
 
   /** Hand the spool-hit response to DuckDB-WASM and render the computed rows. */
   async function _activateAndRender(data: ReportSpoolHit, snapshot: QuerySnapshot): Promise<void> {
+    _rebuildParentChildren(data.workcenter_merge_map || []);
     await duckdb.activate(
       data.spool_download_url,
       data.spec_workcenter_map || [],
@@ -432,6 +470,7 @@ export function useProductionAchievement() {
       data.package_lf_map || [],
       data.workcenter_merge_map || [],
       data.daily_plan_map || [],
+      snapshot.source,
     );
     await _recompute(snapshot.mode, snapshot.start_date, snapshot.end_date, snapshot.workcenter_group);
   }
@@ -445,7 +484,7 @@ export function useProductionAchievement() {
     duckdb.deactivate();
     const mode = filters.mode;
     const { start_date, end_date } = _resolveSnapshotDates(mode, new Date());
-    const snapshot: QuerySnapshot = { mode, start_date, end_date, workcenter_group: filters.workcenter_group };
+    const snapshot: QuerySnapshot = { mode, source: filters.source, start_date, end_date, workcenter_group: filters.workcenter_group };
     try {
       const data = await _fetchReport(snapshot, options?.forceRefresh ?? false);
       if (!data) {
@@ -477,7 +516,21 @@ export function useProductionAchievement() {
       if (!filters.start_date) filters.start_date = todayStr;
       if (!filters.end_date) filters.end_date = todayStr;
     }
-    persistState(filters.mode, filters.workcenter_group);
+    persistState(filters.mode, filters.source, filters.workcenter_group);
+    void runQuery();
+  }
+
+  /**
+   * PA-18: 產出 / 轉出 data-source TAB. Switching source = a wholly different
+   * dataset (different Oracle source table + spool namespace), so this always
+   * triggers a full re-fetch + re-activate, never a client-side re-filter.
+   * Ignored while a poll is in flight (OD-4).
+   */
+  function setSource(source: ProductionSourceMode): void {
+    if (loading.value) return; // OD-4
+    if (filters.source === source) return;
+    filters.source = source;
+    persistState(filters.mode, filters.source, filters.workcenter_group);
     void runQuery();
   }
 
@@ -491,7 +544,7 @@ export function useProductionAchievement() {
     if (loading.value) return; // OD-4
     if (filters.workcenter_group === group) return;
     filters.workcenter_group = group;
-    persistState(filters.mode, filters.workcenter_group);
+    persistState(filters.mode, filters.source, filters.workcenter_group);
     if (duckdb.isActive.value && _lastSnapshot) {
       void _recompute(_lastSnapshot.mode, _lastSnapshot.start_date, _lastSnapshot.end_date, group);
     } else {
@@ -523,6 +576,29 @@ export function useProductionAchievement() {
     return runQuery({ forceRefresh: true });
   }
 
+  /**
+   * PA-17: pre-check `can_edit_targets` before navigating to
+   * /production-achievement-settings, so a not-whitelisted user gets an
+   * inline message instead of a wasted round-trip into a page they can only
+   * read. A network/parse failure is treated the same as an explicit deny
+   * ('error', a distinct reason string so the caller can show a different
+   * message) -- fail-closed, matching can_edit_targets()'s own contract.
+   * Does NOT change /production-achievement-settings' own route-level
+   * visibility (still readable via direct URL by any released user) -- this
+   * is a client-side UX gate on the button only.
+   */
+  async function checkSettingsAccess(): Promise<'allowed' | 'denied' | 'error'> {
+    try {
+      const res = await apiGet<{ can_edit_targets: boolean }>('/api/production-achievement/permissions/me');
+      if (res.success && res.data) {
+        return res.data.can_edit_targets ? 'allowed' : 'denied';
+      }
+      return 'error';
+    } catch {
+      return 'error';
+    }
+  }
+
   return {
     filters,
     filterOptions,
@@ -530,6 +606,7 @@ export function useProductionAchievement() {
     cumulativeRows,
     cumulativeTrend,
     viewKind,
+    isExpandedSelection,
     loading,
     error,
     hasQueried,
@@ -538,8 +615,10 @@ export function useProductionAchievement() {
     runQuery,
     refreshQuery,
     setMode,
+    setSource,
     setWorkcenterGroup,
     setRangeDates,
     cancelQuery,
+    checkSettingsAccess,
   };
 }

@@ -65,7 +65,7 @@ async function handleDeletePackageLf(raw: string): Promise<void> {
   await deletePackageLf(raw);
 }
 
-async function handleIncludeWorkcenter(payload: { raw_workcenter_group: string; merged_workcenter_group: string }): Promise<void> {
+async function handleIncludeWorkcenter(payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group?: string }): Promise<void> {
   await saveWorkcenterMerge(payload);
 }
 
@@ -73,7 +73,7 @@ async function handleExcludeWorkcenter(raw: string): Promise<void> {
   await excludeWorkcenterGroup(raw);
 }
 
-async function handleRenameWorkcenter(payload: { raw_workcenter_group: string; merged_workcenter_group: string }): Promise<void> {
+async function handleRenameWorkcenter(payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group?: string }): Promise<void> {
   await saveWorkcenterMerge(payload);
 }
 

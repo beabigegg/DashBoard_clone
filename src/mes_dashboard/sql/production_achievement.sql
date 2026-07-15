@@ -150,8 +150,20 @@ SELECT
     SUM(weh.TRACKOUTQTY) AS ACTUAL_OUTPUT_QTY
 FROM DWH.DW_MES_LOTWIPHISTORY weh
 LEFT JOIN workflow_info wb ON weh.CONTAINERID = wb.CONTAINERID
+-- Rework exclusion (business-rules.md PA-05 supplement, production-achievement-
+-- moveout): only 量產 (GA) / 點測 (GC) container-name prefixes count, mirroring
+-- 025.txt's `CONTAINERNAME Like 'GA%'` (widened to also keep GC, consistent with
+-- the 轉出 source's own filter). DW_MES_LOTWIPHISTORY has NO CONTAINERNAME column
+-- (only CONTAINERID), so the prefix is resolved via an INNER JOIN to
+-- DW_MES_CONTAINER (5.5M rows, indexed on CONTAINERID -> per-row index lookup,
+-- one row per container so no fan-out). This must sit on the MAIN query, not on
+-- scoped_container_names: that CTE only carries the narrow 焊接 SPECNAME subset
+-- needing WORKFLOWNAME, whereas the GA/GC filter must apply to EVERY
+-- PA-05-qualifying row (成型/金線/… included).
+JOIN DWH.DW_MES_CONTAINER cga ON weh.CONTAINERID = cga.CONTAINERID
 WHERE weh.TRACKOUTTIMESTAMP >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
   AND weh.TRACKOUTTIMESTAMP <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD HH24:MI:SS')
+  AND (cga.CONTAINERNAME LIKE 'GA%' OR cga.CONTAINERNAME LIKE 'GC%')
   {{ CONTAINERNAME_FILTER }}
   AND (
     (CASE WHEN (wb.WORKFLOWNAME LIKE '%雙晶%' OR wb.WORKFLOWNAME LIKE '%三晶%') THEN 1 ELSE 0 END = 0

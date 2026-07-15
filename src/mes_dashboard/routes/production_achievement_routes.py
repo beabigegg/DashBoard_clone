@@ -7,6 +7,7 @@ overhaul adds 10 new rows):
   GET  /api/production-achievement/filter-options
   GET  /api/production-achievement/targets
   PUT  /api/production-achievement/targets
+  GET  /api/production-achievement/permissions/me
   GET  /admin/api/production-achievement/permissions
   PUT  /admin/api/production-achievement/permissions/{user_identifier}
   GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}]     (D1)
@@ -103,7 +104,7 @@ from mes_dashboard.services.production_achievement_workcenter_merge_service impo
     MySQLUnavailableError as WorkcenterMergeMySQLUnavailableError,
     delete_workcenter_merge,
     get_workcenter_merge_entries,
-    get_workcenter_merge_map,
+    get_workcenter_parent_groups,
     upsert_workcenter_merge,
 )
 
@@ -137,6 +138,26 @@ _PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB: bool = os.getenv(
 # use the hyphen form (data-shape-contract.md §3.28.4).
 _SPOOL_NAMESPACE = "production_achievement"
 _JOB_TYPE = "production-achievement"
+# 轉出 (moveout) source counterparts (PA-18) -- distinct spool namespace + job
+# type, same RQ queue (the moveout worker registers on the shared queue).
+_MOVEOUT_SPOOL_NAMESPACE = "production_achievement_moveout"
+_MOVEOUT_JOB_TYPE = "production-achievement-moveout"
+_VALID_SOURCES = ("output", "moveout")
+
+
+def _resolve_source(raw: "str | None") -> str:
+    """Return a validated data source ('output' default | 'moveout', PA-18).
+
+    Raises ProductionAchievementValidationError on any other value so the route
+    can surface it as a 400 (never silently coerce an unknown source to a
+    default -- that would serve the wrong dataset).
+    """
+    source = (raw or "output").strip().lower()
+    if source not in _VALID_SOURCES:
+        raise ProductionAchievementValidationError(
+            f"source 必須為 {' 或 '.join(_VALID_SOURCES)}"
+        )
+    return source
 
 
 # ============================================================
@@ -169,23 +190,33 @@ def api_get_report():
 
     try:
         _validate_date_range(start_date, end_date)
+        source = _resolve_source(request.args.get("source"))
     except ProductionAchievementValidationError as exc:
         return validation_error(str(exc))
 
-    query_id = make_canonical_pa_spool_id(start_date, end_date)
+    is_moveout = source == "moveout"
+    spool_namespace = _MOVEOUT_SPOOL_NAMESPACE if is_moveout else _SPOOL_NAMESPACE
+    job_type = _MOVEOUT_JOB_TYPE if is_moveout else _JOB_TYPE
+
+    query_id = make_canonical_pa_spool_id(start_date, end_date, source=source)
 
     if force_refresh:
-        clear_spooled_df(_SPOOL_NAMESPACE, query_id)
+        clear_spooled_df(spool_namespace, query_id)
 
     # ── Spool-hit: 200, inline maps injected unconditionally (Q1, not
     # row-count gated like resource_history's threshold). Grows from 2 to 5
     # inline arrays by production-achievement-overhaul (data-shape-contract.md
     # §3.28.4): +package_lf_map (D1), +workcenter_merge_map (D2),
     # +daily_plan_map. ─────────────────────────────────────────────────────
-    spool_path = None if force_refresh else get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    spool_path = None if force_refresh else get_spool_file_path(spool_namespace, query_id)
     if spool_path is not None:
         try:
-            spec_workcenter_map = [
+            # spec_workcenter_map (SPECNAME->workcenter_group) is only meaningful
+            # for the 產出 source (its spool is SPECNAME-grain). The 轉出 spool is
+            # already raw_workcenter_group-grain, so this map is an empty array in
+            # moveout mode (PA-18) -- the client's moveout Stage-1 rollup does not
+            # join it.
+            spec_workcenter_map = [] if is_moveout else [
                 {"SPECNAME": spec, "workcenter_group": info.get("group")}
                 for spec, info in get_spec_workcenter_mapping().items()
                 if info.get("group")
@@ -198,9 +229,16 @@ def api_get_report():
                 {"raw_package_lf": raw, "merged_group": merged}
                 for raw, merged in get_package_lf_map().items()
             ]
+            # PA-19: carry parent_group in the inline array so the client can
+            # build both the raw->子站 (D2 INNER JOIN) and the子站->大項
+            # (detail-table expansion) mappings from one payload.
             workcenter_merge_map = [
-                {"raw_workcenter_group": raw, "merged_workcenter_group": merged}
-                for raw, merged in get_workcenter_merge_map().items()
+                {
+                    "raw_workcenter_group": e["raw_workcenter_group"],
+                    "merged_workcenter_group": e["merged_workcenter_group"],
+                    "parent_group": e["parent_group"],
+                }
+                for e in get_workcenter_merge_entries()
             ]
             daily_plan_map = [
                 {"workcenter_group": wg, "package_lf_group": plg, "daily_plan_qty": qty}
@@ -211,7 +249,8 @@ def api_get_report():
 
         return success_response({
             "query_id": query_id,
-            "spool_download_url": f"/api/spool/{_SPOOL_NAMESPACE}/{query_id}.parquet",
+            "spool_download_url": f"/api/spool/{spool_namespace}/{query_id}.parquet",
+            "source": source,
             "spec_workcenter_map": spec_workcenter_map,
             "targets_map": targets_map,
             "package_lf_map": package_lf_map,
@@ -231,24 +270,30 @@ def api_get_report():
 
     # Lazy import registers the job type (module-level register_job_type()
     # side-effect) -- gated by the kill switch, mirrors eap_alarm_routes.py.
+    # Same flag gates both sources; moveout imports its own worker module.
     if _PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB:
-        import mes_dashboard.workers.production_achievement_worker  # noqa: F401
+        if is_moveout:
+            import mes_dashboard.workers.production_achievement_moveout_worker  # noqa: F401
+        else:
+            import mes_dashboard.workers.production_achievement_worker  # noqa: F401
 
     # enqueue_job_dynamic spreads `params` into the RQ call kwargs as
     # {"job_id": ..., **params}; the worker entry is
-    # execute_production_achievement_unified_job(job_id, params), so the query
-    # params must be nested under a "params" key (mirrors production_history's
-    # `params={"params": body}`) — a flat dict here would spread start_date/
-    # end_date as unexpected top-level kwargs and raise TypeError in the worker.
+    # execute_production_achievement[_moveout]_unified_job(job_id, params), so
+    # the query params must be nested under a "params" key (mirrors
+    # production_history's `params={"params": body}`) — a flat dict here would
+    # spread start_date/end_date as unexpected top-level kwargs and raise
+    # TypeError in the worker.
     job_id_result, err, status_hint = enqueue_query_job(
-        _JOB_TYPE,
+        job_type,
         owner=get_owner_token(),
         params={"params": {"start_date": start_date, "end_date": end_date}},
         sync_fallback_allowed=False,
     )
     if job_id_result is None:
         logger.warning(
-            "production_achievement: async enqueue failed (hint=%s): %s", status_hint, err
+            "production_achievement: async enqueue failed (source=%s hint=%s): %s",
+            source, status_hint, err,
         )
         return error_response(
             SERVICE_UNAVAILABLE,
@@ -262,7 +307,7 @@ def api_get_report():
         {
             "async": True,
             "job_id": job_id_result,
-            "status_url": f"/api/job/{job_id_result}?prefix={_JOB_TYPE}",
+            "status_url": f"/api/job/{job_id_result}?prefix={job_type}",
         },
         status_code=202,
     )
@@ -337,6 +382,22 @@ def api_put_targets():
         return internal_error(str(exc))
 
     return success_response({"acknowledged": True})
+
+
+# ============================================================
+# GET /api/production-achievement/permissions/me (self-check, any logged-in
+# user -- lets the report page's frontend decide whether to route into
+# /production-achievement-settings BEFORE navigating, instead of only
+# discovering the answer via a 403 on the first write inside that page.
+# Deliberately login_required only, NOT can_edit_targets-gated: a
+# not-whitelisted user must still be able to ask "am I whitelisted?".
+# ============================================================
+
+
+@production_achievement_bp.route("/permissions/me", methods=["GET"])
+@login_required
+def api_get_own_permission():
+    return success_response({"can_edit_targets": can_edit_targets()})
 
 
 # ============================================================
@@ -482,6 +543,9 @@ def api_put_workcenter_merge_map():
     body = request.get_json(silent=True) or {}
     raw_workcenter_group = body.get("raw_workcenter_group")
     merged_workcenter_group = body.get("merged_workcenter_group")
+    # parent_group (PA-19) optional; defaults to merged (single-layer) in the
+    # service when omitted/blank.
+    parent_group = body.get("parent_group") or None
 
     if not raw_workcenter_group or not merged_workcenter_group:
         return validation_error("必須提供 raw_workcenter_group 和 merged_workcenter_group")
@@ -490,6 +554,7 @@ def api_put_workcenter_merge_map():
         upsert_workcenter_merge(
             raw_workcenter_group=raw_workcenter_group,
             merged_workcenter_group=merged_workcenter_group,
+            parent_group=parent_group,
             updated_by=get_owner_token(),
         )
     except WorkcenterMergeMySQLUnavailableError as exc:
@@ -604,7 +669,12 @@ def api_post_daily_plans_import_preview():
         return internal_error(str(exc))
 
     try:
-        legal_workcenter_groups = set(get_workcenter_merge_map().values())
+        # PA-19: a daily plan keys on the 大項/parent_group (what the settings
+        # dropdown offers and what the report joins achievement on), NOT the
+        # merged 子站 value. The 電鍍 大項 has no "電鍍" merged 子站 (it splits
+        # into 掛鍍/條鍍/滾鍍/委外), so a merged-value legal set would reject the
+        # report's 電鍍 sheet outright — the parent set is the correct oracle.
+        legal_workcenter_groups = set(get_workcenter_parent_groups())
         legal_package_lf_map = get_package_lf_map()
         legal_package_lf_groups = set(legal_package_lf_map.values()) | (
             set(get_known_package_lf_values()) - set(legal_package_lf_map.keys())
@@ -636,7 +706,12 @@ def api_post_daily_plans_import_confirm():
         return validation_error("必須提供 rows（至少一筆）")
 
     try:
-        legal_workcenter_groups = set(get_workcenter_merge_map().values())
+        # PA-19: a daily plan keys on the 大項/parent_group (what the settings
+        # dropdown offers and what the report joins achievement on), NOT the
+        # merged 子站 value. The 電鍍 大項 has no "電鍍" merged 子站 (it splits
+        # into 掛鍍/條鍍/滾鍍/委外), so a merged-value legal set would reject the
+        # report's 電鍍 sheet outright — the parent set is the correct oracle.
+        legal_workcenter_groups = set(get_workcenter_parent_groups())
         legal_package_lf_map = get_package_lf_map()
         legal_package_lf_groups = set(legal_package_lf_map.values()) | (
             set(get_known_package_lf_values()) - set(legal_package_lf_map.keys())

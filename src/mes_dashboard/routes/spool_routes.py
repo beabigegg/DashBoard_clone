@@ -26,7 +26,8 @@ _ALLOWED_NAMESPACES = frozenset({
     "downtime_analysis_job_bridge",
     "eap_alarm",
     "wip_dataset",  # wip-rq-worker-chunks-cleanup: async WIP detail spool
-    "production_achievement",  # production-achievement-async-spool
+    "production_achievement",  # production-achievement-async-spool (產出 source)
+    "production_achievement_moveout",  # production-achievement-moveout (轉出 source, PA-18)
     "uph_performance",  # add-uph-performance-page
 })
 

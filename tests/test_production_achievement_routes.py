@@ -173,8 +173,14 @@ class TestReportRoute:
         return_value={("焊接_DB", "SOD-123FL"): 300},
     )
     @patch(
-        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_map",
-        return_value={"焊接_DW": "焊接_WB"},
+        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries",
+        return_value=[{
+            "raw_workcenter_group": "焊接_DW",
+            "merged_workcenter_group": "焊接_WB",
+            "parent_group": "焊接_WB",
+            "updated_at": "2026-04-01T00:00:00",
+            "updated_by": "system-seed",
+        }],
     )
     @patch(
         "mes_dashboard.routes.production_achievement_routes.get_package_lf_map",
@@ -194,12 +200,11 @@ class TestReportRoute:
     )
     def test_spool_hit_response_shape_has_spool_download_url_spec_map_targets_map(
         self, mock_spool, mock_spec_map, mock_targets_map, mock_package_lf_map,
-        mock_workcenter_merge_map, mock_daily_plans_map, auth_client
+        mock_workcenter_merge_entries, mock_daily_plans_map, auth_client
     ):
-        """AC-6: envelope grows from 2 to 5 inline arrays
-        (data-shape-contract.md §3.28.4) -- spec_workcenter_map, targets_map
-        (unchanged shape) plus the 3 new arrays: package_lf_map (D1),
-        workcenter_merge_map (D2), daily_plan_map."""
+        """AC-6: envelope inline arrays -- spec_workcenter_map, targets_map,
+        package_lf_map (D1), workcenter_merge_map (D2, now carrying
+        parent_group per PA-19), daily_plan_map. Default source=output."""
         resp = auth_client.get(
             "/api/production-achievement/report",
             query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
@@ -209,6 +214,7 @@ class TestReportRoute:
         assert payload["success"] is True
         data = payload["data"]
         assert "query_id" in data
+        assert data["source"] == "output"
         assert data["spool_download_url"] == (
             f"/api/spool/production_achievement/{data['query_id']}.parquet"
         )
@@ -221,7 +227,11 @@ class TestReportRoute:
             {"raw_package_lf": "SOT23-5L", "merged_group": "SOT23-5L/6L"}
         ]
         assert data["workcenter_merge_map"] == [
-            {"raw_workcenter_group": "焊接_DW", "merged_workcenter_group": "焊接_WB"}
+            {
+                "raw_workcenter_group": "焊接_DW",
+                "merged_workcenter_group": "焊接_WB",
+                "parent_group": "焊接_WB",
+            }
         ]
         assert data["daily_plan_map"] == [
             {"workcenter_group": "焊接_DB", "package_lf_group": "SOD-123FL", "daily_plan_qty": 300}
@@ -234,8 +244,8 @@ class TestReportRoute:
         return_value={},
     )
     @patch(
-        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_map",
-        return_value={},
+        "mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries",
+        return_value=[],
     )
     @patch(
         "mes_dashboard.routes.production_achievement_routes.get_package_lf_map",
@@ -306,6 +316,84 @@ class TestReportRoute:
         assert resp.status_code == 503
         payload = resp.get_json()
         assert payload["error"]["code"] == "SERVICE_UNAVAILABLE"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/production-achievement/report?source=... (PA-18 轉出/moveout source)
+# ---------------------------------------------------------------------------
+
+class TestReportSourceParam:
+    def test_invalid_source_returns_400(self, auth_client):
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02", "source": "bogus"},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
+
+    @patch("mes_dashboard.routes.production_achievement_routes.get_daily_plans_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_workcenter_merge_entries", return_value=[])
+    @patch("mes_dashboard.routes.production_achievement_routes.get_package_lf_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_targets_map", return_value={})
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spec_workcenter_mapping")
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/moveout.parquet",
+    )
+    def test_moveout_spool_hit_empty_spec_map_and_moveout_namespace(
+        self, mock_spool, mock_spec_map, mock_targets, mock_pkg, mock_merge, mock_daily, auth_client
+    ):
+        """PA-18: in moveout mode spec_workcenter_map is an empty array (the
+        spool is raw_workcenter_group-grain), the download URL uses the moveout
+        namespace, and `source` is echoed. get_spec_workcenter_mapping is never
+        even consulted (short-circuited)."""
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02", "source": "moveout"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["source"] == "moveout"
+        assert data["spec_workcenter_map"] == []
+        assert data["spool_download_url"] == (
+            f"/api/spool/production_achievement_moveout/{data['query_id']}.parquet"
+        )
+        mock_spec_map.assert_not_called()
+        # moveout spool key differs from the output key for the same dates
+        from mes_dashboard.services.production_achievement_service import make_canonical_pa_spool_id
+        assert data["query_id"] == make_canonical_pa_spool_id("2026-04-01", "2026-04-02", source="moveout")
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_moveout_enqueue_routes_to_moveout_job_type(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        """PA-18: a moveout spool-miss enqueues the production-achievement-moveout
+        job type (not the output job type) and its status_url uses that prefix."""
+        mock_enqueue.return_value = ("mo-job-1", None, None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02", "source": "moveout"},
+        )
+        assert resp.status_code == 202
+        assert mock_enqueue.call_args.args[0] == "production-achievement-moveout"
+        assert "prefix=production-achievement-moveout" in resp.get_json()["data"]["status_url"]
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_default_source_output_enqueues_output_job_type(
+        self, mock_spool, mock_enqueue, mock_avail, auth_client
+    ):
+        """No source param -> default 'output' -> the production-achievement job."""
+        mock_enqueue.return_value = ("out-job-1", None, None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-04-01", "end_date": "2026-04-02"},
+        )
+        assert resp.status_code == 202
+        assert mock_enqueue.call_args.args[0] == "production-achievement"
 
 
 # ---------------------------------------------------------------------------
@@ -385,27 +473,30 @@ class TestFilterOptionsRoute:
         assert payload["success"] is True
 
     @patch(
-        "mes_dashboard.services.production_achievement_service.get_workcenter_merge_map"
+        "mes_dashboard.services.production_achievement_workcenter_merge_service.get_workcenter_merge_entries"
     )
-    def test_filter_options_workcenter_groups_is_merged_d2_list_end_to_end(
-        self, mock_merge_map, auth_client
+    def test_filter_options_workcenter_groups_is_distinct_parent_list_end_to_end(
+        self, mock_entries, auth_client
     ):
-        """Phase 1 (production-achievement-overhaul): workcenter_groups is
-        redefined in place to the merged (D2) list. Exercises the REAL
-        get_filter_options() through the route (only the deep
-        get_workcenter_merge_map dependency is mocked) -- 焊接_WB/焊接_DW
-        both merge to 焊接_WB and must appear once, not twice; an excluded
-        raw group (absent from the merge map) must never appear."""
-        mock_merge_map.return_value = {
-            "焊接_WB": "焊接_WB",
-            "焊接_DW": "焊接_WB",
-            "焊接_DB": "焊接_DB",
-        }
+        """PA-19: workcenter_groups is the DISTINCT parent_group (大項) list.
+        Exercises the REAL get_filter_options() -> get_workcenter_parent_groups()
+        chain through the route (only the deep DB-read get_workcenter_merge_entries
+        is mocked) -- 掛鍍/條鍍 both roll up under 電鍍 so 電鍍 appears once;
+        single-layer 焊接_DB appears as itself; an excluded raw group never
+        appears."""
+        mock_entries.return_value = [
+            {"raw_workcenter_group": "掛鍍", "merged_workcenter_group": "掛鍍",
+             "parent_group": "電鍍", "updated_at": "", "updated_by": ""},
+            {"raw_workcenter_group": "條鍍", "merged_workcenter_group": "條鍍",
+             "parent_group": "電鍍", "updated_at": "", "updated_by": ""},
+            {"raw_workcenter_group": "焊接_DB", "merged_workcenter_group": "焊接_DB",
+             "parent_group": "焊接_DB", "updated_at": "", "updated_by": ""},
+        ]
         resp = auth_client.get("/api/production-achievement/filter-options")
         assert resp.status_code == 200
         data = resp.get_json()["data"]
-        assert data["workcenter_groups"] == ["焊接_DB", "焊接_WB"]
-        assert "切割" not in data["workcenter_groups"]
+        assert data["workcenter_groups"] == ["焊接_DB", "電鍍"]
+        assert "TCT" not in data["workcenter_groups"]
 
 
 # ---------------------------------------------------------------------------
@@ -501,6 +592,32 @@ class TestPutTargetsRoute:
             json={"shift_code": "D", "workcenter_group": "切割", "target_qty": "abc"},
         )
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# GET /api/production-achievement/permissions/me (self-check, any logged-in
+# user -- login_required only, never can_edit_targets-gated)
+# ---------------------------------------------------------------------------
+
+class TestGetOwnPermissionRoute:
+    def test_requires_login(self, client):
+        resp = client.get("/api/production-achievement/permissions/me")
+        assert resp.status_code == 401
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=False)
+    def test_not_whitelisted_user_gets_200_with_false(self, mock_can_edit, auth_client):
+        """A non-whitelisted user must still be able to ask the question --
+        this endpoint is the self-check itself, not a write it would be
+        locked out of."""
+        resp = auth_client.get("/api/production-achievement/permissions/me")
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["can_edit_targets"] is False
+
+    @patch("mes_dashboard.routes.production_achievement_routes.can_edit_targets", return_value=True)
+    def test_whitelisted_user_gets_true(self, mock_can_edit, auth_client):
+        resp = auth_client.get("/api/production-achievement/permissions/me")
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["can_edit_targets"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -933,14 +1050,17 @@ class TestDailyPlansImportPreviewRoute:
     @patch(f"{_IMPORT_MOD}.get_daily_plans_map")
     @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
     @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_merge_map")
+    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
     @patch(f"{_IMPORT_MOD}.parse_pjmes052_workbook")
     def test_happy_path_returns_preview(
         self, mock_parse, mock_wg_map, mock_plf_map, mock_known, mock_plans_map,
         mock_categorize, mock_can_edit, auth_client,
     ):
         mock_parse.return_value = ["parsed-row-sentinel"]
-        mock_wg_map.return_value = {"焊接_DB": "焊接_DB"}
+        # PA-19: the daily-plan legal set is the 大項/parent_group list (what a
+        # plan can key to), not the raw->merged map — so the route now calls
+        # get_workcenter_parent_groups(), which returns a list of parent names.
+        mock_wg_map.return_value = ["焊接_DB"]
         mock_plf_map.return_value = {"SOD-123FL OP1": "SOD-123FL"}
         mock_known.return_value = ["SOD-123FL", "SOT-23"]
         mock_plans_map.return_value = {("焊接_DB", "SOD-123FL"): 100}
@@ -988,7 +1108,10 @@ class TestDailyPlansImportConfirmRoute:
         assert resp.status_code == 400
 
     def _mock_legal_sets(self, mock_wg_map, mock_plf_map, mock_known):
-        mock_wg_map.return_value = {"焊接_DB": "焊接_DB"}
+        # PA-19: the daily-plan legal set is the 大項/parent_group list (what a
+        # plan can key to), not the raw->merged map — so the route now calls
+        # get_workcenter_parent_groups(), which returns a list of parent names.
+        mock_wg_map.return_value = ["焊接_DB"]
         mock_plf_map.return_value = {}
         mock_known.return_value = ["SOD-123FL"]
 
@@ -997,7 +1120,7 @@ class TestDailyPlansImportConfirmRoute:
     @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
     @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
     @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_merge_map")
+    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
     def test_400_and_no_write_when_workcenter_group_illegal(
         self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
     ):
@@ -1014,7 +1137,7 @@ class TestDailyPlansImportConfirmRoute:
     @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
     @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
     @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_merge_map")
+    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
     def test_400_and_no_write_when_package_lf_group_illegal(
         self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
     ):
@@ -1031,7 +1154,7 @@ class TestDailyPlansImportConfirmRoute:
     @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
     @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
     @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_merge_map")
+    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
     def test_400_and_no_write_when_one_row_has_negative_qty(
         self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
     ):
@@ -1051,7 +1174,7 @@ class TestDailyPlansImportConfirmRoute:
     @patch(f"{_IMPORT_MOD}.bulk_upsert_daily_plans")
     @patch(f"{_IMPORT_MOD}.get_known_package_lf_values")
     @patch(f"{_IMPORT_MOD}.get_package_lf_map")
-    @patch(f"{_IMPORT_MOD}.get_workcenter_merge_map")
+    @patch(f"{_IMPORT_MOD}.get_workcenter_parent_groups")
     def test_happy_path_calls_bulk_upsert_once(
         self, mock_wg_map, mock_plf_map, mock_known, mock_bulk, mock_can_edit, auth_client,
     ):

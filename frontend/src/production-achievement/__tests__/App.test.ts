@@ -124,6 +124,20 @@ describe('production-achievement App.vue', () => {
     vi.restoreAllMocks();
   });
 
+  it('PA-18: renders the 產出/轉出 source TAB, defaults to 產出 active, and toggles on click', async () => {
+    const wrapper = mountApp();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pa-source-output"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pa-source-moveout"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pa-source-output"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('[data-testid="pa-source-moveout"]').attributes('aria-pressed')).toBe('false');
+
+    await wrapper.find('[data-testid="pa-source-moveout"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pa-source-moveout"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('[data-testid="pa-source-moveout"]').classes()).toContain('pa-app__source-btn--active');
+  });
+
   it('defaults to 當日 mode on landing (no persisted state)', async () => {
     const wrapper = mountApp();
     await flushPromises();
@@ -148,6 +162,21 @@ describe('production-achievement App.vue', () => {
 
     expect(wrapper.find('[data-testid="pa-mode-month"]').attributes('aria-pressed')).toBe('true');
     expect(wrapper.find('[data-testid="pa-mode-today"]').attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
+  });
+
+  it('the active mode button carries the glow-animation class, the inactive ones do not', async () => {
+    const wrapper = mountApp();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="pa-mode-today"]').classes()).toContain('pa-app__mode-btn--active');
+    expect(wrapper.find('[data-testid="pa-mode-yesterday"]').classes()).not.toContain('pa-app__mode-btn--active');
+
+    await wrapper.find('[data-testid="pa-mode-yesterday"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="pa-mode-yesterday"]').classes()).toContain('pa-app__mode-btn--active');
+    expect(wrapper.find('[data-testid="pa-mode-today"]').classes()).not.toContain('pa-app__mode-btn--active');
     wrapper.unmount();
   });
 
@@ -182,12 +211,70 @@ describe('production-achievement App.vue', () => {
     wrapper.unmount();
   });
 
-  it('設定 button navigates to /production-achievement-settings', async () => {
+  it('設定 button navigates to /production-achievement-settings when whitelisted (PA-17)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/permissions/me')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { can_edit_targets: true }, meta: {} }));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
+    });
+
     const wrapper = mountApp();
     await flushPromises();
 
     await wrapper.find('[data-testid="pa-settings-btn"]').trigger('click');
+    await flushPromises();
     expect(navigateMock).toHaveBeenCalledWith('/production-achievement-settings');
+    wrapper.unmount();
+  });
+
+  it('設定 button is styled red (ui-btn--danger) regardless of permission (PA-17)', async () => {
+    const wrapper = mountApp();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pa-settings-btn"]').classes()).toContain('ui-btn--danger');
+    wrapper.unmount();
+  });
+
+  it('設定 button blocks navigation and shows a message when NOT whitelisted (PA-17)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/permissions/me')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { can_edit_targets: false }, meta: {} }));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
+    });
+
+    const wrapper = mountApp();
+    await flushPromises();
+
+    await wrapper.find('[data-testid="pa-settings-btn"]').trigger('click');
+    await flushPromises();
+
+    expect(navigateMock).not.toHaveBeenCalled();
+    const banners = wrapper.findAllComponents(ErrorBanner);
+    expect(banners.some((b) => (b.props('message') ?? '').includes('沒有權限'))).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('設定 button blocks navigation and shows a distinct message on a permission-check network failure (PA-17)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/permissions/me')) {
+        return Promise.reject(new Error('network down'));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
+    });
+
+    const wrapper = mountApp();
+    await flushPromises();
+
+    await wrapper.find('[data-testid="pa-settings-btn"]').trigger('click');
+    await flushPromises();
+
+    expect(navigateMock).not.toHaveBeenCalled();
+    const banners = wrapper.findAllComponents(ErrorBanner);
+    expect(banners.some((b) => (b.props('message') ?? '').includes('查詢失敗'))).toBe(true);
     wrapper.unmount();
   });
 
@@ -241,6 +328,71 @@ describe('production-achievement App.vue', () => {
     const kpiCards = wrapper.findAllComponents(SummaryCard);
     const byLabel = Object.fromEntries(kpiCards.map((c) => [c.props('label'), c.props('value')]));
     expect(byLabel['實際產出合計']).toBe(400);
+    expect(byLabel['計畫合計']).toBe(500);
+    expect(byLabel['整體達成率']).toBeCloseTo(80.0, 5);
+    wrapper.unmount();
+  });
+
+  it('PA-19: expanded 大項 (電鍍) KPI 實際合計 sums LEAF 子站 rows only — the 大項小計 rollup row is never double-counted', async () => {
+    // Land directly on 電鍍 (轉出) so the initial auto-run renders expanded mode.
+    sessionStorage.setItem(
+      'production-achievement:last-report-state',
+      JSON.stringify({ mode: 'today', source: 'moveout', workcenter_group: '電鍍' }),
+    );
+    const client = await getDuckClient();
+    // GROUPING SETS output for the daily expand SELECT: 2 子站 leaves (no plan)
+    // + 1 大項小計 (summed actuals + the parent-keyed plan). Every setup/CREATE
+    // sendQuery returns []; only the expand daily SELECT gets the rows.
+    client.sendQuery.mockImplementation((sql: string) => {
+      const s = String(sql);
+      if (s.includes('GROUPING SETS') && s.includes('achievement_rate')) {
+        return Promise.resolve([
+          { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, d_output_qty: 200, n_output_qty: 100, daily_output_qty: 300, daily_plan_qty: null, achievement_rate: null },
+          { package_lf_group: 'PKG-1', workcenter_group: '條鍍', is_subtotal: 0, d_output_qty: 60, n_output_qty: 40, daily_output_qty: 100, daily_plan_qty: null, achievement_rate: null },
+          { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, d_output_qty: 260, n_output_qty: 140, daily_output_qty: 400, daily_plan_qty: 500, achievement_rate: 0.8 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const MOVEOUT_BODY = {
+      success: true,
+      data: {
+        query_id: 'mv1',
+        spool_download_url: '/api/spool/production_achievement_moveout/mv1.parquet',
+        spec_workcenter_map: [],
+        targets_map: [],
+        package_lf_map: [],
+        workcenter_merge_map: [
+          { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' },
+          { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍' },
+        ],
+        daily_plan_map: [{ workcenter_group: '電鍍', package_lf_group: 'PKG-1', daily_plan_qty: 500 }],
+        source: 'moveout',
+      },
+      meta: {},
+    };
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/filter-options')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['電鍍', '焊接_DB'] }, meta: {} }));
+      }
+      if (u.includes('/api/production-achievement/report')) {
+        return Promise.resolve(jsonResponse(MOVEOUT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const wrapper = mountApp();
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    const kpiCards = wrapper.findAllComponents(SummaryCard);
+    const byLabel = Object.fromEntries(kpiCards.map((c) => [c.props('label'), c.props('value')]));
+    // LEAF sum only: 300 + 100 = 400 (NOT 800 with the 大項小計 double-counted).
+    expect(byLabel['實際轉出合計']).toBe(400);
+    // Only the 大項小計 row carries a plan, so 計畫合計 = its plan (no leaf plans).
     expect(byLabel['計畫合計']).toBe(500);
     expect(byLabel['整體達成率']).toBeCloseTo(80.0, 5);
     wrapper.unmount();
@@ -310,8 +462,12 @@ describe('production-achievement App.vue', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="pa-report-table"]').exists()).toBe(false);
-    const banner = wrapper.findComponent(ErrorBanner);
-    expect(banner.props('message')).toContain('背景查詢服務不可用');
+    // A second ErrorBanner instance exists for the unrelated PA-17
+    // settings-permission message (empty/hidden here) — find the one that
+    // actually carries the query-failure text.
+    const banners = wrapper.findAllComponents(ErrorBanner);
+    const banner = banners.find((b) => (b.props('message') ?? '').includes('背景查詢服務不可用'));
+    expect(banner).toBeTruthy();
     wrapper.unmount();
   });
 });

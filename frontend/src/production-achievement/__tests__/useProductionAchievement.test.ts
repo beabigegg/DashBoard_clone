@@ -396,6 +396,44 @@ describe('useProductionAchievement — month mode date resolution (regression: f
   });
 });
 
+describe('useProductionAchievement — source (產出/轉出) TAB (PA-18)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('report request carries source=output by default and source=moveout after setSource', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+    const urls: string[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/api/production-achievement/report')) urls.push(String(url));
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
+    });
+
+    const { runQuery, setSource, filters } = useProductionAchievement();
+    await runQuery();
+    await vi.waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(1));
+    expect(urls[urls.length - 1]).toContain('source=output');
+
+    setSource('moveout');
+    expect(filters.source).toBe('moveout');
+    await vi.waitFor(() => expect(urls.some((u) => u.includes('source=moveout'))).toBe(true));
+  });
+
+  it('setSource persists across a new composable instance (sessionStorage, OD-7-style)', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { workcenter_groups: [] }, meta: {} }));
+
+    const first = useProductionAchievement();
+    first.setSource('moveout');
+    await vi.waitFor(() => expect(first.filters.source).toBe('moveout'));
+
+    const second = useProductionAchievement();
+    expect(second.filters.source).toBe('moveout');
+  });
+});
+
 describe('useProductionAchievement — range mode date handling', () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -432,5 +470,43 @@ describe('useProductionAchievement — range mode date handling', () => {
 
     expect(capturedUrl).not.toContain(farFuture);
     expect(capturedUrl).toContain('start_date=2026-07-01');
+  });
+});
+
+describe('useProductionAchievement — checkSettingsAccess (PA-17)', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns "allowed" when the self-check reports can_edit_targets=true', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({ success: true, data: { can_edit_targets: true }, meta: {} }),
+    );
+    const { checkSettingsAccess } = useProductionAchievement();
+    await expect(checkSettingsAccess()).resolves.toBe('allowed');
+  });
+
+  it('returns "denied" when the self-check reports can_edit_targets=false', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({ success: true, data: { can_edit_targets: false }, meta: {} }),
+    );
+    const { checkSettingsAccess } = useProductionAchievement();
+    await expect(checkSettingsAccess()).resolves.toBe('denied');
+  });
+
+  it('returns "error" on a network failure -- fail-closed, distinct from an explicit deny', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('network down'));
+    const { checkSettingsAccess } = useProductionAchievement();
+    await expect(checkSettingsAccess()).resolves.toBe('error');
+  });
+
+  it('returns "error" on a success:false envelope', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({ success: false, error: { code: 'UNAUTHORIZED', message: '請先登入' }, meta: {} }, 401),
+    );
+    const { checkSettingsAccess } = useProductionAchievement();
+    await expect(checkSettingsAccess()).resolves.toBe('error');
   });
 });

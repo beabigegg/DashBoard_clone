@@ -17,6 +17,31 @@
   --pa-daily-qty-bar: theme('colors.token.h64748b');
 }
 
+/* Consistent vertical rhythm between the filter card / KPI cards / chart /
+ * detail table -- these are direct siblings under .pa-app__page but only
+ * `.ui-card` (filter panel, detail table) carries the shared `margin-bottom`
+ * (styles/tailwind.css); SummaryCardGroup/SectionCard (chart) carry none, so
+ * KPI-to-chart and chart-to-table previously touched with zero gap. `gap` on
+ * the flex column replaces per-child margin uniformly; the direct-child
+ * `.ui-card` margin-bottom is zeroed here to avoid doubling up. */
+.theme-production-achievement.pa-app__page {
+  display: flex;
+  flex-direction: column;
+  gap: theme('spacing.token.p16');
+}
+
+.theme-production-achievement.pa-app__page > .ui-card {
+  margin-bottom: 0;
+}
+
+/* Detail table hugs the card edges (no ui-card-body padding around it) --
+ * DataTable's own cell padding (10px/12px, shared-ui/components/DataTable.vue)
+ * already provides the inner breathing room, and `.ui-card`'s `overflow:
+ * hidden` clips the table to the card's rounded corners. */
+.theme-production-achievement .pa-app__table-card .ui-card-body {
+  padding: 0;
+}
+
 .theme-production-achievement .pa-app__filter-panel {
   @apply p-4 flex flex-col gap-3 overflow-visible;
 }
@@ -28,10 +53,140 @@
   @apply flex items-center gap-2;
 }
 
+/* 設定 button (PA-17): stays visibly red even combined with the muted
+ * `.ui-btn--sm` base (a two-class compound selector outranks `.ui-btn--sm`'s
+ * own single-class background/color, which otherwise wins on source order —
+ * see `.ui-btn--danger`/`.ui-btn--sm` in styles/tailwind.css). Signals "this
+ * leads to a permission-gated area", not an error state. */
+.theme-production-achievement .pa-app__header-actions .ui-btn--danger.ui-btn--sm {
+  background: theme('colors.state.danger');
+  color: theme('colors.token.hffffff');
+  border-color: theme('colors.state.danger');
+}
+
+.theme-production-achievement .pa-app__header-actions .ui-btn--danger.ui-btn--sm:hover:not(:disabled) {
+  background: theme('colors.token.hdc2626');
+  border-color: theme('colors.token.hdc2626');
+}
+
 /* 4-button mode switch (當日/前日/當月/自訂區間, IP-8) — replaces the old
- * free-form start/end date pickers for 3 of the 4 modes (OD-2). */
+ * free-form start/end date pickers for 3 of the 4 modes (OD-2). Segmented-
+ * control look (tracked background + solid pill for the active segment) —
+ * a plain outlined button with only a border/text color swap read as "not
+ * obvious enough" against the page background; drives its own look entirely
+ * via `.pa-app__mode-btn` rather than the shared `.ui-btn--primary`/
+ * `.ui-btn--secondary`/`.ui-btn--sm` modifiers (those set a background/
+ * border of their own, single-class rules that win on source order over a
+ * naive two-class override — not worth fighting for a fully custom control). */
 .theme-production-achievement .pa-app__mode-switch {
-  @apply flex flex-wrap gap-2;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p4');
+  padding: theme('spacing.token.p4');
+  background: theme('colors.surface.active');
+  border-radius: 10px;
+}
+
+.theme-production-achievement .pa-app__mode-btn {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  color: theme('colors.text.secondary');
+  padding: theme('spacing.token.p6') theme('spacing.token.p14');
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--motion-normal) var(--motion-ease);
+}
+
+.theme-production-achievement .pa-app__mode-btn:hover:not(.pa-app__mode-btn--active):not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+  color: theme('colors.brand.600');
+}
+
+.theme-production-achievement .pa-app__mode-btn--active {
+  background: theme('colors.brand.500');
+  color: theme('colors.token.hffffff');
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  animation: pa-mode-glow 2.4s ease-in-out infinite;
+}
+
+.theme-production-achievement .pa-app__mode-btn--active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  background-size: 200% auto;
+  animation: pa-pill-shimmer 2.8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes pa-mode-glow {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(0, 107, 168, 0.2), 0 0 14px 2px rgba(0, 107, 168, 0.45); }
+  50%      { box-shadow: 0 0 12px 3px rgba(0, 107, 168, 0.45), 0 0 24px 4px rgba(0, 107, 168, 0.2); }
+}
+
+@keyframes pa-pill-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-production-achievement .pa-app__mode-btn--active { animation: none; }
+  .theme-production-achievement .pa-app__mode-btn--active::after { animation: none; }
+}
+
+/* 產出/轉出 data-source switch (PA-18) — same segmented-control look as the
+ * mode switch, but a deliberately INDEPENDENT class family so future edits to
+ * one control never accidentally move the other. Rendered above the mode switch
+ * (source is a higher-level dimension than the date window). */
+.theme-production-achievement .pa-app__source-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: theme('spacing.token.p4');
+  padding: theme('spacing.token.p4');
+  background: theme('colors.surface.active');
+  border-radius: 10px;
+}
+
+.theme-production-achievement .pa-app__source-btn {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  color: theme('colors.text.secondary');
+  padding: theme('spacing.token.p6') theme('spacing.token.p14');
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--motion-normal) var(--motion-ease);
+}
+
+.theme-production-achievement .pa-app__source-btn:hover:not(.pa-app__source-btn--active):not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+  color: theme('colors.brand.600');
+}
+
+.theme-production-achievement .pa-app__source-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.theme-production-achievement .pa-app__source-btn--active {
+  background: theme('colors.brand.500');
+  color: theme('colors.token.hffffff');
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* PA-19: the per-package 大項小計 (subtotal) row in expanded 電鍍/切割 mode.
+ * DataTable is shared (no row-level class hook), so the emphasis is applied to
+ * the cell content span the App's #cell slot renders — bold to set the小計
+ * apart from its子站 leaf rows above it. */
+.theme-production-achievement .pa-app__subtotal-cell {
+  font-weight: 700;
 }
 
 /* Scoped override for the global `.ui-card { overflow: hidden }` rule so the

@@ -42,6 +42,9 @@ export interface PackageLfMapRow {
 export interface WorkcenterMergeMapRow {
   raw_workcenter_group: string;
   merged_workcenter_group: string;
+  /** PA-19: the 大項 this子站 rolls up under (電鍍/切割 for their sub-stations;
+   *  otherwise === merged_workcenter_group). */
+  parent_group: string;
   updated_at: string;
   updated_by: string;
 }
@@ -58,6 +61,7 @@ export interface WorkcenterFullListRow {
   raw_workcenter_group: string;
   included: boolean;
   merged_workcenter_group: string | null;
+  parent_group: string | null;
   updated_at: string | null;
   updated_by: string | null;
 }
@@ -249,6 +253,7 @@ export function useProductionAchievementSettings() {
         raw_workcenter_group: raw,
         included: !!row,
         merged_workcenter_group: row?.merged_workcenter_group ?? null,
+        parent_group: row?.parent_group ?? null,
         updated_at: row?.updated_at ?? null,
         updated_by: row?.updated_by ?? null,
       };
@@ -305,7 +310,7 @@ export function useProductionAchievementSettings() {
     }
   }
 
-  async function saveWorkcenterMerge(payload: { raw_workcenter_group: string; merged_workcenter_group: string }): Promise<boolean> {
+  async function saveWorkcenterMerge(payload: { raw_workcenter_group: string; merged_workcenter_group: string; parent_group?: string }): Promise<boolean> {
     editError.value = '';
     editSaving.value = true;
     try {

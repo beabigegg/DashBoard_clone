@@ -62,11 +62,16 @@ export interface PackageLfMapRow {
   merged_group: string;
 }
 
-/** §3.33 D2 — explicit-inclusion, exclude-by-absence (PA-10). OPPOSITE default from PackageLfMapRow. */
+/** §3.33 D2 — explicit-inclusion, exclude-by-absence (PA-10). OPPOSITE default from PackageLfMapRow.
+ *  `parent_group` (PA-19) is the 大項 this子站 rolls up under; single-layer
+ *  stations have parent_group === merged_workcenter_group. */
 export interface WorkcenterMergeMapRow {
   raw_workcenter_group: string;
   merged_workcenter_group: string;
+  parent_group: string;
 }
+
+export type ProductionSourceMode = 'output' | 'moveout';
 
 /** §3.34 — keyed (workcenter_group, package_lf_group), both already-merged values (PA-11). */
 export interface DailyPlanMapRow {
@@ -79,6 +84,15 @@ export interface DailyPlanMapRow {
 
 export interface DailyViewRow {
   package_lf_group: string;
+  /** The 子站 (merged workcenter_group), present only in expanded (大項) mode
+   *  (PA-19); undefined for a single-layer station selection. On a 大項小計
+   *  subtotal row it carries the 大項 (parent_group) name for the label. */
+  workcenter_group?: string;
+  /** PA-19: true on the per-package 大項小計 row (電鍍/切割 expanded mode). The
+   *  子站 leaf rows show 轉出/產出 actuals only (null plan/achievement); the
+   *  subtotal row carries the 大項-total D/N/合計 plus the parent-keyed 計畫 and
+   *  the 大項-level 達成率. Undefined/false on every leaf and single-layer row. */
+  is_subtotal?: boolean;
   d_output_qty: number;
   n_output_qty: number;
   daily_output_qty: number;
@@ -88,6 +102,11 @@ export interface DailyViewRow {
 
 export interface CumulativeViewRow {
   package_lf_group: string;
+  /** The 子站 (merged workcenter_group), present only in expanded (大項) mode
+   *  (PA-19). On a 大項小計 subtotal row it carries the 大項 name. */
+  workcenter_group?: string;
+  /** PA-19: true on the per-package 大項小計 row — see DailyViewRow.is_subtotal. */
+  is_subtotal?: boolean;
   cumulative_actual_qty: number;
   cumulative_plan_qty: number | null;
   cumulative_diff_qty: number | null;
@@ -113,7 +132,14 @@ export interface CumulativeViewResult {
 }
 
 export interface ComputeDailyViewOptions {
+  /** The selected station. In single-layer mode it is the子站 workcenter_group
+   *  (filter on workcenter_group); in expanded mode (PA-19) it is the 大項
+   *  parent_group (filter on parent_group, rows split per子站). */
   workcenterGroup: string;
+  /** PA-19: when true, `workcenterGroup` is treated as a 大項 (parent_group)
+   *  and each returned row additionally carries its子站 `workcenter_group`,
+   *  grouped by (package_lf_group,子站). Used for 電鍍/切割. */
+  expand?: boolean;
   /**
    * The single target calendar day ('YYYY-MM-DD'), required so the rollup
    * filters to EXACTLY this output_date (PA-03/PA-06 grouping key). Without
@@ -128,6 +154,8 @@ export interface ComputeDailyViewOptions {
 
 export interface ComputeCumulativeViewOptions {
   workcenterGroup: string;
+  /** PA-19: expanded (大項) mode — see ComputeDailyViewOptions.expand. */
+  expand?: boolean;
   /** Already-resolved/capped date bounds (useProductionAchievement.ts owns resolveMonthPeriod()/range-end capping). */
   startDate: string;
   endDate: string;
@@ -220,15 +248,24 @@ function buildPackageLfMapSql(rows: PackageLfMapRow[]): string {
   );
 }
 
-/** D2 map (PA-10) — INNER JOIN target, exclude-by-absence. OPPOSITE default from PackageLfMapRow above. */
+/** D2 map (PA-10) — INNER JOIN target, exclude-by-absence. OPPOSITE default from PackageLfMapRow above.
+ *  Carries parent_group (PA-19) for the子站->大項 rollup. */
 function buildWorkcenterMergeMapSql(rows: WorkcenterMergeMapRow[]): string {
+  // Backfill parent_group === merged when a row omits it (defensive: a legacy
+  // server payload without parent_group must still place the子站 under itself).
+  const normalized = rows.map((r) => ({
+    raw_workcenter_group: r.raw_workcenter_group,
+    merged_workcenter_group: r.merged_workcenter_group,
+    parent_group: r.parent_group || r.merged_workcenter_group,
+  }));
   return buildValuesTableSql(
     WORKCENTER_MERGE_MAP_TABLE,
     [
       { name: 'raw_workcenter_group', type: 'VARCHAR', kind: 'string' },
       { name: 'merged_workcenter_group', type: 'VARCHAR', kind: 'string' },
+      { name: 'parent_group', type: 'VARCHAR', kind: 'string' },
     ],
-    rows as unknown as Record<string, unknown>[],
+    normalized as unknown as Record<string, unknown>[],
   );
 }
 
@@ -280,17 +317,31 @@ export function useProductionAchievementDuckDB() {
 
   let _client: DuckDBClient | null = null;
   let _isRegistered = false;
+  let _sourceMode: ProductionSourceMode = 'output';
 
   /**
-   * Stage 1 (`pa_rollup_raw`) — identical INNER JOIN to the original ADR-0016
-   * SPECNAME -> raw workcenter_group rollup (PA-06, case-insensitive join on
-   * UPPER(TRIM(SPECNAME)) both sides), now carrying PACKAGE_LF through the
-   * GROUP BY. This intermediate grain is what workcenter_merge_map keys on —
-   * it cannot be joined against the SPECNAME-grain spool directly (design.md
-   * "the two DuckDB stages stay separate").
+   * Stage 1 (`pa_rollup_raw`) — produce the (output_date, shift_code,
+   * raw_workcenter_group, raw_package_lf) grain that workcenter_merge_map keys
+   * on. Two source shapes (PA-18):
+   *   'output': the spool is SPECNAME-grain, so INNER JOIN spec_workcenter_map
+   *     (PA-06, case-insensitive) to resolve SPECNAME -> raw workcenter_group.
+   *   'moveout': the spool ALREADY carries raw_workcenter_group (=FROMWORKCENTER),
+   *     so no join — just carry it and PACKAGE_LF through the GROUP BY.
    */
   async function _buildRollupRaw(): Promise<void> {
-    const sql = `
+    const sql = _sourceMode === 'moveout'
+      ? `
+      CREATE OR REPLACE TABLE ${ROLLUP_RAW_TABLE} AS
+      SELECT
+        s.output_date AS output_date,
+        s.shift_code AS shift_code,
+        s.raw_workcenter_group AS raw_workcenter_group,
+        s.PACKAGE_LF AS raw_package_lf,
+        SUM(s.actual_output_qty) AS actual_output_qty
+      FROM ${TABLE_NAME} s
+      GROUP BY s.output_date, s.shift_code, s.raw_workcenter_group, s.PACKAGE_LF
+    `
+      : `
       CREATE OR REPLACE TABLE ${ROLLUP_RAW_TABLE} AS
       SELECT
         s.output_date AS output_date,
@@ -312,23 +363,27 @@ export function useProductionAchievementDuckDB() {
    * JOIN) + LEFT JOIN package_lf_map (PA-09, D1: a raw PACKAGE_LF with no row
    * falls back to itself, NULL/blank -> '(未分類)' — never INNER JOIN). These
    * are deliberately opposite join kinds; do not "normalize" them to match.
+   * Carries `parent_group` (PA-19, the 大項) alongside `workcenter_group`
+   * (the子站) so the detail table can filter by either level.
    */
   async function _buildRollup(): Promise<void> {
+    const pkgExpr = `COALESCE(pm.merged_group, NULLIF(CAST(r.raw_package_lf AS VARCHAR), ''), ${sqlString(UNCLASSIFIED_SENTINEL)})`;
     const sql = `
       CREATE OR REPLACE TABLE ${ROLLUP_TABLE} AS
       SELECT
         r.output_date AS output_date,
         r.shift_code AS shift_code,
         wm.merged_workcenter_group AS workcenter_group,
-        COALESCE(pm.merged_group, NULLIF(CAST(r.raw_package_lf AS VARCHAR), ''), ${sqlString(UNCLASSIFIED_SENTINEL)}) AS package_lf_group,
+        wm.parent_group AS parent_group,
+        ${pkgExpr} AS package_lf_group,
         SUM(r.actual_output_qty) AS actual_output_qty
       FROM ${ROLLUP_RAW_TABLE} r
       INNER JOIN ${WORKCENTER_MERGE_MAP_TABLE} wm
         ON r.raw_workcenter_group = wm.raw_workcenter_group
       LEFT JOIN ${PACKAGE_LF_MAP_TABLE} pm
         ON r.raw_package_lf = pm.raw_package_lf
-      GROUP BY r.output_date, r.shift_code, wm.merged_workcenter_group,
-        COALESCE(pm.merged_group, NULLIF(CAST(r.raw_package_lf AS VARCHAR), ''), ${sqlString(UNCLASSIFIED_SENTINEL)})
+      GROUP BY r.output_date, r.shift_code, wm.merged_workcenter_group, wm.parent_group,
+        ${pkgExpr}
     `;
     await _client!.sendQuery(sql);
   }
@@ -351,7 +406,9 @@ export function useProductionAchievementDuckDB() {
     packageLfMap: PackageLfMapRow[] = [],
     workcenterMergeMap: WorkcenterMergeMapRow[] = [],
     dailyPlanMap: DailyPlanMapRow[] = [],
+    sourceMode: ProductionSourceMode = 'output',
   ): Promise<void> {
+    _sourceMode = sourceMode;
     isLoading.value = true;
     error.value = '';
 
@@ -414,46 +471,109 @@ export function useProductionAchievementDuckDB() {
    */
   async function computeDailyView(options: ComputeDailyViewOptions): Promise<DailyViewRow[]> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
-    const wc = sqlString(options.workcenterGroup);
+    const sel = sqlString(options.workcenterGroup);
     const outputDate = sqlString(options.outputDate);
+    const expand = options.expand === true;
 
+    if (!expand) {
+      // Single-layer station: one row per package. daily_plan joins on the
+      // selected workcenter_group (which IS the parent for a single-layer
+      // station), PA-11.
+      const sql = `
+        SELECT
+          package_lf_group,
+          d_output_qty,
+          n_output_qty,
+          daily_output_qty,
+          daily_plan_qty,
+          CASE
+            WHEN daily_plan_qty IS NULL THEN NULL
+            WHEN daily_plan_qty = 0 THEN NULL
+            ELSE CAST(daily_output_qty AS DOUBLE) / daily_plan_qty
+          END AS achievement_rate
+        FROM (
+          SELECT
+            r.package_lf_group AS package_lf_group,
+            SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) AS d_output_qty,
+            SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) AS n_output_qty,
+            SUM(r.actual_output_qty) AS daily_output_qty,
+            MAX(dp.daily_plan_qty) AS daily_plan_qty
+          FROM ${ROLLUP_TABLE} r
+          LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+            ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
+          WHERE r.workcenter_group = ${sel}
+            AND CAST(r.output_date AS DATE) = CAST(${outputDate} AS DATE)
+          GROUP BY r.package_lf_group
+        ) sub
+        ORDER BY package_lf_group
+      `;
+      const rows = await _client.sendQuery(sql);
+      return (rows as Record<string, unknown>[]).map((row) => ({
+        package_lf_group: String(row.package_lf_group ?? ''),
+        d_output_qty: sf(row.d_output_qty),
+        n_output_qty: sf(row.n_output_qty),
+        daily_output_qty: sf(row.daily_output_qty),
+        daily_plan_qty: nullableNumber(row.daily_plan_qty),
+        achievement_rate: nullableNumber(row.achievement_rate),
+      }));
+    }
+
+    // PA-19 expanded (大項) mode (電鍍/切割): filter on parent_group and emit,
+    // per package, one leaf row per子站 (actuals only) PLUS a per-package
+    // 大項小計 row. GROUPING SETS produces both grains in one pass; GROUPING()=1
+    // marks the subtotal grain (子站 aggregated away). The 每日計畫 is keyed on
+    // the 大項/parent (= the selection), NOT the子站 — so it attaches ONLY to the
+    // subtotal row (leaf rows show a null plan/達成率, the parent-total achievement
+    // lives on the小計 row, matching the Excel report). The plan join can touch
+    // leaf grains too, but the is_subtotal CASE nulls it there; quantities are
+    // pre-aggregated in `agg` before the join, so no fan-out. ORDER BY puts each
+    // package's leaf子站 rows first (is_subtotal 0) then its小計 (is_subtotal 1).
     const sql = `
       SELECT
-        package_lf_group,
-        d_output_qty,
-        n_output_qty,
-        daily_output_qty,
-        daily_plan_qty,
+        agg.package_lf_group AS package_lf_group,
+        agg.workcenter_group AS workcenter_group,
+        agg.is_subtotal AS is_subtotal,
+        agg.d_output_qty AS d_output_qty,
+        agg.n_output_qty AS n_output_qty,
+        agg.daily_output_qty AS daily_output_qty,
+        CASE WHEN agg.is_subtotal = 1 THEN dp.daily_plan_qty ELSE NULL END AS daily_plan_qty,
         CASE
-          WHEN daily_plan_qty IS NULL THEN NULL
-          WHEN daily_plan_qty = 0 THEN NULL
-          ELSE CAST(daily_output_qty AS DOUBLE) / daily_plan_qty
+          WHEN agg.is_subtotal = 1 AND dp.daily_plan_qty IS NOT NULL AND dp.daily_plan_qty <> 0
+          THEN CAST(agg.daily_output_qty AS DOUBLE) / dp.daily_plan_qty
+          ELSE NULL
         END AS achievement_rate
       FROM (
         SELECT
           r.package_lf_group AS package_lf_group,
+          r.workcenter_group AS workcenter_group,
+          GROUPING(r.workcenter_group) AS is_subtotal,
           SUM(CASE WHEN r.shift_code = 'D' THEN r.actual_output_qty ELSE 0 END) AS d_output_qty,
           SUM(CASE WHEN r.shift_code = 'N' THEN r.actual_output_qty ELSE 0 END) AS n_output_qty,
-          SUM(r.actual_output_qty) AS daily_output_qty,
-          MAX(dp.daily_plan_qty) AS daily_plan_qty
+          SUM(r.actual_output_qty) AS daily_output_qty
         FROM ${ROLLUP_TABLE} r
-        LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-          ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
-        WHERE r.workcenter_group = ${wc}
+        WHERE r.parent_group = ${sel}
           AND CAST(r.output_date AS DATE) = CAST(${outputDate} AS DATE)
-        GROUP BY r.package_lf_group
-      ) sub
-      ORDER BY package_lf_group
+        GROUP BY GROUPING SETS ((r.package_lf_group, r.workcenter_group), (r.package_lf_group))
+      ) agg
+      LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+        ON dp.workcenter_group = ${sel} AND dp.package_lf_group = agg.package_lf_group
+      ORDER BY agg.package_lf_group, agg.is_subtotal, agg.workcenter_group
     `;
     const rows = await _client.sendQuery(sql);
-    return (rows as Record<string, unknown>[]).map((row) => ({
-      package_lf_group: String(row.package_lf_group ?? ''),
-      d_output_qty: sf(row.d_output_qty),
-      n_output_qty: sf(row.n_output_qty),
-      daily_output_qty: sf(row.daily_output_qty),
-      daily_plan_qty: nullableNumber(row.daily_plan_qty),
-      achievement_rate: nullableNumber(row.achievement_rate),
-    }));
+    return (rows as Record<string, unknown>[]).map((row) => {
+      const isSubtotal = Number(row.is_subtotal) === 1;
+      return {
+        package_lf_group: String(row.package_lf_group ?? ''),
+        // subtotal rows carry the 大項 (selection) name for the小計 label
+        workcenter_group: isSubtotal ? options.workcenterGroup : String(row.workcenter_group ?? ''),
+        is_subtotal: isSubtotal,
+        d_output_qty: sf(row.d_output_qty),
+        n_output_qty: sf(row.n_output_qty),
+        daily_output_qty: sf(row.daily_output_qty),
+        daily_plan_qty: nullableNumber(row.daily_plan_qty),
+        achievement_rate: nullableNumber(row.achievement_rate),
+      };
+    });
   }
 
   /**
@@ -465,10 +585,14 @@ export function useProductionAchievementDuckDB() {
    */
   async function computeCumulativeView(options: ComputeCumulativeViewOptions): Promise<CumulativeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
-    const wc = sqlString(options.workcenterGroup);
+    const sel = sqlString(options.workcenterGroup);
     const startDate = sqlString(options.startDate);
     const endDate = sqlString(options.endDate);
     const elapsedDays = daysBetweenInclusive(options.startDate, options.endDate);
+    const expand = options.expand === true;
+    // PA-19: expanded (大項) mode filters on parent_group and splits per子站
+    // (see computeDailyView). Single-layer mode filters on workcenter_group.
+    const filterCol = expand ? 'parent_group' : 'workcenter_group';
 
     // Date-bound to [startDate, endDate] — without this filter, the server's
     // own Oracle fetch window (widened to capture the requested range's
@@ -476,34 +600,83 @@ export function useProductionAchievementDuckDB() {
     // dated just outside the requested range (e.g. a 當月 query for
     // 2026-07-01..07-14 also carries a 2026-06-30 spillover row) that must
     // never count toward this period's cumulative totals or trend.
-    const rowsSql = `
-      SELECT
-        r.package_lf_group AS package_lf_group,
-        SUM(r.actual_output_qty) AS cumulative_actual_qty,
-        MAX(dp.daily_plan_qty) AS daily_plan_qty
-      FROM ${ROLLUP_TABLE} r
-      LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-        ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
-      WHERE r.workcenter_group = ${wc}
-        AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
-      GROUP BY r.package_lf_group
-      ORDER BY r.package_lf_group
-    `;
-    const rawRows = await _client.sendQuery(rowsSql);
-    const rows: CumulativeViewRow[] = (rawRows as Record<string, unknown>[]).map((row) => {
-      const dailyPlan = nullableNumber(row.daily_plan_qty);
-      const actual = sf(row.cumulative_actual_qty);
-      const cumulativePlan = dailyPlan === null ? null : dailyPlan * elapsedDays;
-      const diff = cumulativePlan === null ? null : actual - cumulativePlan;
-      const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
-      return {
-        package_lf_group: String(row.package_lf_group ?? ''),
-        cumulative_actual_qty: actual,
-        cumulative_plan_qty: cumulativePlan,
-        cumulative_diff_qty: diff,
-        cumulative_achievement_rate: rate,
-      };
-    });
+    let rows: CumulativeViewRow[];
+    if (!expand) {
+      const rowsSql = `
+        SELECT
+          r.package_lf_group AS package_lf_group,
+          SUM(r.actual_output_qty) AS cumulative_actual_qty,
+          MAX(dp.daily_plan_qty) AS daily_plan_qty
+        FROM ${ROLLUP_TABLE} r
+        LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+          ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
+        WHERE r.workcenter_group = ${sel}
+          AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
+        GROUP BY r.package_lf_group
+        ORDER BY r.package_lf_group
+      `;
+      const rawRows = await _client.sendQuery(rowsSql);
+      rows = (rawRows as Record<string, unknown>[]).map((row) => {
+        const dailyPlan = nullableNumber(row.daily_plan_qty);
+        const actual = sf(row.cumulative_actual_qty);
+        const cumulativePlan = dailyPlan === null ? null : dailyPlan * elapsedDays;
+        const diff = cumulativePlan === null ? null : actual - cumulativePlan;
+        const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
+        return {
+          package_lf_group: String(row.package_lf_group ?? ''),
+          cumulative_actual_qty: actual,
+          cumulative_plan_qty: cumulativePlan,
+          cumulative_diff_qty: diff,
+          cumulative_achievement_rate: rate,
+        };
+      });
+    } else {
+      // PA-19 expanded (大項) mode: 子站 leaf rows (actuals only) + per-package
+      // 大項小計 (parent-keyed 累計計畫/達成率). Mirrors computeDailyView's
+      // GROUPING SETS structure — the 累計計畫 attaches ONLY to the subtotal grain
+      // (plan is keyed on the 大項/parent = the selection), leaf子站 rows show a
+      // null plan/差異/達成率.
+      const rowsSql = `
+        SELECT
+          agg.package_lf_group AS package_lf_group,
+          agg.workcenter_group AS workcenter_group,
+          agg.is_subtotal AS is_subtotal,
+          agg.cumulative_actual_qty AS cumulative_actual_qty,
+          CASE WHEN agg.is_subtotal = 1 THEN dp.daily_plan_qty ELSE NULL END AS daily_plan_qty
+        FROM (
+          SELECT
+            r.package_lf_group AS package_lf_group,
+            r.workcenter_group AS workcenter_group,
+            GROUPING(r.workcenter_group) AS is_subtotal,
+            SUM(r.actual_output_qty) AS cumulative_actual_qty
+          FROM ${ROLLUP_TABLE} r
+          WHERE r.parent_group = ${sel}
+            AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
+          GROUP BY GROUPING SETS ((r.package_lf_group, r.workcenter_group), (r.package_lf_group))
+        ) agg
+        LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
+          ON dp.workcenter_group = ${sel} AND dp.package_lf_group = agg.package_lf_group
+        ORDER BY agg.package_lf_group, agg.is_subtotal, agg.workcenter_group
+      `;
+      const rawRows = await _client.sendQuery(rowsSql);
+      rows = (rawRows as Record<string, unknown>[]).map((row) => {
+        const isSubtotal = Number(row.is_subtotal) === 1;
+        const dailyPlan = nullableNumber(row.daily_plan_qty);
+        const actual = sf(row.cumulative_actual_qty);
+        const cumulativePlan = dailyPlan === null ? null : dailyPlan * elapsedDays;
+        const diff = cumulativePlan === null ? null : actual - cumulativePlan;
+        const rate = cumulativePlan === null || cumulativePlan === 0 ? null : actual / cumulativePlan;
+        return {
+          package_lf_group: String(row.package_lf_group ?? ''),
+          workcenter_group: isSubtotal ? options.workcenterGroup : String(row.workcenter_group ?? ''),
+          is_subtotal: isSubtotal,
+          cumulative_actual_qty: actual,
+          cumulative_plan_qty: cumulativePlan,
+          cumulative_diff_qty: diff,
+          cumulative_achievement_rate: rate,
+        };
+      });
+    }
 
     // D3 aggregate-then-divide trend: sum actual and (known) plan across ALL
     // package_lf_groups for each day BEFORE dividing. A package_lf_group with
@@ -515,6 +688,12 @@ export function useProductionAchievementDuckDB() {
     // total is a plain JS scan below (not a SQL window function) — rows are
     // already ORDER BY output_date, so a linear accumulation is simplest and
     // sidesteps any engine-specific behavior around SUM(...) OVER (...).
+    // Trend aggregates ACROSS ALL package_lf_groups (and, in expanded 大項 mode,
+    // all子站) under the selection for each day, then divides (D3). The trend is
+    // a 大項-level line regardless of mode, so it rolls the子站 up to (day,
+    // package) and joins the 每日計畫 on the SELECTION (= the parent 大項 in
+    // expanded mode, = the station in single-layer mode) — the plan is keyed on
+    // that value in BOTH modes (PA-19), so no子站 split is needed here.
     const trendSql = `
       SELECT
         strftime(CAST(g.output_date AS DATE), '%Y-%m-%d') AS output_date,
@@ -523,12 +702,12 @@ export function useProductionAchievementDuckDB() {
       FROM (
         SELECT output_date, package_lf_group, SUM(actual_output_qty) AS actual_output_qty
         FROM ${ROLLUP_TABLE}
-        WHERE workcenter_group = ${wc}
+        WHERE ${filterCol} = ${sel}
           AND CAST(output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
         GROUP BY output_date, package_lf_group
       ) g
       LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
-        ON dp.workcenter_group = ${wc} AND dp.package_lf_group = g.package_lf_group
+        ON dp.workcenter_group = ${sel} AND dp.package_lf_group = g.package_lf_group
       GROUP BY g.output_date
       ORDER BY g.output_date
     `;

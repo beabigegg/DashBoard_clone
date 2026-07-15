@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.42.0"
+    "version": "1.43.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -6710,6 +6710,32 @@
         },
         "x-cdd-errors": "400/403/500/503"
       }
+    },
+    "/api/production-achievement/permissions/me": {
+      "get": {
+        "summary": "GET /api/production-achievement/permissions/me",
+        "responses": {
+          "200": {
+            "description": "Contract response: ProductionAchievementOwnPermissionResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementOwnPermissionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cdd-errors": "500"
+      }
     }
   },
   "x-cdd-generated-from": "contracts/api/api-contract.md",
@@ -9583,6 +9609,36 @@
         "required": [
           "success",
           "data"
+        ]
+      },
+      "ProductionAchievementOwnPermissionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProductionAchievementOwnPermissionData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementOwnPermissionData": {
+        "type": "object",
+        "properties": {
+          "can_edit_targets": {
+            "type": "boolean",
+            "description": "Whether the current session user is whitelisted to edit production-achievement targets/settings."
+          }
+        },
+        "required": [
+          "can_edit_targets"
         ]
       }
     }

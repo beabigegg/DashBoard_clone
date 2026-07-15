@@ -60,3 +60,4 @@ ensure_rq_logging()
 # (production-achievement-async-spool, env-contract.md §Worker Feature-Flag
 # Env-Var Parity).
 import mes_dashboard.workers.production_achievement_worker  # noqa: E402,F401
+import mes_dashboard.workers.production_achievement_moveout_worker  # noqa: E402,F401

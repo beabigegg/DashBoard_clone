@@ -23,8 +23,8 @@
  * mini-app (D4, no drawer entry); OD-7 mode/station preservation across that
  * round-trip is handled inside useProductionAchievement.ts (sessionStorage).
  */
-import { computed, onMounted, onUnmounted } from 'vue';
-import { useProductionAchievement, type ProductionAchievementMode } from './composables/useProductionAchievement';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useProductionAchievement, type ProductionAchievementMode, type ProductionSourceMode } from './composables/useProductionAchievement';
 import { navigateToRuntimeRoute } from '../core/shell-navigation';
 import MultiSelect from '../shared-ui/components/MultiSelect.vue';
 import DataTable from '../shared-ui/components/DataTable.vue';
@@ -50,13 +50,16 @@ const {
   error,
   hasQueried,
   asyncJobProgress,
+  isExpandedSelection,
   fetchFilterOptions,
   runQuery,
   refreshQuery,
   setMode,
+  setSource,
   setWorkcenterGroup,
   setRangeDates,
   cancelQuery,
+  checkSettingsAccess,
 } = useProductionAchievement();
 
 const MODE_OPTIONS: { value: ProductionAchievementMode; label: string }[] = [
@@ -64,6 +67,13 @@ const MODE_OPTIONS: { value: ProductionAchievementMode; label: string }[] = [
   { value: 'yesterday', label: '前日' },
   { value: 'month', label: '當月' },
   { value: 'range', label: '自訂區間' },
+];
+
+// PA-18: 產出 (equipment track-out, 焊接/成型 only) vs 轉出 (lot move-out, all
+// stations). Data-source TAB — switching re-fetches a wholly different dataset.
+const SOURCE_OPTIONS: { value: ProductionSourceMode; label: string }[] = [
+  { value: 'output', label: '產出' },
+  { value: 'moveout', label: '轉出' },
 ];
 
 onMounted(() => {
@@ -97,13 +107,42 @@ function handleRangeEndChange(e: Event): void {
   setRangeDates(filters.start_date, value);
 }
 
-function goToSettings(): void {
-  navigateToRuntimeRoute('/production-achievement-settings');
+// PA-17: pre-check permission before navigating -- a not-whitelisted user
+// sees an inline message instead of a wasted round-trip into a page they
+// can only read. Does not change the settings page's own route-level
+// visibility (still readable via direct URL by any released user).
+const settingsAccessMessage = ref('');
+const settingsAccessChecking = ref(false);
+
+async function goToSettings(): Promise<void> {
+  if (settingsAccessChecking.value) return;
+  settingsAccessMessage.value = '';
+  settingsAccessChecking.value = true;
+  try {
+    const result = await checkSettingsAccess();
+    if (result === 'allowed') {
+      navigateToRuntimeRoute('/production-achievement-settings');
+    } else if (result === 'denied') {
+      settingsAccessMessage.value = '您沒有權限進入此設定頁面，請聯絡管理員申請權限';
+    } else {
+      settingsAccessMessage.value = '權限查詢失敗，請稍後再試';
+    }
+  } finally {
+    settingsAccessChecking.value = false;
+  }
+}
+
+function dismissSettingsAccessMessage(): void {
+  settingsAccessMessage.value = '';
 }
 
 // 重新查詢 button: 當日/前日/當月 only (自訂區間 already re-runs on every date
 // input change, so it doesn't need a separate manual trigger).
 const showRefreshButton = computed(() => filters.mode !== 'range');
+
+// PA-18: the actual-value noun follows the data source (產出 / 轉出) so the
+// KPI/table labels read correctly in both TABs.
+const metricNoun = computed(() => (filters.source === 'moveout' ? '轉出' : '產出'));
 
 // ── Row helpers shared by table + chart + KPI (single source per OD-11) ────
 type ViewRow = DailyViewRow | CumulativeViewRow;
@@ -119,10 +158,23 @@ function planOf(row: ViewRow): number | null {
 function rateOf(row: ViewRow): number | null {
   return 'achievement_rate' in row ? row.achievement_rate : row.cumulative_achievement_rate;
 }
+// PA-19: the per-package 大項小計 row (expanded 電鍍/切割 mode) is a ROLLUP of its
+// 子站 leaf rows — it must be excluded from any SUM(actual) so the leaf rows are
+// counted exactly once. It is the ONLY row carrying the 大項 plan, so plan sums
+// key off it naturally.
+function isSubtotalRow(row: ViewRow): boolean {
+  return 'is_subtotal' in row && row.is_subtotal === true;
+}
 
 // ── KPI cards (OD-11): SUM(actual)/SUM(plan) over the SAME rows already
-// rendered in the table/chart below — never an independent re-aggregation. ──
-const totalActual = computed(() => currentRows.value.reduce((sum, r) => sum + Number(actualOf(r) || 0), 0));
+// rendered in the table/chart below — never an independent re-aggregation.
+// actual sums the LEAF rows only (subtotal rows would double-count); plan sums
+// the rows that carry a plan (subtotal rows in expanded mode, leaf rows in
+// single-layer) — the two are consistent since a leaf never carries a plan in
+// expanded mode. ──
+const totalActual = computed(() =>
+  currentRows.value.filter((r) => !isSubtotalRow(r)).reduce((sum, r) => sum + Number(actualOf(r) || 0), 0),
+);
 const rowsWithPlan = computed(() => currentRows.value.filter((r) => planOf(r) !== null));
 const totalPlan = computed(() =>
   rowsWithPlan.value.length === 0 ? null : rowsWithPlan.value.reduce((sum, r) => sum + Number(planOf(r) || 0), 0),
@@ -130,7 +182,14 @@ const totalPlan = computed(() =>
 const overallRate = computed(() => (totalPlan.value === null || totalPlan.value === 0 ? null : totalActual.value / totalPlan.value));
 
 // ── PlanAchievementStackedChart (daily mode only: x=package group, D班/N班 stacked %) ──
-const chartCategories = computed(() => dailyRows.value.map((r) => r.package_lf_group));
+// In expanded 大項 mode (PA-19) the達成率 lives on the per-package 大項小計 rows
+// (子站 leaf rows have no plan), so the chart plots those — one bar per package,
+// keyed on the plain package label (subtotals are already unique per package).
+// Single-layer mode charts every row.
+const chartRows = computed(() =>
+  isExpandedSelection.value ? dailyRows.value.filter((r) => r.is_subtotal === true) : dailyRows.value,
+);
+const chartCategories = computed(() => chartRows.value.map((r) => r.package_lf_group));
 // Y-axis stays % (single axis; 計畫 is the y=100 markLine, not a second
 // scale). Each series carries its own qtyData so the chart's "% (QTY)"
 // label/tooltip can distinguish D班/N班 individually (field-directed spec).
@@ -138,14 +197,14 @@ const chartSeries = computed(() => [
   {
     name: 'D班',
     colorVar: 'var(--pa-shift-d)',
-    data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.d_output_qty / r.daily_plan_qty : null)),
-    qtyData: dailyRows.value.map((r) => r.d_output_qty),
+    data: chartRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.d_output_qty / r.daily_plan_qty : null)),
+    qtyData: chartRows.value.map((r) => r.d_output_qty),
   },
   {
     name: 'N班',
     colorVar: 'var(--pa-shift-n)',
-    data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.n_output_qty / r.daily_plan_qty : null)),
-    qtyData: dailyRows.value.map((r) => r.n_output_qty),
+    data: chartRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.n_output_qty / r.daily_plan_qty : null)),
+    qtyData: chartRows.value.map((r) => r.n_output_qty),
   },
 ]);
 
@@ -172,19 +231,41 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
           >
             重新查詢
           </button>
-          <button type="button" class="ui-btn ui-btn--secondary ui-btn--sm" data-testid="pa-settings-btn" @click="goToSettings">
+          <button
+            type="button"
+            class="ui-btn ui-btn--danger ui-btn--sm"
+            data-testid="pa-settings-btn"
+            :disabled="settingsAccessChecking"
+            @click="goToSettings"
+          >
             設定
           </button>
         </div>
       </div>
       <div class="ui-card-body pa-app__filter-panel">
+        <ErrorBanner :message="settingsAccessMessage" @dismiss="dismissSettingsAccessMessage" />
+        <div class="pa-app__source-switch" role="group" aria-label="資料來源">
+          <button
+            v-for="opt in SOURCE_OPTIONS"
+            :key="opt.value"
+            type="button"
+            class="pa-app__source-btn"
+            :class="{ 'pa-app__source-btn--active': filters.source === opt.value }"
+            :aria-pressed="filters.source === opt.value"
+            :data-testid="`pa-source-${opt.value}`"
+            :disabled="loading"
+            @click="setSource(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
         <div class="pa-app__mode-switch" role="group" aria-label="查詢模式">
           <button
             v-for="opt in MODE_OPTIONS"
             :key="opt.value"
             type="button"
-            class="ui-btn ui-btn--sm"
-            :class="filters.mode === opt.value ? 'ui-btn--primary' : 'ui-btn--secondary'"
+            class="pa-app__mode-btn"
+            :class="{ 'pa-app__mode-btn--active': filters.mode === opt.value }"
             :aria-pressed="filters.mode === opt.value"
             :data-testid="`pa-mode-${opt.value}`"
             @click="setMode(opt.value)"
@@ -248,7 +329,7 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
          then, instead of also showing a contradictory empty table. -->
     <template v-if="showResults">
       <SummaryCardGroup :columns="3" data-testid="pa-kpi-cards">
-        <SummaryCard label="實際產出合計" :value="totalActual" format="number" accent="brand" />
+        <SummaryCard :label="`實際${metricNoun}合計`" :value="totalActual" format="number" accent="brand" />
         <SummaryCard label="計畫合計" :value="totalPlan" format="number" accent="info" />
         <SummaryCard label="整體達成率" :value="overallRate !== null ? overallRate * 100 : null" format="percent" accent="success" />
       </SummaryCardGroup>
@@ -269,7 +350,7 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
         category-axis-name="日期"
       />
 
-      <div class="ui-card">
+      <div class="ui-card pa-app__table-card">
         <div class="ui-card-header">
           <span class="ui-card-title">生產達成率明細</span>
         </div>
@@ -281,16 +362,23 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
             empty-type="filter-empty"
             data-testid="pa-report-table"
           >
-            <DataTableColumn column-key="package_lf_group" label="Package Group" sortable />
-            <DataTableColumn column-key="d_output_qty" label="D班產出" align="right" sortable />
-            <DataTableColumn column-key="n_output_qty" label="N班產出" align="right" sortable />
-            <DataTableColumn column-key="daily_output_qty" label="每日產出" align="right" sortable />
-            <DataTableColumn column-key="daily_plan_qty" label="每日計畫" align="right" sortable />
-            <DataTableColumn column-key="achievement_rate" label="每日達成率" align="right" sortable />
-            <template #cell="{ columnKey, value }">
-              <template v-if="['d_output_qty', 'n_output_qty', 'daily_output_qty', 'daily_plan_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
-              <template v-else-if="columnKey === 'achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
-              <template v-else>{{ value }}</template>
+            <!-- Sorting is disabled in expanded 大項 mode so the per-package
+                 子站→小計 grouping stays intact (a generic column sort would
+                 scatter 大項小計 rows away from their子站). -->
+            <DataTableColumn v-if="isExpandedSelection" column-key="workcenter_group" label="子站" :sortable="false" />
+            <DataTableColumn column-key="package_lf_group" label="Package Group" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="d_output_qty" :label="`D班${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="n_output_qty" :label="`N班${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="daily_output_qty" :label="`每日${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="daily_plan_qty" label="每日計畫" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="achievement_rate" label="每日達成率" align="right" :sortable="!isExpandedSelection" />
+            <template #cell="{ columnKey, value, row }">
+              <span :class="{ 'pa-app__subtotal-cell': (row as Record<string, unknown>).is_subtotal === true }">
+                <template v-if="columnKey === 'workcenter_group' && (row as Record<string, unknown>).is_subtotal === true">▸ 小計 {{ value }}</template>
+                <template v-else-if="['d_output_qty', 'n_output_qty', 'daily_output_qty', 'daily_plan_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
+                <template v-else-if="columnKey === 'achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
+                <template v-else>{{ value }}</template>
+              </span>
             </template>
           </DataTable>
 
@@ -301,15 +389,20 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
             empty-type="filter-empty"
             data-testid="pa-report-table"
           >
-            <DataTableColumn column-key="package_lf_group" label="Package Group" sortable />
-            <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫" align="right" sortable />
-            <DataTableColumn column-key="cumulative_actual_qty" label="累計產出" align="right" sortable />
-            <DataTableColumn column-key="cumulative_diff_qty" label="累計差異" align="right" sortable />
-            <DataTableColumn column-key="cumulative_achievement_rate" label="累計達成率" align="right" sortable />
-            <template #cell="{ columnKey, value }">
-              <template v-if="['cumulative_plan_qty', 'cumulative_actual_qty', 'cumulative_diff_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
-              <template v-else-if="columnKey === 'cumulative_achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
-              <template v-else>{{ value }}</template>
+            <!-- Sort disabled in expanded 大項 mode — see the daily table above. -->
+            <DataTableColumn v-if="isExpandedSelection" column-key="workcenter_group" label="子站" :sortable="false" />
+            <DataTableColumn column-key="package_lf_group" label="Package Group" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_actual_qty" :label="`累計${metricNoun}`" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_diff_qty" label="累計差異" align="right" :sortable="!isExpandedSelection" />
+            <DataTableColumn column-key="cumulative_achievement_rate" label="累計達成率" align="right" :sortable="!isExpandedSelection" />
+            <template #cell="{ columnKey, value, row }">
+              <span :class="{ 'pa-app__subtotal-cell': (row as Record<string, unknown>).is_subtotal === true }">
+                <template v-if="columnKey === 'workcenter_group' && (row as Record<string, unknown>).is_subtotal === true">▸ 小計 {{ value }}</template>
+                <template v-else-if="['cumulative_plan_qty', 'cumulative_actual_qty', 'cumulative_diff_qty'].includes(columnKey)">{{ formatQty(value as number | null) }}</template>
+                <template v-else-if="columnKey === 'cumulative_achievement_rate'">{{ formatAchievementRate(value as number | null) }}</template>
+                <template v-else>{{ value }}</template>
+              </span>
             </template>
           </DataTable>
         </div>

@@ -304,7 +304,7 @@ describe('useProductionAchievementDuckDB composable', () => {
     const specMap = [{ SPECNAME: 'EPOXY D/B', workcenter_group: '焊接_DB' }];
     const targetsMap = [{ shift_code: 'D', workcenter_group: '焊接_DB', target_qty: 500 }];
     const packageLfMap = [{ raw_package_lf: 'SOD-123FL OP1', merged_group: 'SOD-123FL' }];
-    const workcenterMergeMap = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB' }];
+    const workcenterMergeMap = [{ raw_workcenter_group: '焊接_DB', merged_workcenter_group: '焊接_DB', parent_group: '焊接_DB' }];
     const dailyPlanMap = [{ workcenter_group: '焊接_DB', package_lf_group: 'SOD-123FL', daily_plan_qty: 300 }];
     await composable.activate('/api/spool/production_achievement/x.parquet', specMap, targetsMap, packageLfMap, workcenterMergeMap, dailyPlanMap);
 
@@ -321,6 +321,122 @@ describe('useProductionAchievementDuckDB composable', () => {
     expect(stage2Sql).toBeDefined();
     expect(stage2Sql!.toUpperCase()).toContain('INNER JOIN');
     expect(stage2Sql!.toUpperCase()).toContain('LEFT JOIN');
+    // PA-19: Stage 2 carries parent_group alongside the子站 workcenter_group.
+    expect(stage2Sql!).toContain('parent_group');
+  });
+
+  it('PA-18 moveout mode: Stage 1 uses raw_workcenter_group directly, NO spec-map JOIN', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockClear();
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    const workcenterMergeMap = [{ raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' }];
+    await composable.activate(
+      '/api/spool/production_achievement_moveout/x.parquet',
+      [], [], [], workcenterMergeMap, [], 'moveout',
+    );
+    const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    const stage1Sql = sqlCalls.find((sql) => /CREATE OR REPLACE TABLE pa_rollup_raw\s/.test(sql));
+    expect(stage1Sql).toBeDefined();
+    // moveout spool already carries raw_workcenter_group -> no SPECNAME join, no UPPER(TRIM
+    expect(stage1Sql!).toContain('raw_workcenter_group');
+    expect(stage1Sql!.toUpperCase()).not.toContain('UPPER(TRIM');
+    expect(stage1Sql!).not.toContain('pa_spec_workcenter_map');
+    // Stage 2 (parent_group carry) is UNCHANGED and shared — the "目標共用" point.
+    const stage2Sql = sqlCalls.find((sql) => /CREATE OR REPLACE TABLE pa_rollup\s/.test(sql));
+    expect(stage2Sql!).toContain('parent_group');
+    expect(stage2Sql!.toUpperCase()).toContain('INNER JOIN');
+  });
+
+  it('PA-19 expanded (大項) computeDailyView filters on parent_group and returns子站 workcenter_group', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([
+      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', d_output_qty: 10, n_output_qty: 5, daily_output_qty: 15, daily_plan_qty: 20, achievement_rate: 0.75 },
+    ]);
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('/api/spool/production_achievement_moveout/x.parquet', [], [], [], [{ raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' }], [], 'moveout');
+    client.sendQuery.mockClear();
+    client.sendQuery.mockResolvedValue([
+      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', d_output_qty: 10, n_output_qty: 5, daily_output_qty: 15, daily_plan_qty: 20, achievement_rate: 0.75 },
+    ]);
+    const rows = await composable.computeDailyView({ workcenterGroup: '電鍍', outputDate: '2026-07-14', expand: true });
+    const querySql = String(client.sendQuery.mock.calls[0][0]);
+    expect(querySql).toContain('r.parent_group');
+    expect(querySql).toContain('workcenter_group');
+    expect(rows[0].workcenter_group).toBe('掛鍍');
+  });
+
+  it('PA-19 expanded computeDailyView uses GROUPING SETS, keys the plan on the 大項/parent, and puts 計畫/達成率 ONLY on the 大項小計 row', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate(
+      '/api/spool/production_achievement_moveout/x.parquet', [], [], [], [
+        { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' },
+        { raw_workcenter_group: '條鍍', merged_workcenter_group: '條鍍', parent_group: '電鍍' },
+      ], [], 'moveout',
+    );
+    client.sendQuery.mockClear();
+    // Shape the GROUPING SETS output the composable maps: 2 子站 leaf rows
+    // (is_subtotal 0) + 1 per-package 大項小計 (is_subtotal 1, workcenter_group
+    // aggregated to NULL by GROUPING SETS, plan/rate populated in SQL).
+    client.sendQuery.mockResolvedValue([
+      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, d_output_qty: 10, n_output_qty: 5, daily_output_qty: 15, daily_plan_qty: null, achievement_rate: null },
+      { package_lf_group: 'PKG-1', workcenter_group: '條鍍', is_subtotal: 0, d_output_qty: 12, n_output_qty: 5, daily_output_qty: 17, daily_plan_qty: null, achievement_rate: null },
+      { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, d_output_qty: 22, n_output_qty: 10, daily_output_qty: 32, daily_plan_qty: 40, achievement_rate: 0.8 },
+    ]);
+    const rows = await composable.computeDailyView({ workcenterGroup: '電鍍', outputDate: '2026-07-14', expand: true });
+    const querySql = String(client.sendQuery.mock.calls[0][0]);
+    expect(querySql.toUpperCase()).toContain('GROUPING SETS');
+    // plan join keys on the selection (= 大項/parent '電鍍'), NOT a子站 value
+    expect(querySql).toContain("dp.workcenter_group = '電鍍'");
+
+    const leaves = rows.filter((r) => !r.is_subtotal);
+    const subtotal = rows.find((r) => r.is_subtotal);
+    expect(leaves).toHaveLength(2);
+    // 子站 leaf rows carry actuals but NO plan/達成率 (plan lives on the 大項)
+    expect(leaves.every((r) => r.daily_plan_qty === null && r.achievement_rate === null)).toBe(true);
+    expect(leaves.map((r) => r.workcenter_group)).toEqual(['掛鍍', '條鍍']);
+    // 大項小計 row: workcenter_group relabeled to the 大項, carries plan + rate
+    expect(subtotal).toBeDefined();
+    expect(subtotal!.workcenter_group).toBe('電鍍');
+    expect(subtotal!.daily_output_qty).toBe(32);
+    expect(subtotal!.daily_plan_qty).toBe(40);
+    expect(subtotal!.achievement_rate).toBe(0.8);
+  });
+
+  it('PA-19 expanded computeCumulativeView emits 子站 leaf rows + a 大項小計 with parent-keyed 累計計畫/達成率', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate(
+      '/api/spool/production_achievement_moveout/x.parquet', [], [], [], [
+        { raw_workcenter_group: '掛鍍', merged_workcenter_group: '掛鍍', parent_group: '電鍍' },
+      ], [], 'moveout',
+    );
+    client.sendQuery.mockClear();
+    // rows query (GROUPING SETS) then trend query. elapsedDays for a single day = 1.
+    client.sendQuery.mockResolvedValueOnce([
+      { package_lf_group: 'PKG-1', workcenter_group: '掛鍍', is_subtotal: 0, cumulative_actual_qty: 30, daily_plan_qty: null },
+      { package_lf_group: 'PKG-1', workcenter_group: null, is_subtotal: 1, cumulative_actual_qty: 30, daily_plan_qty: 40 },
+    ]);
+    client.sendQuery.mockResolvedValueOnce([]); // trend
+    const result = await composable.computeCumulativeView({ workcenterGroup: '電鍍', startDate: '2026-07-14', endDate: '2026-07-14', expand: true });
+    const rowsSql = String(client.sendQuery.mock.calls[0][0]);
+    expect(rowsSql.toUpperCase()).toContain('GROUPING SETS');
+    expect(rowsSql).toContain("dp.workcenter_group = '電鍍'");
+
+    const leaf = result.rows.find((r) => !r.is_subtotal)!;
+    const subtotal = result.rows.find((r) => r.is_subtotal)!;
+    expect(leaf.workcenter_group).toBe('掛鍍');
+    expect(leaf.cumulative_plan_qty).toBeNull();
+    expect(leaf.cumulative_achievement_rate).toBeNull();
+    expect(subtotal.workcenter_group).toBe('電鍍');
+    expect(subtotal.cumulative_plan_qty).toBe(40); // 40/day * 1 day
+    expect(subtotal.cumulative_achievement_rate).toBeCloseTo(30 / 40);
   });
 
   it('activate() defaults missing package_lf_map/workcenter_merge_map/daily_plan_map to empty (MYSQL_OPS_ENABLED=false degrade)', async () => {
