@@ -205,6 +205,70 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     expect(dailyRows.value).toEqual([]);
   });
 
+  it('refreshQuery sends force_refresh=true, unlike a plain runQuery() call', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    const reportUrls: string[] = [];
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/report')) reportUrls.push(u);
+      return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+    });
+
+    const { runQuery, refreshQuery } = useProductionAchievement();
+    await runQuery();
+    await refreshQuery();
+
+    expect(reportUrls).toHaveLength(2);
+    expect(reportUrls[0]).not.toContain('force_refresh');
+    expect(reportUrls[1]).toContain('force_refresh=true');
+  });
+
+  it('refreshQuery is ignored (OD-4 no-op) while a poll is already in flight', async () => {
+    const client = await mockedDuckDbClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    const JOB_ID = 'pa-job-refresh-mid-poll';
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    let reportCallCount = 0;
+    let resolveJobStatus: ((v: Response) => void) | null = null;
+    const jobStatusPromise = new Promise<Response>((resolve) => {
+      resolveJobStatus = resolve;
+    });
+
+    fetchMock.mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/report')) {
+        reportCallCount++;
+        if (reportCallCount === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              success: true,
+              data: { async: true, job_id: JOB_ID, status_url: `/api/job/${JOB_ID}?prefix=production-achievement` },
+              meta: {},
+            }),
+          );
+        }
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      if (u.includes(`/api/job/${JOB_ID}`)) {
+        return jobStatusPromise; // held pending — true mid-poll state
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: [] }, meta: {} }));
+    });
+
+    const { runQuery, refreshQuery, loading } = useProductionAchievement();
+    const runPromise = runQuery();
+    await vi.waitFor(() => expect(loading.value).toBe(true));
+
+    await refreshQuery(); // OD-4 no-op: loading is true, runQuery()'s own guard applies
+    expect(reportCallCount).toBe(1); // only the original enqueue — refreshQuery fired no second /report call
+
+    resolveJobStatus!(jsonResponse({ success: true, data: { status: 'finished', job_id: JOB_ID }, meta: {} }));
+    await runPromise;
+  });
+
   it('OD-3: setMode auto-runs the query without any explicit submit call', async () => {
     const client = await mockedDuckDbClient();
     client.sendQuery.mockResolvedValue([]);

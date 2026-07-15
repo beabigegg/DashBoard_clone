@@ -309,6 +309,65 @@ class TestReportRoute:
 
 
 # ---------------------------------------------------------------------------
+# GET /api/production-achievement/report?force_refresh=true (manual 重新查詢
+# button, 當日/前日/當月 tabs) -- unconditionally discards an existing spool
+# hit and re-enqueues, instead of serving the (possibly stale) cached spool.
+# ---------------------------------------------------------------------------
+
+class TestReportForceRefresh:
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.clear_spooled_df")
+    @patch(
+        "mes_dashboard.routes.production_achievement_routes.get_spool_file_path",
+        return_value="/tmp/fake/spool.parquet",
+    )
+    def test_force_refresh_bypasses_spool_hit_and_re_enqueues(
+        self, mock_spool, mock_clear, mock_enqueue, mock_avail, auth_client
+    ):
+        """Even though get_spool_file_path would resolve a hit, force_refresh=true
+        must still take the 202 enqueue branch -- proving the cached spool was
+        never consulted for the response (spool-hit would return 200)."""
+        mock_enqueue.return_value = ("production-achievement-refresh1", None, None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={
+                "start_date": "2026-07-15",
+                "end_date": "2026-07-15",
+                "force_refresh": "true",
+            },
+        )
+        assert resp.status_code == 202
+        payload = resp.get_json()
+        assert payload["data"]["job_id"] == "production-achievement-refresh1"
+        mock_clear.assert_called_once()
+        clear_args = mock_clear.call_args.args
+        assert clear_args[0] == "production_achievement"
+        # get_spool_file_path must never even be consulted once force_refresh
+        # has already cleared the entry (proves the response cannot be a
+        # stale spool-hit slipping through under a different code path).
+        mock_spool.assert_not_called()
+
+    @patch("mes_dashboard.routes.production_achievement_routes.is_async_available", return_value=True)
+    @patch("mes_dashboard.routes.production_achievement_routes.enqueue_query_job")
+    @patch("mes_dashboard.routes.production_achievement_routes.clear_spooled_df")
+    @patch("mes_dashboard.routes.production_achievement_routes.get_spool_file_path", return_value=None)
+    def test_without_force_refresh_clear_spooled_df_is_never_called(
+        self, mock_spool, mock_clear, mock_enqueue, mock_avail, auth_client
+    ):
+        """Default (no force_refresh param) behavior is untouched -- a normal
+        spool-miss must never invalidate anything that isn't already missing."""
+        mock_enqueue.return_value = ("production-achievement-normal1", None, None)
+        resp = auth_client.get(
+            "/api/production-achievement/report",
+            query_string={"start_date": "2026-07-15", "end_date": "2026-07-15"},
+        )
+        assert resp.status_code == 202
+        mock_clear.assert_not_called()
+        mock_spool.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
 # GET /api/production-achievement/filter-options
 # ---------------------------------------------------------------------------
 

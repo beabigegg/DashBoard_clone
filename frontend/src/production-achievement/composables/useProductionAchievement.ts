@@ -304,10 +304,16 @@ export function useProductionAchievement() {
     return { start_date: rawStart, end_date: end };
   }
 
-  async function _fetchReportOnce(snapshot: QuerySnapshot): Promise<ReportSpoolHit | ReportAsyncEnqueued> {
+  async function _fetchReportOnce(snapshot: QuerySnapshot, forceRefresh = false): Promise<ReportSpoolHit | ReportAsyncEnqueued> {
+    const params: Record<string, string> = {
+      start_date: snapshot.start_date,
+      end_date: snapshot.end_date,
+      workcenter_group: snapshot.workcenter_group,
+    };
+    if (forceRefresh) params.force_refresh = 'true';
     const response = await apiGet<ReportSpoolHit | ReportAsyncEnqueued>('/api/production-achievement/report', {
       timeout: API_TIMEOUT,
-      params: { start_date: snapshot.start_date, end_date: snapshot.end_date, workcenter_group: snapshot.workcenter_group },
+      params,
     });
     return unwrapApiData(response, '查詢失敗，請稍後再試') as ReportSpoolHit | ReportAsyncEnqueued;
   }
@@ -384,8 +390,8 @@ export function useProductionAchievement() {
     return data as ReportSpoolHit;
   }
 
-  async function _fetchReport(snapshot: QuerySnapshot): Promise<ReportSpoolHit | null> {
-    const data = await _fetchReportOnce(snapshot);
+  async function _fetchReport(snapshot: QuerySnapshot, forceRefresh = false): Promise<ReportSpoolHit | null> {
+    const data = await _fetchReportOnce(snapshot, forceRefresh);
     if (isAsyncEnqueued(data)) {
       return _pollForCompletion(data, snapshot);
     }
@@ -430,7 +436,7 @@ export function useProductionAchievement() {
     await _recompute(snapshot.mode, snapshot.start_date, snapshot.end_date, snapshot.workcenter_group);
   }
 
-  async function runQuery(): Promise<void> {
+  async function runQuery(options?: { forceRefresh?: boolean }): Promise<void> {
     if (loading.value) return;
     error.value = '';
     loading.value = true;
@@ -441,7 +447,7 @@ export function useProductionAchievement() {
     const { start_date, end_date } = _resolveSnapshotDates(mode, new Date());
     const snapshot: QuerySnapshot = { mode, start_date, end_date, workcenter_group: filters.workcenter_group };
     try {
-      const data = await _fetchReport(snapshot);
+      const data = await _fetchReport(snapshot, options?.forceRefresh ?? false);
       if (!data) {
         // Cancelled mid-poll or the poll failed — error.value (if any) is
         // already set by _pollForCompletion(); table renders empty, not an error.
@@ -501,6 +507,22 @@ export function useProductionAchievement() {
     void runQuery();
   }
 
+  /**
+   * Manual 重新查詢 button (當日/前日/當月 tabs only). Unconditionally
+   * re-fetches the CURRENT mode's date window from Oracle -- ``force_refresh``
+   * makes the server discard any existing spool for that query_id before the
+   * hit check, so this can never resolve to a stale cached snapshot the way
+   * the plain 200 spool-hit path can (see production_achievement_daily_cache.py
+   * root-cause fix: the scheduled warmup only refreshes "today" on its own
+   * hourly cycle -- this is the user-facing "don't wait for it" escape hatch,
+   * and it's the only way to force a fresh fetch for 前日/當月 at all, since
+   * those aren't covered by the warmup scheduler). Same OD-4 no-op-while-
+   * loading guard as every other entry point -- runQuery() itself enforces it.
+   */
+  function refreshQuery(): Promise<void> {
+    return runQuery({ forceRefresh: true });
+  }
+
   return {
     filters,
     filterOptions,
@@ -514,6 +536,7 @@ export function useProductionAchievement() {
     asyncJobProgress,
     fetchFilterOptions,
     runQuery,
+    refreshQuery,
     setMode,
     setWorkcenterGroup,
     setRangeDates,

@@ -246,6 +246,59 @@ describe('production-achievement App.vue', () => {
     wrapper.unmount();
   });
 
+  it('重新查詢 button is visible on 當日/前日/當月 but not on 自訂區間', async () => {
+    const wrapper = mountApp();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="pa-refresh-btn"]').exists()).toBe(true); // 當日 (default)
+
+    await wrapper.find('[data-testid="pa-mode-yesterday"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pa-refresh-btn"]').exists()).toBe(true);
+
+    await wrapper.find('[data-testid="pa-mode-month"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pa-refresh-btn"]').exists()).toBe(true);
+
+    await wrapper.find('[data-testid="pa-mode-range"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="pa-refresh-btn"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('clicking 重新查詢 unconditionally re-issues /report with force_refresh=true', async () => {
+    const client = await getDuckClient();
+    client.sendQuery.mockResolvedValue([]);
+
+    const reportCalls: string[] = [];
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('/api/production-achievement/filter-options')) {
+        return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
+      }
+      if (u.includes('/api/production-achievement/report')) {
+        reportCalls.push(u);
+        return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));
+      }
+      return Promise.resolve(jsonResponse({ success: true, data: {}, meta: {} }));
+    });
+
+    const wrapper = mountApp();
+    await flushPromises();
+    await flushPromises();
+
+    expect(reportCalls.length).toBeGreaterThan(0);
+    expect(reportCalls[0]).not.toContain('force_refresh');
+
+    await wrapper.find('[data-testid="pa-refresh-btn"]').trigger('click');
+    await flushPromises();
+    await flushPromises();
+
+    const lastCall = reportCalls[reportCalls.length - 1];
+    expect(lastCall).toContain('force_refresh=true');
+    wrapper.unmount();
+  });
+
   it('hides results and shows ErrorBanner on a query failure (no contradictory empty table)', async () => {
     const wrapper = mountApp();
     await flushPromises();

@@ -22,15 +22,18 @@ import pytest
 
 class TestCacheHitShortCircuits:
     def test_cache_hit_returns_without_run_or_oracle_call(self, monkeypatch):
-        """A pre-existing spool must short-circuit BEFORE any job is built
-        (proving zero .run()/Oracle calls -- building the job is the only
-        path that could reach Oracle)."""
+        """A pre-existing, still-FRESH spool must short-circuit BEFORE any
+        job is built (proving zero .run()/Oracle calls -- building the job
+        is the only path that could reach Oracle)."""
         import mes_dashboard.services.production_achievement_daily_cache as cache_mod
 
         monkeypatch.setattr(
             cache_mod, "get_spool_file_path",
             lambda namespace, query_id: "/existing/spool/path.parquet",
         )
+        # Today's freshness check only runs for ensure_today_loaded (yesterday
+        # never calls it -- a closed day is fresh forever once cached).
+        monkeypatch.setattr(cache_mod, "_is_today_spool_stale", lambda query_id: False)
         mock_build = MagicMock()
         monkeypatch.setattr(cache_mod, "_build_warmup_job", mock_build)
 
@@ -103,6 +106,119 @@ class TestCacheMissTriggersJobRun:
         assert run_calls == [
             (f"warmup-pa-{yesterday_str}", {"start_date": yesterday_str, "end_date": yesterday_str})
         ]
+
+
+class TestTodayStaleSpoolRebuilds:
+    """Root-cause fix for blank 當日產出: an existing-but-stale spool for
+    TODAY must be rebuilt (not short-circuited), while the identical
+    existing-spool state for YESTERDAY still short-circuits untouched."""
+
+    def test_stale_today_spool_triggers_rebuild(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "on")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/stale/spool/path.parquet",
+        )
+        monkeypatch.setattr(cache_mod, "_is_today_spool_stale", lambda query_id: True)
+
+        run_calls = []
+
+        class _FakeJob:
+            def __init__(self, job_id, params):
+                self.job_id = job_id
+                self.params = params
+
+            def run(self):
+                run_calls.append((self.job_id, self.params))
+                return "/fresh/spool/path.parquet"
+
+        monkeypatch.setattr(
+            cache_mod, "_build_warmup_job",
+            lambda job_id, params: _FakeJob(job_id, params),
+        )
+
+        result = cache_mod.ensure_today_loaded()
+
+        assert result == "/fresh/spool/path.parquet"
+        assert len(run_calls) == 1
+
+    def test_stale_today_spool_with_flag_off_returns_existing_stale_path(self, monkeypatch):
+        """Kill switch still wins: with the flag off, a stale-but-existing
+        spool is served as-is (no rebuild capability) rather than losing the
+        data entirely -- mirrors the pre-existing flag-off degrade behavior."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("PRODUCTION_ACHIEVEMENT_USE_UNIFIED_JOB", "off")
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/stale/spool/path.parquet",
+        )
+        monkeypatch.setattr(cache_mod, "_is_today_spool_stale", lambda query_id: True)
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_job", mock_build)
+
+        assert cache_mod.ensure_today_loaded() == "/stale/spool/path.parquet"
+        mock_build.assert_not_called()
+
+    def test_yesterday_never_consults_staleness_check(self, monkeypatch):
+        """A closed day (yesterday) must short-circuit on ANY existing spool
+        without ever calling the today-only staleness check."""
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(
+            cache_mod, "get_spool_file_path",
+            lambda namespace, query_id: "/existing/spool/path.parquet",
+        )
+        mock_stale = MagicMock(return_value=True)
+        monkeypatch.setattr(cache_mod, "_is_today_spool_stale", mock_stale)
+        mock_build = MagicMock()
+        monkeypatch.setattr(cache_mod, "_build_warmup_job", mock_build)
+
+        assert cache_mod.ensure_yesterday_loaded() == "/existing/spool/path.parquet"
+        mock_stale.assert_not_called()
+        mock_build.assert_not_called()
+
+
+class TestIsTodaySpoolStale:
+    def test_fresh_metadata_is_not_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("WARMUP_INTERVAL_SECONDS", "3600")
+        monkeypatch.setattr(cache_mod.time, "time", lambda: 10_000.0)
+        monkeypatch.setattr(
+            cache_mod, "get_spool_metadata",
+            lambda namespace, query_id: {"created_at": 10_000 - 60},  # 1 minute old
+        )
+
+        assert cache_mod._is_today_spool_stale("some-query-id") is False
+
+    def test_old_metadata_is_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setenv("WARMUP_INTERVAL_SECONDS", "3600")
+        monkeypatch.setattr(cache_mod.time, "time", lambda: 10_000.0)
+        monkeypatch.setattr(
+            cache_mod, "get_spool_metadata",
+            lambda namespace, query_id: {"created_at": 10_000 - 3601},  # just over 1h old
+        )
+
+        assert cache_mod._is_today_spool_stale("some-query-id") is True
+
+    def test_missing_metadata_is_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "get_spool_metadata", lambda namespace, query_id: None)
+
+        assert cache_mod._is_today_spool_stale("some-query-id") is True
+
+    def test_missing_created_at_is_stale(self, monkeypatch):
+        import mes_dashboard.services.production_achievement_daily_cache as cache_mod
+
+        monkeypatch.setattr(cache_mod, "get_spool_metadata", lambda namespace, query_id: {})
+
+        assert cache_mod._is_today_spool_stale("some-query-id") is True
 
 
 class TestFlagOffKillSwitch:

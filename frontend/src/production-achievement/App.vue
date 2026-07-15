@@ -52,6 +52,7 @@ const {
   asyncJobProgress,
   fetchFilterOptions,
   runQuery,
+  refreshQuery,
   setMode,
   setWorkcenterGroup,
   setRangeDates,
@@ -99,6 +100,10 @@ function handleRangeEndChange(e: Event): void {
 function goToSettings(): void {
   navigateToRuntimeRoute('/production-achievement-settings');
 }
+
+// 重新查詢 button: 當日/前日/當月 only (自訂區間 already re-runs on every date
+// input change, so it doesn't need a separate manual trigger).
+const showRefreshButton = computed(() => filters.mode !== 'range');
 
 // ── Row helpers shared by table + chart + KPI (single source per OD-11) ────
 type ViewRow = DailyViewRow | CumulativeViewRow;
@@ -156,9 +161,21 @@ const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievemen
     <div class="ui-card pa-filter-card">
       <div class="ui-card-header">
         <span class="ui-card-title">查詢條件</span>
-        <button type="button" class="ui-btn ui-btn--secondary ui-btn--sm" data-testid="pa-settings-btn" @click="goToSettings">
-          設定
-        </button>
+        <div class="pa-app__header-actions">
+          <button
+            v-if="showRefreshButton"
+            type="button"
+            class="ui-btn ui-btn--secondary ui-btn--sm"
+            data-testid="pa-refresh-btn"
+            :disabled="loading"
+            @click="refreshQuery"
+          >
+            重新查詢
+          </button>
+          <button type="button" class="ui-btn ui-btn--secondary ui-btn--sm" data-testid="pa-settings-btn" @click="goToSettings">
+            設定
+          </button>
+        </div>
       </div>
       <div class="ui-card-body pa-app__filter-panel">
         <div class="pa-app__mode-switch" role="group" aria-label="查詢模式">

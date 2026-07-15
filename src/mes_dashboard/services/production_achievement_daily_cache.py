@@ -31,22 +31,41 @@ Fail-safe by construction (PA-14): a total scheduler outage degrades to the
 existing 202-poll path -- DailyView issues the identical
 ``GET /report(start=end=<day>)`` request either way (no separate warm/cold
 client code fork).
+
+Today-staleness (bug fix, blank 當日產出): unlike a CLOSED day (yesterday and
+earlier, whose data never changes once the day is over), "today" keeps
+gaining new Oracle rows all day as each shift produces output. The hourly
+``_warmup_achievement_today_job`` (spool_warmup_scheduler.py,
+``WARMUP_INTERVAL_SECONDS``) is supposed to keep today's spool current, but
+``_ensure_day_loaded`` used to short-circuit on ANY non-expired spool
+regardless of age -- so the FIRST warmup run of the day (e.g. right at/just
+after midnight, or right as a shift starts) would freeze that early,
+near-empty snapshot in place for the spool's entire multi-hour Redis TTL
+(cache-spool-patterns.md), and every subsequent hourly warmup became a
+no-op. ``_is_today_spool_stale`` below re-checks the spool's own
+``created_at`` against ``WARMUP_INTERVAL_SECONDS`` so "today" gets rebuilt
+roughly every warmup cycle, while "yesterday" (``is_today=False``) keeps the
+original exists-means-fresh short-circuit -- a closed day never needs a
+rebuild once cached.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import date, timedelta
 from typing import Optional
 
-from mes_dashboard.core.query_spool_store import get_spool_file_path
+from mes_dashboard.core.query_spool_store import get_spool_file_path, get_spool_metadata
 from mes_dashboard.services.production_achievement_service import (
     PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE,
     make_canonical_pa_spool_id,
 )
 
 logger = logging.getLogger("mes_dashboard.production_achievement_daily_cache")
+
+_DEFAULT_TODAY_STALE_SECONDS = 3600
 
 
 def _is_unified_job_enabled() -> bool:
@@ -86,21 +105,61 @@ def _build_warmup_job(job_id: str, params: dict):
     return _WarmupProductionAchievementJob(job_id=job_id, params=params)
 
 
-def _ensure_day_loaded(day: date) -> Optional[str]:
-    """Check the spool first; on miss (and only when the flag is on),
-    build+run the warm-cache subclass for a single-day range
-    (``start_date == end_date == day``).
+def _today_stale_threshold_seconds() -> int:
+    """Reuse ``WARMUP_INTERVAL_SECONDS`` (spool_warmup_scheduler.py) as the
+    staleness bound for "today" -- the hourly warmup cycle can only pick up
+    newly-arrived Oracle rows if today's cached spool is treated as stale by
+    the time the NEXT cycle fires, not just at its multi-hour Redis TTL
+    horizon."""
+    raw = os.getenv("WARMUP_INTERVAL_SECONDS", str(_DEFAULT_TODAY_STALE_SECONDS))
+    try:
+        return max(int(raw), 60)
+    except (TypeError, ValueError):
+        return _DEFAULT_TODAY_STALE_SECONDS
+
+
+def _is_today_spool_stale(query_id: str) -> bool:
+    """True when today's already-registered spool was created long enough
+    ago that it may be missing Oracle rows produced since (today keeps
+    growing until midnight, unlike a closed day -- see module docstring).
+
+    Treated as stale whenever the metadata can't be read at all (missing or
+    unparsable ``created_at``) -- that state is already anomalous by the
+    time this is called (``get_spool_file_path`` just resolved a path from
+    this same metadata store), so rebuilding is the safe default.
+    """
+    metadata = get_spool_metadata(PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE, query_id)
+    if not metadata:
+        return True
+    created_at = int(metadata.get("created_at") or 0)
+    if not created_at:
+        return True
+    age_seconds = int(time.time()) - created_at
+    return age_seconds >= _today_stale_threshold_seconds()
+
+
+def _ensure_day_loaded(day: date, *, is_today: bool = False) -> Optional[str]:
+    """Check the spool first; on miss -- or, for "today" only, on a stale
+    hit -- (and only when the flag is on) build+run the warm-cache subclass
+    for a single-day range (``start_date == end_date == day``).
+
+    Args:
+        is_today: When True, an existing spool is rebuilt if
+            ``_is_today_spool_stale`` says it may be missing newly-arrived
+            rows. ``ensure_yesterday_loaded`` never sets this -- a closed day
+            is fresh forever once cached.
 
     Returns:
-        The spool path if already warm or after a successful run; None if
-        the spool is missing and the flag is off (falls through to the
+        The spool path if already warm (and, for today, still fresh) or
+        after a successful run; the existing (possibly stale) spool path, or
+        None on a true miss, if the flag is off (falls through to the
         existing 202-poll path, PA-14).
     """
     date_str = day.strftime("%Y-%m-%d")
     query_id = make_canonical_pa_spool_id(date_str, date_str)
 
     spool_path = get_spool_file_path(PRODUCTION_ACHIEVEMENT_SPOOL_NAMESPACE, query_id)
-    if spool_path is not None:
+    if spool_path is not None and not (is_today and _is_today_spool_stale(query_id)):
         return spool_path
 
     if not _is_unified_job_enabled():
@@ -108,7 +167,13 @@ def _ensure_day_loaded(day: date) -> Optional[str]:
             "production_achievement_daily_cache: flag off, skipping warmup for %s",
             date_str,
         )
-        return None
+        return spool_path
+
+    if spool_path is not None:
+        logger.info(
+            "production_achievement_daily_cache: today's spool %s is stale, rebuilding",
+            query_id,
+        )
 
     job = _build_warmup_job(
         job_id=f"warmup-pa-{date_str}",
@@ -118,9 +183,10 @@ def _ensure_day_loaded(day: date) -> Optional[str]:
 
 
 def ensure_today_loaded() -> Optional[str]:
-    """Ensure today's DailyView (今日) spool is warm. Returns the spool path,
-    or None if the flag is off and the spool is missing."""
-    return _ensure_day_loaded(date.today())
+    """Ensure today's DailyView (今日) spool is warm AND fresh (rebuilt if
+    stale per ``_is_today_spool_stale``). Returns the spool path, or None if
+    the flag is off and the spool is missing."""
+    return _ensure_day_loaded(date.today(), is_today=True)
 
 
 def ensure_yesterday_loaded() -> Optional[str]:

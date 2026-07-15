@@ -21,6 +21,13 @@
   @apply p-4 flex flex-col gap-3 overflow-visible;
 }
 
+/* ui-card-header's action group (重新查詢 + 設定) -- ui-card-header itself is
+ * already a flex row with justify-content: space-between (shared base), this
+ * just groups the 2 buttons together on the trailing side. */
+.theme-production-achievement .pa-app__header-actions {
+  @apply flex items-center gap-2;
+}
+
 /* 4-button mode switch (當日/前日/當月/自訂區間, IP-8) — replaces the old
  * free-form start/end date pickers for 3 of the 4 modes (OD-2). */
 .theme-production-achievement .pa-app__mode-switch {

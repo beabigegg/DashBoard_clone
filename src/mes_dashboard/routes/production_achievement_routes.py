@@ -37,7 +37,7 @@ from mes_dashboard.core.permissions import (
     get_owner_token,
     login_required,
 )
-from mes_dashboard.core.query_spool_store import get_spool_file_path
+from mes_dashboard.core.query_spool_store import clear_spooled_df, get_spool_file_path
 from mes_dashboard.core.response import (
     SERVICE_UNAVAILABLE,
     error_response,
@@ -145,9 +145,19 @@ def api_get_report():
     async-spool, ADR-0016). shift_code/workcenter_group are no longer accepted
     as server-side filters: the canonical spool key is date-range only and
     PA-06/PA-07 narrowing now happens client-side in DuckDB-WASM.
+
+    ``force_refresh=true`` (manual 重新查詢 button, 當日/前日/當月 tabs):
+    unconditionally discards any existing spool for this exact query_id
+    BEFORE the hit check below, so the request always falls through to the
+    enqueue branch and re-fetches Oracle -- the root-cause fix for
+    production_achievement_daily_cache.py's staleness window still leaves a
+    gap between scheduled warmup cycles; this gives the user an explicit
+    "I don't trust the cached snapshot right now" escape hatch instead of
+    waiting for the next cycle.
     """
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
+    force_refresh = request.args.get("force_refresh", "").strip().lower() in ("1", "true", "yes", "on")
 
     try:
         _validate_date_range(start_date, end_date)
@@ -156,12 +166,15 @@ def api_get_report():
 
     query_id = make_canonical_pa_spool_id(start_date, end_date)
 
+    if force_refresh:
+        clear_spooled_df(_SPOOL_NAMESPACE, query_id)
+
     # ── Spool-hit: 200, inline maps injected unconditionally (Q1, not
     # row-count gated like resource_history's threshold). Grows from 2 to 5
     # inline arrays by production-achievement-overhaul (data-shape-contract.md
     # §3.28.4): +package_lf_map (D1), +workcenter_merge_map (D2),
     # +daily_plan_map. ─────────────────────────────────────────────────────
-    spool_path = get_spool_file_path(_SPOOL_NAMESPACE, query_id)
+    spool_path = None if force_refresh else get_spool_file_path(_SPOOL_NAMESPACE, query_id)
     if spool_path is not None:
         try:
             spec_workcenter_map = [
