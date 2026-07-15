@@ -186,6 +186,12 @@ function createAbortSignal(
  * promise across two POST calls means the second caller can receive an abort
  * signal (e.g. timeout) that originated from the first call's AbortController,
  * producing a misleading "signal is aborted without reason" error.
+ *
+ * The same hazard applies to a GET call that supplies its own `externalSignal`
+ * (e.g. a cancel-button AbortController) — the caller in `fetchJson()` bypasses
+ * dedup for those regardless of what this function returns, so a cancel/timeout
+ * intended for one logical request can never abort an unrelated caller's
+ * identical-URL GET.
  */
 function _buildDedupKey(method: string, url: string, _body: unknown): string | null {
   const m = String(method).toUpperCase();
@@ -265,7 +271,11 @@ async function fetchJson(url: string, options: FetchOptions = {}): Promise<unkno
   };
 
   const requestUrl = buildUrlWithParams(url, params);
-  const dedupKey = noDedup
+  // A caller-supplied externalSignal (e.g. a cancel-button AbortController)
+  // must never be shared via dedup -- the same "signal is aborted without
+  // reason" hazard documented on _buildDedupKey for POST applies to GET too
+  // once one caller can abort independently of the other's intent.
+  const dedupKey = noDedup || externalSignal
     ? null
     : _buildDedupKey(fetchOptions.method || 'GET', requestUrl, fetchOptions.body);
 

@@ -97,6 +97,56 @@ describe('in-flight dedup: GET requests', () => {
     expect(fetchCallCount).toBe(2);
     _clearInFlight();
   });
+
+  it('a GET call with its own externalSignal is NOT deduped with an identical-URL call', async () => {
+    // Regression for the "signal is aborted without reason" bug
+    // (production-achievement-chengxing-output follow-up, 2026-07-15): two
+    // GET calls to the identical URL used to share one in-flight fetch +
+    // AbortController even when only one caller supplied its own
+    // externalSignal (e.g. a cancel-button controller). Aborting that
+    // caller's signal then killed the OTHER, unrelated caller's request too.
+    const { apiGet, _clearInFlight } = await import('../../src/core/api.js');
+    _clearInFlight();
+
+    const controller = new AbortController();
+    const [r1, r2] = await Promise.all([
+      apiGet('/api/test/dedup-signal', { signal: controller.signal }),
+      apiGet('/api/test/dedup-signal'),
+    ]);
+
+    expect(fetchCallCount).toBe(2);
+    expect(r1.success).toBe(true);
+    expect(r2.success).toBe(true);
+    _clearInFlight();
+  });
+
+  it('aborting one caller\'s externalSignal never rejects an unrelated identical-URL caller', async () => {
+    const { apiGet, _clearInFlight } = await import('../../src/core/api.js');
+    _clearInFlight();
+
+    // Fetch that only resolves for calls without an abort signal already
+    // fired; a call made with an aborted signal should reject via fetch's
+    // own abort handling, exactly like the browser would.
+    global.fetch = vi.fn((url, { signal } = {}) => {
+      return new Promise((resolve, reject) => {
+        if (signal) {
+          signal.addEventListener('abort', () => reject(new DOMException('signal is aborted without reason', 'AbortError')));
+        }
+        setTimeout(() => resolve(makeOkResponse({ success: true, data: {}, meta: {} })), 10);
+      });
+    });
+
+    const controller = new AbortController();
+    const cancelledCall = apiGet('/api/test/dedup-abort', { signal: controller.signal });
+    const unrelatedCall = apiGet('/api/test/dedup-abort');
+
+    controller.abort();
+
+    await expect(cancelledCall).rejects.toThrow();
+    await expect(unrelatedCall).resolves.toMatchObject({ success: true });
+
+    _clearInFlight();
+  });
 });
 
 describe('in-flight dedup: POST requests', () => {
