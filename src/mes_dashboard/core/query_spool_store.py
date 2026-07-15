@@ -364,6 +364,16 @@ def load_spooled_df(namespace: str, query_id: str) -> Optional[pd.DataFrame]:
 
     path = _path_from_relative(str(metadata.get("relative_path") or ""))
     if path is None or not path.exists():
+        # Non-expired metadata pointing at a file that's not there — a
+        # dangling pointer this early is anomalous (not a normal TTL
+        # expiry), so it's worth a WARNING even though this self-heals by
+        # clearing the pointer (the next request just falls through to a
+        # fresh fetch/enqueue).
+        logger.warning(
+            "Spool pointer dangling (ns=%s, id=%s): metadata valid until %s but "
+            "resolved path %s is missing/unresolvable — clearing pointer",
+            namespace, safe_query_id, expires_at, path,
+        )
         clear_spooled_df(namespace, safe_query_id, remove_file=False)
         return None
 
@@ -460,6 +470,16 @@ def get_spool_file_path(namespace: str, query_id: str) -> Optional[str]:
 
     path = _path_from_relative(str(metadata.get("relative_path") or ""))
     if path is None or not path.exists():
+        # See load_spooled_df's identical guard: a dangling (non-expired)
+        # pointer this early is anomalous — log it so a premature cache-miss
+        # (e.g. production-achievement's report route silently falling back
+        # to a full re-fetch/enqueue) is diagnosable from server logs instead
+        # of only visible as "the frontend seems to re-query every time."
+        logger.warning(
+            "Spool pointer dangling (ns=%s, id=%s): metadata valid until %s but "
+            "resolved path %s is missing/unresolvable — clearing pointer",
+            namespace, safe_query_id, expires_at, path,
+        )
         clear_spooled_df(namespace, safe_query_id, remove_file=False)
         return None
     return str(path)

@@ -11,10 +11,13 @@
  * sharing PlanAchievementStackedChart.vue for the chart. All auto-run — OD-3 —
  * no 查詢/清除篩選 buttons. OD-1: no shift filter (D/N are columns only).
  *
- * The station-group filter is a SINGLE-select — MultiSelect.vue has no native
- * single-select mode and is additive-only (16 consumers, CLAUDE.md), so this
- * reuses the same fake-single-select idiom the OLD App.vue already used
- * (`:model-value="x ? [x] : []"`).
+ * The station-group filter is a SINGLE-select — MultiSelect.vue's
+ * `single-select` prop (additive opt-in, checkbox list becomes radio-style
+ * and picking an option closes the dropdown immediately) is used instead of
+ * the old fake-single-select idiom that let the underlying widget show
+ * checkboxes while only the first checked value was ever applied — that
+ * mismatch between "looks multi-select" and "behaves single-select" read as
+ * broken to users.
  *
  * 設定 button navigates to the standalone /production-achievement-settings
  * mini-app (D4, no drawer entry); OD-7 mode/station preservation across that
@@ -32,7 +35,7 @@ import SummaryCard from '../shared-ui/components/SummaryCard.vue';
 import SummaryCardGroup from '../shared-ui/components/SummaryCardGroup.vue';
 import AsyncQueryProgress from '../shared-ui/components/AsyncQueryProgress.vue';
 import PlanAchievementStackedChart from './components/PlanAchievementStackedChart.vue';
-import TargetEditPanel from './components/TargetEditPanel.vue';
+import CumulativeTrendComboChart from './components/CumulativeTrendComboChart.vue';
 import { formatQty, formatAchievementRate, achievementRateForChart } from './utils';
 import type { DailyViewRow, CumulativeViewRow } from './composables/useProductionAchievementDuckDB';
 
@@ -43,21 +46,15 @@ const {
   cumulativeRows,
   cumulativeTrend,
   viewKind,
-  targets,
   loading,
   error,
   hasQueried,
-  editForbidden,
-  editError,
-  editSaving,
   asyncJobProgress,
   fetchFilterOptions,
-  fetchTargets,
   runQuery,
   setMode,
   setWorkcenterGroup,
   setRangeDates,
-  saveTarget,
   cancelQuery,
 } = useProductionAchievement();
 
@@ -70,7 +67,6 @@ const MODE_OPTIONS: { value: ProductionAchievementMode; label: string }[] = [
 
 onMounted(() => {
   void fetchFilterOptions();
-  void fetchTargets();
   void runQuery(); // OD-3: land on 當日 (or the OD-7 persisted mode) and auto-run immediately
 });
 
@@ -104,10 +100,6 @@ function goToSettings(): void {
   navigateToRuntimeRoute('/production-achievement-settings');
 }
 
-async function handleSaveTarget(payload: { shift_code: string; workcenter_group: string; target_qty: number }): Promise<void> {
-  await saveTarget(payload);
-}
-
 // ── Row helpers shared by table + chart + KPI (single source per OD-11) ────
 type ViewRow = DailyViewRow | CumulativeViewRow;
 
@@ -132,19 +124,30 @@ const totalPlan = computed(() =>
 );
 const overallRate = computed(() => (totalPlan.value === null || totalPlan.value === 0 ? null : totalActual.value / totalPlan.value));
 
-// ── Chart series (shared PlanAchievementStackedChart — daily x=package group, cumulative x=date) ──
-const chartCategories = computed(() =>
-  viewKind.value === 'daily' ? dailyRows.value.map((r) => r.package_lf_group) : cumulativeTrend.value.map((t) => t.output_date),
-);
-const chartSeries = computed(() => {
-  if (viewKind.value === 'daily') {
-    return [
-      { name: 'D班', colorVar: 'var(--pa-shift-d)', data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.d_output_qty / r.daily_plan_qty : null)) },
-      { name: 'N班', colorVar: 'var(--pa-shift-n)', data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.n_output_qty / r.daily_plan_qty : null)) },
-    ];
-  }
-  return [{ name: '達成率', colorVar: 'var(--pa-cumulative-rate)', data: cumulativeTrend.value.map((t) => achievementRateForChart(t.achievement_rate)) }];
-});
+// ── PlanAchievementStackedChart (daily mode only: x=package group, D班/N班 stacked %) ──
+const chartCategories = computed(() => dailyRows.value.map((r) => r.package_lf_group));
+// Y-axis stays % (single axis; 計畫 is the y=100 markLine, not a second
+// scale). Each series carries its own qtyData so the chart's "% (QTY)"
+// label/tooltip can distinguish D班/N班 individually (field-directed spec).
+const chartSeries = computed(() => [
+  {
+    name: 'D班',
+    colorVar: 'var(--pa-shift-d)',
+    data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.d_output_qty / r.daily_plan_qty : null)),
+    qtyData: dailyRows.value.map((r) => r.d_output_qty),
+  },
+  {
+    name: 'N班',
+    colorVar: 'var(--pa-shift-n)',
+    data: dailyRows.value.map((r) => achievementRateForChart(r.daily_plan_qty ? r.n_output_qty / r.daily_plan_qty : null)),
+    qtyData: dailyRows.value.map((r) => r.n_output_qty),
+  },
+]);
+
+// ── CumulativeTrendComboChart (當月/自訂區間 only: x=date, bar=每日產出數量, line=累計達成率) ──
+const comboCategories = computed(() => cumulativeTrend.value.map((t) => t.output_date));
+const comboQtyData = computed(() => cumulativeTrend.value.map((t) => t.actual_qty));
+const comboRateData = computed(() => cumulativeTrend.value.map((t) => achievementRateForChart(t.cumulative_achievement_rate)));
 </script>
 
 <template>
@@ -204,6 +207,7 @@ const chartSeries = computed(() => {
               :options="filterOptions.workcenter_groups"
               placeholder="請選擇站點群組"
               :searchable="true"
+              :single-select="true"
               @update:model-value="setWorkcenterGroup(($event as string[])[0] || '')"
             />
           </div>
@@ -223,17 +227,6 @@ const chartSeries = computed(() => {
       @cancel="cancelQuery"
     />
 
-    <!-- Target-value management (always visible per api-contract.md row 258 — no permission gate on read).
-         Unchanged panel/wiring — the legacy shift-based target table is untouched by this change. -->
-    <TargetEditPanel
-      :targets="targets"
-      :edit-forbidden="editForbidden"
-      :edit-error="editError"
-      :edit-saving="editSaving"
-      :workcenter-group-options="filterOptions.workcenter_groups"
-      @save="handleSaveTarget"
-    />
-
     <!-- Results — suppressed on error: ErrorBanner above is the sole message
          then, instead of also showing a contradictory empty table. -->
     <template v-if="showResults">
@@ -244,10 +237,19 @@ const chartSeries = computed(() => {
       </SummaryCardGroup>
 
       <PlanAchievementStackedChart
-        :title="viewKind === 'daily' ? '每日達成率' : '累計達成率趨勢'"
+        v-if="viewKind === 'daily'"
+        title="每日達成率"
         :categories="chartCategories"
         :series="chartSeries"
-        :category-axis-name="viewKind === 'daily' ? '包裝群組' : '日期'"
+        category-axis-name="Package Group"
+      />
+      <CumulativeTrendComboChart
+        v-else
+        title="累計達成率趨勢"
+        :categories="comboCategories"
+        :qty-data="comboQtyData"
+        :rate-data="comboRateData"
+        category-axis-name="日期"
       />
 
       <div class="ui-card">
@@ -262,7 +264,7 @@ const chartSeries = computed(() => {
             empty-type="filter-empty"
             data-testid="pa-report-table"
           >
-            <DataTableColumn column-key="package_lf_group" label="包裝群組" sortable />
+            <DataTableColumn column-key="package_lf_group" label="Package Group" sortable />
             <DataTableColumn column-key="d_output_qty" label="D班產出" align="right" sortable />
             <DataTableColumn column-key="n_output_qty" label="N班產出" align="right" sortable />
             <DataTableColumn column-key="daily_output_qty" label="每日產出" align="right" sortable />
@@ -282,7 +284,7 @@ const chartSeries = computed(() => {
             empty-type="filter-empty"
             data-testid="pa-report-table"
           >
-            <DataTableColumn column-key="package_lf_group" label="包裝群組" sortable />
+            <DataTableColumn column-key="package_lf_group" label="Package Group" sortable />
             <DataTableColumn column-key="cumulative_plan_qty" label="累計計畫" align="right" sortable />
             <DataTableColumn column-key="cumulative_actual_qty" label="累計產出" align="right" sortable />
             <DataTableColumn column-key="cumulative_diff_qty" label="累計差異" align="right" sortable />

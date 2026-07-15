@@ -21,6 +21,15 @@ interface Props {
   /** Minimum dropdown width (px). Dropdown grows beyond the trigger width up to
    *  this value, clamped to stay inside the viewport. Useful for long labels. */
   dropdownMinWidth?: number;
+  /**
+   * When true, at most one option can be selected: picking an option REPLACES
+   * the current selection (never toggle-add) and the dropdown closes
+   * automatically, matching a native `<select>`. Options render as radio
+   * buttons instead of checkboxes and 全選 (select-all) is hidden — it has no
+   * meaning for a single-select. Additive opt-in — defaults to false, so
+   * every existing multi-select consumer is unaffected.
+   */
+  singleSelect?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +42,7 @@ const props = withDefaults(defineProps<Props>(), {
   selectAllScope: 'visible',
   wrapOptions: false,
   dropdownMinWidth: 0,
+  singleSelect: false,
 });
 
 const emit = defineEmits<{
@@ -116,6 +126,11 @@ function isSelected(value: string) {
 }
 
 function toggleOption(value: string) {
+  if (props.singleSelect) {
+    emit('update:modelValue', [String(value)]);
+    closeDropdown();
+    return;
+  }
   const next = new Set(selectedSet.value);
   const key = String(value);
   if (next.has(key)) next.delete(key);
@@ -224,7 +239,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
             data-testid="multiselect-option"
             @click="toggleOption(option.value)"
           >
-            <input type="checkbox" :checked="isSelected(option.value)" tabindex="-1" />
+            <input :type="singleSelect ? 'radio' : 'checkbox'" :checked="isSelected(option.value)" tabindex="-1" />
             <span>{{ option.label }}</span>
           </button>
           <div v-if="displayedOptions.length === 0" class="multi-select-empty">
@@ -233,7 +248,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick, 
         </div>
 
         <div class="multi-select-actions">
-          <button type="button" class="ui-btn ui-btn--sm" @click="selectAll">全選</button>
+          <button v-if="!singleSelect" type="button" class="ui-btn ui-btn--sm" @click="selectAll">全選</button>
           <button type="button" class="ui-btn ui-btn--sm" data-testid="multiselect-clear" @click="clearAll">清除</button>
           <button type="button" class="ui-btn ui-btn--sm" data-testid="multiselect-close" @click="closeDropdown">關閉</button>
         </div>

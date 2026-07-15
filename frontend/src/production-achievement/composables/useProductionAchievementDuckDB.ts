@@ -99,6 +99,12 @@ export interface CumulativeTrendPoint {
   actual_qty: number;
   plan_qty: number | null;
   achievement_rate: number | null;
+  /** Running SUM(actual_qty) from the first day of the range through this day (inclusive). */
+  cumulative_actual_qty: number;
+  /** Running SUM(plan_qty) from the first day of the range through this day; null only when no day-to-date has a known plan. */
+  cumulative_plan_qty: number | null;
+  /** cumulative_actual_qty / cumulative_plan_qty; null when cumulative_plan_qty is null or 0. */
+  cumulative_achievement_rate: number | null;
 }
 
 export interface CumulativeViewResult {
@@ -108,6 +114,16 @@ export interface CumulativeViewResult {
 
 export interface ComputeDailyViewOptions {
   workcenterGroup: string;
+  /**
+   * The single target calendar day ('YYYY-MM-DD'), required so the rollup
+   * filters to EXACTLY this output_date (PA-03/PA-06 grouping key). Without
+   * this filter, a "today"/"yesterday" query's own Oracle fetch window
+   * (`[start_date 00:00, ...)`) also captures the tail of the PRECEDING
+   * day's overnight N shift (00:00:00-07:29:59, which PA-03 attributes back
+   * to `start_date - 1`) — that data would silently merge into the
+   * requested day's N-shift total instead of staying under its own day.
+   */
+  outputDate: string;
 }
 
 export interface ComputeCumulativeViewOptions {
@@ -399,6 +415,7 @@ export function useProductionAchievementDuckDB() {
   async function computeDailyView(options: ComputeDailyViewOptions): Promise<DailyViewRow[]> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
     const wc = sqlString(options.workcenterGroup);
+    const outputDate = sqlString(options.outputDate);
 
     const sql = `
       SELECT
@@ -423,6 +440,7 @@ export function useProductionAchievementDuckDB() {
         LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
           ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
         WHERE r.workcenter_group = ${wc}
+          AND CAST(r.output_date AS DATE) = CAST(${outputDate} AS DATE)
         GROUP BY r.package_lf_group
       ) sub
       ORDER BY package_lf_group
@@ -448,8 +466,16 @@ export function useProductionAchievementDuckDB() {
   async function computeCumulativeView(options: ComputeCumulativeViewOptions): Promise<CumulativeViewResult> {
     if (!_isRegistered || !_client) throw new Error('DuckDB not initialised');
     const wc = sqlString(options.workcenterGroup);
+    const startDate = sqlString(options.startDate);
+    const endDate = sqlString(options.endDate);
     const elapsedDays = daysBetweenInclusive(options.startDate, options.endDate);
 
+    // Date-bound to [startDate, endDate] — without this filter, the server's
+    // own Oracle fetch window (widened to capture the requested range's
+    // overnight N-shift tails, PA-03) leaves spillover rows in ROLLUP_TABLE
+    // dated just outside the requested range (e.g. a 當月 query for
+    // 2026-07-01..07-14 also carries a 2026-06-30 spillover row) that must
+    // never count toward this period's cumulative totals or trend.
     const rowsSql = `
       SELECT
         r.package_lf_group AS package_lf_group,
@@ -459,6 +485,7 @@ export function useProductionAchievementDuckDB() {
       LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
         ON r.workcenter_group = dp.workcenter_group AND r.package_lf_group = dp.package_lf_group
       WHERE r.workcenter_group = ${wc}
+        AND CAST(r.output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
       GROUP BY r.package_lf_group
       ORDER BY r.package_lf_group
     `;
@@ -484,15 +511,20 @@ export function useProductionAchievementDuckDB() {
     // ignores NULL) rather than making the whole day's rate unknown — this
     // mirrors summing only the KNOWN plans, consistent with how the detail
     // rows above already show a "—" only for THAT group's own missing plan.
+    // Only per-day actual_qty/plan_qty come from SQL; the RUNNING cumulative
+    // total is a plain JS scan below (not a SQL window function) — rows are
+    // already ORDER BY output_date, so a linear accumulation is simplest and
+    // sidesteps any engine-specific behavior around SUM(...) OVER (...).
     const trendSql = `
       SELECT
-        g.output_date AS output_date,
+        strftime(CAST(g.output_date AS DATE), '%Y-%m-%d') AS output_date,
         SUM(g.actual_output_qty) AS actual_qty,
         SUM(dp.daily_plan_qty) AS plan_qty
       FROM (
         SELECT output_date, package_lf_group, SUM(actual_output_qty) AS actual_output_qty
         FROM ${ROLLUP_TABLE}
         WHERE workcenter_group = ${wc}
+          AND CAST(output_date AS DATE) BETWEEN CAST(${startDate} AS DATE) AND CAST(${endDate} AS DATE)
         GROUP BY output_date, package_lf_group
       ) g
       LEFT JOIN ${DAILY_PLAN_MAP_TABLE} dp
@@ -501,15 +533,23 @@ export function useProductionAchievementDuckDB() {
       ORDER BY g.output_date
     `;
     const rawTrend = await _client.sendQuery(trendSql);
+    let runningActual = 0;
+    let runningPlan: number | null = null;
     const trend: CumulativeTrendPoint[] = (rawTrend as Record<string, unknown>[]).map((row) => {
       const actual = sf(row.actual_qty);
       const plan = nullableNumber(row.plan_qty);
       const rate = plan === null || plan === 0 ? null : actual / plan;
+      runningActual += actual;
+      if (plan !== null) runningPlan = (runningPlan ?? 0) + plan;
+      const cumulativeRate = runningPlan === null || runningPlan === 0 ? null : runningActual / runningPlan;
       return {
         output_date: String(row.output_date ?? ''),
         actual_qty: actual,
         plan_qty: plan,
         achievement_rate: rate,
+        cumulative_actual_qty: runningActual,
+        cumulative_plan_qty: runningPlan,
+        cumulative_achievement_rate: cumulativeRate,
       };
     });
 

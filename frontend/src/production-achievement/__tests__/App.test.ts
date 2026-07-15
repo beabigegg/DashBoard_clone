@@ -15,8 +15,8 @@
  * DuckDB is mocked at the `core/duckdb-client` + `core/duckdb-activation-policy`
  * boundary (same convention as before) so the REAL composable + App.vue
  * template run end-to-end. Only the genuinely HEAVY children (ECharts-backed
- * chart, DataTable, TargetEditPanel) are stubbed via targeted `global.stubs`
- * — SummaryCard/SummaryCardGroup stay real so their `props`/values are
+ * chart, DataTable) are stubbed via targeted `global.stubs` —
+ * SummaryCard/SummaryCardGroup stay real so their `props`/values are
  * inspectable (a blanket `shallow: true` stub renders as a childless void
  * element in this Vue Test Utils version, hiding nested SummaryCard props).
  */
@@ -86,18 +86,18 @@ async function getDuckClient() {
   };
 }
 
-/** Stub only the genuinely heavy children (ECharts chart, DataTable internals,
- *  TargetEditPanel's own DataTable) — everything else (SummaryCard, MultiSelect,
- *  ErrorBanner, AsyncQueryProgress) renders for real so props/attrs are inspectable. */
+/** Stub only the genuinely heavy children (ECharts chart, DataTable internals)
+ *  — everything else (SummaryCard, MultiSelect, ErrorBanner, AsyncQueryProgress)
+ *  renders for real so props/attrs are inspectable. */
 function mountApp() {
   return mount(App, {
     attachTo: document.body,
     global: {
       stubs: {
         PlanAchievementStackedChart: true,
+        CumulativeTrendComboChart: true,
         DataTable: true,
         DataTableColumn: true,
-        TargetEditPanel: true,
       },
     },
   });
@@ -213,16 +213,13 @@ describe('production-achievement App.vue', () => {
       .mockResolvedValueOnce([]) // rollup create
       .mockResolvedValueOnce(DAILY_ROWS); // computeDailyView SELECT
 
-    // onMounted() fires fetchFilterOptions()/fetchTargets()/runQuery() as 3
-    // independent (not sequentially-awaited) async chains — branch by URL
-    // rather than relying on their relative fetch() arrival order.
+    // onMounted() fires fetchFilterOptions()/runQuery() as 2 independent (not
+    // sequentially-awaited) async chains — branch by URL rather than relying
+    // on their relative fetch() arrival order.
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       const u = String(url);
       if (u.includes('/api/production-achievement/filter-options')) {
         return Promise.resolve(jsonResponse({ success: true, data: { shift_codes: [], workcenter_groups: ['焊接_DB'] }, meta: {} }));
-      }
-      if (u.includes('/api/production-achievement/targets')) {
-        return Promise.resolve(jsonResponse({ success: true, data: [], meta: {} }));
       }
       if (u.includes('/api/production-achievement/report')) {
         return Promise.resolve(jsonResponse(SPOOL_HIT_BODY));

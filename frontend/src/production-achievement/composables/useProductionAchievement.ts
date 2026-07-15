@@ -41,12 +41,15 @@
  *   GET /api/job/<job_id>?prefix=production-achievement            (generic poll, §1.4)
  *   POST /api/job/<job_id>/abandon  { prefix }                     (generic cancel, §1.4)
  *   GET /api/production-achievement/filter-options
- *   GET /api/production-achievement/targets?shift_code&workcenter_group
- *   PUT /api/production-achievement/targets  { shift_code, workcenter_group, target_qty }
+ *
+ * The legacy shift-keyed target-value editor (GET/PUT
+ * /api/production-achievement/targets) was removed from this page's UI —
+ * targets_map is still fetched inline with the report response and handed to
+ * DuckDB (see ReportSpoolHit/_activateAndRender below) but is no longer
+ * user-editable here.
  */
 import { computed, reactive, ref } from 'vue';
 import { apiGet, apiPost } from '../../core/api';
-import type { ApiResponse } from '../../core/types';
 import { unwrapApiData } from '../../core/unwrap-api-result';
 import { pollJobUntilComplete } from '../../shared-composables/useAsyncJobPolling';
 import { useProductionAchievementDuckDB } from './useProductionAchievementDuckDB';
@@ -62,14 +65,6 @@ import type {
 } from './useProductionAchievementDuckDB';
 
 export type ProductionAchievementMode = 'today' | 'yesterday' | 'month' | 'range';
-
-export interface ProductionAchievementTargetRow {
-  shift_code: string;
-  workcenter_group: string;
-  target_qty: number;
-  updated_at: string;
-  updated_by: string;
-}
 
 export interface FilterState {
   mode: ProductionAchievementMode;
@@ -107,42 +102,6 @@ const VALID_MODES: ProductionAchievementMode[] = ['today', 'yesterday', 'month',
 // OD-7: survives a full page navigation to /production-achievement-settings
 // and back (separate mini-app — no in-memory store can bridge that round-trip).
 const PERSIST_KEY = 'production-achievement:last-report-state';
-
-function getCsrfToken(): string {
-  return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
-}
-
-interface PutError extends Error {
-  status: number;
-  errorCode: string | null;
-}
-
-/**
- * core/api.ts's apiPost() hardcodes method: 'POST' (no PUT override hook), so
- * PUT requests use a small dedicated helper — same CSRF-header + envelope
- * pattern as the existing admin-pages/App.vue putJson() precedent.
- */
-async function apiPut<T>(url: string, payload: unknown): Promise<ApiResponse<T>> {
-  const csrf = getCsrfToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
-  if (csrf) headers['X-CSRF-Token'] = csrf;
-  const resp = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(payload) });
-  let body: ApiResponse<T> | null = null;
-  try {
-    body = await resp.json();
-  } catch {
-    // empty/non-JSON body — fall through to the status-based error below
-  }
-  if (!resp.ok || (body && body.success === false)) {
-    const message =
-      (body && !body.success ? body.error?.message : undefined) || `HTTP ${resp.status}`;
-    const err = new Error(message) as PutError;
-    err.status = resp.status;
-    err.errorCode = (body && !body.success ? body.error?.code : null) || null;
-    throw err;
-  }
-  return body as ApiResponse<T>;
-}
 
 function formatLocalDate(d: Date): string {
   const y = d.getFullYear();
@@ -221,7 +180,6 @@ export function useProductionAchievement() {
   const dailyRows = ref<DailyViewRow[]>([]);
   const cumulativeRows = ref<CumulativeViewRow[]>([]);
   const cumulativeTrend = ref<CumulativeTrendPoint[]>([]);
-  const targets = ref<ProductionAchievementTargetRow[]>([]);
   const loading = ref(false);
   const error = ref('');
   const hasQueried = ref(false);
@@ -229,13 +187,6 @@ export function useProductionAchievement() {
   const viewKind = computed<'daily' | 'cumulative'>(() =>
     filters.mode === 'today' || filters.mode === 'yesterday' ? 'daily' : 'cumulative',
   );
-
-  // Permission is not pre-checkable via a dedicated contract endpoint for a
-  // non-admin user. The edit control is shown optimistically and this flag is
-  // flipped to false the first time a PUT 403s (fail-closed, same as before).
-  const editForbidden = ref(false);
-  const editError = ref('');
-  const editSaving = ref(false);
 
   // ── Async job progress (RQ 202 path, api-contract.md §7 Type B) ──────────
   const asyncJobProgress = reactive({
@@ -308,17 +259,6 @@ export function useProductionAchievement() {
     } catch {
       // Fail-open on filter-options load: station select just shows no options
       // beyond the current default value; the report itself is unaffected.
-    }
-  }
-
-  async function fetchTargets(): Promise<void> {
-    try {
-      const res = await apiGet<ProductionAchievementTargetRow[]>('/api/production-achievement/targets');
-      if (res.success) {
-        targets.value = Array.isArray(res.data) ? res.data : [];
-      }
-    } catch {
-      targets.value = [];
     }
   }
 
@@ -462,7 +402,11 @@ export function useProductionAchievement() {
    *  DuckDB tables (no spool re-fetch) for the given mode/date-window. */
   async function _recompute(mode: ProductionAchievementMode, startDate: string, endDate: string, workcenterGroup: string): Promise<void> {
     if (mode === 'today' || mode === 'yesterday') {
-      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup });
+      // today/yesterday are always a single day (start_date === end_date,
+      // see _resolveSnapshotDates) — outputDate scopes computeDailyView to
+      // exactly that day so the preceding day's overnight N-shift tail
+      // (captured by this query's own fetch window, PA-03) never bleeds in.
+      dailyRows.value = await duckdb.computeDailyView({ workcenterGroup, outputDate: startDate });
       cumulativeRows.value = [];
       cumulativeTrend.value = [];
     } else {
@@ -557,52 +501,6 @@ export function useProductionAchievement() {
     void runQuery();
   }
 
-  async function saveTarget(payload: { shift_code: string; workcenter_group: string; target_qty: number }): Promise<boolean> {
-    editError.value = '';
-    editSaving.value = true;
-    try {
-      await apiPut<null>('/api/production-achievement/targets', payload);
-      await fetchTargets();
-      // Re-render immediately from the refreshed target list. A target-value
-      // PUT never changes the spooled report data (only PA-07's join input)
-      // -- when DuckDB is already active for this session, recompute
-      // client-side (zero Oracle/spool cost) instead of re-issuing the async report.
-      if (hasQueried.value) {
-        if (duckdb.isActive.value && _lastSnapshot) {
-          const targetsMap: TargetsMapRow[] = targets.value.map((t) => ({
-            shift_code: t.shift_code,
-            workcenter_group: t.workcenter_group,
-            target_qty: t.target_qty,
-          }));
-          await duckdb.updateTargetsMap(targetsMap);
-          await _recompute(_lastSnapshot.mode, _lastSnapshot.start_date, _lastSnapshot.end_date, _lastSnapshot.workcenter_group);
-        } else {
-          await runQuery();
-        }
-      }
-      return true;
-    } catch (err: unknown) {
-      const status = (err as { status?: number })?.status;
-      const code = (err as { errorCode?: string | null })?.errorCode;
-      if (status === 403 || code === 'FORBIDDEN') {
-        // A 403 that slips through the proactive UI (e.g. stale permission
-        // cache) is handled gracefully here: disable further edit attempts
-        // for the rest of the session rather than retrying silently.
-        editForbidden.value = true;
-        editError.value = '您沒有編輯目標值的權限';
-      } else if (status === 503) {
-        editError.value = '目標值服務暫時無法使用，請稍後再試';
-      } else if (status === 400) {
-        editError.value = err instanceof Error ? err.message : '目標值格式錯誤';
-      } else {
-        editError.value = err instanceof Error ? err.message : '儲存失敗，請稍後再試';
-      }
-      return false;
-    } finally {
-      editSaving.value = false;
-    }
-  }
-
   return {
     filters,
     filterOptions,
@@ -610,21 +508,15 @@ export function useProductionAchievement() {
     cumulativeRows,
     cumulativeTrend,
     viewKind,
-    targets,
     loading,
     error,
     hasQueried,
-    editForbidden,
-    editError,
-    editSaving,
     asyncJobProgress,
     fetchFilterOptions,
-    fetchTargets,
     runQuery,
     setMode,
     setWorkcenterGroup,
     setRangeDates,
-    saveTarget,
     cancelQuery,
   };
 }

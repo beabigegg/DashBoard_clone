@@ -100,7 +100,7 @@ function openNewRow(): void {
 
 function submitNewRow(): void {
   if (!newRow.workcenter_group || !newRow.package_lf_group) {
-    newRowError.value = '請選擇站點群組與包裝群組';
+    newRowError.value = '請選擇站點群組與 Package Group';
     return;
   }
   const message = validateQtyInput(newRow.daily_plan_qty);
@@ -146,7 +146,7 @@ const isEmpty = computed(() => !props.loading && props.rows.length === 0);
         <option v-for="group in workcenterGroupOptions" :key="group" :value="group">{{ group }}</option>
       </select>
       <select v-model="newRow.package_lf_group" class="pa-settings-panel__select" data-testid="pa-plan-new-package">
-        <option value="" disabled>包裝群組</option>
+        <option value="" disabled>Package Group</option>
         <option v-for="group in packageLfGroupOptions" :key="group" :value="group">{{ group }}</option>
       </select>
       <input
@@ -164,7 +164,7 @@ const isEmpty = computed(() => !props.loading && props.rows.length === 0);
 
     <DataTable :data="(rows as unknown as Record<string, unknown>[])" :loading="loading" empty-type="no-data">
       <DataTableColumn column-key="workcenter_group" label="站點群組" />
-      <DataTableColumn column-key="package_lf_group" label="包裝群組" />
+      <DataTableColumn column-key="package_lf_group" label="Package Group" />
       <DataTableColumn column-key="daily_plan_qty" label="每日計畫量" align="right" />
       <DataTableColumn column-key="updated_at" label="最後更新" />
       <DataTableColumn column-key="updated_by" label="更新人" />

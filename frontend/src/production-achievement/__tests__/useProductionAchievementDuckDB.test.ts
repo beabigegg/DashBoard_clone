@@ -345,7 +345,7 @@ describe('useProductionAchievementDuckDB composable', () => {
   it('computeDailyView() throws when called before activate() (state guard)', async () => {
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
-    await expect(composable.computeDailyView({ workcenterGroup: '焊接_DB' })).rejects.toThrow();
+    await expect(composable.computeDailyView({ workcenterGroup: '焊接_DB', outputDate: '2026-07-14' })).rejects.toThrow();
   });
 
   it('computeCumulativeView() throws when called before activate() (state guard)', async () => {
@@ -386,7 +386,7 @@ describe('useProductionAchievementDuckDB composable', () => {
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
     await composable.activate('url', [], [], [], [], []);
-    const rows = await composable.computeDailyView({ workcenterGroup: '焊接_DB' });
+    const rows = await composable.computeDailyView({ workcenterGroup: '焊接_DB', outputDate: '2026-07-14' });
     expect(rows).toEqual([
       {
         package_lf_group: 'SOD-123FL',
@@ -400,6 +400,12 @@ describe('useProductionAchievementDuckDB composable', () => {
     const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
     const selectSql = sqlCalls[sqlCalls.length - 1];
     expect(selectSql).toContain("'焊接_DB'");
+    // Regression: computeDailyView() must scope to exactly ONE output_date --
+    // without this filter, the query's own fetch window also captures the
+    // PRECEDING day's overnight N-shift tail (PA-03) and silently merges it
+    // into this day's N-shift total.
+    expect(selectSql).toContain('r.output_date');
+    expect(selectSql).toContain("'2026-07-14'");
   });
 
   it('computeDailyView() null/zero-rate guards mirror PA-12 (missing plan -> null, zero plan -> null, zero actual+plan -> 0.0)', async () => {
@@ -416,7 +422,7 @@ describe('useProductionAchievementDuckDB composable', () => {
     const { useProductionAchievementDuckDB } = await importComposable();
     const composable = useProductionAchievementDuckDB();
     await composable.activate('url', [], [], [], [], []);
-    const rows = await composable.computeDailyView({ workcenterGroup: '焊接_DB' });
+    const rows = await composable.computeDailyView({ workcenterGroup: '焊接_DB', outputDate: '2026-07-14' });
     expect(rows.find((r) => r.package_lf_group === 'A')!.achievement_rate).toBeNull();
     expect(rows.find((r) => r.package_lf_group === 'B')!.achievement_rate).toBeNull();
     expect(rows.find((r) => r.package_lf_group === 'C')!.achievement_rate).toBe(0);
@@ -444,6 +450,98 @@ describe('useProductionAchievementDuckDB composable', () => {
     const meanOfPercentages = (950 / 1000 + 5 / 10) / 2; // 0.95 exactly — deliberately different
     expect(result.trend[0].achievement_rate).toBeCloseTo(aggregateThenDivide, 6);
     expect(result.trend[0].achievement_rate).not.toBeCloseTo(meanOfPercentages, 3);
+  });
+
+  it('computeCumulativeView() trend query formats output_date via strftime -- a raw DuckDB DATE/TIMESTAMP crossing the worker boundary unformatted renders as an epoch-ms integer on the chart x-axis, not a date string', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([]); // per-group cumulative rows query
+    client.sendQuery.mockResolvedValueOnce([]); // per-day trend query
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-01' });
+
+    const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    const trendSql = sqlCalls[sqlCalls.length - 1];
+    expect(trendSql).toContain("strftime(CAST(g.output_date AS DATE), '%Y-%m-%d')");
+  });
+
+  it('computeCumulativeView() bounds BOTH the per-group rows query and the trend query to [startDate, endDate] -- regression for 當月/自訂區間 including a spillover day (e.g. a 2026-07-01..07-14 month query must never include a 2026-06-30 row from the server fetch window\'s own N-shift-tail buffer, PA-03)', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([]); // per-group cumulative rows query
+    client.sendQuery.mockResolvedValueOnce([]); // per-day trend query
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-14' });
+
+    const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    const rowsSql = sqlCalls[sqlCalls.length - 2];
+    const trendSql = sqlCalls[sqlCalls.length - 1];
+    for (const sql of [rowsSql, trendSql]) {
+      expect(sql).toContain("BETWEEN CAST('2026-07-01' AS DATE) AND CAST('2026-07-14' AS DATE)");
+    }
+  });
+
+  it('computeCumulativeView() trend rows carry a running cumulative_actual_qty/cumulative_plan_qty/cumulative_achievement_rate for the combo chart (bar = daily actual_qty, line = running cumulative rate) -- accumulated in JS, NOT a SQL window function (engine-independent, avoids any SUM(...) OVER (...) discrepancy)', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([]); // per-group cumulative rows query
+    // Raw SQL only returns PER-DAY actual_qty/plan_qty -- no running totals.
+    client.sendQuery.mockResolvedValueOnce([
+      { output_date: '2026-07-01', actual_qty: 100, plan_qty: 120 },
+      { output_date: '2026-07-02', actual_qty: 150, plan_qty: 120 },
+      { output_date: '2026-07-03', actual_qty: 90, plan_qty: null },
+    ]);
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    const result = await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-03' });
+
+    expect(result.trend[0].cumulative_actual_qty).toBe(100);
+    expect(result.trend[0].cumulative_plan_qty).toBe(120);
+    expect(result.trend[0].cumulative_achievement_rate).toBeCloseTo(100 / 120, 6);
+    expect(result.trend[1].cumulative_actual_qty).toBe(250);
+    expect(result.trend[1].cumulative_achievement_rate).toBeCloseTo(250 / 240, 6);
+    // Day 3 has no NEW plan of its own (plan_qty null) but the running total
+    // carries forward from day 2 -- never resets to null/0 just because one
+    // day contributed nothing new.
+    expect(result.trend[2].cumulative_plan_qty).toBe(240);
+    expect(result.trend[2].cumulative_achievement_rate).toBeCloseTo(340 / 240, 6);
+
+    const sqlCalls = client.sendQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    const trendSql = sqlCalls[sqlCalls.length - 1];
+    expect(trendSql).not.toContain('OVER (');
+  });
+
+  it('computeCumulativeView() running cumulative_plan_qty stays null until the FIRST day with a known plan, then never resets to null again', async () => {
+    const client = await mockedClient();
+    client.sendQuery.mockResolvedValue([]);
+    for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
+    client.sendQuery.mockResolvedValueOnce([]); // per-group cumulative rows query
+    client.sendQuery.mockResolvedValueOnce([
+      { output_date: '2026-07-01', actual_qty: 50, plan_qty: null },
+      { output_date: '2026-07-02', actual_qty: 60, plan_qty: 100 },
+    ]);
+
+    const { useProductionAchievementDuckDB } = await importComposable();
+    const composable = useProductionAchievementDuckDB();
+    await composable.activate('url', [], [], [], [], []);
+    const result = await composable.computeCumulativeView({ workcenterGroup: '焊接_DB', startDate: '2026-07-01', endDate: '2026-07-02' });
+
+    expect(result.trend[0].cumulative_plan_qty).toBeNull();
+    expect(result.trend[0].cumulative_achievement_rate).toBeNull();
+    expect(result.trend[1].cumulative_actual_qty).toBe(110);
+    expect(result.trend[1].cumulative_plan_qty).toBe(100);
+    expect(result.trend[1].cumulative_achievement_rate).toBeCloseTo(110 / 100, 6);
   });
 
   it('computeCumulativeView() scales daily_plan_qty by elapsed_days for 累計計畫', async () => {
@@ -487,6 +585,6 @@ describe('useProductionAchievementDuckDB composable', () => {
     composable.deactivate();
     expect(composable.isActive.value).toBe(false);
     expect(client.destroy).toHaveBeenCalled();
-    await expect(composable.computeDailyView({ workcenterGroup: 'x' })).rejects.toThrow();
+    await expect(composable.computeDailyView({ workcenterGroup: 'x', outputDate: '2026-07-14' })).rejects.toThrow();
   });
 });

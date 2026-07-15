@@ -232,6 +232,14 @@ _REDIS_PAYLOAD_KEYS = (
     'package_lf_values',
 )
 
+# Bump to invalidate L2 entries written before a payload-key change (mirrors
+# container_filter_cache.py's SCHEMA_VERSION/PHF-04 idiom). v2 adds
+# package_lf_values (production-achievement-overhaul) -- without this guard,
+# a pre-v2 Redis blob satisfies the L2 hit path forever (until its TTL
+# expires) while silently never populating package_lf_values, since a plain
+# dict.get() on a key the old payload never had just returns None.
+_SCHEMA_VERSION = 2
+
 
 def _write_to_redis(data: dict) -> None:
     """Serialize cache payload to Redis with TTL.
@@ -246,12 +254,13 @@ def _write_to_redis(data: dict) -> None:
         if client is None:
             return
         payload = {k: data[k] for k in _REDIS_PAYLOAD_KEYS if k in data}
+        payload['schema_version'] = _SCHEMA_VERSION
         client.set(
             get_key(_REDIS_KEY),
             json.dumps(payload, default=str),
             ex=_REDIS_TTL_SECONDS,
         )
-        logger.debug("Filter cache written to Redis (TTL=%ds)", _REDIS_TTL_SECONDS)
+        logger.debug("Filter cache written to Redis (TTL=%ds, schema v%d)", _REDIS_TTL_SECONDS, _SCHEMA_VERSION)
     except Exception as exc:
         logger.warning("Failed to write filter cache to Redis: %s", exc)
 
@@ -272,6 +281,13 @@ def _read_from_redis() -> Optional[dict]:
         if raw is None:
             return None
         data = json.loads(raw)
+        if data.get('schema_version') != _SCHEMA_VERSION:
+            logger.info(
+                "Filter cache Redis payload schema_version=%r mismatch (expected %d) — "
+                "forcing rebuild",
+                data.get('schema_version'), _SCHEMA_VERSION,
+            )
+            return None
         logger.debug("Filter cache restored from Redis")
         return data
     except Exception as exc:
@@ -360,11 +376,12 @@ def _load_cache() -> bool:
                 _CACHE['is_loading'] = False
             logger.info(
                 "Filter cache populated from Redis: %d groups, %d workcenters, "
-                "%d specs, %d spec-wc mappings",
+                "%d specs, %d spec-wc mappings, %d package_lf values",
                 len(_CACHE.get('workcenter_groups') or []),
                 len(_CACHE.get('workcenter_mapping') or {}),
                 len(_CACHE.get('spec_order_mapping') or {}),
                 len(_CACHE.get('spec_workcenter_mapping') or {}),
+                len(_CACHE.get('package_lf_values') or []),
             )
             return True
 

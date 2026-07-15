@@ -197,3 +197,53 @@ describe('MultiSelect — dropdown-close emit (fix-prod-history-multiselect-filt
     expect(wrapper.emitted('dropdown-close')).toBeTruthy();
   });
 });
+
+describe('MultiSelect — singleSelect prop (production-achievement 站點群組 field feedback)', () => {
+  afterEach(() => {
+    _wrapper?.unmount();
+    _wrapper = null;
+    document.body.innerHTML = '';
+  });
+
+  it('defaults to false — existing multi-select consumers see no behavioral change (checkbox inputs, no auto-close)', async () => {
+    const wrapper = (_wrapper = mountSelect({ modelValue: [] }));
+    await wrapper.find('.multi-select-trigger').trigger('click');
+    await nextTick();
+    expect(getOptions()[0].querySelector('input')?.getAttribute('type')).toBe('checkbox');
+  });
+
+  it('picking an option REPLACES the selection (never toggle-add) and closes the dropdown immediately', async () => {
+    const wrapper = (_wrapper = mountSelect({ modelValue: ['Alpha'], singleSelect: true }));
+    await wrapper.find('.multi-select-trigger').trigger('click');
+    await nextTick();
+    expect(getDropdown()).not.toBeNull();
+
+    const options = getOptions();
+    options[1].click(); // Beta
+    await nextTick();
+
+    const updateEmits = wrapper.emitted('update:modelValue') as string[][][] | undefined;
+    expect(updateEmits).toBeTruthy();
+    expect(updateEmits![0][0]).toEqual(['Beta']); // replaced, not ['Alpha', 'Beta']
+
+    await wrapper.setProps({ modelValue: ['Beta'] });
+    await nextTick();
+    // The dropdown auto-closed after the pick — no lingering multi-select
+    // affordance where a user could keep checking more boxes.
+    expect(getDropdown()).toBeNull();
+  });
+
+  it('renders radio inputs instead of checkboxes, and hides 全選 (select-all has no meaning for a single-select)', async () => {
+    const wrapper = (_wrapper = mountSelect({ modelValue: [], singleSelect: true }));
+    await wrapper.find('.multi-select-trigger').trigger('click');
+    await nextTick();
+
+    const options = getOptions();
+    options.forEach((opt) => {
+      expect(opt.querySelector('input')?.getAttribute('type')).toBe('radio');
+    });
+
+    const actionLabels = Array.from(document.querySelectorAll('.multi-select-actions button')).map((b) => b.textContent?.trim());
+    expect(actionLabels).not.toContain('全選');
+  });
+});

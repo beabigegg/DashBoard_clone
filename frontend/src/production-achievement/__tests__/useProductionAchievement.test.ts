@@ -97,7 +97,19 @@ const EXPECTED_CUMULATIVE_ROW = {
   cumulative_achievement_rate: 1.0,
 };
 
-const TREND_POINT = { output_date: '2026-07-01', actual_qty: 300, plan_qty: 300, achievement_rate: 1.0 };
+// Raw shape returned by the mocked DuckDB trend SQL (client.sendQuery row) --
+// includes the window-function running totals the real query now computes.
+const RAW_TREND_ROW = { output_date: '2026-07-01', actual_qty: 300, plan_qty: 300, cumulative_actual_qty: 300, cumulative_plan_qty: 300 };
+// Fully mapped CumulativeTrendPoint the composable derives from RAW_TREND_ROW.
+const TREND_POINT = {
+  output_date: '2026-07-01',
+  actual_qty: 300,
+  plan_qty: 300,
+  achievement_rate: 1.0,
+  cumulative_actual_qty: 300,
+  cumulative_plan_qty: 300,
+  cumulative_achievement_rate: 1.0,
+};
 
 describe('resolveMonthPeriod (PA-13 pure function)', () => {
   it('1st-of-month reference date resolves to the FULL previous calendar month', () => {
@@ -177,7 +189,7 @@ describe('useProductionAchievement — runQuery mode branching + auto-run + asyn
     client.sendQuery.mockResolvedValue([]);
     for (let i = 0; i < 7; i++) client.sendQuery.mockResolvedValueOnce([]);
     client.sendQuery.mockResolvedValueOnce([RAW_CUMULATIVE_ROW]); // rows query
-    client.sendQuery.mockResolvedValueOnce([TREND_POINT]); // trend query
+    client.sendQuery.mockResolvedValueOnce([RAW_TREND_ROW]); // trend query
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(SPOOL_HIT_BODY));
 

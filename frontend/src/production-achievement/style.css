@@ -14,6 +14,7 @@
   --pa-shift-n: theme('colors.token.h7c3aed');
   --pa-plan-line: theme('colors.token.hef4444');
   --pa-cumulative-rate: theme('colors.token.h16a34a');
+  --pa-daily-qty-bar: theme('colors.token.h64748b');
 }
 
 .theme-production-achievement .pa-app__filter-panel {

@@ -297,3 +297,56 @@ class TestPackageLfValuesCache:
         break that test."""
         mock_read.side_effect = RuntimeError("Oracle down")
         assert fc._load_package_lf_values() == []
+
+    def test_read_from_redis_rejects_pre_v2_payload_missing_package_lf_values(self):
+        """A Redis blob written before package_lf_values existed (no
+        schema_version, or a stale one) must be treated as a miss -- not
+        silently accepted with package_lf_values defaulting to None/[] for
+        the rest of that TTL window. Mirrors container_filter_cache.py's
+        SCHEMA_VERSION/PHF-04 guard."""
+        import json as _json
+
+        legacy_payload = _json.dumps({
+            'workcenter_groups': [{"name": "DB", "sequence": 1}],
+            'workcenter_mapping': {},
+            'workcenter_to_short': {},
+            'spec_order_mapping': {},
+            'spec_workcenter_mapping': {},
+            # no 'package_lf_values', no 'schema_version' -- pre-overhaul shape
+        })
+        mock_client = type('MockRedis', (), {'get': lambda self, key: legacy_payload})()
+
+        with patch.object(fc, 'REDIS_ENABLED', True), \
+             patch.object(fc, 'get_redis_client', return_value=mock_client):
+            result = fc._read_from_redis()
+
+        assert result is None
+
+    def test_write_then_read_from_redis_round_trips_current_schema(self):
+        """A payload written by the current _write_to_redis() must be
+        accepted by _read_from_redis() (schema_version round-trips)."""
+        import json as _json
+
+        store = {}
+        mock_client = type('MockRedis', (), {
+            'get': lambda self, key: store.get(key),
+            'set': lambda self, key, value, ex=None: store.__setitem__(key, value),
+        })()
+
+        data = {
+            'workcenter_groups': [],
+            'workcenter_mapping': {},
+            'workcenter_to_short': {},
+            'spec_order_mapping': {},
+            'spec_workcenter_mapping': {},
+            'package_lf_values': ["SOT23-5L"],
+        }
+
+        with patch.object(fc, 'REDIS_ENABLED', True), \
+             patch.object(fc, 'get_redis_client', return_value=mock_client), \
+             patch.object(fc, 'get_key', side_effect=lambda k: k):
+            fc._write_to_redis(data)
+            result = fc._read_from_redis()
+
+        assert result is not None
+        assert result['package_lf_values'] == ["SOT23-5L"]
