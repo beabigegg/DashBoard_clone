@@ -59,6 +59,26 @@ class TestPA05PredicateSQL:
     def test_pa05_predicate_each_specname_processtype_pairing(self, specname_or_processtype):
         assert specname_or_processtype in PA05_PREDICATE_SQL
 
+    @pytest.mark.parametrize(
+        "specid",
+        [
+            "48812c8000025fd2",
+            "48812c8000025fd4",
+            "48812c8000000025",
+            "48812c8000000026",
+            "48812c8000000027",
+            "48812c8000039e15",
+        ],
+    )
+    def test_pa05_predicate_includes_each_chengxing_specid(self, specid):
+        """成型 (molding) branch, PA-05 extension -- keyed on SPECID, not
+        SPECNAME (SPECID lives directly on DW_MES_LOTWIPHISTORY)."""
+        assert specid in PA05_PREDICATE_SQL
+
+    def test_pa05_predicate_chengxing_branch_requires_nonzero_trackoutqty(self):
+        assert "WC.SPECID IN" in PA05_PREDICATE_SQL
+        assert "Trackoutqty<>0" in PA05_PREDICATE_SQL
+
 
 class TestGroupingAndWorkcenterGroupResolution:
     @patch("mes_dashboard.services.production_achievement_service.get_spec_workcenter_mapping")

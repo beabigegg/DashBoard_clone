@@ -21,6 +21,8 @@
 --
 -- PA-05 effective-output predicate (business-rules.md) is preserved verbatim
 -- below — every SPECNAME/processtypename/WORKFLOWNAME branch, not simplified.
+-- Extended 2026-07-15 (PA-05a) with a 成型 (molding) branch keyed on SPECID
+-- instead of SPECNAME -- see that branch's own inline comment.
 --
 -- Parameters (bound via oracledb named params):
 --   :start_date     - YYYY-MM-DD (inclusive)
@@ -163,6 +165,14 @@ WHERE weh.TRACKOUTTIMESTAMP >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
     OR (weh.SPECNAME IN ('1DB') AND weh.processtypename IN ('2DB_DB'))
     OR (weh.SPECNAME IN ('DBCB') AND weh.processtypename IN ('DBCB_CB'))
     OR (weh.SPECNAME IN ('2DBCBRO','1DBCBRO','CBRO') AND weh.processtypename IN ('CBA_RO'))
+    -- 成型 (molding) station qualifying predicate (PA-05 extension, 2026-07-15).
+    -- Keyed on SPECID (not SPECNAME) per the source report's own 成型 sheet
+    -- query -- SPECID lives directly on DW_MES_LOTWIPHISTORY (same table,
+    -- adjacent column to SPECNAME; no join needed, confirmed against
+    -- data/table_schema_info.json). No WORKFLOWNAME/processtypename
+    -- dependency, unlike the 焊接 branches above. TRACKOUTQTY<>0 is a no-op
+    -- for SUM(TRACKOUTQTY) but kept verbatim for source parity.
+    OR (weh.SPECID IN ('48812c8000025fd2','48812c8000025fd4','48812c8000000025','48812c8000000026','48812c8000000027','48812c8000039e15') AND weh.TRACKOUTQTY <> 0)
   )
 GROUP BY
     CASE

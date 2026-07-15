@@ -50,7 +50,9 @@ PA05_PREDICATE_SQL = (
     "OR (WC.SPECNAME IN ('2DB') AND weh.processtypename IN ('2DB_DB2')) "
     "OR (WC.SPECNAME IN ('1DB') AND weh.processtypename IN ('2DB_DB')) "
     "OR (WC.SPECNAME IN ('DBCB') AND weh.processtypename IN ('DBCB_CB')) "
-    "OR (WC.SPECNAME IN ('2DBCBRO','1DBCBRO','CBRO') AND weh.processtypename IN ('CBA_RO'))"
+    "OR (WC.SPECNAME IN ('2DBCBRO','1DBCBRO','CBRO') AND weh.processtypename IN ('CBA_RO')) "
+    "OR (WC.SPECID IN ('48812c8000025fd2','48812c8000025fd4','48812c8000000025','48812c8000000026',"
+    "'48812c8000000027','48812c8000039e15') AND weh.Trackoutqty<>0)"
 )
 
 _TWO_SHIFT_HIST_START = "20191231"  # exclusive lower edge of the historical window

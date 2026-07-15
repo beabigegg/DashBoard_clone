@@ -12,6 +12,10 @@ a corresponding entry below.
 ### Added
 - daily-plan-excel-import: Two new additive endpoints on the existing `/api/production-achievement/daily-plans` family: `POST .../import/preview` (multipart `file` upload, parses a PJMES052-生產達成率.xlsx report and categorizes each row as new/update/unchanged/invalid_workcenter/invalid_package/invalid_qty against live legal-value sets and the current `production_achievement_daily_plans` table, writes nothing) and `POST .../import/confirm` (JSON `{rows}`, re-validates every row server-side — never trusts the client's preview selection — and bulk-upserts in a single transaction, all-or-nothing). Both gated by the existing `can_edit_targets` permission verbatim. New schemas: `ProductionAchievementDailyPlanImportRow`, `ProductionAchievementDailyPlanImportMissingRow`, `ProductionAchievementDailyPlanImportSummary`, `ProductionAchievementDailyPlanImportPreviewData`, `ProductionAchievementDailyPlanImportPreviewResponse`, `ProductionAchievementDailyPlanImportConfirmData`, `ProductionAchievementDailyPlanImportConfirmResponse`. See business-rules.md PA-16.
 
+## [business 1.49.0] — 2026-07-15
+### Added
+- production-achievement-chengxing-output: Extended PA-05 (effective-output qualifying predicate) with a new 成型 (molding) branch (PA-05a), sourced verbatim from that station's own report query. Unlike every existing 焊接 branch, it is keyed on `SPECID` (not `SPECNAME`, no join required — `SPECID` lives directly on `DW_MES_LOTWIPHISTORY`) and has no `WORKFLOWNAME`/`processtypename` dependency. Only 成型 is covered; the other 8 non-焊接 `workcenter_group`s remain target/plan-setting-only with no actual-output predicate.
+
 ## [business 1.48.0] — 2026-07-15
 ### Added
 - daily-plan-excel-import: Added PA-16 (每日計畫 Excel 匯入 — PJMES052-生產達成率.xlsx fixed-layout parsing, 4-way row categorization, orphan-prevention via the PA-09/PA-10 legal-value sets, missing-from-file rows left unchanged, all-or-nothing confirm transaction). Cross-references PA-09/PA-10/PA-11/PA-12.
