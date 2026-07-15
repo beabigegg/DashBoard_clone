@@ -182,7 +182,9 @@ class DowntimeJob(BaseChunkedDuckDBJob):
     namespace = "downtime"
     chunk_strategy = ChunkStrategy.SINGLE
     requires_cross_chunk_reduction = True
-    max_parallel = 3
+    # No explicit max_parallel override: SINGLE strategy always yields exactly
+    # one chunk, so effective concurrency is always 1 regardless of the base
+    # class default — this line is structurally inert for this worker.
 
     def __init__(self, job_id: str, params: dict) -> None:
         super().__init__(job_id)

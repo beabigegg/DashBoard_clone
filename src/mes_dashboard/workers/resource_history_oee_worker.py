@@ -71,7 +71,6 @@ class ResourceHistoryOeeJob(BaseChunkedDuckDBJob):
     namespace = "resource_oee"
     chunk_strategy = ChunkStrategy.TIME
     requires_cross_chunk_reduction = True
-    max_parallel = 3
 
     def __init__(self, job_id: str, params: dict) -> None:
         super().__init__(job_id)

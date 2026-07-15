@@ -596,7 +596,6 @@ class EapAlarmJob(BaseChunkedDuckDBJob):
     namespace = "eap_alarm"
     chunk_strategy = ChunkStrategy.TIME
     requires_cross_chunk_reduction = False
-    max_parallel = 3
 
     def __init__(self, job_id: str, params: dict) -> None:
         super().__init__(job_id)

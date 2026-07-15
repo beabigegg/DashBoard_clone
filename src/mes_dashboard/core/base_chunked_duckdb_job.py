@@ -94,7 +94,18 @@ class BaseChunkedDuckDBJob(ABC):
 
     # Subclass may override:
     requires_cross_chunk_reduction: bool = False
-    max_parallel: int = 3
+    # Chunk fan-out concurrency, shared by every chunked worker unless a
+    # subclass overrides it. Most chunked Oracle queries in this codebase pay
+    # a largely fixed per-invocation cost that does not shrink with a
+    # narrower date-range chunk (measured live against Oracle: 1/4/15-day
+    # windows cost ~the same wall-clock per query). That makes a low
+    # max_parallel actively pathological for wide date ranges — chunking
+    # multiplies the fixed cost by the chunk count, and only concurrency
+    # hides it. Tune via CHUNKED_JOB_MAX_PARALLEL; raising it further
+    # requires ORACLE_ARROW_POOL_MAX (oracle_arrow_reader.py) to stay >= this
+    # value, since each worker process draws chunk connections from its own
+    # OracleArrowReader pool.
+    max_parallel: int = int(os.environ.get("CHUNKED_JOB_MAX_PARALLEL", "8"))
 
     # Class-level writer lock: serializes DuckDB writes across threads.
     _writer_lock: threading.Lock = threading.Lock()

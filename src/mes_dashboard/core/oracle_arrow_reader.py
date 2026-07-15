@@ -60,8 +60,13 @@ class OracleArrowReader:
     This prevents pre-fork pool creation under gunicorn ``preload_app=True``
     (ADR-0004).
 
-    Pool sizing: min=2, max=15 (3 jobs × 3 parallel chunks + headroom,
-    per §4.2 of query-dataflow-unification.md).
+    Pool sizing: env-configurable via ORACLE_ARROW_POOL_MIN/_MAX/_INCREMENT
+    (default min=2, max=20, increment=2). This pool is per worker OS process
+    (one process per RQ queue), so max bounds concurrent Oracle connections
+    for whichever single chunked job that process is currently running — it
+    must stay >= BaseChunkedDuckDBJob's max_parallel (CHUNKED_JOB_MAX_PARALLEL,
+    base_chunked_duckdb_job.py) or chunk fan-out will block waiting on the
+    pool instead of actually running chunks concurrently.
     """
 
     _pool: "oracledb.SessionPool | None" = None  # class-level, per-worker
@@ -81,8 +86,14 @@ class OracleArrowReader:
         password = os.environ.get("DB_PASSWORD", "")
         dsn = f"{host}:{port}/{service}"
 
+        pool_min = int(os.environ.get("ORACLE_ARROW_POOL_MIN", "2"))
+        pool_max = int(os.environ.get("ORACLE_ARROW_POOL_MAX", "20"))
+        pool_increment = int(os.environ.get("ORACLE_ARROW_POOL_INCREMENT", "2"))
+
         logger.info(
-            "OracleArrowReader: initializing pool (min=2, max=15) for DSN=%s user=%s",
+            "OracleArrowReader: initializing pool (min=%d, max=%d) for DSN=%s user=%s",
+            pool_min,
+            pool_max,
             f"{host}:{port}/<service>",
             user,
         )
@@ -90,9 +101,9 @@ class OracleArrowReader:
             user=user,
             password=password,
             dsn=dsn,
-            min=2,
-            max=15,
-            increment=1,
+            min=pool_min,
+            max=pool_max,
+            increment=pool_increment,
         )
 
     def chunk_iter(

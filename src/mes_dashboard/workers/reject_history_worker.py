@@ -59,7 +59,6 @@ class RejectHistoryJob(BaseChunkedDuckDBJob):
     namespace = "reject_dataset"
     chunk_strategy = ChunkStrategy.TIME
     requires_cross_chunk_reduction = True
-    max_parallel = 1  # Oracle concurrent-connection conservative
 
     def __init__(self, job_id: str, params: dict) -> None:
         super().__init__(job_id)
