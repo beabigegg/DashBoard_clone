@@ -59,6 +59,24 @@ def _safe_value(val):
     return val
 
 
+def _format_hold_time(val) -> Optional[str]:
+    """Format CURRENTHOLDTIME as a string; None when the lot is not on hold."""
+    if val is None or pd.isna(val):
+        return None
+    return str(val)
+
+
+def _compute_hold_duration_hours(hold_time, sys_date) -> Optional[float]:
+    """Hours elapsed since CURRENTHOLDTIME, relative to the view's SYS_DATE snapshot."""
+    if hold_time is None or sys_date is None or pd.isna(hold_time) or pd.isna(sys_date):
+        return None
+    try:
+        delta = pd.Timestamp(sys_date) - pd.Timestamp(hold_time)
+        return round(delta.total_seconds() / 3600.0, 2)
+    except Exception:
+        return None
+
+
 def _build_base_conditions_builder(
     include_dummy: bool = False,
     workorder: Optional[str] = None,
@@ -3555,6 +3573,10 @@ def get_hold_detail_lots(
                     'dept': _safe_value(row.get('DEPTNAME')),
                     'holdComment': _safe_value(row.get('COMMENT_HOLD')),
                     'futureHoldComment': _safe_value(row.get('COMMENT_FUTURE')),
+                    'holdTime': _format_hold_time(row.get('CURRENTHOLDTIME')),
+                    'holdDurationHours': _compute_hold_duration_hours(
+                        row.get('CURRENTHOLDTIME'), row.get('SYS_DATE')
+                    ),
                 })
 
             total_pages = (total + page_size - 1) // page_size if total > 0 else 1
@@ -3704,6 +3726,8 @@ def _get_hold_detail_lots_from_oracle(
                     DEPTNAME AS DEPT,
                     COMMENT_HOLD AS HOLD_COMMENT,
                     COMMENT_FUTURE AS FUTURE_HOLD_COMMENT,
+                    CURRENTHOLDTIME AS HOLD_TIME,
+                    ROUND((SYS_DATE - CURRENTHOLDTIME) * 24, 2) AS HOLD_DURATION_HOURS,
                     ROW_NUMBER() OVER (ORDER BY AGEBYDAYS DESC, LOTID) AS RN
                 FROM {WIP_VIEW}
                 {where_clause}
@@ -3730,6 +3754,8 @@ def _get_hold_detail_lots_from_oracle(
                     'dept': _safe_value(row['DEPT']),
                     'holdComment': _safe_value(row['HOLD_COMMENT']),
                     'futureHoldComment': _safe_value(row['FUTURE_HOLD_COMMENT']),
+                    'holdTime': _format_hold_time(row['HOLD_TIME']),
+                    'holdDurationHours': _safe_value(row['HOLD_DURATION_HOURS']),
                 })
 
         total_pages = (total + page_size - 1) // page_size if total > 0 else 1

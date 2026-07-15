@@ -4,7 +4,7 @@
  * Mirrors the pattern used in hold-history/App.vue (_buildCsv / _downloadCsv).
  *
  * Acceptance criteria:
- *   AC-3: 13 columns in display order
+ *   AC-3: columns in display order (see CSV_HEADERS/CSV_KEYS)
  *   AC-4: UTF-8 BOM prefix (﻿)
  *   AC-5: RFC 4180 escaping; null/missing → empty string; empty → header-only
  */
@@ -22,6 +22,8 @@ const CSV_HEADERS: string[] = [
   'Hold Reason',
   'Spec',
   'Age',
+  'Hold Time',
+  'Hold Duration (Hours)',
   'Hold By',
   'Dept',
   'Hold Comment',
@@ -39,6 +41,8 @@ const CSV_KEYS: string[] = [
   'holdReason',
   'spec',
   'age',
+  'holdTime',
+  'holdDurationHours',
   'holdBy',
   'dept',
   'holdComment',

@@ -200,6 +200,24 @@ function formatAge(value: unknown): string {
   return `${value}天`;
 }
 
+function formatHoldTime(value: unknown): string {
+  if (value === null || value === undefined || value === '-') return '-';
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/);
+  return match ? `${match[1]} ${match[2]}` : String(value);
+}
+
+function formatHoldDuration(value: unknown): string {
+  if (value === null || value === undefined || value === '-') return '-';
+  const totalHours = Number(value);
+  if (!Number.isFinite(totalHours) || totalHours < 0) return '-';
+  const days = Math.floor(totalHours / 24);
+  const hours = Math.floor(totalHours % 24);
+  if (days > 0) return hours > 0 ? `${days}天${hours}小時` : `${days}天`;
+  if (hours > 0) return `${hours}小時`;
+  const minutes = Math.round((totalHours * 60) % 60);
+  return minutes > 0 ? `${minutes}分` : '<1分';
+}
+
 function handleLotPageChange(nextPage: number) {
   if (paginationLoading.value) return;
   if (nextPage < 1 || nextPage > Number(pagination.value?.totalPages || 1)) return;
@@ -1028,6 +1046,8 @@ onBeforeUnmount(() => {
             <DataTableColumn column-key="holdReason" label="Hold Reason" sortable />
             <DataTableColumn column-key="spec" label="Spec" sortable />
             <DataTableColumn column-key="age" label="Age" sortable align="right" />
+            <DataTableColumn column-key="holdTime" label="Hold Time" sortable />
+            <DataTableColumn column-key="holdDurationHours" label="Hold Duration" sortable align="right" />
             <DataTableColumn column-key="holdBy" label="Hold By" sortable />
             <DataTableColumn column-key="dept" label="Dept" sortable />
             <DataTableColumn column-key="holdComment" label="Hold Comment" sortable />
@@ -1035,6 +1055,8 @@ onBeforeUnmount(() => {
             <template #cell="{ columnKey, row, value }">
               <template v-if="columnKey === 'qty'">{{ formatNumber(value) }}</template>
               <template v-else-if="columnKey === 'age'">{{ formatAge(value) }}</template>
+              <template v-else-if="columnKey === 'holdTime'">{{ formatHoldTime(value) }}</template>
+              <template v-else-if="columnKey === 'holdDurationHours'">{{ formatHoldDuration(value) }}</template>
               <template v-else>{{ value || '-' }}</template>
             </template>
           </DataTable>

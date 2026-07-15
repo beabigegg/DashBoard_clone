@@ -47,6 +47,34 @@ function formatAge(value: unknown): string {
   return `${value}天`;
 }
 
+function formatHoldTime(value: unknown): string {
+  if (value === null || value === undefined || value === '-') {
+    return '-';
+  }
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/);
+  return match ? `${match[1]} ${match[2]}` : String(value);
+}
+
+function formatHoldDuration(value: unknown): string {
+  if (value === null || value === undefined || value === '-') {
+    return '-';
+  }
+  const totalHours = Number(value);
+  if (!Number.isFinite(totalHours) || totalHours < 0) {
+    return '-';
+  }
+  const days = Math.floor(totalHours / 24);
+  const hours = Math.floor(totalHours % 24);
+  if (days > 0) {
+    return hours > 0 ? `${days}天${hours}小時` : `${days}天`;
+  }
+  if (hours > 0) {
+    return `${hours}小時`;
+  }
+  const minutes = Math.round((totalHours * 60) % 60);
+  return minutes > 0 ? `${minutes}分` : '<1分';
+}
+
 const tableInfo = computed(() => {
   const page = Number(props.pagination?.page || 1);
   const perPage = Number(props.pagination?.perPage || 20);
@@ -92,6 +120,8 @@ const pageInfo = computed(() => {
             <th class="sortable-th" @click="toggleSort('holdReason')" :aria-sort="ariaSortFor('holdReason')"><span class="th-sort-inner">Hold Reason <component :is="sortIconFor('holdReason')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdReason' }" :size="13" /></span></th>
             <th class="sortable-th" @click="toggleSort('spec')" :aria-sort="ariaSortFor('spec')"><span class="th-sort-inner">Spec <component :is="sortIconFor('spec')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'spec' }" :size="13" /></span></th>
             <th class="sortable-th" @click="toggleSort('age')" :aria-sort="ariaSortFor('age')"><span class="th-sort-inner">Age <component :is="sortIconFor('age')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'age' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('holdTime')" :aria-sort="ariaSortFor('holdTime')"><span class="th-sort-inner">Hold Time <component :is="sortIconFor('holdTime')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdTime' }" :size="13" /></span></th>
+            <th class="sortable-th" @click="toggleSort('holdDurationHours')" :aria-sort="ariaSortFor('holdDurationHours')"><span class="th-sort-inner">Hold Duration <component :is="sortIconFor('holdDurationHours')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdDurationHours' }" :size="13" /></span></th>
             <th class="sortable-th" @click="toggleSort('holdBy')" :aria-sort="ariaSortFor('holdBy')"><span class="th-sort-inner">Hold By <component :is="sortIconFor('holdBy')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdBy' }" :size="13" /></span></th>
             <th class="sortable-th" @click="toggleSort('dept')" :aria-sort="ariaSortFor('dept')"><span class="th-sort-inner">Dept <component :is="sortIconFor('dept')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'dept' }" :size="13" /></span></th>
             <th class="sortable-th" @click="toggleSort('holdComment')" :aria-sort="ariaSortFor('holdComment')"><span class="th-sort-inner">Hold Comment <component :is="sortIconFor('holdComment')" class="sort-icon" :class="{ 'sort-icon--active': sortKey === 'holdComment' }" :size="13" /></span></th>
@@ -100,13 +130,13 @@ const pageInfo = computed(() => {
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="13" class="placeholder">Loading...</td>
+            <td colspan="15" class="placeholder">Loading...</td>
           </tr>
           <tr v-else-if="errorMessage">
-            <td colspan="13" class="placeholder">{{ errorMessage }}</td>
+            <td colspan="15" class="placeholder">{{ errorMessage }}</td>
           </tr>
           <tr v-else-if="sortedData.length === 0">
-            <td colspan="13" class="placeholder">No data</td>
+            <td colspan="15" class="placeholder">No data</td>
           </tr>
           <tr v-for="lot in sortedData" v-else :key="lot.lotId as string">
             <td>{{ lot.lotId || '-' }}</td>
@@ -118,6 +148,8 @@ const pageInfo = computed(() => {
             <td>{{ lot.holdReason || '-' }}</td>
             <td>{{ lot.spec || '-' }}</td>
             <td>{{ formatAge(lot.age) }}</td>
+            <td>{{ formatHoldTime(lot.holdTime) }}</td>
+            <td>{{ formatHoldDuration(lot.holdDurationHours) }}</td>
             <td>{{ lot.holdBy || '-' }}</td>
             <td>{{ lot.dept || '-' }}</td>
             <td>{{ lot.holdComment || '-' }}</td>
