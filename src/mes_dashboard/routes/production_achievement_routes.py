@@ -12,6 +12,8 @@ overhaul adds 10 new rows):
   GET/PUT/DELETE /api/production-achievement/package-lf-map[/{raw}]     (D1)
   GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/{raw}] (D2)
   GET/PUT        /api/production-achievement/daily-plans
+  POST           /api/production-achievement/daily-plans/import/preview
+  POST           /api/production-achievement/daily-plans/import/confirm
   GET            /api/production-achievement/known-package-lf-values
   GET            /api/production-achievement/known-workcenter-groups
 
@@ -59,10 +61,16 @@ from mes_dashboard.services.filter_cache import (
 from mes_dashboard.services.production_achievement_daily_plan_service import (
     DailyPlanValidationError,
     MySQLUnavailableError as DailyPlanMySQLUnavailableError,
+    bulk_upsert_daily_plans,
     get_daily_plans,
     get_daily_plans_map,
     upsert_daily_plan,
     validate_daily_plan_qty,
+)
+from mes_dashboard.services.production_achievement_import_service import (
+    ImportParseError,
+    categorize_import_rows,
+    parse_pjmes052_workbook,
 )
 from mes_dashboard.services.production_achievement_package_lf_service import (
     MySQLUnavailableError as PackageLfMySQLUnavailableError,
@@ -564,6 +572,111 @@ def api_put_daily_plans():
         return internal_error(str(exc))
 
     return success_response({"acknowledged": True})
+
+
+# ============================================================
+# POST /api/production-achievement/daily-plans/import/preview
+# POST /api/production-achievement/daily-plans/import/confirm
+# (Excel-import for 每日計畫量設定, business-rules.md PA-16)
+# ============================================================
+
+
+@production_achievement_bp.route("/daily-plans/import/preview", methods=["POST"])
+@login_required
+def api_post_daily_plans_import_preview():
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯每日計畫")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return validation_error("必須提供檔案")
+    if not uploaded.filename.lower().endswith(".xlsx"):
+        return validation_error("僅支援 .xlsx 檔案")
+
+    try:
+        parsed_rows = parse_pjmes052_workbook(uploaded.stream)
+    except ImportParseError as exc:
+        return validation_error(f"無法解析檔案：{exc}")
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    try:
+        legal_workcenter_groups = set(get_workcenter_merge_map().values())
+        legal_package_lf_map = get_package_lf_map()
+        legal_package_lf_groups = set(legal_package_lf_map.values()) | (
+            set(get_known_package_lf_values()) - set(legal_package_lf_map.keys())
+        )
+        preview = categorize_import_rows(
+            parsed_rows,
+            legal_workcenter_groups=legal_workcenter_groups,
+            legal_package_lf_groups=legal_package_lf_groups,
+            current_plans=get_daily_plans_map(),
+        )
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    return success_response(preview)
+
+
+@production_achievement_bp.route("/daily-plans/import/confirm", methods=["POST"])
+@login_required
+def api_post_daily_plans_import_confirm():
+    if not can_edit_targets():
+        return forbidden_error("無權限編輯每日計畫")
+
+    if not MYSQL_OPS_ENABLED:
+        return service_unavailable_error("MySQL OPS 未啟用")
+
+    body = request.get_json(silent=True) or {}
+    submitted_rows = body.get("rows")
+    if not isinstance(submitted_rows, list) or not submitted_rows:
+        return validation_error("必須提供 rows（至少一筆）")
+
+    try:
+        legal_workcenter_groups = set(get_workcenter_merge_map().values())
+        legal_package_lf_map = get_package_lf_map()
+        legal_package_lf_groups = set(legal_package_lf_map.values()) | (
+            set(get_known_package_lf_values()) - set(legal_package_lf_map.keys())
+        )
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    # Never trust the client's own preview categorization -- re-validate
+    # every row server-side; reject the WHOLE batch on any failure so
+    # confirm's result is unambiguous (never a partial import).
+    validated_rows = []
+    for row in submitted_rows:
+        if not isinstance(row, dict):
+            return validation_error("rows 格式錯誤")
+        workcenter_group = row.get("workcenter_group")
+        package_lf_group = row.get("package_lf_group")
+        if not workcenter_group or not package_lf_group:
+            return validation_error("每筆 row 必須提供 workcenter_group 和 package_lf_group")
+        if workcenter_group not in legal_workcenter_groups:
+            return validation_error(f"站點群組「{workcenter_group}」不在系統合法清單中")
+        if package_lf_group not in legal_package_lf_groups:
+            return validation_error(f"Package「{package_lf_group}」無法對應到現有 package_lf_group")
+        try:
+            validated_qty = validate_daily_plan_qty(row.get("daily_plan_qty"))
+        except DailyPlanValidationError as exc:
+            return validation_error(str(exc))
+        validated_rows.append({
+            "workcenter_group": workcenter_group,
+            "package_lf_group": package_lf_group,
+            "daily_plan_qty": validated_qty,
+        })
+
+    try:
+        upserted = bulk_upsert_daily_plans(validated_rows, updated_by=get_owner_token())
+    except DailyPlanMySQLUnavailableError as exc:
+        return service_unavailable_error(str(exc))
+    except Exception as exc:
+        return internal_error(str(exc))
+
+    return success_response({"acknowledged": True, "upserted": upserted})
 
 
 # ============================================================

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API behavior, compatibility rules, and endpoint contract requirements.",
-    "version": "1.41.0"
+    "version": "1.42.0"
   },
   "paths": {
     "/api/auth/login": {
@@ -6630,6 +6630,86 @@
         ],
         "x-cdd-errors": "500"
       }
+    },
+    "/api/production-achievement/daily-plans/import/preview": {
+      "post": {
+        "summary": "POST /api/production-achievement/daily-plans/import/preview",
+        "responses": {
+          "201": {
+            "description": "Contract response: ProductionAchievementDailyPlanImportPreviewResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: multipart/form-data field file (.xlsx only); parses PJMES052-生產達成率 report, categorizes rows against live legal-value/current-plan state, writes nothing; gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
+    },
+    "/api/production-achievement/daily-plans/import/confirm": {
+      "post": {
+        "summary": "POST /api/production-achievement/daily-plans/import/confirm",
+        "responses": {
+          "201": {
+            "description": "Contract response: ProductionAchievementDailyPlanImportConfirmResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportConfirmResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error response (see contract error format)"
+          },
+          "403": {
+            "description": "Error response (see contract error format)"
+          },
+          "500": {
+            "description": "Error response (see contract error format)"
+          },
+          "503": {
+            "description": "Error response (see contract error format)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Contract request: body {rows: [{workcenter_group, package_lf_group, daily_plan_qty}]}; server re-validates every row against legal-value sets (never trusts client selection) and bulk-upserts in a single transaction (all-or-nothing); gated by can_edit_targets permission (403 if not whitelisted) (schema not machine-resolved; see contract)",
+          "content": {},
+          "x-cdd-unresolved": true
+        },
+        "x-cdd-errors": "400/403/500/503"
+      }
     }
   },
   "x-cdd-generated-from": "contracts/api/api-contract.md",
@@ -7656,7 +7736,6 @@
             "description": "spool key"
           }
         },
-        "additionalProperties": false,
         "required": [
           "async",
           "job_id",
@@ -7683,7 +7762,6 @@
             "description": "job status hint"
           }
         },
-        "additionalProperties": false,
         "required": [
           "async",
           "job_id",
@@ -7836,7 +7914,6 @@
             "description": "polling URL; prefix=wip-detail"
           }
         },
-        "additionalProperties": false,
         "required": [
           "async",
           "job_id",
@@ -8132,7 +8209,6 @@
             "description": "workflow name"
           }
         },
-        "additionalProperties": false,
         "required": [
           "success",
           "equipment"
@@ -8160,7 +8236,6 @@
             "type": "number"
           }
         },
-        "additionalProperties": false,
         "required": [
           "output_date",
           "shift_code",
@@ -8382,7 +8457,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "shift_code",
           "workcenter_group",
@@ -8433,7 +8507,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "user_identifier",
           "can_edit_targets",
@@ -8777,7 +8850,6 @@
             "format": "ISO-8601 cache refresh timestamp; null if cache never populated"
           }
         },
-        "additionalProperties": false,
         "required": [
           "pj_types",
           "product_lines",
@@ -8804,7 +8876,6 @@
             "description": "present only when async=true; polling URL"
           }
         },
-        "additionalProperties": false,
         "required": [
           "async",
           "query_id"
@@ -8828,7 +8899,6 @@
             "description": "async job status, or a plain spool-hit indicator when the key was already resolved"
           }
         },
-        "additionalProperties": false,
         "required": [
           "status"
         ]
@@ -8865,7 +8935,6 @@
             "description": "distinct PJ_TYPE (Type) values present in the built spool"
           }
         },
-        "additionalProperties": false,
         "required": [
           "equipment_id_options",
           "workcenter_name_options",
@@ -8891,7 +8960,6 @@
             "description": "Oracle-free Package options from container_filter_cache, available before any query runs"
           }
         },
-        "additionalProperties": false,
         "required": [
           "pj_types",
           "product_lines"
@@ -8912,7 +8980,6 @@
             "description": "one value per label bucket; null entries mean a missing hour, never a zero"
           }
         },
-        "additionalProperties": false,
         "required": [
           "name",
           "data"
@@ -8932,7 +8999,6 @@
             "type": "integer"
           }
         },
-        "additionalProperties": false,
         "required": [
           "equipment_id",
           "sample_count"
@@ -8952,7 +9018,6 @@
             "description": "raw PARAMETER_VALUE, no scale conversion (UPH-04)"
           }
         },
-        "additionalProperties": false,
         "required": [
           "lot_id",
           "equipment_id"
@@ -8980,7 +9045,6 @@
             "description": "closed enum: equipment_id, family, or package (default family)"
           }
         },
-        "additionalProperties": false,
         "required": [
           "labels",
           "series",
@@ -9005,7 +9069,6 @@
             "description": "available Type values for this block's own independent filter"
           }
         },
-        "additionalProperties": false,
         "required": [
           "items",
           "pj_types"
@@ -9028,7 +9091,6 @@
             "type": "integer"
           }
         },
-        "additionalProperties": false,
         "required": [
           "page",
           "per_page",
@@ -9051,7 +9113,6 @@
             "description": "pagination"
           }
         },
-        "additionalProperties": false,
         "required": [
           "rows",
           "meta"
@@ -9073,7 +9134,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "raw_package_lf",
           "merged_group",
@@ -9097,7 +9157,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "raw_workcenter_group",
           "merged_workcenter_group",
@@ -9124,7 +9183,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "workcenter_group",
           "package_lf_group",
@@ -9146,7 +9204,6 @@
             "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
           }
         },
-        "additionalProperties": false,
         "required": [
           "success",
           "data"
@@ -9162,7 +9219,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "SPECNAME",
           "workcenter_group"
@@ -9181,7 +9237,6 @@
             "type": "integer"
           }
         },
-        "additionalProperties": false,
         "required": [
           "shift_code",
           "workcenter_group",
@@ -9198,7 +9253,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "raw_package_lf",
           "merged_group"
@@ -9214,7 +9268,6 @@
             "type": "string"
           }
         },
-        "additionalProperties": false,
         "required": [
           "raw_workcenter_group",
           "merged_workcenter_group"
@@ -9233,7 +9286,6 @@
             "type": "integer"
           }
         },
-        "additionalProperties": false,
         "required": [
           "workcenter_group",
           "package_lf_group",
@@ -9253,7 +9305,6 @@
             "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
           }
         },
-        "additionalProperties": false,
         "required": [
           "success",
           "data"
@@ -9275,7 +9326,6 @@
             "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
           }
         },
-        "additionalProperties": false,
         "required": [
           "success",
           "data"
@@ -9297,7 +9347,6 @@
             "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
           }
         },
-        "additionalProperties": false,
         "required": [
           "success",
           "data"
@@ -9319,7 +9368,6 @@
             "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
           }
         },
-        "additionalProperties": false,
         "required": [
           "success",
           "data"
@@ -9335,7 +9383,6 @@
             }
           }
         },
-        "additionalProperties": false,
         "required": [
           "package_lf_values"
         ]
@@ -9350,7 +9397,6 @@
             }
           }
         },
-        "additionalProperties": false,
         "required": [
           "raw_workcenter_groups"
         ]
@@ -9364,8 +9410,180 @@
           "app_version": {
             "type": "string"
           }
+        }
+      },
+      "ProductionAchievementDailyPlanImportRow": {
+        "type": "object",
+        "properties": {
+          "workcenter_group": {
+            "type": "string"
+          },
+          "package_lf_group": {
+            "type": "string"
+          },
+          "daily_plan_qty": {
+            "type": "integer",
+            "description": "null when status=invalid_qty"
+          },
+          "current_qty": {
+            "type": "integer",
+            "description": "existing daily_plan_qty for this combo, null if new"
+          },
+          "status": {
+            "type": "string",
+            "description": "enum new/update/unchanged/invalid_workcenter/invalid_package/invalid_qty"
+          },
+          "source_sheet": {
+            "type": "string"
+          },
+          "source_block": {
+            "type": "string"
+          },
+          "importable": {
+            "type": "boolean"
+          },
+          "default_selected": {
+            "type": "boolean"
+          },
+          "warning": {
+            "type": "string"
+          }
         },
-        "additionalProperties": false
+        "required": [
+          "workcenter_group",
+          "package_lf_group",
+          "status",
+          "source_sheet",
+          "source_block",
+          "importable",
+          "default_selected"
+        ]
+      },
+      "ProductionAchievementDailyPlanImportMissingRow": {
+        "type": "object",
+        "properties": {
+          "workcenter_group": {
+            "type": "string"
+          },
+          "package_lf_group": {
+            "type": "string"
+          },
+          "daily_plan_qty": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "workcenter_group",
+          "package_lf_group",
+          "daily_plan_qty"
+        ]
+      },
+      "ProductionAchievementDailyPlanImportSummary": {
+        "type": "object",
+        "properties": {
+          "total_parsed": {
+            "type": "integer"
+          },
+          "new": {
+            "type": "integer"
+          },
+          "update": {
+            "type": "integer"
+          },
+          "unchanged": {
+            "type": "integer"
+          },
+          "invalid": {
+            "type": "integer"
+          },
+          "missing_from_file": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_parsed",
+          "new",
+          "update",
+          "unchanged",
+          "invalid",
+          "missing_from_file"
+        ]
+      },
+      "ProductionAchievementDailyPlanImportPreviewData": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportRow"
+            }
+          },
+          "missing_from_file": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportMissingRow"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportSummary"
+          }
+        },
+        "required": [
+          "rows",
+          "missing_from_file",
+          "summary"
+        ]
+      },
+      "ProductionAchievementDailyPlanImportPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportPreviewData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ProductionAchievementDailyPlanImportConfirmData": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean"
+          },
+          "upserted": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "acknowledged",
+          "upserted"
+        ]
+      },
+      "ProductionAchievementDailyPlanImportConfirmResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProductionAchievementDailyPlanImportConfirmData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ProductionAchievementResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
       }
     }
   }

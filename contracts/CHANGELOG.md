@@ -8,6 +8,14 @@ While a contract is at 0.x (draft), entries here are optional.
 Once a contract reaches 1.0.0, every schema-version bump must have
 a corresponding entry below.
 
+## [api 1.42.0] — 2026-07-15
+### Added
+- daily-plan-excel-import: Two new additive endpoints on the existing `/api/production-achievement/daily-plans` family: `POST .../import/preview` (multipart `file` upload, parses a PJMES052-生產達成率.xlsx report and categorizes each row as new/update/unchanged/invalid_workcenter/invalid_package/invalid_qty against live legal-value sets and the current `production_achievement_daily_plans` table, writes nothing) and `POST .../import/confirm` (JSON `{rows}`, re-validates every row server-side — never trusts the client's preview selection — and bulk-upserts in a single transaction, all-or-nothing). Both gated by the existing `can_edit_targets` permission verbatim. New schemas: `ProductionAchievementDailyPlanImportRow`, `ProductionAchievementDailyPlanImportMissingRow`, `ProductionAchievementDailyPlanImportSummary`, `ProductionAchievementDailyPlanImportPreviewData`, `ProductionAchievementDailyPlanImportPreviewResponse`, `ProductionAchievementDailyPlanImportConfirmData`, `ProductionAchievementDailyPlanImportConfirmResponse`. See business-rules.md PA-16.
+
+## [business 1.48.0] — 2026-07-15
+### Added
+- daily-plan-excel-import: Added PA-16 (每日計畫 Excel 匯入 — PJMES052-生產達成率.xlsx fixed-layout parsing, 4-way row categorization, orphan-prevention via the PA-09/PA-10 legal-value sets, missing-from-file rows left unchanged, all-or-nothing confirm transaction). Cross-references PA-09/PA-10/PA-11/PA-12.
+
 ## [business 1.47.0] — 2026-07-14
 ### Added
 - production-achievement-overhaul: Added PA-09 (PACKAGE_LF merge mapping — sparse exceptions, fallback-to-self, D1), PA-10 (workcenter merge mapping — explicit-inclusion, exclude-by-absence, D2; explicitly the OPPOSITE default from PA-09), PA-11 (daily-plan table semantics — keyed `(workcenter_group, package_lf_group)`, no shift dimension, additive/independent of `production_achievement_targets`), PA-12 (daily achievement-rate denominator — D班+N班 sum ÷ daily_plan, null/zero guards mirroring PA-07), PA-13 (month/range cumulative calculation — elapsed_days × daily_plan, aggregate-then-divide trend per D3, 1st-of-month/range-capping period resolution), PA-14 (today/yesterday warm-cache freshness SLA, D5 — bounded by `WARMUP_INTERVAL_SECONDS`, graceful degrade to PA-08's 202 path), PA-15 (N-shift-tail closing-chunk completeness fix, D6). Fifteen new Decision Table rows.

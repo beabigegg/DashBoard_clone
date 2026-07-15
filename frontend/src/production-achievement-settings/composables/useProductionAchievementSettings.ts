@@ -23,11 +23,13 @@
  *   GET/PUT/DELETE /api/production-achievement/package-lf-map[/<raw>]
  *   GET/PUT/DELETE /api/production-achievement/workcenter-merge-map[/<raw>]
  *   GET/PUT        /api/production-achievement/daily-plans
+ *   POST           /api/production-achievement/daily-plans/import/preview
+ *   POST           /api/production-achievement/daily-plans/import/confirm
  *   GET            /api/production-achievement/known-package-lf-values
  *   GET            /api/production-achievement/known-workcenter-groups
  */
 import { computed, ref } from 'vue';
-import { apiGet } from '../../core/api';
+import { apiGet, apiPost, apiUpload } from '../../core/api';
 import type { ApiResponse } from '../../core/types';
 
 export interface PackageLfMapRow {
@@ -58,6 +60,49 @@ export interface WorkcenterFullListRow {
   merged_workcenter_group: string | null;
   updated_at: string | null;
   updated_by: string | null;
+}
+
+// ── Excel-import for DailyPlanPanel (business-rules.md PA-16) ──────────────
+export type DailyPlanImportRowStatus =
+  | 'new'
+  | 'update'
+  | 'unchanged'
+  | 'invalid_workcenter'
+  | 'invalid_package'
+  | 'invalid_qty';
+
+export interface DailyPlanImportRow {
+  workcenter_group: string;
+  package_lf_group: string;
+  daily_plan_qty: number | null;
+  current_qty: number | null;
+  status: DailyPlanImportRowStatus;
+  source_sheet: string;
+  source_block: string;
+  importable: boolean;
+  default_selected: boolean;
+  warning: string | null;
+}
+
+export interface DailyPlanMissingRow {
+  workcenter_group: string;
+  package_lf_group: string;
+  daily_plan_qty: number;
+}
+
+export interface DailyPlanImportSummary {
+  total_parsed: number;
+  new: number;
+  update: number;
+  unchanged: number;
+  invalid: number;
+  missing_from_file: number;
+}
+
+export interface DailyPlanImportPreview {
+  rows: DailyPlanImportRow[];
+  missing_from_file: DailyPlanMissingRow[];
+  summary: DailyPlanImportSummary;
 }
 
 const SAVE_NOTE_TEXT = '變更將於下次資料重新整理後套用';
@@ -99,6 +144,10 @@ export function useProductionAchievementSettings() {
   const workcenterMergeMap = ref<WorkcenterMergeMapRow[]>([]);
   const knownWorkcenterGroups = ref<string[]>([]);
   const dailyPlans = ref<DailyPlanRow[]>([]);
+
+  const importPreview = ref<DailyPlanImportPreview | null>(null);
+  const importLoading = ref(false);
+  const importResult = ref<{ acknowledged: boolean; upserted: number } | null>(null);
 
   const loading = ref(false);
   const loadError = ref('');
@@ -305,6 +354,61 @@ export function useProductionAchievementSettings() {
     }
   }
 
+  // ── Excel-import: preview (parse-only, no write) → confirm (bulk upsert) ─
+  // apiUpload/apiPost (core/api.ts) throw an ApiError with the same
+  // {status, errorCode} shape requestJson()'s WriteError uses, so a 403 here
+  // flows through the same _handleWriteError fail-closed path as every
+  // other write in this composable.
+
+  async function previewDailyPlanImport(file: File): Promise<boolean> {
+    editError.value = '';
+    importLoading.value = true;
+    importPreview.value = null;
+    importResult.value = null;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiUpload<DailyPlanImportPreview>(
+        '/api/production-achievement/daily-plans/import/preview',
+        formData,
+      );
+      importPreview.value = res.success ? res.data : null;
+      return true;
+    } catch (err) {
+      _handleWriteError(err);
+      return false;
+    } finally {
+      importLoading.value = false;
+    }
+  }
+
+  async function confirmDailyPlanImport(
+    rows: { workcenter_group: string; package_lf_group: string; daily_plan_qty: number }[],
+  ): Promise<boolean> {
+    editError.value = '';
+    editSaving.value = true;
+    try {
+      const res = await apiPost<{ acknowledged: boolean; upserted: number }>(
+        '/api/production-achievement/daily-plans/import/confirm',
+        { rows },
+      );
+      importResult.value = res.success ? res.data : null;
+      saveNote.value = SAVE_NOTE_TEXT;
+      await fetchDailyPlans();
+      return true;
+    } catch (err) {
+      _handleWriteError(err);
+      return false;
+    } finally {
+      editSaving.value = false;
+    }
+  }
+
+  function dismissImportState(): void {
+    importPreview.value = null;
+    importResult.value = null;
+  }
+
   // Plain object of refs/computed/functions — matches the established
   // useProductionAchievement()/useProductionAchievementDuckDB() convention
   // (not reactive()-wrapped; callers use `.value` in script, template refs
@@ -315,6 +419,9 @@ export function useProductionAchievementSettings() {
     workcenterMergeMap,
     knownWorkcenterGroups,
     dailyPlans,
+    importPreview,
+    importLoading,
+    importResult,
     loading,
     loadError,
     editForbidden,
@@ -331,6 +438,9 @@ export function useProductionAchievementSettings() {
     saveWorkcenterMerge,
     excludeWorkcenterGroup,
     saveDailyPlan,
+    previewDailyPlanImport,
+    confirmDailyPlanImport,
+    dismissImportState,
     dismissSaveNote,
   };
 }

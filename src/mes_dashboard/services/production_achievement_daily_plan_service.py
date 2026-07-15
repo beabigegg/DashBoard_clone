@@ -172,3 +172,59 @@ def upsert_daily_plan(
             "production_achievement_daily_plan_service: write failed: %s", exc
         )
         raise MySQLUnavailableError(str(exc)) from exc
+
+
+def bulk_upsert_daily_plans(
+    rows: List[Dict[str, Any]], *, updated_by: str
+) -> int:
+    """Upsert multiple daily_plans rows in a SINGLE transaction (Excel-import
+    confirm step, business-rules.md PA-16) -- unlike ``upsert_daily_plan``
+    (one connection/commit per call), all rows share one
+    ``get_mysql_connection()`` context so a mid-batch failure rolls back the
+    ENTIRE batch (no partial import).
+
+    Each row dict must have ``workcenter_group``, ``package_lf_group``,
+    ``daily_plan_qty`` (already validated by the caller via
+    ``validate_daily_plan_qty`` -- this function does not re-validate).
+    Returns the number of rows upserted. Raises MySQLUnavailableError when
+    MYSQL_OPS_ENABLED=false or MySQL is unreachable.
+    """
+    if not MYSQL_OPS_ENABLED:
+        raise MySQLUnavailableError("MySQL OPS is disabled (MYSQL_OPS_ENABLED=false)")
+    if not rows:
+        return 0
+
+    from sqlalchemy import text
+
+    sql = text(
+        """
+        INSERT INTO production_achievement_daily_plans
+            (workcenter_group, package_lf_group, daily_plan_qty, updated_at, updated_by)
+        VALUES
+            (:workcenter_group, :package_lf_group, :daily_plan_qty, NOW(), :updated_by)
+        ON DUPLICATE KEY UPDATE
+            daily_plan_qty = VALUES(daily_plan_qty),
+            updated_at = NOW(),
+            updated_by = VALUES(updated_by)
+        """
+    )
+    try:
+        with get_mysql_connection() as conn:
+            for row in rows:
+                conn.execute(
+                    sql,
+                    {
+                        "workcenter_group": row["workcenter_group"],
+                        "package_lf_group": row["package_lf_group"],
+                        "daily_plan_qty": row["daily_plan_qty"],
+                        "updated_by": updated_by,
+                    },
+                )
+    except Exception as exc:
+        logger.warning(
+            "production_achievement_daily_plan_service: bulk write failed, rolled back: %s",
+            exc,
+        )
+        raise MySQLUnavailableError(str(exc)) from exc
+
+    return len(rows)

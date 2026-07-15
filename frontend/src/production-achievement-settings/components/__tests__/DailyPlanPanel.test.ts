@@ -98,6 +98,26 @@ describe('DailyPlanPanel', () => {
     expect(wrapper.find('[data-testid="pa-plan-readonly-note"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="pa-plan-new-btn"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="pa-plan-edit-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="pa-plan-import-btn"]').exists()).toBe(false);
+  });
+
+  describe('Excel-import entry point (business-rules.md PA-16)', () => {
+    it('shows the 匯入 button when editable, opens the import dialog on click', async () => {
+      const wrapper = await mountAndFlush({ rows: ROWS });
+      expect(wrapper.find('[data-testid="pa-plan-import-dialog"]').exists()).toBe(false);
+      await wrapper.find('[data-testid="pa-plan-import-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-testid="pa-plan-import-dialog"]').exists()).toBe(true);
+    });
+
+    it('closing the dialog emits import-close', async () => {
+      const wrapper = await mountAndFlush({ rows: ROWS });
+      await wrapper.find('[data-testid="pa-plan-import-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      await wrapper.find('[data-testid="pa-plan-import-close"]').trigger('click');
+      expect(wrapper.emitted('import-close')).toBeTruthy();
+      expect(wrapper.find('[data-testid="pa-plan-import-dialog"]').exists()).toBe(false);
+    });
   });
 
   it('renders empty-note when there are no plan rows', async () => {

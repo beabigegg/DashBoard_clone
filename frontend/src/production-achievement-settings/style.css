@@ -46,6 +46,10 @@
   @apply flex items-center justify-between;
 }
 
+.theme-production-achievement-settings .pa-settings-panel__header-actions {
+  @apply flex items-center gap-2;
+}
+
 .theme-production-achievement-settings .pa-settings-panel__title {
   font-size: 14px;
   font-weight: 600;
@@ -144,4 +148,108 @@
 .theme-production-achievement-settings .pa-settings-panel__hint-chip:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* DailyPlanImportDialog.vue (Excel-import, business-rules.md PA-16) */
+
+.theme-production-achievement-settings .pa-plan-import__overlay {
+  @apply fixed inset-0 flex items-center justify-center p-4;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 50;
+}
+
+.theme-production-achievement-settings .pa-plan-import__panel {
+  @apply bg-white border rounded-lg p-4 flex flex-col gap-3;
+  border-color: theme('colors.stroke.soft');
+  width: min(960px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.theme-production-achievement-settings .pa-plan-import__header {
+  @apply flex items-center justify-between;
+}
+
+.theme-production-achievement-settings .pa-plan-import__file-row {
+  @apply flex items-center gap-2;
+}
+
+.theme-production-achievement-settings .pa-plan-import__file-input {
+  @apply text-sm;
+  color: theme('colors.text.secondary');
+}
+
+.theme-production-achievement-settings .pa-plan-import__file-input::file-selector-button {
+  @apply text-xs font-semibold rounded px-3 py-1.5 border cursor-pointer;
+  margin-right: theme('spacing.token.p10');
+  background: theme('colors.surface.muted');
+  border-color: theme('colors.stroke.soft');
+  color: theme('colors.text.primary');
+}
+
+.theme-production-achievement-settings .pa-plan-import__file-input::file-selector-button:hover {
+  background: theme('colors.surface.hover');
+}
+
+.theme-production-achievement-settings .pa-plan-import__file-input:disabled::file-selector-button {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.theme-production-achievement-settings .pa-plan-import__summary {
+  @apply text-sm;
+  color: theme('colors.text.secondary');
+}
+
+.theme-production-achievement-settings .pa-plan-import__toolbar {
+  @apply flex items-center justify-end;
+}
+
+.theme-production-achievement-settings .pa-plan-import__tag {
+  @apply inline-block text-xs font-semibold rounded-full px-3 py-1;
+}
+
+.theme-production-achievement-settings .pa-plan-import__tag--new {
+  background: theme('colors.token.hecfdf5');
+  color: theme('colors.token.h065f46');
+}
+
+.theme-production-achievement-settings .pa-plan-import__tag--update {
+  background: theme('colors.token.hdbeafe');
+  color: theme('colors.token.h1e40af');
+}
+
+.theme-production-achievement-settings .pa-plan-import__tag--unchanged {
+  background: theme('colors.token.hf3f4f6');
+  color: theme('colors.token.h6b7280');
+}
+
+.theme-production-achievement-settings .pa-plan-import__tag--invalid {
+  background: theme('colors.token.hfee2e2');
+  color: theme('colors.token.hb91c1c');
+}
+
+.theme-production-achievement-settings .pa-plan-import__missing {
+  @apply text-sm rounded px-3 py-2 border;
+  background: theme('colors.surface.muted');
+  border-color: theme('colors.stroke.soft');
+}
+
+.theme-production-achievement-settings .pa-plan-import__missing summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.theme-production-achievement-settings .pa-plan-import__missing ul {
+  @apply mt-2 flex flex-col gap-1 text-xs;
+  color: theme('colors.text.secondary');
+}
+
+.theme-production-achievement-settings .pa-plan-import__actions {
+  @apply flex items-center gap-2;
+}
+
+.theme-production-achievement-settings .pa-plan-import__result {
+  @apply text-sm font-semibold;
+  color: theme('colors.token.h065f46');
 }

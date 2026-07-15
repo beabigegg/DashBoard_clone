@@ -14,7 +14,8 @@
 import { computed, reactive, ref } from 'vue';
 import DataTable from '../../shared-ui/components/DataTable.vue';
 import DataTableColumn from '../../shared-ui/components/DataTableColumn.vue';
-import type { DailyPlanRow } from '../composables/useProductionAchievementSettings';
+import DailyPlanImportDialog from './DailyPlanImportDialog.vue';
+import type { DailyPlanImportPreview, DailyPlanRow } from '../composables/useProductionAchievementSettings';
 
 interface Props {
   rows?: DailyPlanRow[];
@@ -24,6 +25,9 @@ interface Props {
   editForbidden?: boolean;
   editError?: string;
   editSaving?: boolean;
+  importPreview?: DailyPlanImportPreview | null;
+  importLoading?: boolean;
+  importResult?: { acknowledged: boolean; upserted: number } | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,11 +38,29 @@ const props = withDefaults(defineProps<Props>(), {
   editForbidden: false,
   editError: '',
   editSaving: false,
+  importPreview: null,
+  importLoading: false,
+  importResult: null,
 });
 
 const emit = defineEmits<{
   save: [payload: { workcenter_group: string; package_lf_group: string; daily_plan_qty: number }];
+  'import-preview-file': [file: File];
+  'import-confirm': [rows: { workcenter_group: string; package_lf_group: string; daily_plan_qty: number }[]];
+  'import-close': [];
 }>();
+
+const importDialogOpen = ref(false);
+
+function openImportDialog(): void {
+  if (props.editForbidden) return;
+  importDialogOpen.value = true;
+}
+
+function closeImportDialog(): void {
+  importDialogOpen.value = false;
+  emit('import-close');
+}
 
 function keyFor(row: { workcenter_group: string; package_lf_group: string }): string {
   return `${row.workcenter_group}::${row.package_lf_group}`;
@@ -123,17 +145,39 @@ const isEmpty = computed(() => !props.loading && props.rows.length === 0);
   <div class="pa-settings-panel" data-testid="pa-settings-plan-panel">
     <div class="pa-settings-panel__header">
       <h3 class="pa-settings-panel__title">每日計畫量設定</h3>
-      <button
-        v-if="!editForbidden"
-        type="button"
-        class="ui-btn ui-btn--secondary ui-btn--sm"
-        data-testid="pa-plan-new-btn"
-        :disabled="editSaving"
-        @click="openNewRow"
-      >
-        新增每日計畫
-      </button>
+      <div v-if="!editForbidden" class="pa-settings-panel__header-actions">
+        <button
+          type="button"
+          class="ui-btn ui-btn--secondary ui-btn--sm"
+          data-testid="pa-plan-import-btn"
+          :disabled="editSaving"
+          @click="openImportDialog"
+        >
+          匯入
+        </button>
+        <button
+          type="button"
+          class="ui-btn ui-btn--secondary ui-btn--sm"
+          data-testid="pa-plan-new-btn"
+          :disabled="editSaving"
+          @click="openNewRow"
+        >
+          新增每日計畫
+        </button>
+      </div>
     </div>
+
+    <DailyPlanImportDialog
+      :open="importDialogOpen"
+      :preview="importPreview"
+      :preview-loading="importLoading"
+      :confirm-saving="editSaving"
+      :confirm-result="importResult"
+      :edit-error="editError"
+      @select-file="(file: File) => emit('import-preview-file', file)"
+      @confirm="(rows) => emit('import-confirm', rows)"
+      @close="closeImportDialog"
+    />
 
     <p v-if="editForbidden" class="pa-settings-panel__readonly-note" role="status" data-testid="pa-plan-readonly-note">
       您目前為檢視模式，無法編輯每日計畫量。

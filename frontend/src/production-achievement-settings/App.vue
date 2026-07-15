@@ -25,6 +25,9 @@ import DailyPlanPanel from './components/DailyPlanPanel.vue';
 const {
   packageLfMap,
   dailyPlans,
+  importPreview,
+  importLoading,
+  importResult,
   loading,
   editForbidden,
   editError,
@@ -40,6 +43,9 @@ const {
   saveWorkcenterMerge,
   excludeWorkcenterGroup,
   saveDailyPlan,
+  previewDailyPlanImport,
+  confirmDailyPlanImport,
+  dismissImportState,
   dismissSaveNote,
 } = useProductionAchievementSettings();
 
@@ -73,6 +79,18 @@ async function handleRenameWorkcenter(payload: { raw_workcenter_group: string; m
 
 async function handleSaveDailyPlan(payload: { workcenter_group: string; package_lf_group: string; daily_plan_qty: number }): Promise<void> {
   await saveDailyPlan(payload);
+}
+
+async function handleImportPreviewFile(file: File): Promise<void> {
+  await previewDailyPlanImport(file);
+}
+
+async function handleImportConfirm(rows: { workcenter_group: string; package_lf_group: string; daily_plan_qty: number }[]): Promise<void> {
+  await confirmDailyPlanImport(rows);
+}
+
+function handleImportClose(): void {
+  dismissImportState();
 }
 </script>
 
@@ -125,7 +143,13 @@ async function handleSaveDailyPlan(payload: { workcenter_group: string; package_
         :edit-forbidden="editForbidden"
         :edit-error="editError"
         :edit-saving="editSaving"
+        :import-preview="importPreview"
+        :import-loading="importLoading"
+        :import-result="importResult"
         @save="handleSaveDailyPlan"
+        @import-preview-file="handleImportPreviewFile"
+        @import-confirm="handleImportConfirm"
+        @import-close="handleImportClose"
       />
     </template>
   </div>
