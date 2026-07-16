@@ -126,6 +126,34 @@ def _make_detection_parquet(tmp_path: pathlib.Path) -> pathlib.Path:
     return path
 
 
+# Detection spool used to prove `top_loss_reason` honors the loss_reasons
+# filter (regression for the bug where the KPI's "Top loss reason" query read
+# from the unfiltered `detection_raw` view instead of the loss_reason-masked
+# `detection` view).  REASON-A is the population-wide dominant reason (reject
+# qty 20), but REASON-B (reject qty 5) is a distinct, smaller-population
+# reason that becomes the sole survivor -- and therefore the dominant reason
+# -- once the loss_reasons filter is narrowed to it.
+SAMPLE_DETECTION_TOPREASON_FILTER = [
+    ("LOT101", "LOT101-NAME", 100, 20, "REASON-A", "WKST-01", "EQ-01", "2025-02-01", "WORKFLOW-A", "PKG-A", "PJ-A", "RC-101"),
+    ("LOT102", "LOT102-NAME", 50, 5, "REASON-B", "WKST-01", "EQ-02", "2025-02-02", "WORKFLOW-A", "PKG-A", "PJ-A", "RC-102"),
+    ("LOT103", "LOT103-NAME", 80, 3, "REASON-C", "WKST-02", "EQ-03", "2025-02-03", "WORKFLOW-B", "PKG-B", "PJ-B", "RC-103"),
+]
+
+
+def _make_detection_topreason_filter_parquet(tmp_path: pathlib.Path) -> pathlib.Path:
+    df = pd.DataFrame(
+        SAMPLE_DETECTION_TOPREASON_FILTER,
+        columns=[
+            "CONTAINERID", "CONTAINERNAME", "TRACKINQTY", "REJECTQTY",
+            "LOSSREASONNAME", "WORKCENTERNAME", "DETECTION_EQUIPMENTNAME",
+            "TXNDATE", "WORKFLOW", "PRODUCTLINENAME", "PJ_TYPE", "FINISHEDRUNCARD",
+        ],
+    )
+    path = tmp_path / "detection_topreason_filter.parquet"
+    df.to_parquet(path, index=False)
+    return path
+
+
 def _make_bwd_lineage_parquet(tmp_path: pathlib.Path) -> pathlib.Path:
     df = pd.DataFrame(
         SAMPLE_BWD_LINEAGE,
@@ -488,3 +516,31 @@ class TestBackwardSummary:
         # Backward KPI uses detection-spool field names
         for required_key in ("lot_count", "total_defect_qty", "total_input", "total_defect_rate"):
             assert required_key in kpi, f"Missing KPI key: {required_key}"
+
+
+class TestTopLossReasonHonorsFilter:
+    """Regression test: `top_loss_reason` must reflect the loss_reasons filter,
+    matching the pandas/sync KPI path (_build_kpi in mid_section_defect_service.py)
+    instead of always reporting the unfiltered population's dominant reason.
+    """
+
+    def test_top_loss_reason_reflects_loss_reason_filter(self, tmp_path):
+        events_path = str(_make_bwd_events_parquet(tmp_path))
+        lineage_path = str(_make_bwd_lineage_parquet(tmp_path))
+        detection_path = str(_make_detection_topreason_filter_parquet(tmp_path))
+
+        rt = _runtime_with_paths("test-top-reason-001", events_path, lineage_path, detection_path)
+
+        # Sanity check the fixture: population-wide top reason is REASON-A
+        # (reject qty 20), not REASON-B (reject qty 5).
+        unfiltered_summary = rt.get_summary(direction="backward")
+        assert unfiltered_summary is not None
+        assert unfiltered_summary["kpi"]["top_loss_reason"] == "REASON-A"
+
+        # Once the user filters to loss_reasons=["REASON-B"], the KPI card
+        # must report REASON-B as the top reason for the filtered scope --
+        # not REASON-A, which is only dominant in the unfiltered population.
+        rt_filtered = _runtime_with_paths("test-top-reason-002", events_path, lineage_path, detection_path)
+        filtered_summary = rt_filtered.get_summary(direction="backward", loss_reasons=["REASON-B"])
+        assert filtered_summary is not None
+        assert filtered_summary["kpi"]["top_loss_reason"] == "REASON-B"

@@ -646,131 +646,6 @@ class MsdDuckdbRuntime:
             )
             return None
 
-    def _compute_kpi(self, conn) -> Dict[str, Any]:
-        """Compute total defect count, lot count, and defect rate from events view.
-
-        Column names match the upstream_history / downstream_rejects spool schema
-        used by the forward-direction events job (CONTAINERID, REJECT_TOTAL_QTY,
-        TRACKINQTY) rather than the detection spool schema.
-        """
-        try:
-            row = conn.execute(
-                """
-                SELECT
-                    COUNT(DISTINCT CONTAINERID) AS lot_count,
-                    SUM(REJECT_TOTAL_QTY) AS defect_qty,
-                    SUM(TRACKINQTY) AS input_qty
-                FROM events
-                """
-            ).fetchone()
-            if row:
-                lot_count, defect_qty, input_qty = row
-                defect_rate = (
-                    round(float(defect_qty) / float(input_qty) * 100, 2)
-                    if input_qty and input_qty > 0
-                    else 0.0
-                )
-                return {
-                    "lot_count": int(lot_count or 0),
-                    "defect_qty": int(defect_qty or 0),
-                    "input_qty": int(input_qty or 0),
-                    "defect_rate": defect_rate,
-                }
-        except Exception as exc:
-            logger.debug("_compute_kpi failed: %s", exc)
-        return {"lot_count": 0, "defect_qty": 0, "input_qty": 0, "defect_rate": 0.0}
-
-    def _compute_charts(self, conn) -> List[Dict[str, Any]]:
-        """Compute top-N station defect rate chart from events view."""
-        try:
-            rows = conn.execute(
-                """
-                SELECT
-                    WORKCENTERNAME,
-                    SUM(REJECT_TOTAL_QTY) AS defect_qty,
-                    SUM(TRACKINQTY) AS input_qty
-                FROM events
-                GROUP BY WORKCENTERNAME
-                ORDER BY defect_qty DESC
-                LIMIT 20
-                """
-            ).fetchall()
-            return [
-                {
-                    "station": r[0],
-                    "defect_qty": int(r[1] or 0),
-                    "input_qty": int(r[2] or 0),
-                    "defect_rate": round(float(r[1] or 0) / float(r[2]) * 100, 2) if r[2] else 0.0,
-                }
-                for r in rows
-            ]
-        except Exception as exc:
-            logger.debug("_compute_charts failed: %s", exc)
-            return []
-
-    def _compute_daily_trend(self, conn) -> List[Dict[str, Any]]:
-        """Compute daily defect trend from events view.
-
-        The forward events spool merges two record types with different date fields:
-        - downstream rejects: have TXNDATE, REJECT_TOTAL_QTY; TRACKINQTY is NULL
-        - upstream history: have TRACKINTIMESTAMP, TRACKINQTY; TXNDATE is NULL
-
-        COALESCE(TXNDATE, TRACKINTIMESTAMP) lets both types map to a real date,
-        eliminating the NULL/"None" bucket that obscures the trend.
-        """
-        try:
-            rows = conn.execute(
-                """
-                SELECT
-                    CAST(COALESCE(TXNDATE, TRACKINTIMESTAMP) AS DATE) AS txn_day,
-                    SUM(REJECT_TOTAL_QTY) AS defect_qty,
-                    SUM(TRACKINQTY) AS input_qty
-                FROM events
-                GROUP BY CAST(COALESCE(TXNDATE, TRACKINTIMESTAMP) AS DATE)
-                ORDER BY txn_day NULLS LAST
-                """
-            ).fetchall()
-            return [
-                {
-                    "date": str(r[0]) if r[0] is not None else None,
-                    "defect_qty": int(r[1] or 0),
-                    "input_qty": int(r[2] or 0),
-                }
-                for r in rows
-                if r[0] is not None
-            ]
-        except Exception as exc:
-            logger.debug("_compute_daily_trend failed: %s", exc)
-            return []
-
-    def _compute_attribution(self, conn) -> List[Dict[str, Any]]:
-        """Compute downstream attribution by joining events + lineage views."""
-        try:
-            rows = conn.execute(
-                """
-                SELECT
-                    l.ANCESTOR_NAME,
-                    COUNT(DISTINCT e.CONTAINERID) AS lot_count,
-                    SUM(e.REJECT_TOTAL_QTY) AS defect_qty
-                FROM events e
-                JOIN lineage l ON e.CONTAINERID = l.DESCENDANT_ID
-                GROUP BY l.ANCESTOR_NAME
-                ORDER BY defect_qty DESC
-                LIMIT 20
-                """
-            ).fetchall()
-            return [
-                {
-                    "ancestor": r[0],
-                    "lot_count": int(r[1] or 0),
-                    "defect_qty": int(r[2] or 0),
-                }
-                for r in rows
-            ]
-        except Exception as exc:
-            logger.debug("_compute_attribution failed (may be schema difference): %s", exc)
-            return []
-
     # ------------------------------------------------------------------
     # Summary with Detection Spool (canonical path for trace job)
     # ------------------------------------------------------------------
@@ -918,12 +793,15 @@ class MsdDuckdbRuntime:
                     else 0.0
                 )
 
-                # Top loss reason — from population so it reflects the true top
-                # reason regardless of the loss_reason filter selection.
+                # Top loss reason — uses the same loss_reason-masked numerator
+                # view (`detection`) as total_defect_qty above, so the dominant
+                # reason reflects whatever loss_reason filter the user applied.
+                # This matches the pandas/sync KPI path in
+                # mid_section_defect_service.py (_build_kpi).
                 top_row = conn.execute(
                     """
                     SELECT LOSSREASONNAME, SUM(REJECTQTY) AS total
-                    FROM detection_raw
+                    FROM detection
                     WHERE LOSSREASONNAME IS NOT NULL AND LOSSREASONNAME != ''
                     GROUP BY LOSSREASONNAME
                     ORDER BY total DESC
@@ -996,39 +874,6 @@ class MsdDuckdbRuntime:
             ]
         except Exception as exc:
             logger.debug("_compute_daily_trend_from_detection failed: %s", exc)
-            return []
-
-    def _compute_attribution_from_detection(self, conn) -> List[Dict[str, Any]]:
-        """Attribute defective lots to upstream WORKCENTER_GROUP via lineage + events."""
-        try:
-            rows = conn.execute(
-                """
-                WITH defective AS (
-                    SELECT DISTINCT CONTAINERID FROM detection WHERE REJECTQTY > 0
-                )
-                SELECT
-                    e.WORKCENTER_GROUP                  AS station_group,
-                    COUNT(DISTINCT l.DESCENDANT_ID)     AS defective_lot_count,
-                    SUM(e.TRACKINQTY)                   AS total_input
-                FROM defective d
-                JOIN lineage l ON l.DESCENDANT_ID = d.CONTAINERID
-                JOIN events  e ON e.CONTAINERID   = l.ANCESTOR_ID
-                WHERE e.WORKCENTER_GROUP IS NOT NULL
-                GROUP BY e.WORKCENTER_GROUP
-                ORDER BY defective_lot_count DESC
-                LIMIT 20
-                """
-            ).fetchall()
-            return [
-                {
-                    "station_group": r[0],
-                    "defective_lot_count": int(r[1] or 0),
-                    "total_input": int(r[2] or 0),
-                }
-                for r in rows
-            ]
-        except Exception as exc:
-            logger.debug("_compute_attribution_from_detection failed: %s", exc)
             return []
 
     def _compute_affected_machine_count(self, conn) -> int:
