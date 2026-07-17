@@ -69,9 +69,20 @@ CREATE TABLE IF NOT EXISTS production_achievement_package_lf_map (
 -- parent_group (business-rules.md PA-19, production-achievement-moveout): the
 -- "大項" a子站 rolls up under for the station dropdown + Excel-style expanded
 -- detail. Most stations are single-layer (parent_group = merged_workcenter_group
--- = itself). The two exceptions are 電鍍 (parent of 掛鍍/條鍍/滾鍍/委外) and
--- 切割 (parent of 切割/PKG_SAW). The dropdown lists DISTINCT parent_group;
--- selecting a parent with >1 child expands its sub-stations in the detail table.
+-- = itself). The one exception is 電鍍 (parent of 掛鍍/條鍍/滾鍍/委外). The
+-- dropdown lists DISTINCT parent_group; selecting a parent with >1 child
+-- expands its sub-stations in the detail table.
+--
+-- 切割 was a second two-layer exception (parent of 切割/PKG_SAW) until the
+-- production-achievement-moveout PKG_SAW fix (2026-07): real-DB reconciliation
+-- against 025.txt found PKG_SAW is Live's OWN separate report column
+-- (WorkCenter85, raw QTY), never summed into 切割 (WorkCenter10, which Live
+-- also divides by consumefactor). Rolling PKG_SAW into 切割's parent_group
+-- here both double-counted PKG_SAW's volume onto 切割 AND masked that 切割
+-- alone needed the consumefactor division (see production_achievement_
+-- moveout.sql's header comment for the full derivation and the exact-match
+-- validation). The PKG_SAW row is REMOVED below (not reassigned) -- PKG_SAW
+-- is now D2 excluded, same as TCT/MA/IST/補鍍.
 CREATE TABLE IF NOT EXISTS production_achievement_workcenter_merge_map (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     raw_workcenter_group VARCHAR(100) NOT NULL,
@@ -145,12 +156,14 @@ VALUES
 -- PA-10 / PA-19: raw FROMWORKCENTER -> (merged 子站, parent 大項). Every raw
 -- workcenter NOT listed here is INTENTIONALLY excluded (D2 exclude-by-absence;
 -- notably TCT / MA / IST / 補鍍 -- the change request confirmed these are not
--- shown in either 產出 or 轉出). Two-layer stations:
+-- shown in either 產出 or 轉出 -- plus PKG_SAW, excluded by the
+-- production-achievement-moveout PKG_SAW fix (see the parent_group comment
+-- above): it is Live's own separate report column, never part of 切割. The
+-- one remaining two-layer station:
 --   電鍍(parent) = 掛鍍 / 條鍍 / 滾鍍 / 委外(=BANDL+TOTAI, Excel presentation-
 --                  layer merge -- 025.txt keeps BANDL/TOTAI raw & separate)
---   切割(parent) = 切割 / PKG_SAW
--- All other stations are single-layer (parent_group = merged = itself). 焊接_DW
--- still merges into 焊接_WB (unchanged), parent 焊接_WB.
+-- 切割 is now single-layer (parent_group = merged = itself), like every other
+-- station below. 焊接_DW still merges into 焊接_WB (unchanged), parent 焊接_WB.
 INSERT IGNORE INTO production_achievement_workcenter_merge_map
     (raw_workcenter_group, merged_workcenter_group, parent_group, updated_at, updated_by)
 VALUES
@@ -167,9 +180,14 @@ VALUES
     ('FQC',      'FQC',      'FQC',      NOW(3), 'system-seed'),
     ('成品入庫', '成品入庫', '成品入庫', NOW(3), 'system-seed'),
     ('切割',     '切割',     '切割',     NOW(3), 'system-seed'),
-    ('PKG_SAW',  'PKG_SAW',  '切割',     NOW(3), 'system-seed'),
     ('掛鍍',     '掛鍍',     '電鍍',     NOW(3), 'system-seed'),
     ('條鍍',     '條鍍',     '電鍍',     NOW(3), 'system-seed'),
     ('滾鍍',     '滾鍍',     '電鍍',     NOW(3), 'system-seed'),
     ('BANDL',    '委外',     '電鍍',     NOW(3), 'system-seed'),
     ('TOTAI',    '委外',     '電鍍',     NOW(3), 'system-seed');
+
+-- production-achievement-moveout PKG_SAW fix (2026-07): existing deployments
+-- that already seeded PKG_SAW->切割 before this fix keep that row forever
+-- otherwise -- INSERT IGNORE above never removes an existing row. Explicit
+-- DELETE, safe to re-run (no-op once already removed).
+DELETE FROM production_achievement_workcenter_merge_map WHERE raw_workcenter_group = 'PKG_SAW';

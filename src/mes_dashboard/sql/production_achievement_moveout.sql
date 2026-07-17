@@ -36,6 +36,22 @@
 --     PJMES025 detail: after a DW replication gap for the TMTT->品檢 hop was
 --     fixed by IT (2026-07-17 re-transfer), this TMTT-only GOODDIEQTY swap
 --     reconciles to Live exactly (40,464,399 = 40,464,399, both shifts).
+--
+--     Separately, 切割 was found to diverge from Live by +20% (2026-07-15)
+--     for an UNRELATED reason: 025.txt applies Round(QTY/consumefactor,0) to
+--     切割 alone (its WorkCenter10 column) -- no other station, including
+--     TMTT, is divided by consumefactor -- and ALSO keeps PKG_SAW as a fully
+--     separate report column (WorkCenter85, raw QTY, never summed with
+--     切割). This project's workcenter_merge_map used to roll PKG_SAW into
+--     切割's parent_group (PA-19), which both double-added PKG_SAW's volume
+--     onto 切割 AND masked that 切割's own QTY still needed the consumefactor
+--     division. CONSUMEFACTOR lives directly on DW_MES_HM_LOTMOVEOUT (no
+--     join needed); dividing 切割's QTY by NVL(CONSUMEFACTOR,1) (Oracle
+--     ROUND, matching 025.txt's NVL(CF.consumefactor,1) fallback) plus
+--     removing the PKG_SAW seed row (scripts/sql/production_achievement_
+--     tables.sql -- PKG_SAW is now D2 excluded, like TCT/MA/IST) reconciles
+--     切割 to Live exactly (42,070,354 = 42,070,354, both shifts,
+--     2026-07-15).
 --   * PACKAGE_LF: 025.txt calls the Live-only PL/SQL PJ_GET_PACKAGE_NEW_F over
 --     five OLTP tables that have NO DW equivalent; we approximate by reverse-
 --     looking-up DW_MES_LOTWIPHISTORY.PACKAGE_LF via CONTAINERID (documented
@@ -60,7 +76,7 @@
 -- Tables:
 --   DWH.DW_MES_HM_LOTMOVEOUT (alias weh) -- move-out events. Carries
 --     FROMWORKCENTER/WORKCENTER, FROMSPECNAME/SPECNAME, SHIFTNAME, QTY,
---     TXNDATE, CONTAINERID, CONTAINERNAME, CALLBYCDONAME.
+--     CONSUMEFACTOR, TXNDATE, CONTAINERID, CONTAINERNAME, CALLBYCDONAME.
 --   DWH.DW_MES_LOTWIPHISTORY (alias h) -- reverse-lookup for PACKAGE_LF only,
 --     joined by the indexed CONTAINERID (DW_MES_LOTWIPHISTORY_IDX1).
 --   DWH.DW_MES_PJ_COMBINEDASSYLOTS -- TMTT-only combine-lot table. LOTID is
@@ -76,7 +92,8 @@ WITH scoped_moveout AS (
         weh.TXNDATE,
         weh.SHIFTNAME,
         weh.FROMWORKCENTER,
-        weh.QTY
+        weh.QTY,
+        weh.CONSUMEFACTOR
     FROM DWH.DW_MES_HM_LOTMOVEOUT weh
     WHERE weh.TXNDATE >= TO_TIMESTAMP(:start_date,     'YYYY-MM-DD')
       AND weh.TXNDATE <  TO_TIMESTAMP(:chunk_end_excl, 'YYYY-MM-DD HH24:MI:SS')
@@ -106,9 +123,9 @@ WITH scoped_moveout AS (
       -- owner-type -- 量產/點測/代工/樣品/工程/餘晶/已驗證/降規/… -- exactly as
       -- Live does. Reconciled clean-station total to Live 月轉出 within +0.13%
       -- (a narrow 量產+點測-only whitelist under-counts by 1.35% because Live
-      -- also keeps 代工/樣品/工程). Residuals outside this filter: 切割 +20%
-      -- (documented consumefactor deviation) and TMTT (same-station-move
-      -- nuance) -- both tracked separately.
+      -- also keeps 代工/樣品/工程). TMTT and 切割 each had their own separate
+      -- station-specific quantity deviation, both now fixed -- see the qty:
+      -- header bullet above.
       AND NVL(weh.OWNERNAME, ' ') NOT LIKE '重工%'
 ),
 tmtt_gooddie AS (
@@ -172,9 +189,12 @@ SELECT
     -- carrier's own QTY when it never appears in the combine-lot table
     -- (never combined). Every other station is untouched (gd.CONTAINERID
     -- only has rows for TMTT-sourced CONTAINERIDs -- see tmtt_gooddie).
+    -- 切割: 025.txt's Round(QTY/consumefactor,0) (see header comment) --
+    -- no other station divides by consumefactor.
     SUM(
         CASE
             WHEN m.FROMWORKCENTER = 'TMTT' THEN NVL(gd.GOODDIE_QTY, m.QTY)
+            WHEN m.FROMWORKCENTER = '切割' THEN ROUND(m.QTY / NVL(m.CONSUMEFACTOR, 1), 0)
             ELSE m.QTY
         END
     ) AS ACTUAL_OUTPUT_QTY

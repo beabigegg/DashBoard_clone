@@ -277,11 +277,13 @@ def get_filter_options() -> Dict[str, Any]:
     ``production_achievement_workcenter_merge_service.get_workcenter_parent_groups()``
     (business-rules.md PA-19). Redefined by production-achievement-moveout from
     the earlier "distinct merged_workcenter_group" list: the dropdown now shows
-    大項 (電鍍/切割/焊接_DB/…), and selecting a 大項 with >1 子站 (電鍍/切割)
-    expands its sub-stations in the detail table. A raw workcenter_group absent
-    from ``production_achievement_workcenter_merge_map`` is still excluded (D2
+    大項 (電鍍/切割/焊接_DB/…), and selecting a 大項 with >1 子站 (電鍍) expands
+    its sub-stations in the detail table. A raw workcenter_group absent from
+    ``production_achievement_workcenter_merge_map`` is still excluded (D2
     exclude-by-absence, PA-10); a single-layer station's parent_group is itself,
-    so the two lists coincide for every station except 電鍍/切割.
+    so the two lists coincide for every station except 電鍍 (切割 was a second
+    two-layer exception until the PKG_SAW fix -- see production_achievement_
+    moveout.sql's header comment -- and is now single-layer too).
     """
     parent_groups = get_workcenter_parent_groups()
     return {
