@@ -21,9 +21,21 @@
 --     column is trusted for the shift ASSIGNMENT per the change request (no
 --     TxnDate recompute), then normalized to the {D,N} label the pipeline
 --     keys on (see the main SELECT's shift_code CASE and PA-18).
---   * qty: 025.txt uses NVL(PJ_GOODDIEQTY, Qty) via the combine-lot table; the
---     change request unifies on the raw QTY (no combine-lot join, no切割
---     consumefactor division).
+--   * qty: 025.txt uses NVL(PJ_GOODDIEQTY, Qty) via the combine-lot table for
+--     EVERY station; the change request originally unified on the raw QTY
+--     everywhere (no combine-lot join). Real-DB investigation (2026-07,
+--     PJMES025 reconciliation) found this raw-QTY simplification silently
+--     under-counts TMTT specifically by ~10% (D -9.0%/N -12.1%, 2026-07-15):
+--     TMTT physically combines multiple original GA-prefixed lots into one
+--     carrier container ("合批") that continues downstream, and that
+--     carrier's own QTY does not always reflect the true per-lot good-die
+--     total. tmtt_gooddie below reinstates 025.txt's NVL(PJ_GOODDIEQTY, Qty)
+--     pattern, scoped ONLY to TMTT (every other station keeps raw QTY,
+--     already reconciled clean against Live -- see the 12-station audit in
+--     this change's investigation report). Verified against the same
+--     PJMES025 detail: after a DW replication gap for the TMTT->品檢 hop was
+--     fixed by IT (2026-07-17 re-transfer), this TMTT-only GOODDIEQTY swap
+--     reconciles to Live exactly (40,464,399 = 40,464,399, both shifts).
 --   * PACKAGE_LF: 025.txt calls the Live-only PL/SQL PJ_GET_PACKAGE_NEW_F over
 --     five OLTP tables that have NO DW equivalent; we approximate by reverse-
 --     looking-up DW_MES_LOTWIPHISTORY.PACKAGE_LF via CONTAINERID (documented
@@ -51,6 +63,12 @@
 --     TXNDATE, CONTAINERID, CONTAINERNAME, CALLBYCDONAME.
 --   DWH.DW_MES_LOTWIPHISTORY (alias h) -- reverse-lookup for PACKAGE_LF only,
 --     joined by the indexed CONTAINERID (DW_MES_LOTWIPHISTORY_IDX1).
+--   DWH.DW_MES_PJ_COMBINEDASSYLOTS -- TMTT-only combine-lot table. LOTID is
+--     the "carrier" container's own CONTAINERID (verified against 025.txt's
+--     B-subquery: CAL.LOTID = FL.CONTAINERID, FL.ContainerId = HM.HistoryId
+--     -- i.e. the SAME CONTAINERID scoped_moveout already carries for a TMTT
+--     row). CONTAINERID/PJ_GOODDIEQTY are per-original-lot rows under that
+--     LOTID; summed, they give the carrier's true good-die quantity.
 
 WITH scoped_moveout AS (
     SELECT
@@ -92,6 +110,19 @@ WITH scoped_moveout AS (
       -- (documented consumefactor deviation) and TMTT (same-station-move
       -- nuance) -- both tracked separately.
       AND NVL(weh.OWNERNAME, ' ') NOT LIKE '重工%'
+),
+tmtt_gooddie AS (
+    -- TMTT-only NVL(PJ_GOODDIEQTY, Qty) source (see header comment). Scoped
+    -- to TMTT CONTAINERIDs already in scoped_moveout to keep the IN-list
+    -- small; other stations never look this CTE up (see the CASE in the
+    -- final SELECT), so an empty/no-match row here just falls through to
+    -- the existing raw QTY via NVL at the aggregation site.
+    SELECT LOTID AS CONTAINERID, SUM(PJ_GOODDIEQTY) AS GOODDIE_QTY
+    FROM DWH.DW_MES_PJ_COMBINEDASSYLOTS
+    WHERE LOTID IN (
+        SELECT DISTINCT CONTAINERID FROM scoped_moveout WHERE FROMWORKCENTER = 'TMTT'
+    )
+    GROUP BY LOTID
 ),
 container_package AS (
     SELECT CONTAINERID, PACKAGE_LF
@@ -137,9 +168,19 @@ SELECT
     END AS OUTPUT_DATE,
     TRIM(m.FROMWORKCENTER) AS RAW_WORKCENTER_GROUP,
     cp.PACKAGE_LF AS PACKAGE_LF,
-    SUM(m.QTY) AS ACTUAL_OUTPUT_QTY
+    -- TMTT: prefer the combine-lot GOODDIEQTY total, fall back to the
+    -- carrier's own QTY when it never appears in the combine-lot table
+    -- (never combined). Every other station is untouched (gd.CONTAINERID
+    -- only has rows for TMTT-sourced CONTAINERIDs -- see tmtt_gooddie).
+    SUM(
+        CASE
+            WHEN m.FROMWORKCENTER = 'TMTT' THEN NVL(gd.GOODDIE_QTY, m.QTY)
+            ELSE m.QTY
+        END
+    ) AS ACTUAL_OUTPUT_QTY
 FROM scoped_moveout m
 LEFT JOIN container_package cp ON m.CONTAINERID = cp.CONTAINERID
+LEFT JOIN tmtt_gooddie gd ON m.CONTAINERID = gd.CONTAINERID
 GROUP BY
     CASE
         WHEN UPPER(TRIM(m.SHIFTNAME)) IN ('D', 'DAY', 'D班', '日', '日班', '白', '白班') THEN 'D'
